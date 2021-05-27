@@ -145,12 +145,12 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
 
 d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t slot_index) {
     d1::task** victim_pool = lock_task_pool();
-    __TBB_ASSERT(shadow_head.load(std::memory_order_relaxed) == head.load(std::memory_order_relaxed), nullptr);
     if (!victim_pool) {
         return nullptr;
     }
     d1::task* result = nullptr;
     std::size_t H = head.load(std::memory_order_relaxed); // mirror
+    __TBB_ASSERT(shadow_head.load(std::memory_order_relaxed) == H, nullptr);
     std::size_t H0 = H;
     bool tasks_omitted = false;
     do {
