@@ -60,6 +60,7 @@ d1::task* arena_slot::get_task_impl(size_t T, execution_data_ext& ed, bool& task
 
 d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation) {
     __TBB_ASSERT(is_task_pool_published(), nullptr);
+    __TBB_ASSERT(shadow_tail.load(std::memory_order_relaxed) == tail.load(std::memory_order_relaxed), nullptr);
     // The current task position in the task pool.
     std::size_t T0 = tail.load(std::memory_order_relaxed);
     // The bounds of available tasks in the task pool. H0 is only used when the head bound is reached.
@@ -122,11 +123,10 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
             if ( H0 < T0 ) {
                 // Restore the task pool if there are some tasks.
                 head.store(H0, std::memory_order_relaxed);
+                shadow_head.store(H0, std::memory_order_relaxed);
                 tail.store(T0, std::memory_order_relaxed);
                 // The release fence is used in publish_task_pool.
                 publish_task_pool();
-                // Synchronize with snapshot as we published some tasks.
-                ed.task_disp->m_thread_data->my_arena->advertise_new_work<arena::wakeup>();
             }
         } else {
             // A task has been obtained. We need to make a hole in position T.
@@ -134,12 +134,10 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
             __TBB_ASSERT( result, nullptr );
             task_pool_ptr[T] = nullptr;
             tail.store(T0, std::memory_order_release);
-            // Synchronize with snapshot as we published some tasks.
-            // TODO: consider some approach not to call wakeup for each time. E.g. check if the tail reached the head.
-            ed.task_disp->m_thread_data->my_arena->advertise_new_work<arena::wakeup>();
         }
     }
 
+    shadow_tail.store(tail.load(std::memory_order_relaxed), std::memory_order_relaxed);
     __TBB_ASSERT( (std::intptr_t)tail.load(std::memory_order_relaxed) >= 0, nullptr );
     __TBB_ASSERT( result || tasks_omitted || is_quiescent_local_task_pool_reset(), nullptr );
     return result;
@@ -147,6 +145,7 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
 
 d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t slot_index) {
     d1::task** victim_pool = lock_task_pool();
+    __TBB_ASSERT(shadow_head.load(std::memory_order_relaxed) == head.load(std::memory_order_relaxed), nullptr);
     if (!victim_pool) {
         return nullptr;
     }
@@ -197,19 +196,16 @@ d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t
         // Some proxies in the task pool have been omitted. Set the stolen task to nullptr.
         victim_pool[H-1] = nullptr;
         // The release store synchronizes the victim_pool update(the store of nullptr).
-        head.store( /*dead: H = */ H0, std::memory_order_release );
+        head.store(/*dead: H = */ H0, std::memory_order_release);
     }
 unlock:
+    shadow_head.store(head.load(std::memory_order_relaxed), std::memory_order_relaxed);
     unlock_task_pool(victim_pool);
 
 #if __TBB_PREFETCHING
     __TBB_cl_evict(&victim_slot.head);
     __TBB_cl_evict(&victim_slot.tail);
 #endif
-    if (tasks_omitted) {
-        // Synchronize with snapshot as the head and tail can be bumped which can falsely trigger EMPTY state
-        a.advertise_new_work<arena::wakeup>();
-    }
     return result;
 }
 

@@ -58,6 +58,7 @@ struct alignas(max_nfs_size) arena_slot_shared_state {
     //! Index of the first ready task in the deque.
     /** Modified by thieves, and by the owner during compaction/reallocation **/
     std::atomic<std::size_t> head;
+    std::atomic<std::size_t> shadow_head;
 };
 
 struct alignas(max_nfs_size) arena_slot_private_state {
@@ -76,6 +77,7 @@ struct alignas(max_nfs_size) arena_slot_private_state {
     //! Index of the element following the last ready task in the deque.
     /** Modified by the owner thread. **/
     std::atomic<std::size_t> tail;
+    std::atomic<std::size_t> shadow_tail;
 
     //! Capacity of the primary task pool (number of elements - pointers to task).
     std::size_t my_task_pool_size;
@@ -171,7 +173,7 @@ public:
 
     bool is_empty() const {
         return task_pool.load(std::memory_order_relaxed) == EmptyTaskPool ||
-               head.load(std::memory_order_relaxed) >= tail.load(std::memory_order_relaxed);
+               shadow_head.load(std::memory_order_relaxed) == shadow_tail.load(std::memory_order_relaxed);
     }
 
     bool is_occupied() const {
@@ -211,6 +213,7 @@ private:
     /** If necessary relocates existing task pointers or grows the ready task deque.
      *  Returns (possible updated) tail index (not accounting for n). **/
     std::size_t prepare_task_pool(std::size_t num_tasks) {
+        __TBB_ASSERT(shadow_tail.load(std::memory_order_relaxed) == tail.load(std::memory_order_relaxed), nullptr);
         std::size_t T = tail.load(std::memory_order_relaxed); // mirror
         if ( T + num_tasks <= my_task_pool_size ) {
             return T;
@@ -225,6 +228,8 @@ private:
             return 0;
         }
         acquire_task_pool();
+        __TBB_ASSERT(shadow_head.load(std::memory_order_relaxed) == head.load(std::memory_order_relaxed),
+            "No thief is expected so head should be equal to its shadow");
         std::size_t H =  head.load(std::memory_order_relaxed); // mirror
         d1::task** new_task_pool = task_pool_ptr;
         __TBB_ASSERT( my_task_pool_size >= min_task_pool_size, nullptr);
@@ -267,14 +272,17 @@ private:
         // Release fence is necessary to make sure that previously stored task pointers
         // are visible to thieves.
         tail.store(new_tail, std::memory_order_release);
+        shadow_tail.store(new_tail, std::memory_order_relaxed);
     }
 
     //! Used by workers to enter the task pool
     /** Does not lock the task pool in case if arena slot has been successfully grabbed. **/
     void publish_task_pool() {
-        __TBB_ASSERT ( task_pool == EmptyTaskPool, "someone else grabbed my arena slot?" );
-        __TBB_ASSERT ( head.load(std::memory_order_relaxed) < tail.load(std::memory_order_relaxed),
-                "entering arena without tasks to share" );
+        __TBB_ASSERT(task_pool == EmptyTaskPool, "someone else grabbed my arena slot?");
+        __TBB_ASSERT(shadow_tail.load(std::memory_order_relaxed) == tail.load(std::memory_order_relaxed), nullptr);
+        __TBB_ASSERT(shadow_head.load(std::memory_order_relaxed) == head.load(std::memory_order_relaxed), nullptr);
+        __TBB_ASSERT(head.load(std::memory_order_relaxed) < tail.load(std::memory_order_relaxed),
+                "entering arena without tasks to share");
         // Release signal on behalf of previously spawned tasks (when this thread was not in arena yet)
         task_pool.store(task_pool_ptr, std::memory_order_release );
     }
@@ -364,6 +372,8 @@ private:
 
     bool is_quiescent_local_task_pool_empty() const {
         __TBB_ASSERT(is_local_task_pool_quiescent(), "Task pool is not quiescent");
+        __TBB_ASSERT(shadow_tail.load(std::memory_order_relaxed) == tail.load(std::memory_order_relaxed), nullptr);
+        __TBB_ASSERT(shadow_head.load(std::memory_order_relaxed) == head.load(std::memory_order_relaxed), nullptr);
         return head.load(std::memory_order_relaxed) == tail.load(std::memory_order_relaxed);
     }
 
@@ -392,6 +402,8 @@ private:
         __TBB_ASSERT(task_pool.load(std::memory_order_relaxed) == LockedTaskPool, "Task pool must be locked when resetting task pool");
         tail.store(0, std::memory_order_relaxed);
         head.store(0, std::memory_order_relaxed);
+        shadow_tail.store(0, std::memory_order_relaxed);
+        shadow_head.store(0, std::memory_order_relaxed);
         leave_task_pool();
     }
 
@@ -400,9 +412,11 @@ private:
     void commit_relocated_tasks(std::size_t new_tail) {
         __TBB_ASSERT(is_local_task_pool_quiescent(), "Task pool must be locked when calling commit_relocated_tasks()");
         head.store(0, std::memory_order_relaxed);
+        shadow_head.store(0, std::memory_order_relaxed);
         // Tail is updated last to minimize probability of a thread making arena
         // snapshot being misguided into thinking that this task pool is empty.
         tail.store(new_tail, std::memory_order_release);
+        shadow_tail.store(new_tail, std::memory_order_relaxed);
         release_task_pool();
     }
 };
