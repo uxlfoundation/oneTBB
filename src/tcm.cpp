@@ -1004,7 +1004,10 @@ class theTCM {
   static ThreadComposabilityManager* tcm_ptr;
   static std::size_t reference_count;
   static std::mutex tcm_mutex;
+  static const bool is_tcm_enabled;
 public:
+  static bool is_enabled() { return is_tcm_enabled; }
+
   static void increase_ref_count() {
     std::lock_guard<std::mutex> l(tcm_mutex);
     if (reference_count++)
@@ -1033,6 +1036,15 @@ public:
 ThreadComposabilityManager* theTCM::tcm_ptr{nullptr};
 std::size_t theTCM::reference_count{0};
 std::mutex theTCM::tcm_mutex{};
+const bool theTCM::is_tcm_enabled = [] {
+  char* tcm_disable_envar = std::getenv("TCM_DISABLE");
+  if (tcm_disable_envar) {
+    std::string tcm_disable(tcm_disable_envar);
+    if (tcm_disable != "0")
+      return false;
+  }
+  return true;
+ }();
 
 } // namespace tcm
 
@@ -1053,7 +1065,7 @@ ze_result_t zermConnect(zerm_callback_t callback, zerm_client_id_t *client_id)
   using tcm::theTCM;
   tcm::internal::tracer t("zermConnect");
 
-  if (client_id) {
+  if (theTCM::is_enabled() && client_id) {
     theTCM::increase_ref_count();
     auto& mgr = theTCM::instance();
       if ((*client_id = mgr.register_client(callback)))
