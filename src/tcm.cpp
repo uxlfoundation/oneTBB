@@ -4,9 +4,9 @@
  *
  */
 
+#include "tcm/detail/_tcm_assert.h"
 #include "tcm.h"
 #include "hwloc.h"
-#include "detail/_tcm_assert.h"
 
 #include <algorithm>
 #include <atomic>

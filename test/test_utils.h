@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "detail/_tcm_assert.h"
+#include "tcm/detail/_tcm_assert.h"
 #include "tcm.h"
 #include "hwloc.h"
 #include <stdlib.h>
