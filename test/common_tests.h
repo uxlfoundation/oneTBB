@@ -16,7 +16,9 @@ std::set<zerm_permit_handle_t*> renegotiating_permits;
 ze_result_t client_renegotiate(zerm_permit_handle_t ph, void* arg,
                                zerm_callback_flags_t invocation_reason)
 {
-  check(true, "begin client_renegotiate callback");
+  const char* test_name = "client_renegotiate callback";
+  test_prolog(test_name);
+
   bool r = true;
 
   r &= check(invocation_reason.new_concurrency,
@@ -32,74 +34,77 @@ ze_result_t client_renegotiate(zerm_permit_handle_t ph, void* arg,
   // happen twice for it.
   renegotiating_permits.erase(permit_via_arg);
 
-  check(true, "end client_renegotiate callback");
+  test_epilog(test_name);
   return r ? ZE_RESULT_SUCCESS : ZE_RESULT_ERROR_UNKNOWN;
 }
 
 bool test_alternating_clients() {
-  check(true, "\n\nbegin test_alternating_clients");
+  const char* test_name = "test_alternating_clients";
+  test_prolog(test_name);
+
   zerm_client_id_t clidA, clidB;
 
   ze_result_t r = zermConnect(client_renegotiate, &clidA);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermConnect A"))
+  if (!check_success(r, "zermConnect A"))
     return false;
 
   r = zermConnect(client_renegotiate, &clidB);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermConnect B"))
+  if (!check_success(r, "zermConnect B"))
     return false;
 
   zerm_permit_handle_t phA = nullptr, phB = nullptr;
   uint32_t pA_concurrency, pB_concurrency,
            e_concurrency = total_number_of_threads;
 
-  zerm_permit_t pA{&pA_concurrency, nullptr}, pB{&pB_concurrency, nullptr};
-  zerm_permit_t e = {&e_concurrency, nullptr, 1, ZERM_PERMIT_STATE_ACTIVE, 0};
+  zerm_permit_t pA = make_void_permit(&pA_concurrency),
+                pB = make_void_permit(&pB_concurrency);
+  zerm_permit_t e = make_active_permit(&e_concurrency);
 
   zerm_permit_request_t req = make_request(0, total_number_of_threads);
   r = zermRequestPermit(clidA, req, &phA, &phA, &pA);
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermRequestPermit A") && check_permit(e, pA)))
-    return check(false, "end test_alternating_clients");
+  if (!(check_success(r, "zermRequestPermit A") && check_permit(e, pA)))
+    return test_fail(test_name);
 
   r = zermRegisterThread(phA);
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermRegisterThread A") &&
+  if (!(check_success(r, "zermRegisterThread A") &&
         check_permit(e, phA)))
-    return check(false, "end test_alternating_clients");
+    return test_fail(test_name);
 
   r = zermUnregisterThread();
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermUnregisterThread A") &&
+  if (!(check_success(r, "zermUnregisterThread A") &&
         check_permit(e, phA)))
-    return check(false, "end test_alternating_clients");
+    return test_fail(test_name);
 
   r = zermReleasePermit(phA);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermReleasePermit A"))
-    return check(false, "end test_alternating_clients");
+  if (!check_success(r, "zermReleasePermit A"))
+    return test_fail(test_name);
 
   r = zermRequestPermit(clidB, req, &phB, &phB, &pB);
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermRequestPermit B") && check_permit(e, pB)))
-    return check(false, "end test_alternating_clients");
+  if (!(check_success(r, "zermRequestPermit B") && check_permit(e, pB)))
+    return test_fail(test_name);
 
   r = zermRegisterThread(phB);
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermRegisterThread B") &&
+  if (!(check_success(r, "zermRegisterThread B") &&
         check_permit(e, phB)))
-    return check(false, "end test_alternating_clients");
+    return test_fail(test_name);
 
   r = zermUnregisterThread();
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermUnregisterThread B") &&
+  if (!(check_success(r, "zermUnregisterThread B") &&
         check_permit(e, phB)))
-    return check(false, "end test_alternating_clients");
+    return test_fail(test_name);
 
   r = zermReleasePermit(phB);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermReleasePermit B"))
-    return check(false, "end test_alternating_clients");
+  if (!check_success(r, "zermReleasePermit B"))
+    return test_fail(test_name);
 
   r = zermDisconnect(clidA);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermDisconnect A"))
-    return check(false, "end test_alternating_clients");
+  if (!check_success(r, "zermDisconnect A"))
+    return test_fail(test_name);
 
   r = zermDisconnect(clidB);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermDisconnect B"))
-    return check(false, "end test_alternating_clients");
+  if (!check_success(r, "zermDisconnect B"))
+    return test_fail(test_name);
 
   std::cout << "test_alternating_clients done" << std::endl;
-  return check(true, "end test_alternating_clients");
+  return test_epilog(test_name);
 }

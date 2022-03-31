@@ -1,6 +1,6 @@
 # Copyright (c) 2021-2022 Intel Corporation
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.1)
 
 if (NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)

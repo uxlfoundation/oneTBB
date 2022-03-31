@@ -8,7 +8,10 @@
 
 #include "tcm/detail/_tcm_assert.h"
 #include "tcm.h"
+// MSVC Warning: unreferenced formal parameter
+__TCM_SUPPRESS_WARNING_WITH_PUSH(4100)
 #include "hwloc.h"
+__TCM_SUPPRESS_WARNING_POP
 #include <stdlib.h>
 #include <vector>
 #include <set>
@@ -18,6 +21,8 @@
 #include <string>
 #include <limits>
 
+ // MSVC Warning: Args can be incorrect: this does not match function name specification
+__TCM_SUPPRESS_WARNING_WITH_PUSH(6387)
 // TODO: Function SetEnv() is borrowed from oneTBB project. Check the license.
 inline int SetEnv( const char *envname, const char *envval ) {
   __TCM_ASSERT( (envname && envval), "SetEnv requires two valid C strings" );
@@ -41,11 +46,17 @@ inline int SetEnv( const char *envname, const char *envval ) {
 #endif
 }
 
+char* GetEnv(const char* envname) {
+    __TCM_ASSERT(envname, "GetEnv requires valid C string");
+    return std::getenv(envname);
+}
+__TCM_SUPPRESS_WARNING_POP
+
 std::string bitmap_to_string(const zerm_cpu_mask_t mask) {
   int size = hwloc_bitmap_weight(mask);
   if (size <= 0) size = 256;
   std::string result(size, ' ');
-  hwloc_bitmap_snprintf(result.data(), result.size(), mask);
+  hwloc_bitmap_snprintf(result.data(), result.size(), (hwloc_const_bitmap_t)mask);
   return result;
 }
 
@@ -67,10 +78,34 @@ bool check(bool b, const std::string& msg, const std::string& report_msg = "") {
   return b;
 }
 
+inline void test_prolog(const std::string& msg) {
+  std::cout << "\n\nSUCCESS: begin " << msg << std::endl;
+}
+
+inline bool test_stop(bool b, const std::string& msg) {
+  return check(b, "end " + msg);
+}
+
+inline bool test_fail(const std::string& msg) {
+  return test_stop(false, msg);
+}
+
+inline bool test_epilog(const std::string& msg) {
+  return test_stop(true, msg);
+}
+
+inline bool succeeded(ze_result_t res) {
+  return (ZE_RESULT_SUCCESS == res);
+}
+
+inline bool check_success(ze_result_t res, const std::string& msg, const std::string& report_msg = "") {
+  return check(succeeded(res), msg, report_msg);
+}
+
 //! Returns available platform resources, taking into account the possible degree
 //! of the oversubscription (oversb_factor must be greater than zero).
 uint32_t platform_resources () {
-  const char* oversb_factor_env_value = std::getenv("RM_OVERSUBSCRIPTION_FACTOR");
+  const char* oversb_factor_env_value = GetEnv("RM_OVERSUBSCRIPTION_FACTOR");
   float oversb_factor = 1.0f;
   if (oversb_factor_env_value) {
     // TODO: Consider alternative options for std::stof
@@ -195,6 +230,32 @@ bool check_permit(const zerm_permit_t& expected, const zerm_permit_t& actual,
   return result;
 }
 
+zerm_permit_request_t make_request(int min_sw_threads, int max_sw_threads,
+  zerm_permit_flags_t flags = {}) {
+  zerm_permit_request_t result = ZERM_PERMIT_REQUEST_INITIALIZER;
+  result.min_sw_threads = min_sw_threads;
+  result.max_sw_threads = max_sw_threads;
+  result.flags = flags;
+  return result;
+}
+
+zerm_permit_t make_void_permit(uint32_t* concurrencies, zerm_cpu_mask_t* cpu_masks = nullptr,
+  uint32_t size = 1, zerm_permit_state_t state = ZERM_PERMIT_STATE_VOID,
+  zerm_permit_flags_t flags = {}) {
+  __TCM_ASSERT(concurrencies, "Array of concurrencies cannnot be nullptr.");
+  return zerm_permit_t{ concurrencies, cpu_masks, size, state, flags };
+}
+
+zerm_permit_t make_active_permit(uint32_t* concurrencies, zerm_cpu_mask_t* cpu_masks = nullptr,
+  uint32_t size = 1, zerm_permit_flags_t flags = {}) {
+  return make_void_permit(concurrencies, cpu_masks, size, ZERM_PERMIT_STATE_ACTIVE, flags);
+}
+
+zerm_permit_t make_pending_permit(uint32_t* concurrencies, zerm_cpu_mask_t* cpu_masks = nullptr,
+  uint32_t size = 1, zerm_permit_flags_t flags = {}) {
+  return make_void_permit(concurrencies, cpu_masks, size, ZERM_PERMIT_STATE_PENDING, flags);
+}
+
 //! Expects successful reading of a permit, thus cannot be used concurrently
 //! with the modification of the permit. Throws exception if reading of the
 //! permit was not successful.
@@ -205,10 +266,9 @@ bool check_permit(const zerm_permit_t& expected, zerm_permit_handle_t ph,
     return false;
 
   uint32_t actual_concurrency;
-  zerm_permit_t actual{&actual_concurrency, nullptr};
+  zerm_permit_t actual = make_void_permit(&actual_concurrency);
   ze_result_t reading_result = zermGetPermitData(ph, &actual);
-  if (!check(reading_result == ZE_RESULT_SUCCESS,
-             "Reading data from permit " + std::to_string(uintptr_t(ph))))
+  if (!check_success(reading_result, "Reading data from permit " + std::to_string(uintptr_t(ph))))
     throw std::string("Error: failed reading permit with status " + std::to_string(reading_result));
 
   return check_permit(expected, actual, skip, report);
@@ -227,14 +287,5 @@ std::set<zerm_permit_handle_t*> list_unchanged_permits(const permits_data_t& pds
       result.insert(pd.first);
   }
 
-  return result;
-}
-
-zerm_permit_request_t make_request(int min_sw_threads, int max_sw_threads,
-                                 zerm_permit_flags_t flags = {}) {
-  zerm_permit_request_t result = ZERM_PERMIT_REQUEST_INITIALIZER;
-  result.min_sw_threads = min_sw_threads;
-  result.max_sw_threads = max_sw_threads;
-  result.flags = flags;
   return result;
 }

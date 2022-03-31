@@ -1,22 +1,38 @@
 # Copyright (c) 2021-2022 Intel Corporation
 
+# include common compile settings
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/common.cmake)
+
+if (NOT MSVC) # no need to change options for MSVC
+    # suppress extra warnings:
+    # - suggest braces around initialization of subobject
+    # - missing field initializer
+    set(TCM_WARNING_LEVEL ${TCM_WARNING_LEVEL} -Wno-missing-braces)
+endif()
+
 foreach(tpp test_basic_apis.cpp test_fcfsc.cpp test_rb.cpp)
   string(REPLACE ".cpp" "" texe ${tpp})
   add_executable(${texe} ${tpp})
+  target_compile_options(${texe} PRIVATE ${TCM_WARNING_LEVEL})
+  target_compile_definitions(${texe} PRIVATE ${TCM_COMPILE_DEFINITIONS})
+
   target_link_libraries(${texe} PUBLIC tcm)
   add_test(${texe} ${texe})
 endforeach()
 
 # Group of tests that runs the same test in different environment checking TCM
 # reacts accordingly
-add_executable(test_tcm_disabling test_tcm_disabling.cpp)
-target_link_libraries(test_tcm_disabling PUBLIC tcm)
+set(TCM_TEST_DISABLING test_tcm_disabling)
+add_executable(${TCM_TEST_DISABLING} test_tcm_disabling.cpp)
+target_compile_options(${TCM_TEST_DISABLING} PRIVATE ${TCM_WARNING_LEVEL})
+target_compile_definitions(${TCM_TEST_DISABLING} PRIVATE ${TCM_COMPILE_DEFINITIONS})
+target_link_libraries(${TCM_TEST_DISABLING} PUBLIC tcm)
 
-add_test(test_tcm_disabling_with_empty_env test_tcm_disabling)
-set_tests_properties(test_tcm_disabling_with_empty_env PROPERTIES ENVIRONMENT "TCM_DISABLE=")
+add_test(${TCM_TEST_DISABLING}_with_empty_env ${TCM_TEST_DISABLING})
+set_tests_properties(${TCM_TEST_DISABLING}_with_empty_env PROPERTIES ENVIRONMENT "TCM_DISABLE=")
 
-add_test(test_tcm_disabling_with_non_null_env test_tcm_disabling)
-set_tests_properties(test_tcm_disabling_with_non_null_env PROPERTIES ENVIRONMENT "TCM_DISABLE=1")
+add_test(${TCM_TEST_DISABLING}_with_non_null_env ${TCM_TEST_DISABLING})
+set_tests_properties(${TCM_TEST_DISABLING}_with_non_null_env PROPERTIES ENVIRONMENT "TCM_DISABLE=1")
 
-add_test(test_tcm_disabling_with_null_env test_tcm_disabling)
-set_tests_properties(test_tcm_disabling_with_null_env PROPERTIES ENVIRONMENT "TCM_DISABLE=0")
+add_test(${TCM_TEST_DISABLING}_with_null_env ${TCM_TEST_DISABLING})
+set_tests_properties(${TCM_TEST_DISABLING}_with_null_env PROPERTIES ENVIRONMENT "TCM_DISABLE=0")

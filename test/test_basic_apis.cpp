@@ -12,94 +12,95 @@
 #include <string>
 
 bool test_state_functions() {
-  check(true, "\n\nbegin test_state_functions");
-  zerm_client_id_t clid;
+  const char* test_name = "test_state_functions";
+  test_prolog(test_name);
 
+  zerm_client_id_t clid;
   ze_result_t r = zermConnect(nullptr, &clid);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermConnect"))
-    return check(false, "end test_state_functions");
+  if (!check_success(r, "zermConnect"))
+    return test_fail(test_name);
 
   zerm_permit_handle_t ph{nullptr};
   uint32_t p_concurrency;
-  zerm_permit_t p{&p_concurrency, nullptr};
+  zerm_permit_t p = make_void_permit(&p_concurrency);
   uint32_t e_concurrency = total_number_of_threads;
-  zerm_permit_t e = {
-    &e_concurrency, nullptr, 1, ZERM_PERMIT_STATE_ACTIVE, 0
-  };
+  zerm_permit_t e = make_active_permit(&e_concurrency);
 
   zerm_permit_request_t req = make_request(0, total_number_of_threads);
   r = zermRequestPermit(clid, req, nullptr, &ph, &p);
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermRequestPermit") && check_permit(e, p)))
-    return check(false, "end test_state_functions");
+  if (!(check_success(r, "zermRequestPermit") && check_permit(e, p)))
+    return test_fail(test_name);
 
   r = zermIdlePermit(ph);
   e.state = ZERM_PERMIT_STATE_IDLE;
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermIdlePermit") && check_permit(e, ph)))
-    return check(false, "end test_state_functions");
+  if (!(check_success(r, "zermIdlePermit") && check_permit(e, ph)))
+    return test_fail(test_name);
 
   r = zermActivatePermit(ph);
   e.state = ZERM_PERMIT_STATE_ACTIVE;
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermActivatePermit 1") && check_permit(e, ph)))
-    return check(false, "end test_state_functions");
+  if (!(check_success(r, "zermActivatePermit 1") && check_permit(e, ph)))
+    return test_fail(test_name);
 
   r = zermDeactivatePermit(ph);
   e.state = ZERM_PERMIT_STATE_INACTIVE;
-  if (!(check(r== ZE_RESULT_SUCCESS, "zermDeactivatePermit") && check_permit(e, ph)))
-    return check(false, "end test_state_functions");
+  if (!(check_success(r, "zermDeactivatePermit") && check_permit(e, ph)))
+    return test_fail(test_name);
 
   r = zermActivatePermit(ph);
   e.state = ZERM_PERMIT_STATE_ACTIVE;
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermActivatePermit 2") && check_permit(e, ph)))
-    return check(false, "end test_state_functions");
+  if (!(check_success(r, "zermActivatePermit 2") && check_permit(e, ph)))
+    return test_fail(test_name);
 
   r = zermIdlePermit(ph);
   e.state = ZERM_PERMIT_STATE_IDLE;
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermIdlePermit") && check_permit(e, ph)))
-    return check(false, "end test_state_functions");
+  if (!(check_success(r, "zermIdlePermit") && check_permit(e, ph)))
+    return test_fail(test_name);
 
   r = zermDeactivatePermit(ph);
   e.state = ZERM_PERMIT_STATE_INACTIVE;
-  if (!(check(r== ZE_RESULT_SUCCESS, "zermDeactivatePermit") && check_permit(e, ph)))
-    return check(false, "end test_state_functions");
+  if (!(check_success(r, "zermDeactivatePermit") && check_permit(e, ph)))
+    return test_fail(test_name);
 
   r = zermActivatePermit(ph);
   e.state = ZERM_PERMIT_STATE_ACTIVE;
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermActivatePermit 3") && check_permit(e, ph)))
-    return check(false, "end test_state_functions");
+  if (!(check_success(r, "zermActivatePermit 3") && check_permit(e, ph)))
+    return test_fail(test_name);
 
   r = zermReleasePermit(ph);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermReleasePermit"))
-    return check(false, "end test_state_functions");
+  if (!check_success(r, "zermReleasePermit"))
+    return test_fail(test_name);
 
   r = zermDisconnect(clid);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermDisconnect"))
-    return check(false, "end test_state_functions");
+  if (!check_success(r, "zermDisconnect"))
+    return test_fail(test_name);
 
   std::cout << "test_state_functions done" << std::endl;
-  return check(true, "end test_state_functions");
+  return test_epilog(test_name);
 }
 
 bool test_pending_state() {
-  check(true, "\n\nbegin test_pending_state");
-  zerm_client_id_t clid;
+  const char* test_name = "test_pending_state";
+  test_prolog(test_name);
 
+  zerm_client_id_t clid;
   ze_result_t r = zermConnect(nullptr, &clid);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermConnect"))
-    return check(false, "end test_pending_state");
+  if (!check_success(r, "zermConnect"))
+    return test_fail(test_name);
 
   zerm_permit_handle_t phA{nullptr}, phB{nullptr};
   uint32_t pA_concurrency{0}, pB_concurrency{0};
   uint32_t eA_concurrency{0}, eB_concurrency{0};
-  zerm_permit_t pA{&pA_concurrency, nullptr, 1}, pB{&pB_concurrency, nullptr, 1};
-  zerm_permit_t eA = { &eA_concurrency, nullptr, 1, ZERM_PERMIT_STATE_VOID, 0 };
-  zerm_permit_t eB = { &eB_concurrency, nullptr, 1, ZERM_PERMIT_STATE_PENDING, 0 };
+  zerm_permit_t pA = make_void_permit(&pA_concurrency),
+                pB = make_void_permit(&pB_concurrency);
+  zerm_permit_t eA = make_void_permit(&eA_concurrency);
+  zerm_permit_t eB = make_pending_permit(&eB_concurrency);
 
   zerm_permit_request_t reqA =
     make_request(2 * total_number_of_threads, 2 * total_number_of_threads);
   r = zermRequestPermit(clid, reqA, nullptr, &phA, &pA);
   if (!(check(r == ZE_RESULT_ERROR_INVALID_ARGUMENT && !phA, "zermRequestPermit for A")
         && check_permit(eA, pA)))
-    return check(false, "end test_pending_state");
+    return test_fail(test_name);
 
   eA_concurrency = total_number_of_threads;
   eA.state = ZERM_PERMIT_STATE_ACTIVE;
@@ -107,82 +108,84 @@ bool test_pending_state() {
   reqA = make_request(0, total_number_of_threads);
   reqA.flags.rigid_concurrency = true;
   r = zermRequestPermit(clid, reqA, nullptr, &phA, &pA);
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermRequestPermit for A (re-requesting 1)")
+  if (!(check_success(r, "zermRequestPermit for A (re-requesting 1)")
         && check_permit(eA, pA)))
-    return check(false, "end test_pending_state");
+    return test_fail(test_name);
 
   reqA = make_request(2 * total_number_of_threads, 2 * total_number_of_threads);
   r = zermRequestPermit(clid, reqA, nullptr, &phA, &pA);
   if (!(check(r == ZE_RESULT_ERROR_INVALID_ARGUMENT, "zermRequestPermit for A (re-requesting 2)")
         && check_permit(eA, phA)))
-    return check(false, "end test_pending_state");
+    return test_fail(test_name);
 
   zerm_permit_request_t reqB = make_request(total_number_of_threads, total_number_of_threads);
   r = zermRequestPermit(clid, reqB, nullptr, &phB, &pB);
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermRequestPermit for B") && check_permit(eB, pB)))
-    return check(false, "end test_pending_state");
+  if (!(check_success(r, "zermRequestPermit for B") && check_permit(eB, pB)))
+    return test_fail(test_name);
 
   r = zermReleasePermit(phB);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermReleasePermit for B"))
-    return check(false, "end test_pending_state");
+  if (!check_success(r, "zermReleasePermit for B"))
+    return test_fail(test_name);
 
   r = zermReleasePermit(phA);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermReleasePermit for A"))
-    return check(false, "end test_pending_state");
+  if (!check_success(r, "zermReleasePermit for A"))
+    return test_fail(test_name);
 
   r = zermDisconnect(clid);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermDisconnect"))
-    return check(false, "end test_pending_state");
+  if (!check_success(r, "zermDisconnect"))
+    return test_fail(test_name);
 
   std::cout << "test_pending_state done" << std::endl;
-  return check(true, "end test_pending_state");
+  return test_epilog(test_name);
 }
 
 bool test_thread_registration() {
-  check(true, "\n\nbegin test_registration");
-  zerm_client_id_t clid;
+  const char* test_name = "test_thread_registration";
+  test_prolog(test_name);
 
+  zerm_client_id_t clid;
   ze_result_t r = zermConnect(nullptr, &clid);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermConnect"))
-    return check(false, "end test_registration");
+  if (!check_success(r, "zermConnect"))
+    return test_fail(test_name);
 
   zerm_permit_handle_t ph{nullptr};
   uint32_t p_concurrency;
-  zerm_permit_t p{&p_concurrency, nullptr};
+  zerm_permit_t p = make_void_permit(&p_concurrency);
   uint32_t e_concurrency = total_number_of_threads;
-  zerm_permit_t e = {&e_concurrency, nullptr, 1, ZERM_PERMIT_STATE_ACTIVE, 0};
+  zerm_permit_t e = make_active_permit(&e_concurrency);
 
   r = zermRegisterThread(ph);
   if (!(check(r == ZE_RESULT_ERROR_UNKNOWN, "zermRegisterThread for empty permit handle")))
-    return check(false, "end test_registration");
+    return test_fail(test_name);
 
   zerm_permit_request_t req = make_request(0, total_number_of_threads);
   r = zermRequestPermit(clid, req, nullptr, &ph, &p);
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermRequestPermit") && check_permit(e, p)))
-    return check(false, "end test_registration");
+  if (!(check_success(r, "zermRequestPermit") && check_permit(e, p)))
+    return test_fail(test_name);
 
   r = zermRegisterThread(ph);
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermRegisterThread")))
-    return check(false, "end test_registration");
+  if (!(check_success(r, "zermRegisterThread")))
+    return test_fail(test_name);
 
   r = zermUnregisterThread();
-  if (!(check(r == ZE_RESULT_SUCCESS, "zermUnregisterThread")))
-    return check(false, "end test_registration");
+  if (!(check_success(r, "zermUnregisterThread")))
+    return test_fail(test_name);
 
   r = zermReleasePermit(ph);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermReleasePermit"))
-    return check(false, "end test_registration");
+  if (!check_success(r, "zermReleasePermit"))
+    return test_fail(test_name);
 
   r = zermDisconnect(clid);
-  if (!check(r == ZE_RESULT_SUCCESS, "zermDisconnect"))
-    return check(false, "end test_registration");
+  if (!check_success(r, "zermDisconnect"))
+    return test_fail(test_name);
 
   std::cout << "test_registration done" << std::endl;
-  return check(true, "end test_registration");
+  return test_epilog(test_name);
 }
 
 bool test_default_constraints_construction() {
-  check(true, "\n\nbegin test_default_constraints_construction");
+  const char* test_name = "test_default_constraints_construction";
+  test_prolog(test_name);
 
   zerm_cpu_constraints_t constraints = ZERM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
   bool res = true;
@@ -192,11 +195,12 @@ bool test_default_constraints_construction() {
   res &= check(constraints.numa_id == zerm_automatic, "Check default numa_id value");
   res &= check(constraints.core_type_id == zerm_automatic, "Check default core_type_id value");
   res &= check(constraints.threads_per_core == zerm_automatic, "Check default threads_per_core value");
-  return check(res, "end test_default_constraints_construction");
+  return test_stop(res, test_name);
 }
 
 bool test_request_initializer() {
-  check(true, "\n\nbegin test_default_request_construction");
+  const char* test_name = "test_request_initializer";
+  test_prolog(test_name);
 
   zerm_permit_request_t request = ZERM_PERMIT_REQUEST_INITIALIZER;
   bool res = true;
@@ -220,19 +224,22 @@ bool test_request_initializer() {
     ++count;
   }
   res &= (count == 4);
-  return check(res, "end test_default_request_construction");
+  return test_stop(res, test_name);
 }
 
 bool test_get_stale_permit() {
-  check(true, "\n\nbegin test_get_stale_permit");
+  const char* test_name = "test_get_stale_permit";
+  test_prolog(test_name);
 
   // TODO: implement the test
 
-  return check(true, "end test_get_stale_permit");
+  return test_epilog(test_name);
 }
 
+#ifndef WIN32
 static_assert(sizeof(zerm_permit_flags_t) == 4, "The permit flags type has wrong size");
 static_assert(sizeof(zerm_callback_flags_t) == 4, "The permit flags type has wrong size");
+#endif
 
 int main() {
   bool res = true;

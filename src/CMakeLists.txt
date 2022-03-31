@@ -1,5 +1,8 @@
 # Copyright (c) 2021-2022 Intel Corporation
 
+# include common compile settings
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/common.cmake)
+
 # --------------------------------------------------------------------------------------------------
 # Find the HWLOC library
 if (NOT TARGET HWLOC::hwloc)
@@ -8,16 +11,19 @@ if (NOT TARGET HWLOC::hwloc)
 endif()
 # --------------------------------------------------------------------------------------------------
 
-add_library(tcm SHARED tcm.cpp)
+add_library(${PROJECT_NAME} SHARED tcm.cpp)
 
-target_include_directories(tcm PUBLIC
+target_compile_options(${PROJECT_NAME} PRIVATE ${TCM_WARNING_LEVEL})
+target_compile_definitions(${PROJECT_NAME} PRIVATE ${TCM_COMPILE_DEFINITIONS})
+
+target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-target_link_libraries(tcm PUBLIC HWLOC::hwloc)
-target_compile_definitions(tcm PUBLIC $<$<CONFIG:DEBUG>:TCM_DEBUG>)
+target_link_libraries(${PROJECT_NAME} PUBLIC HWLOC::hwloc)
+target_compile_definitions(${PROJECT_NAME} PUBLIC $<$<CONFIG:DEBUG>:TCM_DEBUG>)
 
-install(TARGETS tcm
+install(TARGETS ${PROJECT_NAME}
   EXPORT ${PROJECT_NAME}Targets
   LIBRARY
     DESTINATION ${CMAKE_INSTALL_LIBDIR}

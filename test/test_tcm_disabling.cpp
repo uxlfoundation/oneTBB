@@ -22,26 +22,24 @@ bool is_tcm_enabled() {
 }
 
 bool test_tcm_connection(const bool is_success_expected) {
-  check(true, "\n\nbegin test_tcm_disabling");
+  const char* test_name = "test_tcm_disabling";
+  test_prolog(test_name);
 
   zerm_client_id_t clid = std::numeric_limits<zerm_client_id_t>::max();
   zerm_client_id_t clid_bak = clid;
 
-  ze_result_t r = zermConnect(nullptr, &clid);
-  bool is_connection_successful = (r == ZE_RESULT_SUCCESS);
+  bool is_connection_successful = succeeded(zermConnect(nullptr, &clid));
 
-  bool test_result = true;
+  bool res = true;
   if (is_success_expected) {
-    test_result &= check(is_connection_successful, "zermConnect accepts connection");
-    test_result &= check(clid_bak != clid, "zermConnect assigns client id");
+    res &= check(is_connection_successful, "zermConnect accepts connection");
+    res &= check(clid_bak != clid, "zermConnect assigns client id");
   } else {
-    test_result &= check(!is_connection_successful, "zermConnect refuses connection");
-    test_result &= check(clid_bak == clid, "zermConnect does not change client id");
+    res &= check(!is_connection_successful, "zermConnect refuses connection");
+    res &= check(clid_bak == clid, "zermConnect does not change client id");
   }
 
-  check(true, "end test_tcm_disabling");
-
-  return test_result;
+  return test_stop(res, test_name);
 }
 
 int main() {

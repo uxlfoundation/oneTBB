@@ -6,7 +6,10 @@
 
 #include "tcm/detail/_tcm_assert.h"
 #include "tcm.h"
+// MSVC Warning: unreferenced formal parameter
+__TCM_SUPPRESS_WARNING_WITH_PUSH(4100)
 #include "hwloc.h"
+__TCM_SUPPRESS_WARNING_POP
 
 #include <algorithm>
 #include <atomic>
@@ -52,6 +55,11 @@ struct tracer {
   tracer(const std::string &s) : s_(s) {
     std::cout << "Entering " << s_ << std::endl;
   }
+
+  void log(const std::string &msg) {
+    std::cout << msg << std::endl;
+  }
+
   ~tracer() {
     std::cout << "Leaving " << s_ << std::endl;
   }
@@ -59,6 +67,7 @@ struct tracer {
 #else
 struct tracer {
   tracer(const std::string &) {}
+  void log(const std::string&) {}
   ~tracer() {}
 };
 #endif
@@ -82,11 +91,19 @@ unsigned int hardware_concurrency() {
   return std::thread::hardware_concurrency();
 }
 
+// MSVC Warning: Arg can be incorrect: this does not match function name specification
+__TCM_SUPPRESS_WARNING_WITH_PUSH(6387)
+char* get_env(const char* envname) {
+  __TCM_ASSERT(envname, "get_env requires valid C string");
+  return std::getenv(envname);
+}
+__TCM_SUPPRESS_WARNING_POP
+
 //! Returns available platform resources, taking into account the possible degree
 //! of the oversubscription (oversb_factor must be greater than zero).
 uint32_t platform_resources () {
   static uint32_t concurrency = [] {
-    const char* oversb_factor_env_value = std::getenv("RM_OVERSUBSCRIPTION_FACTOR");
+    const char* oversb_factor_env_value = get_env("RM_OVERSUBSCRIPTION_FACTOR");
     float oversb_factor = 1.0f;
     if (oversb_factor_env_value) {
       // TODO: Consider alternative options for std::stof
@@ -164,7 +181,7 @@ public:
     tracer t("ThreadComposabilityBase::request_permit");
 
     // Check the ability to satisfy minimum requested concurrency
-    if (req.min_sw_threads > platform_resources()) {
+    if (req.min_sw_threads > int32_t(platform_resources())) {
       if (permit)
         permit->state = ZERM_PERMIT_STATE_VOID;
       return nullptr;
@@ -299,11 +316,13 @@ protected:
   void prepare_permit_modification(zerm_permit_handle_t ph) {
     uint64_t prev_epoch = ph->epoch.fetch_add(1, std::memory_order_relaxed);
     __TCM_ASSERT(prev_epoch % 2 == 0, "Previous epoch value must be even.");
+    suppress_unused_warning(prev_epoch);
   }
 
   void commit_permit_modification(zerm_permit_handle_t ph) {
     uint64_t prev_epoch = ph->epoch.fetch_add(1, std::memory_order_release);
     __TCM_ASSERT(prev_epoch % 2 != 0, "Previous epoch value must be odd.");
+    suppress_unused_warning(prev_epoch);
   }
 
   zerm_permit_epoch_t prepare_permit_copying(zerm_permit_handle_t ph) const {
@@ -393,7 +412,7 @@ protected:
   }
 
   bool skip_permit_renegotiation(zerm_permit_handle_t ph, zerm_permit_handle_t initiator,
-                                 uint32_t& available_concurrency) const
+                                 uint32_t& concurrency) const
   {
     if (ph == initiator)    // renegotiate for one that asked
       return false;
@@ -406,8 +425,8 @@ protected:
     if (!is_renegotiable(state, pd.flags)) {
       // TODO: avoid side-effects in this function
       const uint32_t permit_concurrency = pd.concurrency.load(relaxed);
-      __TCM_ASSERT(available_concurrency >= permit_concurrency, "Underflow detected");
-      available_concurrency -= permit_concurrency;
+      __TCM_ASSERT(concurrency >= permit_concurrency, "Underflow detected");
+      concurrency -= permit_concurrency;
       return true;
     }
 
@@ -441,18 +460,18 @@ protected:
     std::memory_order relaxed = std::memory_order_relaxed;
 
     const uint32_t current_concurrency = pd.concurrency.load(relaxed);
-    const int32_t delta = std::min((int32_t)available_concurrency,
-                                   int32_t(req.max_sw_threads - current_concurrency));
+    const int32_t delta = std::min(int32_t(available_concurrency),
+                                   req.max_sw_threads - int32_t(current_concurrency));
 
     zerm_permit_state_t current_state = pd.state.load(relaxed);
     uint32_t new_concurrency = 0;
-    zerm_permit_state_t new_state = ZERM_PERMIT_STATE_PENDING;
+    zerm_permit_state_t new_state = zerm_permit_state_t(ZERM_PERMIT_STATE_PENDING);
 
-    const bool is_meeting_required_concurrency = current_concurrency + delta >= req.min_sw_threads;
+    const bool is_meeting_required_concurrency = int32_t(current_concurrency) + delta >= req.min_sw_threads;
     if (is_meeting_required_concurrency) {
       new_concurrency = current_concurrency + delta;
       available_concurrency -= delta;
-      new_state = is_idle(current_state) ? ZERM_PERMIT_STATE_IDLE : ZERM_PERMIT_STATE_ACTIVE;
+      new_state = zerm_permit_state_t(is_idle(current_state) ? ZERM_PERMIT_STATE_IDLE : ZERM_PERMIT_STATE_ACTIVE);
     }
 
     prepare_permit_modification(ph);
@@ -515,15 +534,14 @@ protected:
       }
 
       available_concurrency += pd.concurrency.load(std::memory_order_relaxed);
-      if (available_concurrency > 0)
-        additional_concurrency_available = true;
+      additional_concurrency_available = (available_concurrency > 0);
     }
 
     hwloc_bitmap_free(pd.cpu_mask);
     free(ph);
 
-    if (additional_concurrency_available > 0) {
-      tracer t("ThreadComposabilityBase:: going to renegotiate permits");
+    if (additional_concurrency_available) {
+      t.log("ThreadComposabilityBase:: going to renegotiate permits");
       renegotiate_permits(/*initiator*/nullptr);
     }
   }
@@ -574,10 +592,10 @@ protected:
 
             // TODO: rename permit_to_request_map to something that represents
             // the semantics of the container more precisely.
-            auto current_concurrency = pd.concurrency.load(relaxed);
-            auto min_sw_threads = permit_to_request_map[ph].min_sw_threads;
+            uint32_t current_concurrency = pd.concurrency.load(relaxed);
+            int32_t min_sw_threads = permit_to_request_map[ph].min_sw_threads;
             available_concurrency += current_concurrency - min_sw_threads;
-            pd.concurrency.store(min_sw_threads, relaxed);
+            pd.concurrency.store((uint32_t)min_sw_threads, relaxed);
           } else {
             available_concurrency += pd.concurrency.load(relaxed);
           }
@@ -749,13 +767,13 @@ public:
     }
 
     if (!satisfied_client) {
-      tracer t("ThreadComposabilityFCFSCImpl::NOTE p is an unsatisfied permit");
+      t.log("ThreadComposabilityFCFSCImpl::NOTE p is an unsatisfied permit");
       const std::lock_guard<std::mutex> l(data_mutex);
       renegotiation_deque.push_back(ph);
     }
 
     if (additional_concurrency_available) {
-      tracer t("ThreadComposabilityFCFSCImpl::NOTE going to renegotiate permits");
+      t.log("ThreadComposabilityFCFSCImpl::NOTE going to renegotiate permits");
       renegotiate_permits(ph);
     }
   }
@@ -777,8 +795,10 @@ protected:
 
     zerm_permit_data_t& pd = ph->data;
 
-    const uint32_t demand = std::min((int32_t)available_concurrency, pr.min_sw_threads);
-    const bool is_activation = demand == pr.min_sw_threads;
+    __TCM_ASSERT(pr.min_sw_threads >= 0, "Invalid number of minimum threads specified.");
+
+    const uint32_t demand = std::min(available_concurrency, uint32_t(pr.min_sw_threads));
+    const bool is_activation = (demand == uint32_t(pr.min_sw_threads));
 
     if (is_activation) {
       prepare_permit_modification(ph);
@@ -897,6 +917,7 @@ protected:
             callback_reason.new_concurrency = true;
             const ze_result_t cbr = callback(ph, arg, callback_reason);
             __TCM_ASSERT(cbr == ZE_RESULT_SUCCESS, "Callback failed.");
+            suppress_unused_warning(cbr);
           }
         }
       }
@@ -920,7 +941,7 @@ protected:
     }
 
     if (!satisfied_client) {
-      tracer t("ThreadComposabilityFairBalance::NOTE p is an unsatisfied permit, renegotiating.");
+      t.log("ThreadComposabilityFairBalance::NOTE p is an unsatisfied permit, renegotiating.");
       renegotiate_permits(ph);
     }
   }
@@ -933,7 +954,7 @@ public:
   ThreadComposabilityManager() {
     std::string tcm_strategy = "FAIR"; // default
 
-    char* rm_strategy_env_value = std::getenv("RM_STRATEGY");
+    char* rm_strategy_env_value = internal::get_env("RM_STRATEGY");
     if (rm_strategy_env_value)
       tcm_strategy = rm_strategy_env_value;
 
@@ -1068,8 +1089,9 @@ ze_result_t zermConnect(zerm_callback_t callback, zerm_client_id_t *client_id)
   if (theTCM::is_enabled() && client_id) {
     theTCM::increase_ref_count();
     auto& mgr = theTCM::instance();
-      if ((*client_id = mgr.register_client(callback)))
-        return ZE_RESULT_SUCCESS;
+    *client_id = mgr.register_client(callback);
+    if (*client_id)
+      return ZE_RESULT_SUCCESS;
   }
   return ZE_RESULT_ERROR_UNKNOWN;
 }
