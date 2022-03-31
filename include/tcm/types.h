@@ -37,16 +37,16 @@ typedef uint8_t zerm_permit_state_t;
 // Support for permit flags
 
 typedef struct _zerm_permit_flags_t {
-  bool stale : 1;
-  bool rigid_concurrency : 1;
-  bool exclusive : 1;
-  int32_t reserved : 29;
+  uint32_t stale : 1;
+  uint32_t rigid_concurrency : 1;
+  uint32_t exclusive : 1;
+  uint32_t reserved : 29;
 } zerm_permit_flags_t;
 
 typedef struct _zerm_callback_flags_t {
-  bool new_concurrency : 1;
-  bool new_state : 1;
-  int32_t reserved : 30;
+  uint32_t new_concurrency : 1;
+  uint32_t new_state : 1;
+  uint32_t reserved : 30;
 } zerm_callback_flags_t;
 
 // Support for cpu masks

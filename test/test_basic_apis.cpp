@@ -236,10 +236,8 @@ bool test_get_stale_permit() {
   return test_epilog(test_name);
 }
 
-#ifndef WIN32
 static_assert(sizeof(zerm_permit_flags_t) == 4, "The permit flags type has wrong size");
-static_assert(sizeof(zerm_callback_flags_t) == 4, "The permit flags type has wrong size");
-#endif
+static_assert(sizeof(zerm_callback_flags_t) == 4, "The callback flags type has wrong size");
 
 int main() {
   bool res = true;
