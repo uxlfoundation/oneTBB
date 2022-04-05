@@ -126,7 +126,7 @@ bool check_permit_size(const zerm_permit_t& expected, const zerm_permit_t& actua
   const auto& a = actual.size;
   const auto& e = expected.size;
   const bool result = (a == e);
-  std::string report_str = "Check concurrency, expected " + std::to_string(e) + " equals to actual " + std::to_string(a);
+  std::string report_str = "Check size, expected " + std::to_string(e) + " equals to actual " + std::to_string(a);
 
   return report ? check(result, report_str) : result;
 }
@@ -143,7 +143,7 @@ bool check_permit_concurrency(const zerm_permit_t& expected, const zerm_permit_t
     result = (e == a);
     // TODO: print not only the wrong element, but the whole range
     report_str = "Check concurrency, expected " + std::to_string(e) +
-      " equals to actual " + std::to_string(a) + " ,index " + std::to_string(i);
+      " equals to actual " + std::to_string(a) + ", index " + std::to_string(i);
 
     if (!result)
       break;
@@ -205,7 +205,7 @@ bool check_permit_flags(const zerm_permit_t& expected, const zerm_permit_t& actu
   result &= e.rigid_concurrency == a.rigid_concurrency;
   result &= e.exclusive == a.exclusive;
 
-  std::string report_str("Check state, flags " + to_string(e) + " equals to actual " + to_string(a));
+  std::string report_str("Check expectation of " + to_string(e) + " equals to actual " + to_string(a));
 
   return report ? check(result, report_str) : result;
 }
@@ -230,7 +230,7 @@ bool check_permit(const zerm_permit_t& expected, const zerm_permit_t& actual,
   return result;
 }
 
-zerm_permit_request_t make_request(int min_sw_threads, int max_sw_threads,
+zerm_permit_request_t make_request(int32_t min_sw_threads, int32_t max_sw_threads,
   zerm_permit_flags_t flags = {}) {
   zerm_permit_request_t result = ZERM_PERMIT_REQUEST_INITIALIZER;
   result.min_sw_threads = min_sw_threads;

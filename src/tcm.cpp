@@ -87,8 +87,8 @@ bool operator==(const zerm_permit_request_t& lhs, const zerm_permit_request_t& r
     lhs.flags == rhs.flags;
 }
 
-unsigned int hardware_concurrency() {
-  return std::thread::hardware_concurrency();
+uint32_t hardware_concurrency() {
+  return (uint32_t)std::thread::hardware_concurrency();
 }
 
 // MSVC Warning: Arg can be incorrect: this does not match function name specification
@@ -174,9 +174,9 @@ public:
     client_to_callback_map.erase(clid);
   }
 
-  zerm_permit_handle_t request_permit(zerm_client_id_t clid, zerm_permit_request_t& req,
-                                      void* callback_arg, zerm_permit_handle_t ph,
-                                      zerm_permit_t* permit)
+  bool request_permit(zerm_client_id_t clid, zerm_permit_request_t& req,
+                      void* callback_arg, zerm_permit_handle_t* permit_handle,
+                      zerm_permit_t* permit)
   {
     tracer t("ThreadComposabilityBase::request_permit");
 
@@ -184,16 +184,19 @@ public:
     if (req.min_sw_threads > int32_t(platform_resources())) {
       if (permit)
         permit->state = ZERM_PERMIT_STATE_VOID;
-      return nullptr;
+      return false;
     }
 
+    zerm_permit_handle_t ph = *permit_handle;
     const bool is_requesting_new_permit = bool(!ph);
-    if (is_requesting_new_permit) {
+    if (is_requesting_new_permit)
       ph = make_new_permit(clid, req);
-    }
 
     {
       const std::lock_guard<std::mutex> l(data_mutex);
+
+      *permit_handle = ph;
+
       // TODO: Consider adding the permit to containers after the concurrency level
       // calculation to avoid early renegotiation
       if (is_requesting_new_permit) {
@@ -212,15 +215,14 @@ public:
       }
     }
 
-    return ph;
+    return true;
   }
 
   ze_result_t get_permit(zerm_permit_handle_t ph, zerm_permit_t* permit) {
     tracer t("ThreadComposabilityBase::get_permit");
     __TCM_ASSERT(ph && permit, nullptr);
 
-    if (!is_valid(ph))
-      return ZE_RESULT_ERROR_UNKNOWN;
+    // NOTE: expected that ph is valid - but direct call is_valid() can lead to races
 
     permit->flags.stale = false;
     if (!copy_permit(ph, permit)) {
@@ -414,15 +416,12 @@ protected:
   bool skip_permit_renegotiation(zerm_permit_handle_t ph, zerm_permit_handle_t initiator,
                                  uint32_t& concurrency) const
   {
-    if (ph == initiator)    // renegotiate for one that asked
-      return false;
-
     zerm_permit_data_t& pd = ph->data;
 
     const std::memory_order relaxed = std::memory_order_relaxed;
     const zerm_permit_state_t state = pd.state.load(relaxed);
 
-    if (!is_renegotiable(state, pd.flags)) {
+    if (ph != initiator && !is_renegotiable(state, pd.flags)) {
       // TODO: avoid side-effects in this function
       const uint32_t permit_concurrency = pd.concurrency.load(relaxed);
       __TCM_ASSERT(concurrency >= permit_concurrency, "Underflow detected");
@@ -454,7 +453,7 @@ protected:
   //! Returns @true if requested concurrency was satisfied.
   //! TODO: Split this function into "suggestion" and "permit modification"
   bool try_satisfy_request(const zerm_permit_request_t& req, zerm_permit_handle_t ph) {
-    __TCM_ASSERT(req.max_sw_threads > 0, "Incorrect concurrency requested"); 
+    __TCM_ASSERT(req.max_sw_threads >= 0, "Incorrect concurrency requested"); 
 
     zerm_permit_data_t& pd = ph->data;
     std::memory_order relaxed = std::memory_order_relaxed;
@@ -500,13 +499,13 @@ protected:
     __TCM_ASSERT(ph, "Permit was not allocated.");
 
     ph->epoch = 0;
-    zerm_permit_data_t* pd = &ph->data;
+    zerm_permit_data_t& pd = ph->data;
 
-    pd->client_id = clid;
-    pd->cpu_mask = nullptr;
-    pd->concurrency.store(0, std::memory_order_relaxed);
-    pd->state.store(ZERM_PERMIT_STATE_ACTIVE, std::memory_order_relaxed);
-    pd->flags = req.flags;
+    pd.client_id = clid;
+    pd.cpu_mask = nullptr;
+    pd.concurrency.store(0, std::memory_order_relaxed);
+    pd.state.store(ZERM_PERMIT_STATE_ACTIVE, std::memory_order_relaxed);
+    pd.flags = req.flags;
 
     return ph;
   }
@@ -553,7 +552,6 @@ protected:
     // TODO: refactor this function to have uniform approach where applicable,
     // and split responsibilities otherwise.
     tracer t("ThreadComposabilityBase::update_flags");
-    __TCM_ASSERT(is_valid(ph), "Updating non-existing permit.");
     __TCM_ASSERT(!is_void(curr_state), "Updating void permit.");
     __TCM_ASSERT(curr_state != new_state,
                 "Setting permit state to be identical to current.");
@@ -565,6 +563,7 @@ protected:
       zerm_permit_request_t request;
       {
         const std::lock_guard<std::mutex> l(data_mutex);
+        __TCM_ASSERT(is_valid(ph), "Updating non-existing permit.");
         request = permit_to_request_map[ph];
 
         prepare_permit_modification(ph);
@@ -817,7 +816,7 @@ protected:
   //! Calculate concurrency for ACTIVE/IDLE permits in accordance with the FAIR approach.
   //! If necessary, callback should be called separately.
   void renegotiate_active_idle_permit(uint32_t distributed_concurrency, uint32_t total_demand,
-                                      const zerm_permit_request_t& pr, zerm_permit_handle_t ph) {
+                                      const zerm_permit_request_t& pr, zerm_permit_handle_t ph, int32_t& carry) {
     zerm_permit_data_t& pd = ph->data;
 
     uint32_t allotted = 0;
@@ -825,13 +824,9 @@ protected:
     distributed_concurrency = std::min(distributed_concurrency, total_demand);
 
     if (available_concurrency > 0 && total_demand > 0) {
-      const uint32_t numerator = distributed_concurrency * demand;
-      allotted = numerator / total_demand;
-      const uint32_t remainder = numerator % total_demand;
-      if (remainder >= total_demand - remainder)
-        allotted += 1;
-      if (allotted > available_concurrency)
-        allotted = available_concurrency;
+      int32_t tmp = demand * distributed_concurrency + carry;
+      allotted = tmp / total_demand;
+      carry = tmp % total_demand;
     }
 
     available_concurrency -= allotted;
@@ -844,86 +839,83 @@ protected:
 
   void renegotiate_permits(zerm_permit_handle_t initiator) override {
     tracer t("ThreadComposabilityFairBalance::renegotiate_permits");
+
+    uint32_t total_granted = 0;
+    uint32_t active_demand = 0;
+    
+    std::map<uint32_t, zerm_permit_handle_t> renegotiation_pending;
+    std::vector<std::pair<int32_t, zerm_permit_handle_t>> renegotiation_active_idle;
+
+    renegotiation_active_idle.reserve(1024);
     {
-      uint32_t total_granted = 0;
-      uint32_t active_demand = 0;
+      const std::lock_guard<std::mutex> l(data_mutex);
 
-      static std::map<uint32_t, zerm_permit_handle_t> renegotiation_pending;
-      static std::vector<std::pair<int32_t, zerm_permit_handle_t>> renegotiation_active_idle;
-      renegotiation_active_idle.reserve(1024);
+      // distribute whole platform concurrency
+      available_concurrency = platform_resources();
 
-      {
-        const std::lock_guard<std::mutex> l(data_mutex);
+      // Searching of ACTIVE without STATIC flag/IDLE/PENDING permits
+      for (auto& elem : permit_to_request_map) {
+        zerm_permit_handle_t ph = elem.first;
+        if (skip_permit_renegotiation(ph, initiator, available_concurrency))
+          continue;
 
-        // distribute whole platform concurrency
-        available_concurrency = platform_resources();
+        zerm_permit_data_t& pd = ph->data;
+        zerm_permit_request_t& pr = elem.second;
 
-        // Searching of ACTIVE without STATIC flag/IDLE/PENDING permits
-        for (auto& elem: permit_to_request_map) {
-          zerm_permit_handle_t ph = elem.first;
-          if (skip_permit_renegotiation(ph, initiator, available_concurrency))
-            continue;
-
-          zerm_permit_data_t& pd = ph->data;
-          zerm_permit_request_t& pr = elem.second;
-
-          if (is_pending(pd.state.load(std::memory_order_relaxed)))
-            renegotiation_pending.insert(std::make_pair(pr.min_sw_threads, ph));
-          else {
-            active_demand += pr.max_sw_threads - pr.min_sw_threads;
-            total_granted += pr.min_sw_threads;
-            renegotiation_active_idle.push_back(
-              std::make_pair((int32_t)pd.concurrency.load(std::memory_order_relaxed), ph));
-          }
-        }
-
-        __TCM_ASSERT(available_concurrency >= total_granted, "Underflow detected");
-        available_concurrency -= total_granted;
-        // Resource redistribution is performed if we have available resources.
-        if (available_concurrency != 0) {
-          // Processing of the PENDING permits
-          for (auto& elem : renegotiation_pending) {
-            zerm_permit_request_t pr  = permit_to_request_map[elem.second];
-
-            bool is_activation = try_satisfy_required_demand(pr, elem.second);
-            if (!is_activation)
-              // No need processing other pending permits left in the map
-              // since it is sorted from lowest to highest requests' requirements.
-              break;
-
-            renegotiation_active_idle.push_back(std::make_pair(0, elem.second));
-            uint32_t new_demand = pr.max_sw_threads - pr.min_sw_threads;
-            if (new_demand > 0)
-              active_demand += new_demand;
-          }
-
-          // Processing of active and idle permits
-          uint32_t available_concurrency_snapshot = available_concurrency;
-          for (auto& elem: renegotiation_active_idle) {
-            int32_t prev_granted = elem.first;
-            zerm_permit_handle_t ph = elem.second;
-            zerm_permit_request_t& pr = permit_to_request_map[ph];
-
-            renegotiate_active_idle_permit(available_concurrency_snapshot, active_demand, pr, ph);
-
-            if (skip_callback_invocation(ph, initiator, prev_granted))
-              continue;
-
-            zerm_callback_t callback = client_to_callback_map[ph->data.client_id];
-            __TCM_ASSERT(callback, "No callback registered for the group.");
-            void* arg = permit_to_callback_arg_map[ph];
-
-            zerm_callback_flags_t callback_reason{};
-            callback_reason.new_concurrency = true;
-            const ze_result_t cbr = callback(ph, arg, callback_reason);
-            __TCM_ASSERT(cbr == ZE_RESULT_SUCCESS, "Callback failed.");
-            suppress_unused_warning(cbr);
-          }
+        if (is_pending(pd.state.load(std::memory_order_relaxed)))
+          renegotiation_pending.insert(std::make_pair(pr.min_sw_threads, ph));
+        else {
+          active_demand += pr.max_sw_threads - pr.min_sw_threads;
+          total_granted += pr.min_sw_threads;
+          renegotiation_active_idle.push_back(
+            std::make_pair((int32_t)pd.concurrency.load(std::memory_order_relaxed), ph));
         }
       }
 
-      renegotiation_pending.clear();
-      renegotiation_active_idle.clear();
+      __TCM_ASSERT(available_concurrency >= total_granted, "Underflow detected");
+      available_concurrency -= total_granted;
+      // Resource redistribution is performed if we have available resources.
+      if (available_concurrency != 0) {
+        // Processing of the PENDING permits
+        for (auto& elem : renegotiation_pending) {
+          zerm_permit_request_t pr = permit_to_request_map[elem.second];
+
+          bool is_activation = try_satisfy_required_demand(pr, elem.second);
+          if (!is_activation)
+            // No need processing other pending permits left in the map
+            // since it is sorted from lowest to highest requests' requirements.
+            break;
+
+          renegotiation_active_idle.push_back(std::make_pair(0, elem.second));
+          uint32_t new_demand = pr.max_sw_threads - pr.min_sw_threads;
+          if (new_demand > 0)
+            active_demand += new_demand;
+        }
+
+        // Processing of active and idle permits
+        int32_t carry = 0;
+        uint32_t available_concurrency_snapshot = available_concurrency;
+        for (auto& elem : renegotiation_active_idle) {
+          int32_t prev_granted = elem.first;
+          zerm_permit_handle_t ph = elem.second;
+          zerm_permit_request_t& pr = permit_to_request_map[ph];
+
+          renegotiate_active_idle_permit(available_concurrency_snapshot, active_demand, pr, ph, carry);
+
+          if (skip_callback_invocation(ph, initiator, prev_granted))
+            continue;
+
+          zerm_callback_t callback = client_to_callback_map[ph->data.client_id];
+          __TCM_ASSERT(callback, "No callback registered for the group.");
+          void* arg = permit_to_callback_arg_map[ph];
+
+          zerm_callback_flags_t callback_reason{};
+          callback_reason.new_concurrency = true;
+          const ze_result_t cbr = callback(ph, arg, callback_reason);
+          __TCM_ASSERT(cbr == ZE_RESULT_SUCCESS, "Callback failed.");
+          suppress_unused_warning(cbr);
+        }
+      }
     }
   }
 
@@ -977,9 +969,9 @@ public:
     impl_->unregister_client(clid);
   }
 
-  zerm_permit_handle_t request_permit(zerm_client_id_t clid, zerm_permit_request_t& req,
-                                    void* callback_arg, zerm_permit_handle_t permit_handle,
-                                    zerm_permit_t* permit) {
+  bool request_permit(zerm_client_id_t clid, zerm_permit_request_t& req,
+                      void* callback_arg, zerm_permit_handle_t* permit_handle,
+                      zerm_permit_t* permit) {
     internal::tracer t("ThreadComposability::request_permit");
     return impl_->request_permit(clid, req, callback_arg, permit_handle, permit);
   }
@@ -1144,15 +1136,10 @@ ze_result_t zermRequestPermit(zerm_client_id_t client_id,
     return ZE_RESULT_ERROR_UNKNOWN;
 
   auto& mgr = theTCM::instance();
-  zerm_permit_handle_t new_ph = mgr.request_permit(client_id, request, callback_arg,
-                                                 *permit_handle, permit); 
+  bool result = mgr.request_permit(client_id, request, callback_arg,
+                                   permit_handle, permit);
 
-  if (!new_ph)
-    return ZE_RESULT_ERROR_INVALID_ARGUMENT;
-
-  *permit_handle = new_ph;
-
-  return ZE_RESULT_SUCCESS;
+  return result? ZE_RESULT_SUCCESS : ZE_RESULT_ERROR_INVALID_ARGUMENT;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
