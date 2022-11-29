@@ -12,20 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-list(APPEND HWLOC_REQUIRED_VERSIONS 1_11 2 2_5)
+list(APPEND HWLOC_REQUIRED_VERSIONS static 2 2_5)
 
 foreach(hwloc_version ${HWLOC_REQUIRED_VERSIONS})
+    set(HWLOC_TARGET_NAME HWLOC::hwloc_${hwloc_version})
+
+    string(TOUPPER ${hwloc_version} hwloc_version)
+
     if (NOT WIN32)
         set(CMAKE_HWLOC_${hwloc_version}_DLL_PATH STUB)
     endif()
-    set(HWLOC_TARGET_NAME HWLOC::hwloc_${hwloc_version})
 
     if (NOT TARGET ${HWLOC_TARGET_NAME} AND
         CMAKE_HWLOC_${hwloc_version}_LIBRARY_PATH AND
         CMAKE_HWLOC_${hwloc_version}_DLL_PATH AND
         CMAKE_HWLOC_${hwloc_version}_INCLUDE_PATH
     )
-        add_library(${HWLOC_TARGET_NAME} SHARED IMPORTED)
+        if (HWLOC_TARGET_NAME MATCHES "static")
+            set(_hwloc_library_type "STATIC")
+        else()
+            set(_hwloc_library_type "SHARED")
+        endif()
+        add_library(${HWLOC_TARGET_NAME} ${_hwloc_library_type} IMPORTED)
+
         set_target_properties(${HWLOC_TARGET_NAME} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
             "${CMAKE_HWLOC_${hwloc_version}_INCLUDE_PATH}")
         if (WIN32)
@@ -36,6 +45,7 @@ foreach(hwloc_version ${HWLOC_REQUIRED_VERSIONS})
             set_target_properties(${HWLOC_TARGET_NAME} PROPERTIES
                                   IMPORTED_LOCATION "${CMAKE_HWLOC_${hwloc_version}_LIBRARY_PATH}")
         endif()
+        unset(_hwloc_library_type)
     endif()
 
     if (TARGET ${HWLOC_TARGET_NAME})

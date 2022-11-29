@@ -23,4 +23,7 @@ __TBB_internal_allocate_binding_handler;
 __TBB_internal_deallocate_binding_handler;
 __TBB_internal_get_default_concurrency;
 __TBB_internal_destroy_system_topology;
+
+local:
+*;
 };
