@@ -108,12 +108,10 @@ zerm_permit_t make_pending_permit(uint32_t* concurrencies, zerm_cpu_mask_t* cpu_
 }
 
 std::string bitmap_to_string(const zerm_cpu_mask_t mask) {
-  int size = hwloc_bitmap_weight(mask);
-  // size becomes -1 if bitmap is infinitely set
-  if (size <= 0) size = 256;
-  std::string result(size, ' ');
-  hwloc_bitmap_snprintf(result.data(), result.size(), (hwloc_const_bitmap_t)mask);
-  return result;
+  const unsigned max_size = 1024;
+  char buf[max_size] = {0};
+  hwloc_bitmap_snprintf(buf, max_size, (hwloc_const_bitmap_t)mask);
+  return std::string(buf);
 }
 
 std::string to_string(const zerm_permit_flags_t flags) {
