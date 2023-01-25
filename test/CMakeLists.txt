@@ -10,7 +10,7 @@ if (NOT MSVC) # no need to change options for MSVC
     set(TCM_WARNING_LEVEL ${TCM_WARNING_LEVEL} -Wno-missing-braces)
 endif()
 
-foreach(tpp test_basic_apis.cpp test_fcfsc.cpp test_rb.cpp)
+foreach(tpp test_basic_apis.cpp test_fcfsc.cpp test_rb.cpp test_constrained_requests.cpp)
   string(REPLACE ".cpp" "" texe ${tpp})
   add_executable(${texe} ${tpp})
   target_compile_options(${texe} PRIVATE ${TCM_WARNING_LEVEL})

@@ -9,6 +9,7 @@ Typical CMake workflow can be used: Configure -> Build -> Test -> Pack (Install)
 The following project controls are available during the configure stage:
 ```
 TCM_TEST:BOOL - Enable testing (ON by default)
+TCM_STRICT:BOOL - Treat compiler warnings as errors (ON by default)
 ```
 
 Command

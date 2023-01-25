@@ -22,7 +22,7 @@ ze_result_t client_renegotiate(zerm_permit_handle_t ph, void* arg,
   bool r = true;
 
   r &= check(invocation_reason.new_concurrency,
-             "Reason invoking callback is new concurrency value");
+             "Reason invoking callback is a new concurrency value");
 
   zerm_permit_handle_t* permit_via_arg = (zerm_permit_handle_t*)arg;
   r &= check(ph == *permit_via_arg, "Renegotiates for expected arg");
@@ -58,6 +58,7 @@ bool test_alternating_clients() {
 
   zerm_permit_t pA = make_void_permit(&pA_concurrency),
                 pB = make_void_permit(&pB_concurrency);
+
   zerm_permit_t e = make_active_permit(&e_concurrency);
 
   zerm_permit_request_t req = make_request(0, total_number_of_threads);

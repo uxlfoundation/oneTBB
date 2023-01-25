@@ -134,11 +134,11 @@ bool test_nested_clients() {
 
   ze_result_t r = zermConnect(client_renegotiate, &clidA);
   if (!check_success(r, "zermConnect A"))
-    return false;
+    return test_fail(test_name);
 
   r = zermConnect(client_renegotiate, &clidB);
   if (!check_success(r, "zermConnect B"))
-    return false;
+    return test_fail(test_name);
 
   zerm_permit_handle_t phA = nullptr, phB = nullptr;
 
@@ -155,37 +155,34 @@ bool test_nested_clients() {
     return test_fail(test_name);
 
   r = zermRegisterThread(phA);
-  if (!(check_success(r, "zermRegisterThread A") &&
-        check_permit(eA, phA)))
+  if (!(check_success(r, "zermRegisterThread A") && check_permit(eA, phA)))
     return test_fail(test_name);
 
   renegotiating_permits = {&phA};
-  uint32_t dummy_concurrency;
-  zerm_permit_t eB = make_active_permit(&dummy_concurrency);
 
-  zerm_permit_request_t rB = make_request(0, total_number_of_threads);
+  uint32_t eB_concurrency = 0;
+  zerm_permit_t eB = make_active_permit(&eB_concurrency);
+
+  zerm_permit_request_t rB = make_request(total_number_of_threads/2, total_number_of_threads);
 
   r = zermRequestPermit(clidB, rB, &phB, &phB, &pB);
+  eA_concurrency = total_number_of_threads - total_number_of_threads/2;
+  eB_concurrency = total_number_of_threads/2;
   auto unchanged_permits = list_unchanged_permits({{&phA, &pA}});
+
   if (!(check_success(r, "zermRequestPermit B") &&
-        check_permits_concurrencies({phA, phB}, {rA.max_sw_threads, rB.max_sw_threads}) &&
-        check_permit(eB, pB, skip_concurrenency_check) &&
-        check_permit(eA, phA, skip_concurrenency_check) &&
+        check_permit(eB, pB) && check_permit(eA, phA) &&
         renegotiating_permits == unchanged_permits))
     return test_fail(test_name);
 
   r = zermRegisterThread(phB);
   if (!(check_success(r, "zermRegisterThread B") &&
-        check_permits_concurrencies({phA, phB}, {rA.max_sw_threads, rB.max_sw_threads}) &&
-        check_permit(eB, pB, skip_concurrenency_check) &&
-        check_permit(eA, phA, skip_concurrenency_check)))
+        check_permit(eB, pB) && check_permit(eA, phA)))
     return test_fail(test_name);
 
   r = zermUnregisterThread();
   if (!(check_success(r, "zermUnregisterThread B") &&
-        check_permits_concurrencies({phA, phB}, {rA.max_sw_threads, rB.max_sw_threads}) &&
-        check_permit(eB, pB, skip_concurrenency_check) &&
-        check_permit(eA, phA, skip_concurrenency_check)))
+        check_permit(eB, pB) && check_permit(eA, phA)))
     return test_fail(test_name);
 
   renegotiating_permits = {&phA};
@@ -213,7 +210,6 @@ bool test_nested_clients() {
   if (!check_success(r, "zermDisconnect B"))
     return test_fail(test_name);
 
-  std::cout << "test_nested_clients done" << std::endl;
   return test_epilog(test_name);
 }
 
@@ -225,11 +221,11 @@ bool test_nested_clients_partial_consumption() {
 
   ze_result_t r = zermConnect(client_renegotiate, &clidA);
   if (!check_success(r, "zermConnect A"))
-    return false;
+    return test_fail(test_name);
 
   r = zermConnect(client_renegotiate, &clidB);
   if (!check_success(r, "zermConnect B"))
-    return false;
+    return test_fail(test_name);
 
   zerm_permit_handle_t phA = nullptr, phB = nullptr;
 
@@ -240,10 +236,9 @@ bool test_nested_clients_partial_consumption() {
                 pB = make_void_permit(&pB_concurrency),
                 eA = make_active_permit(&eA_concurrency);
 
-  zerm_permit_request_t rA = make_request(0, total_number_of_threads/2);
+  zerm_permit_request_t rA = make_request(total_number_of_threads/4, total_number_of_threads/2);
   r = zermRequestPermit(clidA, rA, &phA, &phA, &pA);
-  if (!(check_success(r, "zermRequestPermit A half threads") &&
-        check_permit(eA, pA)))
+  if (!(check_success(r, "zermRequestPermit A half threads") && check_permit(eA, pA)))
     return test_fail(test_name);
 
   r = zermRegisterThread(phA);
@@ -251,16 +246,18 @@ bool test_nested_clients_partial_consumption() {
     return test_fail(test_name);
 
   renegotiating_permits = {&phA};
-  uint32_t dummy_concurrency;
-  zerm_permit_t eB = make_active_permit(&dummy_concurrency);
 
-  zerm_permit_request_t rB = make_request(0, total_number_of_threads);
+
+  uint32_t eB_concurrency = 0;
+  zerm_permit_t eB = make_active_permit(&eB_concurrency);
+
+  zerm_permit_request_t rB = make_request(total_number_of_threads/4*3, total_number_of_threads);
   r = zermRequestPermit(clidB, rB, &phB, &phB, &pB);
+
+  eA_concurrency = total_number_of_threads - rB.min_sw_threads; eB_concurrency = rB.min_sw_threads;
   auto unchanged_permits = list_unchanged_permits({{&phA, &pA}});
   if (!(check_success(r, "zermRequestPermit B all threads") &&
-        check_permits_concurrencies({phA, phB}, {rA.max_sw_threads, rB.max_sw_threads}) &&
-        check_permit(eA, phA, skip_concurrenency_check) &&
-        check_permit(eB, pB, skip_concurrenency_check) &&
+        check_permit(eA, phA) && check_permit(eB, pB) &&
         renegotiating_permits == unchanged_permits))
     return test_fail(test_name);
 
@@ -307,7 +304,6 @@ bool test_nested_clients_partial_consumption() {
   if (!check_success(r, "zermDisconnect B"))
     return test_fail(test_name);
 
-  std::cout << "test_nested_clients_partial_consumption done" << std::endl;
   return test_epilog(test_name);
 }
 
@@ -320,11 +316,11 @@ bool test_overlapping_clients() {
 
   ze_result_t r = zermConnect(client_renegotiate, &clidA);
   if (!check_success(r, "zermConnect A"))
-    return false;
+    return test_fail(test_name);
 
   r = zermConnect(client_renegotiate, &clidB);
   if (!check_success(r, "zermConnect B"))
-    return false;
+    return test_fail(test_name);
 
   zerm_permit_handle_t phA = nullptr, phB = nullptr;
 
@@ -335,7 +331,7 @@ bool test_overlapping_clients() {
                 pB = make_void_permit(&pB_concurrency),
                 eA = make_active_permit(&eA_concurrency);
 
-  zerm_permit_request_t rA = make_request(0, total_number_of_threads);
+  zerm_permit_request_t rA = make_request(total_number_of_threads/2, total_number_of_threads);
   r = zermRequestPermit(clidA, rA, &phA, &phA, &pA);
   if (!(check_success(r, "zermRequestPermit A all threads") &&
         check_permit(eA, pA)))
@@ -345,7 +341,7 @@ bool test_overlapping_clients() {
   uint32_t eB_concurrency;
   zerm_permit_t eB = make_active_permit(&eB_concurrency);
 
-  zerm_permit_request_t rB = make_request(0, total_number_of_threads);
+  zerm_permit_request_t rB = make_request(total_number_of_threads/2, total_number_of_threads);
 
   r = zermRequestPermit(clidB, rB, &phB, &phB, &pB);
   auto unchanged_permits = list_unchanged_permits({{&phA, &pA}});
@@ -376,7 +372,6 @@ bool test_overlapping_clients() {
   if (!check_success(r, "zermDisconnect B"))
     return test_fail(test_name);
 
-  std::cout << "test_overlapping_clients done" << std::endl;
   return test_epilog(test_name);
 }
 
@@ -389,15 +384,15 @@ bool test_overlapping_clients_two_callbacks() {
 
   ze_result_t r = zermConnect(client_renegotiate, &clidA);
   if (!check_success(r, "zermConnect A"))
-    return false;
+    return test_fail(test_name);
 
   r = zermConnect(client_renegotiate, &clidB);
   if (!check_success(r, "zermConnect B"))
-    return false;
+    return test_fail(test_name);
 
   r = zermConnect(client_renegotiate, &clidC);
   if (!check_success(r, "zermConnect C"))
-    return false;
+    return test_fail(test_name);
 
   zerm_permit_handle_t phA = nullptr, phB = nullptr, phC = nullptr;
   uint32_t pA_concurrency, pB_concurrency, pC_concurrency,
@@ -417,55 +412,102 @@ bool test_overlapping_clients_two_callbacks() {
   uint32_t eB_concurrency = total_number_of_threads/2;
   zerm_permit_t eB = make_active_permit(&eB_concurrency);
 
-  zerm_permit_request_t rB = make_request(0, total_number_of_threads / 2);
+  zerm_permit_request_t rB = make_request(0, total_number_of_threads/2);
   r = zermRequestPermit(clidB, rB, &phB, &phB, &pB);
   if (!(check_success(r, "zermRequestPermit B half threads") &&
         check_permit(eA, phA) && check_permit(eB, pB)))
     return test_fail(test_name);
 
   renegotiating_permits = {&phA, &phB};
-  std::vector<int32_t> demands = {
-    total_number_of_threads/2, total_number_of_threads/2, total_number_of_threads
-  };
 
   uint32_t eC_concurrency;
   zerm_permit_t eC = make_active_permit(&eC_concurrency);
 
-  zerm_permit_request_t rC = make_request(0, total_number_of_threads);
+  zerm_permit_request_t rC = make_request(total_number_of_threads/2, total_number_of_threads);
 
   r = zermRequestPermit(clidC, rC, &phC, &phC, &pC);
+  if (!check_success(r, "zermRequestPermit C all threads"))
+      return test_fail(test_name);
+
   auto unchanged_permits = list_unchanged_permits({{&phA, &pA}, {&phB, &pB}});
-  if (!(check_success(r, "zermRequestPermit C all threads") &&
-        check_permits_concurrencies({phA, phB, phC}, demands) &&
-        check_permit(eA, phA, skip_concurrenency_check) &&
-        check_permit(eB, phB, skip_concurrenency_check) &&
-        check_permit(eC, phC, skip_concurrenency_check) &&
-        renegotiating_permits == unchanged_permits))
+
+  // The concurrencies of permit A and B can be borrowed since they specified that they can have
+  // them zero at the minimum. The request for permit C requires negotiation from one of them to
+  // satisfy its minimum. However, it is not known which one is chosen for negotiation. So we check
+  // first the determined value in permit C and that expected negotation happened.
+  eC_concurrency = total_number_of_threads/2;
+  if (!(check_permit(eC, phC) && renegotiating_permits == unchanged_permits))
     return test_fail(test_name);
+
+  if (!check_success(zermGetPermitData(phA, &pA),
+                     "Reading permit " + std::to_string(uintptr_t(phA))))
+    return test_fail(test_name);
+  if (!check_success(zermGetPermitData(phB, &pB),
+                     "Reading permit " + std::to_string(uintptr_t(phB))))
+    return test_fail(test_name);
+
+  if (!(check_permit(eA, pA, skip_concurrenency_check) &&
+        check_permit(eB, pB, skip_concurrenency_check)))
+    return test_fail(test_name);
+
+  // Then we check that negotiation succeeds for one of the existing permits
+  const uint32_t &A_concurrency = pA.concurrencies[0], &B_concurrency = pB.concurrencies[0];
+  const uint32_t expected_concurrency = uint32_t(total_number_of_threads/2);
+
+  bool succeeded =
+      (A_concurrency == 0 && B_concurrency == expected_concurrency) ||
+      (A_concurrency == expected_concurrency && B_concurrency == 0);
+
+  if (!succeeded) {
+    check(false, "Unexpected resource distribuion.");
+    return test_fail(test_name);
+  }
 
   // When A is released, we should get a callback for others only if their
   // permits has changed.
   renegotiating_permits = {&phB, &phC};
-  check_success(zermGetPermitData(phB, &pB), "Reading permit phB");
-  check_success(zermGetPermitData(phC, &pC), "Reading permit phC");
+  if (!check_success(zermGetPermitData(phC, &pC), "Reading permit phC"))
+    test_fail(test_name);
 
-  demands = {total_number_of_threads/2, total_number_of_threads};
   r = zermReleasePermit(phA);
   unchanged_permits = list_unchanged_permits({{&phB, &pB}, {&phC, &pC}});
-  if (!(check_success(r, "zermReleasePermit A") &&
-        check_permits_concurrencies({phB, phC}, demands) &&
-        check_permit(eB, phB, skip_concurrenency_check) &&
-        check_permit(eC, phC, skip_concurrenency_check) &&
-        renegotiating_permits == unchanged_permits))
+  if (!(check_success(r, "zermReleasePermit A") && renegotiating_permits == unchanged_permits))
     return test_fail(test_name);
 
-  // When B is released, we should get a second callback for pC:
+  if (A_concurrency == 0) {
+      // Nothing has changed for permits B and C, since no additional concurrency appears by the
+      // release of A
+      eB_concurrency = expected_concurrency;
+  } else {
+      // The permit A released total_number_of_threads/2 of resources. They are distributed evenly
+      // between two existing permits. However, the number of resources might not divide by two
+      // without a remainder.
+      eB_concurrency = total_number_of_threads/2/2;
+      eC_concurrency += total_number_of_threads/2 - eB_concurrency;
+  }
+  if (!check_success(zermGetPermitData(phB, &pB),
+                     "Reading permit " + std::to_string(uintptr_t(phB))))
+    return test_fail(test_name);
+  if (!check_success(zermGetPermitData(phC, &pC),
+                     "Reading permit " + std::to_string(uintptr_t(phC))))
+    return test_fail(test_name);
+
+  if (!(check_permit(eB, pB, skip_concurrenency_check) &&
+        check_permit(eC, pC, skip_concurrenency_check)))
+    return test_fail(test_name);
+
+  succeeded = (eB_concurrency == pB.concurrencies[0] && eC_concurrency == pC.concurrencies[0]) ||
+      (eC_concurrency == pB.concurrencies[0] && eB_concurrency == pC.concurrencies[0]);
+  if (!succeeded) {
+    check(false, "Unexpected resource distribuion.");
+    test_fail(test_name);
+  }
+
+  // When B is released, all the resources should be given to C since no other demand exists
   renegotiating_permits = {&phC};
   eC.concurrencies[0] = total_number_of_threads;
-
   r = zermReleasePermit(phB);
-  if (!(check_success(r, "zermReleasePermit B") &&
-        check_permit(eC, phC) && renegotiating_permits.size() == 0))
+  if (!(check_success(r, "zermReleasePermit B") && check_permit(eC, phC)))
     return test_fail(test_name);
 
   r = zermReleasePermit(phC);
@@ -484,7 +526,6 @@ bool test_overlapping_clients_two_callbacks() {
   if (!check_success(r, "zermDisconnect C"))
     return test_fail(test_name);
 
-  std::cout << "test_overlapping_clients_two_callbacks done" << std::endl;
   return test_epilog(test_name);
 }
 
@@ -497,7 +538,7 @@ bool test_partial_release() {
   zerm_client_id_t clidA;
   ze_result_t r = zermConnect(client_renegotiate, &clidA);
   if (!check_success(r, "zermConnect (client A)"))
-    return false;
+    return test_fail(test_name);
 
   zerm_permit_handle_t phA = nullptr;
   uint32_t pA_concurrency, eA_concurrency = total_number_of_threads;
@@ -522,12 +563,13 @@ bool test_partial_release() {
   zerm_client_id_t clidB;
   r = zermConnect(client_renegotiate, &clidB);
   if (!check_success(r, "zermConnect (client B)"))
-    return false;
+    return test_fail(test_name);
 
   zerm_permit_handle_t phB = nullptr;
+  uint32_t pB_concurrency, eB_concurrency = total_number_of_threads/2;
 
-  zerm_permit_t pB = make_void_permit(&pA_concurrency),
-                eB = make_active_permit(&eA_concurrency);
+  zerm_permit_t pB = make_void_permit(&pB_concurrency),
+                eB = make_active_permit(&eB_concurrency);
 
   zerm_permit_request_t rB = make_request(0, total_number_of_threads/2);
   r = zermRequestPermit(clidB, rB, &phB, &phB, &pB);
@@ -565,7 +607,7 @@ bool test_permit_reactivation() {
   zerm_client_id_t clidA;
   ze_result_t r = zermConnect(client_renegotiate, &clidA);
   if (!check_success(r, "zermConnect (client A)"))
-    return false;
+    return test_fail(test_name);
 
   zerm_permit_handle_t phA = nullptr;
   uint32_t pA_concurrency, eA_concurrency = total_number_of_threads;
@@ -580,6 +622,7 @@ bool test_permit_reactivation() {
     return test_fail(test_name);
 
   eA.state = ZERM_PERMIT_STATE_INACTIVE;
+  eA_concurrency = 0;
   r = zermDeactivatePermit(phA);
   if (!(check_success(r, "zermDeactivatePermit (client A)") &&
         check_permit(eA, phA)))
@@ -588,19 +631,20 @@ bool test_permit_reactivation() {
   zerm_client_id_t clidB;
   r = zermConnect(client_renegotiate, &clidB);
   if (!check_success(r, "zermConnect (client B)"))
-    return false;
-  
+    return test_fail(test_name);
+
   zerm_permit_handle_t phB = nullptr;
   uint32_t pB_concurrency, eB_concurrency = total_number_of_threads/2;
 
   zerm_permit_t pB = make_void_permit(&pB_concurrency),
                 eB = make_active_permit(&eB_concurrency);
 
-  zerm_permit_request_t rB = make_request(0, total_number_of_threads/2);
+  zerm_permit_request_t rB = make_request(1, total_number_of_threads/2);
   r = zermRequestPermit(clidB, rB, &phB, &phB, &pB);
   if (!(check_success(r, "zermRequestPermit (client B)") &&
         check_permit(eB, pB)))
     return test_fail(test_name);
+
 
   // Activate previously deactivated request from client A. Since the amount of
   // previously held resources are not available, the renegotiation mechanism
@@ -609,20 +653,25 @@ bool test_permit_reactivation() {
   // its callback should be invoked.
   renegotiating_permits = {&phB};
 
-  auto demands = {total_number_of_threads, total_number_of_threads/2};
+  skip_checks_t skip_concurrenency_check = {};
+  skip_concurrenency_check.concurrency = true;
+
   eA.state = ZERM_PERMIT_STATE_ACTIVE;
+  eB_concurrency = rB.max_sw_threads;
+  // Permit A won't negotiate since its minimum is satisfied. However, it will use the remaining
+  // resources since its desired number is full machine
+  eA_concurrency = total_number_of_threads - rB.max_sw_threads;
 
   r = zermActivatePermit(phA);
   auto unchanged_permits = list_unchanged_permits({{&phB, &pB}});
   if (!(check_success(r, "zermActivatePermit (client A)") &&
-        check_permits_concurrencies({phA, phB}, demands) &&
-        check_permit(eA, phA, skip_concurrenency_check) &&
-        check_permit(eB, phB, skip_concurrenency_check) &&
+        check_permit(eA, phA) && check_permit(eB, phB) &&
         renegotiating_permits == unchanged_permits))
     return test_fail(test_name);
 
   renegotiating_permits = {&phA};
 
+  eA_concurrency = total_number_of_threads;
   r = zermReleasePermit(phB);
   if (!(check_success(r, "zermReleasePermit (client B)") &&
         check_permit(eA, phA) && renegotiating_permits.size() == 0))
@@ -653,6 +702,12 @@ bool test_rigid_concurrency_permit() {
 
   zerm_client_id_t clid{0};
 
+  auto clear_state = [&clid, test_name]()
+  {
+    zermDisconnect(clid);
+    return test_fail(test_name);
+  };
+
   auto renegotiation_function = [](zerm_permit_handle_t p, void* arg,
                                    zerm_callback_flags_t reason)
   {
@@ -672,16 +727,10 @@ bool test_rigid_concurrency_permit() {
   zerm_permit_handle_t phA{nullptr};
   uint32_t pA_concurrency{0}, eA_concurrency = uint32_t(total_number_of_threads / 2);
 
-  auto clear_state = [&clid, test_name]()
-  {
-    zermDisconnect(clid);
-    return test_fail(test_name);
-  };
-
   zerm_permit_t pA = make_void_permit(&pA_concurrency),
                 eA = make_active_permit(&eA_concurrency);
 
-  zerm_permit_request_t rA = make_request(0, (int32_t)eA_concurrency);
+  zerm_permit_request_t rA = make_request(total_number_of_threads/4, (int32_t)eA_concurrency);
 
   r = zermRequestPermit(clid, rA, &phA, &phA, &pA);
   if (!(check_success(r, "zermRequestPermit regular") &&
@@ -691,20 +740,20 @@ bool test_rigid_concurrency_permit() {
   // Request that shouldn't be renegotiated in active state
   zerm_permit_flags_t rigid_concurrency_flags{};
   rigid_concurrency_flags.rigid_concurrency = true;
-  zerm_permit_request_t rS = make_request(0, total_number_of_threads, rigid_concurrency_flags);
+  zerm_permit_request_t rS = make_request(0, total_number_of_threads, /*constraints*/nullptr,
+                                          /*size*/0, ZERM_REQUEST_PRIORITY_NORMAL,
+                                          rigid_concurrency_flags);
 
-  std::vector<int32_t> demands = { rA.max_sw_threads, rS.max_sw_threads };
-  auto concurrencies = compute_concurrencies(demands, total_number_of_threads);
+  // Permit S won't negotiate with the permit A since its minimum is satisfied.
+  uint32_t pS_concurrency, eS_concurrency = total_number_of_threads - eA_concurrency;
 
-  uint32_t pS_concurrency{0}, eS_concurrency{uint32_t(concurrencies[1])};
-
-  zerm_permit_t pS = make_void_permit(&pS_concurrency),
-                eS = make_active_permit(&eS_concurrency, nullptr, 1, rigid_concurrency_flags);
+  zerm_permit_t pS = make_void_permit(&pS_concurrency);
+  zerm_permit_t eS = make_active_permit(&eS_concurrency);
+  eS.flags = rigid_concurrency_flags;
 
   r = zermRequestPermit(clid, rS, &phS, &phS, &pS);
   if (!(check_success(r, "zermRequestPermit static") &&
-        check_permits_concurrencies({ phA, phS }, demands) &&
-        check_permit(eS, pS, skip_concurrenency_check)))
+        check_permit(eA, phA) && check_permit(eS, pS)))
   {
     zermReleasePermit(phA);
     zermReleasePermit(phS);
@@ -716,32 +765,43 @@ bool test_rigid_concurrency_permit() {
   is_callback_invoked = false;
 
   r = zermReleasePermit(phA);
-  if (!check_success(r, "zermReleasePermit regular"))
-  {
+  if (!check_success(r, "zermReleasePermit regular")) {
     zermReleasePermit(phS);
     return clear_state();
   }
 
-  check(!is_callback_invoked,
-        "Check static permit does not participates in the renegotiation"
-        " while in active state.");
-
-  // Check that renegotiation takes place when the static permit transferred to
-  // the IDLE state, but its callback is not invoked.
-  allow_renegotiation = true;
-  eS.concurrencies[0] = total_number_of_threads;
-  eS.state = ZERM_PERMIT_STATE_IDLE;
+  if (!check(!is_callback_invoked, "Check rigid concurrency permit does not participate"
+             " in the renegotiation while in active state."))
+  {
+    zermReleasePermit(phS);
+    return clear_state();
+  }
 
   r = zermIdlePermit(phS);
-  if (!(check_success(r, "zermIdlePermit static") &&
-        check_permit(eS, phS)))
+  eS.state = ZERM_PERMIT_STATE_IDLE;
+  if (!(check_success(r, "zermIdlePermit static") && check_permit(eS, phS) &&
+      check(!is_callback_invoked, "Callback not invoked for the rigid concurrency permit that "
+            "switched to the idle state.")))
   {
     zermReleasePermit(phS);
     return clear_state();
   }
 
-  if (!check(!is_callback_invoked, "Callback shouldn't be invoked after "
-             "renegotiating permit that switched to idle state."))
+  r = zermDeactivatePermit(phS);
+  eS.concurrencies[0] = 0; eS.state = ZERM_PERMIT_STATE_INACTIVE;
+  if (!(check_success(r, "zermDeactivatePermit static") && check_permit(eS, phS) &&
+      check(!is_callback_invoked, "Callback not invoked for the rigid concurrency permit that "
+            "was deactivated.")))
+  {
+    zermReleasePermit(phS);
+    return clear_state();
+  }
+
+  r = zermActivatePermit(phS);
+  eS.concurrencies[0] = total_number_of_threads; eS.state = ZERM_PERMIT_STATE_ACTIVE;
+  if (!(check_success(r, "zermActivatePermit static") && check_permit(eS, phS) &&
+      check(!is_callback_invoked, "Callback not invoked for the rigid concurrency permit that "
+            "was deactivated.")))
   {
     zermReleasePermit(phS);
     return clear_state();
@@ -755,7 +815,6 @@ bool test_rigid_concurrency_permit() {
   if (!check_success(r, "zermDisconnect"))
     return test_fail(test_name);
 
-  std::cout << "test_static_permit done" << std::endl;
   return test_epilog(test_name);
 }
 
@@ -848,9 +907,8 @@ bool test_support_for_pending_state() {
 
   renegotiating_permits = {&phC, &phD};
   reqA = make_request(total_number_of_threads, total_number_of_threads);
-  eA.concurrencies[0] = 0;
+  eA.concurrencies[0] = 0; eA.state = ZERM_PERMIT_STATE_PENDING;
   eD.concurrencies[0] = total_number_of_threads;
-  eA.state = ZERM_PERMIT_STATE_PENDING;
   r = zermRequestPermit(clidA, reqA, &phA, &phA, &pA);
   unchanged_permits = list_unchanged_permits({{&phC, &pC}, {&phD, &pD}});
   if (!(check_success(r, "zermRequestPermit for client A (re-requesting)")
@@ -900,7 +958,6 @@ bool test_support_for_pending_state() {
   if (!check_success(r, "zermDisconnect for client D"))
     return test_fail(test_name);
 
-  std::cout << "test_support_for_pending_state done" << std::endl;
   return test_epilog(test_name);
 }
 

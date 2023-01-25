@@ -42,11 +42,13 @@ bool test_state_functions() {
     return test_fail(test_name);
 
   r = zermDeactivatePermit(ph);
+  e_concurrency = 0;
   e.state = ZERM_PERMIT_STATE_INACTIVE;
   if (!(check_success(r, "zermDeactivatePermit") && check_permit(e, ph)))
     return test_fail(test_name);
 
   r = zermActivatePermit(ph);
+  e_concurrency = total_number_of_threads;
   e.state = ZERM_PERMIT_STATE_ACTIVE;
   if (!(check_success(r, "zermActivatePermit 2") && check_permit(e, ph)))
     return test_fail(test_name);
@@ -57,11 +59,13 @@ bool test_state_functions() {
     return test_fail(test_name);
 
   r = zermDeactivatePermit(ph);
+  e_concurrency = 0;
   e.state = ZERM_PERMIT_STATE_INACTIVE;
   if (!(check_success(r, "zermDeactivatePermit") && check_permit(e, ph)))
     return test_fail(test_name);
 
   r = zermActivatePermit(ph);
+  e_concurrency = total_number_of_threads;
   e.state = ZERM_PERMIT_STATE_ACTIVE;
   if (!(check_success(r, "zermActivatePermit 3") && check_permit(e, ph)))
     return test_fail(test_name);
@@ -92,8 +96,8 @@ bool test_pending_state() {
   uint32_t eA_concurrency{0}, eB_concurrency{0};
   zerm_permit_t pA = make_void_permit(&pA_concurrency),
                 pB = make_void_permit(&pB_concurrency);
-  zerm_permit_t eA = make_void_permit(&eA_concurrency);
-  zerm_permit_t eB = make_pending_permit(&eB_concurrency);
+  zerm_permit_t eA = make_void_permit(&eA_concurrency),
+                eB = make_pending_permit(&eB_concurrency);
 
   zerm_permit_request_t reqA =
     make_request(2 * total_number_of_threads, 2 * total_number_of_threads);

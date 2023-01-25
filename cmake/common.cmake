@@ -33,3 +33,7 @@ else(MSVC)
 
   set(TCM_COMPILE_DEFINITIONS "")
 endif(MSVC)
+
+if (NOT TCM_STRICT)
+  unset(TCM_WARNING_LEVEL)
+endif()

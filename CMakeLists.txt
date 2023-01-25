@@ -47,6 +47,7 @@ install(
 # --------------------------------------------------------------------------------------------------
 
 option(TCM_TEST "Enable testing" ON)
+option(TCM_STRICT "Treat compiler warnings as errors" ON)
 
 if (TCM_TEST)
   enable_testing()

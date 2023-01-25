@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "hwloc_test_utils.h"
 #include "tcm/detail/_tcm_assert.h"
 #include "tcm.h"
 // MSVC Warning: unreferenced formal parameter
@@ -52,8 +53,63 @@ char* GetEnv(const char* envname) {
 }
 __TCM_SUPPRESS_WARNING_POP
 
+
+struct masks_guard_t {
+  masks_guard_t(uint32_t size) : m_size(size) {}
+  void operator()(zerm_cpu_mask_t* cpu_masks) const {
+    for (uint32_t i = 0; i < m_size; ++i) {
+      hwloc_bitmap_free(cpu_masks[i]);
+    }
+    delete [] cpu_masks;
+  }
+private:
+  const uint32_t m_size;
+};
+
+
+zerm_permit_request_t make_request(int min_sw_threads, int max_sw_threads,
+                                   zerm_cpu_constraints_t* constraints = nullptr, uint32_t size = 0,
+                                   zerm_request_priority_t priority = ZERM_REQUEST_PRIORITY_NORMAL,
+                                   zerm_permit_flags_t flags = {})
+{
+    __TCM_ASSERT(0 <= min_sw_threads && min_sw_threads <= max_sw_threads, "Incorrect concurrency requested");
+    __TCM_ASSERT((constraints && size) || (!constraints && !size), "Inconsistent request.");
+    return zerm_permit_request_t{
+        min_sw_threads, max_sw_threads, constraints, size, priority, flags, /*reserved*/{0}
+    };
+}
+
+// TODO: rename to make_permit
+
+zerm_permit_t make_permit(uint32_t* concurrencies, zerm_cpu_mask_t* cpu_masks = nullptr,
+                          uint32_t size = 1, zerm_permit_state_t state = ZERM_PERMIT_STATE_VOID,
+                          zerm_permit_flags_t flags = {})
+{
+  __TCM_ASSERT(concurrencies, "Array of concurrencies cannnot be nullptr.");
+  return zerm_permit_t{concurrencies, cpu_masks, size, state, flags};
+}
+
+zerm_permit_t make_void_permit(uint32_t* concurrencies, zerm_cpu_mask_t* cpu_masks = nullptr,
+                               uint32_t size = 1, zerm_permit_flags_t flags = {})
+{
+    return make_permit(concurrencies, cpu_masks, size, ZERM_PERMIT_STATE_VOID, flags);
+}
+
+zerm_permit_t make_active_permit(uint32_t* concurrencies, zerm_cpu_mask_t* cpu_masks = nullptr,
+                                 uint32_t size = 1, zerm_permit_flags_t flags = {})
+{
+  return make_permit(concurrencies, cpu_masks, size, ZERM_PERMIT_STATE_ACTIVE, flags);
+}
+
+zerm_permit_t make_pending_permit(uint32_t* concurrencies, zerm_cpu_mask_t* cpu_masks = nullptr,
+                                  uint32_t size = 1, zerm_permit_flags_t flags = {})
+{
+  return make_permit(concurrencies, cpu_masks, size, ZERM_PERMIT_STATE_PENDING, flags);
+}
+
 std::string bitmap_to_string(const zerm_cpu_mask_t mask) {
   int size = hwloc_bitmap_weight(mask);
+  // size becomes -1 if bitmap is infinitely set
   if (size <= 0) size = 256;
   std::string result(size, ' ');
   hwloc_bitmap_snprintf(result.data(), result.size(), (hwloc_const_bitmap_t)mask);
@@ -72,7 +128,7 @@ bool check(bool b, const std::string& msg, const std::string& report_msg = "") {
     std::cout << "      ERROR      " << msg << std::endl;
     std::cout << "*****************" << msg << std::endl;
     std::cout << report_msg;
-  }  else {
+  }  else if (!msg.empty()){
     std::cout << "SUCCESS: " << msg << std::endl;
   }
   return b;
@@ -98,23 +154,38 @@ inline bool succeeded(ze_result_t res) {
   return (ZE_RESULT_SUCCESS == res);
 }
 
-inline bool check_success(ze_result_t res, const std::string& msg, const std::string& report_msg = "") {
+inline bool check_success(ze_result_t res, const std::string& msg = "",
+                          const std::string& report_msg = "")
+{
   return check(succeeded(res), msg, report_msg);
 }
 
-//! Returns available platform resources, taking into account the possible degree
-//! of the oversubscription (oversb_factor must be greater than zero).
-uint32_t platform_resources () {
-  const char* oversb_factor_env_value = GetEnv("RM_OVERSUBSCRIPTION_FACTOR");
+const float tcm_oversubscription_factor = [] {
+  const char* oversb_factor_env_value = GetEnv("TCM_OVERSUBSCRIPTION_FACTOR");
   float oversb_factor = 1.0f;
   if (oversb_factor_env_value) {
     // TODO: Consider alternative options for std::stof
     oversb_factor = std::stof(oversb_factor_env_value);
-    check(oversb_factor > std::numeric_limits<float>::epsilon(),
-          "Incorrect value of RM_OVERSUBSCRIPTION_FACTOR environment variable.");
+    __TCM_ASSERT(oversb_factor > std::numeric_limits<float>::epsilon(),
+                 "Incorrect value of TCM_OVERSUBSCRIPTION_FACTOR environment variable.");
   }
+  return oversb_factor;
+}();
 
-  return uint32_t(oversb_factor * std::thread::hardware_concurrency());
+//! Returns available platform resources, taking into account the possible
+//! degree of the oversubscription (oversb_factor must be greater than zero).
+uint32_t platform_resources () {
+  return uint32_t(tcm_oversubscription_factor * std::thread::hardware_concurrency());
+}
+
+//! Returns available platform resources, taking into account the possible
+//! degree of the oversubscription (oversb_factor must be greater than zero) and
+//! process mask.
+uint32_t platform_resources(tcm_test::system_topology& tp) {
+  auto process_mask = tp.allocate_process_affinity_mask();
+  uint32_t result = uint32_t(tcm_oversubscription_factor * hwloc_bitmap_weight(process_mask));
+  tp.free_affinity_mask(process_mask);
+  return result;
 }
 
 // TODO: rename total_number_of_threads to num_total_threads
@@ -126,7 +197,9 @@ bool check_permit_size(const zerm_permit_t& expected, const zerm_permit_t& actua
   const auto& a = actual.size;
   const auto& e = expected.size;
   const bool result = (a == e);
-  std::string report_str = "Check size, expected " + std::to_string(e) + " equals to actual " + std::to_string(a);
+
+  std::string report_str = "Check size of arrays inside permit, expected " + std::to_string(e) +
+      " equals to actual " + std::to_string(a);
 
   return report ? check(result, report_str) : result;
 }
@@ -143,7 +216,8 @@ bool check_permit_concurrency(const zerm_permit_t& expected, const zerm_permit_t
     result = (e == a);
     // TODO: print not only the wrong element, but the whole range
     report_str = "Check concurrency, expected " + std::to_string(e) +
-      " equals to actual " + std::to_string(a) + ", index " + std::to_string(i);
+      " equals to actual " + std::to_string(a) + ", concurrency array index of "
+        + std::to_string(i);
 
     if (!result)
       break;
@@ -155,28 +229,31 @@ bool check_permit_concurrency(const zerm_permit_t& expected, const zerm_permit_t
 bool check_permit_mask(const zerm_permit_t& expected, const zerm_permit_t& actual,
                        const bool report = true)
 {
+  std::string report_str{};
   // check the cpu_masks pointers
   if (expected.cpu_masks == nullptr && actual.cpu_masks == nullptr) {
     return true;
   } else if (expected.cpu_masks == nullptr || actual.cpu_masks == nullptr) {
-    return check(false, "Check CPU masks");
+    report_str = "Check CPU mask, expected.masks '" +
+                 std::to_string(uintptr_t(expected.cpu_masks)) +
+                 "' equals to actual '" + std::to_string(uintptr_t(actual.cpu_masks)) + "'";
+    return report ? check(false, report_str) : false;
   }
 
   bool result = false;
-  std::string report_str{};
   for (unsigned i = 0; i < expected.size; ++i) {
     // check the cpu_masks values
     const auto& e = expected.cpu_masks[i]; const auto& a = actual.cpu_masks[i];
 
     if (e && a) {
-      result = (hwloc_bitmap_compare(e,a) == 0);
+      result = (hwloc_bitmap_compare(e, a) == 0);
       // TODO: print not only the wrong element, but the whole range
-      report_str = "Check CPU mask, expected " +  bitmap_to_string(e) +
-        " equals to actual " + bitmap_to_string(a) + " ,index " + std::to_string(i);
+      report_str = "Check CPU mask, expected '" + bitmap_to_string(e) +
+        "' equals to actual '" + bitmap_to_string(a) + "', mask index " + std::to_string(i);
     } else {
       result = (a == nullptr);
-      report_str = "Check CPU mask is not nullptr: actual " +  bitmap_to_string(a) +
-        " ,index " + std::to_string(i);
+      report_str = "Check CPU mask is not nullptr: actual '" +  bitmap_to_string(a) +
+        "', index " + std::to_string(i);
     }
 
     if (!result) break;
@@ -185,13 +262,18 @@ bool check_permit_mask(const zerm_permit_t& expected, const zerm_permit_t& actua
   return report ? check(result, report_str) : result;
 }
 
+static const char* states[] = {
+  "VOID", "INACTIVE", "PENDING", "IDLE", "ACTIVE"
+};
+
 bool check_permit_state(const zerm_permit_t& expected, const zerm_permit_t& actual,
                         const bool report = true)
 {
   const auto& e = expected.state; const auto& a = actual.state;
   const bool result = (e == a);
   std::string report_str = "Check state, expected " + std::to_string(e) +
-    " equals to actual " + std::to_string(a);
+    " (" + std::string(states[e]) + ") equals to actual " + std::to_string(a) +
+    " (" + std::string(states[a]) + ")";
 
   return report ? check(result, report_str) : result;
 }
@@ -218,6 +300,8 @@ struct skip_checks_t {
   bool mask = false;
 };
 
+// Compares two permits' data. Returns true if the data is equal, false -
+// otherwise. Function allows skipping check of specific permit data fields.
 bool check_permit(const zerm_permit_t& expected, const zerm_permit_t& actual,
                   const skip_checks_t skip = {}, const bool report = true)
 {
@@ -230,52 +314,44 @@ bool check_permit(const zerm_permit_t& expected, const zerm_permit_t& actual,
   return result;
 }
 
-zerm_permit_request_t make_request(int32_t min_sw_threads, int32_t max_sw_threads,
-  zerm_permit_flags_t flags = {}) {
-  zerm_permit_request_t result = ZERM_PERMIT_REQUEST_INITIALIZER;
-  result.min_sw_threads = min_sw_threads;
-  result.max_sw_threads = max_sw_threads;
-  result.flags = flags;
-  return result;
-}
-
-zerm_permit_t make_void_permit(uint32_t* concurrencies, zerm_cpu_mask_t* cpu_masks = nullptr,
-  uint32_t size = 1, zerm_permit_state_t state = ZERM_PERMIT_STATE_VOID,
-  zerm_permit_flags_t flags = {}) {
-  __TCM_ASSERT(concurrencies, "Array of concurrencies cannnot be nullptr.");
-  return zerm_permit_t{ concurrencies, cpu_masks, size, state, flags };
-}
-
-zerm_permit_t make_active_permit(uint32_t* concurrencies, zerm_cpu_mask_t* cpu_masks = nullptr,
-  uint32_t size = 1, zerm_permit_flags_t flags = {}) {
-  return make_void_permit(concurrencies, cpu_masks, size, ZERM_PERMIT_STATE_ACTIVE, flags);
-}
-
-zerm_permit_t make_pending_permit(uint32_t* concurrencies, zerm_cpu_mask_t* cpu_masks = nullptr,
-  uint32_t size = 1, zerm_permit_flags_t flags = {}) {
-  return make_void_permit(concurrencies, cpu_masks, size, ZERM_PERMIT_STATE_PENDING, flags);
-}
-
-//! Expects successful reading of a permit, thus cannot be used concurrently
-//! with the modification of the permit. Throws exception if reading of the
-//! permit was not successful.
+//! Checks the expected permit data with the data obtained by reading passed
+//! permit handle. Returns true if the data is equal, and false - otherwise.
 bool check_permit(const zerm_permit_t& expected, zerm_permit_handle_t ph,
                   const skip_checks_t skip = {}, const bool report = true)
 {
   if (!check(ph, "check permit handle is not nullptr."))
     return false;
 
-  uint32_t actual_concurrency;
-  zerm_permit_t actual = make_void_permit(&actual_concurrency);
-  ze_result_t reading_result = zermGetPermitData(ph, &actual);
-  if (!check_success(reading_result, "Reading data from permit " + std::to_string(uintptr_t(ph))))
-    throw std::string("Error: failed reading permit with status " + std::to_string(reading_result));
+  __TCM_ASSERT(expected.size > 0, "Permit size cannot be zero.");
+  std::vector<uint32_t> concurrencies(expected.size, 0);
+  std::unique_ptr<zerm_cpu_mask_t[], masks_guard_t> cpu_masks(nullptr, masks_guard_t(expected.size));
+  if (expected.cpu_masks) {
+    cpu_masks.reset(new zerm_cpu_mask_t[expected.size]);
+    for (uint32_t i = 0; i < expected.size; ++i) {
+      cpu_masks[i] = hwloc_bitmap_alloc();
+    }
+  }
 
-  return check_permit(expected, actual, skip, report);
+  zerm_permit_t actual = make_void_permit(concurrencies.data(), cpu_masks.get(), expected.size);
+  ze_result_t reading_result = zermGetPermitData(ph, &actual);
+  if (!check_success(reading_result)) {
+      return check(false, "Reading data from permit " + std::to_string(uintptr_t(ph)),
+                   "zermGetPermitData() returns status " + std::to_string(reading_result));
+  }
+
+  bool result = check_permit(expected, actual, skip, report);
+  return result;
 }
 
 typedef std::vector< std::pair<zerm_permit_handle_t*, zerm_permit_t*> > permits_data_t;
 
+/**
+ * \brief Returns a set of permit handles, whose data is equal to corresponding
+ * (expected) permit data passed as a sequence of pairs.
+ *
+ * Thus, if existing permits are passed as a parameter, the function returns
+ * permit handles, for which the renegotiation should not have taken place.
+ */
 std::set<zerm_permit_handle_t*> list_unchanged_permits(const permits_data_t& pds) {
   std::set<zerm_permit_handle_t*> result;
 
