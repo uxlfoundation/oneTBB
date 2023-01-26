@@ -1100,7 +1100,7 @@ protected:
                     constraint.max_concurrency, pd_mask
                 );
 
-                __TCM_ASSERT(constraint_max >= constraint_min, "Broken concurrency in constraint");
+                __TCM_ASSERT(constraint_min <= constraint_max, "Broken concurrency in constraint");
 
                 negotiable_snapshot_t stakeholders = try_satisfy(ph, constraint_min, constraint_max,
                                                                  current_concurrency, pd_mask);
@@ -1756,7 +1756,6 @@ public:
         // The data_mutex lock must be taken
         tracer t("ThreadComposabilityFCFSCImpl::adjust_existing_permit");
         __TCM_ASSERT(is_valid(ph), "Invalid permit.");
-        // __TCM_ASSERT(req == permit_to_request_map[ph], "Inconsistent request state.");
 
         fulfilment_t ff = try_satisfy_request(req, ph, available_concurrency);
 
@@ -1971,7 +1970,6 @@ protected:
         tracer t("ThreadComposabilityFairBalance::adjust_existing_permit");
 
         __TCM_ASSERT(is_valid(ph), "Invalid permit.");
-        // __TCM_ASSERT(req == permit_to_request_map[ph], "Inconsistent request state.");
 
         // Trying to squeeze resources out of the platform, returning permits that share
         // resources needed by that ph
