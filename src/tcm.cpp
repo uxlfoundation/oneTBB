@@ -554,14 +554,44 @@ public:
       client_to_callback_map.erase(clid);
   }
 
-  zerm_permit_request_t copy_request(zerm_permit_request_t& req) {
-    zerm_permit_request_t copy_req{req};
-    copy_req.cpu_constraints = new zerm_cpu_constraints_t[copy_req.constraints_size];
-    for (uint32_t i = 0; i < copy_req.constraints_size; ++i) {
-      copy_req.cpu_constraints[i] = req.cpu_constraints[i];
-    }
+  void allocate_constraints(zerm_permit_request_t& req) {
+      __TCM_ASSERT(req.cpu_constraints, "Nothing to copy from.");
+      zerm_cpu_constraints_t* client_constraints = req.cpu_constraints;
+      req.cpu_constraints = new zerm_cpu_constraints_t[req.constraints_size];
+      for (uint32_t i = 0; i < req.constraints_size; ++i) {
+          req.cpu_constraints[i] = client_constraints[i];
+          if (client_constraints[i].mask)
+              req.cpu_constraints[i].mask = hwloc_bitmap_dup(client_constraints[i].mask);
+      }
+  }
 
-    return copy_req;
+  void deallocate_constraints(zerm_permit_request_t& req) {
+      __TCM_ASSERT(req.cpu_constraints, "Nothing to deallocate.");
+      for (uint32_t i = 0; i < req.constraints_size; ++i)
+          hwloc_bitmap_free(req.cpu_constraints[i].mask);
+      delete [] req.cpu_constraints;
+  }
+
+  void copy_request(zerm_permit_request_t& to, const zerm_permit_request_t& from) {
+    __TCM_ASSERT(to.constraints_size == from.constraints_size,
+                 "Updating permit request should not change the mask of the permit.");
+    zerm_cpu_constraints_t* internal_cpu_constraints = to.cpu_constraints;
+    to = from;
+    to.cpu_constraints = internal_cpu_constraints; // Restore the pointer to TCM's memory
+
+    for (uint32_t i = 0; i < to.constraints_size; ++i) {
+        zerm_cpu_mask_t internal_mask = to.cpu_constraints[i].mask;
+        __TCM_ASSERT(!!internal_mask == !!from.cpu_constraints[i].mask,
+                     "Mask cannot be changed when re-requesting resources for existing permit.");
+
+        if (internal_mask) {
+            int r = hwloc_bitmap_copy(internal_mask, from.cpu_constraints[i].mask);
+            __TCM_ASSERT_EX(r >= 0, "Could not copy the mask from the permit request.");
+        }
+
+        to.cpu_constraints[i] = from.cpu_constraints[i];
+        to.cpu_constraints[i].mask = internal_mask;
+    }
   }
 
   bool request_permit(zerm_client_id_t clid, zerm_permit_request_t& req,
@@ -601,6 +631,12 @@ public:
       // calculation to avoid early renegotiation
       if (is_requesting_new_permit) {
           client_to_permit_mmap.emplace(ph->data.client_id, ph);
+          // Allocate memory for deep copying of the permit request.
+          auto emplace_result = permit_to_request_map.emplace(ph, req);
+          __TCM_ASSERT(emplace_result.second, "The element with such key should not be present.");
+          zerm_permit_request_t& req_copy = emplace_result.first->second;
+          if (req_copy.cpu_constraints)
+            allocate_constraints(req_copy);
       } else {
           // Request is being updated for existing permit. To avoid in-the-middle
           // negotiations for that permit change its state to PENDING until its new
@@ -608,10 +644,17 @@ public:
           const uint32_t released = move_to_pending(ph);
           available_concurrency += released;
       }
-      // TODO: Do deep copy of constrained requests. Otherwise, accessing it after the client went
-      // out of scope will result in crash.
-      permit_to_request_map[ph] = copy_request(req);
+
       permit_to_callback_arg_map[ph] = callback_arg;
+
+      // Avoid dependency on the client memory allocated for permit request.
+      // It helps to avoid:
+      //   a) Crashes in case client memory gets destroyed while the associated permit is not yet
+      //      released.
+      //   b) Data races in case of a client updating the permit request for re-requesting resources
+      //      for an existing permit, while other thread is reading it inside TCM.
+      __TCM_ASSERT(is_valid(ph), "Permit request structure must exist.");
+      copy_request(permit_to_request_map[ph], req);
 
       std::vector<permit_change_t> updates = adjust_existing_permit(req, ph);
 
@@ -1504,7 +1547,12 @@ protected:
         {
             const std::lock_guard<std::mutex> l(data_mutex);
             __TCM_ASSERT(is_valid(ph), "Invalid permit is being released.");
+
+            zerm_permit_request_t& req = permit_to_request_map[ph];
+            if (req.cpu_constraints)
+              deallocate_constraints(req);
             permit_to_request_map.erase(ph);
+
             permit_to_callback_arg_map.erase(ph);
 
             auto client_phs = client_to_permit_mmap.equal_range(pd.client_id);
