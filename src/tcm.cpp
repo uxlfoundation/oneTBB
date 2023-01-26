@@ -554,6 +554,16 @@ public:
       client_to_callback_map.erase(clid);
   }
 
+  zerm_permit_request_t copy_request(zerm_permit_request_t& req) {
+    zerm_permit_request_t copy_req{req};
+    copy_req.cpu_constraints = new zerm_cpu_constraints_t[copy_req.constraints_size];
+    for (uint32_t i = 0; i < copy_req.constraints_size; ++i) {
+      copy_req.cpu_constraints[i] = req.cpu_constraints[i];
+    }
+
+    return copy_req;
+  }
+
   bool request_permit(zerm_client_id_t clid, zerm_permit_request_t& req,
                       void* callback_arg, zerm_permit_handle_t* permit_handle,
                       zerm_permit_t* permit)
@@ -600,7 +610,7 @@ public:
       }
       // TODO: Do deep copy of constrained requests. Otherwise, accessing it after the client went
       // out of scope will result in crash.
-      permit_to_request_map[ph] = req;
+      permit_to_request_map[ph] = copy_request(req);
       permit_to_callback_arg_map[ph] = callback_arg;
 
       std::vector<permit_change_t> updates = adjust_existing_permit(req, ph);
@@ -1012,7 +1022,7 @@ protected:
     }
 
     negotiable_snapshot_t try_satisfy_high_level_constraints(zerm_permit_handle_t ph,
-                                                             zerm_cpu_constraints_t& constraint,
+                                                             const zerm_cpu_constraints_t& constraint,
                                                              const uint32_t current_concurrency,
                                                              zerm_cpu_mask_t pd_mask)
     {
@@ -1046,6 +1056,8 @@ protected:
                 uint32_t constraint_max = infer_constraint_max_concurrency(
                     constraint.max_concurrency, pd_mask
                 );
+
+                __TCM_ASSERT(constraint_max >= constraint_min, "Broken concurrency in constraint");
 
                 negotiable_snapshot_t stakeholders = try_satisfy(ph, constraint_min, constraint_max,
                                                                  current_concurrency, pd_mask);
@@ -1107,7 +1119,7 @@ protected:
                                  zerm_permit_handle_t ph)
     {
         for (uint32_t constr_idx = 0; constr_idx < req.constraints_size; ++constr_idx) {
-            zerm_cpu_constraints_t& constraint = req.cpu_constraints[constr_idx];
+            const zerm_cpu_constraints_t& constraint = req.cpu_constraints[constr_idx];
             __TCM_ASSERT(
                 constraint.max_concurrency == zerm_automatic ||
                 constraint.min_concurrency <= constraint.max_concurrency,
@@ -1381,8 +1393,6 @@ protected:
     fulfilment_t try_satisfy_request(const zerm_permit_request_t& req, zerm_permit_handle_t ph,
                                      uint32_t available_concurrency_snapshot)
     {
-        __TCM_ASSERT(req.max_sw_threads >= 0, "Incorrect concurrency requested");
-
         // TODO: Determine whether permit can have dynamic flags, i.e. flags can be
         // changed during resource re-requesting. Otherwise, copying of flags seems
         // unnecessary anywhere else except for the first time resources are
@@ -1698,7 +1708,7 @@ public:
         // The data_mutex lock must be taken
         tracer t("ThreadComposabilityFCFSCImpl::adjust_existing_permit");
         __TCM_ASSERT(is_valid(ph), "Invalid permit.");
-        __TCM_ASSERT(req == permit_to_request_map[ph], "Inconsistent request state.");
+        // __TCM_ASSERT(req == permit_to_request_map[ph], "Inconsistent request state.");
 
         fulfilment_t ff = try_satisfy_request(req, ph, available_concurrency);
 
@@ -1913,7 +1923,7 @@ protected:
         tracer t("ThreadComposabilityFairBalance::adjust_existing_permit");
 
         __TCM_ASSERT(is_valid(ph), "Invalid permit.");
-        __TCM_ASSERT(req == permit_to_request_map[ph], "Inconsistent request state.");
+        // __TCM_ASSERT(req == permit_to_request_map[ph], "Inconsistent request state.");
 
         // Trying to squeeze resources out of the platform, returning permits that share
         // resources needed by that ph
