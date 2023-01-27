@@ -1199,7 +1199,7 @@ protected:
             if (new_concurrency < cns.adjusted_min_concurrency()) {
                 // Cannot negotiate necessary amount of resources for constraint. The permit is
                 // going to be left in PENDING state.
-                fulfilment.pending_constraints_indices.push_back(i);
+                fulfilment.pending_constraints_indices.push_back(static_cast<int>(i));
                 // Value < 0 means cannot satisfy required concurrency.
                 decision[i].need = new_concurrency - cns.adjusted_min_concurrency();
             } else {
@@ -1358,8 +1358,8 @@ protected:
         result.push_back(std::move(requested_permit));
 
         // Merging constraints negotiations for each permit handle
-        for (zerm_permit_handle_t ph : handles) {
-            auto range = new_grants.equal_range(ph);
+        for (zerm_permit_handle_t curr_ph : handles) {
+            auto range = new_grants.equal_range(curr_ph);
             permit_change_t pc = range.first->second;
             std::vector<uint32_t>& concurrencies = pc.new_concurrencies;
             for (auto it = ++range.first; it != range.second; ++it) {

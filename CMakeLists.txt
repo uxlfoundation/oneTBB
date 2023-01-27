@@ -11,6 +11,14 @@ set(CMAKE_CXX_EXTENSIONS OFF) # use -std=c++... instead of -std=gnu++...
 option(TCM_TEST "Enable testing" ON)
 option(TCM_STRICT "Treat compiler warnings as errors" ON)
 
+# include compile settings
+set(TCM_COMPILER_SETTINGS_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/compilers/${CMAKE_CXX_COMPILER_ID}.cmake)
+if (EXISTS ${TCM_COMPILER_SETTINGS_FILE})
+    include(${TCM_COMPILER_SETTINGS_FILE})
+else()
+    message(WARNING "TCM compiler settings not found ${TCM_COMPILER_SETTINGS_FILE}")
+endif()
+
 # --------------------------------------------------------------------------------------------------
 # Define Cpack variables + CMake installation related includes
 set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
@@ -47,14 +55,6 @@ install(
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
 # --------------------------------------------------------------------------------------------------
-
-# include compile settings
-set(TCM_COMPILER_SETTINGS_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/compilers/${CMAKE_CXX_COMPILER_ID}.cmake)
-if (EXISTS ${TCM_COMPILER_SETTINGS_FILE})
-    include(${TCM_COMPILER_SETTINGS_FILE})
-else()
-    message(WARNING "TCM compiler settings not found ${TCM_COMPILER_SETTINGS_FILE}")
-endif()
 
 if (TCM_TEST)
   enable_testing()

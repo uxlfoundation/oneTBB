@@ -2,12 +2,6 @@
 
 cmake_minimum_required(VERSION 3.1)
 
-if (EXISTS ${TCM_COMPILER_SETTINGS_FILE})
-    include(${TCM_COMPILER_SETTINGS_FILE})
-else()
-    message(WARNING "TCM compiler settings not found ${TCM_COMPILER_SETTINGS_FILE}")
-endif()
-
 # --------------------------------------------------------------------------------------------------
 # Find the HWLOC library
 if (NOT TARGET HWLOC::hwloc)

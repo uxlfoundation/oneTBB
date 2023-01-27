@@ -63,7 +63,7 @@ struct mask_deleter {
 template <typename MaskGenerator>
 struct test_one_constrained_request {
   std::string test_name;
-  uint32_t concurrency = total_number_of_threads;
+  uint32_t concurrency = static_cast<uint32_t>(total_number_of_threads);
   MaskGenerator get_mask{};
 
   bool operator()() {
@@ -131,8 +131,8 @@ bool test_one_constrained_request_first_core_mask() {
 template <typename MaskGeneratorA, typename MaskGeneratorB>
 struct test_two_constrained_requests {
   std::string test_name;
-  uint32_t concurrencyA = total_number_of_threads / 2;
-  uint32_t concurrencyB = total_number_of_threads - total_number_of_threads / 2;
+  uint32_t concurrencyA = static_cast<uint32_t>(total_number_of_threads / 2);
+  uint32_t concurrencyB = static_cast<uint32_t>(total_number_of_threads - total_number_of_threads / 2);
   MaskGeneratorA get_maskA{};
   MaskGeneratorB get_maskB{};
 
@@ -229,8 +229,8 @@ template <typename MaskGeneratorA, typename MaskGeneratorB>
 struct test_two_constrained_requests_oversubscribe {
 
   std::string test_name;
-  uint32_t concurrencyA = tcm_oversubscription_factor;
-  uint32_t concurrencyB = tcm_oversubscription_factor;
+  uint32_t concurrencyA = static_cast<uint32_t>(tcm_oversubscription_factor);
+  uint32_t concurrencyB = static_cast<uint32_t>(tcm_oversubscription_factor);
   MaskGeneratorA get_maskA{};
   MaskGeneratorB get_maskB{};
 

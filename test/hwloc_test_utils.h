@@ -10,7 +10,20 @@
 #include <vector>
 
 #include "tcm/detail/_tcm_assert.h"
-#include "hwloc.h"
+
+#if _MSC_VER && !__INTEL_COMPILER && !__clang__
+#pragma warning( push )
+#pragma warning( disable : 4100 )
+#elif _MSC_VER && __clang__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+#include <hwloc.h>
+#if _MSC_VER && !__INTEL_COMPILER && !__clang__
+#pragma warning( pop )
+#elif _MSC_VER && __clang__
+#pragma GCC diagnostic pop
+#endif
 
 #define __TCM_HWLOC_HYBRID_CPUS_INTERFACES_PRESENT                         \
   (HWLOC_API_VERSION >= 0x20400)
