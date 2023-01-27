@@ -555,16 +555,21 @@ public:
       client_to_callback_map.erase(clid);
   }
 
-  // void allocate_constraints(zerm_permit_request_t& req) {
-  //     __TCM_ASSERT(req.cpu_constraints, "Nothing to copy from.");
-  //     zerm_cpu_constraints_t* client_constraints = req.cpu_constraints;
-  //     req.cpu_constraints = new zerm_cpu_constraints_t[req.constraints_size];
-  //     for (uint32_t i = 0; i < req.constraints_size; ++i) {
-  //         req.cpu_constraints[i] = client_constraints[i];
-  //         if (client_constraints[i].mask)
-  //             req.cpu_constraints[i].mask = hwloc_bitmap_dup(client_constraints[i].mask);
-  //     }
-  // }
+    /**
+     * Allocates and copies constraints for the specified permit request.
+     *
+     * Assumes actual pointer to constraints is written to the passed constraints argument.
+     */
+  void allocate_constraints_by_copy(zerm_permit_request_t& req) {
+      __TCM_ASSERT(req.cpu_constraints, "Nothing to copy from.");
+      zerm_cpu_constraints_t* client_constraints = req.cpu_constraints;
+      req.cpu_constraints = new zerm_cpu_constraints_t[req.constraints_size];
+      for (uint32_t i = 0; i < req.constraints_size; ++i) {
+          req.cpu_constraints[i] = client_constraints[i];
+          if (client_constraints[i].mask)
+              req.cpu_constraints[i].mask = hwloc_bitmap_dup(client_constraints[i].mask);
+      }
+  }
 
   void deallocate_constraints(zerm_permit_request_t& req) {
       __TCM_ASSERT(req.cpu_constraints, "Nothing to deallocate.");
@@ -632,23 +637,16 @@ public:
           permits.push_back(ph);
           client_to_permit_mmap.emplace(ph->data.client_id, ph);
       } else {
+          __TCM_ASSERT(is_valid(ph), "Permit request structure must exist.");
+          copy_request(ph->request, req);
+
           // Request is being updated for existing permit. To avoid in-the-middle
           // negotiations for that permit change its state to PENDING until its new
           // required/minimum parameters are further satisfied.
           const uint32_t released = move_to_pending(ph);
           available_concurrency += released;
       }
-
       permit_to_callback_arg_map[ph] = callback_arg;
-
-      // Avoid dependency on the client memory allocated for permit request.
-      // It helps to avoid:
-      //   a) Crashes in case client memory gets destroyed while the associated permit is not yet
-      //      released.
-      //   b) Data races in case of a client updating the permit request for re-requesting resources
-      //      for an existing permit, while other thread is reading it inside TCM.
-      __TCM_ASSERT(is_valid(ph), "Permit request structure must exist.");
-      copy_request(ph->request, req);
 
       std::vector<permit_change_t> updates = adjust_existing_permit(req, ph);
 
@@ -1519,16 +1517,22 @@ protected:
         pd.size = 1;
         pd.cpu_mask = nullptr;
 
+        // Avoid dependency on the client memory allocated for permit request. It helps to avoid:
+        //
+        //   a) Crashes in case client memory gets destroyed while the associated permit is not yet
+        //      released.
+        //
+        //   b) Data races in case of a client updating the permit request for re-requesting
+        //      resources for an existing permit, while other thread is reading it inside TCM.
         zerm_permit_request_t& pr = ph->request;
-        pr = ZERM_PERMIT_REQUEST_INITIALIZER;
+        pr = req;               // Do shallow copy first
+
         if (bool(req.cpu_constraints)) {
+            allocate_constraints_by_copy(pr);
+
             pd.size = req.constraints_size;
             pd.cpu_mask = new zerm_cpu_mask_t[pd.size];
-            pr.cpu_constraints = new zerm_cpu_constraints_t[req.constraints_size];
             for (uint32_t i = 0; i < pd.size; ++i) {
-                if (req.cpu_constraints[i].mask)
-                    pr.cpu_constraints[i].mask = hwloc_bitmap_alloc();
-
                 pd.cpu_mask[i] = hwloc_bitmap_alloc();
                 __TCM_ASSERT(hwloc_bitmap_iszero(pd.cpu_mask[i]), "Not empty mask");
             }
