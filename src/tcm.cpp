@@ -1803,8 +1803,8 @@ protected:
         // distribute whole platform concurrency
         uint32_t available_concurrency_snapshot = initially_available_concurrency;
 
-        static std::map<uint32_t, zerm_permit_handle_t> renegotiation_pending;
-        static std::vector<std::pair<int32_t, zerm_permit_handle_t>> renegotiation_active_idle;
+        std::map<uint32_t, zerm_permit_handle_t> renegotiation_pending;
+        std::vector<std::pair<int32_t, zerm_permit_handle_t>> renegotiation_active_idle;
         std::vector<permit_change_t> updates;
         {
             const std::lock_guard<std::mutex> lock(data_mutex);
@@ -1901,9 +1901,6 @@ protected:
                 updates.push_back(permit_update);
             }
             callbacks = apply(*this, initiator, updates);
-
-            renegotiation_pending.clear();
-            renegotiation_active_idle.clear();
         }
         invoke_callbacks(callbacks);
     }
