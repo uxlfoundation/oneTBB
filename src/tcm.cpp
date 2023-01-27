@@ -585,7 +585,7 @@ public:
 
     for (uint32_t i = 0; i < to.constraints_size; ++i) {
         zerm_cpu_mask_t internal_mask = to.cpu_constraints[i].mask;
-        __TCM_ASSERT(!!internal_mask == !!from.cpu_constraints[i].mask,
+        __TCM_ASSERT(0 == hwloc_bitmap_compare(internal_mask, from.cpu_constraints[i].mask),
                      "Mask cannot be changed when re-requesting resources for existing permit.");
 
         if (internal_mask) {
