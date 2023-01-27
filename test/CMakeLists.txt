@@ -1,7 +1,5 @@
 # Copyright (c) 2021-2022 Intel Corporation
 
-# include common compile settings
-include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/common.cmake)
 
 if (NOT MSVC) # no need to change options for MSVC
     # suppress extra warnings:
@@ -13,7 +11,15 @@ endif()
 foreach(tpp test_basic_apis.cpp test_fcfsc.cpp test_rb.cpp test_constrained_requests.cpp)
   string(REPLACE ".cpp" "" texe ${tpp})
   add_executable(${texe} ${tpp})
-  target_compile_options(${texe} PRIVATE ${TCM_WARNING_LEVEL})
+  target_compile_options(${texe}
+    PRIVATE
+    ${TCM_WARNING_LEVEL}
+    ${TCM_TEST_WARNING_FLAGS}
+    ${TCM_WARNING_SUPPRESS}
+    ${TCM_MMD_FLAG}
+    ${TCM_DSE_FLAG}
+    ${TCM_COMMON_COMPILE_FLAGS}
+  )
   target_compile_definitions(${texe} PRIVATE ${TCM_COMPILE_DEFINITIONS})
 
   target_link_libraries(${texe} PUBLIC tcm)

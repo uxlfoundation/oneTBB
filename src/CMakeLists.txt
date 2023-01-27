@@ -1,7 +1,12 @@
 # Copyright (c) 2021-2022 Intel Corporation
 
-# include common compile settings
-include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/common.cmake)
+cmake_minimum_required(VERSION 3.1)
+
+if (EXISTS ${TCM_COMPILER_SETTINGS_FILE})
+    include(${TCM_COMPILER_SETTINGS_FILE})
+else()
+    message(WARNING "TCM compiler settings not found ${TCM_COMPILER_SETTINGS_FILE}")
+endif()
 
 # --------------------------------------------------------------------------------------------------
 # Find the HWLOC library
@@ -13,14 +18,27 @@ endif()
 
 add_library(${PROJECT_NAME} SHARED tcm.cpp)
 
-target_compile_options(${PROJECT_NAME} PRIVATE ${TCM_WARNING_LEVEL})
+target_compile_options(${PROJECT_NAME}
+  PRIVATE
+  ${TCM_WARNING_LEVEL}
+  ${TCM_WARNING_SUPPRESS}
+  ${TCM_LIB_COMPILE_FLAGS}
+  ${TCM_MMD_FLAG}
+  ${TCM_DSE_FLAG}
+  ${TCM_COMMON_COMPILE_FLAGS}
+)
 target_compile_definitions(${PROJECT_NAME} PRIVATE ${TCM_COMPILE_DEFINITIONS})
 
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-target_link_libraries(${PROJECT_NAME} PUBLIC HWLOC::hwloc)
+target_link_libraries(${PROJECT_NAME}
+  PUBLIC
+  HWLOC::hwloc
+  PRIVATE
+  ${TCM_LIB_LINK_FLAGS}
+)
 target_compile_definitions(${PROJECT_NAME} PUBLIC $<$<CONFIG:DEBUG>:TCM_DEBUG>)
 
 install(TARGETS ${PROJECT_NAME}

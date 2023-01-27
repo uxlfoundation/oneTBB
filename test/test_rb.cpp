@@ -653,9 +653,6 @@ bool test_permit_reactivation() {
   // its callback should be invoked.
   renegotiating_permits = {&phB};
 
-  skip_checks_t skip_concurrenency_check = {};
-  skip_concurrenency_check.concurrency = true;
-
   eA.state = ZERM_PERMIT_STATE_ACTIVE;
   eB_concurrency = rB.max_sw_threads;
   // Permit A won't negotiate since its minimum is satisfied. However, it will use the remaining
