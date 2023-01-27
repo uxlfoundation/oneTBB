@@ -47,6 +47,7 @@ typedef uint64_t zerm_permit_epoch_t;
 
 struct zerm_permit_rep_t {
   std::atomic<zerm_permit_epoch_t> epoch;
+  zerm_permit_request_t request; // Holds latest corresponding request
   zerm_permit_data_t data;
 };
 
@@ -363,8 +364,8 @@ struct ThreadComposabilityManagerData {
   //! The CPU mask of the process
   zerm_cpu_mask_t process_mask = nullptr;
 
-  //! The map of existing permits and corresponding requests.
-  std::unordered_map<zerm_permit_handle_t, zerm_permit_request_t> permit_to_request_map{};
+  //! The existing permits
+  std::vector<zerm_permit_handle_t> permits{};
 
   //! The map of callbacks per each client. Callbacks are used during
   //! renegotiation of permits.
@@ -554,16 +555,16 @@ public:
       client_to_callback_map.erase(clid);
   }
 
-  void allocate_constraints(zerm_permit_request_t& req) {
-      __TCM_ASSERT(req.cpu_constraints, "Nothing to copy from.");
-      zerm_cpu_constraints_t* client_constraints = req.cpu_constraints;
-      req.cpu_constraints = new zerm_cpu_constraints_t[req.constraints_size];
-      for (uint32_t i = 0; i < req.constraints_size; ++i) {
-          req.cpu_constraints[i] = client_constraints[i];
-          if (client_constraints[i].mask)
-              req.cpu_constraints[i].mask = hwloc_bitmap_dup(client_constraints[i].mask);
-      }
-  }
+  // void allocate_constraints(zerm_permit_request_t& req) {
+  //     __TCM_ASSERT(req.cpu_constraints, "Nothing to copy from.");
+  //     zerm_cpu_constraints_t* client_constraints = req.cpu_constraints;
+  //     req.cpu_constraints = new zerm_cpu_constraints_t[req.constraints_size];
+  //     for (uint32_t i = 0; i < req.constraints_size; ++i) {
+  //         req.cpu_constraints[i] = client_constraints[i];
+  //         if (client_constraints[i].mask)
+  //             req.cpu_constraints[i].mask = hwloc_bitmap_dup(client_constraints[i].mask);
+  //     }
+  // }
 
   void deallocate_constraints(zerm_permit_request_t& req) {
       __TCM_ASSERT(req.cpu_constraints, "Nothing to deallocate.");
@@ -573,8 +574,6 @@ public:
   }
 
   void copy_request(zerm_permit_request_t& to, const zerm_permit_request_t& from) {
-    __TCM_ASSERT(to.constraints_size == from.constraints_size,
-                 "Updating permit request should not change the mask of the permit.");
     zerm_cpu_constraints_t* internal_cpu_constraints = to.cpu_constraints;
     to = from;
     to.cpu_constraints = internal_cpu_constraints; // Restore the pointer to TCM's memory
@@ -630,13 +629,8 @@ public:
       // TODO: Consider adding the permit to containers after the concurrency level
       // calculation to avoid early renegotiation
       if (is_requesting_new_permit) {
+          permits.push_back(ph);
           client_to_permit_mmap.emplace(ph->data.client_id, ph);
-          // Allocate memory for deep copying of the permit request.
-          auto emplace_result = permit_to_request_map.emplace(ph, req);
-          __TCM_ASSERT(emplace_result.second, "The element with such key should not be present.");
-          zerm_permit_request_t& req_copy = emplace_result.first->second;
-          if (req_copy.cpu_constraints)
-            allocate_constraints(req_copy);
       } else {
           // Request is being updated for existing permit. To avoid in-the-middle
           // negotiations for that permit change its state to PENDING until its new
@@ -654,7 +648,7 @@ public:
       //   b) Data races in case of a client updating the permit request for re-requesting resources
       //      for an existing permit, while other thread is reading it inside TCM.
       __TCM_ASSERT(is_valid(ph), "Permit request structure must exist.");
-      copy_request(permit_to_request_map[ph], req);
+      copy_request(ph->request, req);
 
       std::vector<permit_change_t> updates = adjust_existing_permit(req, ph);
 
@@ -830,7 +824,9 @@ protected:
 
   // Helper to determine whether the permit is not released yet. Must be
   // called under data_mutex.
-  bool is_valid(zerm_permit_handle_t ph) const { return 1 == permit_to_request_map.count(ph); }
+  bool is_valid(zerm_permit_handle_t ph) const {
+      return permits.cend() != std::find(permits.cbegin(), permits.cend(), ph);
+  }
 
   bool skip_permit_negotiation(zerm_permit_handle_t ph, zerm_permit_handle_t initiator) const
   {
@@ -917,9 +913,9 @@ protected:
         // Masks that do not intersect when separately applied
         std::queue<stakeholder_t> separate_masks;
 
-        for (auto& ph_i : permit_to_request_map) {
-            zerm_permit_data_t& pd_i = ph_i.first->data;
-            zerm_permit_request_t &req = ph_i.second;
+        for (zerm_permit_handle_t& ph_i : permits) {
+            zerm_permit_request_t& req = ph_i->request;
+            zerm_permit_data_t& pd_i = ph_i->data;
 
             if ( !pd_i.cpu_mask )     // Subscription is tracked separately on the platform level
                 continue;
@@ -936,7 +932,7 @@ protected:
 
             const bool can_negotiate = is_negotiable(ph_i_state, pd_i.flags);
 
-            __TCM_ASSERT_EX(ph_i.first != ph, "A being satisfied permit request is considered "
+            __TCM_ASSERT_EX(ph_i != ph, "A being satisfied permit request is considered "
                             "as the one whose resources can be negotiated.");
 
             for (unsigned constr_idx = 0; constr_idx < pd_i.size; ++constr_idx) {
@@ -949,7 +945,7 @@ protected:
                     can_negotiate ? (granted - req.cpu_constraints[constr_idx].min_concurrency) : 0;
 
 
-                stakeholder_t stakeholder{/*permit handle*/ph_i.first, int32_t(constr_idx), negotiable};
+                stakeholder_t stakeholder{ph_i, int32_t(constr_idx), negotiable};
                 bool add = false; // Determines whether the stakeholder actually contributes to the
                                   // subscription of the interested part of the platform, and hence
                                   // should be added to the stakeholders list.
@@ -1396,10 +1392,12 @@ protected:
                 if (st.m_constraint_index == negotiable_snapshot_t::among_all_constraints)
                     st.m_constraint_index = 0;
                 new_concurrencies[st.m_constraint_index] -= current_negotiation;
-                __TCM_ASSERT(!permit_to_request_map[st.m_ph].cpu_constraints ||
-                             permit_to_request_map[st.m_ph].cpu_constraints[st.m_constraint_index]
-                             .min_concurrency <= int32_t(new_concurrencies[st.m_constraint_index]),
-                             "Wrongly computed negotation found.");
+                __TCM_ASSERT(
+                    !st.m_ph->request.cpu_constraints ||
+                    st.m_ph->request.cpu_constraints[st.m_constraint_index].min_concurrency <=
+                    int32_t(new_concurrencies[st.m_constraint_index]),
+                    "Wrongly computed negotation found."
+                );
 
                 permit_change_t pc{st.m_ph, data.state.load(std::memory_order_relaxed),
                                    new_concurrencies};
@@ -1463,9 +1461,8 @@ protected:
             snapshot.set_adjusted_concurrencies(req.min_sw_threads, req.max_sw_threads);
 
             // Considering that all the permits affect the current one
-            for ( auto& ph_req_pair : permit_to_request_map ) {
-                const zerm_permit_handle_t& ph_i = ph_req_pair.first;
-                const zerm_permit_request_t& ph_req = ph_req_pair.second;
+            for (zerm_permit_handle_t& ph_i : permits) {
+                const zerm_permit_request_t& ph_req = ph_i->request;
                 const zerm_permit_state_t ph_state = ph_i->data.state.load(std::memory_order_relaxed);
 
                 if (ph_i == ph) {
@@ -1505,38 +1502,44 @@ protected:
     virtual std::vector<permit_change_t> adjust_existing_permit(const zerm_permit_request_t& req,
                                                                 zerm_permit_handle_t permit) = 0;
 
-  zerm_permit_handle_t make_new_permit(const zerm_client_id_t clid,
-                                       const zerm_permit_request_t& req)
-  {
-    tracer t("ThreadComposabilityManagerBase::make_new_permit");
+    zerm_permit_handle_t
+    make_new_permit(const zerm_client_id_t clid, const zerm_permit_request_t& req) {
+        tracer t("ThreadComposabilityManagerBase::make_new_permit");
 
-    zerm_permit_handle_t ph = new zerm_permit_rep_t;
-    __TCM_ASSERT(ph, "Permit was not allocated.");
+        zerm_permit_handle_t ph = new zerm_permit_rep_t;
+        __TCM_ASSERT(ph, "Permit was not allocated.");
 
-    ph->epoch.store(0, std::memory_order_relaxed);
-    zerm_permit_data_t& pd = ph->data;
+        ph->epoch.store(0, std::memory_order_relaxed);
+        zerm_permit_data_t& pd = ph->data;
 
-    __TCM_ASSERT(!req.cpu_constraints || req.constraints_size > 0, "Inconsistent constrained request");
+        __TCM_ASSERT(!req.cpu_constraints || req.constraints_size > 0,
+                     "Inconsistent constrained request");
 
-    pd.client_id = clid;
-    pd.size = 1;
-    pd.cpu_mask = nullptr;
+        pd.client_id = clid;
+        pd.size = 1;
+        pd.cpu_mask = nullptr;
 
-    if (bool(req.cpu_constraints)) {
-      pd.size = req.constraints_size;
-      pd.cpu_mask = new zerm_cpu_mask_t[pd.size];
-      for (uint32_t i = 0; i < pd.size; ++i) {
-        pd.cpu_mask[i] = hwloc_bitmap_alloc();
-        __TCM_ASSERT(hwloc_bitmap_iszero(pd.cpu_mask[i]), "Not empty mask");
-      }
+        zerm_permit_request_t& pr = ph->request;
+        pr = ZERM_PERMIT_REQUEST_INITIALIZER;
+        if (bool(req.cpu_constraints)) {
+            pd.size = req.constraints_size;
+            pd.cpu_mask = new zerm_cpu_mask_t[pd.size];
+            pr.cpu_constraints = new zerm_cpu_constraints_t[req.constraints_size];
+            for (uint32_t i = 0; i < pd.size; ++i) {
+                if (req.cpu_constraints[i].mask)
+                    pr.cpu_constraints[i].mask = hwloc_bitmap_alloc();
+
+                pd.cpu_mask[i] = hwloc_bitmap_alloc();
+                __TCM_ASSERT(hwloc_bitmap_iszero(pd.cpu_mask[i]), "Not empty mask");
+            }
+        }
+
+        pd.concurrency = new std::atomic<uint32_t>[pd.size]{0};
+        pd.state.store(ZERM_PERMIT_STATE_PENDING, std::memory_order_relaxed);
+        pd.flags = req.flags;
+
+        return ph;
     }
-
-    pd.concurrency = new std::atomic<uint32_t>[pd.size]{0};
-    pd.state.store(ZERM_PERMIT_STATE_PENDING, std::memory_order_relaxed);
-    pd.flags = req.flags;
-
-    return ph;
-  }
 
     void release_permit_impl(zerm_permit_handle_t ph) {
         tracer t("ThreadComposabilityBase::release_permit_impl");
@@ -1548,10 +1551,10 @@ protected:
             const std::lock_guard<std::mutex> l(data_mutex);
             __TCM_ASSERT(is_valid(ph), "Invalid permit is being released.");
 
-            zerm_permit_request_t& req = permit_to_request_map[ph];
+            zerm_permit_request_t& req = ph->request;
             if (req.cpu_constraints)
               deallocate_constraints(req);
-            permit_to_request_map.erase(ph);
+            permits.erase(std::remove(permits.begin(), permits.end(), ph), permits.end());
 
             permit_to_callback_arg_map.erase(ph);
 
@@ -1600,8 +1603,7 @@ protected:
             {
                 const std::lock_guard<std::mutex> l(data_mutex);
                 __TCM_ASSERT(is_valid(ph), "Updating non-existing permit.");
-                zerm_permit_request_t request = permit_to_request_map[ph];
-                std::vector<permit_change_t> updates = adjust_existing_permit(request, ph);
+                std::vector<permit_change_t> updates = adjust_existing_permit(ph->request, ph);
                 callbacks = apply(*this, ph, updates);
             }
             invoke_callbacks(callbacks);
@@ -1651,7 +1653,6 @@ public:
         // Not sure this is the best approach
         while (available_concurrency_snapshot > 0) {
             zerm_permit_handle_t current_ph;
-            zerm_permit_request_t req;
             uint32_t current_grant = 0;
             int32_t delta = 0;
             update_callbacks_t callbacks;
@@ -1672,7 +1673,7 @@ public:
                     continue;
                 }
 
-                req = permit_to_request_map[current_ph];
+                const zerm_permit_request_t& req = current_ph->request;
 
                 __TCM_ASSERT(
                     1 == client_to_callback_map.count(pd.client_id),
@@ -1869,8 +1870,7 @@ protected:
             renegotiation_active_idle.reserve(active_permits_upper_bound_estimate);
 
             // Searching of ACTIVE without rigid_concurrency flag/IDLE/PENDING permits
-            for (auto& elem: permit_to_request_map) {
-                zerm_permit_handle_t ph = elem.first;
+            for (zerm_permit_handle_t& ph: permits) {
                 zerm_permit_data_t& pd = ph->data;
                 if (skip_permit_negotiation(ph, initiator)) {
                     const uint32_t permit_grant = get_permit_grant(ph);
@@ -1883,7 +1883,7 @@ protected:
                     continue;
                 }
 
-                zerm_permit_request_t& pr = elem.second;
+                const zerm_permit_request_t& pr = ph->request;
 
                 if (is_pending(pd.state.load(std::memory_order_relaxed)))
                     renegotiation_pending.insert(std::make_pair(pr.min_sw_threads, ph));
@@ -1908,7 +1908,7 @@ protected:
             uint32_t overall_pending_satisfied = 0;
             for (auto& elem : renegotiation_pending) {
                 zerm_permit_handle_t ph = elem.second;
-                zerm_permit_request_t pr = permit_to_request_map[ph];
+                const zerm_permit_request_t& pr = ph->request;
 
                 fulfilment_t ff = try_satisfy_request(pr, ph, available_concurrency_snapshot);
                 uint32_t required_concurrency = infer_constraint_min_concurrency(pr.min_sw_threads);
@@ -1950,7 +1950,7 @@ protected:
             uint32_t carry = 0;
             for (auto& elem: renegotiation_active_idle) {
                 zerm_permit_handle_t ph = elem.second;
-                zerm_permit_request_t& pr = permit_to_request_map[ph];
+                const zerm_permit_request_t& pr = ph->request;
 
                 permit_change_t permit_update = renegotiate_active_idle_permit(
                     available_concurrency_snapshot, active_demand, pr, ph, carry
