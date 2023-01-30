@@ -589,7 +589,7 @@ public:
         __TCM_ASSERT(
           internal_mask == nullptr ||
           0 == hwloc_bitmap_compare(internal_mask, from.cpu_constraints[i].mask),
-          "Mask cannot be changed when re-requesting resources for existing permit."
+          "Changing of the mask when re-requesting resources for existing permit is not supported."
         );
 
         to.cpu_constraints[i] = from.cpu_constraints[i];
