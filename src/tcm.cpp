@@ -578,7 +578,7 @@ public:
       delete [] req.cpu_constraints;
   }
 
-  void copy_request(zerm_permit_request_t& to, const zerm_permit_request_t& from) {
+  void copy_request_without_masks(zerm_permit_request_t& to, const zerm_permit_request_t& from) {
     zerm_cpu_constraints_t* internal_cpu_constraints = to.cpu_constraints;
     to = from;
     to.cpu_constraints = internal_cpu_constraints; // Restore the pointer to TCM's memory
@@ -637,7 +637,7 @@ public:
           client_to_permit_mmap.emplace(ph->data.client_id, ph);
       } else {
           __TCM_ASSERT(is_valid(ph), "Permit request structure must exist.");
-          copy_request(ph->request, req);
+          copy_request_without_masks(ph->request, req);
 
           // Request is being updated for existing permit. To avoid in-the-middle
           // negotiations for that permit change its state to PENDING until its new
