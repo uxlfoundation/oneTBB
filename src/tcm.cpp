@@ -585,13 +585,12 @@ public:
 
     for (uint32_t i = 0; i < to.constraints_size; ++i) {
         zerm_cpu_mask_t internal_mask = to.cpu_constraints[i].mask;
-        __TCM_ASSERT(internal_mask == nullptr || 0 == hwloc_bitmap_compare(internal_mask, from.cpu_constraints[i].mask),
-                     "Mask cannot be changed when re-requesting resources for existing permit.");
 
-        if (internal_mask) {
-            int r = hwloc_bitmap_copy(internal_mask, from.cpu_constraints[i].mask);
-            __TCM_ASSERT_EX(r >= 0, "Could not copy the mask from the permit request.");
-        }
+        __TCM_ASSERT(
+          internal_mask == nullptr ||
+          0 == hwloc_bitmap_compare(internal_mask, from.cpu_constraints[i].mask),
+          "Mask cannot be changed when re-requesting resources for existing permit."
+        );
 
         to.cpu_constraints[i] = from.cpu_constraints[i];
         to.cpu_constraints[i].mask = internal_mask;
