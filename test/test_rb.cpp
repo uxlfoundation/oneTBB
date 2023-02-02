@@ -262,17 +262,11 @@ bool test_nested_clients_partial_consumption() {
     return test_fail(test_name);
 
   r = zermRegisterThread(phB);
-  if (!(check_success(r, "zermRegisterThread B") &&
-        check_permits_concurrencies({phA, phB}, {rA.max_sw_threads, rB.max_sw_threads}) &&
-        check_permit(eA, phA, skip_concurrenency_check) &&
-        check_permit(eB, phB, skip_concurrenency_check)))
+  if (!(check_success(r, "zermRegisterThread B") && check_permit(eA, phA) && check_permit(eB, phB)))
     return test_fail(test_name);
 
   r = zermUnregisterThread();
-  if (!(check_success(r, "zermUnregisterThread B") &&
-        check_permits_concurrencies({phA, phB}, {rA.max_sw_threads, rB.max_sw_threads}) &&
-        check_permit(eA, phA, skip_concurrenency_check) &&
-        check_permit(eB, phB, skip_concurrenency_check)))
+  if (!(check_success(r, "zermUnregisterThread B") && check_permit(eA, phA) && check_permit(eB, phB)))
     return test_fail(test_name);
 
   renegotiating_permits = {&phA};
