@@ -1293,26 +1293,27 @@ protected:
             to_find_i = std::min(left_to_find, to_find_i);
 
             const auto available_i = cns.num_immediately_available() - decision[i].to_assign;
-            const auto concurrency_above_min = std::min(available_i, to_find_i);
+            const auto assign_further = std::min(available_i, to_find_i);
 
-            uint32_t to_negotiate = to_find_i - concurrency_above_min;
+            uint32_t to_negotiate = to_find_i - assign_further;
             to_negotiate = std::min(cns.num_negotiable(), to_negotiate);
 
             const uint32_t able_to_satisfy =
-                decision[i].to_assign + concurrency_above_min + to_negotiate;
+                decision[i].to_assign + assign_further + to_negotiate;
 
             // Value > 0 means cannot satisfy desired concurrency.
             decision[i].need = cns.adjusted_max_concurrency() - able_to_satisfy;
             __TCM_ASSERT(decision[i].need >= 0, "Incorrect invariant.");
 
-            __TCM_ASSERT(concurrency_above_min + to_negotiate <= left_to_find,
+            __TCM_ASSERT(assign_further + to_negotiate <= left_to_find,
                          (std::string("Trying to satisfy more than needed for the ") +
                           std::to_string(i) + std::string("-th constraint of permit handle ") +
                           std::to_string(std::uintptr_t(ph))).c_str());
 
             // Do not negotiate if minimum has been satisfied
-            decision[i].to_assign += concurrency_above_min;
-            left_to_find -= concurrency_above_min;
+            decision[i].to_assign += assign_further;
+            fulfilment.num_satisfiable += assign_further;
+            left_to_find -= assign_further;
         }
 
         // for (std::size_t i = 0; i < sh.size() && left_to_find; ++i) {
