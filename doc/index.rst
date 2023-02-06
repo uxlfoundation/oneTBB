@@ -379,7 +379,7 @@ Thread Composability Manager using:
 
 .. code:: cpp
 
-    ze_result_t zermConnect(zerm_callback_t callback, zerm_client_id_t* client_id)
+    tcm_result_t tcmConnect(tcm_callback_t callback, tcm_client_id_t* client_id)
 
 +-------------------+--------+--------------------------------------------------------------------------------+
 | Parameter         | Type   | Description                                                                    |
@@ -394,7 +394,7 @@ it should close the connection by calling:
 
 .. code:: cpp
 
-    ze_result_t zermDisconnect(zerm_client_id_t client_id)
+    tcm_result_t tcmDisconnect(tcm_client_id_t client_id)
 
 +-------------------+--------+---------------------------+
 | Parameter         | Type   | Description               |
@@ -409,20 +409,20 @@ Clients request for a permit using:
 
 .. code:: cpp
 
-    ze_result_t zermRequestPermit(zerm_client_id_t client_id,
-                                  zerm_permit_request_t request,
+    tcm_result_t tcmRequestPermit(tcm_client_id_t client_id,
+                                  tcm_permit_request_t request,
                                   void* callback_arg,
-                                  zerm_permit_handle_t* permit_handle,
-                                  zerm_permit_t* permit)
+                                  tcm_permit_handle_t* permit_handle,
+                                  tcm_permit_t* permit)
 
 +-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Parameter             | Type     | Description                                                                                                                                                                                                                                                     |
 +=======================+==========+=================================================================================================================================================================================================================================================================+
-| :code:`client_id`     | In       | Client ID obtained by zermConnect.                                                                                                                                                                                                                              |
+| :code:`client_id`     | In       | Client ID obtained by tcmConnect.                                                                                                                                                                                                                              |
 +-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | :code:`request`       | In       | Specification of resources requested.                                                                                                                                                                                                                           |
 +-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`callback_arg`  | In       | The argument to pass into the callback function (set previously using :code:`zermConnect`) in case of a subsequent permit renegotiation.                                                                                                                        |
+| :code:`callback_arg`  | In       | The argument to pass into the callback function (set previously using :code:`tcmConnect`) in case of a subsequent permit renegotiation.                                                                                                                        |
 +-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | :code:`permit_handle` | In/Out   | Descriptor of resources permitted by the Thread Composability Manager for use by the client. Assign :code:`nullptr` before passing to this function to request a new permit. Pass a descriptor of an existing permit to request updates to permit parameters.   |
 +-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -437,15 +437,15 @@ is allowed.
 Updating a permit request
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Updating of a permit request is done using the :code:`zermRequestPermit` API.
+Updating of a permit request is done using the :code:`tcmRequestPermit` API.
 
 To indicate that it is an update of the existing permit request rather
 than a request for a new one, client passes a :code:`permit_handle` value that
-was returned by a previous call to :code:`zermRequestPermit`.
+was returned by a previous call to :code:`tcmRequestPermit`.
 
 The parameters of a permit request that can be changed are:
 
--  Callback argument (:code:`callback_arg` parameter of the :code:`zermRequestPermit`)
+-  Callback argument (:code:`callback_arg` parameter of the :code:`tcmRequestPermit`)
 
 -  Request priority (see `Priorities of Permit
    Requests <#priorities-of-permit-requests>`__)
@@ -464,8 +464,8 @@ allotted to a particular permit, the client should use the following API:
 
 .. code:: cpp
 
-    ze_result_t zermGetPermitData(zerm_permit_handle_t* permit_handle,
-                                  zerm_permit_t* permit)
+    tcm_result_t tcmGetPermitData(tcm_permit_handle_t* permit_handle,
+                                  tcm_permit_t* permit)
 
 +-----------------------+----------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Parameter             | Type     | Description                                                                                                                                                               |
@@ -478,15 +478,15 @@ allotted to a particular permit, the client should use the following API:
 **Note**: Due to possible concurrent requests from clients, resulting in
 redistribution of resources by the Thread Composability Manager, the data
 received in a :code:`permit` might be already old by the time the thread
-returns from the :code:`zermGetPermitData` function. In some situations,
+returns from the :code:`tcmGetPermitData` function. In some situations,
 the Thread Composability Manager can detect this is happening during the
-call to :code:`zermGetPermitData`, in which case a :code:`stale` flag of
+call to :code:`tcmGetPermitData`, in which case a :code:`stale` flag of
 the received permit is set to true (see section about `permit properties
 <#properties-of-permits>`__). In any case, the client is responsible for
 synchronization of multiple, possibly different, copies of permit’s data
 on its own side.
 
-**Note:** :code:`zermGetPermitData` is designed to be lightweight, lock-free
+**Note:** :code:`tcmGetPermitData` is designed to be lightweight, lock-free
 function.
 
 Threads of the client 
@@ -500,7 +500,7 @@ permit, user calls:
 
 .. code:: cpp
 
-    ze_result_t zermRegisterThread(zerm_permit_handle_t permit_handle)
+    tcm_result_t tcmRegisterThread(tcm_permit_handle_t permit_handle)
 
 +-----------------------+--------+--------------------------------------------------------------------------------+
 | Parameter             | Type   | Description                                                                    |
@@ -513,7 +513,7 @@ part of the latest resource permit, user calls:
 
 .. code:: cpp
 
-    ze_result_t zermUnregisterThread()
+    tcm_result_t tcmUnregisterThread()
 
 This API should be called by every thread that is going to be a part of
 the permit, including the thread that requested the permit.
@@ -531,7 +531,7 @@ is in idle state now using :code:`zeIdlePermit`:
 
 .. code:: cpp
 
-    ze_result_t zermIdlePermit(zerm_permit_handle_t permit_handle)
+    tcm_result_t tcmIdlePermit(tcm_permit_handle_t permit_handle)
 
 +-----------------------+--------+------------------------------------------------+
 | Parameter             | Type   | Description                                    |
@@ -548,7 +548,7 @@ the work soon, but still does not want to release the permit, it calls
 
 .. code:: cpp
 
-    ze_result_t zermDeactivatePermit(zerm_permit_handle_t permit_handle)
+    tcm_result_t tcmDeactivatePermit(tcm_permit_handle_t permit_handle)
 
 +-----------------------+--------+----------------------------------------------+
 | Parameter             | Type   | Description                                  |
@@ -565,7 +565,7 @@ Once the work appeared again, the client can reactivate the permit
 
 .. code:: cpp
 
-    ze_result_t zermActivatePermit(zerm_permit_handle_t permit_handle)
+    tcm_result_t tcmActivatePermit(tcm_permit_handle_t permit_handle)
 
 +-----------------------+----------+----------------------------------------------+
 | Parameter             | Type     | Description                                  |
@@ -588,7 +588,7 @@ anymore, the client releases the permit by calling:
 
 .. code:: cpp
 
-    ze_result_t zermReleasePermit(zerm_permit_handle_t permit_handle)
+    tcm_result_t tcmReleasePermit(tcm_permit_handle_t permit_handle)
 
 +-----------------------+--------+------------------------------------------------------------------------------------+
 | Parameter             | Type   | Description                                                                        |
@@ -613,7 +613,7 @@ be a “client properties” structure?
 
 .. code:: cpp
 
-    ze_result_t zermSetClientMaxConcurrency(zerm_client_id_t client_id,
+    tcm_result_t tcmSetClientMaxConcurrency(tcm_client_id_t client_id,
                                             uint32_t max_concurrency)
 
 +-------------------------+--------+--------------------------------------------------------------------------------------------------------------------------------------+
@@ -629,8 +629,8 @@ be a “client properties” structure?
 
 .. code:: cpp
 
-    ze_result_t zermSetClientConstraints(zerm_client_id_t client_id,
-                                         zerm_cpu_contraints_t constraints)
+    tcm_result_t tcmSetClientConstraints(tcm_client_id_t client_id,
+                                         tcm_cpu_contraints_t constraints)
 
 +---------------------+--------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Parameter           | Type   | Description                                                                                                                                                                      |
@@ -656,7 +656,7 @@ Manager:
 
 .. code:: cpp
 
-    ze_result_t zermQueryResourceManagerConstraints(zerm_cpu_constraints_t*
+    tcm_result_t tcmQueryResourceManagerConstraints(tcm_cpu_constraints_t*
     constraints);
 
 +---------------------+--------+---------------------------------------------------------------------------------------+
@@ -671,31 +671,31 @@ Data Structures of the Thread Composability Manager
 Result of the Thread Composability Manager Function Invocation 
 --------------------------------------------------------------
 
-:code:`ze_result_t` enum defines a set of possible return codes that the API
+:code:`tcm_result_t` enum defines a set of possible return codes that the API
 may use.
 
 .. code:: cpp
 
-    typedef enum _ze_result_t {
-      ZE_RESULT_SUCCESS = 0x0,
-      ZE_RESULT_ERROR_UNKNOWN = 0x7ffffffe,
-      ZE_RESULT_UNSUPPORTED = 0x6ffffffe
-    } ze_result_t;
+    typedef enum _tcm_result_t {
+      TCM_RESULT_SUCCESS = 0x0,
+      TCM_RESULT_ERROR_UNKNOWN = 0x7ffffffe,
+      TCM_RESULT_UNSUPPORTED = 0x6ffffffe
+    } tcm_result_t;
 
 +---------------------------------+----------------------------------------------------------------+
 | Value                           | Description                                                    |
 +=================================+================================================================+
-| :code:`ZE_RESULT_SUCCESS`       | Indicates successful execution of the function.                |
+| :code:`TCM_RESULT_SUCCESS`       | Indicates successful execution of the function.                |
 +---------------------------------+----------------------------------------------------------------+
-| :code:`ZE_RESULT_ERROR_UNKNOWN` | Indicates erroneous situation during the function execution.   |
+| :code:`TCM_RESULT_ERROR_UNKNOWN` | Indicates erroneous situation during the function execution.   |
 +---------------------------------+----------------------------------------------------------------+
-| :code:`ZE_RESULT_UNSUPPORTED`   | Indicates that the feature is unsupported.                     |
+| :code:`TCM_RESULT_UNSUPPORTED`   | Indicates that the feature is unsupported.                     |
 +---------------------------------+----------------------------------------------------------------+
 
-Example of returning :code:`ZE_RESULT_ERROR_UNKNOWN` is passing non-existing
-:code:`permit_handle` to :code:`zermGetPermitData` function.
+Example of returning :code:`TCM_RESULT_ERROR_UNKNOWN` is passing non-existing
+:code:`permit_handle` to :code:`tcmGetPermitData` function.
 
-Examples of returning :code:`ZE_RESULT_UNSUPPORTED` are the usages of the API
+Examples of returning :code:`TCM_RESULT_UNSUPPORTED` are the usages of the API
 with [WIP\_DSGN] or [WIP\_IMPL] statuses found in this document.
 
 **Note**: The Thread Composability Manager follows offensive programming style,
@@ -705,56 +705,56 @@ Manager does not check its input parameters and may crash or work in unexpected
 manner in such cases. The debug version of the Thread Composability Manager
 binary may assert incorrect API usages.
 
-**[WIP\_DSGN]** Discuss necessity of :code:`ZE_RETURN_ERROR_UNKNOWN` in
+**[WIP\_DSGN]** Discuss necessity of :code:`TCM_RETURN_ERROR_UNKNOWN` in
 presence of offensive programming style.
 
 States of Permits 
 ------------------
 
-The :code:`zerm_permit_state_t` structure describes various states of the
+The :code:`tcm_permit_state_t` structure describes various states of the
 permit that the Thread Composability Manager can assign.
 
 .. code:: cpp
 
-    enum zerm_permit_states_t {
-      ZERM_PERMIT_STATE_VOID,
-      ZERM_PERMIT_STATE_INACTIVE,
-      ZERM_PERMIT_STATE_PENDING,
-      ZERM_PERMIT_STATE_IDLE,
-      ZERM_PERMIT_STATE_ACTIVE
+    enum tcm_permit_states_t {
+      TCM_PERMIT_STATE_VOID,
+      TCM_PERMIT_STATE_INACTIVE,
+      TCM_PERMIT_STATE_PENDING,
+      TCM_PERMIT_STATE_IDLE,
+      TCM_PERMIT_STATE_ACTIVE
     };
 
-    typedef uint8_t zerm_permit_state_t;
+    typedef uint8_t tcm_permit_state_t;
 
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Value                              | Description                                                                                                                                                     |
 +====================================+=================================================================================================================================================================+
-| :code:`ZERM_PERMIT_STATE_VOID`     | No permit. Neither client owns any resources associted with the permit, nor does the Thread Composability Manager know about corresponding request existence.   |
+| :code:`TCM_PERMIT_STATE_VOID`     | No permit. Neither client owns any resources associted with the permit, nor does the Thread Composability Manager know about corresponding request existence.   |
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`ZERM_PERMIT_STATE_INACTIVE` | Client does not own and therefore should not use resources related to this permit.                                                                              |
+| :code:`TCM_PERMIT_STATE_INACTIVE` | Client does not own and therefore should not use resources related to this permit.                                                                              |
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`ZERM_PERMIT_STATE_PENDING`  | Resources are not assigned to this permit, but will be assigned as soon as execution allows.                                                                    |
+| :code:`TCM_PERMIT_STATE_PENDING`  | Resources are not assigned to this permit, but will be assigned as soon as execution allows.                                                                    |
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`ZERM_PERMIT_STATE_IDLE`     | Resources are owned by the client, but they do not perform useful work.                                                                                         |
+| :code:`TCM_PERMIT_STATE_IDLE`     | Resources are owned by the client, but they do not perform useful work.                                                                                         |
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`ZERM_PERMIT_STATE_ACTIVE`   | Resources are owned by the client, and they are used to perform useful work.                                                                                    |
+| :code:`TCM_PERMIT_STATE_ACTIVE`   | Resources are owned by the client, and they are used to perform useful work.                                                                                    |
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
-**[WIP\_DSGN]** Discuss necessity of :code:`ZERM_PERMIT_STATE_VOID`.
+**[WIP\_DSGN]** Discuss necessity of :code:`TCM_PERMIT_STATE_VOID`.
 
 Properties of Permits 
 ----------------------
 
-The :code:`zerm_permit_flags_t` describes the properties of the permits.
+The :code:`tcm_permit_flags_t` describes the properties of the permits.
 
 .. code:: cpp
 
-    typedef struct _zerm_permit_flags_t {
+    typedef struct _tcm_permit_flags_t {
       bool stale : 1;
       bool rigid_concurrency : 1;
       bool exclusive : 1;
       int32_t reserved : 29;
-    } zerm_permit_flags_t;
+    } tcm_permit_flags_t;
 
 +---------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Value                     | Description                                                                                                                                                                                                                                                            |
@@ -773,31 +773,31 @@ The :code:`zerm_permit_flags_t` describes the properties of the permits.
 Callback Type
 -------------
 
-The type of the function to pass into :code:`zermConnect` function. This
+The type of the function to pass into :code:`tcmConnect` function. This
 function is called by the resource manager each time permit of the client
 has been changed by the Thread Composability Manager due to API calls from
 other clients or changes in other permits from the same client. It is not
 called for permits, whose change is initiated by the the client itself, that
-is due to calls to :code:`zermIdlePermit`, :code:`zermActivatePermit`,
-:code:`zermDeactivatePermit`.
+is due to calls to :code:`tcmIdlePermit`, :code:`tcmActivatePermit`,
+:code:`tcmDeactivatePermit`.
 
 The sole purpose of invoking this callback function by the resource
 manager is to tell the client that the data of a particular permit has
 been changed and that the client should take that into account. Client
-may call :code:`zermGetPermitData` inside callback function in order to get the
+may call :code:`tcmGetPermitData` inside callback function in order to get the
 latest permit data.
 
 .. code:: cpp
 
-    typedef ze_result_t (*zerm_callback_t)(zerm_permit_handle_t p, void* arg,
-    zerm_callback_flags_t flags);
+    typedef tcm_result_t (*tcm_callback_t)(tcm_permit_handle_t p, void* arg,
+    tcm_callback_flags_t flags);
 
 +---------------+------------------------------------------------------------------------------------+
 | Value         | Description                                                                        |
 +===============+====================================================================================+
 | :code:`p`     | The unique permit handle, whose data has been changed.                             |
 +---------------+------------------------------------------------------------------------------------+
-| :code:`arg`   | The callback argument a client passed to the :code:`zermRequestPermit` function.   |
+| :code:`arg`   | The callback argument a client passed to the :code:`tcmRequestPermit` function.   |
 +---------------+------------------------------------------------------------------------------------+
 | :code:`flags` | The reasons of callback invocation.                                                |
 +---------------+------------------------------------------------------------------------------------+
@@ -805,16 +805,16 @@ latest permit data.
 Callback Invocation Reasons 
 ----------------------------
 
-The :code:`zerm_callbacks_flags_t` describes the reasons client callbacks
+The :code:`tcm_callbacks_flags_t` describes the reasons client callbacks
 were invoked by the Thread Composability Manager.
 
 .. code:: cpp
 
-    typedef struct _zerm_callback_flags_t {
+    typedef struct _tcm_callback_flags_t {
       bool new_concurrency : 1;
       bool new_state : 1;
       int32_t reserved : 30;
-    } zerm_callback_flags_t;
+    } tcm_callback_flags_t;
 
 +-------------------------+----------------------------------------------------------------------+
 | Value                   | Description                                                          |
@@ -832,20 +832,20 @@ necessary.
 Permits 
 --------
 
-The :code:`zerm_permit_t` structure represents the permit data that is filled
+The :code:`tcm_permit_t` structure represents the permit data that is filled
 in by the Thread Composability Manager. The client is responsible for allocating
 and deallocating memory for objects of this structure, including the arrays
 of necessary size.
 
 .. code:: cpp
 
-    typedef struct _zerm_permit_t {
+    typedef struct _tcm_permit_t {
       uint32_t* concurrencies;
-      zerm_cpu_mask_t* cpu_masks;
+      tcm_cpu_mask_t* cpu_masks;
       uint32_t size;
-      zerm_permit_state_t state;
-      zerm_permit_flags_t flags;
-    } zerm_permit_t;
+      tcm_permit_state_t state;
+      tcm_permit_flags_t flags;
+    } tcm_permit_t;
 
 +-----------------------+--------------------------------------------------------------------------------------------------------------------+
 | Field                 | Description                                                                                                        |
@@ -883,13 +883,13 @@ struct fields. For low-level mask the client speicifies the mask field.
 In case both low-level and high-level description are specified, the
 Thread Composability Manager uses low-level mask.
 
-Objects of :code:`zerm_cpu_constraints_t` type are required to be initialized
-using :code:`ZERM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER`:
+Objects of :code:`tcm_cpu_constraints_t` type are required to be initialized
+using :code:`TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER`:
 
 .. code:: cpp
 
-    zerm_cpu_constraints_t constraints =
-    ZERM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+    tcm_cpu_constraints_t constraints =
+    TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
 
 The following fields can be assigned specific value chosen by the
 client, in which case the meaning is:
@@ -908,28 +908,28 @@ assigned to special values. Special values are:
 +------------------------+----------------------------------------------------------------------------------------------------------------------------------+
 | Value                  | Description                                                                                                                      |
 +========================+==================================================================================================================================+
-| :code:`zerm_automatic` | The Thread Composability Manager chooses the value based on the internal heuristics and current load of the platform.            |
+| :code:`tcm_automatic` | The Thread Composability Manager chooses the value based on the internal heuristics and current load of the platform.            |
 +------------------------+----------------------------------------------------------------------------------------------------------------------------------+
-| :code:`zerm_any`       | The Thread Composability Manager chooses one specific value based on the internal heuristics and current load of the platform.   |
+| :code:`tcm_any`       | The Thread Composability Manager chooses one specific value based on the internal heuristics and current load of the platform.   |
 +------------------------+----------------------------------------------------------------------------------------------------------------------------------+
 
 .. code:: cpp
 
-    typedef /*implementation-defined*/ zerm_cpu_mask_t;
-    typedef /*implementation-defined*/ zerm_numa_node_t;
-    typedef /*implementation-defined*/ zerm_core_type_t;
+    typedef /*implementation-defined*/ tcm_cpu_mask_t;
+    typedef /*implementation-defined*/ tcm_numa_node_t;
+    typedef /*implementation-defined*/ tcm_core_type_t;
 
-    const /*implementation-defined*/ zerm_automatic =/*implementation-defined*/;
-    const /*implementation-defined*/ zerm_any =/*implementation-defined*/;
+    const /*implementation-defined*/ tcm_automatic =/*implementation-defined*/;
+    const /*implementation-defined*/ tcm_any =/*implementation-defined*/;
 
-    typedef struct _zerm_cpu_constraints_t {
+    typedef struct _tcm_cpu_constraints_t {
       int32_t min_concurrency;
       int32_t max_concurrency;
-      zerm_cpu_mask_t mask;
-      zerm_numa_node_t numa_id;
-      zerm_core_type_t core_type_id;
+      tcm_cpu_mask_t mask;
+      tcm_numa_node_t numa_id;
+      tcm_core_type_t core_type_id;
       int32_t threads_per_core;
-    } zerm_cpu_constraints_t;
+    } tcm_cpu_constraints_t;
 
 +--------------------------+-------------------------------------------------------------------------------------------------------------------+
 | Field                    | Description                                                                                                       |
@@ -961,37 +961,37 @@ ones.
 
 .. code:: cpp
 
-    enum zerm_request_priorities_t {
-      ZERM_REQUEST_PRIORITY_LOW = (INT32_MAX / 4) * 1,
-      ZERM_REQUEST_PRIORITY_NORMAL = (INT32_MAX / 4) * 2,
-      ZERM_REQUEST_PRIORITY_HIGH = (INT32_MAX / 4) * 3
+    enum tcm_request_priorities_t {
+      TCM_REQUEST_PRIORITY_LOW = (INT32_MAX / 4) * 1,
+      TCM_REQUEST_PRIORITY_NORMAL = (INT32_MAX / 4) * 2,
+      TCM_REQUEST_PRIORITY_HIGH = (INT32_MAX / 4) * 3
     };
 
-    typedef int32_t zerm_request_priority_t;
+    typedef int32_t tcm_request_priority_t;
 
 Permit Requests 
 ----------------
 
-The :code:`zerm_permit_request_t` structure is the main data structure of the
+The :code:`tcm_permit_request_t` structure is the main data structure of the
 Thread Composability Manager's API that describes the resources to be
 requested from the Thread Composability Manager.
 
 .. code:: cpp
 
-    typedef struct _zerm_permit_request_t {
+    typedef struct _tcm_permit_request_t {
       int32_t min_sw_threads;
       int32_t max_sw_threads;
-      zerm_cpu_constraints_t* cpu_constraints;
+      tcm_cpu_constraints_t* cpu_constraints;
       uint32_t constraints_size;
-      zerm_request_priority_t priority;
-      zerm_permit_flags_t flags;
+      tcm_request_priority_t priority;
+      tcm_permit_flags_t flags;
       char reserved[4];
-    } zerm_permit_request_t;
+    } tcm_permit_request_t;
 
 +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Field                    | Description                                                                                                                                                      |
 +==========================+==================================================================================================================================================================+
-| :code:`min_sw_threads`   | The minimum number of software threads to fulfil. If it cannot be satisfied, the Thread Composability Manager returns :code:`ZERM_PERMIT_STATE_PENDING` state.   |
+| :code:`min_sw_threads`   | The minimum number of software threads to fulfil. If it cannot be satisfied, the Thread Composability Manager returns :code:`TCM_PERMIT_STATE_PENDING` state.   |
 +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | :code:`max_sw_threads`   | The maximum number of software threads desired.                                                                                                                  |
 +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -1006,21 +1006,21 @@ requested from the Thread Composability Manager.
 | :code:`reserved`         | The reserved memory for future use.                                                                                                                              |
 +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
-Objects of :code:`zerm_permit_request_t` type are required to be initialized
-using :code:`ZERM_PERMIT_REQUEST_INITIALIZER`:
+Objects of :code:`tcm_permit_request_t` type are required to be initialized
+using :code:`TCM_PERMIT_REQUEST_INITIALIZER`:
 
 .. code:: cpp
 
-    zerm_permit_request_t request = ZERM_PERMIT_REQUEST_INITIALIZER;
+    tcm_permit_request_t request = TCM_PERMIT_REQUEST_INITIALIZER;
 
 After initializing, at least :code:`min_sw_threads` and :code:`max_sw_threads`
-values must be modified before being passed into :code:`zermRequestPermit`
+values must be modified before being passed into :code:`tcmRequestPermit`
 function.
 
 **Note**: The specified values for :code:`min_sw_threads` and :code:`max_sw_threads`
-in the :code:`zerm_permit_request_t` should be compatible with the
+in the :code:`tcm_permit_request_t` should be compatible with the
 :code:`min_concurrency` and :code:`max_concurrency` values in the
-:code:`zerm_cpu_constraints_t` array if the latter is specified. Otherwise,
+:code:`tcm_cpu_constraints_t` array if the latter is specified. Otherwise,
 the behaviour is undefined.
 
 The compatibility rule:
@@ -1292,7 +1292,7 @@ between them.
 
 Inner requests are denied since the resources are occupied already and
 the outer level explicitly disabled nested requests by specified
-dedicated :code:`ZE_DISABLE_NESTED_REQUESTS` flag.
+dedicated :code:`TCM_DISABLE_NESTED_REQUESTS` flag.
 
 Implementation considerations
 =============================
@@ -1313,7 +1313,7 @@ The structure that is kept in TLS is:
 .. code:: cpp
 
     struct thread_state {
-      ze_permit_handle_t active_permits[];
+      tcm_permit_handle_t active_permits[];
     };
 
 The :code:`active_permits` container is empty until a thread is registered as a

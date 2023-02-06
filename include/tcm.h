@@ -21,30 +21,30 @@ extern "C" {
 
 // Thread Composability Manager interfaces:
 
-__TCM_EXPORT ze_result_t zermConnect(zerm_callback_t callback,
-                                     zerm_client_id_t *client_id);
-__TCM_EXPORT ze_result_t zermDisconnect(zerm_client_id_t client_id);
+__TCM_EXPORT tcm_result_t tcmConnect(tcm_callback_t callback,
+                                     tcm_client_id_t *client_id);
+__TCM_EXPORT tcm_result_t tcmDisconnect(tcm_client_id_t client_id);
 
-__TCM_EXPORT ze_result_t zermRequestPermit(zerm_client_id_t client_id,
-                                           zerm_permit_request_t request,
+__TCM_EXPORT tcm_result_t tcmRequestPermit(tcm_client_id_t client_id,
+                                           tcm_permit_request_t request,
                                            void* callback_arg,
-                                           zerm_permit_handle_t* permit_handle,
-                                           zerm_permit_t* permit);
+                                           tcm_permit_handle_t* permit_handle,
+                                           tcm_permit_t* permit);
 
-__TCM_EXPORT ze_result_t zermGetPermitData(zerm_permit_handle_t permit_handle,
-                                           zerm_permit_t* permit);
+__TCM_EXPORT tcm_result_t tcmGetPermitData(tcm_permit_handle_t permit_handle,
+                                           tcm_permit_t* permit);
 
-__TCM_EXPORT ze_result_t zermReleasePermit(zerm_permit_handle_t permit);
+__TCM_EXPORT tcm_result_t tcmReleasePermit(tcm_permit_handle_t permit);
 
-__TCM_EXPORT ze_result_t zermIdlePermit(zerm_permit_handle_t permit_handle);
+__TCM_EXPORT tcm_result_t tcmIdlePermit(tcm_permit_handle_t permit_handle);
 
-__TCM_EXPORT ze_result_t zermDeactivatePermit(zerm_permit_handle_t permit_handle);
+__TCM_EXPORT tcm_result_t tcmDeactivatePermit(tcm_permit_handle_t permit_handle);
 
-__TCM_EXPORT ze_result_t zermActivatePermit(zerm_permit_handle_t permit_handle);
+__TCM_EXPORT tcm_result_t tcmActivatePermit(tcm_permit_handle_t permit_handle);
 
-__TCM_EXPORT ze_result_t zermRegisterThread(zerm_permit_handle_t permit_handle);
+__TCM_EXPORT tcm_result_t tcmRegisterThread(tcm_permit_handle_t permit_handle);
 
-__TCM_EXPORT ze_result_t zermUnregisterThread();
+__TCM_EXPORT tcm_result_t tcmUnregisterThread();
 
 #ifdef __cplusplus
 } // extern "C"

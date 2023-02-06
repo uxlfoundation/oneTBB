@@ -28,27 +28,27 @@ __TCM_SUPPRESS_WARNING_POP
 #include <vector>
 #include <queue>
 
-#if __RM_ENABLE_TRACER
+#if __TCM_ENABLE_TRACER
 #include <iostream>
 #endif
 
-struct zerm_permit_data_t {
-  zerm_client_id_t client_id;
+struct tcm_permit_data_t {
+  tcm_client_id_t client_id;
   std::atomic<uint32_t>* concurrency;
-  zerm_cpu_mask_t* cpu_mask;
+  tcm_cpu_mask_t* cpu_mask;
   uint32_t size;
-  std::atomic<zerm_permit_state_t> state;
-  zerm_permit_flags_t flags;
+  std::atomic<tcm_permit_state_t> state;
+  tcm_permit_flags_t flags;
 };
 
 extern "C" {
 
-typedef uint64_t zerm_permit_epoch_t;
+typedef uint64_t tcm_permit_epoch_t;
 
-struct zerm_permit_rep_t {
-  std::atomic<zerm_permit_epoch_t> epoch;
-  zerm_permit_request_t request; // Holds latest corresponding request
-  zerm_permit_data_t data;
+struct tcm_permit_rep_t {
+  std::atomic<tcm_permit_epoch_t> epoch;
+  tcm_permit_request_t request; // Holds latest corresponding request
+  tcm_permit_data_t data;
 };
 
 } // extern "C"
@@ -56,7 +56,7 @@ struct zerm_permit_rep_t {
 namespace tcm {
 namespace internal {
 
-#if __RM_ENABLE_TRACER
+#if __TCM_ENABLE_TRACER
 struct tracer {
   const std::string s_;
   tracer(const std::string &s) : s_(s) {
@@ -79,14 +79,14 @@ struct tracer {
 };
 #endif
 
-bool operator==(const zerm_permit_flags_t& lhs, const zerm_permit_flags_t& rhs) {
+bool operator==(const tcm_permit_flags_t& lhs, const tcm_permit_flags_t& rhs) {
   return
     lhs.stale == rhs.stale &&
     lhs.rigid_concurrency == rhs.rigid_concurrency &&
     lhs.exclusive == rhs.exclusive;
 }
 
-bool operator==(const zerm_permit_request_t& lhs, const zerm_permit_request_t& rhs) {
+bool operator==(const tcm_permit_request_t& lhs, const tcm_permit_request_t& rhs) {
   return
     lhs.min_sw_threads == rhs.min_sw_threads &&
     lhs.max_sw_threads == rhs.max_sw_threads &&
@@ -100,29 +100,29 @@ bool operator==(const zerm_permit_request_t& lhs, const zerm_permit_request_t& r
  * Permit state helpers
  *******************************************************************************
  */
-bool is_void(const zerm_permit_state_t& state) { return ZERM_PERMIT_STATE_VOID == state; }
-bool is_active(const zerm_permit_state_t& state) { return ZERM_PERMIT_STATE_ACTIVE == state; }
-bool is_inactive(const zerm_permit_state_t& state) { return ZERM_PERMIT_STATE_INACTIVE == state; }
-bool is_idle(const zerm_permit_state_t& state) { return ZERM_PERMIT_STATE_IDLE == state; }
-bool is_pending(const zerm_permit_state_t& state) { return ZERM_PERMIT_STATE_PENDING == state; }
+bool is_void(const tcm_permit_state_t& state) { return TCM_PERMIT_STATE_VOID == state; }
+bool is_active(const tcm_permit_state_t& state) { return TCM_PERMIT_STATE_ACTIVE == state; }
+bool is_inactive(const tcm_permit_state_t& state) { return TCM_PERMIT_STATE_INACTIVE == state; }
+bool is_idle(const tcm_permit_state_t& state) { return TCM_PERMIT_STATE_IDLE == state; }
+bool is_pending(const tcm_permit_state_t& state) { return TCM_PERMIT_STATE_PENDING == state; }
 
-bool is_owning_resources(const zerm_permit_state_t& state) {
+bool is_owning_resources(const tcm_permit_state_t& state) {
     return is_active(state) || is_idle(state);
 }
 
-bool is_negotiable(const zerm_permit_state_t& state, const zerm_permit_flags_t& flags) {
+bool is_negotiable(const tcm_permit_state_t& state, const tcm_permit_flags_t& flags) {
     if (is_owning_resources(state) && flags.rigid_concurrency)
         return false;
     return true;
 }
 
-bool is_activating_from_inactive(const zerm_permit_state_t& curr_state,
-                                 const zerm_permit_state_t& new_state)
+bool is_activating_from_inactive(const tcm_permit_state_t& curr_state,
+                                 const tcm_permit_state_t& new_state)
 {
     return is_inactive(curr_state) && is_active(new_state);
 }
 
-bool is_deactivating(const zerm_permit_state_t& curr_state, const zerm_permit_state_t& new_state) {
+bool is_deactivating(const tcm_permit_state_t& curr_state, const tcm_permit_state_t& new_state) {
     return is_owning_resources(curr_state) && is_inactive(new_state);
 }
 
@@ -134,7 +134,7 @@ bool is_deactivating(const zerm_permit_state_t& curr_state, const zerm_permit_st
 
 
 // Computes the currently used amount of resources by specified permit data
-uint32_t get_permit_grant(const zerm_permit_data_t& pd) {
+uint32_t get_permit_grant(const tcm_permit_data_t& pd) {
     uint32_t permit_grant = 0;
     for (unsigned i = 0; i < pd.size; ++i)
         permit_grant += pd.concurrency[i].load(std::memory_order_relaxed);
@@ -142,16 +142,16 @@ uint32_t get_permit_grant(const zerm_permit_data_t& pd) {
 }
 
 // Computes the currently used amount of resources by specified permit handle
-uint32_t get_permit_grant(zerm_permit_handle_t ph) { return get_permit_grant(ph->data); }
+uint32_t get_permit_grant(tcm_permit_handle_t ph) { return get_permit_grant(ph->data); }
 
 
-void prepare_permit_modification(zerm_permit_handle_t ph) {
+void prepare_permit_modification(tcm_permit_handle_t ph) {
     uint64_t prev_epoch = ph->epoch.fetch_add(1, std::memory_order_relaxed);
     __TCM_ASSERT(prev_epoch % 2 == 0, "Previous epoch value must be even.");
     suppress_unused_warning(prev_epoch);
 }
 
-void commit_permit_modification(zerm_permit_handle_t ph) {
+void commit_permit_modification(tcm_permit_handle_t ph) {
     uint64_t prev_epoch = ph->epoch.fetch_add(1, std::memory_order_release);
     __TCM_ASSERT(prev_epoch % 2 != 0, "Previous epoch value must be odd.");
     suppress_unused_warning(prev_epoch);
@@ -196,24 +196,24 @@ uint32_t platform_resources(unsigned int process_concurrency) {
 uint32_t get_num_proc_groups() { return 1; }
 
 struct mask_deleter {
-    void operator()(zerm_cpu_mask_t* mask_ptr) const { hwloc_bitmap_free(*mask_ptr); }
+    void operator()(tcm_cpu_mask_t* mask_ptr) const { hwloc_bitmap_free(*mask_ptr); }
 };
 
-int get_mask_concurrency(const zerm_cpu_mask_t &mask) {
+int get_mask_concurrency(const tcm_cpu_mask_t &mask) {
     __TCM_ASSERT(mask, "Existing mask is expected.");
     int mc = hwloc_bitmap_weight(mask);
     __TCM_ASSERT(mc > 0, "HWLOC's infinitely set mask?");
     return mc;
 }
 
-int get_oversubscribed_mask_concurrency(const zerm_cpu_mask_t &mask,
+int get_oversubscribed_mask_concurrency(const tcm_cpu_mask_t &mask,
                                         float oversubscription_factor = tcm_oversubscription_factor)
 {
     return int(get_mask_concurrency(mask) * oversubscription_factor);
 }
 
 int32_t infer_constraint_min_concurrency(int32_t min_concurrency_value) {
-    if (zerm_automatic == min_concurrency_value)
+    if (tcm_automatic == min_concurrency_value)
         // Returning zero since the subconstraint may be used as an optional source of
         // resources, e.g., if requested concurrency cannot be satisfied with the other
         // subconstraints
@@ -225,9 +225,9 @@ int32_t infer_constraint_min_concurrency(int32_t min_concurrency_value) {
     return min_concurrency_value;
 }
 
-int32_t infer_constraint_max_concurrency(int32_t max_concurrency_value, const zerm_cpu_mask_t& mask)
+int32_t infer_constraint_max_concurrency(int32_t max_concurrency_value, const tcm_cpu_mask_t& mask)
 {
-    if (zerm_automatic == max_concurrency_value)
+    if (tcm_automatic == max_concurrency_value)
         return get_mask_concurrency(mask);
 
     __TCM_ASSERT(max_concurrency_value > 0,
@@ -243,7 +243,7 @@ struct fitting_result_t {
     // necessary to fulfill desired concurrency (is_required_satisfied == true) or to
     // fulfill required concurrency (is_required_satisfied == false)
     uint32_t needed_concurrency{0};
-    zerm_cpu_mask_t mask{nullptr};
+    tcm_cpu_mask_t mask{nullptr};
 };
 
 
@@ -251,41 +251,41 @@ struct fitting_result_t {
  * Describes how to modify a single permit
  */
 struct permit_change_t {
-    zerm_permit_handle_t ph = nullptr;       // permit handle to update
-    zerm_permit_state_t new_state = 0;       // state to transition into
+    tcm_permit_handle_t ph = nullptr;       // permit handle to update
+    tcm_permit_state_t new_state = 0;       // state to transition into
     std::vector<uint32_t> new_concurrencies; // concurrencies to set
 };
 
 struct callback_args_t {
-    zerm_permit_handle_t ph;
+    tcm_permit_handle_t ph;
     void* callback_arg;
-    zerm_callback_flags_t reason;
+    tcm_callback_flags_t reason;
 };
 
 /**
  * Describes the callbacks and arguments to pass there.
  */
-typedef std::unordered_multimap<zerm_callback_t, callback_args_t> update_callbacks_t;
+typedef std::unordered_multimap<tcm_callback_t, callback_args_t> update_callbacks_t;
 
 void invoke_callbacks(const update_callbacks_t& callbacks) {
     for (const auto& n : callbacks) {
-        const zerm_callback_t& callback = n.first;
+        const tcm_callback_t& callback = n.first;
         const callback_args_t& args = n.second;
 
         auto result = callback(args.ph, args.callback_arg, args.reason);
 
-        __TCM_ASSERT_EX(result == ZE_RESULT_SUCCESS, "Unsuccesful callback invocation.");
+        __TCM_ASSERT_EX(result == TCM_RESULT_SUCCESS, "Unsuccesful callback invocation.");
     }
 }
 
 
 // Permit changing helpers
-uint32_t release_resources_moving_to_new_state(zerm_permit_handle_t ph,
-                                               zerm_permit_state_t new_state)
+uint32_t release_resources_moving_to_new_state(tcm_permit_handle_t ph,
+                                               tcm_permit_state_t new_state)
 {
-    __TCM_ASSERT(new_state == ZERM_PERMIT_STATE_VOID ||
-                 new_state == ZERM_PERMIT_STATE_PENDING ||
-                 new_state == ZERM_PERMIT_STATE_INACTIVE, "Inconsistent request.");
+    __TCM_ASSERT(new_state == TCM_PERMIT_STATE_VOID ||
+                 new_state == TCM_PERMIT_STATE_PENDING ||
+                 new_state == TCM_PERMIT_STATE_INACTIVE, "Inconsistent request.");
 
     auto& pd = ph->data;
     uint32_t current_grant = 0;
@@ -302,12 +302,12 @@ uint32_t release_resources_moving_to_new_state(zerm_permit_handle_t ph,
     return current_grant;
 }
 
-uint32_t move_to_inactive(zerm_permit_handle_t ph) {
-    return release_resources_moving_to_new_state(ph, ZERM_PERMIT_STATE_INACTIVE);
+uint32_t move_to_inactive(tcm_permit_handle_t ph) {
+    return release_resources_moving_to_new_state(ph, TCM_PERMIT_STATE_INACTIVE);
 }
 
-uint32_t move_to_pending(zerm_permit_handle_t ph) {
-    return release_resources_moving_to_new_state(ph, ZERM_PERMIT_STATE_PENDING);
+uint32_t move_to_pending(tcm_permit_handle_t ph) {
+    return release_resources_moving_to_new_state(ph, TCM_PERMIT_STATE_PENDING);
 }
 
 
@@ -353,7 +353,7 @@ struct ThreadComposabilityManagerData {
 
   std::mutex data_mutex{};
 
-  zerm_client_id_t client_id = 1;
+  tcm_client_id_t client_id = 1;
 
   //! The count of currently available resources.
   uint32_t available_concurrency = 0;
@@ -362,21 +362,21 @@ struct ThreadComposabilityManagerData {
   uint32_t initially_available_concurrency;
 
   //! The CPU mask of the process
-  zerm_cpu_mask_t process_mask = nullptr;
+  tcm_cpu_mask_t process_mask = nullptr;
 
   //! The existing permits
-  std::vector<zerm_permit_handle_t> permits{};
+  std::vector<tcm_permit_handle_t> permits{};
 
   //! The map of callbacks per each client. Callbacks are used during
   //! renegotiation of permits.
-  std::unordered_map<zerm_client_id_t, zerm_callback_t> client_to_callback_map{};
+  std::unordered_map<tcm_client_id_t, tcm_callback_t> client_to_callback_map{};
 
   //! The map of callback arguments associated with permits. Used during
   //! callback invocation.
-  std::unordered_map<zerm_permit_handle_t, void*> permit_to_callback_arg_map{};
+  std::unordered_map<tcm_permit_handle_t, void*> permit_to_callback_arg_map{};
 
   //! The multimap of permits associated with the given client.
-  std::unordered_multimap<zerm_client_id_t, zerm_permit_handle_t> client_to_permit_mmap{};
+  std::unordered_multimap<tcm_client_id_t, tcm_permit_handle_t> client_to_permit_mmap{};
 
   // TODO: Consider alternative data structure for maintaining
   // registering/unregistering of threads by answering:
@@ -389,7 +389,7 @@ struct ThreadComposabilityManagerData {
   std::mutex threads_map_mutex{};
 
   //! The map of threads that register to be a part of a permit.
-  std::unordered_map<std::thread::id, zerm_permit_handle_t> thread_to_permit_map{};
+  std::unordered_map<std::thread::id, tcm_permit_handle_t> thread_to_permit_map{};
 };
 
 
@@ -399,7 +399,7 @@ struct ThreadComposabilityManagerData {
  *
  * The callback is added into the returned list only if there was an actual change to the permit.
  */
-update_callbacks_t apply(ThreadComposabilityManagerData& data, const zerm_permit_handle_t initiator,
+update_callbacks_t apply(ThreadComposabilityManagerData& data, const tcm_permit_handle_t initiator,
                          const std::vector<permit_change_t>& updates)
 {
     update_callbacks_t update_callbacks;
@@ -408,7 +408,7 @@ update_callbacks_t apply(ThreadComposabilityManagerData& data, const zerm_permit
     for (const auto& change : updates) {
         callback_args_t args{change.ph, data.permit_to_callback_arg_map[change.ph], {}};
 
-        zerm_permit_data_t& original_data = change.ph->data;
+        tcm_permit_data_t& original_data = change.ph->data;
         prepare_permit_modification(change.ph);
         if (original_data.state.load(std::memory_order_relaxed) != change.new_state) {
             original_data.state.store(change.new_state, std::memory_order_relaxed);
@@ -431,7 +431,7 @@ update_callbacks_t apply(ThreadComposabilityManagerData& data, const zerm_permit
             continue;
 
         if (args.reason.new_concurrency || args.reason.new_state) { // if there was a change
-            zerm_callback_t callback = data.client_to_callback_map[original_data.client_id];
+            tcm_callback_t callback = data.client_to_callback_map[original_data.client_id];
             update_callbacks.insert( {callback, args} );
         }
     }
@@ -446,8 +446,8 @@ update_callbacks_t apply(ThreadComposabilityManagerData& data, const zerm_permit
 // which equals to permitted concurrency value on the subconstraint minus minimum
 // requested concurrency on that subconstraint.
 struct stakeholder_t {
-    zerm_permit_handle_t m_ph = nullptr;
-    int32_t m_constraint_index = zerm_automatic; // zerm_automatic if the whole permit is
+    tcm_permit_handle_t m_ph = nullptr;
+    int32_t m_constraint_index = tcm_automatic; // tcm_automatic if the whole permit is
                                                  // considered rather than its particular
                                                  // subconstraint
     uint32_t m_negotiable = 0;
@@ -464,7 +464,7 @@ typedef std::priority_queue<stakeholder_t, std::vector<stakeholder_t>,
 
 // The container of negotiable stakeholders. Filled in while trying to satisfy a request.
 struct negotiable_snapshot_t {
-    static const int32_t among_all_constraints = zerm_automatic;
+    static const int32_t among_all_constraints = tcm_automatic;
 
     bool is_negotiable() const { return m_negotiable == 0; }
     uint32_t num_negotiable() const { return m_negotiable; }
@@ -486,7 +486,7 @@ struct negotiable_snapshot_t {
 
     renegotiable_resources_queue_t get_contributing_permits() const { return m_permits; }
 
-    void add(const zerm_permit_handle_t& ph, uint32_t negotiable, int32_t constraint_index) {
+    void add(const tcm_permit_handle_t& ph, uint32_t negotiable, int32_t constraint_index) {
       /* negotiable == grant - minimum sw threads, if constraint_index equals to
          among_all_constraints. Otherwise, negotiable == grant - minimum concurrency
          within specific subconstraint, determined by the constraint_index in the array of
@@ -530,7 +530,7 @@ private:
         renegotiable_resources_queue_t(greater_negotiable_stakeholder_t{});
 
     // The set of permits that have been added to the queue
-    std::set< std::pair<zerm_permit_handle_t, /*constraint_index*/int32_t>>
+    std::set< std::pair<tcm_permit_handle_t, /*constraint_index*/int32_t>>
     m_included_permits;
 };
 
@@ -539,15 +539,15 @@ class ThreadComposabilityManagerBase : public ThreadComposabilityManagerData {
 public:
   virtual ~ThreadComposabilityManagerBase() {}
 
-  zerm_client_id_t register_client(zerm_callback_t r) {
+  tcm_client_id_t register_client(tcm_callback_t r) {
       tracer t("ThreadComposabilityBase::register_client");
       const std::lock_guard<std::mutex> l(data_mutex);
-      zerm_client_id_t clid = client_id++;
+      tcm_client_id_t clid = client_id++;
       client_to_callback_map[clid] = r;
       return clid;
   }
 
-  void unregister_client(zerm_client_id_t clid) {
+  void unregister_client(tcm_client_id_t clid) {
       tracer t("ThreadComposabilityBase::unregister_client");
       const std::lock_guard<std::mutex> l(data_mutex);
       __TCM_ASSERT(client_to_permit_mmap.count(clid) == 0, "Deactivating the client with associated permits.");
@@ -560,10 +560,10 @@ public:
      *
      * Assumes actual pointer to constraints is written to the passed constraints argument.
      */
-  void allocate_constraints_by_copy(zerm_permit_request_t& req) {
+  void allocate_constraints_by_copy(tcm_permit_request_t& req) {
       __TCM_ASSERT(req.cpu_constraints, "Nothing to copy from.");
-      zerm_cpu_constraints_t* client_constraints = req.cpu_constraints;
-      req.cpu_constraints = new zerm_cpu_constraints_t[req.constraints_size];
+      tcm_cpu_constraints_t* client_constraints = req.cpu_constraints;
+      req.cpu_constraints = new tcm_cpu_constraints_t[req.constraints_size];
       for (uint32_t i = 0; i < req.constraints_size; ++i) {
           req.cpu_constraints[i] = client_constraints[i];
           if (client_constraints[i].mask)
@@ -571,20 +571,20 @@ public:
       }
   }
 
-  void deallocate_constraints(zerm_permit_request_t& req) {
+  void deallocate_constraints(tcm_permit_request_t& req) {
       __TCM_ASSERT(req.cpu_constraints, "Nothing to deallocate.");
       for (uint32_t i = 0; i < req.constraints_size; ++i)
           hwloc_bitmap_free(req.cpu_constraints[i].mask);
       delete [] req.cpu_constraints;
   }
 
-  void copy_request_without_masks(zerm_permit_request_t& to, const zerm_permit_request_t& from) {
-    zerm_cpu_constraints_t* internal_cpu_constraints = to.cpu_constraints;
+  void copy_request_without_masks(tcm_permit_request_t& to, const tcm_permit_request_t& from) {
+    tcm_cpu_constraints_t* internal_cpu_constraints = to.cpu_constraints;
     to = from;
     to.cpu_constraints = internal_cpu_constraints; // Restore the pointer to TCM's memory
 
     for (uint32_t i = 0; i < to.constraints_size; ++i) {
-        zerm_cpu_mask_t internal_mask = to.cpu_constraints[i].mask;
+        tcm_cpu_mask_t internal_mask = to.cpu_constraints[i].mask;
 
         __TCM_ASSERT(
           internal_mask == nullptr ||
@@ -597,28 +597,28 @@ public:
     }
   }
 
-  bool request_permit(zerm_client_id_t clid, zerm_permit_request_t& req,
-                      void* callback_arg, zerm_permit_handle_t* permit_handle,
-                      zerm_permit_t* permit)
+  bool request_permit(tcm_client_id_t clid, tcm_permit_request_t& req,
+                      void* callback_arg, tcm_permit_handle_t* permit_handle,
+                      tcm_permit_t* permit)
   {
     tracer t("ThreadComposabilityBase::request_permit");
 
     // Check the ability to satisfy minimum requested concurrency
     if (req.min_sw_threads > int32_t(platform_resources())) {
       if (permit)
-        permit->state = ZERM_PERMIT_STATE_VOID;
+        permit->state = TCM_PERMIT_STATE_VOID;
       return false;
     }
 
     bool additional_concurrency_available = false;
 
-    zerm_permit_handle_t ph = *permit_handle;
+    tcm_permit_handle_t ph = *permit_handle;
     const bool is_requesting_new_permit = bool(!ph);
     if (is_requesting_new_permit) {
       ph = make_new_permit(clid, req);
       // New permits should have PENDING state until its required/minimum parameters are satisfied.
       __TCM_ASSERT(
-          ZERM_PERMIT_STATE_PENDING == ph->data.state.load(std::memory_order_relaxed),
+          TCM_PERMIT_STATE_PENDING == ph->data.state.load(std::memory_order_relaxed),
           "Non-pending state for new permits contributes to their premature negotiations."
       );
     }
@@ -670,7 +670,7 @@ public:
     return true;
   }
 
-  ze_result_t get_permit(zerm_permit_handle_t ph, zerm_permit_t* permit) {
+  tcm_result_t get_permit(tcm_permit_handle_t ph, tcm_permit_t* permit) {
     tracer t("ThreadComposabilityBase::get_permit");
     __TCM_ASSERT(ph && permit, nullptr);
 
@@ -681,111 +681,111 @@ public:
       permit->flags.stale = true;
     }
 
-    return ZE_RESULT_SUCCESS;
+    return TCM_RESULT_SUCCESS;
   }
 
-  ze_result_t idle_permit(zerm_permit_handle_t ph) {
+  tcm_result_t idle_permit(tcm_permit_handle_t ph) {
     tracer t("ThreadComposabilityBase::idle_permit");
     __TCM_ASSERT(ph, nullptr);
 
-    zerm_permit_data_t& pd = ph->data;
+    tcm_permit_data_t& pd = ph->data;
 
-    zerm_permit_state_t curr_state;
+    tcm_permit_state_t curr_state;
     {
       const std::lock_guard<std::mutex> l(data_mutex);
       curr_state = pd.state.load(std::memory_order_relaxed);
     }
 
     if (!is_active(curr_state))
-      return ZE_RESULT_ERROR_UNKNOWN;
+      return TCM_RESULT_ERROR_UNKNOWN;
 
-    return update_permit(ph, curr_state, /*new_state*/ZERM_PERMIT_STATE_IDLE);
+    return update_permit(ph, curr_state, /*new_state*/TCM_PERMIT_STATE_IDLE);
   }
 
-  ze_result_t activate_permit(zerm_permit_handle_t ph) {
+  tcm_result_t activate_permit(tcm_permit_handle_t ph) {
     tracer t("ThreadComposabilityBase::activate_permit");
     __TCM_ASSERT(ph, nullptr);
 
-    zerm_permit_data_t& pd = ph->data;
-    zerm_permit_state_t curr_state;
+    tcm_permit_data_t& pd = ph->data;
+    tcm_permit_state_t curr_state;
     {
       const std::lock_guard<std::mutex> l(data_mutex);
       curr_state = pd.state.load(std::memory_order_relaxed);
     }
 
     if (!is_inactive(curr_state) && !is_idle(curr_state))
-      return ZE_RESULT_ERROR_UNKNOWN;
+      return TCM_RESULT_ERROR_UNKNOWN;
 
-    return update_permit(ph, curr_state, /*new_state*/ZERM_PERMIT_STATE_ACTIVE);
+    return update_permit(ph, curr_state, /*new_state*/TCM_PERMIT_STATE_ACTIVE);
   }
 
-  ze_result_t deactivate_permit(zerm_permit_handle_t ph) {
+  tcm_result_t deactivate_permit(tcm_permit_handle_t ph) {
     tracer t("ThreadComposabilityBase::activate_permit");
     __TCM_ASSERT(ph, nullptr);
 
-    zerm_permit_data_t& pd = ph->data;
-    zerm_permit_state_t curr_state;
+    tcm_permit_data_t& pd = ph->data;
+    tcm_permit_state_t curr_state;
     {
       const std::lock_guard<std::mutex> l(data_mutex);
       curr_state = pd.state.load(std::memory_order_relaxed);
     }
 
-    _ze_result_t status = ZE_RESULT_ERROR_UNKNOWN;
+    _tcm_result_t status = TCM_RESULT_ERROR_UNKNOWN;
     if (is_owning_resources(curr_state) || is_pending(curr_state)) {
-      status = update_permit(ph, curr_state, /*new_state*/ZERM_PERMIT_STATE_INACTIVE);
+      status = update_permit(ph, curr_state, /*new_state*/TCM_PERMIT_STATE_INACTIVE);
     }
 
     return status;
   }
 
-  ze_result_t release_permit(zerm_permit_handle_t ph) {
+  tcm_result_t release_permit(tcm_permit_handle_t ph) {
     tracer t("ThreadComposabilityBase::release_permit");
     __TCM_ASSERT(ph, nullptr);
 
-    zerm_permit_data_t& pd = ph->data;
-    zerm_permit_state_t curr_state;
+    tcm_permit_data_t& pd = ph->data;
+    tcm_permit_state_t curr_state;
     {
       const std::lock_guard<std::mutex> l(data_mutex);
       curr_state = pd.state.load(std::memory_order_relaxed);
     }
 
-    return update_permit(ph, curr_state, /*new_state*/ZERM_PERMIT_STATE_VOID);
+    return update_permit(ph, curr_state, /*new_state*/TCM_PERMIT_STATE_VOID);
   }
 
-  ze_result_t register_thread(zerm_permit_handle_t ph) {
+  tcm_result_t register_thread(tcm_permit_handle_t ph) {
     tracer t("ThreadComposabilityBase::register_thread");
     __TCM_ASSERT(ph, nullptr);
 
     const std::lock_guard<std::mutex> l(threads_map_mutex);
     thread_to_permit_map[std::this_thread::get_id()] = ph;
-    return ZE_RESULT_SUCCESS;
+    return TCM_RESULT_SUCCESS;
   }
 
-  ze_result_t unregister_thread() {
+  tcm_result_t unregister_thread() {
     tracer t("ThreadComposabilityBase::unregister_thread");
     const std::lock_guard<std::mutex> l(threads_map_mutex);
     thread_to_permit_map[std::this_thread::get_id()] = nullptr;
-    return ZE_RESULT_SUCCESS;
+    return TCM_RESULT_SUCCESS;
   }
 
 protected:
-  zerm_permit_epoch_t prepare_permit_copying(zerm_permit_handle_t ph) const {
+  tcm_permit_epoch_t prepare_permit_copying(tcm_permit_handle_t ph) const {
     return ph->epoch.load(std::memory_order_acquire);
   }
 
-  bool has_copying_succeeded(zerm_permit_handle_t permit_handle, zerm_permit_epoch_t c) const {
+  bool has_copying_succeeded(tcm_permit_handle_t permit_handle, tcm_permit_epoch_t c) const {
     return c == permit_handle->epoch.load(std::memory_order_relaxed);
   }
 
-  bool is_safe_to_copy(const zerm_permit_epoch_t& e) const { return e % 2 == 0; }
+  bool is_safe_to_copy(const tcm_permit_epoch_t& e) const { return e % 2 == 0; }
 
-  bool copy_permit(zerm_permit_handle_t ph, zerm_permit_t* permit) const {
-    zerm_permit_epoch_t e = prepare_permit_copying(ph);
+  bool copy_permit(tcm_permit_handle_t ph, tcm_permit_t* permit) const {
+    tcm_permit_epoch_t e = prepare_permit_copying(ph);
 
     if (!is_safe_to_copy(e))
       return false; // someone else is modifying this permit
 
-    zerm_permit_data_t& pd = ph->data;
+    tcm_permit_data_t& pd = ph->data;
 
     __TCM_ASSERT(permit->concurrencies, "Permit concurrencies field contains null pointer.");
     __TCM_ASSERT(permit->size == pd.size, "Permit and request size inconsistency.");
@@ -821,17 +821,17 @@ protected:
 
   // Helper to determine whether the permit is not released yet. Must be
   // called under data_mutex.
-  bool is_valid(zerm_permit_handle_t ph) const {
+  bool is_valid(tcm_permit_handle_t ph) const {
       return permits.cend() != std::find(permits.cbegin(), permits.cend(), ph);
   }
 
-  bool skip_permit_negotiation(zerm_permit_handle_t ph, zerm_permit_handle_t initiator) const
+  bool skip_permit_negotiation(tcm_permit_handle_t ph, tcm_permit_handle_t initiator) const
   {
     if (ph == initiator)    // renegotiate for one that asked
       return false;
 
-    const zerm_permit_data_t& pd = ph->data;
-    const zerm_permit_state_t state = pd.state.load(std::memory_order_relaxed);
+    const tcm_permit_data_t& pd = ph->data;
+    const tcm_permit_state_t state = pd.state.load(std::memory_order_relaxed);
 
     if (!is_negotiable(state, pd.flags)) {
       return true;
@@ -846,7 +846,7 @@ protected:
     return true;
   }
 
-  bool skip_callback_invocation(zerm_permit_handle_t ph, zerm_permit_handle_t initiator,
+  bool skip_callback_invocation(tcm_permit_handle_t ph, tcm_permit_handle_t initiator,
                                 uint32_t previous_grant) const
   {
     if (ph == initiator)        // skip callback invocation for one that asked ...
@@ -860,31 +860,31 @@ protected:
     // TODO: rename "try_satisfy" method into something like "calculate mask occupancy"
 
     // Tries to satisfy requested concurrency on the specific mask
-    negotiable_snapshot_t try_satisfy(zerm_permit_handle_t ph,
-                                      const zerm_cpu_constraints_t& constraint,
+    negotiable_snapshot_t try_satisfy(tcm_permit_handle_t ph,
+                                      const tcm_cpu_constraints_t& constraint,
                                       const uint32_t current_concurrency,
-                                      zerm_cpu_mask_t mask)
+                                      tcm_cpu_mask_t mask)
     {
         int32_t constraint_min = infer_constraint_min_concurrency(constraint.min_concurrency);
         int32_t constraint_max = infer_constraint_max_concurrency(constraint.max_concurrency, mask);
         return try_satisfy(ph, constraint_min, constraint_max, current_concurrency, mask);
     }
 
-    negotiable_snapshot_t try_satisfy(zerm_permit_handle_t ph,
+    negotiable_snapshot_t try_satisfy(tcm_permit_handle_t ph,
                                       const uint32_t constraint_min, const uint32_t constraint_max,
                                       const uint32_t current_concurrency,
-                                      zerm_cpu_mask_t mask)
+                                      tcm_cpu_mask_t mask)
     {
         negotiable_snapshot_t stakeholders;
         stakeholders.set_adjusted_concurrencies(constraint_min, constraint_max);
 
         // TODO: cache masks
-        zerm_cpu_mask_t per_constraint_union_mask = hwloc_bitmap_alloc();
-        zerm_cpu_mask_t common_mask = hwloc_bitmap_alloc();
+        tcm_cpu_mask_t per_constraint_union_mask = hwloc_bitmap_alloc();
+        tcm_cpu_mask_t common_mask = hwloc_bitmap_alloc();
         __TCM_ASSERT(per_constraint_union_mask && common_mask,
                      "HWLOC was unable to allocate the bitmap(s).");
-        std::unique_ptr<zerm_cpu_mask_t, mask_deleter> unique_result_mask(&per_constraint_union_mask);
-        std::unique_ptr<zerm_cpu_mask_t, mask_deleter> unique_common_mask(&common_mask);
+        std::unique_ptr<tcm_cpu_mask_t, mask_deleter> unique_result_mask(&per_constraint_union_mask);
+        std::unique_ptr<tcm_cpu_mask_t, mask_deleter> unique_common_mask(&common_mask);
 
         hwloc_bitmap_or(common_mask, common_mask, mask);
         uint32_t common_concurrency = 0;
@@ -910,14 +910,14 @@ protected:
         // Masks that do not intersect when separately applied
         std::queue<stakeholder_t> separate_masks;
 
-        for (zerm_permit_handle_t& ph_i : permits) {
-            zerm_permit_request_t& req = ph_i->request;
-            zerm_permit_data_t& pd_i = ph_i->data;
+        for (tcm_permit_handle_t& ph_i : permits) {
+            tcm_permit_request_t& req = ph_i->request;
+            tcm_permit_data_t& pd_i = ph_i->data;
 
             if ( !pd_i.cpu_mask )     // Subscription is tracked separately on the platform level
                 continue;
 
-            zerm_permit_state_t ph_i_state = pd_i.state.load(std::memory_order_relaxed);
+            tcm_permit_state_t ph_i_state = pd_i.state.load(std::memory_order_relaxed);
 
             // TODO: Looping over permits that own resources and can be negotiated is
             // frequent. Consider maintaining separate structure to avoid filtering them
@@ -996,7 +996,7 @@ protected:
         bool has_union_applied = false;
         while (!separate_masks.empty()) {
             auto& stakeholder = separate_masks.front();
-            const zerm_permit_data_t &pd_i = stakeholder.m_ph->data;
+            const tcm_permit_data_t &pd_i = stakeholder.m_ph->data;
             auto m = pd_i.cpu_mask[stakeholder.m_constraint_index];
             if (hwloc_bitmap_intersects(common_mask, m)) {
                 // TODO: extract common with the above part
@@ -1057,10 +1057,10 @@ protected:
         return topology;
     }
 
-    negotiable_snapshot_t try_satisfy_high_level_constraints(zerm_permit_handle_t ph,
-                                                             const zerm_cpu_constraints_t& constraint,
+    negotiable_snapshot_t try_satisfy_high_level_constraints(tcm_permit_handle_t ph,
+                                                             const tcm_cpu_constraints_t& constraint,
                                                              const uint32_t current_concurrency,
-                                                             zerm_cpu_mask_t pd_mask)
+                                                             tcm_cpu_mask_t pd_mask)
     {
         __TCM_ASSERT(!constraint.mask, "Constraint mask must not exist.");
         uint32_t constraint_min = infer_constraint_min_concurrency(constraint.min_concurrency);
@@ -1072,10 +1072,10 @@ protected:
 
         negotiable_snapshot_t result_snapshot;
 
-        if (constraint.numa_id == zerm_any) {
+        if (constraint.numa_id == tcm_any) {
             bool is_desired_satisfied = false;
-            zerm_cpu_mask_t result_mask = hwloc_bitmap_alloc();
-            std::unique_ptr<zerm_cpu_mask_t, mask_deleter> result_mask_guard(&result_mask);
+            tcm_cpu_mask_t result_mask = hwloc_bitmap_alloc();
+            std::unique_ptr<tcm_cpu_mask_t, mask_deleter> result_mask_guard(&result_mask);
 
             for (int i = 0; i < num_numa_nodes; ++i) {
                 // TODO: separate mask filling and attempts of its satisfaction.
@@ -1151,20 +1151,20 @@ protected:
     // Loops over all the constraints in the given array and populate the list of negotiable
     // snapshots.
     // TODO: rename to "calculate constraint snapshots" or something
-    void try_satisfy_constraints(stakeholder_cache& sc, const zerm_permit_request_t& req,
-                                 zerm_permit_handle_t ph)
+    void try_satisfy_constraints(stakeholder_cache& sc, const tcm_permit_request_t& req,
+                                 tcm_permit_handle_t ph)
     {
         for (uint32_t constr_idx = 0; constr_idx < req.constraints_size; ++constr_idx) {
-            const zerm_cpu_constraints_t& constraint = req.cpu_constraints[constr_idx];
+            const tcm_cpu_constraints_t& constraint = req.cpu_constraints[constr_idx];
             __TCM_ASSERT(
-                constraint.max_concurrency == zerm_automatic ||
+                constraint.max_concurrency == tcm_automatic ||
                 constraint.min_concurrency <= constraint.max_concurrency,
                 "Invalid constraint."
             );
 
             negotiable_snapshot_t& snapshot = sc.stakeholders[constr_idx];
-            zerm_permit_data_t& pd = ph->data;
-            zerm_cpu_mask_t& pd_mask = pd.cpu_mask[constr_idx];
+            tcm_permit_data_t& pd = ph->data;
+            tcm_cpu_mask_t& pd_mask = pd.cpu_mask[constr_idx];
             const uint32_t current_concurrency = pd.concurrency[constr_idx]
                 .load(std::memory_order_relaxed);
             if (constraint.mask) {
@@ -1214,7 +1214,7 @@ protected:
     };
 
     // Distributes as max as possible of the desired concurrency
-    fulfilment_t calculate_updates(const zerm_permit_request_t& req, zerm_permit_handle_t ph,
+    fulfilment_t calculate_updates(const tcm_permit_request_t& req, tcm_permit_handle_t ph,
                                    const stakeholder_cache& cache)
     {
         __TCM_ASSERT(0 <= req.max_sw_threads,
@@ -1357,14 +1357,14 @@ protected:
         return fulfilment;
     }
 
-    std::vector<permit_change_t> negotiate(fulfilment_t& f, const zerm_permit_request_t& /*req*/,
-                                           zerm_permit_handle_t& ph)
+    std::vector<permit_change_t> negotiate(fulfilment_t& f, const tcm_permit_request_t& /*req*/,
+                                           tcm_permit_handle_t& ph)
     {
-        permit_change_t requested_permit{ph, ZERM_PERMIT_STATE_ACTIVE, {}};
+        permit_change_t requested_permit{ph, TCM_PERMIT_STATE_ACTIVE, {}};
         std::vector<uint32_t>& requested_permit_concurrencies = requested_permit.new_concurrencies;
         std::vector<permit_change_t> result;
-        std::unordered_multimap<zerm_permit_handle_t, permit_change_t> new_grants;
-        std::unordered_set<zerm_permit_handle_t> handles;
+        std::unordered_multimap<tcm_permit_handle_t, permit_change_t> new_grants;
+        std::unordered_set<tcm_permit_handle_t> handles;
 
         for (fulfilment_decision_t& fd : f.decisions) {
             requested_permit_concurrencies.push_back(fd.to_assign);
@@ -1380,7 +1380,7 @@ protected:
 
                 uint32_t current_negotiation = std::min(fd.to_negotiate, st.m_negotiable);
 
-                zerm_permit_data_t& data = st.m_ph->data;
+                tcm_permit_data_t& data = st.m_ph->data;
                 std::vector<uint32_t> new_concurrencies{data.size};
                 // TODO: introduce "dump_concurrencies" helper
                 for (std::size_t i = 0; i < new_concurrencies.size(); ++i) {
@@ -1408,7 +1408,7 @@ protected:
         result.push_back(std::move(requested_permit));
 
         // Merging constraints negotiations for each permit handle
-        for (zerm_permit_handle_t curr_ph : handles) {
+        for (tcm_permit_handle_t curr_ph : handles) {
             auto range = new_grants.equal_range(curr_ph);
             permit_change_t pc = range.first->second;
             std::vector<uint32_t>& concurrencies = pc.new_concurrencies;
@@ -1428,7 +1428,7 @@ protected:
     //! Tries to meet the requested concurrency. Must be called under the data_mutex.
     //! Returns @fulfilment_t
     //! TODO: Split this function into "suggestion" and "permit modification"
-    fulfilment_t try_satisfy_request(const zerm_permit_request_t& req, zerm_permit_handle_t ph,
+    fulfilment_t try_satisfy_request(const tcm_permit_request_t& req, tcm_permit_handle_t ph,
                                      uint32_t available_concurrency_snapshot)
     {
         // TODO: Determine whether permit can have dynamic flags, i.e. flags can be
@@ -1436,7 +1436,7 @@ protected:
         // unnecessary anywhere else except for the first time resources are
         // requested and representation of corresponding permit is allocated.
 
-        __TCM_ASSERT(req.max_sw_threads != zerm_automatic && req.max_sw_threads >= 0,
+        __TCM_ASSERT(req.max_sw_threads != tcm_automatic && req.max_sw_threads >= 0,
                      "Requesting automatic inferring of max_sw_threads is not implemented.");
 
         stakeholder_cache sc{/*constraints array length*/ph->data.size};
@@ -1448,7 +1448,7 @@ protected:
             // has process mask set as its cpu_mask. This allows reusing of the
             // try_satisfy_constraints() method
 
-            const zerm_permit_data_t& pd = ph->data;
+            const tcm_permit_data_t& pd = ph->data;
             const uint32_t current_concurrency = pd.concurrency[0].load(std::memory_order_relaxed);
 
             __TCM_ASSERT(1 == pd.size, "Act as if it is the permit with single constraint");
@@ -1458,9 +1458,9 @@ protected:
             snapshot.set_adjusted_concurrencies(req.min_sw_threads, req.max_sw_threads);
 
             // Considering that all the permits affect the current one
-            for (zerm_permit_handle_t& ph_i : permits) {
-                const zerm_permit_request_t& ph_req = ph_i->request;
-                const zerm_permit_state_t ph_state = ph_i->data.state.load(std::memory_order_relaxed);
+            for (tcm_permit_handle_t& ph_i : permits) {
+                const tcm_permit_request_t& ph_req = ph_i->request;
+                const tcm_permit_state_t ph_state = ph_i->data.state.load(std::memory_order_relaxed);
 
                 if (ph_i == ph) {
                     // __TCM_ASSERT(ph_i != ph, "The being satisfied permit should be skipped.");
@@ -1494,20 +1494,20 @@ protected:
         return fulfilment;
     }
 
-    virtual void renegotiate_permits(zerm_permit_handle_t initiator) = 0;
+    virtual void renegotiate_permits(tcm_permit_handle_t initiator) = 0;
 
-    virtual std::vector<permit_change_t> adjust_existing_permit(const zerm_permit_request_t& req,
-                                                                zerm_permit_handle_t permit) = 0;
+    virtual std::vector<permit_change_t> adjust_existing_permit(const tcm_permit_request_t& req,
+                                                                tcm_permit_handle_t permit) = 0;
 
-    zerm_permit_handle_t
-    make_new_permit(const zerm_client_id_t clid, const zerm_permit_request_t& req) {
+    tcm_permit_handle_t
+    make_new_permit(const tcm_client_id_t clid, const tcm_permit_request_t& req) {
         tracer t("ThreadComposabilityManagerBase::make_new_permit");
 
-        zerm_permit_handle_t ph = new zerm_permit_rep_t;
+        tcm_permit_handle_t ph = new tcm_permit_rep_t;
         __TCM_ASSERT(ph, "Permit was not allocated.");
 
         ph->epoch.store(0, std::memory_order_relaxed);
-        zerm_permit_data_t& pd = ph->data;
+        tcm_permit_data_t& pd = ph->data;
 
         __TCM_ASSERT(!req.cpu_constraints || req.constraints_size > 0,
                      "Inconsistent constrained request");
@@ -1523,14 +1523,14 @@ protected:
         //
         //   b) Data races in case of a client updating the permit request for re-requesting
         //      resources for an existing permit, while other thread is reading it inside TCM.
-        zerm_permit_request_t& pr = ph->request;
+        tcm_permit_request_t& pr = ph->request;
         pr = req;               // Do shallow copy first
 
         if (bool(req.cpu_constraints)) {
             allocate_constraints_by_copy(pr);
 
             pd.size = req.constraints_size;
-            pd.cpu_mask = new zerm_cpu_mask_t[pd.size];
+            pd.cpu_mask = new tcm_cpu_mask_t[pd.size];
             for (uint32_t i = 0; i < pd.size; ++i) {
                 pd.cpu_mask[i] = hwloc_bitmap_alloc();
                 __TCM_ASSERT(hwloc_bitmap_iszero(pd.cpu_mask[i]), "Not empty mask");
@@ -1538,23 +1538,23 @@ protected:
         }
 
         pd.concurrency = new std::atomic<uint32_t>[pd.size]{0};
-        pd.state.store(ZERM_PERMIT_STATE_PENDING, std::memory_order_relaxed);
+        pd.state.store(TCM_PERMIT_STATE_PENDING, std::memory_order_relaxed);
         pd.flags = req.flags;
 
         return ph;
     }
 
-    void release_permit_impl(zerm_permit_handle_t ph) {
+    void release_permit_impl(tcm_permit_handle_t ph) {
         tracer t("ThreadComposabilityBase::release_permit_impl");
         __TCM_ASSERT(ph, nullptr);
 
         bool additional_concurrency_available = false;
-        zerm_permit_data_t& pd = ph->data;
+        tcm_permit_data_t& pd = ph->data;
         {
             const std::lock_guard<std::mutex> l(data_mutex);
             __TCM_ASSERT(is_valid(ph), "Invalid permit is being released.");
 
-            zerm_permit_request_t& req = ph->request;
+            tcm_permit_request_t& req = ph->request;
             if (req.cpu_constraints)
               deallocate_constraints(req);
             permits.erase(std::remove(permits.begin(), permits.end(), ph), permits.end());
@@ -1589,8 +1589,8 @@ protected:
         }
     }
 
-    ze_result_t update_permit(zerm_permit_handle_t ph, const zerm_permit_state_t curr_state,
-                              const zerm_permit_state_t new_state)
+    tcm_result_t update_permit(tcm_permit_handle_t ph, const tcm_permit_state_t curr_state,
+                              const tcm_permit_state_t new_state)
     {
         // TODO: refactor this function to have uniform approach where applicable,
         // and split responsibilities otherwise.
@@ -1598,7 +1598,7 @@ protected:
         __TCM_ASSERT(!is_void(curr_state), "Updating void permit.");
         __TCM_ASSERT(curr_state != new_state,
                      "Setting permit state to be identical to current.");
-        zerm_permit_data_t& pd = ph->data;
+        tcm_permit_data_t& pd = ph->data;
         if (is_void(new_state)) {
             release_permit_impl(ph);
         } else if (is_activating_from_inactive(curr_state, new_state)) {
@@ -1633,13 +1633,13 @@ protected:
             pd.state.store(new_state, std::memory_order_relaxed);
             commit_permit_modification(ph);
         }
-        return ZE_RESULT_SUCCESS;
+        return TCM_RESULT_SUCCESS;
     }
 }; // class ThreadComposabilityBase
 
 class ThreadComposabilityFCFSCImpl : public ThreadComposabilityManagerBase {
 public:
-    void renegotiate_permits(zerm_permit_handle_t initiator) override {
+    void renegotiate_permits(tcm_permit_handle_t initiator) override {
         tracer t("ThreadComposabilityFCFSCImpl::renegotiate_permits");
         int32_t available_concurrency_snapshot;
         {
@@ -1649,13 +1649,13 @@ public:
 
         // TODO: consider comparing performance with other containers such as
         // std::deque.
-        std::vector<zerm_permit_handle_t> skipped_permits;
+        std::vector<tcm_permit_handle_t> skipped_permits;
 
         // we contact enough clients that could absorb
         // available_concurrency_snapshot
         // Not sure this is the best approach
         while (available_concurrency_snapshot > 0) {
-            zerm_permit_handle_t current_ph;
+            tcm_permit_handle_t current_ph;
             uint32_t current_grant = 0;
             int32_t delta = 0;
             update_callbacks_t callbacks;
@@ -1670,13 +1670,13 @@ public:
                     // permit is not valid anymore, skip it.
                     continue;
 
-                zerm_permit_data_t& pd = current_ph->data;
+                tcm_permit_data_t& pd = current_ph->data;
                 if (skip_permit_negotiation(current_ph, initiator)) {
                     skipped_permits.push_back(current_ph);
                     continue;
                 }
 
-                const zerm_permit_request_t& req = current_ph->request;
+                const tcm_permit_request_t& req = current_ph->request;
 
                 __TCM_ASSERT(
                     1 == client_to_callback_map.count(pd.client_id),
@@ -1754,8 +1754,8 @@ public:
         );
     }
 
-    std::vector<permit_change_t> adjust_existing_permit(const zerm_permit_request_t &req,
-                                                        zerm_permit_handle_t ph) override
+    std::vector<permit_change_t> adjust_existing_permit(const tcm_permit_request_t &req,
+                                                        tcm_permit_handle_t ph) override
     {
         // The data_mutex lock must be taken
         tracer t("ThreadComposabilityFCFSCImpl::adjust_existing_permit");
@@ -1790,7 +1790,7 @@ public:
         return negotiate(ff, req, ph);
     }
 private:
-    std::deque<zerm_permit_handle_t> renegotiation_deque;
+    std::deque<tcm_permit_handle_t> renegotiation_deque;
 
     void nullify_negotiations(fulfilment_t& ff) {
         ff.num_negotiable = 0;
@@ -1805,25 +1805,25 @@ private:
 
 class ThreadComposabilityFairBalance : public ThreadComposabilityManagerBase {
   // Stores the keys in the map of existing permits.
-  std::deque<zerm_permit_handle_t> renegotiation_deque;
+  std::deque<tcm_permit_handle_t> renegotiation_deque;
 
 protected:
     //! Calculate concurrency for ACTIVE/IDLE permits in accordance with the FAIR approach.
     //! If necessary, callback should be called separately.
     permit_change_t renegotiate_active_idle_permit(uint32_t distributed_concurrency,
                                                    uint32_t total_demand,
-                                                   const zerm_permit_request_t& pr,
-                                                   zerm_permit_handle_t ph,
+                                                   const tcm_permit_request_t& pr,
+                                                   tcm_permit_handle_t ph,
                                                    uint32_t& carry)
     {
         __TCM_ASSERT(pr.min_sw_threads >= 0, "Actual value of required concurrency is expected.");
         permit_change_t update {ph,
-            /*required concurrency should have been satisfied by this time*/ZERM_PERMIT_STATE_ACTIVE,
+            /*required concurrency should have been satisfied by this time*/TCM_PERMIT_STATE_ACTIVE,
             /*new_concurrencies[0] = */{unsigned(pr.min_sw_threads)}
         };
 
         // TODO: take account of the mask when computing allotment
-        zerm_permit_data_t& pd = ph->data;
+        tcm_permit_data_t& pd = ph->data;
         if (pr.cpu_constraints) {
             for (uint32_t i = 0; i < pd.size; ++i) {
                 update.new_concurrencies[i] = pr.cpu_constraints[i].min_concurrency;
@@ -1855,7 +1855,7 @@ protected:
         return update;
     }
 
-    void renegotiate_permits(zerm_permit_handle_t initiator) override {
+    void renegotiate_permits(tcm_permit_handle_t initiator) override {
         tracer t("ThreadComposabilityFairBalance::renegotiate_permits");
         uint32_t total_granted = 0;
         uint32_t active_demand = 0;
@@ -1864,8 +1864,8 @@ protected:
         // distribute whole platform concurrency
         uint32_t available_concurrency_snapshot = initially_available_concurrency;
 
-        std::map<uint32_t, zerm_permit_handle_t> renegotiation_pending;
-        std::vector<std::pair<int32_t, zerm_permit_handle_t>> renegotiation_active_idle;
+        std::map<uint32_t, tcm_permit_handle_t> renegotiation_pending;
+        std::vector<std::pair<int32_t, tcm_permit_handle_t>> renegotiation_active_idle;
         std::vector<permit_change_t> updates;
         {
             const std::lock_guard<std::mutex> lock(data_mutex);
@@ -1873,8 +1873,8 @@ protected:
             renegotiation_active_idle.reserve(active_permits_upper_bound_estimate);
 
             // Searching of ACTIVE without rigid_concurrency flag/IDLE/PENDING permits
-            for (zerm_permit_handle_t& ph: permits) {
-                zerm_permit_data_t& pd = ph->data;
+            for (tcm_permit_handle_t& ph: permits) {
+                tcm_permit_data_t& pd = ph->data;
                 if (skip_permit_negotiation(ph, initiator)) {
                     const uint32_t permit_grant = get_permit_grant(ph);
                     __TCM_ASSERT(0 == permit_grant ||
@@ -1886,7 +1886,7 @@ protected:
                     continue;
                 }
 
-                const zerm_permit_request_t& pr = ph->request;
+                const tcm_permit_request_t& pr = ph->request;
 
                 if (is_pending(pd.state.load(std::memory_order_relaxed)))
                     renegotiation_pending.insert(std::make_pair(pr.min_sw_threads, ph));
@@ -1910,8 +1910,8 @@ protected:
             // Satisfied, but not yet applied, concurrency from pending requests
             uint32_t overall_pending_satisfied = 0;
             for (auto& elem : renegotiation_pending) {
-                zerm_permit_handle_t ph = elem.second;
-                const zerm_permit_request_t& pr = ph->request;
+                tcm_permit_handle_t ph = elem.second;
+                const tcm_permit_request_t& pr = ph->request;
 
                 fulfilment_t ff = try_satisfy_request(pr, ph, available_concurrency_snapshot);
                 uint32_t required_concurrency = infer_constraint_min_concurrency(pr.min_sw_threads);
@@ -1952,8 +1952,8 @@ protected:
             // Processing of active and idle permits
             uint32_t carry = 0;
             for (auto& elem: renegotiation_active_idle) {
-                zerm_permit_handle_t ph = elem.second;
-                const zerm_permit_request_t& pr = ph->request;
+                tcm_permit_handle_t ph = elem.second;
+                const tcm_permit_request_t& pr = ph->request;
 
                 permit_change_t permit_update = renegotiate_active_idle_permit(
                     available_concurrency_snapshot, active_demand, pr, ph, carry
@@ -1966,8 +1966,8 @@ protected:
     }
 
     //! TODO: Why do we have to pass req here? Can use the request from permit_to_request_map inside?
-    std::vector<permit_change_t> adjust_existing_permit(const zerm_permit_request_t &req,
-                                                        zerm_permit_handle_t ph) override
+    std::vector<permit_change_t> adjust_existing_permit(const tcm_permit_request_t &req,
+                                                        tcm_permit_handle_t ph) override
     {
         // The data_mutex lock must be taken
         tracer t("ThreadComposabilityFairBalance::adjust_existing_permit");
@@ -1979,7 +1979,7 @@ protected:
         fulfilment_t ff = try_satisfy_request(req, ph, available_concurrency);
 
         if (int32_t(ff.num_satisfiable) < req.min_sw_threads) {
-            return {}; // Also works if min_sw_threads == zerm_automatic
+            return {}; // Also works if min_sw_threads == tcm_automatic
         }
 
         if ( !ff.pending_constraints_indices.empty() ) {
@@ -2019,54 +2019,54 @@ public:
     }
   }
 
-  zerm_client_id_t register_client(zerm_callback_t r) {
+  tcm_client_id_t register_client(tcm_callback_t r) {
     internal::tracer t("ThreadComposability::register_client");
     return impl_->register_client(r);
   }
 
-  void unregister_client(zerm_client_id_t clid) {
+  void unregister_client(tcm_client_id_t clid) {
     internal::tracer t("ThreadComposability::unregister_client");
     impl_->unregister_client(clid);
   }
 
-  bool request_permit(zerm_client_id_t clid, zerm_permit_request_t& req,
-                      void* callback_arg, zerm_permit_handle_t* permit_handle,
-                      zerm_permit_t* permit) {
+  bool request_permit(tcm_client_id_t clid, tcm_permit_request_t& req,
+                      void* callback_arg, tcm_permit_handle_t* permit_handle,
+                      tcm_permit_t* permit) {
     internal::tracer t("ThreadComposability::request_permit");
     return impl_->request_permit(clid, req, callback_arg, permit_handle, permit);
   }
 
-  ze_result_t get_permit(zerm_permit_handle_t ph, zerm_permit_t* p) {
+  tcm_result_t get_permit(tcm_permit_handle_t ph, tcm_permit_t* p) {
     internal::tracer t("ThreadComposability::get_permit");
     return impl_->get_permit(ph, p);
   }
 
-  ze_result_t idle_permit(zerm_permit_handle_t p) {
+  tcm_result_t idle_permit(tcm_permit_handle_t p) {
     internal::tracer t("ThreadComposability::idle_permit");
     return impl_->idle_permit(p);
   }
 
-  ze_result_t activate_permit(zerm_permit_handle_t p) {
+  tcm_result_t activate_permit(tcm_permit_handle_t p) {
     internal::tracer t("ThreadComposability::activate_permit");
     return impl_->activate_permit(p);
   }
 
-  ze_result_t deactivate_permit(zerm_permit_handle_t p) {
+  tcm_result_t deactivate_permit(tcm_permit_handle_t p) {
     internal::tracer t("ThreadComposability::deactivate_permit");
     return impl_->deactivate_permit(p);
   }
 
-  ze_result_t release_permit(zerm_permit_handle_t p) {
+  tcm_result_t release_permit(tcm_permit_handle_t p) {
     internal::tracer t("ThreadComposability::release_permit");
     return impl_->release_permit(p);
   }
 
-  ze_result_t register_thread(zerm_permit_handle_t p) {
+  tcm_result_t register_thread(tcm_permit_handle_t p) {
     internal::tracer t("ThreadComposability::register_thread");
     return impl_->register_thread(p);
   }
 
-  ze_result_t unregister_thread() {
+  tcm_result_t unregister_thread() {
     internal::tracer t("ThreadComposability::register_thread");
     return impl_->unregister_thread();
   }
@@ -2131,21 +2131,21 @@ extern "C" {
 ///       resource management function.
 ///
 /// @returns
-///     - ::ZE_RESULT_SUCCESS
-///     - ::ZE_RESULT_ERROR_UNKNOWN
-ze_result_t zermConnect(zerm_callback_t callback, zerm_client_id_t *client_id)
+///     - ::TCM_RESULT_SUCCESS
+///     - ::TCM_RESULT_ERROR_UNKNOWN
+tcm_result_t tcmConnect(tcm_callback_t callback, tcm_client_id_t *client_id)
 {
   using tcm::theTCM;
-  tcm::internal::tracer t("zermConnect");
+  tcm::internal::tracer t("tcmConnect");
 
   if (theTCM::is_enabled() && client_id) {
     theTCM::increase_ref_count();
     auto& mgr = theTCM::instance();
     *client_id = mgr.register_client(callback);
     if (*client_id)
-      return ZE_RESULT_SUCCESS;
+      return TCM_RESULT_SUCCESS;
   }
-  return ZE_RESULT_ERROR_UNKNOWN;
+  return TCM_RESULT_ERROR_UNKNOWN;
 }
 
 /// @brief Terminate the connection with the thread composability manager
@@ -2153,22 +2153,22 @@ ze_result_t zermConnect(zerm_callback_t callback, zerm_client_id_t *client_id)
 /// @details
 ///     - Must be called whenever the client, which is seen as a set of permits associated
 ///       with the given client_id, finishes its work with the thread composability manager
-///       and no other calls, possibly except for zermConnect are expected to be made
+///       and no other calls, possibly except for tcmConnect are expected to be made
 ///       from that client.
 ///
 /// @returns
-///     - ::ZE_RESULT_SUCCESS
-///     - ::ZE_RESULT_ERROR_UNKNOWN
-ze_result_t zermDisconnect(zerm_client_id_t client_id)
+///     - ::TCM_RESULT_SUCCESS
+///     - ::TCM_RESULT_ERROR_UNKNOWN
+tcm_result_t tcmDisconnect(tcm_client_id_t client_id)
 {
   using tcm::theTCM;
-  tcm::internal::tracer t("zermDisconnect");
+  tcm::internal::tracer t("tcmDisconnect");
 
   auto& mgr = theTCM::instance();
   mgr.unregister_client(client_id);
   theTCM::decrease_ref_count();
 
-  return ZE_RESULT_SUCCESS;
+  return TCM_RESULT_SUCCESS;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2178,28 +2178,28 @@ ze_result_t zermDisconnect(zerm_client_id_t client_id)
 ///     - The client must call this function to request the permit.
 ///
 /// @returns
-///     - ::ZE_RESULT_SUCCESS
-///     - ::ZE_RESULT_ERROR_UNKNOWN
-ze_result_t zermRequestPermit(zerm_client_id_t client_id,
-                              zerm_permit_request_t request,
+///     - ::TCM_RESULT_SUCCESS
+///     - ::TCM_RESULT_ERROR_UNKNOWN
+tcm_result_t tcmRequestPermit(tcm_client_id_t client_id,
+                              tcm_permit_request_t request,
                               void* callback_arg,
-                              zerm_permit_handle_t *permit_handle,
-                              zerm_permit_t* permit)
+                              tcm_permit_handle_t *permit_handle,
+                              tcm_permit_t* permit)
 {
   using tcm::theTCM;
-  tcm::internal::tracer t("zermRequestPermit");
+  tcm::internal::tracer t("tcmRequestPermit");
 
   if (!permit_handle)
-    return ZE_RESULT_ERROR_UNKNOWN;
+    return TCM_RESULT_ERROR_UNKNOWN;
 
   if (request.min_sw_threads < 0 || request.max_sw_threads < request.min_sw_threads)
-    return ZE_RESULT_ERROR_UNKNOWN;
+    return TCM_RESULT_ERROR_UNKNOWN;
 
   auto& mgr = theTCM::instance();
   bool result = mgr.request_permit(client_id, request, callback_arg,
                                    permit_handle, permit);
 
-  return result? ZE_RESULT_SUCCESS : ZE_RESULT_ERROR_INVALID_ARGUMENT;
+  return result? TCM_RESULT_SUCCESS : TCM_RESULT_ERROR_INVALID_ARGUMENT;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2207,18 +2207,18 @@ ze_result_t zermRequestPermit(zerm_client_id_t client_id,
 ///
 /// @details
 ///     - The client calls this function whenever it wants to read the permit.
-///       In paricular, after zermIdlePermit and zermActivatePermit calls, and
+///       In paricular, after tcmIdlePermit and tcmActivatePermit calls, and
 ///       during invocation of the client's callback.
 ///
 /// @returns
-///     - ::ZE_RESULT_SUCCESS
-///     - ::ZE_RESULT_ERROR_UNKNOWN
-ze_result_t zermGetPermitData(zerm_permit_handle_t permit_handle, zerm_permit_t* permit) {
+///     - ::TCM_RESULT_SUCCESS
+///     - ::TCM_RESULT_ERROR_UNKNOWN
+tcm_result_t tcmGetPermitData(tcm_permit_handle_t permit_handle, tcm_permit_t* permit) {
   using tcm::theTCM;
-  tcm::internal::tracer t("zermGetPermitData");
+  tcm::internal::tracer t("tcmGetPermitData");
 
   if (!permit_handle || !permit)
-    return ZE_RESULT_ERROR_UNKNOWN;
+    return TCM_RESULT_ERROR_UNKNOWN;
 
   auto& mgr = theTCM::instance();
   return mgr.get_permit(permit_handle, permit);
@@ -2231,17 +2231,17 @@ ze_result_t zermGetPermitData(zerm_permit_handle_t permit_handle, zerm_permit_t*
 ///     - The client must call this function to mark the permit as idle.
 ///
 /// @returns
-///     - ::ZE_RESULT_SUCCESS
-///     - ::ZE_RESULT_ERROR_UNKNOWN
-ze_result_t zermIdlePermit(zerm_permit_handle_t p) {
+///     - ::TCM_RESULT_SUCCESS
+///     - ::TCM_RESULT_ERROR_UNKNOWN
+tcm_result_t tcmIdlePermit(tcm_permit_handle_t p) {
   using tcm::theTCM;
-  tcm::internal::tracer t("zermIdlePermit");
+  tcm::internal::tracer t("tcmIdlePermit");
 
   auto& mgr = theTCM::instance();
   if (p) {
     return mgr.idle_permit(p);
   }
-  return ZE_RESULT_ERROR_UNKNOWN;
+  return TCM_RESULT_ERROR_UNKNOWN;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2251,9 +2251,9 @@ ze_result_t zermIdlePermit(zerm_permit_handle_t p) {
 ///     - The client must call this function to activate the permit.
 ///
 /// @returns
-///     - ::ZE_RESULT_SUCCESS
-///     - ::ZE_RESULT_ERROR_UNKNOWN
-ze_result_t zermActivatePermit(zerm_permit_handle_t p) {
+///     - ::TCM_RESULT_SUCCESS
+///     - ::TCM_RESULT_ERROR_UNKNOWN
+tcm_result_t tcmActivatePermit(tcm_permit_handle_t p) {
   using tcm::theTCM;
   tcm::internal::tracer t("zeReactivatePermit");
 
@@ -2261,7 +2261,7 @@ ze_result_t zermActivatePermit(zerm_permit_handle_t p) {
   if (p) {
     return mgr.activate_permit(p);
   }
-  return ZE_RESULT_ERROR_UNKNOWN;
+  return TCM_RESULT_ERROR_UNKNOWN;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2271,9 +2271,9 @@ ze_result_t zermActivatePermit(zerm_permit_handle_t p) {
 ///     - The client must call this function to deactivate the permit.
 ///
 /// @returns
-///     - ::ZE_RESULT_SUCCESS
-///     - ::ZE_RESULT_ERROR_UNKNOWN
-ze_result_t zermDeactivatePermit(zerm_permit_handle_t p) {
+///     - ::TCM_RESULT_SUCCESS
+///     - ::TCM_RESULT_ERROR_UNKNOWN
+tcm_result_t tcmDeactivatePermit(tcm_permit_handle_t p) {
   using tcm::theTCM;
   tcm::internal::tracer t("zeReactivatePermit");
 
@@ -2281,7 +2281,7 @@ ze_result_t zermDeactivatePermit(zerm_permit_handle_t p) {
   if (p) {
     return mgr.deactivate_permit(p);
   }
-  return ZE_RESULT_ERROR_UNKNOWN;
+  return TCM_RESULT_ERROR_UNKNOWN;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2291,17 +2291,17 @@ ze_result_t zermDeactivatePermit(zerm_permit_handle_t p) {
 ///     - The client must call this function to release the permit.
 ///
 /// @returns
-///     - ::ZE_RESULT_SUCCESS
-///     - ::ZE_RESULT_ERROR_UNKNOWN
-ze_result_t zermReleasePermit(zerm_permit_handle_t p) {
+///     - ::TCM_RESULT_SUCCESS
+///     - ::TCM_RESULT_ERROR_UNKNOWN
+tcm_result_t tcmReleasePermit(tcm_permit_handle_t p) {
   using tcm::theTCM;
-  tcm::internal::tracer t("zermReleasePermit");
+  tcm::internal::tracer t("tcmReleasePermit");
 
   auto& mgr = theTCM::instance();
   if (p) {
     return mgr.release_permit(p);
   }
-  return ZE_RESULT_ERROR_UNKNOWN;
+  return TCM_RESULT_ERROR_UNKNOWN;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2311,16 +2311,16 @@ ze_result_t zermReleasePermit(zerm_permit_handle_t p) {
 ///     - The client must call this function when the thread allocated as part of the permit starts the work.
 ///
 /// @returns
-///     - ::ZE_RESULT_SUCCESS
-///     - ::ZE_RESULT_ERROR_UNKNOWN
-ze_result_t zermRegisterThread(zerm_permit_handle_t p) {
+///     - ::TCM_RESULT_SUCCESS
+///     - ::TCM_RESULT_ERROR_UNKNOWN
+tcm_result_t tcmRegisterThread(tcm_permit_handle_t p) {
   using tcm::theTCM;
 
   auto& mgr = theTCM::instance();
   if (p) {
     return mgr.register_thread(p);
   }
-  return ZE_RESULT_ERROR_UNKNOWN;
+  return TCM_RESULT_ERROR_UNKNOWN;
 }
 
 
@@ -2331,9 +2331,9 @@ ze_result_t zermRegisterThread(zerm_permit_handle_t p) {
 ///     - The client must call this function when the thread allocated as part of the permit ends the work.
 ///
 /// @returns
-///     - ::ZE_RESULT_SUCCESS
-///     - ::ZE_RESULT_ERROR_UNKNOWN
-ze_result_t zermUnregisterThread() {
+///     - ::TCM_RESULT_SUCCESS
+///     - ::TCM_RESULT_ERROR_UNKNOWN
+tcm_result_t tcmUnregisterThread() {
   using tcm::theTCM;
 
   auto& mgr = theTCM::instance();
