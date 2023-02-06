@@ -31,6 +31,37 @@ include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 # --------------------------------------------------------------------------------------------------
 
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
+    message(STATUS "CMAKE_BUILD_TYPE is not specified. Using default: ${CMAKE_BUILD_TYPE}")
+    # Possible values of build type for cmake-gui
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
+if (NOT DEFINED TCM_OUTPUT_DIR_BASE)
+     string(REGEX MATCH "^([0-9]+\.[0-9]+|[0-9]+)" _tcm_compiler_version_short ${CMAKE_CXX_COMPILER_VERSION})
+     string(TOLOWER ${CMAKE_CXX_COMPILER_ID}_${_tcm_compiler_version_short}_cxx${CMAKE_CXX_STANDARD} TCM_OUTPUT_DIR_BASE)
+     unset(_tcm_compiler_version_short)
+endif()
+
+foreach(output_type LIBRARY ARCHIVE PDB RUNTIME)
+    if (CMAKE_BUILD_TYPE)
+        string(TOLOWER ${CMAKE_BUILD_TYPE} _tcm_build_type_lower)
+        set(CMAKE_${output_type}_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${TCM_OUTPUT_DIR_BASE}_${_tcm_build_type_lower})
+        unset(_tcm_build_type_lower)
+    endif()
+
+    if (CMAKE_CONFIGURATION_TYPES)
+        foreach(suffix ${CMAKE_CONFIGURATION_TYPES})
+            string(TOUPPER ${suffix} _tcm_suffix_upper)
+            string(TOLOWER ${suffix} _tcm_suffix_lower)
+            set(CMAKE_${output_type}_OUTPUT_DIRECTORY_${_tcm_suffix_upper} ${CMAKE_BINARY_DIR}/${TCM_OUTPUT_DIR_BASE}_${_tcm_suffix_lower})
+        endforeach()
+        unset(_tcm_suffix_lower)
+        unset(_tcm_suffix_upper)
+    endif()
+endforeach()
+
 add_subdirectory(src)
 
 # --------------------------------------------------------------------------------------------------

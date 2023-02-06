@@ -23,7 +23,7 @@ foreach(tpp test_basic_apis.cpp test_fcfsc.cpp test_rb.cpp test_constrained_requ
   target_compile_definitions(${texe} PRIVATE ${TCM_COMPILE_DEFINITIONS})
 
   target_link_libraries(${texe} PUBLIC tcm)
-  add_test(${texe} ${texe})
+  add_test(NAME ${texe} COMMAND ${texe} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endforeach()
 
 # Group of tests that runs the same test in different environment checking TCM
@@ -34,11 +34,11 @@ target_compile_options(${TCM_TEST_DISABLING} PRIVATE ${TCM_WARNING_LEVEL})
 target_compile_definitions(${TCM_TEST_DISABLING} PRIVATE ${TCM_COMPILE_DEFINITIONS})
 target_link_libraries(${TCM_TEST_DISABLING} PUBLIC tcm)
 
-add_test(${TCM_TEST_DISABLING}_with_empty_env ${TCM_TEST_DISABLING})
+add_test(NAME ${TCM_TEST_DISABLING}_with_empty_env COMMAND ${TCM_TEST_DISABLING} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 set_tests_properties(${TCM_TEST_DISABLING}_with_empty_env PROPERTIES ENVIRONMENT "TCM_DISABLE=")
 
-add_test(${TCM_TEST_DISABLING}_with_non_null_env ${TCM_TEST_DISABLING})
+add_test(NAME ${TCM_TEST_DISABLING}_with_non_null_env COMMAND ${TCM_TEST_DISABLING} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 set_tests_properties(${TCM_TEST_DISABLING}_with_non_null_env PROPERTIES ENVIRONMENT "TCM_DISABLE=1")
 
-add_test(${TCM_TEST_DISABLING}_with_null_env ${TCM_TEST_DISABLING})
+add_test(NAME ${TCM_TEST_DISABLING}_with_null_env COMMAND ${TCM_TEST_DISABLING} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 set_tests_properties(${TCM_TEST_DISABLING}_with_null_env PROPERTIES ENVIRONMENT "TCM_DISABLE=0")
