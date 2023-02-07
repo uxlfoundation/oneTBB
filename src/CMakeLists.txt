@@ -46,3 +46,15 @@ install(TARGETS ${PROJECT_NAME}
   PUBLIC_HEADER
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
+
+if (WIN32)
+  install(IMPORTED_RUNTIME_ARTIFACTS HWLOC::hwloc
+    RUNTIME
+      DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
+else()
+  get_target_property(hwloc_lib HWLOC::hwloc IMPORTED_LOCATION)
+  get_filename_component(hwloc_lib_dir "${hwloc_lib}" DIRECTORY)
+  file(GLOB hwloc_binaries ${hwloc_lib_dir}/libhwloc.so*)
+  install(FILES ${hwloc_binaries} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
