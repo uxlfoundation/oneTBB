@@ -346,6 +346,63 @@ bool test_two_constrained_requests_oversubscribe_single_core(tcm_test::system_to
 //  return test();
 //}
 
+bool test_allow_mask_omitting_during_permit_copy(tcm_test::system_topology& /*tp*/) {
+    const char* test_name = "test_allow_omitting_mask_in_permit_copy";
+    test_prolog(test_name);
+
+    tcm_client_id_t client_id;
+    auto r = tcmConnect(nullptr, &client_id);
+    if (!check_success(r, "tcmConnect succeeded"))
+        return test_fail(test_name);
+
+    tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+    std::unique_ptr<tcm_cpu_mask_t, mask_deleter> req_mask_guard(&constraints.mask);
+    constraints.mask = hwloc_bitmap_alloc();
+    hwloc_bitmap_set(constraints.mask, 1);
+    auto req = make_request(0, total_number_of_threads, &constraints, /*size*/1);
+
+    tcm_permit_handle_t ph{nullptr};
+    uint32_t p_concurrency;
+    // Check that TCM does not require space for the mask when copying the permit data
+    tcm_permit_t p = make_void_permit(&p_concurrency);
+
+    // since constraint's max_concurrency will be inferred to the mask concurrency during the request
+    uint32_t e_concurrency = hwloc_bitmap_weight(constraints.mask);
+    tcm_permit_t eP = make_active_permit(&e_concurrency);
+    r = tcmRequestPermit(client_id, req, /*callback_arg*/nullptr, &ph, &p);
+    if (!(check_success(r, "tcmRequestPermit succeeded") && check_permit(eP, p) &&
+          check(!p.cpu_masks, "The mask has not been allocated by TCM in tcmRequestPermit")))
+        return test_fail(test_name);
+
+    r = tcmGetPermitData(ph, &p);
+    if (!(check_success(r, "tcmGetPermitData succeeded") && check_permit(eP, p) &&
+          check(!p.cpu_masks, "The mask has not been allocated by TCM in tcmGetPermitData")))
+        return test_fail(test_name);
+
+    tcm_cpu_mask_t mask = hwloc_bitmap_alloc();
+    std::unique_ptr<tcm_cpu_mask_t, mask_deleter> permit_mask_guard(&mask);
+    p.cpu_masks = &mask;
+    if (!check(hwloc_bitmap_compare(mask, req.cpu_constraints->mask) != 0,
+               "Just created and requested mask differs"))
+        return test_fail(test_name);
+
+    r = tcmGetPermitData(ph, &p);
+    eP.cpu_masks = &req.cpu_constraints->mask; // Expecting the requested mask
+    if (!(check_success(r, "tcmGetPermitData succeeded") && check_permit(eP, p),
+          "The copied mask is equal to the requested"))
+        return test_fail(test_name);
+
+    r = tcmReleasePermit(ph);
+    if (!check_success(r, "tcmReleasePermit succeeded"))
+        return test_fail(test_name);
+
+    r = tcmDisconnect(client_id);
+    if (!check_success(r, "tcmDisconnect succeeded"))
+        return test_fail(test_name);
+
+    return test_epilog(test_name);
+}
+
 int main() {
   bool res = true;
 
@@ -357,6 +414,7 @@ int main() {
   res &= test_one_constrained_request_first_core_mask();
   res &= test_two_constrained_requests_full_overlapping_mask();
   res &= test_two_constrained_requests_oversubscribe_single_core(tp);
+  res &= test_allow_mask_omitting_during_permit_copy(tp);
 
   tcm_test::system_topology::destroy();
 

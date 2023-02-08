@@ -232,9 +232,9 @@ bool check_permit_mask(const tcm_permit_t& expected, const tcm_permit_t& actual,
   if (expected.cpu_masks == nullptr && actual.cpu_masks == nullptr) {
     return true;
   } else if (expected.cpu_masks == nullptr || actual.cpu_masks == nullptr) {
-    report_str = "Check CPU mask, expected.masks '" +
-                 std::to_string(uintptr_t(expected.cpu_masks)) +
-                 "' equals to actual '" + std::to_string(uintptr_t(actual.cpu_masks)) + "'";
+    report_str = "Check CPU mask, expected cpu_masks pointer '" +
+        std::to_string(uintptr_t(expected.cpu_masks)) + "' equals to actual cpu_masks pointer '" +
+        std::to_string(uintptr_t(actual.cpu_masks)) + "'";
     return report ? check(false, report_str) : false;
   }
 
