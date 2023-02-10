@@ -91,3 +91,5 @@ if (TCM_TEST)
   enable_testing()
   add_subdirectory(test)
 endif()
+
+add_subdirectory(cmake/post_install)
