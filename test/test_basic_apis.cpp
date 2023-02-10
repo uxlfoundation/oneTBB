@@ -243,6 +243,59 @@ bool test_get_stale_permit() {
 static_assert(sizeof(tcm_permit_flags_t) == 4, "The permit flags type has wrong size");
 static_assert(sizeof(tcm_callback_flags_t) == 4, "The callback flags type has wrong size");
 
+bool test_allow_not_specifying_client_callback() {
+  const char* test_name = "test_allow_not_specifying_client_callback";
+
+  tcm_client_id_t client_id;
+
+  auto r = tcmConnect(/*callback*/nullptr, &client_id);
+  if (!check_success(r, "tcmConnect"))
+    return test_fail(test_name);
+
+  const int num_requests = 2;
+  std::vector<tcm_permit_handle_t> handles(num_requests, nullptr);
+  std::vector<tcm_permit_t> permits(2 * num_requests); // actual + expected
+  std::vector<uint32_t> permit_concurrencies = {0, 0, uint32_t(total_number_of_threads), 0};
+  for (auto i = 0; i < num_requests; ++i) {
+    tcm_permit_request_t req = TCM_PERMIT_REQUEST_INITIALIZER;
+    req.min_sw_threads = req.max_sw_threads = total_number_of_threads;
+    permits[i] = make_void_permit(&permit_concurrencies[i]);
+    r = tcmRequestPermit(client_id, req, /*callback_arg*/nullptr, &handles[i], &permits[i]);
+    if (!check_success(r, "tcmRequestPermit " + std::to_string(i)))
+      return test_fail(test_name);
+  }
+
+  permits[num_requests] = make_active_permit(&permit_concurrencies[num_requests]);
+  permits[num_requests+1] = make_pending_permit(&permit_concurrencies[num_requests+1]);
+
+  // Checking permits
+  for (auto i = 0; i < num_requests; ++i) {
+    auto& expected = permits[num_requests+i];
+    if (!check_permit(expected, permits[i]))
+      return test_fail(test_name);
+  }
+
+  // Releasing permits, entailing negotiation
+  r = tcmReleasePermit(handles[0]);
+  if (!check_success(r, "tcmReleasePermit (active permit)"))
+    return test_fail(test_name);
+
+  permit_concurrencies[num_requests+1] = uint32_t(total_number_of_threads);
+  permits[num_requests+1] = make_active_permit(&permit_concurrencies[num_requests+1]);
+  if (!check_permit(permits[num_requests+1], handles[1]))
+    return test_fail(test_name);
+
+  r = tcmReleasePermit(handles[1]);
+  if (!check_success(r, "tcmReleasePermit (last permit)"))
+    return test_fail(test_name);
+
+  r = tcmDisconnect(client_id);
+  if (!check_success(r, "tcmDisconnect"))
+    return test_fail(test_name);
+
+  return test_epilog(test_name);
+}
+
 int main() {
   bool res = true;
 
@@ -252,6 +305,7 @@ int main() {
   res &= test_get_stale_permit();
   res &= test_default_constraints_construction();
   res &= test_request_initializer();
+  res &= test_allow_not_specifying_client_callback();
 
   return int(!res);
 }

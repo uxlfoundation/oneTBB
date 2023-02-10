@@ -272,6 +272,7 @@ void invoke_callbacks(const update_callbacks_t& callbacks) {
         const tcm_callback_t& callback = n.first;
         const callback_args_t& args = n.second;
 
+        __TCM_ASSERT(callback, "Incorrect invariant: missing callback is in the invocation list.");
         auto result = callback(args.ph, args.callback_arg, args.reason);
 
         __TCM_ASSERT_EX(result == TCM_RESULT_SUCCESS, "Unsuccesful callback invocation.");
@@ -432,7 +433,9 @@ update_callbacks_t apply(ThreadComposabilityManagerData& data, const tcm_permit_
 
         if (args.reason.new_concurrency || args.reason.new_state) { // if there was a change
             tcm_callback_t callback = data.client_to_callback_map[original_data.client_id];
-            update_callbacks.insert( {callback, args} );
+            if (callback) {
+                update_callbacks.insert( {callback, args} );
+            }
         }
     }
 
