@@ -105,8 +105,8 @@ typedef int32_t tcm_request_priority_t;
 
 // Support for requests
 
-#define TCM_PERMIT_REQUEST_INITIALIZER {tcm_automatic, tcm_automatic, \
-                                         NULL, 0, TCM_REQUEST_PRIORITY_NORMAL, {}, {}}
+#define TCM_PERMIT_REQUEST_INITIALIZER {tcm_automatic, tcm_automatic, NULL, 0, \
+                                        TCM_REQUEST_PRIORITY_NORMAL, {}, {}}
 
 typedef struct _tcm_permit_request_t {
   int32_t min_sw_threads;

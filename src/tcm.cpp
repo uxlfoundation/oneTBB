@@ -193,8 +193,6 @@ uint32_t platform_resources(unsigned int process_concurrency) {
   return concurrency;
 }
 
-uint32_t get_num_proc_groups() { return 1; }
-
 struct mask_deleter {
     void operator()(tcm_cpu_mask_t* mask_ptr) const { hwloc_bitmap_free(*mask_ptr); }
 };
@@ -335,14 +333,19 @@ fitting_result_t try_fit_concurrency(const int32_t min_threads, const int32_t ma
 struct ThreadComposabilityManagerData {
   ThreadComposabilityManagerData() {
     // TODO: parse topology only once
-    system_topology::construct(get_num_proc_groups());
+    system_topology::construct();
     system_topology& topology = system_topology::instance();
     // TODO: avoid unnecessary process mask allocation by reusing the one from
     // the system_topology?
 
     // TODO: make process_mask have const-qualifier so that it is not modified
     process_mask = topology.allocate_process_affinity_mask();
-    const auto process_concurrency = topology.get_process_concurrency();
+    if (process_mask) {
+      process_concurrency = topology.get_process_concurrency();
+    } else {
+      // TODO: add manual parsing and weight calculation of the process mask
+      process_concurrency = hardware_concurrency();
+    }
     available_concurrency = platform_resources(process_concurrency);
     initially_available_concurrency = available_concurrency;
   }
@@ -355,6 +358,9 @@ struct ThreadComposabilityManagerData {
   std::mutex data_mutex{};
 
   tcm_client_id_t client_id = 1;
+
+  //! The count of available resources.
+  uint32_t process_concurrency = 0;
 
   //! The count of currently available resources.
   uint32_t available_concurrency = 0;
@@ -1444,7 +1450,7 @@ protected:
                      "Requesting automatic inferring of max_sw_threads is not implemented.");
 
         stakeholder_cache sc{/*constraints array length*/ph->data.size};
-        if (req.cpu_constraints) {
+        if (req.cpu_constraints && process_mask) {
             __TCM_ASSERT(req.constraints_size > 0, "Size of constraints array is not specified.");
             try_satisfy_constraints(sc, req, ph);
         } else {

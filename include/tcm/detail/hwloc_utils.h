@@ -4,10 +4,11 @@
  *
  */
 
-#ifndef _TCM_TEST_HWLOC_UTILS
-#define _TCM_TEST_HWLOC_UTILS
+#ifndef __TCM_HWLOC_UTILS_HEADER
+#define __TCM_HWLOC_UTILS_HEADER
 
 #include <vector>
+#include <thread>               // std::this_thread::yield()
 
 #include "tcm/detail/_tcm_assert.h"
 
@@ -19,6 +20,9 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 #include <hwloc.h>
+#if _WIN32 || _WIN64
+#include <hwloc/windows.h>      // for hwloc_windows_get_nr_processor_groups
+#endif
 #if _MSC_VER && !__INTEL_COMPILER && !__clang__
 #pragma warning( pop )
 #elif _MSC_VER && __clang__
@@ -30,6 +34,52 @@
 
 #define __TCM_HWLOC_TOPOLOGY_FLAG_RESTRICT_TO_CPUBINDING_PRESENT           \
   (HWLOC_API_VERSION >= 0x20500)
+
+class hwloc_topology_loader_t {
+public:
+    hwloc_topology_loader_t() {
+        if (hwloc_topology_init(&topology) != 0) {
+          return;
+        }
+
+        if (hwloc_topology_load(topology) != 0) {
+          hwloc_topology_destroy(topology);
+          return;
+        }
+
+        is_initialized = true;
+    }
+
+    ~hwloc_topology_loader_t() {
+        if (is_initialized) {
+            while (spin_mutex.test_and_set()) { std::this_thread::yield(); }
+            hwloc_topology_destroy(topology);
+            is_initialized = false;
+            spin_mutex.clear();
+        }
+    }
+
+    hwloc_topology_t get_topology() {
+        hwloc_topology_t new_topology{nullptr};
+
+        while (spin_mutex.test_and_set()) { std::this_thread::yield(); }
+        if (is_initialized) {
+            hwloc_topology_dup(&new_topology, topology);
+        }
+        spin_mutex.clear();
+
+        return new_topology;
+    }
+
+private:
+    bool is_initialized{false};
+    std::atomic_flag spin_mutex = ATOMIC_FLAG_INIT;
+    hwloc_topology_t topology;
+};
+
+// Having the object in the global scope allows moving the overhead of HWLOC topology loading to the
+// library load time.
+static hwloc_topology_loader_t topology_loader;
 
 class system_topology {
     friend class binding_handler;
@@ -62,28 +112,19 @@ class system_topology {
     bool intergroup_binding_allowed(std::size_t groups_num) { return groups_num > 1; }
 
 private:
-    void topology_initialization(std::size_t groups_num) {
+    void topology_initialization() {
         initialization_state = started;
 
-        // Parse topology
-        if ( hwloc_topology_init( &topology ) == 0 ) {
-            initialization_state = topology_allocated;
-#if __TCM_HWLOC_TOPOLOGY_FLAG_RESTRICT_TO_CPUBINDING_PRESENT
-            if ( groups_num == 1 &&
-                 hwloc_topology_set_flags(topology,
-                     HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM |
-                     HWLOC_TOPOLOGY_FLAG_RESTRICT_TO_CPUBINDING
-                 ) != 0
-            ) {
-                return;
-            }
-#endif
-            if ( hwloc_topology_load( topology ) == 0 ) {
-                initialization_state = topology_loaded;
-            }
-        }
-        if ( initialization_state != topology_loaded )
+        topology = topology_loader.get_topology();
+        if (!topology) {
             return;
+        }
+        initialization_state = topology_loaded;
+        std::size_t groups_num = 1;
+
+#if _WIN32 || _WIN64
+        groups_num = hwloc_windows_get_nr_processor_groups(topology, 0);
+#endif
 
         // Getting process affinity mask
         if ( intergroup_binding_allowed(groups_num) ) {
@@ -94,8 +135,10 @@ private:
             process_node_affinity_mask = hwloc_bitmap_alloc();
 
             auto r = hwloc_get_cpubind(topology, process_cpu_affinity_mask, HWLOC_CPUBIND_PROCESS);
-            __TCM_ASSERT_EX(r >= 0, "HWLOC get CPU bind error.");
-            hwloc_cpuset_to_nodeset(topology, process_cpu_affinity_mask, process_node_affinity_mask);
+            __TCM_ASSERT_EX(r >= 0, "hwloc_get_cpubind() error.");
+            r = hwloc_cpuset_to_nodeset(topology, process_cpu_affinity_mask,
+                                        process_node_affinity_mask);
+            __TCM_ASSERT_EX(r >= 0, "hwloc_cpuset_to_nodeset error.");
         }
 
         number_of_processors_groups = groups_num;
@@ -218,18 +261,19 @@ private:
 #endif
     }
 
-    void initialize( std::size_t groups_num ) {
+    void initialize() {
         if ( initialization_state != uninitialized )
             return;
 
-        topology_initialization(groups_num);
+        topology_initialization();
         numa_topology_parsing();
         core_types_topology_parsing();
 
+        if (initialization_state != topology_loaded) {
+            return;
+        }
+        initialization_state = topology_parsed;
         enforce_hwloc_2_5_runtime_linkage();
-
-        if (initialization_state == topology_loaded)
-            initialization_state = topology_parsed;
     }
 
     static system_topology* instance_ptr;
@@ -239,10 +283,10 @@ public:
 
     bool is_topology_parsed() { return initialization_state == topology_parsed; }
 
-    static void construct( std::size_t groups_num ) {
+    static void construct() {
         if (instance_ptr == nullptr) {
             instance_ptr = new system_topology();
-            instance_ptr->initialize(groups_num);
+            instance_ptr->initialize();
         }
     }
 
@@ -370,8 +414,9 @@ public:
     }
 
     affinity_mask allocate_process_affinity_mask() {
-        __TCM_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized system_topology");
-        return hwloc_bitmap_dup(process_cpu_affinity_mask);
+        if (is_topology_parsed())
+          return hwloc_bitmap_dup(process_cpu_affinity_mask);
+        return nullptr;
     }
 
     void free_affinity_mask( affinity_mask mask_to_free ) {
@@ -397,4 +442,4 @@ public:
 
 system_topology* system_topology::instance_ptr{nullptr};
 
-#endif /* _TCM_TEST_HWLOC_UTILS */
+#endif /* __TCM_HWLOC_UTILS_HEADER */
