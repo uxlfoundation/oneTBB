@@ -25,7 +25,8 @@ tcm_result_t client_renegotiate(tcm_permit_handle_t ph, void* arg,
              "Reason invoking callback is a new concurrency value");
 
   tcm_permit_handle_t* permit_via_arg = (tcm_permit_handle_t*)arg;
-  r &= check(ph == *permit_via_arg, "Renegotiates for expected arg");
+  r &= check(permit_via_arg, "Callback arg is not nullptr.");
+  r &= check(ph == *permit_via_arg, "Renegotiates for expected arg.");
 
   auto count = renegotiating_permits.count(permit_via_arg);
   r &= check(count == 1, "Renegotiates for expected permit");
