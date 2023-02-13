@@ -16,23 +16,40 @@
 
 #if __linux__
 #include <dlfcn.h>              // for dlopen, dlsym
+#elif _WIN32
+#include <windows.h>
+#else
+#error Implementation of the test is not provided for this kind of OS.
 #endif
 
 #include "tcm.h"
 
 
-tcm_result_t(*tcm_connect)(tcm_callback_t, tcm_client_id_t*){nullptr};
-tcm_result_t(*tcm_request_permit)(tcm_client_id_t, tcm_permit_request_t, void* /*callback_arg*/,
-                                  tcm_permit_handle_t*, tcm_permit_t*){nullptr};
+typedef tcm_result_t (*tcm_connect_t)(tcm_callback_t, tcm_client_id_t*);
+typedef tcm_result_t (*tcm_request_permit_t)(tcm_client_id_t, tcm_permit_request_t,
+                                             void* /*callback_arg*/, tcm_permit_handle_t*,
+                                             tcm_permit_t*);
 
+tcm_connect_t tcm_connect{nullptr};
+tcm_request_permit_t tcm_request_permit{nullptr};
+
+void load_tcm() {
+#if __linux__
+    void* tcm_handler = dlopen(TCM_LIB_PATH, /*flags*/ RTLD_NOW | RTLD_LOCAL);
+#elif _WIN32
+    HMODULE tcm_handler = LoadLibrary(TEXT(TCM_LIB_PATH));
+#endif
+    if (NULL == tcm_handler)
+        return;
 
 #if __linux__
-void load_tcm() {
-    void* tcm_handler = dlopen(TCM_LIB_PATH, /*flags*/ RTLD_NOW | RTLD_LOCAL);
-    tcm_connect = (decltype(tcm_connect))dlsym(tcm_handler, "tcmConnect");
-    tcm_request_permit = (decltype(tcm_request_permit))dlsym(tcm_handler, "tcmRequestPermit");
-}
+    tcm_connect = (tcm_connect_t)dlsym(tcm_handler, "tcmConnect");
+    tcm_request_permit = (tcm_request_permit_t)dlsym(tcm_handler, "tcmRequestPermit");
+#elif _WIN32
+    tcm_connect = (tcm_connect_t)GetProcAddress(tcm_handler, "tcmConnect");
+    tcm_request_permit = (tcm_request_permit_t)GetProcAddress(tcm_handler, "tcmRequestPermit");
 #endif
+}
 
 bool is_tcm_load_failed() {
     bool load_failed = false;
@@ -70,7 +87,6 @@ struct test_hang_guard {
 };
 
 int main() {
-#if __linux__
     std::atomic<bool> release_main_thread{false};
     bool is_test_failed{false};
 
@@ -95,9 +111,10 @@ int main() {
         req.min_sw_threads = 0;
         req.max_sw_threads = 1;
         tcm_permit_handle_t permit_handle{nullptr};
-        tcm_permit_t permit;
-        uint32_t concurrency = 0; permit.concurrencies = &concurrency;
-        permit.size = 1;
+        uint32_t concurrency = 0;
+        tcm_permit_t permit{
+            &concurrency, /*cpu_masks*/nullptr, /*size*/1, TCM_PERMIT_STATE_VOID, /*flags*/{}
+        };
         r = tcm_request_permit(id, req, /*callback_arg*/nullptr, &permit_handle, &permit);
         if (r != TCM_RESULT_SUCCESS || !permit_handle) {
             std::cerr << "******** ERROR ********: call to tcmRequestPermit() failed." << std::endl;
@@ -111,8 +128,4 @@ int main() {
     while (!release_main_thread) { std::this_thread::yield(); }
 
     return int(is_test_failed);
-#else
-    // Skipping tests on other platforms, including Windows
-    return 0;
-#endif
 }
