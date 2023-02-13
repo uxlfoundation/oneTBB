@@ -8,6 +8,12 @@ if (NOT MSVC) # no need to change options for MSVC
     set(TCM_WARNING_LEVEL ${TCM_WARNING_LEVEL} -Wno-missing-braces)
 endif()
 
+# Find the HWLOC library
+if (NOT TARGET HWLOC::hwloc)
+  list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake/modules)
+  find_package(HWLOC REQUIRED 2.5 VERSION)
+endif()
+
 foreach(tpp test_basic_apis.cpp test_fcfsc.cpp test_rb.cpp test_constrained_requests.cpp)
   string(REPLACE ".cpp" "" texe ${tpp})
   add_executable(${texe} ${tpp})
@@ -22,7 +28,7 @@ foreach(tpp test_basic_apis.cpp test_fcfsc.cpp test_rb.cpp test_constrained_requ
   )
   target_compile_definitions(${texe} PRIVATE ${TCM_COMPILE_DEFINITIONS})
 
-  target_link_libraries(${texe} PUBLIC tcm)
+  target_link_libraries(${texe} PUBLIC TCM::tcm HWLOC::hwloc)
   add_test(NAME ${texe} COMMAND ${texe} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endforeach()
 
@@ -32,7 +38,7 @@ set(TCM_TEST_DISABLING test_tcm_disabling)
 add_executable(${TCM_TEST_DISABLING} test_tcm_disabling.cpp)
 target_compile_options(${TCM_TEST_DISABLING} PRIVATE ${TCM_WARNING_LEVEL})
 target_compile_definitions(${TCM_TEST_DISABLING} PRIVATE ${TCM_COMPILE_DEFINITIONS})
-target_link_libraries(${TCM_TEST_DISABLING} PUBLIC tcm)
+target_link_libraries(${TCM_TEST_DISABLING} PUBLIC TCM::tcm HWLOC::hwloc)
 
 add_test(NAME ${TCM_TEST_DISABLING}_with_empty_env COMMAND ${TCM_TEST_DISABLING} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 set_tests_properties(${TCM_TEST_DISABLING}_with_empty_env PROPERTIES ENVIRONMENT "TCM_DISABLE=")
@@ -51,8 +57,8 @@ add_executable(${TCM_TEST_PREMATURE_EXIT} test_premature_exit.cpp)
 target_compile_options(${TCM_TEST_PREMATURE_EXIT} PRIVATE ${TCM_WARNING_LEVEL})
 target_compile_definitions(${TCM_TEST_PREMATURE_EXIT}
   PRIVATE ${TCM_COMPILE_DEFINITIONS}
-  PRIVATE TCM_LIB_PATH="$<TARGET_FILE:tcm>"
+  PRIVATE TCM_LIB_PATH="$<TARGET_FILE:TCM::tcm>"
 )
 target_include_directories(${TCM_TEST_PREMATURE_EXIT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
-target_link_libraries(${TCM_TEST_PREMATURE_EXIT} PRIVATE Threads::Threads)
+target_link_libraries(${TCM_TEST_PREMATURE_EXIT} PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
 add_test(NAME ${TCM_TEST_PREMATURE_EXIT} COMMAND ${TCM_TEST_PREMATURE_EXIT})

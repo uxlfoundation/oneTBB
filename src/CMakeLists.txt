@@ -10,9 +10,10 @@ if (NOT TARGET HWLOC::hwloc)
 endif()
 # --------------------------------------------------------------------------------------------------
 
-add_library(${PROJECT_NAME} SHARED tcm.cpp)
+add_library(tcm SHARED tcm.cpp)
+add_library(TCM::tcm ALIAS tcm)
 
-target_compile_options(${PROJECT_NAME}
+target_compile_options(tcm
   PRIVATE
   ${TCM_WARNING_LEVEL}
   ${TCM_WARNING_SUPPRESS}
@@ -21,21 +22,20 @@ target_compile_options(${PROJECT_NAME}
   ${TCM_DSE_FLAG}
   ${TCM_COMMON_COMPILE_FLAGS}
 )
-target_compile_definitions(${PROJECT_NAME} PRIVATE ${TCM_COMPILE_DEFINITIONS})
+target_compile_definitions(tcm PRIVATE ${TCM_COMPILE_DEFINITIONS})
 
-target_include_directories(${PROJECT_NAME} PUBLIC
+target_include_directories(tcm PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-target_link_libraries(${PROJECT_NAME}
-  PUBLIC
-  HWLOC::hwloc
+target_link_libraries(tcm
   PRIVATE
+  HWLOC::hwloc
   ${TCM_LIB_LINK_FLAGS}
 )
-target_compile_definitions(${PROJECT_NAME} PUBLIC $<$<CONFIG:DEBUG>:TCM_DEBUG>)
+target_compile_definitions(tcm PUBLIC $<$<CONFIG:DEBUG>:TCM_DEBUG>)
 
-install(TARGETS ${PROJECT_NAME}
+install(TARGETS tcm
   EXPORT ${PROJECT_NAME}Targets
   LIBRARY
     DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -47,14 +47,14 @@ install(TARGETS ${PROJECT_NAME}
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-if (WIN32)
-  install(IMPORTED_RUNTIME_ARTIFACTS HWLOC::hwloc
-    RUNTIME
-      DESTINATION ${CMAKE_INSTALL_BINDIR}
-  )
-else()
-  get_target_property(hwloc_lib HWLOC::hwloc IMPORTED_LOCATION)
-  get_filename_component(hwloc_lib_dir "${hwloc_lib}" DIRECTORY)
-  file(GLOB hwloc_binaries ${hwloc_lib_dir}/libhwloc.so*)
-  install(FILES ${hwloc_binaries} DESTINATION ${CMAKE_INSTALL_LIBDIR})
-endif()
+# if (WIN32)
+#   install(IMPORTED_RUNTIME_ARTIFACTS HWLOC::hwloc
+#     RUNTIME
+#       DESTINATION ${CMAKE_INSTALL_BINDIR}
+#   )
+# else()
+#   get_target_property(hwloc_lib HWLOC::hwloc IMPORTED_LOCATION)
+#   get_filename_component(hwloc_lib_dir "${hwloc_lib}" DIRECTORY)
+#   file(GLOB hwloc_binaries ${hwloc_lib_dir}/libhwloc.so*)
+#   install(FILES ${hwloc_binaries} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+# endif()
