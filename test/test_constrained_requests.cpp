@@ -226,7 +226,7 @@ struct test_one_request_low_level_constraints {
     std::unique_ptr<tcm_cpu_mask_t, mask_deleter> permit_mask(&p_mask);
     std::unique_ptr<tcm_cpu_mask_t, mask_deleter> expected_mask(&e_mask);
     std::unique_ptr<tcm_cpu_mask_t, mask_deleter> requested_mask(&r_mask);
-    uint32_t concurrency = tcm_oversubscription_factor * mask.size();
+    uint32_t concurrency = uint32_t(tcm_oversubscription_factor * mask.size());
 
     tcm_cpu_constraints_t cpu_constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
     cpu_constraints.min_concurrency = 0;
@@ -268,7 +268,7 @@ bool test_one_request_first_parsed_numa_id() {
   auto e_mask = mask();
   std::unique_ptr<tcm_cpu_mask_t, mask_deleter> permit_mask(&p_mask);
   std::unique_ptr<tcm_cpu_mask_t, mask_deleter> expected_mask(&e_mask);
-  uint32_t concurrency = tcm_oversubscription_factor * mask.size();
+  uint32_t concurrency = uint32_t(tcm_oversubscription_factor * mask.size());
 
   tcm_cpu_constraints_t cpu_constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
   cpu_constraints.min_concurrency = 0;
@@ -293,7 +293,7 @@ bool test_one_request_two_constraints_process_mask_no_oversubscription() {
   process_mask mask{};
   const uint32_t size = 2;
 
-  uint32_t total_concurrency = tcm_oversubscription_factor * mask.size();
+  uint32_t total_concurrency = uint32_t(tcm_oversubscription_factor * mask.size());
   uint32_t e_concurrency[size] = { total_concurrency / 2,
                                    total_concurrency - total_concurrency / 2 };
   tcm_cpu_mask_t permit_mask[size];
@@ -343,8 +343,8 @@ struct two_requests_config {
   int32_t min_concurrencyB;         // requested min_concurrency for client B
   int32_t max_concurrencyB;         // requested max_concurrency for client B
   uint32_t new_concurrencyB;        // new concurrency for for client B after renegotiation
-  tcm_permit_states_t cur_stateB;  // expected state for client B
-  tcm_permit_states_t new_stateB;  // new state for client B after renegotiation
+  tcm_permit_state_t cur_stateB;    // expected state for client B
+  tcm_permit_state_t new_stateB;    // new state for client B after renegotiation
 };
 
 template <typename MaskGeneratorA, typename MaskGeneratorB>
@@ -464,7 +464,7 @@ bool test_two_requests_process_mask_no_oversubscription() {
 }
 
 bool test_two_requests_oversubscribe_first_core() {
-  uint32_t concurrencyA = tcm_oversubscription_factor * first_core_mask{}.size();
+  uint32_t concurrencyA = uint32_t(tcm_oversubscription_factor * first_core_mask{}.size());
   uint32_t concurrencyB = concurrencyA;
   two_requests_config test_config{};
   test_config.test_name = "test_two_requests_oversubscribe_first_core";
