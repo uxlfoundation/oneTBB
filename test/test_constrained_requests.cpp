@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (C) 2021-2022 Intel Corporation
+ * Copyright (C) 2021-2023 Intel Corporation
  *
  */
 
@@ -15,13 +15,6 @@
 #include <iostream>
 #include <memory>
 #include <string>
-
-// ============================================================================
-
-//! TODO: Implement the relevant logic for the getting of the processor groups number
-uint32_t get_num_proc_groups() {
-    return 1;
-}
 
 // ============================================================================
 // HWLOC mask utility
@@ -579,7 +572,7 @@ int main() {
   bool res = true;
 
   // TODO: Consider making a topology instance global variable
-  tcm_test::system_topology::construct(get_num_proc_groups());
+  tcm_test::system_topology::construct();
 
   res &= test_allow_mask_omitting_during_permit_copy();
 

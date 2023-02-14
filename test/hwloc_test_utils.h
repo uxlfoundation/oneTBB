@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (C) 2021-2022 Intel Corporation
+ * Copyright (C) 2021-2023 Intel Corporation
  *
  */
 
@@ -8,6 +8,7 @@
 #define _TCM_TEST_HWLOC_UTILS
 
 #include <vector>
+#include <thread>               // for std::thread::hardware_concurrency
 
 #include "tcm/detail/_tcm_assert.h"
 
@@ -19,6 +20,9 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 #include <hwloc.h>
+#if _WIN32 || _WIN64
+#include <hwloc/windows.h>      // for hwloc_windows_get_nr_processor_groups
+#endif
 #if _MSC_VER && !__INTEL_COMPILER && !__clang__
 #pragma warning( pop )
 #elif _MSC_VER && __clang__
@@ -67,28 +71,26 @@ class system_topology {
     bool intergroup_binding_allowed(std::size_t groups_num) { return groups_num > 1; }
 
 private:
-    void topology_initialization(std::size_t groups_num) {
+    void topology_initialization() {
         initialization_state = started;
 
         // Parse topology
         if ( hwloc_topology_init( &topology ) == 0 ) {
             initialization_state = topology_allocated;
-#if __TCM_HWLOC_TOPOLOGY_FLAG_RESTRICT_TO_CPUBINDING_PRESENT
-            if ( groups_num == 1 &&
-                 hwloc_topology_set_flags(topology,
-                     HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM |
-                     HWLOC_TOPOLOGY_FLAG_RESTRICT_TO_CPUBINDING
-                 ) != 0
-            ) {
-                return;
-            }
-#endif
+
             if ( hwloc_topology_load( topology ) == 0 ) {
                 initialization_state = topology_loaded;
             }
         }
         if ( initialization_state != topology_loaded )
             return;
+
+        initialization_state = topology_loaded;
+        std::size_t groups_num = 1;
+
+#if _WIN32 || _WIN64
+        groups_num = hwloc_windows_get_nr_processor_groups(topology, 0);
+#endif
 
         // Getting process affinity mask
         if ( intergroup_binding_allowed(groups_num) ) {
@@ -223,11 +225,11 @@ private:
 #endif
     }
 
-    void initialize( std::size_t groups_num ) {
+    void initialize() {
         if ( initialization_state != uninitialized )
             return;
 
-        topology_initialization(groups_num);
+        topology_initialization();
         numa_topology_parsing();
         core_types_topology_parsing();
 
@@ -242,12 +244,12 @@ public:
     typedef hwloc_cpuset_t             affinity_mask;
     typedef hwloc_const_cpuset_t const_affinity_mask;
 
-    bool is_topology_parsed() { return initialization_state == topology_parsed; }
+    bool is_topology_parsed() const { return initialization_state == topology_parsed; }
 
-    static void construct( std::size_t groups_num ) {
+    static void construct() {
         if (instance_ptr == nullptr) {
             instance_ptr = new system_topology();
-            instance_ptr->initialize(groups_num);
+            instance_ptr->initialize();
         }
     }
 
@@ -366,6 +368,20 @@ public:
         int default_concurrency = hwloc_bitmap_weight(constraints_mask);
         hwloc_bitmap_free(constraints_mask);
         return default_concurrency;
+    }
+
+    unsigned get_process_concurrency() const {
+        __TCM_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized system_topology");
+
+        int process_concurrency = hwloc_bitmap_weight(process_cpu_affinity_mask);
+        if (process_concurrency <= 0) {
+            process_concurrency = std::thread::hardware_concurrency();
+        }
+        if (process_concurrency > 0) {
+            return process_concurrency;
+        }
+
+        return 1; // fallback case
     }
 
     affinity_mask allocate_process_affinity_mask() {

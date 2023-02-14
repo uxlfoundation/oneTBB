@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (C) 2021-2022 Intel Corporation
+ * Copyright (C) 2021-2023 Intel Corporation
  *
  */
 
@@ -179,14 +179,8 @@ const float tcm_oversubscription_factor = [] {
 
 uint32_t hardware_concurrency() { return (uint32_t)std::thread::hardware_concurrency(); }
 
-//! Returns available platform resources, taking into account the possible degree
-//! of the oversubscription (oversb_factor must be greater than zero).
-uint32_t platform_resources () {
-  static uint32_t concurrency = uint32_t(tcm_oversubscription_factor * hardware_concurrency());
-  // TODO: Consider returning not less than one resource
-  return concurrency;
-}
-
+//! Returns available platform resources, taking into account possible degree
+//! of oversubscription.
 uint32_t platform_resources(unsigned int process_concurrency) {
   static uint32_t concurrency = uint32_t(tcm_oversubscription_factor * process_concurrency);
   // TODO: Consider returning not less than one resource
@@ -613,7 +607,7 @@ public:
     tracer t("ThreadComposabilityBase::request_permit");
 
     // Check the ability to satisfy minimum requested concurrency
-    if (req.min_sw_threads > int32_t(platform_resources())) {
+    if (req.min_sw_threads > int32_t(initially_available_concurrency)) {
       if (permit)
         permit->state = TCM_PERMIT_STATE_VOID;
       return false;

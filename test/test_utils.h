@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (C) 2021-2022 Intel Corporation
+ * Copyright (C) 2021-2023 Intel Corporation
  *
  */
 
@@ -171,23 +171,18 @@ const float tcm_oversubscription_factor = [] {
 }();
 
 //! Returns available platform resources, taking into account the possible
-//! degree of the oversubscription (oversb_factor must be greater than zero).
-uint32_t platform_resources () {
-  return uint32_t(tcm_oversubscription_factor * std::thread::hardware_concurrency());
-}
-
-//! Returns available platform resources, taking into account the possible
 //! degree of the oversubscription (oversb_factor must be greater than zero) and
 //! process mask.
-uint32_t platform_resources(tcm_test::system_topology& tp) {
-  auto process_mask = tp.allocate_process_affinity_mask();
-  uint32_t result = uint32_t(tcm_oversubscription_factor * hwloc_bitmap_weight(process_mask));
-  tp.free_affinity_mask(process_mask);
-  return result;
+int32_t platform_resources(const tcm_test::system_topology& tp) {
+  return int32_t(tcm_oversubscription_factor * tp.get_process_concurrency());
 }
 
 // TODO: rename total_number_of_threads to num_total_threads
-const int32_t total_number_of_threads = platform_resources();
+const int32_t total_number_of_threads = []() {
+    tcm_test::system_topology::construct();
+    auto& tp = tcm_test::system_topology::instance();
+    return platform_resources(tp);
+}();
 
 bool check_permit_size(const tcm_permit_t& expected, const tcm_permit_t& actual,
                        const bool report = true)
