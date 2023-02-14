@@ -336,14 +336,13 @@ bool test_overlapping_clients() {
   tcm_permit_t eB = make_active_permit(&eB_concurrency);
 
   tcm_permit_request_t rB = make_request(total_number_of_threads/2, total_number_of_threads);
+  eA_concurrency = rA.max_sw_threads - rB.min_sw_threads;
+  eB_concurrency = rB.min_sw_threads;
 
   r = tcmRequestPermit(clidB, rB, &phB, &phB, &pB);
   auto unchanged_permits = list_unchanged_permits({{&phA, &pA}});
   if (!(check_success(r, "tcmRequestPermit B all threads") &&
-        check_permits_concurrencies({phA, phB}, {rA.max_sw_threads, rB.max_sw_threads}) &&
-        check_permit(eA, phA, skip_concurrenency_check) &&
-        check_permit(eB, pB, skip_concurrenency_check) &&
-        renegotiating_permits == unchanged_permits))
+        check_permit(eA, phA) && check_permit(eB, pB) && renegotiating_permits == unchanged_permits))
     return test_fail(test_name);
 
   renegotiating_permits = {&phB};
