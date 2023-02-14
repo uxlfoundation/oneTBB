@@ -1440,7 +1440,7 @@ protected:
         // unnecessary anywhere else except for the first time resources are
         // requested and representation of corresponding permit is allocated.
 
-        __TCM_ASSERT(req.max_sw_threads != tcm_automatic && req.max_sw_threads >= 0,
+        __TCM_ASSERT(req.max_sw_threads >= 0,
                      "Requesting automatic inferring of max_sw_threads is not implemented.");
 
         stakeholder_cache sc{/*constraints array length*/ph->data.size};

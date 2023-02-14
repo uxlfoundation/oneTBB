@@ -296,6 +296,42 @@ bool test_allow_not_specifying_client_callback() {
   return test_epilog(test_name);
 }
 
+bool test_requesting_zero_resources() {
+  // The test checks that it is okay to ask for zero resources in order to get
+  // the permit handle initialized by the TCM. This is useful when client wants
+  // to have actual permit handle value to make further, perhaps, concurrent
+  // request updates on it.
+
+  const char* test_name = "test_requesting_zero_resources";
+  test_prolog(test_name);
+
+  tcm_client_id_t client_id;
+
+  tcm_result_t r = tcmConnect(nullptr, &client_id);
+  if (!check_success(r, "tcmConnect"))
+    return test_fail(test_name);
+
+  int min_sw_threads = 0, max_sw_threads = 0;
+  uint32_t p_concurrency = 0; tcm_permit_t p = make_void_permit(&p_concurrency);
+  uint32_t e_concurrency = max_sw_threads; tcm_permit_t e = make_active_permit(&e_concurrency);
+
+  tcm_permit_request_t req = make_request(min_sw_threads, max_sw_threads);
+  tcm_permit_handle_t ph{nullptr};
+  r = tcmRequestPermit(client_id, req, nullptr, &ph, &p);
+  if (!(check_success(r, "tcmRequestPermit") && check_permit(e, ph)))
+    return test_fail(test_name);
+
+  r = tcmReleasePermit(ph);
+  if (!check_success(r, "tcmReleasePermit"))
+    return test_fail(test_name);
+
+  r = tcmDisconnect(client_id);
+  if (!check_success(r, "tcmDisconnect"))
+    return test_fail(test_name);
+
+  return test_epilog(test_name);
+}
+
 int main() {
   bool res = true;
 
@@ -306,6 +342,7 @@ int main() {
   res &= test_default_constraints_construction();
   res &= test_request_initializer();
   res &= test_allow_not_specifying_client_callback();
+  res &= test_requesting_zero_resources();
 
   return int(!res);
 }
