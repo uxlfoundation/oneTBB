@@ -8,6 +8,13 @@ if (NOT CMAKE_CXX_STANDARD)
 endif()
 set(CMAKE_CXX_EXTENSIONS OFF) # use -std=c++... instead of -std=gnu++...
 
+# Detect architecture (bitness).
+if (CMAKE_SIZEOF_VOID_P EQUAL 4)
+    set(TCM_ARCH 32)
+else()
+    set(TCM_ARCH 64)
+endif()
+
 option(TCM_TEST "Enable testing" ON)
 option(TCM_STRICT "Treat compiler warnings as errors" ON)
 
@@ -19,17 +26,6 @@ else()
     message(WARNING "TCM compiler settings not found ${TCM_COMPILER_SETTINGS_FILE}")
 endif()
 
-# --------------------------------------------------------------------------------------------------
-# Define Cpack variables + CMake installation related includes
-set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
-set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
-string(TOLOWER ${PROJECT_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME} CPACK_PACKAGE_FILE_NAME)
-set(CPACK_GENERATOR ZIP)
-
-include(CPack)
-include(CMakePackageConfigHelpers)
-include(GNUInstallDirs)
-# --------------------------------------------------------------------------------------------------
 set(CMAKE_DEBUG_POSTFIX _debug)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -63,6 +59,17 @@ foreach(output_type LIBRARY ARCHIVE PDB RUNTIME)
     endif()
 endforeach()
 
+# --------------------------------------------------------------------------------------------------
+# Define Cpack variables + CMake installation related includes
+set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+string(TOLOWER ${PROJECT_NAME}-${CPACK_PACKAGE_VERSION}-${TCM_ARCH}-${CMAKE_BUILD_TYPE}-${CMAKE_SYSTEM_NAME} CPACK_PACKAGE_FILE_NAME)
+set(CPACK_GENERATOR ZIP)
+
+include(CPack)
+include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
+# --------------------------------------------------------------------------------------------------
 
 if (TCM_DIR)
   # Allow specifying external TCM to test with.
