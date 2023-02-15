@@ -30,6 +30,7 @@ include(CPack)
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 # --------------------------------------------------------------------------------------------------
+set(CMAKE_DEBUG_POSTFIX _debug)
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
