@@ -624,6 +624,7 @@ public:
           TCM_PERMIT_STATE_PENDING == ph->data.state.load(std::memory_order_relaxed),
           "Non-pending state for new permits contributes to their premature negotiations."
       );
+      *permit_handle = ph;
     }
 
     update_callbacks_t callbacks;
@@ -631,7 +632,6 @@ public:
       const std::lock_guard<std::mutex> l(data_mutex);
 
       uint32_t initially_available = available_concurrency;
-      *permit_handle = ph;
 
       // TODO: Consider adding the permit to containers after the concurrency level
       // calculation to avoid early renegotiation
