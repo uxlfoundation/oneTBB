@@ -38,7 +38,7 @@ if (_hwloc_info_exe)
         OUTPUT_STRIP_TRAILING_WHITESPACE
     )
 
-    string(REGEX MATCH "([0-9]+.[0-9]+.[0-9]+)$" HWLOC_VERSION "${_hwloc_info_output}")
+    string(REGEX MATCH "([0-9]+.[0-9]+.[0-9]+)" HWLOC_VERSION "${_hwloc_info_output}")
     if ("${HWLOC_VERSION}" STREQUAL "")
         unset(HWLOC_VERSION)
     endif()
