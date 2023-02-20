@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (C) 2021-2022 Intel Corporation
+ * Copyright (C) 2021-2023 Intel Corporation
  *
  */
 
@@ -15,10 +15,10 @@ namespace internal {
 
 //! Utility template function to prevent "unused" warnings by various compilers.
 template<typename T>
-void suppress_unused_warning(const T&) {}
+static void suppress_unused_warning(const T&) {}
 
-
-void report_failed_assert(const char* location, int line, const char* condition, const char* message) {
+#if TCM_DEBUG
+static void report_failed_assert(const char* location, int line, const char* condition, const char* message) {
   static std::atomic<bool> has_assert_reported{false};
   if (has_assert_reported.exchange(true, std::memory_order_relaxed))
     return;
@@ -32,6 +32,7 @@ void report_failed_assert(const char* location, int line, const char* condition,
   std::fflush(stderr);
   std::abort();
 }
+#endif
 
 // TODO: rename to __TCM_ENABLE_ASSERTS to be able to use them even in release
 // mode

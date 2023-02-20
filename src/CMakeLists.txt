@@ -10,7 +10,11 @@ if (NOT TARGET HWLOC::hwloc)
 endif()
 # --------------------------------------------------------------------------------------------------
 
-add_library(tcm SHARED tcm.cpp)
+add_library(tcm SHARED 
+  tcm.cpp
+  version.cpp
+)
+
 add_library(TCM::tcm ALIAS tcm)
 
 target_compile_options(tcm
@@ -32,6 +36,7 @@ target_link_libraries(tcm
   PRIVATE
   HWLOC::hwloc
   ${TCM_LIB_LINK_FLAGS}
+  ${TCM_COMMON_LINK_LIBS}
 )
 target_compile_definitions(tcm PUBLIC $<$<CONFIG:DEBUG>:TCM_DEBUG>)
 

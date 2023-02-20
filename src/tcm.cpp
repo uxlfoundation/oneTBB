@@ -6,6 +6,7 @@
 
 #include "tcm/detail/_tcm_assert.h"
 #include "tcm/detail/hwloc_utils.h"
+#include "tcm/detail/_environment.h"
 #include "tcm.h"
 
 // MSVC Warning: unreferenced formal parameter
@@ -157,32 +158,14 @@ void commit_permit_modification(tcm_permit_handle_t ph) {
     suppress_unused_warning(prev_epoch);
 }
 
-// MSVC Warning: Arg can be incorrect: this does not match function name specification
-__TCM_SUPPRESS_WARNING_WITH_PUSH(6387)
-char* get_env(const char* envname) {
-  __TCM_ASSERT(envname, "get_env requires valid C string");
-  return std::getenv(envname);
-}
-__TCM_SUPPRESS_WARNING_POP
-
-const float tcm_oversubscription_factor = [] {
-  float oversb_factor = 1.0f;
-  const char* oversb_factor_env_value = std::getenv("TCM_OVERSUBSCRIPTION_FACTOR");
-  if (oversb_factor_env_value) {
-    // TODO: Consider alternative options for std::stof
-    oversb_factor = std::stof(oversb_factor_env_value);
-    __TCM_ASSERT(oversb_factor > std::numeric_limits<float>::epsilon(),
-                 "Incorrect value of TCM_OVERSUBSCRIPTION_FACTOR environment variable.");
-  }
-  return oversb_factor;
-}();
+float tcm_oversubscription_factor();
 
 uint32_t hardware_concurrency() { return (uint32_t)std::thread::hardware_concurrency(); }
 
 //! Returns available platform resources, taking into account possible degree
 //! of oversubscription.
 uint32_t platform_resources(unsigned int process_concurrency) {
-  static uint32_t concurrency = uint32_t(tcm_oversubscription_factor * process_concurrency);
+  static uint32_t concurrency = uint32_t(tcm_oversubscription_factor() * process_concurrency);
   // TODO: Consider returning not less than one resource
   return concurrency;
 }
@@ -199,7 +182,7 @@ int get_mask_concurrency(const tcm_cpu_mask_t &mask) {
 }
 
 int get_oversubscribed_mask_concurrency(const tcm_cpu_mask_t &mask,
-                                        float oversubscription_factor = tcm_oversubscription_factor)
+                                        float oversubscription_factor = tcm_oversubscription_factor())
 {
     return int(get_mask_concurrency(mask) * oversubscription_factor);
 }
@@ -2007,19 +1990,15 @@ protected:
 class ThreadComposabilityManager {
   std::unique_ptr<internal::ThreadComposabilityManagerBase> impl_;
 public:
-  ThreadComposabilityManager() {
-    std::string tcm_strategy = "FAIR"; // default
-
-    char* rm_strategy_env_value = internal::get_env("RM_STRATEGY");
-    if (rm_strategy_env_value)
-      tcm_strategy = rm_strategy_env_value;
+  explicit ThreadComposabilityManager(const internal::environment& tcm_env) {
+    std::string tcm_strategy = tcm_env.tcm_resource_distribution_strategy;
 
     if (tcm_strategy == "FCFS") {
       impl_.reset(new internal::ThreadComposabilityFCFSCImpl);
     } else if (tcm_strategy == "FAIR") {
       impl_.reset(new internal::ThreadComposabilityFairBalance);
     } else {
-      __TCM_ASSERT(false, "Incorrect value of RM_STRATEGY environment variable.");
+      __TCM_ASSERT(false, "Incorrect value of TCM_RESOURCE_DISTRIBUTION_STRATEGY environment variable.");
     }
   }
 
@@ -2081,15 +2060,20 @@ class theTCM {
   static ThreadComposabilityManager* tcm_ptr;
   static std::size_t reference_count;
   static std::mutex tcm_mutex;
-  static const bool is_tcm_enabled;
+  static internal::environment tcm_env;
+
 public:
-  static bool is_enabled() { return is_tcm_enabled; }
+  static bool is_enabled() { 
+    return tcm_env.tcm_disable == 0;
+  }
+
+  friend float internal::tcm_oversubscription_factor();
 
   static void increase_ref_count() {
     std::lock_guard<std::mutex> l(tcm_mutex);
     if (reference_count++)
       return;
-    tcm_ptr = new ThreadComposabilityManager;
+    tcm_ptr = new ThreadComposabilityManager(tcm_env);
   }
 
   static ThreadComposabilityManager& instance() {
@@ -2110,18 +2094,18 @@ public:
   }
 };
 
+
 ThreadComposabilityManager* theTCM::tcm_ptr{nullptr};
 std::size_t theTCM::reference_count{0};
 std::mutex theTCM::tcm_mutex{};
-const bool theTCM::is_tcm_enabled = [] {
-  char* tcm_disable_envar = std::getenv("TCM_DISABLE");
-  if (tcm_disable_envar) {
-    std::string tcm_disable(tcm_disable_envar);
-    if (tcm_disable != "0")
-      return false;
-  }
-  return true;
- }();
+internal::environment theTCM::tcm_env{};
+
+float internal::tcm_oversubscription_factor() {
+  static const float oversb_factor = theTCM::tcm_env.tcm_oversubscription_factor;
+  __TCM_ASSERT(oversb_factor > std::numeric_limits<float>::epsilon(),
+                "Incorrect value of TCM_OVERSUBSCRIPTION_FACTOR environment variable.");
+  return oversb_factor;
+}
 
 } // namespace tcm
 

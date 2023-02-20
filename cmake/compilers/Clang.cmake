@@ -10,3 +10,5 @@ set(TCM_WARNING_LEVEL -Wall -Wextra -Wpedantic $<$<BOOL:${TCM_STRICT}>:-Werror>)
 set(TCM_TEST_WARNING_FLAGS -Wshadow -Wcast-qual -Woverloaded-virtual -Wnon-virtual-dtor)
 
 set(TCM_COMPILE_DEFINITIONS "")
+
+set(TCM_COMMON_LINK_LIBS ${CMAKE_DL_LIBS})

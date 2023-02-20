@@ -7,13 +7,9 @@
 #ifndef __TCM_HEADER
 #define __TCM_HEADER
 
+#include "tcm/detail/_export.h"
 #include "tcm/types.h"
-
-#if WIN32
-  #define __TCM_EXPORT __declspec(dllexport)
-#else
-  #define __TCM_EXPORT
-#endif
+#include "tcm/version.h"
 
 #ifdef __cplusplus
 extern "C" {

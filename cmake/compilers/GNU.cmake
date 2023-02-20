@@ -14,6 +14,10 @@ if (NOT ${CMAKE_CXX_COMPILER_ID} STREQUAL Intel)
     set(TCM_DSE_FLAG $<$<NOT:$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},6.0>>:-flifetime-dse=1>)
 endif()
 
+if (NOT MINGW)
+    set(TCM_COMMON_LINK_LIBS dl)
+endif()
+
 # Gnu flags to prevent compiler from optimizing out security checks
 set(TCM_COMMON_COMPILE_FLAGS ${TCM_COMMON_COMPILE_FLAGS} -fno-strict-overflow -fno-delete-null-pointer-checks -fwrapv)
 

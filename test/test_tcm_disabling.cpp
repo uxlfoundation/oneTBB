@@ -12,11 +12,11 @@
 const char* tcm_disable_env_name = "TCM_DISABLE";
 
 bool is_tcm_enabled() {
-  char* tcm_disable_env = std::getenv(tcm_disable_env_name);
-  if (tcm_disable_env) {
-    std::string tcm_disable_env_value(tcm_disable_env);
-    if (tcm_disable_env_value != "0")
+  if (char* tcm_disable_env = std::getenv(tcm_disable_env_name)) {
+    int tcm_disable_env_value = std::atoi(tcm_disable_env);
+    if (tcm_disable_env_value != 0) {
       return false;
+    }
   }
   return true;
 }

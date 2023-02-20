@@ -647,10 +647,6 @@ bool test_support_for_pending_state() {
 }
 
 int main() {
-  if (SetEnv("RM_STRATEGY", "FCFS")) {
-    std::cout << "WARNING: Cannot set RM_STRATEGY env variable.";
-  }
-
   bool res = true;
 
   res &= test_alternating_clients();

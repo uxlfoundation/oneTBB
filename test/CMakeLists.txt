@@ -14,10 +14,12 @@ if (NOT TARGET HWLOC::hwloc)
   find_package(HWLOC REQUIRED 2.5 VERSION)
 endif()
 
-foreach(tpp test_basic_apis.cpp test_fcfsc.cpp test_rb.cpp test_constrained_requests.cpp)
-  string(REPLACE ".cpp" "" texe ${tpp})
-  add_executable(${texe} ${tpp})
-  target_compile_options(${texe}
+function(add_tcm_test)
+  set(oneValueArgs NAME ENVIRONMENT)
+  cmake_parse_arguments(_tcm_test "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+  add_executable(${_tcm_test_NAME} ${_tcm_test_NAME}.cpp)
+  target_compile_options(${_tcm_test_NAME}
     PRIVATE
     ${TCM_WARNING_LEVEL}
     ${TCM_TEST_WARNING_FLAGS}
@@ -26,11 +28,19 @@ foreach(tpp test_basic_apis.cpp test_fcfsc.cpp test_rb.cpp test_constrained_requ
     ${TCM_DSE_FLAG}
     ${TCM_COMMON_COMPILE_FLAGS}
   )
-  target_compile_definitions(${texe} PRIVATE ${TCM_COMPILE_DEFINITIONS})
+  target_compile_definitions(${_tcm_test_NAME} PRIVATE ${TCM_COMPILE_DEFINITIONS})
 
-  target_link_libraries(${texe} PUBLIC TCM::tcm HWLOC::hwloc)
-  add_test(NAME ${texe} COMMAND ${texe} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-endforeach()
+  target_link_libraries(${_tcm_test_NAME} PUBLIC TCM::tcm HWLOC::hwloc)
+  add_test(NAME ${_tcm_test_NAME} COMMAND ${_tcm_test_NAME} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+
+  set_tests_properties(${_tcm_test_NAME} PROPERTIES ENVIRONMENT "${_tcm_test_ENVIRONMENT}")
+endfunction()
+
+add_tcm_test(NAME test_basic_apis)
+add_tcm_test(NAME test_fcfsc ENVIRONMENT "TCM_RESOURCE_DISTRIBUTION_STRATEGY=FCFS")
+add_tcm_test(NAME test_rb ENVIRONMENT "TCM_RESOURCE_DISTRIBUTION_STRATEGY=FAIR")
+add_tcm_test(NAME test_constrained_requests)
+add_tcm_test(NAME test_tcm_version)
 
 # Group of tests that runs the same test in different environment checking TCM
 # reacts accordingly

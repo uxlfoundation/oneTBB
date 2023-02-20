@@ -1,7 +1,13 @@
 # Copyright (c) 2021-2022 Intel Corporation
 
 cmake_minimum_required(VERSION 3.1)
-project(TCM LANGUAGES CXX VERSION 0.5)
+
+file(READ include/tcm/version.h _tcm_version_info)
+string(REGEX REPLACE ".*#define TCM_VERSION_MAJOR ([0-9]+).*" "\\1" _tcm_ver_major "${_tcm_version_info}")
+string(REGEX REPLACE ".*#define TCM_VERSION_MINOR ([0-9]+).*" "\\1" _tcm_ver_minor "${_tcm_version_info}")
+string(REGEX REPLACE ".*#define TCM_VERSION_PATCH ([0-9]+).*" "\\1" _tcm_ver_patch "${_tcm_version_info}")
+
+project(TCM LANGUAGES CXX VERSION ${_tcm_ver_major}.${_tcm_ver_minor}.${_tcm_ver_patch})
 
 if (NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
