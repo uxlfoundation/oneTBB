@@ -1107,7 +1107,7 @@ renegotiation mechanism:
 
 .. image:: images/image2.png
 
-Comments from **Aleksei Fedotov**:
+Comments for the above diagram:
 
 I see a couple of inconsistencies to resolve:
 
