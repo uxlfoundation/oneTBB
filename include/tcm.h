@@ -1,8 +1,6 @@
 /*
- *
- * Copyright (C) 2021-2022 Intel Corporation
- *
- */
+    Copyright (c) 2021-2023 Intel Corporation
+*/
 
 #ifndef __TCM_HEADER
 #define __TCM_HEADER

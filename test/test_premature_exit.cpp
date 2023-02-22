@@ -1,8 +1,6 @@
 /*
- *
- * Copyright (C) 2023 Intel Corporation
- *
- */
+    Copyright (c) 2021-2023 Intel Corporation
+*/
 
 #ifndef TCM_LIB_PATH
 #error TCM_LIB_PATH must be defined to the path of the TCM library for this test to work.

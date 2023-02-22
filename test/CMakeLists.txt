@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 Intel Corporation
+# Copyright (c) 2021-2023 Intel Corporation
 
 
 if (NOT MSVC) # no need to change options for MSVC

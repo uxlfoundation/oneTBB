@@ -1,8 +1,6 @@
 /*
- *
- * Copyright (C) 2021-2023 Intel Corporation
- *
- */
+    Copyright (c) 2021-2023 Intel Corporation
+*/
 
 #ifndef _TCM_TEST_HWLOC_UTILS
 #define _TCM_TEST_HWLOC_UTILS

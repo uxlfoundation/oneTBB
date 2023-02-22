@@ -1,8 +1,6 @@
 /*
- *
- * Copyright (C) 2021-2022 Intel Corporation
- *
- */
+    Copyright (c) 2021-2023 Intel Corporation
+*/
 
 #include "test_utils.h"
 

@@ -956,7 +956,7 @@ Priorities of Permit Requests
 **[WIP\_DSGN]** Design and implement support for request priorities.
 
 Each resources request can be assigned a priority. Prioritized requests
-are handled differently by the Resouce Manager than non-prioritized
+are handled differently by the Resource Manager than non-prioritized
 ones.
 
 .. code:: cpp

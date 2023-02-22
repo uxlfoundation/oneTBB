@@ -1,8 +1,6 @@
 /*
- *
- * Copyright (C) 2021-2023 Intel Corporation
- *
- */
+    Copyright (c) 2021-2023 Intel Corporation
+*/
 
 #pragma once
 
@@ -85,7 +83,7 @@ tcm_permit_t make_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nu
                           uint32_t size = 1, tcm_permit_state_t state = TCM_PERMIT_STATE_VOID,
                           tcm_permit_flags_t flags = {})
 {
-  __TCM_ASSERT(concurrencies, "Array of concurrencies cannnot be nullptr.");
+  __TCM_ASSERT(concurrencies, "Array of concurrencies cannot be nullptr.");
   return tcm_permit_t{concurrencies, cpu_masks, size, state, flags};
 }
 

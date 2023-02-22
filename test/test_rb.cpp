@@ -1,8 +1,6 @@
 /*
- *
- * Copyright (C) 2021-2022 Intel Corporation
- *
- */
+    Copyright (c) 2021-2023 Intel Corporation
+*/
 
 #include "test_utils.h"
 
@@ -427,7 +425,7 @@ bool test_overlapping_clients_two_callbacks() {
   // The concurrencies of permit A and B can be borrowed since they specified that they can have
   // them zero at the minimum. The request for permit C requires negotiation from one of them to
   // satisfy its minimum. However, it is not known which one is chosen for negotiation. So we check
-  // first the determined value in permit C and that expected negotation happened.
+  // first the determined value in permit C and that expected negotiation happened.
   eC_concurrency = total_number_of_threads/2;
   if (!(check_permit(eC, phC) && renegotiating_permits == unchanged_permits))
     return test_fail(test_name);
@@ -452,7 +450,7 @@ bool test_overlapping_clients_two_callbacks() {
       (A_concurrency == expected_concurrency && B_concurrency == 0);
 
   if (!succeeded) {
-    check(false, "Unexpected resource distribuion.");
+    check(false, "Unexpected resource distribution.");
     return test_fail(test_name);
   }
 
@@ -492,7 +490,7 @@ bool test_overlapping_clients_two_callbacks() {
   succeeded = (eB_concurrency == pB.concurrencies[0] && eC_concurrency == pC.concurrencies[0]) ||
       (eC_concurrency == pB.concurrencies[0] && eB_concurrency == pC.concurrencies[0]);
   if (!succeeded) {
-    check(false, "Unexpected resource distribuion.");
+    check(false, "Unexpected resource distribution.");
     test_fail(test_name);
   }
 

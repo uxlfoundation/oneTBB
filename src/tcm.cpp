@@ -1,8 +1,6 @@
 /*
- *
- * Copyright (C) 2021-2023 Intel Corporation
- *
- */
+    Copyright (c) 2021-2023 Intel Corporation
+*/
 
 #include "tcm/detail/_tcm_assert.h"
 #include "tcm/detail/hwloc_utils.h"
@@ -250,7 +248,7 @@ void invoke_callbacks(const update_callbacks_t& callbacks) {
         __TCM_ASSERT(callback, "Incorrect invariant: missing callback is in the invocation list.");
         auto result = callback(args.ph, args.callback_arg, args.reason);
 
-        __TCM_ASSERT_EX(result == TCM_RESULT_SUCCESS, "Unsuccesful callback invocation.");
+        __TCM_ASSERT_EX(result == TCM_RESULT_SUCCESS, "Unsuccessful callback invocation.");
     }
 }
 
@@ -875,7 +873,7 @@ protected:
         hwloc_bitmap_or(common_mask, common_mask, mask);
         uint32_t common_concurrency = 0;
 
-        // min_required is the maximum among the amount of unavailable resources neeeded
+        // min_required is the maximum among the amount of unavailable resources needed
         // to satisfy the required concurrency (i.e. constraint.min_concurrency).
         // max_desired is the maximum among the amount of resources needed to satisfy the
         // desired concurrency (i.e. constraint.max_concurrency). It is set only when
@@ -1173,7 +1171,7 @@ protected:
     }
 
 
-    struct fulfilment_decision_t { // per constraint decision
+    struct fulfillment_decision_t { // per constraint decision
         uint32_t to_assign = 0; // concurrency to set
         uint32_t to_negotiate = 0; // concurrency that needs to be negotiated out from the permits.
                                    // Its value is included into the concurrency field.
@@ -1182,8 +1180,8 @@ protected:
         renegotiable_resources_queue_t permits; // contributing permits
     };
 
-    struct fulfilment_t {
-        fulfilment_t(std::size_t size = 0)
+    struct fulfillment_t {
+        fulfillment_t(std::size_t size = 0)
             : num_satisfiable(0), num_negotiable(0), pending_constraints_indices(0),
               decisions(size) {}
 
@@ -1196,11 +1194,11 @@ protected:
 
         std::vector<int> pending_constraints_indices; // indices of the constraints array whose
                                                       // required concurrency cannot be satisfied.
-        std::vector<fulfilment_decision_t> decisions; // per constraint prescription
+        std::vector<fulfillment_decision_t> decisions; // per constraint prescription
     };
 
     // Distributes as max as possible of the desired concurrency
-    fulfilment_t calculate_updates(const tcm_permit_request_t& req, tcm_permit_handle_t ph,
+    fulfillment_t calculate_updates(const tcm_permit_request_t& req, tcm_permit_handle_t ph,
                                    const stakeholder_cache& cache)
     {
         __TCM_ASSERT(0 <= req.max_sw_threads,
@@ -1208,8 +1206,8 @@ protected:
         // TODO: Infer request.max_sw_threads by summing up maxima among all constraints
 
         const std::vector<negotiable_snapshot_t>& sh = cache.stakeholders;
-        fulfilment_t fulfilment(/*decisions array size*/sh.size());
-        std::vector<fulfilment_decision_t>& decision = fulfilment.decisions;
+        fulfillment_t fulfillment(/*decisions array size*/sh.size());
+        std::vector<fulfillment_decision_t>& decision = fulfillment.decisions;
 
         // To satisfy a constrained request means allocating a number of resources from the
         // [min_sw_threads, max_sw_threads] interval taken from the parts of the platform via
@@ -1228,12 +1226,12 @@ protected:
             new_concurrency += to_negotiate; // Concurrency that was found for the constraint
 
             decision[i].to_negotiate = to_negotiate;
-            fulfilment.num_negotiable += to_negotiate;
+            fulfillment.num_negotiable += to_negotiate;
 
             if (new_concurrency < cns.adjusted_min_concurrency()) {
                 // Cannot negotiate necessary amount of resources for constraint. The permit is
                 // going to be left in PENDING state.
-                fulfilment.pending_constraints_indices.push_back(static_cast<int>(i));
+                fulfillment.pending_constraints_indices.push_back(static_cast<int>(i));
                 // Value < 0 means cannot satisfy required concurrency.
                 decision[i].need = new_concurrency - cns.adjusted_min_concurrency();
             } else {
@@ -1241,7 +1239,7 @@ protected:
                              "Incorrect invariant.");
             }
             decision[i].to_assign = new_concurrency;
-            fulfilment.num_satisfiable += new_concurrency;
+            fulfillment.num_satisfiable += new_concurrency;
 
             __TCM_ASSERT(new_concurrency <= left_to_find,
                          (std::string("Incorrect calculation of concurrency to assign for the ") +
@@ -1253,9 +1251,9 @@ protected:
             decision[i].permits = cns.get_contributing_permits();
         }
 
-        if (!fulfilment.pending_constraints_indices.empty()) {
+        if (!fulfillment.pending_constraints_indices.empty()) {
             // Cannot satisfy required concurrency on at least single constraint
-            return fulfilment;
+            return fulfillment;
         }
 
         // TODO: Rewrite the algorithm to fix the following:
@@ -1298,7 +1296,7 @@ protected:
 
             // Do not negotiate if minimum has been satisfied
             decision[i].to_assign += assign_further;
-            fulfilment.num_satisfiable += assign_further;
+            fulfillment.num_satisfiable += assign_further;
             left_to_find -= assign_further;
         }
 
@@ -1317,12 +1315,12 @@ protected:
         //     new_concurrency += to_negotiate; // Concurrency that was found for the constraint
 
         //     decision[i].to_negotiate = to_negotiate;
-        //     fulfilment.num_negotiable += to_negotiate;
+        //     fulfillment.num_negotiable += to_negotiate;
 
         //     if (new_concurrency < sh[i].adjusted_min_concurrency()) {
         //         // Cannot negotiate necessary amount of resources for constraint. The permit is
         //         // going to be left in PENDING state.
-        //         fulfilment.pending_constraints_indices.push_back(i);
+        //         fulfillment.pending_constraints_indices.push_back(i);
         //         // Negative value means cannot satisfy required concurrency.
         //         decision[i].need = new_concurrency - sh[i].adjusted_min_concurrency();
         //     } else {
@@ -1330,7 +1328,7 @@ protected:
         //         decision[i].need = sh[i].adjusted_max_concurrency() - new_concurrency;
         //     }
         //     decision[i].to_assign = new_concurrency;
-        //     fulfilment.num_satisfiable += new_concurrency;
+        //     fulfillment.num_satisfiable += new_concurrency;
 
         //     __TCM_ASSERT(new_concurrency <= left_to_find,
         //                  (std::string("Incorrect calculation of concurrency to assign for the ") +
@@ -1341,10 +1339,10 @@ protected:
         //     decision[i].permits = sh[i].get_contributing_permits();
         // }
 
-        return fulfilment;
+        return fulfillment;
     }
 
-    std::vector<permit_change_t> negotiate(fulfilment_t& f, const tcm_permit_request_t& /*req*/,
+    std::vector<permit_change_t> negotiate(fulfillment_t& f, const tcm_permit_request_t& /*req*/,
                                            tcm_permit_handle_t& ph)
     {
         permit_change_t requested_permit{ph, TCM_PERMIT_STATE_ACTIVE, {}};
@@ -1353,7 +1351,7 @@ protected:
         std::unordered_multimap<tcm_permit_handle_t, permit_change_t> new_grants;
         std::unordered_set<tcm_permit_handle_t> handles;
 
-        for (fulfilment_decision_t& fd : f.decisions) {
+        for (fulfillment_decision_t& fd : f.decisions) {
             requested_permit_concurrencies.push_back(fd.to_assign);
 
             // Minimizing the number of negotiations
@@ -1380,7 +1378,7 @@ protected:
                     !st.m_ph->request.cpu_constraints ||
                     st.m_ph->request.cpu_constraints[st.m_constraint_index].min_concurrency <=
                     int32_t(new_concurrencies[st.m_constraint_index]),
-                    "Wrongly computed negotation found."
+                    "Wrongly computed negotiation found."
                 );
 
                 permit_change_t pc{st.m_ph, data.state.load(std::memory_order_relaxed),
@@ -1413,9 +1411,9 @@ protected:
     }
 
     //! Tries to meet the requested concurrency. Must be called under the data_mutex.
-    //! Returns @fulfilment_t
+    //! Returns @fulfillment_t
     //! TODO: Split this function into "suggestion" and "permit modification"
-    fulfilment_t try_satisfy_request(const tcm_permit_request_t& req, tcm_permit_handle_t ph,
+    fulfillment_t try_satisfy_request(const tcm_permit_request_t& req, tcm_permit_handle_t ph,
                                      uint32_t available_concurrency_snapshot)
     {
         // TODO: Determine whether permit can have dynamic flags, i.e. flags can be
@@ -1476,9 +1474,9 @@ protected:
             sc.total_negotiable = snapshot.num_negotiable();
             sc.total_immediately_available = snapshot.num_immediately_available();
         }
-        fulfilment_t fulfilment = calculate_updates(req, ph, sc);
+        fulfillment_t fulfillment = calculate_updates(req, ph, sc);
 
-        return fulfilment;
+        return fulfillment;
     }
 
     virtual void renegotiate_permits(tcm_permit_handle_t initiator) = 0;
@@ -1684,7 +1682,7 @@ public:
                     "The permit has no argument for the client callback."
                 );
 
-                fulfilment_t ff = try_satisfy_request(req, current_ph, available_concurrency);
+                fulfillment_t ff = try_satisfy_request(req, current_ph, available_concurrency);
                 __TCM_ASSERT(ff.num_negotiable <= ff.num_satisfiable,
                              "Number of negotiated must be included into total number of found resources.");
                 __TCM_ASSERT(req.min_sw_threads <= int32_t(ff.num_satisfiable) &&
@@ -1748,7 +1746,7 @@ public:
         tracer t("ThreadComposabilityFCFSCImpl::adjust_existing_permit");
         __TCM_ASSERT(is_valid(ph), "Invalid permit.");
 
-        fulfilment_t ff = try_satisfy_request(req, ph, available_concurrency);
+        fulfillment_t ff = try_satisfy_request(req, ph, available_concurrency);
 
         const int32_t immediately_satisfiable = ff.num_satisfiable - ff.num_negotiable;
         if (immediately_satisfiable < req.min_sw_threads ||
@@ -1779,7 +1777,7 @@ public:
 private:
     std::deque<tcm_permit_handle_t> renegotiation_deque;
 
-    void nullify_negotiations(fulfilment_t& ff) {
+    void nullify_negotiations(fulfillment_t& ff) {
         ff.num_negotiable = 0;
         for (auto& fd : ff.decisions) {
             fd.to_assign -= fd.to_negotiate;
@@ -1900,7 +1898,7 @@ protected:
                 tcm_permit_handle_t ph = elem.second;
                 const tcm_permit_request_t& pr = ph->request;
 
-                fulfilment_t ff = try_satisfy_request(pr, ph, available_concurrency_snapshot);
+                fulfillment_t ff = try_satisfy_request(pr, ph, available_concurrency_snapshot);
                 uint32_t required_concurrency = infer_constraint_min_concurrency(pr.min_sw_threads);
 
                 // To this point only required concurrency was subtracted from available
@@ -1963,7 +1961,7 @@ protected:
 
         // Trying to squeeze resources out of the platform, returning permits that share
         // resources needed by that ph
-        fulfilment_t ff = try_satisfy_request(req, ph, available_concurrency);
+        fulfillment_t ff = try_satisfy_request(req, ph, available_concurrency);
 
         if (int32_t(ff.num_satisfiable) < req.min_sw_threads) {
             return {}; // Also works if min_sw_threads == tcm_automatic

@@ -1,8 +1,6 @@
 /*
- *
- * Copyright (C) 2023 Intel Corporation
- *
- */
+    Copyright (c) 2023 Intel Corporation
+*/
 
 #ifndef __TCM_EXPORT_HEADER
 #define __TCM_EXPORT_HEADER

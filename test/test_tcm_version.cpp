@@ -1,8 +1,6 @@
 /*
- *
- * Copyright (C) 2023 Intel Corporation
- *
- */
+    Copyright (c) 2023 Intel Corporation
+*/
 
 #include "test_utils.h"
 #include "tcm.h"
