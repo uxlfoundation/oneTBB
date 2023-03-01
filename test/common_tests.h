@@ -2,6 +2,9 @@
     Copyright (c) 2021-2023 Intel Corporation
 */
 
+#ifndef __TCM_TESTS_COMMON_TESTS_HEADER
+#define __TCM_TESTS_COMMON_TESTS_HEADER
+
 #include "test_utils.h"
 
 #include <iostream>
@@ -53,14 +56,14 @@ bool test_alternating_clients() {
 
   tcm_permit_handle_t phA = nullptr, phB = nullptr;
   uint32_t pA_concurrency, pB_concurrency,
-           e_concurrency = total_number_of_threads;
+           e_concurrency = num_oversubscribed_resources;
 
   tcm_permit_t pA = make_void_permit(&pA_concurrency),
                 pB = make_void_permit(&pB_concurrency);
 
   tcm_permit_t e = make_active_permit(&e_concurrency);
 
-  tcm_permit_request_t req = make_request(0, total_number_of_threads);
+  tcm_permit_request_t req = make_request(0, num_oversubscribed_resources);
   r = tcmRequestPermit(clidA, req, &phA, &phA, &pA);
   if (!(check_success(r, "tcmRequestPermit A") && check_permit(e, pA)))
     return test_fail(test_name);
@@ -108,3 +111,5 @@ bool test_alternating_clients() {
   std::cout << "test_alternating_clients done" << std::endl;
   return test_epilog(test_name);
 }
+
+#endif // __TCM_TESTS_COMMON_TESTS_HEADER

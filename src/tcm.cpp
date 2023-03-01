@@ -172,10 +172,9 @@ struct mask_deleter {
     void operator()(tcm_cpu_mask_t* mask_ptr) const { hwloc_bitmap_free(*mask_ptr); }
 };
 
-int get_mask_concurrency(const tcm_cpu_mask_t &mask) {
+int get_mask_concurrency(const tcm_cpu_mask_t& mask) {
     __TCM_ASSERT(mask, "Existing mask is expected.");
     int mc = hwloc_bitmap_weight(mask);
-    __TCM_ASSERT(mc > 0, "HWLOC's infinitely set mask?");
     return mc;
 }
 
@@ -198,14 +197,26 @@ int32_t infer_constraint_min_concurrency(int32_t min_concurrency_value) {
     return min_concurrency_value;
 }
 
-int32_t infer_constraint_max_concurrency(int32_t max_concurrency_value, const tcm_cpu_mask_t& mask)
+int32_t infer_constraint_max_concurrency(int32_t max_concurrency_value,
+                                         uint32_t fallback_concurrency, const tcm_cpu_mask_t& mask)
 {
-    if (tcm_automatic == max_concurrency_value)
-        return get_mask_concurrency(mask);
+    if (tcm_automatic != max_concurrency_value) {
+      __TCM_ASSERT(max_concurrency_value > 0,
+                   "Found incorrect value for constraint.max_concurrency.");
+      return max_concurrency_value;
+    }
 
-    __TCM_ASSERT(max_concurrency_value > 0,
-                 "Incorrect value for constraint.max_concurrency was found.");
+    if (mask) {
+      max_concurrency_value = get_mask_concurrency(mask);
+      if (max_concurrency_value < 0) {
+        // Fail to get the concurrency of the provided mask or the mask is inifinitely set, use
+        // fallback value.
+        max_concurrency_value = fallback_concurrency;
+      }
+    }
 
+    // max_concurrency_value might still have automatic value, because of the use of high level
+    // constraint description. In this case, we defer the inference of it to a later stage
     return max_concurrency_value;
 }
 
@@ -581,6 +592,28 @@ public:
     }
   }
 
+  void deduce_request_arguments(tcm_permit_request_t& request) {
+    if (tcm_automatic == request.min_sw_threads) {
+      request.min_sw_threads = 0;
+    }
+
+    if (tcm_automatic == request.max_sw_threads) {
+      request.max_sw_threads = process_concurrency;
+    }
+
+    if (!request.cpu_constraints) {
+      return;
+    }
+
+    for (uint32_t i = 0; i < request.constraints_size; ++i) {
+      tcm_cpu_constraints_t& c = request.cpu_constraints[i];
+
+      c.min_concurrency = infer_constraint_min_concurrency(c.min_concurrency);
+      c.max_concurrency = infer_constraint_max_concurrency(c.max_concurrency, process_concurrency,
+                                                           c.mask);
+    }
+  }
+
   bool request_permit(tcm_client_id_t clid, tcm_permit_request_t& req,
                       void* callback_arg, tcm_permit_handle_t* permit_handle,
                       tcm_permit_t* permit)
@@ -629,9 +662,12 @@ public:
           const uint32_t released = move_to_pending(ph);
           available_concurrency += released;
       }
+
+      deduce_request_arguments(ph->request);
+
       permit_to_callback_arg_map[ph] = callback_arg;
 
-      std::vector<permit_change_t> updates = adjust_existing_permit(req, ph);
+      std::vector<permit_change_t> updates = adjust_existing_permit(ph->request, ph);
 
       callbacks = apply(*this, /*initiator*/ph, updates);
 
@@ -846,18 +882,16 @@ protected:
     // Tries to satisfy requested concurrency on the specific mask
     negotiable_snapshot_t try_satisfy(tcm_permit_handle_t ph,
                                       const tcm_cpu_constraints_t& constraint,
-                                      const uint32_t current_concurrency,
-                                      tcm_cpu_mask_t mask)
+                                      const uint32_t current_concurrency, tcm_cpu_mask_t mask)
     {
-        int32_t constraint_min = infer_constraint_min_concurrency(constraint.min_concurrency);
-        int32_t constraint_max = infer_constraint_max_concurrency(constraint.max_concurrency, mask);
+        const uint32_t constraint_min = constraint.min_concurrency;
+        const uint32_t constraint_max = constraint.max_concurrency;
         return try_satisfy(ph, constraint_min, constraint_max, current_concurrency, mask);
     }
 
     negotiable_snapshot_t try_satisfy(tcm_permit_handle_t ph,
                                       const uint32_t constraint_min, const uint32_t constraint_max,
-                                      const uint32_t current_concurrency,
-                                      tcm_cpu_mask_t mask)
+                                      const uint32_t current_concurrency, tcm_cpu_mask_t mask)
     {
         negotiable_snapshot_t stakeholders;
         stakeholders.set_adjusted_concurrencies(constraint_min, constraint_max);
@@ -881,6 +915,7 @@ protected:
         uint32_t min_required = 0, max_desired = 0; // TODO: these are calculated but not
                                                     // used.
 
+        __TCM_ASSERT(constraint_max > 0, "Cannot satisfy indefinite constraint.");
         int available_min = constraint_max;  // holds the number of resources available immediately,
                                              // not requiring any negotiations
 
@@ -1047,7 +1082,9 @@ protected:
                                                              tcm_cpu_mask_t pd_mask)
     {
         __TCM_ASSERT(!constraint.mask, "Constraint mask must not exist.");
-        uint32_t constraint_min = infer_constraint_min_concurrency(constraint.min_concurrency);
+        __TCM_ASSERT(constraint.min_concurrency >= 0,
+                     "Constraint's min_concurrency must be known.");
+        const uint32_t constraint_min = uint32_t(constraint.min_concurrency);
 
         int num_numa_nodes = 0, num_core_types = 0;
         int* numa_indices = nullptr; int* core_types_indices = nullptr;
@@ -1074,14 +1111,14 @@ protected:
                     continue;   // The result mask is empty, continue with the next numa node
 
                 uint32_t constraint_max = infer_constraint_max_concurrency(
-                    constraint.max_concurrency, pd_mask
+                    constraint.max_concurrency, /*fallback_concurrency*/process_concurrency, pd_mask
                 );
 
                 __TCM_ASSERT(constraint_min <= constraint_max, "Broken concurrency in constraint");
 
-                negotiable_snapshot_t stakeholders = try_satisfy(ph, constraint_min, constraint_max,
+                negotiable_snapshot_t stakeholders = try_satisfy(ph, constraint.min_concurrency,
+                                                                 constraint_max,
                                                                  current_concurrency, pd_mask);
-
 
                 // TODO: move snapshot selection in separate function.
                 // Among the masks satisfying the request, choosing the one with smaller
@@ -1201,9 +1238,7 @@ protected:
     fulfillment_t calculate_updates(const tcm_permit_request_t& req, tcm_permit_handle_t ph,
                                    const stakeholder_cache& cache)
     {
-        __TCM_ASSERT(0 <= req.max_sw_threads,
-                     "Automatic infer of maximum requested threads is not implemented.");
-        // TODO: Infer request.max_sw_threads by summing up maxima among all constraints
+        __TCM_ASSERT(0 <= req.max_sw_threads, "Maximum requested threads must be known.");
 
         const std::vector<negotiable_snapshot_t>& sh = cache.stakeholders;
         fulfillment_t fulfillment(/*decisions array size*/sh.size());
@@ -1412,7 +1447,6 @@ protected:
 
     //! Tries to meet the requested concurrency. Must be called under the data_mutex.
     //! Returns @fulfillment_t
-    //! TODO: Split this function into "suggestion" and "permit modification"
     fulfillment_t try_satisfy_request(const tcm_permit_request_t& req, tcm_permit_handle_t ph,
                                      uint32_t available_concurrency_snapshot)
     {
@@ -1421,8 +1455,7 @@ protected:
         // unnecessary anywhere else except for the first time resources are
         // requested and representation of corresponding permit is allocated.
 
-        __TCM_ASSERT(req.max_sw_threads >= 0,
-                     "Requesting automatic inferring of max_sw_threads is not implemented.");
+        __TCM_ASSERT(req.max_sw_threads >= 0, "Cannot satisfy indefinite request.");
 
         stakeholder_cache sc{/*constraints array length*/ph->data.size};
         if (req.cpu_constraints && process_mask) {
@@ -1489,13 +1522,9 @@ protected:
         tracer t("ThreadComposabilityManagerBase::make_new_permit");
 
         tcm_permit_handle_t ph = new tcm_permit_rep_t;
-        __TCM_ASSERT(ph, "Permit was not allocated.");
 
         ph->epoch.store(0, std::memory_order_relaxed);
         tcm_permit_data_t& pd = ph->data;
-
-        __TCM_ASSERT(!req.cpu_constraints || req.constraints_size > 0,
-                     "Inconsistent constrained request");
 
         pd.client_id = clid;
         pd.size = 1;
@@ -2175,16 +2204,57 @@ tcm_result_t tcmRequestPermit(tcm_client_id_t client_id,
   using tcm::theTCM;
   tcm::internal::tracer t("tcmRequestPermit");
 
-  if (!permit_handle)
-    return TCM_RESULT_ERROR_UNKNOWN;
+  int32_t sum_min = 0, sum_max = 0;
+  if (request.cpu_constraints) {
+    if (request.constraints_size <= 0)
+      return TCM_RESULT_ERROR_INVALID_ARGUMENT;
 
-  if (request.min_sw_threads < 0 || request.max_sw_threads < request.min_sw_threads)
-    return TCM_RESULT_ERROR_UNKNOWN;
+    for (uint32_t i = 0; i < request.constraints_size; ++i) {
+      const tcm_cpu_constraints_t& c = request.cpu_constraints[i];
+      int32_t adjusted_min = 0;
+      if (c.min_concurrency != tcm_automatic) {
+        if (c.min_concurrency < 0) {
+          return TCM_RESULT_ERROR_INVALID_ARGUMENT;
+        }
+        adjusted_min = c.min_concurrency;
+      }
+      sum_min += adjusted_min;
+
+      int32_t adjusted_max = 1024; // TODO: use process concurrency as the default
+      if (c.max_concurrency != tcm_automatic) {
+        if (c.max_concurrency < 0) {
+          return TCM_RESULT_ERROR_INVALID_ARGUMENT;
+        }
+        adjusted_max = c.max_concurrency;
+      } else if (c.mask) {
+        // TODO: handle infinitely set masks
+        adjusted_max = tcm::internal::get_mask_concurrency(c.mask);
+      }
+      sum_max += adjusted_max;
+
+      if (adjusted_max < adjusted_min)
+        return TCM_RESULT_ERROR_INVALID_ARGUMENT;
+    }
+  }
+
+  if (request.min_sw_threads != tcm_automatic && sum_min > request.min_sw_threads) {
+    return TCM_RESULT_ERROR_INVALID_ARGUMENT;
+  } else if (request.max_sw_threads != tcm_automatic &&
+             (request.max_sw_threads < 0 || (sum_max && sum_max < request.max_sw_threads))) {
+    return TCM_RESULT_ERROR_INVALID_ARGUMENT;
+  } else if (request.max_sw_threads < request.min_sw_threads) {
+    return TCM_RESULT_ERROR_INVALID_ARGUMENT;
+  } else if (!permit_handle) {
+    return TCM_RESULT_ERROR_INVALID_ARGUMENT;
+  }
+
+  // Even for default-initialized request parameters, the meaningful values can be inferred.
+
+  // request.min_sw_threads == automatic means zero if no constraints specified. Otherwise, the sum
+  // of minimum concurrencies in the constraints.
 
   auto& mgr = theTCM::instance();
-  bool result = mgr.request_permit(client_id, request, callback_arg,
-                                   permit_handle, permit);
-
+  bool result = mgr.request_permit(client_id, request, callback_arg, permit_handle, permit);
   return result? TCM_RESULT_SUCCESS : TCM_RESULT_ERROR_INVALID_ARGUMENT;
 }
 

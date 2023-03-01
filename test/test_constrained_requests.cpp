@@ -106,7 +106,7 @@ bool test_allow_mask_omitting_during_permit_copy(/*tcm_test::system_topology& tp
     std::unique_ptr<tcm_cpu_mask_t, mask_deleter> req_mask_guard(&constraints.mask);
     constraints.mask = hwloc_bitmap_alloc();
     hwloc_bitmap_set(constraints.mask, 1);
-    auto req = make_request(0, total_number_of_threads, &constraints, /*size*/1);
+    auto req = make_request(tcm_automatic, tcm_automatic, &constraints, /*size*/1);
 
     tcm_permit_handle_t ph{nullptr};
     uint32_t p_concurrency;
@@ -290,6 +290,7 @@ bool test_one_request_two_constraints_process_mask_no_oversubscription() {
   tcm_cpu_mask_t permit_mask[size];
   tcm_cpu_mask_t expected_mask[size];
   tcm_cpu_constraints_t cpu_constraints[size];
+  int32_t min_concurrency = 0;
   for (uint32_t i = 0; i < size; ++i) {
     permit_mask[i] = hwloc_bitmap_alloc();
     expected_mask[i] = mask();
@@ -297,13 +298,14 @@ bool test_one_request_two_constraints_process_mask_no_oversubscription() {
     cpu_constraints[i].min_concurrency = e_concurrency[i];
     cpu_constraints[i].max_concurrency = e_concurrency[i];
     cpu_constraints[i].mask = mask();
+    min_concurrency += e_concurrency[i];
   }
 
   one_request_config test_config{};
   test_config.test_name =
     "test_one_request_two_constraints_process_mask_no_oversubscription";
   test_config.exp_concurrency = e_concurrency;
-  test_config.min_concurrency = 0;
+  test_config.min_concurrency = min_concurrency;
   test_config.max_concurrency = total_concurrency;
   test_config.constraints_size = 2;
   test_config.per_mask = permit_mask;
@@ -436,8 +438,8 @@ struct test_two_requests {
 };
 
 bool test_two_requests_process_mask_no_oversubscription() {
-  uint32_t concurrencyA = total_number_of_threads / 2;
-  uint32_t concurrencyB = total_number_of_threads - total_number_of_threads / 2;
+  uint32_t concurrencyA = num_oversubscribed_resources / 2;
+  uint32_t concurrencyB = num_oversubscribed_resources - num_oversubscribed_resources / 2;
   two_requests_config test_config{};
   test_config.test_name = "test_two_requests_process_mask_no_oversubscription";
   test_config.callback = client_renegotiate;
@@ -506,8 +508,8 @@ bool test_multiple_requests_all_numa_plus_one() {
     constraints[i].numa_id = tcm_any;
     requests[i] = TCM_PERMIT_REQUEST_INITIALIZER;
     // TODO: correct the number of requesting resources.
-    requests[i].min_sw_threads = total_number_of_threads;
-    requests[i].max_sw_threads = total_number_of_threads;
+    requests[i].min_sw_threads = num_oversubscribed_resources;
+    requests[i].max_sw_threads = num_oversubscribed_resources;
     requests[i].constraints_size = 1;
     requests[i].cpu_constraints = &constraints[i];
   }

@@ -2,7 +2,10 @@
     Copyright (c) 2021-2023 Intel Corporation
 */
 
-#pragma once
+#ifndef __TCM_TESTS_TEST_UTILS_HEADER
+#define __TCM_TESTS_TEST_UTILS_HEADER
+
+#include "test_exceptions.h"
 
 #include "hwloc_test_utils.h"
 #include "tcm/detail/_tcm_assert.h"
@@ -20,7 +23,7 @@ __TCM_SUPPRESS_WARNING_POP
 #include <string>
 #include <limits>
 
- // MSVC Warning: Args can be incorrect: this does not match function name specification
+// MSVC Warning: Args can be incorrect: this does not match function name specification
 __TCM_SUPPRESS_WARNING_WITH_PUSH(6387)
 // TODO: Function SetEnv() is borrowed from oneTBB project. Check the license.
 inline int SetEnv( const char *envname, const char *envval ) {
@@ -65,13 +68,14 @@ private:
 };
 
 
-tcm_permit_request_t make_request(int min_sw_threads, int max_sw_threads,
-                                   tcm_cpu_constraints_t* constraints = nullptr, uint32_t size = 0,
-                                   tcm_request_priority_t priority = TCM_REQUEST_PRIORITY_NORMAL,
-                                   tcm_permit_flags_t flags = {})
+tcm_permit_request_t make_request(int min_sw_threads = tcm_automatic,
+                                  int max_sw_threads = tcm_automatic,
+                                  tcm_cpu_constraints_t* constraints = nullptr, uint32_t size = 0,
+                                  tcm_request_priority_t priority = TCM_REQUEST_PRIORITY_NORMAL,
+                                  tcm_permit_flags_t flags = {})
 {
-    __TCM_ASSERT(0 <= min_sw_threads && min_sw_threads <= max_sw_threads, "Incorrect concurrency requested");
-    __TCM_ASSERT((constraints && size) || (!constraints && !size), "Inconsistent request.");
+    __TCM_ASSERT(!(!constraints ^ !size), "Inconsistent request.");
+
     return tcm_permit_request_t{
         min_sw_threads, max_sw_threads, constraints, size, priority, flags, /*reserved*/{0}
     };
@@ -80,8 +84,8 @@ tcm_permit_request_t make_request(int min_sw_threads, int max_sw_threads,
 // TODO: rename to make_permit
 
 tcm_permit_t make_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
-                          uint32_t size = 1, tcm_permit_state_t state = TCM_PERMIT_STATE_VOID,
-                          tcm_permit_flags_t flags = {})
+                         uint32_t size = 1, tcm_permit_state_t state = TCM_PERMIT_STATE_VOID,
+                         tcm_permit_flags_t flags = {})
 {
   __TCM_ASSERT(concurrencies, "Array of concurrencies cannot be nullptr.");
   return tcm_permit_t{concurrencies, cpu_masks, size, state, flags};
@@ -168,18 +172,27 @@ const float tcm_oversubscription_factor = [] {
   return oversb_factor;
 }();
 
-//! Returns available platform resources, taking into account the possible
-//! degree of the oversubscription (oversb_factor must be greater than zero) and
-//! process mask.
+//! Returns available platform resources, taking into account the mask of the process.
 int32_t platform_resources(const tcm_test::system_topology& tp) {
-  return int32_t(tcm_oversubscription_factor * tp.get_process_concurrency());
+  return int32_t(tp.get_process_concurrency());
 }
 
-// TODO: rename total_number_of_threads to num_total_threads
-const int32_t total_number_of_threads = []() {
+const int32_t num_total_resources = []() {
     tcm_test::system_topology::construct();
     auto& tp = tcm_test::system_topology::instance();
     return platform_resources(tp);
+}();
+
+//! Returns available platform resources, taking into account the possible degree of the
+//! oversubscription (oversubscription_factor must be greater than zero) and process mask.
+int32_t platform_resources_oversubscribed(const tcm_test::system_topology& tp) {
+  return int32_t(tcm_oversubscription_factor * platform_resources(tp));
+}
+
+const int32_t num_oversubscribed_resources = []() {
+    tcm_test::system_topology::construct();
+    auto& tp = tcm_test::system_topology::instance();
+    return platform_resources_oversubscribed(tp);
 }();
 
 bool check_permit_size(const tcm_permit_t& expected, const tcm_permit_t& actual,
@@ -334,6 +347,91 @@ bool check_permit(const tcm_permit_t& expected, tcm_permit_handle_t ph,
   return result;
 }
 
+/*
+ * Test helpers to simplify regular work with the TCM.
+ */
+// TODO: Make use of these helpers in all the tests, utilizing RAII for releasing permits, closing
+// connections that remain after exception occurs.
+tcm_client_id_t connect_new_client(tcm_callback_t callback = nullptr,
+                                   const char* error_message = nullptr) {
+  tcm_client_id_t client_id;
+
+  tcm_result_t r = tcmConnect(callback, &client_id);
+  if (!check_success(r, "tcmConnect"))
+    throw tcm_connect_error(error_message);
+
+  return client_id;
+}
+
+void disconnect_client(const tcm_client_id_t& client_id, const char* error_message = nullptr) {
+  tcm_result_t r = tcmDisconnect(client_id);
+  if (!check_success(r, "tcmDisconnect"))
+    throw tcm_disconnect_error(error_message);
+}
+
+tcm_permit_handle_t request_permit(tcm_client_id_t client, tcm_permit_request_t request,
+                                   void* callback_arg = nullptr,
+                                   const char* error_message = nullptr) {
+  tcm_permit_handle_t permit_handle{nullptr};
+
+  auto r = tcmRequestPermit(client, request, callback_arg, &permit_handle, /*permit*/nullptr);
+
+  if (!check_success(r, "tcmRequestPermit")) {
+    throw tcm_request_permit_error(error_message);
+  }
+
+  return permit_handle;
+}
+
+void release_permit(tcm_permit_handle_t ph, const char* error_message = nullptr) {
+  auto r = tcmReleasePermit(ph);
+
+  if (!check_success(r, "tcmReleasePermit")) {
+    throw tcm_release_permit_error(error_message);
+  }
+}
+
+template <int size = 1>
+class permit_t {
+public:
+  permit_t(bool allocate_mask = false)
+    : cpu_masks(allocate_mask? new tcm_cpu_mask_t[size]{hwloc_bitmap_alloc()} : nullptr,
+                masks_guard_t(size)) {}
+
+  operator tcm_permit_t() { return make_permit(concurrency, cpu_masks.get(), size); }
+private:
+  uint32_t concurrency[size]{0};
+  std::unique_ptr<tcm_cpu_mask_t[], masks_guard_t> cpu_masks{nullptr, masks_guard_t(size)};
+  tcm_permit_flags_t flags{};
+};
+
+template <int size = 1>
+permit_t<size> get_permit_data(tcm_permit_handle_t ph, const char* error_message = nullptr) {
+  // TODO: propagate 'allocate_mask' flag to the permit_t class
+  permit_t<size> permit_wrapper;
+  tcm_permit_t permit = permit_wrapper;
+
+  auto r = tcmGetPermitData(ph, &permit);
+  if (!check_success(r, "tcmGetPermitData")) {
+    throw tcm_get_permit_data_error(error_message);
+  }
+
+  return permit_wrapper;
+}
+
+permit_t</*size*/1> make_active_permit(uint32_t expected_concurrency,
+                                       tcm_cpu_mask_t* cpu_masks = nullptr,
+                                       tcm_permit_flags_t flags = {})
+{
+  const bool allocate_mask = bool(cpu_masks);
+  permit_t</*size*/1> permit_wrapper(allocate_mask);
+  tcm_permit_t permit = permit_wrapper;
+  permit.concurrencies[0] = expected_concurrency;
+  permit.flags = flags;
+  return permit_wrapper;
+}
+
+
 typedef std::vector< std::pair<tcm_permit_handle_t*, tcm_permit_t*> > permits_data_t;
 
 /**
@@ -356,3 +454,5 @@ std::set<tcm_permit_handle_t*> list_unchanged_permits(const permits_data_t& pds)
 
   return result;
 }
+
+#endif // __TCM_TESTS_TEST_UTILS_HEADER

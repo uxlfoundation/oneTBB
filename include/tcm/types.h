@@ -80,7 +80,7 @@ const int8_t tcm_automatic = -1;
 const int8_t tcm_any = -2;
 
 #define TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER {tcm_automatic, tcm_automatic, NULL, \
-                                                     tcm_automatic, tcm_automatic, tcm_automatic}
+                                                    tcm_automatic, tcm_automatic, tcm_automatic}
 
 typedef struct _tcm_cpu_constraints_t {
   int32_t min_concurrency;

@@ -21,10 +21,10 @@ bool test_state_functions() {
   tcm_permit_handle_t ph{nullptr};
   uint32_t p_concurrency;
   tcm_permit_t p = make_void_permit(&p_concurrency);
-  uint32_t e_concurrency = total_number_of_threads;
+  uint32_t e_concurrency = num_oversubscribed_resources;
   tcm_permit_t e = make_active_permit(&e_concurrency);
 
-  tcm_permit_request_t req = make_request(0, total_number_of_threads);
+  tcm_permit_request_t req = make_request(0, num_oversubscribed_resources);
   r = tcmRequestPermit(clid, req, nullptr, &ph, &p);
   if (!(check_success(r, "tcmRequestPermit") && check_permit(e, p)))
     return test_fail(test_name);
@@ -46,7 +46,7 @@ bool test_state_functions() {
     return test_fail(test_name);
 
   r = tcmActivatePermit(ph);
-  e_concurrency = total_number_of_threads;
+  e_concurrency = num_oversubscribed_resources;
   e.state = TCM_PERMIT_STATE_ACTIVE;
   if (!(check_success(r, "tcmActivatePermit 2") && check_permit(e, ph)))
     return test_fail(test_name);
@@ -63,7 +63,7 @@ bool test_state_functions() {
     return test_fail(test_name);
 
   r = tcmActivatePermit(ph);
-  e_concurrency = total_number_of_threads;
+  e_concurrency = num_oversubscribed_resources;
   e.state = TCM_PERMIT_STATE_ACTIVE;
   if (!(check_success(r, "tcmActivatePermit 3") && check_permit(e, ph)))
     return test_fail(test_name);
@@ -98,29 +98,29 @@ bool test_pending_state() {
                 eB = make_pending_permit(&eB_concurrency);
 
   tcm_permit_request_t reqA =
-    make_request(2 * total_number_of_threads, 2 * total_number_of_threads);
+    make_request(2 * num_oversubscribed_resources, 2 * num_oversubscribed_resources);
   r = tcmRequestPermit(clid, reqA, nullptr, &phA, &pA);
   if (!(check(r == TCM_RESULT_ERROR_INVALID_ARGUMENT && !phA, "tcmRequestPermit for A")
         && check_permit(eA, pA)))
     return test_fail(test_name);
 
-  eA_concurrency = total_number_of_threads;
+  eA_concurrency = num_oversubscribed_resources;
   eA.state = TCM_PERMIT_STATE_ACTIVE;
   eA.flags.rigid_concurrency = true;
-  reqA = make_request(0, total_number_of_threads);
+  reqA = make_request(0, num_oversubscribed_resources);
   reqA.flags.rigid_concurrency = true;
   r = tcmRequestPermit(clid, reqA, nullptr, &phA, &pA);
   if (!(check_success(r, "tcmRequestPermit for A (re-requesting 1)")
         && check_permit(eA, pA)))
     return test_fail(test_name);
 
-  reqA = make_request(2 * total_number_of_threads, 2 * total_number_of_threads);
+  reqA = make_request(2 * num_oversubscribed_resources, 2 * num_oversubscribed_resources);
   r = tcmRequestPermit(clid, reqA, nullptr, &phA, &pA);
   if (!(check(r == TCM_RESULT_ERROR_INVALID_ARGUMENT, "tcmRequestPermit for A (re-requesting 2)")
         && check_permit(eA, phA)))
     return test_fail(test_name);
 
-  tcm_permit_request_t reqB = make_request(total_number_of_threads, total_number_of_threads);
+  tcm_permit_request_t reqB = make_request(num_oversubscribed_resources, num_oversubscribed_resources);
   r = tcmRequestPermit(clid, reqB, nullptr, &phB, &pB);
   if (!(check_success(r, "tcmRequestPermit for B") && check_permit(eB, pB)))
     return test_fail(test_name);
@@ -153,14 +153,14 @@ bool test_thread_registration() {
   tcm_permit_handle_t ph{nullptr};
   uint32_t p_concurrency;
   tcm_permit_t p = make_void_permit(&p_concurrency);
-  uint32_t e_concurrency = total_number_of_threads;
+  uint32_t e_concurrency = num_oversubscribed_resources;
   tcm_permit_t e = make_active_permit(&e_concurrency);
 
   r = tcmRegisterThread(ph);
   if (!(check(r == TCM_RESULT_ERROR_UNKNOWN, "tcmRegisterThread for empty permit handle")))
     return test_fail(test_name);
 
-  tcm_permit_request_t req = make_request(0, total_number_of_threads);
+  tcm_permit_request_t req = make_request(0, num_oversubscribed_resources);
   r = tcmRequestPermit(clid, req, nullptr, &ph, &p);
   if (!(check_success(r, "tcmRequestPermit") && check_permit(e, p)))
     return test_fail(test_name);
@@ -253,10 +253,10 @@ bool test_allow_not_specifying_client_callback() {
   const int num_requests = 2;
   std::vector<tcm_permit_handle_t> handles(num_requests, nullptr);
   std::vector<tcm_permit_t> permits(2 * num_requests); // actual + expected
-  std::vector<uint32_t> permit_concurrencies = {0, 0, uint32_t(total_number_of_threads), 0};
+  std::vector<uint32_t> permit_concurrencies = {0, 0, uint32_t(num_oversubscribed_resources), 0};
   for (auto i = 0; i < num_requests; ++i) {
     tcm_permit_request_t req = TCM_PERMIT_REQUEST_INITIALIZER;
-    req.min_sw_threads = req.max_sw_threads = total_number_of_threads;
+    req.min_sw_threads = req.max_sw_threads = num_oversubscribed_resources;
     permits[i] = make_void_permit(&permit_concurrencies[i]);
     r = tcmRequestPermit(client_id, req, /*callback_arg*/nullptr, &handles[i], &permits[i]);
     if (!check_success(r, "tcmRequestPermit " + std::to_string(i)))
@@ -278,7 +278,7 @@ bool test_allow_not_specifying_client_callback() {
   if (!check_success(r, "tcmReleasePermit (active permit)"))
     return test_fail(test_name);
 
-  permit_concurrencies[num_requests+1] = uint32_t(total_number_of_threads);
+  permit_concurrencies[num_requests+1] = uint32_t(num_oversubscribed_resources);
   permits[num_requests+1] = make_active_permit(&permit_concurrencies[num_requests+1]);
   if (!check_permit(permits[num_requests+1], handles[1]))
     return test_fail(test_name);
@@ -330,6 +330,30 @@ bool test_requesting_zero_resources() {
   return test_epilog(test_name);
 }
 
+bool test_request_initialized_by_default() {
+  const char* test_name = "test_request_initialized_by_default";
+  test_prolog(test_name);
+
+  tcm_client_id_t client = connect_new_client();
+
+  auto req = make_request();
+
+  auto ph = request_permit(client, req, /*callback_arg*/nullptr);
+
+  auto actual_permit = get_permit_data<>(ph);
+
+  auto expected_permit = make_active_permit(/*expected_concurrency*/num_total_resources);
+
+  bool is_equal = check_permit(expected_permit, actual_permit);
+
+  // TODO: utilize RAII for release and disconnect
+  release_permit(ph, "Failed to release permit handle");
+
+  disconnect_client(client);
+
+  return test_stop(is_equal, test_name);
+}
+
 int main() {
   bool res = true;
 
@@ -339,8 +363,10 @@ int main() {
   res &= test_get_stale_permit();
   res &= test_default_constraints_construction();
   res &= test_request_initializer();
+
   res &= test_allow_not_specifying_client_callback();
   res &= test_requesting_zero_resources();
+  res &= test_request_initialized_by_default();
 
   return int(!res);
 }
