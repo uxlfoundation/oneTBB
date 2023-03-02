@@ -131,6 +131,61 @@ bool is_deactivating(const tcm_permit_state_t& curr_state, const tcm_permit_stat
  *******************************************************************************
  */
 
+int get_mask_concurrency(const tcm_cpu_mask_t& mask) {
+    __TCM_ASSERT(mask, "Existing mask is expected.");
+    int mc = hwloc_bitmap_weight(mask);
+    return mc;
+}
+
+float tcm_oversubscription_factor();
+
+int get_oversubscribed_mask_concurrency(const tcm_cpu_mask_t &mask,
+                                        float oversubscription_factor = tcm_oversubscription_factor())
+{
+    return int(get_mask_concurrency(mask) * oversubscription_factor);
+}
+
+
+bool sum_constraints_bounds(int32_t& sum_min, int32_t& sum_max, const tcm_permit_request_t& request)
+{
+    __TCM_ASSERT(request.cpu_constraints, "Nothing to sum up from.");
+    bool is_request_sane = true;
+    sum_min = sum_max = 0;
+    for (uint32_t i = 0; i < request.constraints_size; ++i) {
+        const tcm_cpu_constraints_t& c = request.cpu_constraints[i];
+        int32_t adjusted_min = 0;
+        if (c.min_concurrency != tcm_automatic) {
+            if (c.min_concurrency < 0) {
+                is_request_sane = false;
+                break;
+            }
+            adjusted_min = c.min_concurrency;
+        }
+        sum_min += adjusted_min;
+
+        int32_t adjusted_max = request.max_sw_threads;
+        if (c.max_concurrency != tcm_automatic) {
+            if (c.max_concurrency < 0) {
+                is_request_sane = false;
+                break;
+            }
+            adjusted_max = c.max_concurrency;
+        } else if (c.mask) {
+            const int32_t mask_concurrency = get_mask_concurrency(c.mask);
+            if (mask_concurrency > 0) {
+                adjusted_max = mask_concurrency;
+            }
+        }
+        sum_max += adjusted_max;
+
+        if (adjusted_max < adjusted_min) {
+            is_request_sane = false;
+            break;
+        }
+    }
+    return is_request_sane;
+}
+
 
 // Computes the currently used amount of resources by specified permit data
 uint32_t get_permit_grant(const tcm_permit_data_t& pd) {
@@ -156,7 +211,6 @@ void commit_permit_modification(tcm_permit_handle_t ph) {
     suppress_unused_warning(prev_epoch);
 }
 
-float tcm_oversubscription_factor();
 
 uint32_t hardware_concurrency() { return (uint32_t)std::thread::hardware_concurrency(); }
 
@@ -171,18 +225,6 @@ uint32_t platform_resources(unsigned int process_concurrency) {
 struct mask_deleter {
     void operator()(tcm_cpu_mask_t* mask_ptr) const { hwloc_bitmap_free(*mask_ptr); }
 };
-
-int get_mask_concurrency(const tcm_cpu_mask_t& mask) {
-    __TCM_ASSERT(mask, "Existing mask is expected.");
-    int mc = hwloc_bitmap_weight(mask);
-    return mc;
-}
-
-int get_oversubscribed_mask_concurrency(const tcm_cpu_mask_t &mask,
-                                        float oversubscription_factor = tcm_oversubscription_factor())
-{
-    return int(get_mask_concurrency(mask) * oversubscription_factor);
-}
 
 int32_t infer_constraint_min_concurrency(int32_t min_concurrency_value) {
     if (tcm_automatic == min_concurrency_value)
@@ -592,9 +634,9 @@ public:
     }
   }
 
-  void deduce_request_arguments(tcm_permit_request_t& request) {
+  void deduce_request_arguments(tcm_permit_request_t& request, const int32_t sum_constraints_min) {
     if (tcm_automatic == request.min_sw_threads) {
-      request.min_sw_threads = 0;
+      request.min_sw_threads = sum_constraints_min;
     }
 
     if (tcm_automatic == request.max_sw_threads) {
@@ -616,7 +658,7 @@ public:
 
   bool request_permit(tcm_client_id_t clid, tcm_permit_request_t& req,
                       void* callback_arg, tcm_permit_handle_t* permit_handle,
-                      tcm_permit_t* permit)
+                      tcm_permit_t* permit, const int32_t sum_constraints_min)
   {
     tracer t("ThreadComposabilityBase::request_permit");
 
@@ -663,7 +705,7 @@ public:
           available_concurrency += released;
       }
 
-      deduce_request_arguments(ph->request);
+      deduce_request_arguments(ph->request, sum_constraints_min);
 
       permit_to_callback_arg_map[ph] = callback_arg;
 
@@ -2041,9 +2083,10 @@ public:
 
   bool request_permit(tcm_client_id_t clid, tcm_permit_request_t& req,
                       void* callback_arg, tcm_permit_handle_t* permit_handle,
-                      tcm_permit_t* permit) {
+                      tcm_permit_t* permit, const int32_t sum_constraints_min) {
     internal::tracer t("ThreadComposability::request_permit");
-    return impl_->request_permit(clid, req, callback_arg, permit_handle, permit);
+    return impl_->request_permit(clid, req, callback_arg, permit_handle, permit,
+                                 sum_constraints_min);
   }
 
   tcm_result_t get_permit(tcm_permit_handle_t ph, tcm_permit_t* p) {
@@ -2090,7 +2133,7 @@ class theTCM {
   static internal::environment tcm_env;
 
 public:
-  static bool is_enabled() { 
+  static bool is_enabled() {
     return tcm_env.tcm_disable == 0;
   }
 
@@ -2204,43 +2247,22 @@ tcm_result_t tcmRequestPermit(tcm_client_id_t client_id,
   using tcm::theTCM;
   tcm::internal::tracer t("tcmRequestPermit");
 
-  int32_t sum_min = 0, sum_max = 0;
+  int32_t sum_min = 0, sum_max = request.max_sw_threads;
   if (request.cpu_constraints) {
     if (request.constraints_size <= 0)
       return TCM_RESULT_ERROR_INVALID_ARGUMENT;
 
-    for (uint32_t i = 0; i < request.constraints_size; ++i) {
-      const tcm_cpu_constraints_t& c = request.cpu_constraints[i];
-      int32_t adjusted_min = 0;
-      if (c.min_concurrency != tcm_automatic) {
-        if (c.min_concurrency < 0) {
-          return TCM_RESULT_ERROR_INVALID_ARGUMENT;
-        }
-        adjusted_min = c.min_concurrency;
-      }
-      sum_min += adjusted_min;
-
-      int32_t adjusted_max = 1024; // TODO: use process concurrency as the default
-      if (c.max_concurrency != tcm_automatic) {
-        if (c.max_concurrency < 0) {
-          return TCM_RESULT_ERROR_INVALID_ARGUMENT;
-        }
-        adjusted_max = c.max_concurrency;
-      } else if (c.mask) {
-        // TODO: handle infinitely set masks
-        adjusted_max = tcm::internal::get_mask_concurrency(c.mask);
-      }
-      sum_max += adjusted_max;
-
-      if (adjusted_max < adjusted_min)
-        return TCM_RESULT_ERROR_INVALID_ARGUMENT;
+    const bool is_request_sane = tcm::internal::sum_constraints_bounds(sum_min, sum_max, request);
+    if (!is_request_sane) {
+      return TCM_RESULT_ERROR_INVALID_ARGUMENT;
     }
   }
 
-  if (request.min_sw_threads != tcm_automatic && sum_min > request.min_sw_threads) {
+  if (request.min_sw_threads != tcm_automatic && request.min_sw_threads < sum_min) {
     return TCM_RESULT_ERROR_INVALID_ARGUMENT;
-  } else if (request.max_sw_threads != tcm_automatic &&
-             (request.max_sw_threads < 0 || (sum_max && sum_max < request.max_sw_threads))) {
+  } else if (request.max_sw_threads != tcm_automatic && request.max_sw_threads < 0) {
+    return TCM_RESULT_ERROR_INVALID_ARGUMENT;
+  } else if (request.max_sw_threads != tcm_automatic && sum_max < request.max_sw_threads) {
     return TCM_RESULT_ERROR_INVALID_ARGUMENT;
   } else if (request.max_sw_threads < request.min_sw_threads) {
     return TCM_RESULT_ERROR_INVALID_ARGUMENT;
@@ -2248,13 +2270,8 @@ tcm_result_t tcmRequestPermit(tcm_client_id_t client_id,
     return TCM_RESULT_ERROR_INVALID_ARGUMENT;
   }
 
-  // Even for default-initialized request parameters, the meaningful values can be inferred.
-
-  // request.min_sw_threads == automatic means zero if no constraints specified. Otherwise, the sum
-  // of minimum concurrencies in the constraints.
-
   auto& mgr = theTCM::instance();
-  bool result = mgr.request_permit(client_id, request, callback_arg, permit_handle, permit);
+  bool result = mgr.request_permit(client_id, request, callback_arg, permit_handle, permit, sum_min);
   return result? TCM_RESULT_SUCCESS : TCM_RESULT_ERROR_INVALID_ARGUMENT;
 }
 
