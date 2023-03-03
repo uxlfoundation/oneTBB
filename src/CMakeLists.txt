@@ -40,6 +40,11 @@ target_link_libraries(tcm
 )
 target_compile_definitions(tcm PUBLIC $<$<CONFIG:DEBUG>:TCM_DEBUG>)
 
+set_target_properties(tcm PROPERTIES
+  VERSION ${_tcm_ver_major}.${_tcm_ver_minor}.${_tcm_ver_patch}
+  SOVERSION ${_tcm_ver_major}
+)
+
 install(TARGETS tcm
   EXPORT ${PROJECT_NAME}Targets
   LIBRARY
