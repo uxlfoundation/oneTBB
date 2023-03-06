@@ -1126,7 +1126,6 @@ protected:
         __TCM_ASSERT(!constraint.mask, "Constraint mask must not exist.");
         __TCM_ASSERT(constraint.min_concurrency >= 0,
                      "Constraint's min_concurrency must be known.");
-        const uint32_t constraint_min = uint32_t(constraint.min_concurrency);
 
         int num_numa_nodes = 0, num_core_types = 0;
         int* numa_indices = nullptr; int* core_types_indices = nullptr;
@@ -1156,7 +1155,7 @@ protected:
                     constraint.max_concurrency, /*fallback_concurrency*/process_concurrency, pd_mask
                 );
 
-                __TCM_ASSERT(constraint_min <= constraint_max, "Broken concurrency in constraint");
+                __TCM_ASSERT(uint32_t(constraint.min_concurrency) <= constraint_max, "Broken concurrency in constraint");
 
                 negotiable_snapshot_t stakeholders = try_satisfy(ph, constraint.min_concurrency,
                                                                  constraint_max,
