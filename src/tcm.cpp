@@ -239,8 +239,8 @@ int32_t infer_constraint_min_concurrency(int32_t min_concurrency_value) {
     return min_concurrency_value;
 }
 
-int32_t infer_constraint_max_concurrency(int32_t max_concurrency_value,
-                                         uint32_t fallback_concurrency, const tcm_cpu_mask_t& mask)
+int32_t infer_constraint_max_concurrency(int32_t max_concurrency_value, uint32_t fallback_value,
+                                         const tcm_cpu_mask_t& mask)
 {
     if (tcm_automatic != max_concurrency_value) {
       __TCM_ASSERT(max_concurrency_value > 0,
@@ -253,7 +253,7 @@ int32_t infer_constraint_max_concurrency(int32_t max_concurrency_value,
       if (max_concurrency_value < 0) {
         // Fail to get the concurrency of the provided mask or the mask is inifinitely set, use
         // fallback value.
-        max_concurrency_value = fallback_concurrency;
+        max_concurrency_value = fallback_value;
       }
     }
 
@@ -651,12 +651,13 @@ public:
       tcm_cpu_constraints_t& c = request.cpu_constraints[i];
 
       c.min_concurrency = infer_constraint_min_concurrency(c.min_concurrency);
-      c.max_concurrency = infer_constraint_max_concurrency(c.max_concurrency, process_concurrency,
+      c.max_concurrency = infer_constraint_max_concurrency(c.max_concurrency,
+                                                           /*fallback_value*/process_concurrency,
                                                            c.mask);
     }
   }
 
-  bool request_permit(tcm_client_id_t clid, tcm_permit_request_t& req,
+  bool request_permit(tcm_client_id_t clid, const tcm_permit_request_t& req,
                       void* callback_arg, tcm_permit_handle_t* permit_handle,
                       tcm_permit_t* permit, const int32_t sum_constraints_min)
   {
@@ -926,8 +927,12 @@ protected:
                                       const tcm_cpu_constraints_t& constraint,
                                       const uint32_t current_concurrency, tcm_cpu_mask_t mask)
     {
+        __TCM_ASSERT(constraint.min_concurrency >= 0, "Cannot satisfy indefinite constraint.");
         const uint32_t constraint_min = constraint.min_concurrency;
+
+        __TCM_ASSERT(constraint.max_concurrency > 0, "Cannot satisfy indefinite constraint.");
         const uint32_t constraint_max = constraint.max_concurrency;
+
         return try_satisfy(ph, constraint_min, constraint_max, current_concurrency, mask);
     }
 
@@ -957,7 +962,6 @@ protected:
         uint32_t min_required = 0, max_desired = 0; // TODO: these are calculated but not
                                                     // used.
 
-        __TCM_ASSERT(constraint_max > 0, "Cannot satisfy indefinite constraint.");
         int available_min = constraint_max;  // holds the number of resources available immediately,
                                              // not requiring any negotiations
 
@@ -1126,6 +1130,7 @@ protected:
         __TCM_ASSERT(!constraint.mask, "Constraint mask must not exist.");
         __TCM_ASSERT(constraint.min_concurrency >= 0,
                      "Constraint's min_concurrency must be known.");
+        const uint32_t constraint_min = uint32_t(constraint.min_concurrency);
 
         int num_numa_nodes = 0, num_core_types = 0;
         int* numa_indices = nullptr; int* core_types_indices = nullptr;
@@ -1133,6 +1138,7 @@ protected:
                                                       &num_core_types, &core_types_indices);
 
         negotiable_snapshot_t result_snapshot;
+        int32_t result_max_concurrency = 0;
 
         if (constraint.numa_id == tcm_any) {
             bool is_desired_satisfied = false;
@@ -1151,14 +1157,13 @@ protected:
                 if ( hwloc_bitmap_iszero(pd_mask) )
                     continue;   // The result mask is empty, continue with the next numa node
 
-                uint32_t constraint_max = infer_constraint_max_concurrency(
-                    constraint.max_concurrency, /*fallback_concurrency*/process_concurrency, pd_mask
+                const uint32_t constraint_max = infer_constraint_max_concurrency(
+                    constraint.max_concurrency, /*fallback_value*/process_concurrency, pd_mask
                 );
 
-                __TCM_ASSERT(uint32_t(constraint.min_concurrency) <= constraint_max, "Broken concurrency in constraint");
+                __TCM_ASSERT(constraint_min <= constraint_max, "Broken concurrency in constraint");
 
-                negotiable_snapshot_t stakeholders = try_satisfy(ph, constraint.min_concurrency,
-                                                                 constraint_max,
+                negotiable_snapshot_t stakeholders = try_satisfy(ph, constraint_min, constraint_max,
                                                                  current_concurrency, pd_mask);
 
                 // TODO: move snapshot selection in separate function.
@@ -1175,17 +1180,20 @@ protected:
                         if (stakeholders.num_available() < result_snapshot.num_available()) {
                             // Found the mask with smaller availability
                             result_snapshot = stakeholders;
+                            result_max_concurrency = constraint_max;
                             hwloc_bitmap_copy(result_mask, pd_mask);
                         }
                     } else if (result_snapshot.num_immediately_available()
                                < stakeholders.num_immediately_available())
                     {
                         result_snapshot = stakeholders; // Found the mask with lesser negotiations
+                        result_max_concurrency = constraint_max;
                         hwloc_bitmap_copy(result_mask, pd_mask);
                     }
                 } else if (result_snapshot.num_available() < stakeholders.num_available()) {
                     is_desired_satisfied = constraint_max <= stakeholders.num_available();
                     result_snapshot = stakeholders;
+                    result_max_concurrency = constraint_max;
                     hwloc_bitmap_copy(result_mask, pd_mask);
                 }
             } // for each numa index
@@ -1195,8 +1203,24 @@ protected:
             topology.fill_constraints_affinity_mask(pd_mask, constraint.numa_id,
                                                     constraint.core_type_id,
                                                     constraint.threads_per_core);
-            result_snapshot = try_satisfy(ph, constraint, current_concurrency, pd_mask);
+
+            __TCM_ASSERT(!hwloc_bitmap_iszero(pd_mask),
+                         "Intersection of constraint masks filtered out compute resources.");
+
+            result_max_concurrency = infer_constraint_max_concurrency(
+              constraint.max_concurrency, /*fallback_value*/process_concurrency, pd_mask
+            );
+            __TCM_ASSERT(result_max_concurrency > 0, "Incorrect invariant.");
+            __TCM_ASSERT(constraint_min <= uint32_t(result_max_concurrency),
+                         "Broken concurrency in constraint");
+
+            result_snapshot = try_satisfy(ph, constraint_min, uint32_t(result_max_concurrency),
+                                          current_concurrency, pd_mask);
         }
+
+        int32_t& constraint_max_concurrency = const_cast<int32_t&>(constraint.max_concurrency);
+        __TCM_ASSERT(result_max_concurrency > 0, "Incorrect invariant.");
+        constraint_max_concurrency = result_max_concurrency;
 
         return result_snapshot;
     }
@@ -1231,10 +1255,15 @@ protected:
                 .load(std::memory_order_relaxed);
             if (constraint.mask) {
                 if (hwloc_bitmap_iszero(pd_mask)) {
-                    // Assigning the mask for the first time, it should not change
-                    // afterwards
+                    // Assigning the mask for the first time, it should not change afterwards
                     hwloc_bitmap_and(pd_mask, constraint.mask, process_mask);
                 }
+
+                int32_t& constraint_max = const_cast<int32_t&>(constraint.max_concurrency);
+                constraint_max = infer_constraint_max_concurrency(
+                    constraint_max, /*fallback_value*/process_concurrency, pd_mask
+                );
+
                 snapshot = try_satisfy(ph, constraint, current_concurrency, pd_mask);
             } else {
                 // assume hwloc_bitmap_copy works in case the same mask is passed as its
@@ -1277,7 +1306,7 @@ protected:
 
     // Distributes as max as possible of the desired concurrency
     fulfillment_t calculate_updates(const tcm_permit_request_t& req, tcm_permit_handle_t ph,
-                                   const stakeholder_cache& cache)
+                                    const stakeholder_cache& cache)
     {
         __TCM_ASSERT(0 <= req.max_sw_threads, "Maximum requested threads must be known.");
 
@@ -1489,7 +1518,7 @@ protected:
     //! Tries to meet the requested concurrency. Must be called under the data_mutex.
     //! Returns @fulfillment_t
     fulfillment_t try_satisfy_request(const tcm_permit_request_t& req, tcm_permit_handle_t ph,
-                                     uint32_t available_concurrency_snapshot)
+                                      uint32_t available_concurrency_snapshot)
     {
         // TODO: Determine whether permit can have dynamic flags, i.e. flags can be
         // changed during resource re-requesting. Otherwise, copying of flags seems

@@ -180,10 +180,10 @@ void measure_performance(std::size_t size, Benchmark benchmark) {
 
 int main() {
     std::size_t size = 100000000;
-    measure_performance(size, composable_parallel_for{});
-    measure_performance(size, two_tbb_parallel_for{});
     measure_performance(size, serial_parallel_for{});
-    measure_performance(size, tbb_arena_mix{});
-    measure_performance(size, composable_task_group{});
+    measure_performance(size, two_tbb_parallel_for{});
+    measure_performance(size, composable_parallel_for{});
     measure_performance(size, serial_task_group{});
+    measure_performance(size, composable_task_group{});
+    measure_performance(size, tbb_arena_mix{});
 }
