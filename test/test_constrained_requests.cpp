@@ -135,8 +135,7 @@ bool test_allow_mask_omitting_during_permit_copy(/*tcm_test::system_topology& tp
 
     r = tcmGetPermitData(ph, &p);
     eP.cpu_masks = &req.cpu_constraints->mask; // Expecting the requested mask
-    if (!(check_success(r, "tcmGetPermitData succeeded") && check_permit(eP, p),
-          "The copied mask is equal to the requested"))
+    if (!(check_success(r, "tcmGetPermitData succeeded") && check_permit(eP, p)))
         return test_fail(test_name);
 
     r = tcmReleasePermit(ph);

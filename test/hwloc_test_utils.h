@@ -60,7 +60,7 @@ class system_topology {
                        started,
                        topology_allocated,
                        topology_loaded,
-                       topology_parsed } initialization_state;
+                       topology_parsed } initialization_state{uninitialized};
 
     // Binding threads that locate in another Windows Processor groups
     // is allowed only if machine topology contains several Windows Processors groups
