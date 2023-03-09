@@ -1903,14 +1903,17 @@ protected:
         __TCM_ASSERT(pr.min_sw_threads >= 0, "Actual value of required concurrency is expected.");
         permit_change_t update {ph,
             /*required concurrency should have been satisfied by this time*/TCM_PERMIT_STATE_ACTIVE,
-            /*new_concurrencies[0] = */{unsigned(pr.min_sw_threads)}
+            /*new_concurrencies[0] = */{uint32_t(pr.min_sw_threads)}
         };
 
         // TODO: take account of the mask when computing allotment
         tcm_permit_data_t& pd = ph->data;
+        int32_t undistributed_concurrency = 0;
         if (pr.cpu_constraints) {
+            undistributed_concurrency = pr.min_sw_threads;
             for (uint32_t i = 0; i < pd.size; ++i) {
                 update.new_concurrencies[i] = pr.cpu_constraints[i].min_concurrency;
+                undistributed_concurrency -= pr.cpu_constraints[i].min_concurrency;
             }
         }
 
@@ -1924,6 +1927,7 @@ protected:
             __TCM_ASSERT(allotted <= distributed_concurrency, "Distributing more than available.");
         }
 
+        allotted += uint32_t(undistributed_concurrency);
         for (uint32_t i = 0; i < pd.size && allotted; ++i) {
             unsigned span = demand;
             if (pr.cpu_constraints) {

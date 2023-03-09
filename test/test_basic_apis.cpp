@@ -141,6 +141,65 @@ bool test_pending_state() {
   return test_epilog(test_name);
 }
 
+bool test_activate_pending_when_one_deactivates() {
+  const char* test_name = "test_activate_pending_when_one_deactivates";
+  test_prolog(test_name);
+
+  tcm_client_id_t clid;
+  tcm_result_t r = tcmConnect(nullptr, &clid);
+  if (!check_success(r, "tcmConnect"))
+    return test_fail(test_name);
+
+  tcm_permit_handle_t phA{nullptr}, phB{nullptr};
+  uint32_t pA_concurrency{0}, pB_concurrency{0};
+  uint32_t eA_concurrency{0}, eB_concurrency{0};
+  tcm_permit_t pA = make_void_permit(&pA_concurrency),
+               pB = make_void_permit(&pB_concurrency);
+  tcm_permit_t eA = make_active_permit(&eA_concurrency),
+               eB = make_pending_permit(&eB_concurrency);
+
+  tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+  tcm_permit_request_t reqA = make_request(1, num_oversubscribed_resources, &constraints, /*size*/1);
+  reqA.flags.rigid_concurrency = true;
+  eA_concurrency = num_oversubscribed_resources;
+  eA.flags.rigid_concurrency = true;
+  r = tcmRequestPermit(clid, reqA, nullptr, &phA, &pA);
+  if (!(check_success(r, "tcmRequestPermit for A") && check_permit(eA, pA)))
+    return test_fail(test_name);
+
+  tcm_permit_request_t reqB = make_request(1, num_oversubscribed_resources, &constraints, /*size*/1);
+  reqB.flags.rigid_concurrency = true;
+  eB.flags.rigid_concurrency = true;
+  r = tcmRequestPermit(clid, reqB, nullptr, &phB, &pB);
+  if (!(check_success(r, "tcmRequestPermit for B") && check_permit(eB, pB)))
+    return test_fail(test_name);
+
+  r = tcmDeactivatePermit(phA);
+  eA_concurrency = 0;
+  eA.state = TCM_PERMIT_STATE_INACTIVE;
+  if (!check_success(r, "tcmDeactivatePermit for A") && check_permit(eA, phA))
+    return test_fail(test_name);
+
+  eB_concurrency = num_oversubscribed_resources;
+  eB.state = TCM_PERMIT_STATE_ACTIVE;
+  if (!check_permit(eB, phB))
+    return test_fail(test_name);
+
+  r = tcmReleasePermit(phB);
+  if (!check_success(r, "tcmReleasePermit for B"))
+    return test_fail(test_name);
+
+  r = tcmReleasePermit(phA);
+  if (!check_success(r, "tcmReleasePermit for A"))
+    return test_fail(test_name);
+
+  r = tcmDisconnect(clid);
+  if (!check_success(r, "tcmDisconnect"))
+    return test_fail(test_name);
+
+  return test_epilog(test_name);
+}
+
 bool test_thread_registration() {
   const char* test_name = "test_thread_registration";
   test_prolog(test_name);
@@ -243,6 +302,7 @@ static_assert(sizeof(tcm_callback_flags_t) == 4, "The callback flags type has wr
 
 bool test_allow_not_specifying_client_callback() {
   const char* test_name = "test_allow_not_specifying_client_callback";
+  test_prolog(test_name);
 
   tcm_client_id_t client_id;
 
@@ -359,6 +419,7 @@ int main() {
 
   res &= test_state_functions();
   res &= test_pending_state();
+  res &= test_activate_pending_when_one_deactivates();
   res &= test_thread_registration();
   res &= test_get_stale_permit();
   res &= test_default_constraints_construction();
