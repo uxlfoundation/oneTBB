@@ -29,17 +29,20 @@
                     __TCM_TO_STR(TCM_VERSION_PATCH)     \
                     __TCM_VERSION_SUFFIX
 
-#define __TCM_VERSION_NUMBER "TCM: VERSION\t\t\t\t" TCM_VERSION ENDL
+#define __TCM_VERSION_NUMBER \
+    "TCM: VERSION                            " TCM_VERSION ENDL
+#define __TCM_INTERFACE_VERSION_NUMBER \
+    "TCM: INTERFACE VERSION                  " __TCM_TO_STR(TCM_INTERFACE_VERSION) ENDL
 
 #ifndef TCM_DEBUG
-    #define __TCM_DEBUG      "TCM: TCM_DEBUG\t\t\t\tundefined" ENDL
+    #define __TCM_DEBUG_STRING "undefined"
 #else
-    #define __TCM_DEBUG      "TCM: TCM_DEBUG\t\t\t\tset" ENDL
+    #define __TCM_DEBUG_STRING "set"
 #endif
 
 #define TCM_PRINT_VERSION \
     __TCM_VERSION_NUMBER  \
-    __TCM_DEBUG
+    __TCM_INTERFACE_VERSION_NUMBER
 
 #ifdef __cplusplus
 extern "C" {

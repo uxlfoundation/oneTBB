@@ -2178,6 +2178,10 @@ public:
     tcm_ptr = new ThreadComposabilityManager(tcm_env);
   }
 
+  static internal::environment& get_tcm_env() {
+    return tcm_env;
+  }
+
   static ThreadComposabilityManager& instance() {
     __TCM_ASSERT(tcm_ptr != nullptr, "Access to uninitialized resource manager.");
     return *tcm_ptr;
@@ -2443,6 +2447,26 @@ tcm_result_t tcmUnregisterThread() {
 
   auto& mgr = theTCM::instance();
   return mgr.unregister_thread();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Provides TCM meta information for clients into provided character buffer
+///
+/// @returns
+///     - ::TCM_RESULT_SUCCESS
+///     - ::TCM_RESULT_ERROR_INVALID_ARGUMENT
+///     - ::TCM_RESULT_ERROR_UNKNOWN
+tcm_result_t tcmGetVersionInfo(char* buffer, uint32_t buffer_size) {
+  if (!buffer) {
+    return TCM_RESULT_ERROR_INVALID_ARGUMENT;
+  }
+
+  int result = tcm::internal::environment::get_version_string(tcm::theTCM::get_tcm_env(), buffer, buffer_size);
+  if (result < 0) {
+    return TCM_RESULT_ERROR_UNKNOWN;
+  }
+
+  return TCM_RESULT_SUCCESS;
 }
 
 }
