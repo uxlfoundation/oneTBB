@@ -114,7 +114,7 @@ bool test_allow_mask_omitting_during_permit_copy(/*tcm_test::system_topology& tp
     tcm_permit_t p = make_void_permit(&p_concurrency);
 
     // since constraint's max_concurrency will be inferred to the mask concurrency during the request
-    uint32_t e_concurrency = hwloc_bitmap_weight(constraints.mask);
+    uint32_t e_concurrency = get_mask_oversubscribed_concurrency(constraints.mask);
     tcm_permit_t eP = make_active_permit(&e_concurrency);
     r = tcmRequestPermit(client_id, req, /*callback_arg*/nullptr, &ph, &p);
     if (!(check_success(r, "tcmRequestPermit succeeded") && check_permit(eP, p) &&

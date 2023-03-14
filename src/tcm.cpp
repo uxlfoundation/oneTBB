@@ -249,7 +249,10 @@ int32_t infer_constraint_max_concurrency(int32_t max_concurrency_value, uint32_t
     }
 
     if (mask) {
-      max_concurrency_value = get_mask_concurrency(mask);
+      // Use oversubscribed mask concurrency to avoid inability to allocate maximum requested
+      // resources within the given mask
+      max_concurrency_value = get_oversubscribed_mask_concurrency(mask);
+
       if (max_concurrency_value < 0) {
         // Fail to get the concurrency of the provided mask or the mask is inifinitely set, use
         // fallback value.

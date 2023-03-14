@@ -195,6 +195,10 @@ const int32_t num_oversubscribed_resources = []() {
     return platform_resources_oversubscribed(tp);
 }();
 
+int32_t get_mask_oversubscribed_concurrency(tcm_cpu_mask_t mask) {
+  return int32_t(tcm_oversubscription_factor * hwloc_bitmap_weight(mask));
+}
+
 bool check_permit_size(const tcm_permit_t& expected, const tcm_permit_t& actual,
                        const bool report = true)
 {
