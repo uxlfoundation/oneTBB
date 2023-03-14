@@ -716,7 +716,7 @@ bool test_rigid_concurrency_permit() {
   uint32_t pA_concurrency{0}, eA_concurrency = uint32_t(num_oversubscribed_resources / 2);
 
   tcm_permit_t pA = make_void_permit(&pA_concurrency),
-                eA = make_active_permit(&eA_concurrency);
+               eA = make_active_permit(&eA_concurrency);
 
   tcm_permit_request_t rA = make_request(num_oversubscribed_resources/4, (int32_t)eA_concurrency);
 
@@ -728,7 +728,7 @@ bool test_rigid_concurrency_permit() {
   // Request that shouldn't be renegotiated in active state
   tcm_permit_flags_t rigid_concurrency_flags{};
   rigid_concurrency_flags.rigid_concurrency = true;
-  tcm_permit_request_t rS = make_request(0, num_oversubscribed_resources, /*constraints*/nullptr,
+  tcm_permit_request_t rS = make_request(1, num_oversubscribed_resources, /*constraints*/nullptr,
                                           /*size*/0, TCM_REQUEST_PRIORITY_NORMAL,
                                           rigid_concurrency_flags);
 
@@ -740,17 +740,16 @@ bool test_rigid_concurrency_permit() {
   eS.flags = rigid_concurrency_flags;
 
   r = tcmRequestPermit(clid, rS, &phS, &phS, &pS);
-  if (!(check_success(r, "tcmRequestPermit static") &&
-        check_permit(eA, phA) && check_permit(eS, pS)))
+  if (!(check_success(r, "tcmRequestPermit (rigid concurrency)") && check_permit(eA, phA) &&
+        check_permit(eS, pS)))
   {
     tcmReleasePermit(phA);
     tcmReleasePermit(phS);
     return clear_state();
   }
 
-  check(is_callback_invoked, "Check renegotiation for the regular permit.");
-
-  is_callback_invoked = false;
+  if (!check(!is_callback_invoked, "Renegotiation for the regular permit did not happen"))
+    return test_fail(test_name);
 
   r = tcmReleasePermit(phA);
   if (!check_success(r, "tcmReleasePermit regular")) {
@@ -758,8 +757,8 @@ bool test_rigid_concurrency_permit() {
     return clear_state();
   }
 
-  if (!check(!is_callback_invoked, "Check rigid concurrency permit does not participate"
-             " in the renegotiation while in active state."))
+  if (!check(!is_callback_invoked, "Rigid concurrency permit did not participate in the "
+             "renegotiation while in active state"))
   {
     tcmReleasePermit(phS);
     return clear_state();
@@ -767,7 +766,7 @@ bool test_rigid_concurrency_permit() {
 
   r = tcmIdlePermit(phS);
   eS.state = TCM_PERMIT_STATE_IDLE;
-  if (!(check_success(r, "tcmIdlePermit static") && check_permit(eS, phS) &&
+  if (!(check_success(r, "tcmIdlePermit (rigid concurrency)") && check_permit(eS, phS) &&
       check(!is_callback_invoked, "Callback not invoked for the rigid concurrency permit that "
             "switched to the idle state.")))
   {
