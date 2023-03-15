@@ -104,8 +104,7 @@ bool test_allow_mask_omitting_during_permit_copy(/*tcm_test::system_topology& tp
 
     tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
     std::unique_ptr<tcm_cpu_mask_t, mask_deleter> req_mask_guard(&constraints.mask);
-    constraints.mask = hwloc_bitmap_alloc();
-    hwloc_bitmap_set(constraints.mask, 1);
+    constraints.mask = first_core_mask{}();
     auto req = make_request(tcm_automatic, tcm_automatic, &constraints, /*size*/1);
 
     tcm_permit_handle_t ph{nullptr};

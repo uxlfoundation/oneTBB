@@ -12,6 +12,7 @@ set(TCM_WARNING_SUPPRESS /wd6011 /wd26812)
 
 set(TCM_LIB_COMPILE_FLAGS -D_CRT_SECURE_NO_WARNINGS /GS)
 set(TCM_COMMON_COMPILE_FLAGS /volatile:iso /FS /EHsc)
+set(TCM_COMMON_LINK_LIBS Kernel32.lib)
 
 # prevent Windows.h from adding unnecessary includes
 # prevent Windows.h from definiting mix/max as macros

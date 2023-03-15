@@ -19,6 +19,7 @@
 #endif
 #include <hwloc.h>
 #if _WIN32 || _WIN64
+#include <winbase.h>
 #include <hwloc/windows.h>      // for hwloc_windows_get_nr_processor_groups
 #endif
 #if _MSC_VER && !__INTEL_COMPILER && !__clang__
@@ -76,6 +77,11 @@ private:
         if ( hwloc_topology_init( &topology ) == 0 ) {
             initialization_state = topology_allocated;
 
+            auto parsing_flags = HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM |
+            HWLOC_TOPOLOGY_FLAG_RESTRICT_TO_CPUBINDING;
+            if (get_num_proc_groups() == 1 && hwloc_topology_set_flags(topology, parsing_flags) != 0) {
+                return;
+            }
             if ( hwloc_topology_load( topology ) == 0 ) {
                 initialization_state = topology_loaded;
             }
@@ -220,6 +226,14 @@ private:
 #if HWLOC_API_VERSION >= 0x20500
         auto some_core = hwloc_get_next_obj_by_type(topology, HWLOC_OBJ_CORE, nullptr);
         hwloc_get_obj_with_same_locality(topology, some_core, HWLOC_OBJ_CORE, nullptr, nullptr, 0);
+#endif
+    }
+
+    uint32_t get_num_proc_groups() {
+#if _WIN32||_WIN64
+    return GetActiveProcessorGroupCount();
+#else
+    return 1;
 #endif
     }
 

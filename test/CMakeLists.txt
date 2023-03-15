@@ -34,7 +34,11 @@ function(add_tcm_test)
   )
   target_compile_definitions(${_tcm_test_NAME} PRIVATE ${TCM_COMPILE_DEFINITIONS})
 
-  target_link_libraries(${_tcm_test_NAME} PUBLIC TCM::tcm HWLOC::hwloc ${_tcm_test_DEPENDENCIES})
+  target_link_libraries(${_tcm_test_NAME} PUBLIC 
+    TCM::tcm HWLOC::hwloc 
+    ${_tcm_test_DEPENDENCIES}
+    ${TCM_COMMON_LINK_LIBS}
+  )
   add_test(NAME ${_tcm_test_NAME} COMMAND ${_tcm_test_NAME} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
   set_tests_properties(${_tcm_test_NAME} PROPERTIES ENVIRONMENT "${_tcm_test_ENVIRONMENT}")
