@@ -620,6 +620,7 @@ public:
 
   void copy_request_without_masks(tcm_permit_request_t& to, const tcm_permit_request_t& from) {
     tcm_cpu_constraints_t* internal_cpu_constraints = to.cpu_constraints;
+    __TCM_ASSERT(to.constraints_size == from.constraints_size, "Constraints sizes are different.");
     to = from;
     to.cpu_constraints = internal_cpu_constraints; // Restore the pointer to TCM's memory
 
@@ -2295,6 +2296,8 @@ tcm_result_t tcmRequestPermit(tcm_client_id_t client_id,
     if (!is_request_sane) {
       return TCM_RESULT_ERROR_INVALID_ARGUMENT;
     }
+  } else if (request.constraints_size != 0) {
+    return TCM_RESULT_ERROR_INVALID_ARGUMENT;
   }
 
   if (request.min_sw_threads != tcm_automatic && request.min_sw_threads < sum_min) {

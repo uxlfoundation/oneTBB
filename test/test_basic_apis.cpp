@@ -414,6 +414,43 @@ bool test_request_initialized_by_default() {
   return test_stop(is_equal, test_name);
 }
 
+bool test_incorrect_requests() {
+  const char* test_name = "test_incorrect_requests";
+  test_prolog(test_name);
+
+  tcm_client_id_t client = connect_new_client();
+
+  { // request with incorrect size
+    tcm_cpu_constraints_t* dummy_constraints = reinterpret_cast<tcm_cpu_constraints_t*>(0xABCDEFED);
+    auto req = make_request();
+    req.cpu_constraints = dummy_constraints;
+    tcm_permit_handle_t ph{nullptr};
+    auto r = tcmRequestPermit(client, req, /*callback_arg*/nullptr, &ph, /*permit*/nullptr);
+    if (!check(r == TCM_RESULT_ERROR_INVALID_ARGUMENT,
+               "Request with constraints but zero size returned wrong status"))
+    {
+      return test_fail(test_name);
+    }
+  }
+
+  { // re-request with incorrect size
+    auto req = make_request();
+    auto ph = request_permit(client, req, /*callback_arg*/nullptr);
+    req.constraints_size = 1;
+    auto r = tcmRequestPermit(client, req, /*callback_arg*/nullptr, &ph, /*permit*/nullptr);
+    if (!check(r == TCM_RESULT_ERROR_INVALID_ARGUMENT,
+               "Re-request with incorrect constraints size returned wrong status")) {
+      return test_fail(test_name);
+    }
+    // TODO: utilize RAII for release and disconnect
+    release_permit(ph, "Failed to release permit handle");
+  }
+
+  disconnect_client(client);
+
+  return test_epilog(test_name);
+}
+
 int main() {
   bool res = true;
 
@@ -428,6 +465,8 @@ int main() {
   res &= test_allow_not_specifying_client_callback();
   res &= test_requesting_zero_resources();
   res &= test_request_initialized_by_default();
+
+  res &= test_incorrect_requests();
 
   return int(!res);
 }
