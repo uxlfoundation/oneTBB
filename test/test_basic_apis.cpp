@@ -6,8 +6,7 @@
 
 #include "tcm.h"
 
-#include <iostream>
-#include <string>
+#include <cstdint>
 
 bool test_state_functions() {
   const char* test_name = "test_state_functions";
@@ -158,8 +157,7 @@ bool test_activate_pending_when_one_deactivates() {
   tcm_permit_t eA = make_active_permit(&eA_concurrency),
                eB = make_pending_permit(&eB_concurrency);
 
-  tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
-  tcm_permit_request_t reqA = make_request(1, num_oversubscribed_resources, &constraints, /*size*/1);
+  tcm_permit_request_t reqA = make_request(1, num_oversubscribed_resources);
   reqA.flags.rigid_concurrency = true;
   eA_concurrency = num_oversubscribed_resources;
   eA.flags.rigid_concurrency = true;
@@ -167,7 +165,7 @@ bool test_activate_pending_when_one_deactivates() {
   if (!(check_success(r, "tcmRequestPermit for A") && check_permit(eA, pA)))
     return test_fail(test_name);
 
-  tcm_permit_request_t reqB = make_request(1, num_oversubscribed_resources, &constraints, /*size*/1);
+  tcm_permit_request_t reqB = make_request(1, num_oversubscribed_resources);
   reqB.flags.rigid_concurrency = true;
   eB.flags.rigid_concurrency = true;
   r = tcmRequestPermit(clid, reqB, nullptr, &phB, &pB);
@@ -420,14 +418,38 @@ bool test_incorrect_requests() {
 
   tcm_client_id_t client = connect_new_client();
 
-  { // request with incorrect size
-    tcm_cpu_constraints_t* dummy_constraints = reinterpret_cast<tcm_cpu_constraints_t*>(0xABCDEFED);
-    auto req = make_request();
-    req.cpu_constraints = dummy_constraints;
+  { // default request with default constraints
+    tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+    auto req = make_request(tcm_automatic, tcm_automatic, &constraints, /*size*/1);
     tcm_permit_handle_t ph{nullptr};
     auto r = tcmRequestPermit(client, req, /*callback_arg*/nullptr, &ph, /*permit*/nullptr);
     if (!check(r == TCM_RESULT_ERROR_INVALID_ARGUMENT,
-               "Request with constraints but zero size returned wrong status"))
+               "Default request with default constraints returned invalid argument status"))
+    {
+      return test_fail(test_name);
+    }
+  }
+
+  { // meaningful request with non-meaningful constraints
+    tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+    auto req = make_request(tcm_automatic, num_total_resources, &constraints, /*size*/1);
+    tcm_permit_handle_t ph{nullptr};
+    auto r = tcmRequestPermit(client, req, /*callback_arg*/nullptr, &ph, /*permit*/nullptr);
+    if (!check(r == TCM_RESULT_ERROR_INVALID_ARGUMENT,
+               "Request with non-meaningful constraints returned invalid argument status"))
+    {
+      return test_fail(test_name);
+    }
+  }
+
+  { // request with incorrect constraints size
+    auto req = make_request(tcm_automatic, tcm_automatic, /*constraints*/nullptr, /*size*/0);
+    std::uintptr_t dummy_constraints = 0xABCDEFED;
+    req.cpu_constraints = (tcm_cpu_constraints_t*)dummy_constraints;
+    tcm_permit_handle_t ph{nullptr};
+    auto r = tcmRequestPermit(client, req, /*callback_arg*/nullptr, &ph, /*permit*/nullptr);
+    if (!check(r == TCM_RESULT_ERROR_INVALID_ARGUMENT,
+               "Request with constraints but zero size returned invalid argument status"))
     {
       return test_fail(test_name);
     }
@@ -436,10 +458,10 @@ bool test_incorrect_requests() {
   { // re-request with incorrect size
     auto req = make_request();
     auto ph = request_permit(client, req, /*callback_arg*/nullptr);
-    req.constraints_size = 1;
+    req.constraints_size = 1;             // new size for constraints
     auto r = tcmRequestPermit(client, req, /*callback_arg*/nullptr, &ph, /*permit*/nullptr);
     if (!check(r == TCM_RESULT_ERROR_INVALID_ARGUMENT,
-               "Re-request with incorrect constraints size returned wrong status")) {
+               "Re-request with incorrect constraints size returned invalid argument status")) {
       return test_fail(test_name);
     }
     // TODO: utilize RAII for release and disconnect

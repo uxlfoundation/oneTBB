@@ -175,6 +175,12 @@ bool sum_constraints_bounds(int32_t& sum_min, int32_t& sum_max, const tcm_permit
             if (mask_concurrency > 0) {
                 adjusted_max = mask_concurrency;
             }
+        } else if (tcm_automatic == c.numa_id && tcm_automatic == c.core_type_id &&
+                   tcm_automatic == c.threads_per_core)
+        {
+          // Neither low-level nor high-level constraints specified
+          is_request_sane = false;
+          break;
         }
         sum_max += adjusted_max;
 
