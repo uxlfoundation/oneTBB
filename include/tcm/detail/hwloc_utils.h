@@ -81,7 +81,7 @@ public:
 
 private:
     uint32_t get_num_proc_groups() {
-#if _WIN32||_WIN64
+#if _WIN32 || _WIN64
     return GetActiveProcessorGroupCount();
 #else
     return 1;

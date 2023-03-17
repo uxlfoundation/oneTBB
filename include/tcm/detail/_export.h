@@ -5,7 +5,7 @@
 #ifndef __TCM_EXPORT_HEADER
 #define __TCM_EXPORT_HEADER
 
-#if WIN32
+#if _WIN32 || _WIN64
   #define __TCM_EXPORT __declspec(dllexport)
 #else
   #define __TCM_EXPORT
