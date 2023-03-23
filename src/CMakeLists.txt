@@ -43,6 +43,8 @@ target_compile_definitions(tcm PUBLIC $<$<CONFIG:DEBUG>:TCM_DEBUG>)
 set_target_properties(tcm PROPERTIES
   VERSION ${_tcm_ver_major}.${_tcm_ver_minor}.${_tcm_ver_patch}
   SOVERSION ${_tcm_ver_major}
+  CXX_VISIBILITY_PRESET hidden
+  VISIBILITY_INLINES_HIDDEN ON
 )
 
 install(TARGETS tcm

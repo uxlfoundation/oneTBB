@@ -8,7 +8,7 @@
 #if _WIN32 || _WIN64
   #define __TCM_EXPORT __declspec(dllexport)
 #else
-  #define __TCM_EXPORT
+  #define __TCM_EXPORT __attribute__((visibility("default")))
 #endif
 
 #endif // __EXPORT_HEADER
