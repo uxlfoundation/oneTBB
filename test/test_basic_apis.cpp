@@ -392,24 +392,29 @@ bool test_request_initialized_by_default() {
   const char* test_name = "test_request_initialized_by_default";
   test_prolog(test_name);
 
-  tcm_client_id_t client = connect_new_client();
+  bool test_succeeded = false;
+  try {
+      tcm_client_id_t client = connect_new_client();
 
-  auto req = make_request();
+      auto req = make_request();
 
-  auto ph = request_permit(client, req, /*callback_arg*/nullptr);
+      auto ph = request_permit(client, req, /*callback_arg*/nullptr);
 
-  auto actual_permit = get_permit_data<>(ph);
+      auto actual_permit = get_permit_data<>(ph);
 
-  auto expected_permit = make_active_permit(/*expected_concurrency*/num_total_resources);
+      auto expected_permit = make_active_permit(/*expected_concurrency*/num_total_resources);
 
-  bool is_equal = check_permit(expected_permit, actual_permit);
+      test_succeeded = check_permit(expected_permit, actual_permit);
 
-  // TODO: utilize RAII for release and disconnect
-  release_permit(ph, "Failed to release permit handle");
+      // TODO: utilize RAII for release and disconnect
+      release_permit(ph, "Failed to release permit handle");
 
-  disconnect_client(client);
+      disconnect_client(client);
+  } catch (const tcm_exception& e) {
+      test_succeeded = check(false, "Exception thrown: ", e.what());
+  }
 
-  return test_stop(is_equal, test_name);
+  return test_stop(test_succeeded, test_name);
 }
 
 bool test_incorrect_requests() {
