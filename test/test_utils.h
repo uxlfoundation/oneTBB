@@ -30,6 +30,8 @@ __TCM_SUPPRESS_WARNING_POP
 #include <thread>
 #include <string>
 #include <limits>
+#include <initializer_list>
+#include <utility>
 
 // MSVC Warning: Args can be incorrect: this does not match function name specification
 __TCM_SUPPRESS_WARNING_WITH_PUSH(6387)
@@ -125,9 +127,9 @@ std::string bitmap_to_string(const tcm_cpu_mask_t mask) {
 }
 
 std::string to_string(const tcm_permit_flags_t flags) {
-  return std::string("flags: stale=" + std::to_string(flags.stale) +
+  return std::string("stale=" + std::to_string(flags.stale) +
                      ", rigid_concurrecy=" + std::to_string(flags.rigid_concurrency) +
-                     ", excluisive=" + std::to_string(flags.exclusive));
+                     ", exclusive=" + std::to_string(flags.exclusive));
 }
 
 bool check(bool b, const std::string& msg, const std::string& report_msg = "") {
@@ -203,8 +205,13 @@ const int32_t num_oversubscribed_resources = []() {
     return platform_resources_oversubscribed(tp);
 }();
 
+
+int32_t get_mask_concurrency(tcm_cpu_mask_t mask) {
+  return hwloc_bitmap_weight(mask);
+}
+
 int32_t get_mask_oversubscribed_concurrency(tcm_cpu_mask_t mask) {
-  return int32_t(tcm_oversubscription_factor * hwloc_bitmap_weight(mask));
+  return int32_t(tcm_oversubscription_factor * get_mask_concurrency(mask));
 }
 
 bool check_permit_size(const tcm_permit_t& expected, const tcm_permit_t& actual,
@@ -248,7 +255,7 @@ bool check_permit_mask(const tcm_permit_t& expected, const tcm_permit_t& actual,
   std::string report_str{};
   // check the cpu_masks pointers
   if (expected.cpu_masks == nullptr && actual.cpu_masks == nullptr) {
-    return true;
+    return check(true, "Both masks are null pointers");
   } else if (expected.cpu_masks == nullptr || actual.cpu_masks == nullptr) {
     report_str = "Check CPU mask, expected cpu_masks pointer '" +
         std::to_string(uintptr_t(expected.cpu_masks)) + "' equals to actual cpu_masks pointer '" +
@@ -256,26 +263,27 @@ bool check_permit_mask(const tcm_permit_t& expected, const tcm_permit_t& actual,
     return report ? check(false, report_str) : false;
   }
 
-  bool result = false;
+  bool result = true;
   for (unsigned i = 0; i < expected.size; ++i) {
     // check the cpu_masks values
     const auto& e = expected.cpu_masks[i]; const auto& a = actual.cpu_masks[i];
 
     if (e && a) {
-      result = (hwloc_bitmap_compare(e, a) == 0);
-      // TODO: print not only the wrong element, but the whole range
+      result &= (hwloc_bitmap_compare(e, a) == 0);
       report_str = "Check CPU mask, expected '" + bitmap_to_string(e) +
         "' equals to actual '" + bitmap_to_string(a) + "', mask index " + std::to_string(i);
     } else {
-      result = (a == nullptr);
+      result &= (a == nullptr);
       report_str = "Check CPU mask is not nullptr: actual '" +  bitmap_to_string(a) +
         "', index " + std::to_string(i);
     }
 
-    if (!result) break;
+    if (report) {
+        result &= check(result, report_str);
+    }
   }
 
-  return report ? check(result, report_str) : result;
+  return result;
 }
 
 static const char* states[] = {
@@ -303,7 +311,8 @@ bool check_permit_flags(const tcm_permit_t& expected, const tcm_permit_t& actual
   result &= e.rigid_concurrency == a.rigid_concurrency;
   result &= e.exclusive == a.exclusive;
 
-  std::string report_str("Check expectation of " + to_string(e) + " equals to actual " + to_string(a));
+  std::string report_str("Check flags, expected: " + to_string(e) +
+                         " equals to actual: " + to_string(a));
 
   return report ? check(result, report_str) : result;
 }
@@ -359,6 +368,32 @@ bool check_permit(const tcm_permit_t& expected, tcm_permit_handle_t ph,
   return result;
 }
 
+typedef std::pair<const tcm_permit_t&, const tcm_permit_t&> tcm_permits_pair_t;
+
+bool check_permits(std::initializer_list<tcm_permits_pair_t> expected_and_actual_permit_pairs,
+                   const skip_checks_t skip = {}, const bool report = true)
+{
+    bool result = true;
+    for (const auto& pair : expected_and_actual_permit_pairs) {
+        const auto& expected = pair.first; const auto& actual = pair.second;
+        result &= check_permit(expected, actual, skip, report);
+    }
+    return result;
+}
+
+typedef std::pair<const tcm_permit_t&, tcm_permit_handle_t&> tcm_permit_and_handle_pair_t;
+
+bool check_permits(std::initializer_list<tcm_permit_and_handle_pair_t> expected_and_actual_permit_pairs,
+                   const skip_checks_t skip = {}, const bool report = true)
+{
+    bool result = true;
+    for (const auto& pair : expected_and_actual_permit_pairs) {
+        const auto& expected = pair.first; auto& permit_handle = pair.second;
+        result &= check_permit(expected, permit_handle, skip, report);
+    }
+    return result;
+}
+
 /*
  * Test helpers to simplify regular work with the TCM.
  */
@@ -395,6 +430,13 @@ tcm_permit_handle_t request_permit(tcm_client_id_t client, tcm_permit_request_t 
   return permit_handle;
 }
 
+void idle_permit(tcm_permit_handle_t permit_handle, const char* error_message = nullptr) {
+  auto r = tcmIdlePermit(permit_handle);
+  if (!check_success(r, "tcmIdlePermit")) {
+    throw tcm_idle_permit_error(error_message);
+  }
+}
+
 void release_permit(tcm_permit_handle_t ph, const char* error_message = nullptr) {
   auto r = tcmReleasePermit(ph);
 
@@ -406,22 +448,28 @@ void release_permit(tcm_permit_handle_t ph, const char* error_message = nullptr)
 template <int size = 1>
 class permit_t {
 public:
-  permit_t(bool allocate_mask = false)
-    : cpu_masks(allocate_mask? new tcm_cpu_mask_t[size]{hwloc_bitmap_alloc()} : nullptr,
-                masks_guard_t(size)) {}
+    permit_t(bool allocate_mask = false)
+        : concurrencies(new uint32_t[size]{0}),
+          cpu_masks(allocate_mask? new tcm_cpu_mask_t[size]{hwloc_bitmap_alloc()} : nullptr,
+                    masks_guard_t(size)),
+          permit{
+              concurrencies.get(), cpu_masks.get(), size, TCM_PERMIT_STATE_VOID,
+              tcm_permit_flags_t{}
+          }
+    {}
 
-  operator tcm_permit_t() { return make_permit(concurrency, cpu_masks.get(), size); }
+    operator tcm_permit_t&() { return permit; }
 private:
-  uint32_t concurrency[size]{0};
-  std::unique_ptr<tcm_cpu_mask_t[], masks_guard_t> cpu_masks{nullptr, masks_guard_t(size)};
-  tcm_permit_flags_t flags{};
+    std::unique_ptr<uint32_t[]> concurrencies;
+    std::unique_ptr<tcm_cpu_mask_t[], masks_guard_t> cpu_masks;
+    tcm_permit_t permit;
 };
 
 template <int size = 1>
 permit_t<size> get_permit_data(tcm_permit_handle_t ph, const char* error_message = nullptr) {
   // TODO: propagate 'allocate_mask' flag to the permit_t class
   permit_t<size> permit_wrapper;
-  tcm_permit_t permit = permit_wrapper;
+  tcm_permit_t& permit = permit_wrapper;
 
   auto r = tcmGetPermitData(ph, &permit);
   if (!check_success(r, "tcmGetPermitData")) {
@@ -437,12 +485,23 @@ permit_t</*size*/1> make_active_permit(uint32_t expected_concurrency,
 {
   const bool allocate_mask = bool(cpu_masks);
   permit_t</*size*/1> permit_wrapper(allocate_mask);
-  tcm_permit_t permit = permit_wrapper;
+  tcm_permit_t& permit = permit_wrapper;
   permit.concurrencies[0] = expected_concurrency;
+  permit.state = TCM_PERMIT_STATE_ACTIVE;
   permit.flags = flags;
   return permit_wrapper;
 }
 
+permit_t</*size*/1> make_inactive_permit(tcm_cpu_mask_t* cpu_masks = nullptr,
+                                         tcm_permit_flags_t flags = {})
+{
+  const bool allocate_mask = bool(cpu_masks);
+  permit_t</*size*/1> permit_wrapper(allocate_mask);
+  tcm_permit_t& permit = permit_wrapper;
+  permit.state = TCM_PERMIT_STATE_INACTIVE;
+  permit.flags = flags;
+  return permit_wrapper;
+}
 
 typedef std::vector< std::pair<tcm_permit_handle_t*, tcm_permit_t*> > permits_data_t;
 

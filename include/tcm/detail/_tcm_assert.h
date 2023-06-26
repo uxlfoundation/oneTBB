@@ -10,7 +10,10 @@
     warranties, other than those that are expressly stated in the License.
 */
 
-#pragma once
+#ifndef __TCM_ASSERT_HEADER
+#define __TCM_ASSERT_HEADER
+
+#include "_config.h"
 
 #include <atomic>
 #include <cstdio>
@@ -23,8 +26,9 @@ namespace internal {
 template<typename T>
 static void suppress_unused_warning(const T&) {}
 
-#if TCM_DEBUG
-static void report_failed_assert(const char* location, int line, const char* condition, const char* message) {
+#if TCM_USE_ASSERT
+static void report_failed_assert(const char* location, int line, const char* condition,
+                                 const char* message) {
   static std::atomic<bool> has_assert_reported{false};
   if (has_assert_reported.exchange(true, std::memory_order_relaxed))
     return;
@@ -38,11 +42,9 @@ static void report_failed_assert(const char* location, int line, const char* con
   std::fflush(stderr);
   std::abort();
 }
-#endif
+#endif  // TCM_USE_ASSERT
 
-// TODO: rename to __TCM_ENABLE_ASSERTS to be able to use them even in release
-// mode
-#if TCM_DEBUG
+#if TCM_USE_ASSERT
 #define __TCM_ASSERT(condition, message)                                \
   ((condition)? ((void)0) :                                             \
    ::tcm::internal::                                                    \
@@ -50,10 +52,10 @@ static void report_failed_assert(const char* location, int line, const char* con
 
 #define __TCM_ASSERT_EX(condition, message)     \
     __TCM_ASSERT((condition), (message))
-#else
+#else  // TCM_USE_ASSERT
 #define __TCM_ASSERT(condition, message) ((void)0)
 #define __TCM_ASSERT_EX(condition, message) tcm::internal::suppress_unused_warning(condition)
-#endif
+#endif  // TCM_USE_ASSERT
 
 #if _MSC_VER && !__INTEL_COMPILER
 #define __TCM_SUPPRESS_WARNING_PUSH __pragma(warning(push))
@@ -70,3 +72,5 @@ static void report_failed_assert(const char* location, int line, const char* con
 
 } // namespace internal
 } // namespace tcm
+
+#endif  // __TCM_ASSERT_HEADER

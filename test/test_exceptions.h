@@ -37,6 +37,11 @@ public:
   tcm_request_permit_error(const char* message = nullptr) : tcm_exception(message) {}
 };
 
+class tcm_idle_permit_error : public tcm_exception {
+public:
+  tcm_idle_permit_error(const char* message = nullptr) : tcm_exception(message) {}
+};
+
 class tcm_get_permit_data_error : public tcm_exception {
 public:
   tcm_get_permit_data_error(const char* message = nullptr) : tcm_exception(message) {}

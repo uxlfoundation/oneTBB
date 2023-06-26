@@ -58,6 +58,9 @@ public:
       mask = obj->cpuset;
       weight = hwloc_bitmap_weight(mask);
     }
+    __TCM_ASSERT(obj, "Failed to get the HWLOC object representing the first core. "
+                 "Has test been run on HW subset?");
+    __TCM_ASSERT(weight > 0, "Invalid mask of the first core. Has test been run on a HW subset?");
   }
 
   tcm_cpu_mask_t operator()() const { return hwloc_bitmap_dup(mask); }
@@ -192,8 +195,7 @@ struct test_one_request {
     uint32_t* e_concurrency = config.exp_concurrency;
     tcm_permit_t e = make_active_permit(e_concurrency, e_mask, config.constraints_size);
 
-    tcm_permit_request_t req = make_request(config.min_concurrency,
-                                             config.max_concurrency);
+    tcm_permit_request_t req = make_request(config.min_concurrency, config.max_concurrency);
     req.constraints_size = config.constraints_size;
     req.cpu_constraints = config.constraints;
 
@@ -308,8 +310,7 @@ bool test_one_request_two_constraints_process_mask_no_oversubscription() {
   }
 
   one_request_config test_config{};
-  test_config.test_name =
-    "test_one_request_two_constraints_process_mask_no_oversubscription";
+  test_config.test_name = __func__;
   test_config.exp_concurrency = e_concurrency;
   test_config.min_concurrency = min_concurrency;
   test_config.max_concurrency = total_concurrency;
@@ -421,11 +422,10 @@ struct test_two_requests {
     eB.state = config.new_stateB;
     auto unchanged_permits = list_unchanged_permits({{&phB, &pB}});
 
-    if (!check_success(r, "tcmReleasePermit for client A") &&
-        !check(renegotiating_permits == unchanged_permits,
-               "Incorrect renegotiation during permit A release"))
+    if (!(check_success(r, "tcmReleasePermit for client A") && check_permit(eB, phB) &&
+          check(renegotiating_permits == unchanged_permits,
+                "Incorrect renegotiation during permit A release")))
       return test_fail(config.test_name);
-
 
     r = tcmReleasePermit(phB);
     if (!check_success(r, "tcmReleasePermit for client B"))
@@ -447,7 +447,7 @@ bool test_two_requests_process_mask_no_oversubscription() {
   uint32_t concurrencyA = num_oversubscribed_resources / 2;
   uint32_t concurrencyB = num_oversubscribed_resources - num_oversubscribed_resources / 2;
   two_requests_config test_config{};
-  test_config.test_name = "test_two_requests_process_mask_no_oversubscription";
+  test_config.test_name = __func__;
   test_config.callback = client_renegotiate;
   test_config.exp_concurrencyA = concurrencyA;
   test_config.exp_concurrencyB = concurrencyB;
@@ -484,24 +484,26 @@ bool test_two_requests_oversubscribe_first_core() {
 // ============================================================================
 // Multiple requests
 
-bool test_multiple_requests_all_numa_plus_one() {
-  std::string test_name = "test_multiple_requests_all_numa_plus_one"; 
+bool test_request_all_numas_one_by_one() {
+  std::string test_name = __func__;
   test_prolog(test_name);
+
+  const skip_checks_t skip_concurrency_and_mask_checks{
+      /*size*/false, /*concurrency*/true, /*state*/false, /*flags*/false, /*mask*/true
+  };
 
   // parse all numa nodes
   int32_t numa_count{0}, type_count{0};
   int32_t* numa_indexes{nullptr};
   int32_t* type_indexes{nullptr};
   auto& topology_ptr = tcm_test::system_topology::instance();
-  topology_ptr.fill_topology_information(numa_count, numa_indexes,
-                                         type_count, type_indexes);
+  topology_ptr.fill_topology_information(numa_count, numa_indexes, type_count, type_indexes);
 
   // connect all clients
   tcm_result_t r = TCM_RESULT_ERROR_UNKNOWN;
   std::vector<tcm_client_id_t> client_ids(numa_count + 1);
   for (int i = 0; i < numa_count + 1; ++i) {
-    // TODO: Consider the use of actual callback
-    r = tcmConnect(nullptr, &client_ids[i]);
+    r = tcmConnect(/*client callback*/nullptr, &client_ids[i]);
     if (!check_success(r, "tcmConnect for client " + std::to_string(i)))
       return test_fail(test_name);
   }
@@ -510,69 +512,292 @@ bool test_multiple_requests_all_numa_plus_one() {
   std::vector<tcm_permit_request_t> requests(numa_count + 1);
   std::vector<tcm_cpu_constraints_t> constraints(numa_count + 1);
   for (int i = 0; i < numa_count + 1; ++i) {
-    constraints[i] = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
-    constraints[i].numa_id = tcm_any;
     requests[i] = TCM_PERMIT_REQUEST_INITIALIZER;
-    // TODO: correct the number of requesting resources.
-    requests[i].min_sw_threads = num_oversubscribed_resources;
-    requests[i].max_sw_threads = num_oversubscribed_resources;
+    // Specify automatic for desired concurrency so that it is inferred when some NUMA node is
+    // chosen.
+    requests[i].min_sw_threads = 1; // not automatic as we don't want it to be inferred as zero
+    requests[i].max_sw_threads = tcm_automatic;
     requests[i].constraints_size = 1;
     requests[i].cpu_constraints = &constraints[i];
+    constraints[i] = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+    constraints[i].numa_id = tcm_any;
   }
 
   // request all permits
   std::vector<tcm_permit_handle_t> permit_handles(numa_count + 1, nullptr);
   std::vector<uint32_t> p_concurrencies(numa_count + 1, 0);
-  std::vector<tcm_cpu_mask_t> masks(numa_count + 1, nullptr);
+  tcm_cpu_mask_t* mask_array = new tcm_cpu_mask_t[numa_count + 1];
+  std::unique_ptr<tcm_cpu_mask_t[], masks_guard_t> masks_ptr(mask_array, numa_count + 1);
   std::vector<tcm_permit_t> permits(numa_count + 1);
+  uint32_t total_resources_given = 0;
   for (int i = 0; i < numa_count; ++i) {
-    masks[i] = hwloc_bitmap_alloc();
-    permits[i] = make_void_permit(&p_concurrencies[i], &masks[i]);
+    mask_array[i] = hwloc_bitmap_alloc();
+    permits[i] = make_void_permit(&p_concurrencies[i], mask_array + i);
     r = tcmRequestPermit(
       client_ids[i], requests[i], /*callback_arg*/nullptr, &permit_handles[i], &permits[i]
     );
-    // TODO: Check for ACTIVE state
-    if (!check_success(r, "tcmRequestPermit for client " + std::to_string(i)))
+
+    uint32_t expected_concurrency = 0;
+    tcm_permit_t expected_permit = make_active_permit(&expected_concurrency);
+
+    // TODO: check concurrency exactly and the masks
+    int mask_weight = hwloc_bitmap_weight(permits[i].cpu_masks[0]);
+    if (!(check_success(r, "tcmRequestPermit for client " + std::to_string(i)) &&
+          check_permit(expected_permit, permits[i], skip_concurrency_and_mask_checks) &&
+          check(permits[i].concurrencies[0] > 0, "Concurrency was given") &&
+          check(mask_weight > 0, "Some mask was given") &&
+          check((numa_count == 1 && num_total_resources == mask_weight) ||
+                mask_weight < num_total_resources, "Given mask is reasonable")))
+    {
+        return test_fail(test_name);
+    }
+    total_resources_given += permits[i].concurrencies[0];
+  }
+
+  if (!check(total_resources_given == uint32_t(num_total_resources),
+             "All resources from the platform have been distributed")) {
       return test_fail(test_name);
   }
 
+
   // one additional permit request: one more than the number of NUMA-nodes
+  uint32_t mask_concurrency = 0, mask_oversubscribed_concurrency = 0;
   {
-    masks[numa_count] = hwloc_bitmap_alloc();
-    permits[numa_count] = make_pending_permit(&p_concurrencies[numa_count], &masks[numa_count]);
+    mask_array[numa_count] = hwloc_bitmap_alloc();
+    permits[numa_count] = make_void_permit(&p_concurrencies[numa_count], mask_array + numa_count);
     r = tcmRequestPermit(
       client_ids[numa_count], requests[numa_count], /*callback_arg*/nullptr,
       &permit_handles[numa_count], &permits[numa_count]
     );
-    if (!check_success(r, "tcmRequestPermit for client " + std::to_string(numa_count)))
+    if (!check_success(r, "tcmRequestPermit for one more NUMA node, client " +
+                       std::to_string(numa_count)))
+      return test_fail(test_name);
+
+    tcm_cpu_mask_t mask = permits[numa_count].cpu_masks[0];
+    mask_concurrency = uint32_t(get_mask_concurrency(mask));
+    mask_oversubscribed_concurrency = uint32_t(get_mask_oversubscribed_concurrency(mask));
+    const uint32_t delta = mask_oversubscribed_concurrency - mask_concurrency;
+
+    uint32_t expected_concurrency =
+        std::max(std::min(mask_concurrency, delta), uint32_t(requests[numa_count].min_sw_threads));
+    tcm_permit_t expected_permit = make_active_permit(&expected_concurrency);
+    skip_checks_t skip_mask_check; skip_mask_check.mask = true;
+    if (!(check_permit(expected_permit, permits[numa_count], skip_mask_check) &&
+          check(hwloc_bitmap_weight(permits[numa_count].cpu_masks[0]) > 0, "Mask was given")))
+    {
+        return test_fail(test_name);
+    }
+  }
+
+  // Find a competitor with the last permit
+  unsigned num_intersects = 0;
+  int competitor_idx = -1;
+  for (int i = 0; i < numa_count; ++i) {
+      if (hwloc_bitmap_intersects(permits[i].cpu_masks[0], permits[numa_count].cpu_masks[0])) {
+          ++num_intersects;
+          competitor_idx = i;
+      }
+  }
+  if (!check(1 == num_intersects, "Only one permit intersects with the last one")) {
       return test_fail(test_name);
   }
 
-  // check last permit granted (PENDING state and empty mask are expected)
-  if (!(check(permits[numa_count].concurrencies[0] == 0, "Zero concurrency value") &&
-        check(hwloc_bitmap_weight(permits[numa_count].cpu_masks[0]) > 0,
-              "Non-zero weight for the permit CPU mask") &&
-        check(permits[numa_count].state == TCM_PERMIT_STATE_PENDING,
-              "Permit state is PENDING")))
-    return test_fail(test_name);
+  if (!check(permits[competitor_idx].concurrencies[0] == mask_concurrency,
+             "Competitor permit occupies whole concurrency of the given mask"))
+  {
+      return test_fail(test_name);
+  }
+
+  const uint32_t competitor_previous_concurrency = permits[competitor_idx].concurrencies[0];
+  tcm_cpu_mask_t mask = hwloc_bitmap_alloc();
+  std::unique_ptr<tcm_cpu_mask_t, mask_deleter> cpu_mask(&mask);
+  if (!check(hwloc_bitmap_copy(mask, permits[competitor_idx].cpu_masks[0]) == 0, "Copied the mask")) {
+      return test_fail(test_name);
+  }
+  r = tcmGetPermitData(permit_handles[competitor_idx], &permits[competitor_idx]);
+  const uint32_t used_concurrency =
+      permits[competitor_idx].concurrencies[0] + permits[numa_count].concurrencies[0];
+  if (!(check_success(r, "Copied competitor permit data") &&
+        check(hwloc_bitmap_compare(mask, permits[competitor_idx].cpu_masks[0]) == 0,
+              "Masks compare equally") &&
+        check(competitor_previous_concurrency <= used_concurrency &&
+              used_concurrency <= mask_oversubscribed_concurrency,
+              "The resources of the NUMA node is shared between intersecting permits")))
+  {
+      return test_fail(test_name);
+  }
+
+  uint32_t expected_concurrency = competitor_previous_concurrency;
+  tcm_permit_t expected_permit = make_active_permit(&expected_concurrency, &mask);
+  r = tcmReleasePermit(permit_handles[competitor_idx]);
+  if (!(check_success(r, "tcmReleasePermit for client " + std::to_string(competitor_idx)) &&
+        check_permit(expected_permit, permit_handles[numa_count])))
+  {
+      return test_fail(test_name);
+  }
 
   // release all permits and disconnect the clients
   for (int i = 0; i < numa_count + 1; ++i) {
-    r = tcmReleasePermit(permit_handles[i]);
-    if (!check_success(r, "tcmReleasePermit for client " + std::to_string(i)))
-      return test_fail(test_name);
+    if (competitor_idx != i) {
+      r = tcmReleasePermit(permit_handles[i]);
+      if (!check_success(r, "tcmReleasePermit for client " + std::to_string(i)))
+          return test_fail(test_name);
+    }
 
     r = tcmDisconnect(client_ids[i]);
     if (!check_success(r, "tcmDisconnect for client " + std::to_string(i)))
       return test_fail(test_name);
-
-    // free memory for every permit cpu mask;
-    hwloc_bitmap_free(*permits[i].cpu_masks);
   }
 
   return test_epilog(test_name);
 }
 
+bool test_request_all_numas_rigid_one_by_one() {
+  std::string test_name = __func__;
+  test_prolog(test_name);
+
+  const skip_checks_t skip_concurrency_and_mask_checks{
+      /*size*/false, /*concurrency*/true, /*state*/false, /*flags*/false, /*mask*/true
+  };
+
+  // parse all numa nodes
+  int32_t numa_count{0}, type_count{0};
+  int32_t* numa_indexes{nullptr};
+  int32_t* type_indexes{nullptr};
+  auto& topology_ptr = tcm_test::system_topology::instance();
+  topology_ptr.fill_topology_information(numa_count, numa_indexes, type_count, type_indexes);
+
+  // connect all clients
+  tcm_result_t r = TCM_RESULT_ERROR_UNKNOWN;
+  std::vector<tcm_client_id_t> client_ids(numa_count + 1);
+  for (int i = 0; i < numa_count + 1; ++i) {
+    r = tcmConnect(/*client callback*/nullptr, &client_ids[i]);
+    if (!check_success(r, "tcmConnect for client " + std::to_string(i)))
+      return test_fail(test_name);
+  }
+
+  // make permit requests
+  std::vector<tcm_permit_request_t> requests(numa_count + 1);
+  std::vector<tcm_cpu_constraints_t> constraints(numa_count + 1);
+  for (int i = 0; i < numa_count + 1; ++i) {
+    requests[i] = TCM_PERMIT_REQUEST_INITIALIZER;
+    requests[i].min_sw_threads = tcm_automatic;
+    requests[i].max_sw_threads = tcm_automatic;
+    requests[i].constraints_size = 1;
+    requests[i].cpu_constraints = &constraints[i];
+    requests[i].flags.rigid_concurrency = true;
+    constraints[i] = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+    constraints[i].numa_id = tcm_any;
+  }
+
+  // request all permits
+  std::vector<tcm_permit_handle_t> permit_handles(numa_count + 1, nullptr);
+  std::vector<uint32_t> p_concurrencies(numa_count + 1, 0);
+  tcm_cpu_mask_t* mask_array = new tcm_cpu_mask_t[numa_count + 1];
+  std::unique_ptr<tcm_cpu_mask_t[], masks_guard_t> masks_ptr(mask_array, numa_count + 1);
+  std::vector<tcm_permit_t> permits(numa_count + 1);
+  uint32_t total_resources_given = 0;
+  for (int i = 0; i < numa_count; ++i) {
+    mask_array[i] = hwloc_bitmap_alloc();
+    permits[i] = make_void_permit(&p_concurrencies[i], mask_array + i);
+    r = tcmRequestPermit(
+      client_ids[i], requests[i], /*callback_arg*/nullptr, &permit_handles[i], &permits[i]
+    );
+
+    uint32_t expected_concurrency = 0;
+    tcm_permit_t expected_permit = make_active_permit(&expected_concurrency);
+    expected_permit.flags.rigid_concurrency = true;
+
+    // TODO: check concurrency exactly and the masks
+    int mask_weight = hwloc_bitmap_weight(permits[i].cpu_masks[0]);
+    if (!(check_success(r, "tcmRequestPermit for client " + std::to_string(i)) &&
+          check_permit(expected_permit, permits[i], skip_concurrency_and_mask_checks) &&
+          check(permits[i].concurrencies[0] > 0, "Concurrency was given") &&
+          check(mask_weight > 0, "Some mask was given") &&
+          check((numa_count == 1 && num_total_resources == mask_weight) ||
+                mask_weight < num_total_resources, "Given mask is reasonable")))
+    {
+        return test_fail(test_name);
+    }
+    total_resources_given += permits[i].concurrencies[0];
+  }
+
+  if (!check(total_resources_given == uint32_t(num_total_resources),
+             "All resources from the platform have been distributed")) {
+      return test_fail(test_name);
+  }
+
+  // one additional permit request: one more than the number of NUMA-nodes
+  uint32_t mask_concurrency = 0, mask_oversubscribed_concurrency = 0;
+  mask_array[numa_count] = hwloc_bitmap_alloc();
+  requests[numa_count].min_sw_threads = 1; // make it waiting for resources to become available
+  permits[numa_count] = make_void_permit(&p_concurrencies[numa_count], mask_array + numa_count);
+  r = tcmRequestPermit(
+      client_ids[numa_count], requests[numa_count], /*callback_arg*/nullptr,
+      &permit_handles[numa_count], &permits[numa_count]
+  );
+  if (!check_success(r, "tcmRequestPermit for one more NUMA node, client " +
+                     std::to_string(numa_count)))
+  {
+      return test_fail(test_name);
+  }
+
+  {
+      tcm_cpu_mask_t mask = permits[numa_count].cpu_masks[0];
+      mask_concurrency = uint32_t(get_mask_concurrency(mask));
+      mask_oversubscribed_concurrency = uint32_t(get_mask_oversubscribed_concurrency(mask));
+  }
+  const uint32_t delta = mask_oversubscribed_concurrency - mask_concurrency;
+
+  uint32_t expected_concurrency = std::min(mask_concurrency, delta);
+  const bool is_required_fits_expected =
+      int32_t(expected_concurrency) >= requests[numa_count].min_sw_threads;
+  tcm_cpu_mask_t mask = hwloc_bitmap_alloc();
+  std::unique_ptr<tcm_cpu_mask_t, mask_deleter> mask_guard(&mask);
+  tcm_permit_t expected_permit = make_pending_permit(&expected_concurrency, &mask);
+  if (is_required_fits_expected) {
+      expected_permit.state = TCM_PERMIT_STATE_ACTIVE;
+      hwloc_bitmap_copy(mask, permits[numa_count].cpu_masks[0]);
+      if (!check(hwloc_bitmap_weight(mask) > 0, "Some mask was given")) {
+          return test_fail(test_name);
+      }
+  }
+  expected_permit.flags.rigid_concurrency = true;
+  if (!check_permit(expected_permit, permits[numa_count])) {
+      return test_fail(test_name);
+  }
+
+
+  // Release one and expect the pending permit activates
+  r = tcmReleasePermit(permit_handles[0]);
+  bool result = false;
+  if (is_required_fits_expected) {
+      // Nothing should change since a rigid concurrency permit has been already activated
+      result = check_permit(expected_permit, permit_handles[numa_count]);
+  } else {
+      // The pending rigid concurrency permit should now take the resources released
+      result = check_permit(permits[0], permit_handles[numa_count]);
+  }
+  if (!(check_success(r, "tcmReleasePermit for client 0") && result))
+  {
+      return test_fail(test_name);
+  }
+
+  // release all permits and disconnect the clients
+  for (int i = 0; i < numa_count + 1; ++i) {
+    if (0 != i) {
+      r = tcmReleasePermit(permit_handles[i]);
+      if (!check_success(r, "tcmReleasePermit for client " + std::to_string(i)))
+          return test_fail(test_name);
+    }
+
+    r = tcmDisconnect(client_ids[i]);
+    if (!check_success(r, "tcmDisconnect for client " + std::to_string(i)))
+      return test_fail(test_name);
+  }
+
+  return test_epilog(test_name);
+}
 
 int main() {
   bool res = true;
@@ -589,7 +814,10 @@ int main() {
   res &= test_one_request_two_constraints_process_mask_no_oversubscription();
   res &= test_two_requests_process_mask_no_oversubscription();
   res &= test_two_requests_oversubscribe_first_core();
-  res &= test_multiple_requests_all_numa_plus_one();
+  res &= test_request_all_numas_one_by_one();
+  res &= test_request_all_numas_rigid_one_by_one();
+
+  // TODO: Add tests utilizing interfaces: 1) Core type 2) Threads per core
 
   tcm_test::system_topology::destroy();
 
