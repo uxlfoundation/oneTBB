@@ -693,27 +693,6 @@ void move_permit(ThreadComposabilityManagerData& data, tcm_permit_handle_t ph,
 }
 
 
-// Remembers current permit grant in its request so that consecutive trials to satisfy request read
-// the amount of resources previously given. Useful for permits with rigid concurrency.
-void capture_grant_in_request(tcm_permit_handle_t handle) {
-    const auto& data = handle->data;
-    uint32_t grant = data.concurrency[0];
-
-    auto& request = handle->request;
-    if (request.cpu_constraints) {
-        __TCM_ASSERT(data.size == request.constraints_size, "Inconsistent state");
-        request.cpu_constraints[0].min_concurrency = grant;
-        request.cpu_constraints[0].max_concurrency = grant;
-        for (uint32_t i = 1; i < data.size; ++i) {
-            request.cpu_constraints[i].min_concurrency = data.concurrency[i];
-            request.cpu_constraints[i].max_concurrency = data.concurrency[i];
-            grant += data.concurrency[i];
-        }
-    }
-
-    handle->request.min_sw_threads = handle->request.max_sw_threads = grant;
-}
-
 bool has_unused_resources(const ThreadComposabilityManagerData& data) {
     return data.available_concurrency || !data.idle_permits.empty();
 }
@@ -1976,12 +1955,6 @@ protected:
                     if (shall_deactivate) {
                         std::fill(new_concurrencies.begin(), new_concurrencies.end(), 0);
                         new_state = TCM_PERMIT_STATE_INACTIVE;
-                        if (is_rigid_concurrency(st_data)) {
-                            // We are deactivating IDLE rigid concurrency permit, remember current
-                            // grant in the request to fullfil the exact amount of resources during
-                            // permit activation
-                            capture_grant_in_request(st.ph);
-                        }
                     }
                     permit_change_t pc{st.ph, new_state, new_concurrencies};
                     new_grants.insert( std::make_pair(st.ph, pc) );

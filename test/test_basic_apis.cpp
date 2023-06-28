@@ -217,6 +217,7 @@ bool test_no_negotiation_for_active_rigid_concurrency() {
   test_prolog(test_name);
 
   tcm_client_id_t clid{0};
+  is_callback_invoked = false;
 
   tcm_result_t r = tcmConnect(renegotiation_function, &clid);
   if (!check_success(r, "tcmConnect"))
@@ -310,22 +311,23 @@ bool test_no_negotiation_for_active_rigid_concurrency() {
         check(is_callback_invoked, "Rigid concurrency permit in idle state was negotiated.")))
     return test_fail(test_name);
 
+  allow_rigid_concurrency_permit_negotiation = false;
   is_callback_invoked = false;
   r = tcmActivatePermit(phS);
-  eS.state = TCM_PERMIT_STATE_PENDING; // expected not to get previously given amount of resources
-                                       // as they are not available at the moment
+  // Expected not getting previously given amount of resources as they are not available at the
+  // moment, but still get as much as possible
+  eS_concurrency = num_oversubscribed_resources - eA_concurrency;
+  eS.state = TCM_PERMIT_STATE_ACTIVE;
   if (!(check_success(r, "tcmActivatePermit (rigid concurrency)") &&
         check_permit(eS, phS) && check_permit(eA, phA) &&
-        check(!is_callback_invoked, "Rigid concurrency permit in idle state was not negotiated.")))
+        check(!is_callback_invoked, "Activated rigid concurrency permit was not negotiated.")))
   {
     return test_fail(test_name);
   }
 
   r = tcmReleasePermit(phA);
-  eS_concurrency = num_oversubscribed_resources;
-  eS.state = TCM_PERMIT_STATE_ACTIVE;
   if (!(check_success(r, "tcmReleasePermit (regular)") && check_permit(eS, phS) &&
-        check(is_callback_invoked, "Rigid concurrency permit in pending state was negotiated.")))
+        check(!is_callback_invoked, "Rigid concurrency permit in active state was not negotiated.")))
     return test_fail(test_name);
 
   r = tcmReleasePermit(phS);
@@ -393,6 +395,7 @@ bool test_no_new_resources_for_rigid_concurrency() {
   }
 
   is_callback_invoked = false;
+  allow_rigid_concurrency_permit_negotiation = true;
   r = tcmIdlePermit(phS);
   eS.state = TCM_PERMIT_STATE_INACTIVE; eS_concurrency = 0;
   eA_concurrency = num_oversubscribed_resources;
@@ -406,15 +409,16 @@ bool test_no_new_resources_for_rigid_concurrency() {
     return test_fail(test_name);
   }
 
+  allow_rigid_concurrency_permit_negotiation = false;
   is_callback_invoked = false;
 
   r = tcmReleasePermit(phA);
   if (!(check_success(r, "tcmReleasePermit") && check_permit(eS, phS) &&
-        check(!is_callback_invoked, "INACTIVE rigid concurrency permit state was not negotiated.")))
+        check(!is_callback_invoked, "INACTIVE rigid concurrency permit was not negotiated.")))
     return test_fail(test_name);
 
   r = tcmActivatePermit(phS);
-  eS_concurrency = num_oversubscribed_resources/2;
+  eS_concurrency = num_oversubscribed_resources;
   eS.state = TCM_PERMIT_STATE_ACTIVE;
   if (!(check_success(r, "tcmActivatePermit (rigid concurrency)") && check_permit(eS, phS) &&
       check(!is_callback_invoked, "Callback was not invoked for the rigid concurrency permit that "
@@ -525,6 +529,8 @@ bool test_renegotiation_order() {
   eC_concurrency = num_oversubscribed_resources / 2;
   rC.max_sw_threads = int32_t(eC_concurrency);
   phC = nullptr;                // make it a new request
+  // The request going to negotiate IDLEd rigid concurrency permit
+  allow_rigid_concurrency_permit_negotiation = true;
   r = tcmRequestPermit(clid, rC, &phC, &phC, &pC);
   eA.state = TCM_PERMIT_STATE_ACTIVE;
   eS.state = TCM_PERMIT_STATE_INACTIVE; eS_concurrency = 0;
@@ -534,6 +540,7 @@ bool test_renegotiation_order() {
   {
       return test_fail(test_name);
   }
+  allow_rigid_concurrency_permit_negotiation = false;
 
   // TODO: Request amount of resources independent of floating point arithmetic
   eC_concurrency = 3 * num_oversubscribed_resources / 4;
@@ -561,7 +568,7 @@ bool test_renegotiation_order() {
   is_callback_invoked = false;
   r = tcmReleasePermit(phA);
   if (!(check_success(r, "tcmReleasePermit") && check_permit(eS, phS) &&
-        check(!is_callback_invoked, "Rigid concurrency permit phS has NOT been negotiated")))
+        check(!is_callback_invoked, "Rigid concurrency IDLE permit phS has NOT been negotiated")))
   {
       return test_fail(test_name);
   }
