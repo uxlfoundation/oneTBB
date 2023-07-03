@@ -1,0 +1,52 @@
+/*
+    Copyright (C) 2005-2023 Intel Corporation
+
+    This software and the related documents are Intel copyrighted materials, and your use of them is
+    governed by the express license under which they were provided to you ("License"). Unless the
+    License provides otherwise, you may not use, modify, copy, publish, distribute, disclose or
+    transmit this software or the related documents without Intel's prior written permission.
+
+    This software and the related documents are provided as is, with no express or implied
+    warranties, other than those that are expressly stated in the License.
+*/
+
+#import <Foundation/Foundation.h>
+
+#if TARGET_OS_IPHONE
+
+#import <UIKit/UIKit.h>
+#import "OpenGLES/ES2/gl.h"
+
+@interface OpenGLView : UIView {
+    NSTimer *timer;
+    CGRect imageRect;
+}
+
+@property (nonatomic, retain) NSTimer *timer;
+@property (nonatomic) CGRect imageRect;
+
+- (void) drawRect:(CGRect)rect;
+- (void) touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event;
+
+@end
+
+#elif TARGET_OS_MAC
+
+#import <Foundation/Foundation.h>
+#import <Cocoa/Cocoa.h>
+
+@interface OpenGLView : NSOpenGLView{
+    NSTimer *timer;
+}
+
+@property (nonatomic,retain) NSTimer *timer;
+
+- (void) drawRect:(NSRect)start;
+- (void) mouseDown:(NSEvent *)theEvent;
+- (void) keyDown:(NSEvent *)theEvent;
+- (BOOL) acceptsFirstResponder;
+- (void) viewDidEndLiveResize;
+
+@end
+
+#endif

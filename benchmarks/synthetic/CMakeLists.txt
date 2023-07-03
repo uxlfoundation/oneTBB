@@ -10,23 +10,25 @@
 
 cmake_minimum_required(VERSION 3.11)
 
-find_package(TBB)
-if (NOT TBB_FOUND)
-    message(FATAL_ERROR "oneTBB was not found in CMake using 'find_package(TBB)'")
-endif()
+add_executable(composable_scenarios composable_scenarios.cpp)
 
-set(TCM_OPENMP_FLAG -qopenmp)
-if (NOT CMAKE_CXX_COMPILER_ID MATCHES "IntelLLVM")
-  message(WARNING "C++ compiler ID does not match the IntelLLVM, "
-    "the OpenMP library might be not aware of Thread Composability Manager")
-  include(FindOpenMP)
-  set(TCM_OPENMP_FLAG -fopenmp)
-endif()
+target_compile_options(composable_scenarios
+    PRIVATE
+    ${TCM_WARNING_LEVEL}
+    ${TCM_TEST_WARNING_FLAGS}
+    ${TCM_WARNING_SUPPRESS}
+    ${TCM_MMD_FLAG}
+    ${TCM_DSE_FLAG}
+    ${TCM_COMMON_COMPILE_FLAGS}
+    ${TCM_OPENMP_FLAG}
+)
 
-enable_testing()
 
-add_subdirectory(synthetic)
-add_subdirectory(tbb_examples)
+target_link_options(composable_scenarios
+    PRIVATE
+    -Wl,--disable-new-dtags
+    -rpath ${TCM_CUSTOM_OPENMP_LIB_DIR}
+)
 
-add_custom_target(tcm_benchmarks)
-add_dependencies(tcm_benchmarks composable_scenarios seismic)
+target_link_libraries(composable_scenarios PUBLIC TBB::tbb)
+add_test(NAME composable_scenarios COMMAND composable_scenarios)
