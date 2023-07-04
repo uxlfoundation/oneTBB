@@ -22,11 +22,20 @@ add_subdirectory(../../common/gui gui)
 
 target_link_libraries(seismic PUBLIC TBB::tbb Threads::Threads UI_LIB_seismic)
 
-target_link_options(seismic
-    PRIVATE
-    -Wl,--disable-new-dtags
-    -rpath ${TCM_CUSTOM_OPENMP_LIB_DIR}
-)
+if (NOT TCM_OPENMP_NO_LINK_FLAG)
+    target_link_options(seismic
+        PRIVATE
+        ${TCM_OPENMP_FLAG}
+    )
+endif()
+
+if (TCM_CUSTOM_OPENMP_LIB_DIR)
+    target_link_options(seismic
+        PRIVATE
+        -Wl,--disable-new-dtags
+        -rpath ${TCM_CUSTOM_OPENMP_LIB_DIR}
+    )
+endif()
 
 target_compile_options(seismic PRIVATE ${TBB_CXX_STD_FLAG} ${TCM_OPENMP_FLAG})
 

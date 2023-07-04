@@ -14,6 +14,7 @@
 
 #include <iostream>
 
+#include "omp.h"
 #include "oneapi/tbb/tick_count.h"
 #include "oneapi/tbb/global_control.h"
 
