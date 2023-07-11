@@ -34,6 +34,7 @@ __TCM_SUPPRESS_WARNING_POP
 #include <set>
 #include <vector>
 #include <queue>
+#include <stack>
 
 #if __TCM_ENABLE_TRACER
 #include <iostream>
@@ -85,6 +86,11 @@ struct tracer {
   ~tracer() {}
 };
 #endif
+
+std::stack<tcm_permit_handle_t>& get_active_permit_container() {
+    thread_local std::stack<tcm_permit_handle_t> tls_active_permit;
+    return tls_active_permit;
+}
 
 bool operator==(const tcm_permit_flags_t& lhs, const tcm_permit_flags_t& rhs) {
   return
@@ -629,19 +635,6 @@ struct ThreadComposabilityManagerData {
 
   //! The multimap of permits associated with the given client.
   std::unordered_multimap<tcm_client_id_t, tcm_permit_handle_t> client_to_permit_mmap{};
-
-  // TODO: Consider alternative data structure for maintaining
-  // registering/unregistering of threads by answering:
-  // - Do we need to identify threads that register or unregister themselves?
-  //   - Will atomic counting suffice?
-  // - To avoid search in a container, move atomic counter into permit?
-  //   - Can we cast array of chars to an atomic memory?
-
-  //! The mutex for the map of registering threads.
-  std::mutex threads_map_mutex{};
-
-  //! The map of threads that register to be a part of a permit.
-  std::unordered_map<std::thread::id, tcm_permit_handle_t> thread_to_permit_map{};
 };
 
 
@@ -1178,15 +1171,15 @@ public:
     tracer t("ThreadComposabilityBase::register_thread");
     __TCM_ASSERT(ph, nullptr);
 
-    const std::lock_guard<std::mutex> l(threads_map_mutex);
-    thread_to_permit_map[std::this_thread::get_id()] = ph;
+    get_active_permit_container().push(ph);
     return TCM_RESULT_SUCCESS;
   }
 
   tcm_result_t unregister_thread() {
     tracer t("ThreadComposabilityBase::unregister_thread");
-    const std::lock_guard<std::mutex> l(threads_map_mutex);
-    thread_to_permit_map[std::this_thread::get_id()] = nullptr;
+    auto& permit_stack = get_active_permit_container();
+    __TCM_ASSERT(!permit_stack.empty(), "Attempt unregistering non-registered thread.");
+    permit_stack.pop();
     return TCM_RESULT_SUCCESS;
   }
 
