@@ -26,8 +26,15 @@ namespace tcm {
 namespace detail {
     struct arena_serial_impl {
         template <typename F>
-        void bulk_execute(int n, F&& f) const {
-            for (int i = 0; i < n; ++i) {
+        void bulk_execute(int start, int end, F&& f) const {
+            for (int i = start; i < end; ++i) {
+                f(i);
+            }
+        }
+
+        template <typename Range, typename F>
+        void bulk_execute(const Range& range, F &&f) const {
+            for (int i = range.begin(); i < range.end(); ++i) {
                 f(i);
             }
         }
@@ -35,6 +42,10 @@ namespace detail {
         template <typename F>
         void execute(F &&f) const {
             f();
+        }
+
+        std::size_t max_concurrency() const {
+            return 1;
         }
 
         static std::string name() {
@@ -55,11 +66,30 @@ namespace detail {
             p_.reset(new pool_t(max_concurrency_));
         }
 
+        arena_tbb_impl(const tbb::task_arena::constraints& constraints) 
+        : max_concurrency_(tbb::info::default_concurrency(constraints))
+        {
+            p_.reset(new pool_t(constraints));
+        }
+
         ~arena_tbb_impl() = default;
 
-        template <typename F>
-        void bulk_execute(int n, F &&f) const {
-            p_->execute([n, &f]() { tbb::parallel_for(0, n, std::forward<F>(f)); });
+        template <typename F, typename Partitioner>
+        void bulk_execute(int start, int end, F&& f, Partitioner&& partitioner = tbb::auto_partitioner{}) const {
+            p_->execute([start, end, &f, &partitioner]() {
+                tbb::parallel_for(start, end, std::forward<F>(f), partitioner);
+            });
+        }
+
+        template <typename Range, typename F, typename Partitioner>
+        void bulk_execute(const Range& range, F&& f, Partitioner&& partitioner = tbb::auto_partitioner{}) const {
+            p_->execute([&range, &f, &partitioner]() {
+                tbb::parallel_for(range, std::forward<F>(f), partitioner);
+            });
+        }
+
+        std::size_t max_concurrency() const {
+            return max_concurrency_;
         }
 
         template <typename F>
@@ -80,10 +110,10 @@ namespace detail {
         ~arena_omp_impl() = default;
 
         template <typename F>
-        void bulk_execute(int n, F &&f) {
+        void bulk_execute(int start, int end, F &&f) {
             uint32_t thds = max_concurrency_;
             #pragma omp parallel for if (thds > 0) num_threads(max_concurrency_)
-            for (int i = 0; i < n; ++i) {
+            for (int i = start; i < end; ++i) {
                 f(i);
             }
         }
@@ -95,6 +125,10 @@ namespace detail {
             #pragma omp parallel if (thds > 0) num_threads(thds)
             #pragma omp single
             f();
+        }
+
+        std::size_t max_concurrency() const {
+            return max_concurrency_;
         }
 
         static std::string name() {
@@ -117,14 +151,29 @@ namespace detail {
         arena_type &operator=(const arena_type &a) { impl_ = a.impl_; }
         ~arena_type() {}
 
-        template <typename F>
-        void bulk_execute(int n, F &&f) const {
-            impl_->bulk_execute(n, std::forward<F>(f));
+        template <typename F, typename... Args>
+        void bulk_execute(int n, F&& f, Args&&... args) const {
+            bulk_execute(0, n, std::forward<F>(f), std::forward<Args>(args)...);
+        }
+
+        template <typename F, typename... Args>
+        void bulk_execute(int start, int end, F &&f, Args&&... args) const {
+            impl_->bulk_execute(start, end, std::forward<F>(f), std::forward<Args>(args)...);
+        }
+
+        template <typename Range, typename F, typename... Args,
+            typename std::enable_if<std::is_integral<Range>::value == false, bool>::type = true >
+        void bulk_execute(const Range& range, F &&f, Args&&... args) const {
+            impl_->bulk_execute(range, std::forward<F>(f), std::forward<Args>(args)...);
         }
 
         template <typename F>
         void execute(F &&f) const {
             impl_->execute(std::forward<F>(f));
+        }
+
+        std::size_t max_concurrency() const {
+            return impl_->max_concurrency();
         }
 
         static std::string name() {

@@ -53,5 +53,7 @@ endfunction()
 
 add_synthetic_bench(NAME composable_scenarios)
 add_synthetic_bench(NAME ubench_sequenced)
-add_synthetic_bench(NAME ubench_nested)
 add_synthetic_bench(NAME ubench_concurrent)
+add_synthetic_bench(NAME ubench_perfect_nested)
+add_synthetic_bench(NAME ubench_nested)
+add_synthetic_bench(NAME ubench_constrained ENVIRONMENT "OMP_PLACES=numa_domains;OMP_PROC_BIND=spread,close")
