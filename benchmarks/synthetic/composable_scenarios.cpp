@@ -20,9 +20,11 @@
 #include <vector>
 #include <numeric>
 #include <cmath>
+#include <thread>
 
 struct benchmark_data_holder {
-    benchmark_data_holder(std::size_t size) : work_size(size), A(work_size, 1.5f), B(work_size, 42.42f), C(work_size, 0.f)
+    benchmark_data_holder(std::size_t size)
+        : work_size(size), A(work_size, 1.5f), B(work_size, 42.42f), C(work_size, 0.f)
     {}
 
     std::size_t work_size;
@@ -44,8 +46,38 @@ struct composable_parallel_for {
     }
 
     static const char* name() {
-        return "tbb::parallel_for + openMP";
+        return "tbb::parallel_for + openMP over subrange";
     }
+};
+
+struct composable_per_iteration_parallel_for {
+    composable_per_iteration_parallel_for(std::size_t num_tbb_iters, std::size_t num_omp_iters)
+        : m_num_tbb_iters(num_tbb_iters), m_num_omp_iters(num_omp_iters)
+    {}
+
+    void operator() (benchmark_data_holder& holder) {
+        tbb::parallel_for(
+            tbb::blocked_range<std::size_t>(0, m_num_tbb_iters),
+            [&] (tbb::blocked_range<std::size_t>& r) {
+                for (auto it = r.begin(); it != r.end(); ++it) {
+                    #pragma omp parallel for
+                    for (std::size_t j = 0; j < m_num_omp_iters; ++j) {
+                        const std::size_t offset = it * m_num_omp_iters + j;
+                        holder.C[offset] += holder.mult * holder.A[offset] + holder.B[offset];
+                        holder.C[offset] *=
+                            std::sin(holder.C[offset]) * std::tan(holder.C[offset]) * holder.mult;
+                    }
+                }
+            }
+        );
+    }
+
+    static const char* name() {
+        return "tbb::parallel_for + per iter openMP";
+    }
+private:
+    const std::size_t m_num_tbb_iters;
+    const std::size_t m_num_omp_iters;
 };
 
 struct two_tbb_parallel_for {
@@ -62,7 +94,7 @@ struct two_tbb_parallel_for {
     }
 
     static const char* name() {
-        return "tbb::parallel_for + tbb::parallel_for";
+        return "tbb::parallel_for + separate arena tbb::parallel_for";
     }
 };
 
@@ -171,17 +203,17 @@ struct serial_task_group {
 template <typename Benchmark>
 void measure_performance(std::size_t size, Benchmark benchmark) {
     benchmark_data_holder holder(size);
-    std::vector<std::chrono::steady_clock::rep> times;
-    for (int i = 0; i < 20; ++i) {
+    const int repetitions = 20;
+    std::vector<std::chrono::steady_clock::rep> times(repetitions);
+    for (int i = 0; i < repetitions; ++i) {
 
         auto t1 = std::chrono::steady_clock::now();
 
         benchmark(holder);
 
         auto t2 = std::chrono::steady_clock::now();
-        times.push_back(std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
+        times[i] = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
     }
-
 
     std::cout << Benchmark::name() << " - time = " << std::accumulate(times.begin(), times.end(), 0) / times.size() << "ms" << std::endl;
 }
@@ -191,6 +223,20 @@ int main() {
     measure_performance(size, serial_parallel_for{});
     measure_performance(size, two_tbb_parallel_for{});
     measure_performance(size, composable_parallel_for{});
+
+    {
+        const std::size_t iters_per_tbb_thread = 10;
+        const std::size_t num_tbb_threads = tbb::this_task_arena::max_concurrency();
+        const std::size_t num_tbb_iters = iters_per_tbb_thread * num_tbb_threads;
+
+        const std::size_t iters_per_omp_thread = iters_per_tbb_thread * 100;
+        const std::size_t num_omp_threads = std::size_t(omp_get_max_threads());
+        const std::size_t num_omp_iters = iters_per_omp_thread * num_omp_threads;
+
+        composable_per_iteration_parallel_for benchmark(num_tbb_iters, num_omp_iters);
+        measure_performance(/*size=*/num_tbb_iters * num_omp_iters, benchmark);
+    }
+
     measure_performance(size, serial_task_group{});
     measure_performance(size, composable_task_group{});
     measure_performance(size, tbb_arena_mix{});

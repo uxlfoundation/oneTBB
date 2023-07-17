@@ -23,8 +23,6 @@ if (NOT CMAKE_CXX_COMPILER_ID MATCHES "IntelLLVM")
   set(TCM_OPENMP_FLAG -fopenmp)
 endif()
 
-enable_testing()
-
 add_subdirectory(synthetic)
 add_subdirectory(tbb_examples)
 

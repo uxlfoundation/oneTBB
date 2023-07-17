@@ -58,9 +58,9 @@ namespace detail {
         using pool_ptr_t = std::unique_ptr<pool_t>;
 
         pool_ptr_t p_;
-        uint32_t max_concurrency_;
+        const int32_t max_concurrency_;
     public:
-        arena_tbb_impl(uint32_t max_concurrency = tbb::task_arena::automatic)
+        arena_tbb_impl(int32_t max_concurrency = tbb::task_arena::automatic)
             : max_concurrency_(max_concurrency)
         {
             p_.reset(new pool_t(max_concurrency_));
@@ -103,9 +103,10 @@ namespace detail {
     };
 
     class arena_omp_impl {
-        uint32_t max_concurrency_;
+        const uint32_t max_concurrency_;
     public:
-        arena_omp_impl(uint32_t max_concurrency = std::thread::hardware_concurrency()) : max_concurrency_(max_concurrency) {}
+        arena_omp_impl(uint32_t max_concurrency = 0)
+            : max_concurrency_(max_concurrency) {}
 
         ~arena_omp_impl() = default;
 
@@ -135,7 +136,6 @@ namespace detail {
             return "omp";
         }
     };
-    
 } // namespace detail
 
     template <typename I>
