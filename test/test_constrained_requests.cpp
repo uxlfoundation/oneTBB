@@ -544,10 +544,10 @@ bool test_request_all_numas_one_by_one() {
     int mask_weight = hwloc_bitmap_weight(permits[i].cpu_masks[0]);
     if (!(check_success(r, "tcmRequestPermit for client " + std::to_string(i)) &&
           check_permit(expected_permit, permits[i], skip_concurrency_and_mask_checks) &&
-          check(permits[i].concurrencies[0] > 0, "Concurrency was given") &&
-          check(mask_weight > 0, "Some mask was given") &&
+          check(permits[i].concurrencies[0] > 0, "Concurrency was given", /*num_indents*/1) &&
+          check(mask_weight > 0, "Some mask was given", /*num_indents*/1) &&
           check((numa_count == 1 && num_total_resources == mask_weight) ||
-                mask_weight < num_total_resources, "Given mask is reasonable")))
+                mask_weight < num_total_resources, "Given mask is reasonable", /*num_indents*/1)))
     {
         return test_fail(test_name);
     }
@@ -583,7 +583,8 @@ bool test_request_all_numas_one_by_one() {
     tcm_permit_t expected_permit = make_active_permit(&expected_concurrency);
     skip_checks_t skip_mask_check; skip_mask_check.mask = true;
     if (!(check_permit(expected_permit, permits[numa_count], skip_mask_check) &&
-          check(hwloc_bitmap_weight(permits[numa_count].cpu_masks[0]) > 0, "Mask was given")))
+          check(hwloc_bitmap_weight(permits[numa_count].cpu_masks[0]) > 0, "Mask was given",
+                /*num_indents*/1)))
     {
         return test_fail(test_name);
     }
@@ -619,10 +620,11 @@ bool test_request_all_numas_one_by_one() {
       permits[competitor_idx].concurrencies[0] + permits[numa_count].concurrencies[0];
   if (!(check_success(r, "Copied competitor permit data") &&
         check(hwloc_bitmap_compare(mask, permits[competitor_idx].cpu_masks[0]) == 0,
-              "Masks compare equally") &&
+              "Masks compare equally", /*num_indents*/1) &&
         check(competitor_previous_concurrency <= used_concurrency &&
               used_concurrency <= mask_oversubscribed_concurrency,
-              "The resources of the NUMA node is shared between intersecting permits")))
+              "The resources of the NUMA node is shared between intersecting permits",
+              /*num_indents*/1)))
   {
       return test_fail(test_name);
   }
@@ -712,10 +714,10 @@ bool test_request_all_numas_rigid_one_by_one() {
     int mask_weight = hwloc_bitmap_weight(permits[i].cpu_masks[0]);
     if (!(check_success(r, "tcmRequestPermit for client " + std::to_string(i)) &&
           check_permit(expected_permit, permits[i], skip_concurrency_and_mask_checks) &&
-          check(permits[i].concurrencies[0] > 0, "Concurrency was given") &&
-          check(mask_weight > 0, "Some mask was given") &&
+          check(permits[i].concurrencies[0] > 0, "Concurrency was given", /*num_indents*/1) &&
+          check(mask_weight > 0, "Some mask was given", /*num_indents*/1) &&
           check((numa_count == 1 && num_total_resources == mask_weight) ||
-                mask_weight < num_total_resources, "Given mask is reasonable")))
+                mask_weight < num_total_resources, "Given mask is reasonable", /*num_indents*/1)))
     {
         return test_fail(test_name);
     }

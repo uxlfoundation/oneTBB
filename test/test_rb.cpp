@@ -125,7 +125,7 @@ bool check_permits_concurrencies(const std::set<tcm_permit_handle_t>& phs,
     for (const auto& p : permits)
       ss << p.concurrencies[0] << " ";
     ss << std::endl;
-    check(false, "Found all concurrencies in concurrency set for given permits.", ss.str());
+    check(false, "Found all concurrencies in concurrency set for given permits." + ss.str());
   }
 
   return result;
@@ -493,7 +493,7 @@ bool test_overlapping_clients_two_callbacks() {
   succeeded = (eB_concurrency == pB.concurrencies[0] && eC_concurrency == pC.concurrencies[0]) ||
       (eC_concurrency == pB.concurrencies[0] && eB_concurrency == pC.concurrencies[0]);
   if (!succeeded) {
-    check(false, "Unexpected resource distribution.");
+    check(false, "Unexpected resource distribution.", /*num_indents*/1);
     test_fail(test_name);
   }
 

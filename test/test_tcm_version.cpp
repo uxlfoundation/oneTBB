@@ -25,17 +25,14 @@ bool test_runtime_version() {
 
     const char* runtime_version_string = tcmRuntimeVersion();
     bool is_equal = std::strcmp(runtime_version_string, TCM_VERSION) == 0;
-    res &= check(is_equal,
-        "Test runtime version",
-        "Running with the library of different version than the test was compiled against."
-    );
+    res &= check(is_equal, "Test runtime version", /*num_indents*/0,
+                 "Running with the library of different version than the test was compiled against.");
 
     unsigned api_version = tcmRuntimeInterfaceVersion();
     is_equal = api_version == TCM_INTERFACE_VERSION;
     res &= check(is_equal,
-        "Test runtime API version",
-        "Running with the library of different version than the test was compiled against."
-    );
+                 "Test runtime API version", /*num_indents*/0,
+                 "Running with the library of different version than the test was compiled against.");
 
     return test_stop(res, test_name);
 }

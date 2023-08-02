@@ -26,6 +26,7 @@ __TCM_SUPPRESS_WARNING_POP
 #include <vector>
 #include <set>
 #include <iostream>
+#include <sstream>
 #include <algorithm>
 #include <thread>
 #include <string>
@@ -132,14 +133,24 @@ std::string to_string(const tcm_permit_flags_t flags) {
                      ", exclusive=" + std::to_string(flags.exclusive));
 }
 
-bool check(bool b, const std::string& msg, const std::string& report_msg = "") {
+const char* single_indent = "  ";    // default indent in the test output
+
+bool check(bool b, const std::string& msg, unsigned num_indents = 0,
+           const std::string& report_msg = "")
+{
+  std::stringstream ss;
+  for (unsigned i = 0; i < num_indents; ++i) {
+      ss << single_indent;
+  }
+  std::string indent = ss.str();
+
   if (!b) {
-    std::cout << "*****************" << msg << std::endl;
-    std::cout << "      ERROR      " << msg << std::endl;
-    std::cout << "*****************" << msg << std::endl;
+    std::cout << "***************** " << indent << msg << std::endl;
+    std::cout << "*     ERROR     * " << indent << msg << std::endl;
+    std::cout << "***************** " << indent << msg << std::endl;
     std::cout << report_msg;
   }  else if (!msg.empty()){
-    std::cout << "SUCCESS: " << msg << std::endl;
+    std::cout << "SUCCESS: " << indent << msg << std::endl;
   }
   return b;
 }
@@ -167,7 +178,7 @@ inline bool succeeded(tcm_result_t res) {
 inline bool check_success(tcm_result_t res, const std::string& msg = "",
                           const std::string& report_msg = "")
 {
-  return check(succeeded(res), msg, report_msg);
+  return check(succeeded(res), msg, /*num_indents*/0, report_msg);
 }
 
 const float tcm_oversubscription_factor = [] {
@@ -215,7 +226,7 @@ int32_t get_mask_oversubscribed_concurrency(tcm_cpu_mask_t mask) {
 }
 
 bool check_permit_size(const tcm_permit_t& expected, const tcm_permit_t& actual,
-                       const bool report = true)
+                       const unsigned num_indents = 0, const bool report = true)
 {
   const auto& a = actual.size;
   const auto& e = expected.size;
@@ -224,12 +235,12 @@ bool check_permit_size(const tcm_permit_t& expected, const tcm_permit_t& actual,
   std::string report_str = "Check size of arrays inside permit, expected " + std::to_string(e) +
       " equals to actual " + std::to_string(a);
 
-  return report ? check(result, report_str) : result;
+  return report ? check(result, report_str, num_indents) : result;
 }
 
 
 bool check_permit_concurrency(const tcm_permit_t& expected, const tcm_permit_t& actual,
-                              const bool report = true)
+                              const unsigned num_indents = 0, const bool report = true)
 {
   bool result = false;
   std::string report_str{};
@@ -246,21 +257,21 @@ bool check_permit_concurrency(const tcm_permit_t& expected, const tcm_permit_t& 
       break;
   }
 
-  return report ? check(result, report_str) : result;
+  return report ? check(result, report_str, num_indents) : result;
 }
 
 bool check_permit_mask(const tcm_permit_t& expected, const tcm_permit_t& actual,
-                       const bool report = true)
+                       const unsigned num_indents = 0, const bool report = true)
 {
   std::string report_str{};
   // check the cpu_masks pointers
   if (expected.cpu_masks == nullptr && actual.cpu_masks == nullptr) {
-    return check(true, "Both masks are null pointers");
+    return check(true, "Both masks are null pointers", num_indents);
   } else if (expected.cpu_masks == nullptr || actual.cpu_masks == nullptr) {
     report_str = "Check CPU mask, expected cpu_masks pointer '" +
         std::to_string(uintptr_t(expected.cpu_masks)) + "' equals to actual cpu_masks pointer '" +
         std::to_string(uintptr_t(actual.cpu_masks)) + "'";
-    return report ? check(false, report_str) : false;
+    return report ? check(false, report_str, num_indents) : false;
   }
 
   bool result = true;
@@ -279,7 +290,7 @@ bool check_permit_mask(const tcm_permit_t& expected, const tcm_permit_t& actual,
     }
 
     if (report) {
-        result &= check(result, report_str);
+        result &= check(result, report_str, num_indents);
     }
   }
 
@@ -291,7 +302,7 @@ static const char* states[] = {
 };
 
 bool check_permit_state(const tcm_permit_t& expected, const tcm_permit_t& actual,
-                        const bool report = true)
+                        const unsigned num_indents = 0, const bool report = true)
 {
   const auto& e = expected.state; const auto& a = actual.state;
   const bool result = (e == a);
@@ -299,11 +310,11 @@ bool check_permit_state(const tcm_permit_t& expected, const tcm_permit_t& actual
     " (" + std::string(states[e]) + ") equals to actual " + std::to_string(a) +
     " (" + std::string(states[a]) + ")";
 
-  return report ? check(result, report_str) : result;
+  return report ? check(result, report_str, num_indents) : result;
 }
 
 bool check_permit_flags(const tcm_permit_t& expected, const tcm_permit_t& actual,
-                        const bool report = true)
+                        const unsigned num_indents = 0, const bool report = true)
 {
   const auto& e = expected.flags; const auto& a = actual.flags;
   bool result = true;
@@ -314,7 +325,7 @@ bool check_permit_flags(const tcm_permit_t& expected, const tcm_permit_t& actual
   std::string report_str("Check flags, expected: " + to_string(e) +
                          " equals to actual: " + to_string(a));
 
-  return report ? check(result, report_str) : result;
+  return report ? check(result, report_str, num_indents) : result;
 }
 
 struct skip_checks_t {
@@ -328,23 +339,24 @@ struct skip_checks_t {
 // Compares two permits' data. Returns true if the data is equal, false -
 // otherwise. Function allows skipping check of specific permit data fields.
 bool check_permit(const tcm_permit_t& expected, const tcm_permit_t& actual,
-                  const skip_checks_t skip = {}, const bool report = true)
+                  const skip_checks_t skip = {}, unsigned num_indents = 1, const bool report = true)
 {
   bool result = true;
-  result &= skip.size         || check_permit_size(expected, actual, report);
-  result &= skip.concurrency  || check_permit_concurrency(expected, actual, report);
-  result &= skip.mask         || check_permit_mask(expected, actual, report);
-  result &= skip.state        || check_permit_state(expected, actual, report);
-  result &= skip.flags        || check_permit_flags(expected, actual, report);
+  result &= skip.size         || check_permit_size(expected, actual, num_indents, report);
+  result &= skip.concurrency  || check_permit_concurrency(expected, actual, num_indents, report);
+  result &= skip.mask         || check_permit_mask(expected, actual, num_indents, report);
+  result &= skip.state        || check_permit_state(expected, actual, num_indents, report);
+  result &= skip.flags        || check_permit_flags(expected, actual, num_indents, report);
   return result;
 }
 
 //! Checks the expected permit data with the data obtained by reading passed
 //! permit handle. Returns true if the data is equal, and false - otherwise.
 bool check_permit(const tcm_permit_t& expected, tcm_permit_handle_t ph,
-                  const skip_checks_t skip = {}, const bool report = true)
+                  const skip_checks_t skip = {}, const unsigned num_indents = 1,
+                  const bool report = true)
 {
-  if (!check(ph, "check permit handle is not nullptr."))
+  if (!check(ph, "check permit handle is not nullptr.", num_indents))
     return false;
 
   __TCM_ASSERT(expected.size > 0, "Permit size cannot be zero.");
@@ -361,22 +373,24 @@ bool check_permit(const tcm_permit_t& expected, tcm_permit_handle_t ph,
   tcm_result_t reading_result = tcmGetPermitData(ph, &actual);
   if (!check_success(reading_result)) {
       return check(false, "Reading data from permit " + std::to_string(uintptr_t(ph)),
-                   "tcmGetPermitData() returns status " + std::to_string(reading_result));
+                   num_indents, "tcmGetPermitData() returns status " +
+                   std::to_string(reading_result));
   }
 
-  bool result = check_permit(expected, actual, skip, report);
+  bool result = check_permit(expected, actual, skip, num_indents, report);
   return result;
 }
 
 typedef std::pair<const tcm_permit_t&, const tcm_permit_t&> tcm_permits_pair_t;
 
 bool check_permits(std::initializer_list<tcm_permits_pair_t> expected_and_actual_permit_pairs,
-                   const skip_checks_t skip = {}, const bool report = true)
+                   const unsigned num_indents = 0, const skip_checks_t skip = {},
+                   const bool report = true)
 {
     bool result = true;
     for (const auto& pair : expected_and_actual_permit_pairs) {
         const auto& expected = pair.first; const auto& actual = pair.second;
-        result &= check_permit(expected, actual, skip, report);
+        result &= check_permit(expected, actual, skip, num_indents, report);
     }
     return result;
 }
@@ -384,12 +398,12 @@ bool check_permits(std::initializer_list<tcm_permits_pair_t> expected_and_actual
 typedef std::pair<const tcm_permit_t&, tcm_permit_handle_t&> tcm_permit_and_handle_pair_t;
 
 bool check_permits(std::initializer_list<tcm_permit_and_handle_pair_t> expected_and_actual_permit_pairs,
-                   const skip_checks_t skip = {}, const bool report = true)
+                   const unsigned num_indents = 1, const skip_checks_t skip = {}, const bool report = true)
 {
     bool result = true;
     for (const auto& pair : expected_and_actual_permit_pairs) {
         const auto& expected = pair.first; auto& permit_handle = pair.second;
-        result &= check_permit(expected, permit_handle, skip, report);
+        result &= check_permit(expected, permit_handle, skip, num_indents, report);
     }
     return result;
 }
@@ -512,14 +526,16 @@ typedef std::vector< std::pair<tcm_permit_handle_t*, tcm_permit_t*> > permits_da
  * Thus, if existing permits are passed as a parameter, the function returns
  * permit handles, for which the renegotiation should not have taken place.
  */
-std::set<tcm_permit_handle_t*> list_unchanged_permits(const permits_data_t& pds) {
+std::set<tcm_permit_handle_t*> list_unchanged_permits(const permits_data_t& pds,
+                                                      const unsigned num_indents = 0)
+{
   std::set<tcm_permit_handle_t*> result;
 
   for (auto& pd : pds) {
     const tcm_permit_handle_t ph = *pd.first;
     const tcm_permit_t& expected = *pd.second;
 
-    if (check_permit(expected, ph, skip_checks_t{}, /*report*/false))
+    if (check_permit(expected, ph, skip_checks_t{}, num_indents, /*report*/false))
       result.insert(pd.first);
   }
 

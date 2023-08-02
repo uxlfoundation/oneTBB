@@ -83,7 +83,6 @@ bool test_state_functions() {
   if (!check_success(r, "tcmDisconnect"))
     return test_fail(test_name);
 
-  std::cout << "test_state_functions done" << std::endl;
   return test_epilog(test_name);
 }
 
@@ -625,7 +624,7 @@ bool test_take_from_idle_when_required_is_satisfied() {
         }
         disconnect_client(client);
     } catch (const tcm_exception& e) {
-        test_succeeded = check(false, "Exception thrown: ", e.what());
+        test_succeeded = check(false, std::string("Exception thrown: ") + e.what());
     }
 
     return test_stop(test_succeeded, test_name);
@@ -671,7 +670,6 @@ bool test_thread_registration() {
   if (!check_success(r, "tcmDisconnect"))
     return test_fail(test_name);
 
-  std::cout << "test_registration done" << std::endl;
   return test_epilog(test_name);
 }
 
@@ -860,7 +858,7 @@ bool test_request_initialized_by_default() {
 
       disconnect_client(client);
   } catch (const tcm_exception& e) {
-      test_succeeded = check(false, "Exception thrown: ", e.what());
+      test_succeeded = check(false, std::string("Exception thrown: ") + e.what());
   }
 
   return test_stop(test_succeeded, test_name);
