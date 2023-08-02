@@ -10,6 +10,7 @@ The following project controls are available during the configure stage:
 ```
 TCM_TEST:BOOL - Enable testing (ON by default)
 TCM_STRICT:BOOL - Treat compiler warnings as errors (ON by default)
+TCM_PROFILE:STRING - Enable profiling of TCM functionality
 ```
 
 Command

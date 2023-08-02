@@ -32,6 +32,8 @@ endif()
 option(TCM_TEST "Enable testing" ON)
 option(TCM_STRICT "Treat compiler warnings as errors" ON)
 
+set(TCM_PROFILE ${TCM_PROFILE} CACHE STRING "Enable profiling of TCM functionality" FORCE)
+
 # include compile settings
 set(TCM_COMPILER_SETTINGS_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/compilers/${CMAKE_CXX_COMPILER_ID}.cmake)
 if (EXISTS ${TCM_COMPILER_SETTINGS_FILE})

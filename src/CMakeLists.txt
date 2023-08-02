@@ -25,6 +25,10 @@ add_library(tcm SHARED
 
 add_library(TCM::tcm ALIAS tcm)
 
+if (TCM_PROFILE STREQUAL "api-durations")
+  set(TCM_PROFILE_FLAGS -D__TCM_ENABLE_TIME_TRACER=1)
+endif()
+
 target_compile_options(tcm
   PRIVATE
   ${TCM_WARNING_LEVEL}
@@ -33,6 +37,7 @@ target_compile_options(tcm
   ${TCM_MMD_FLAG}
   ${TCM_DSE_FLAG}
   ${TCM_COMMON_COMPILE_FLAGS}
+  ${TCM_PROFILE_FLAGS}
 )
 target_compile_definitions(tcm PRIVATE ${TCM_COMPILE_DEFINITIONS})
 
