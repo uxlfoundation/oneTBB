@@ -694,59 +694,93 @@ bool has_unused_resources(const ThreadComposabilityManagerData& data) {
     return data.available_concurrency || !data.idle_permits.empty();
 }
 
+
 /**
- * Applies changes to the permits according to the given updates. Returns the list of callbacks and
+ * Updates single permit according to the change. Records what is changed and returns concurrency
+ * delta.
+ */
+int32_t update(tcm_permit_data_t& permit, tcm_permit_state_t current_state,
+               const permit_change_t& change, tcm_callback_flags_t& reason)
+{
+    int32_t concurrency_delta = 0;
+
+    prepare_permit_modification(change.ph);
+    {
+        if (current_state != change.new_state) {
+            permit.state.store(change.new_state, std::memory_order_relaxed);
+            reason.new_state = true;
+        }
+
+        for (std::size_t i = 0; i < change.new_concurrencies.size(); ++i) {
+            const uint32_t old_concurrency = permit.concurrency[i].load(std::memory_order_relaxed);
+            const uint32_t new_concurrency = change.new_concurrencies[i];
+            if (old_concurrency != new_concurrency) {
+                permit.concurrency[i].store(new_concurrency, std::memory_order_relaxed);
+                reason.new_concurrency = true;
+                concurrency_delta += old_concurrency - new_concurrency;
+            }
+        }
+    }
+    commit_permit_modification(change.ph);
+
+    return concurrency_delta;
+}
+
+/**
+ * Applies given change to the permit, maintaining internal state and populating callbacks container
+ * if necessary.
+ * Returns concurrency delta.
+ */
+int32_t apply(const permit_change_t& change, ThreadComposabilityManagerData& data,
+              const tcm_permit_handle_t initiator, const bool remove_initiator_first,
+              update_callbacks_t& callbacks)
+{
+    const tcm_permit_handle_t permit_handle = change.ph;
+    callback_args_t args{permit_handle, /*callback_arg*/nullptr, /*reason invoking callback*/{}};
+    tcm_callback_flags_t& reason = args.reason;
+
+    tcm_permit_data_t& permit = permit_handle->data;
+    tcm_permit_state_t state = permit.state.load(std::memory_order_relaxed);
+
+    if (permit_handle != initiator || remove_initiator_first) {
+        remove_permit(data, permit_handle, state);
+    }
+
+    int32_t concurrency_delta = update(permit, state, change, reason);
+
+    add_permit(data, permit_handle, change.new_state);
+
+    // Record callback invocation for modified permits, except for an initiator of the change
+    if (permit_handle != initiator && (reason.new_concurrency || reason.new_state)) {
+        tcm_callback_t callback = data.client_to_callback_map[permit.client_id];
+        if (callback) {
+            args.callback_arg = data.permit_to_callback_arg_map[permit_handle];
+            callbacks.insert( {callback, args} );
+        }
+    }
+
+    return concurrency_delta;
+}
+
+/**
+ * Applies changes to permits according to the given updates. Returns the list of callbacks and
  * their arguments to be invoked.
  *
  * The callback is added into the returned list only if there was an actual change to the permit.
  */
-update_callbacks_t apply(ThreadComposabilityManagerData& data, const tcm_permit_handle_t initiator,
-                         const std::vector<permit_change_t>& updates)
+update_callbacks_t apply(ThreadComposabilityManagerData& data,
+                         const std::vector<permit_change_t>& updates,
+                         const tcm_permit_handle_t initiator,
+                         const bool remove_initiator_first = true)
 {
     auto nested_tracer = make_event_duration_tracer(data.time_tracer, tcm_events::apply);
-    update_callbacks_t update_callbacks;
+    update_callbacks_t callbacks;
 
     int32_t concurrency_delta = 0;
-    for (const auto& change : updates) {
-        callback_args_t args{change.ph, data.permit_to_callback_arg_map[change.ph], {}};
-
-        tcm_permit_data_t& original_data = change.ph->data;
-        tcm_permit_state_t current_state = original_data.state.load(std::memory_order_relaxed);
-
-        // Even if state has not been changed, we need to re-insert the element into the dedicated
-        // ordered container, since with changed concurrency its position among the container
-        // elements will likely also change
-        remove_permit(data, change.ph, current_state);
-
-        prepare_permit_modification(change.ph);
-        if (current_state != change.new_state) {
-            original_data.state.store(change.new_state, std::memory_order_relaxed);
-            args.reason.new_state = true;
-        }
-
-        std::atomic<uint32_t>* original_concurrencies = original_data.concurrency;
-        for (std::size_t i = 0; i < change.new_concurrencies.size(); ++i) {
-            const uint32_t old_concurrency = original_concurrencies[i].load(std::memory_order_relaxed);
-            const uint32_t new_concurrency = change.new_concurrencies[i];
-            if (old_concurrency != new_concurrency) {
-                original_concurrencies[i].store(new_concurrency, std::memory_order_relaxed);
-                args.reason.new_concurrency = true;
-                concurrency_delta += old_concurrency - new_concurrency;
-            }
-        }
-        commit_permit_modification(change.ph);
-
-        add_permit(data, change.ph, change.new_state);
-
-        if (change.ph == initiator)    // Skip callback invocation for the change requestor
-            continue;
-
-        if (args.reason.new_concurrency || args.reason.new_state) { // if there was a change
-            tcm_callback_t callback = data.client_to_callback_map[original_data.client_id];
-            if (callback) {
-                update_callbacks.insert( {callback, args} );
-            }
-        }
+    for (unsigned i = 0; i < updates.size(); ++i) {
+        __TCM_ASSERT(updates[i].ph != initiator || updates.size() - 1 == i,
+                     "Initiator of updates should be the last in the list");
+        concurrency_delta += apply(updates[i], data, initiator, remove_initiator_first, callbacks);
     }
 
 #if TCM_USE_ASSERT
@@ -761,7 +795,7 @@ update_callbacks_t apply(ThreadComposabilityManagerData& data, const tcm_permit_
 
     data.available_concurrency += concurrency_delta;
 
-    return update_callbacks;
+    return callbacks;
 }
 
 
@@ -1023,17 +1057,19 @@ public:
           __TCM_ASSERT(available_concurrency <= available_concurrency + released, "Overflow detected");
           available_concurrency += released;
       }
-      pending_permits.insert(ph);
-
       deduce_request_arguments(ph->request, sum_constraints_min);
 
       permit_to_callback_arg_map[ph] = callback_arg;
 
       std::vector<permit_change_t> updates = adjust_existing_permit(ph->request, ph);
 
-      callbacks = apply(*this, /*initiator*/ph, updates);
+      if (!updates.empty()) {
+          callbacks = apply(*this, updates, /*initiator*/ph, /*remove_initiator_first*/false);
+      } else {
+          pending_permits.insert(ph);
+      }
 
-      // client might re-request for less number of resources
+      // Client might re-request for less number of resources
       additional_concurrency_available = available_concurrency > initially_available;
     }
 
@@ -1131,7 +1167,7 @@ public:
       }
       add_permit(*this, ph, TCM_PERMIT_STATE_PENDING);
       std::vector<permit_change_t> updates = adjust_existing_permit(ph->request, ph);
-      callbacks = apply(*this, ph, updates);
+      callbacks = apply(*this, updates, ph);
     }
     invoke_callbacks(callbacks, time_tracer);
 
@@ -2328,7 +2364,7 @@ public:
                     // Pass nullptr as the initiator value because the change in resource
                     // distribution is not initiated by current permit. This helps to force callback
                     // invocation for this permit, hence notifying it about the changes.
-                    callbacks = apply(*this, /*initiator*/nullptr, updates);
+                    callbacks = apply(*this, updates, /*initiator*/nullptr);
                 }
                 available_concurrency_snapshot = available_concurrency;
             } // end of mutex lock scope
@@ -2350,9 +2386,10 @@ public:
     {
         // The data_mutex lock must be taken
         tracer t("ThreadComposabilityFCFSCImpl::adjust_existing_permit");
+
         auto nested_tracer = make_event_duration_tracer(time_tracer, tcm_events::adjust_existing_permit);
 
-        __TCM_ASSERT(is_valid(ph), "Invalid permit.");
+        __TCM_ASSERT(is_pending(ph), "Invalid permit.");
 
         fulfillment_t ff = try_satisfy_request(req, ph, available_concurrency);
 
@@ -2481,7 +2518,7 @@ protected:
                     continue;   // As there might be pending requests for other part of the platform
                 }
                 std::vector<permit_change_t> updates = negotiate(ff, pr, ph);
-                update_callbacks_t additional_callbacks = apply(*this, /*initiator*/nullptr, updates);
+                update_callbacks_t additional_callbacks = apply(*this, updates, /*initiator*/nullptr);
 
                 // Avoid invoking callback for the same permit multiple times
                 merge_callback_invocations(callbacks, additional_callbacks);
@@ -2517,7 +2554,7 @@ protected:
                 // resources has been given already.
                 fulfillment_t ff = try_satisfy_request(ph->request, ph, available_concurrency);
                 std::vector<permit_change_t> updates = negotiate(ff, ph->request, ph);
-                update_callbacks_t additional_callbacks = apply(*this, /*initiator*/nullptr, updates);
+                update_callbacks_t additional_callbacks = apply(*this, updates, /*initiator*/nullptr);
 
                 // Avoid invoking callback for the same permit multiple times
                 merge_callback_invocations(callbacks, additional_callbacks);
@@ -2535,7 +2572,7 @@ protected:
         tracer t("ThreadComposabilityFairBalance::adjust_existing_permit");
         auto nested_tracer = make_event_duration_tracer(time_tracer, tcm_events::adjust_existing_permit);
 
-        __TCM_ASSERT(is_valid(ph), "Invalid permit.");
+        __TCM_ASSERT(is_pending(ph), "Invalid permit.");
 
         // Trying to squeeze resources out of the platform, returning permits that share
         // resources needed by that ph
