@@ -22,14 +22,14 @@ namespace tcm {
 namespace internal {
     struct environment {
         static constexpr int string_size = 16;
-        int tcm_disable = 0;
+        int tcm_enable = 0;
         int tcm_version = 0;
         float tcm_oversubscription_factor = 1.0;
         char tcm_resource_distribution_strategy[string_size+1] = "FAIR";
 
         environment() {
             process_env_var("TCM_VERSION", tcm_version);
-            process_env_var("TCM_DISABLE", tcm_disable);
+            process_env_var("TCM_ENABLE", tcm_enable);
             process_env_var("TCM_OVERSUBSCRIPTION_FACTOR", tcm_oversubscription_factor);
             process_env_var("TCM_RESOURCE_DISTRIBUTION_STRATEGY", tcm_resource_distribution_strategy);
 

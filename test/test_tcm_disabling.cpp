@@ -15,16 +15,16 @@
 #include "tcm.h"
 #include <limits>
 
-const char* tcm_disable_env_name = "TCM_DISABLE";
+const char* tcm_enable_env_name = "TCM_ENABLE";
 
 bool is_tcm_enabled() {
-  if (char* tcm_disable_env = std::getenv(tcm_disable_env_name)) {
-    int tcm_disable_env_value = std::atoi(tcm_disable_env);
-    if (tcm_disable_env_value != 0) {
-      return false;
+  if (char* tcm_enable_env = std::getenv(tcm_enable_env_name)) {
+    int tcm_enable_env_value = std::atoi(tcm_enable_env);
+    if (tcm_enable_env_value != 0) {
+      return true;
     }
   }
-  return true;
+  return false;
 }
 
 bool test_tcm_connection(const bool is_success_expected) {

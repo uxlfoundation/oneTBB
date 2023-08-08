@@ -2679,7 +2679,7 @@ class theTCM {
 
 public:
   static bool is_enabled() {
-    return tcm_env.tcm_disable == 0;
+    return tcm_env.tcm_enable == 1;
   }
 
   friend float internal::tcm_oversubscription_factor();

@@ -13,6 +13,14 @@
 #include "tcm/detail/_environment.h"
 #include "tcm/version.h"
 
+#ifndef __TCM_BUILD_TIME
+    #define __TCM_BUILD_TIME "unknown"
+#endif
+
+#ifndef __TCM_COMMIT_ID
+    #define __TCM_COMMIT_ID "unknown"
+#endif
+
 #if _WIN32
     #ifndef WIN32_LEAN_AND_MEAN
         #define WIN32_LEAN_AND_MEAN
@@ -87,22 +95,17 @@ int environment::get_version_string(const environment& env_info, char* buffer, u
 
             int printed = 0;
             if (env_info.tcm_version > 0) {
-                // -34 format is needed because the length "TCM_RESOURCE_DISTRIBUTION_STRATEGY"
-                // string is 34 symbols long so this amount of symbols must be reserved
-                print_extra_info(hwloc_info, default_buffer_sz, "%-34s %d.%d.%d", "HWLOC API VERSION", (hwloc_version >> 16),
+                // -18 format is needed because the length "HWLOC LIBRARY PATH"
+                // string is 18 symbols long so this amount of symbols must be reserved
+                print_extra_info(hwloc_info, default_buffer_sz, "%-18s %d.%d.%d", "HWLOC API VERSION", (hwloc_version >> 16),
                             (hwloc_version >> 8) & 0xff, hwloc_version & 0xff);
-                printed =  print_extra_info(internal_info, default_buffer_sz, "%-34s %s", "HWLOC LIBRARY PATH", get_hwloc_path());
-                printed += print_extra_info(internal_info+printed, default_buffer_sz-printed, "%-34s %s", "TCM_DEBUG", __TCM_DEBUG_STRING);
-                printed += print_extra_info(internal_info+printed, default_buffer_sz-printed, "%-34s %d", "TCM_DISABLE", env_info.tcm_disable);
-                printed += print_extra_info(internal_info+printed, default_buffer_sz-printed, "%-34s %s", "TCM_RESOURCE_DISTRIBUTION_STRATEGY",
-                                            env_info.tcm_resource_distribution_strategy);
-                print_extra_info(tcm_variables_info, default_buffer_sz, "%-34s %.2f", "TCM_OVERSUBSCRIPTION_FACTOR",
-                                env_info.tcm_oversubscription_factor);
-            } else if (env_info.tcm_disable == 0) {
-                print_extra_info(tcm_variables_info, default_buffer_sz, "%-34s %.2f", "TCM_OVERSUBSCRIPTION_FACTOR",
-                                env_info.tcm_oversubscription_factor);
-            } else {
-                print_extra_info(tcm_variables_info, default_buffer_sz, "%-34s %d", "TCM_DISABLE", env_info.tcm_disable);
+                printed = print_extra_info(internal_info, default_buffer_sz, "%-18s %s", "HWLOC LIBRARY PATH", get_hwloc_path());
+                printed += print_extra_info(internal_info+printed, default_buffer_sz-printed, "%-18s %s", "BUILD TIME", __TCM_BUILD_TIME);
+                printed += print_extra_info(internal_info+printed, default_buffer_sz-printed, "%-18s %s", "COMMIT ID", __TCM_COMMIT_ID);
+                printed += print_extra_info(internal_info+printed, default_buffer_sz-printed, "%-18s %s", "TCM_DEBUG", __TCM_DEBUG_STRING);
+                print_extra_info(internal_info+printed, default_buffer_sz-printed, "%-18s %d", "TCM_ENABLE", env_info.tcm_enable);
+            } else if (env_info.tcm_enable == 0) {
+                print_extra_info(tcm_variables_info, default_buffer_sz, "%-18s %s", "TCM", "disabled");
             }
 
         }

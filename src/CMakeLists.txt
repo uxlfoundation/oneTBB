@@ -39,7 +39,13 @@ target_compile_options(tcm
   ${TCM_COMMON_COMPILE_FLAGS}
   ${TCM_PROFILE_FLAGS}
 )
-target_compile_definitions(tcm PRIVATE ${TCM_COMPILE_DEFINITIONS})
+
+string(TIMESTAMP tcm_build_time "%Y-%m-%d %H:%M:%S UTC" UTC)
+target_compile_definitions(tcm PRIVATE
+  ${TCM_COMPILE_DEFINITIONS}
+  __TCM_BUILD_TIME="${tcm_build_time}"
+  $<$<BOOL:${TCM_COMMIT_ID}>:__TCM_COMMIT_ID="${TCM_COMMIT_ID}">
+)
 
 target_include_directories(tcm PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>

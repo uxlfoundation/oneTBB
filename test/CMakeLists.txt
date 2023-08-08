@@ -25,8 +25,8 @@ endif()
 find_package(Threads REQUIRED)
 
 function(add_tcm_test)
-  set(oneValueArgs NAME ENVIRONMENT)
-  set(multiValueArgs DEPENDENCIES)
+  set(oneValueArgs NAME)
+  set(multiValueArgs ENVIRONMENT DEPENDENCIES)
   cmake_parse_arguments(_tcm_test "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
   add_executable(${_tcm_test_NAME} ${_tcm_test_NAME}.cpp)
@@ -51,10 +51,10 @@ function(add_tcm_test)
   set_tests_properties(${_tcm_test_NAME} PROPERTIES ENVIRONMENT "${_tcm_test_ENVIRONMENT}")
 endfunction()
 
-add_tcm_test(NAME test_basic_apis)
-add_tcm_test(NAME test_fcfsc ENVIRONMENT "TCM_RESOURCE_DISTRIBUTION_STRATEGY=FCFS")
-add_tcm_test(NAME test_rb ENVIRONMENT "TCM_RESOURCE_DISTRIBUTION_STRATEGY=FAIR")
-add_tcm_test(NAME test_constrained_requests)
+add_tcm_test(NAME test_basic_apis ENVIRONMENT "TCM_ENABLE=1")
+add_tcm_test(NAME test_fcfsc ENVIRONMENT "TCM_ENABLE=1;TCM_RESOURCE_DISTRIBUTION_STRATEGY=FCFS")
+add_tcm_test(NAME test_rb ENVIRONMENT "TCM_ENABLE=1;TCM_RESOURCE_DISTRIBUTION_STRATEGY=FAIR")
+add_tcm_test(NAME test_constrained_requests ENVIRONMENT "TCM_ENABLE=1")
 add_tcm_test(NAME test_tcm_version)
 add_tcm_test(NAME test_tcm_environment)
 
@@ -65,24 +65,23 @@ set_tests_properties(test_tcm_environment PROPERTIES
 add_test(NAME test_tcm_environment_version_set COMMAND test_tcm_environment
          WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 set_tests_properties(test_tcm_environment_version_set PROPERTIES
-  ENVIRONMENT "TCM_VERSION=1"
-  PASS_REGULAR_EXPRESSION "TCM: VERSION.*TCM: VERSION;TCM: TCM_DISABLE *0"
+  ENVIRONMENT "TCM_VERSION=1;TCM_ENABLE=1"
+  PASS_REGULAR_EXPRESSION "TCM: VERSION.*TCM: VERSION;TCM: TCM_ENABLE *1"
   FAIL_REGULAR_EXPRESSION "ERROR"
 )
 
 add_test(NAME test_tcm_environment_disable COMMAND test_tcm_environment
          WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 set_tests_properties(test_tcm_environment_disable PROPERTIES
-  ENVIRONMENT "TCM_DISABLE=1"
-  PASS_REGULAR_EXPRESSION  "TCM: TCM_DISABLE *1"
-  FAIL_REGULAR_EXPRESSION "ERROR;TCM: TCM_OVERSUBSCRIPTION_FACTOR"
+  PASS_REGULAR_EXPRESSION  "TCM: TCM *disabled"
+  FAIL_REGULAR_EXPRESSION "ERROR"
 )
 
 add_test(NAME test_tcm_environment_disable_version_set COMMAND test_tcm_environment
          WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 set_tests_properties(test_tcm_environment_disable_version_set PROPERTIES
-  ENVIRONMENT "TCM_VERSION=1;TCM_DISABLE=1"
-  PASS_REGULAR_EXPRESSION  "TCM: VERSION.*TCM: VERSION;TCM: TCM_DISABLE *1;TCM: TCM_OVERSUBSCRIPTION_FACTOR"
+  ENVIRONMENT "TCM_VERSION=1"
+  PASS_REGULAR_EXPRESSION  "TCM: VERSION.*TCM: VERSION;TCM: TCM_ENABLE *0"
   FAIL_REGULAR_EXPRESSION "ERROR"
 )
 
@@ -95,13 +94,13 @@ target_compile_definitions(${TCM_TEST_DISABLING} PRIVATE ${TCM_COMPILE_DEFINITIO
 target_link_libraries(${TCM_TEST_DISABLING} PUBLIC TCM::tcm HWLOC::hwloc)
 
 add_test(NAME ${TCM_TEST_DISABLING}_with_empty_env COMMAND ${TCM_TEST_DISABLING} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-set_tests_properties(${TCM_TEST_DISABLING}_with_empty_env PROPERTIES ENVIRONMENT "TCM_DISABLE=")
+set_tests_properties(${TCM_TEST_DISABLING}_with_empty_env PROPERTIES ENVIRONMENT "TCM_ENABLE=")
 
 add_test(NAME ${TCM_TEST_DISABLING}_with_non_null_env COMMAND ${TCM_TEST_DISABLING} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-set_tests_properties(${TCM_TEST_DISABLING}_with_non_null_env PROPERTIES ENVIRONMENT "TCM_DISABLE=1")
+set_tests_properties(${TCM_TEST_DISABLING}_with_non_null_env PROPERTIES ENVIRONMENT "TCM_ENABLE=1")
 
 add_test(NAME ${TCM_TEST_DISABLING}_with_null_env COMMAND ${TCM_TEST_DISABLING} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-set_tests_properties(${TCM_TEST_DISABLING}_with_null_env PROPERTIES ENVIRONMENT "TCM_DISABLE=0")
+set_tests_properties(${TCM_TEST_DISABLING}_with_null_env PROPERTIES ENVIRONMENT "TCM_ENABLE=0")
 
 
 # Test no crash occurs if the app exits while still using TCM
@@ -115,3 +114,4 @@ target_compile_definitions(${TCM_TEST_PREMATURE_EXIT}
 target_include_directories(${TCM_TEST_PREMATURE_EXIT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 target_link_libraries(${TCM_TEST_PREMATURE_EXIT} PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
 add_test(NAME ${TCM_TEST_PREMATURE_EXIT} COMMAND ${TCM_TEST_PREMATURE_EXIT})
+set_tests_properties(${TCM_TEST_PREMATURE_EXIT} PROPERTIES ENVIRONMENT "TCM_ENABLE=1")
