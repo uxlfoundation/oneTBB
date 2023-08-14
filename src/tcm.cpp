@@ -2731,7 +2731,7 @@ float internal::tcm_oversubscription_factor() {
 extern "C" {
 
 ///////////////////////////////////////////////////////////////////////////////
-/// @brief Initialize the connection to the thread composability manager
+/// @brief Initialize the connection to Thread Composability Manager
 ///
 /// @details
 ///     - The client must call this function before calling any other
@@ -2755,11 +2755,11 @@ tcm_result_t tcmConnect(tcm_callback_t callback, tcm_client_id_t *client_id)
   return TCM_RESULT_ERROR_UNKNOWN;
 }
 
-/// @brief Terminate the connection with the thread composability manager
+/// @brief Terminate the connection with Thread Composability Manager
 ///
 /// @details
 ///     - Must be called whenever the client, which is seen as a set of permits associated
-///       with the given client_id, finishes its work with the thread composability manager
+///       with the given client_id, finishes its work with Thread Composability Manager
 ///       and no other calls, possibly except for tcmConnect are expected to be made
 ///       from that client.
 ///
