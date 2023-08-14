@@ -935,6 +935,23 @@ bool test_incorrect_requests() {
   return test_epilog(test_name);
 }
 
+bool test_releasing_nullptr() {
+    const char* test_name = __func__;
+    test_prolog(test_name);
+
+    auto client_id = connect_new_client(nullptr);
+
+    auto r = tcmReleasePermit(/*permit_handle*/nullptr);
+    if (!check(r == TCM_RESULT_ERROR_INVALID_ARGUMENT,
+               "tcmReleasePermit(nullptr) returns invalid argument")) {
+        return test_fail(test_name);
+    }
+
+    disconnect_client(client_id);
+
+    return test_epilog(test_name);
+}
+
 int main() {
   bool res = true;
 
@@ -955,6 +972,7 @@ int main() {
   res &= test_request_initialized_by_default();
 
   res &= test_incorrect_requests();
+  res &= test_releasing_nullptr();
 
   return int(!res);
 }

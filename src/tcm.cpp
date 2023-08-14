@@ -947,10 +947,30 @@ public:
   }
 
   void deallocate_constraints(tcm_permit_request_t& req) {
-      __TCM_ASSERT(req.cpu_constraints, "Nothing to deallocate.");
-      for (uint32_t i = 0; i < req.constraints_size; ++i)
+      __TCM_ASSERT(req.cpu_constraints, "No permit constraints to deallocate");
+      for (uint32_t i = 0; i < req.constraints_size; ++i) {
           hwloc_bitmap_free(req.cpu_constraints[i].mask);
-      delete [] req.cpu_constraints;
+      }
+      delete[] req.cpu_constraints;
+  }
+
+  void deallocate_permit(tcm_permit_handle_t permit_handle) {
+      __TCM_ASSERT(permit_handle, nullptr);
+
+      tcm_permit_request_t& request = permit_handle->request;
+      if (request.cpu_constraints) {
+          deallocate_constraints(request);
+      }
+
+      tcm_permit_data_t& data = permit_handle->data;
+      if (data.cpu_mask) {
+          for (uint32_t i = 0 ; i < data.size; ++i) {
+              hwloc_bitmap_free(data.cpu_mask[i]);
+          }
+          delete[] data.cpu_mask;
+      }
+      delete[] data.concurrency;
+      delete permit_handle;
   }
 
   void copy_request_without_masks(tcm_permit_request_t& to, const tcm_permit_request_t& from) {
@@ -1207,15 +1227,64 @@ public:
     return TCM_RESULT_SUCCESS;
   }
 
-  tcm_result_t release_permit(tcm_permit_handle_t ph) {
+  /**
+   * Clears internal structures from so that TCM does not know about the given permit anymore.
+   * Returns concurrency that permit possessed.
+   */
+  uint32_t clear_up_internals_from(tcm_permit_handle_t permit_handle) {
+      __TCM_ASSERT(permit_handle, nullptr);
+
+      tcm_permit_data_t& data = permit_handle->data;
+      tcm_permit_state_t state = data.state.load(std::memory_order_relaxed);
+
+      remove_permit(*this, permit_handle, state);
+      permit_to_callback_arg_map.erase(permit_handle);
+      auto client_phs = client_to_permit_mmap.equal_range(data.client_id);
+      for (auto it = client_phs.first; it != client_phs.second; ++it) {
+          if (it->second == permit_handle) {
+              client_to_permit_mmap.erase(it);
+              break;
+          }
+      }
+
+      uint32_t released_concurrency = 0;
+      if (is_idle(state) || is_active(state)) {
+          released_concurrency = get_permit_grant(data);
+      }
+#if TCM_USE_ASSERT
+      else {
+          __TCM_ASSERT(get_permit_grant(data) == 0, "Permit state prohibits resource ownership");
+      }
+#endif
+      return released_concurrency;
+  }
+
+  tcm_result_t release_permit(tcm_permit_handle_t handle) {
     tracer t("ThreadComposabilityBase::release_permit");
     auto top_event_tracer = make_event_duration_tracer(time_tracer, tcm_events::release_permit);
 
-    __TCM_ASSERT(ph, nullptr);
-    const bool shall_negotiate = release_permit_impl(ph);
-    if (shall_negotiate) {
+    bool has_released_resources = false;
+    {
+        const std::lock_guard<std::mutex> l(data_mutex);
+        __TCM_ASSERT(handle && is_valid(handle), "Releasing of an invalid permit");
+
+        const uint32_t released_concurrency = clear_up_internals_from(handle);
+
+        __TCM_ASSERT(available_concurrency <= available_concurrency + released_concurrency,
+                     "Overflow detected");
+        const uint32_t initial_concurrency = available_concurrency;
+        available_concurrency += released_concurrency;
+        has_released_resources = initial_concurrency < available_concurrency;
+    }
+
+    // Permit representation has been erased from internal structures, i.e. TCM does not know about
+    // it anymore. Thus, can deallocate permit representation without holding a lock.
+    deallocate_permit(handle);
+
+    if (has_released_resources) {
         renegotiate_permits(/*initiator*/nullptr);
     }
+
     return TCM_RESULT_SUCCESS;
   }
 
@@ -2216,54 +2285,6 @@ protected:
 
         return ph;
     }
-
-    bool release_permit_impl(tcm_permit_handle_t ph) {
-        tracer t("ThreadComposabilityBase::release_permit_impl");
-        __TCM_ASSERT(ph, nullptr);
-
-        bool additional_concurrency_available = false;
-        tcm_permit_data_t& pd = ph->data;
-        {
-            const std::lock_guard<std::mutex> l(data_mutex);
-            __TCM_ASSERT(is_valid(ph), "Invalid permit is being released.");
-
-            tcm_permit_request_t& req = ph->request;
-            if (req.cpu_constraints) {
-                deallocate_constraints(req);
-            }
-
-            tcm_permit_state_t current_state = ph->data.state.load(std::memory_order_relaxed);
-
-            remove_permit(*this, ph, current_state);
-
-            permit_to_callback_arg_map.erase(ph);
-
-            auto client_phs = client_to_permit_mmap.equal_range(pd.client_id);
-            for (auto it = client_phs.first; it != client_phs.second; ++it) {
-                if (it->second == ph) {
-                    client_to_permit_mmap.erase(it);
-                    break;
-                }
-            }
-
-            const uint32_t grant = get_permit_grant(pd);
-            __TCM_ASSERT(available_concurrency <= available_concurrency + grant, "Overflow detected");
-            available_concurrency += grant;
-            if (available_concurrency > 0)
-                additional_concurrency_available = true;
-        }
-
-        if (pd.cpu_mask) {
-            for (uint32_t i = 0 ; i < pd.size; ++i) {
-                hwloc_bitmap_free(pd.cpu_mask[i]);
-            }
-            delete [] pd.cpu_mask;
-        }
-        delete [] pd.concurrency;
-        delete ph;
-
-        return additional_concurrency_available;
-    }
 }; // class ThreadComposabilityBase
 
 class ThreadComposabilityFCFSCImpl : public ThreadComposabilityManagerBase {
@@ -2916,15 +2937,15 @@ tcm_result_t tcmDeactivatePermit(tcm_permit_handle_t p) {
 /// @returns
 ///     - ::TCM_RESULT_SUCCESS
 ///     - ::TCM_RESULT_ERROR_UNKNOWN
-tcm_result_t tcmReleasePermit(tcm_permit_handle_t p) {
+tcm_result_t tcmReleasePermit(tcm_permit_handle_t handle) {
   using tcm::theTCM;
   tcm::internal::tracer t("tcmReleasePermit");
 
-  auto& mgr = theTCM::instance();
-  if (p) {
-    return mgr.release_permit(p);
+  if (handle) {
+    return theTCM::instance().release_permit(handle);
   }
-  return TCM_RESULT_ERROR_UNKNOWN;
+
+  return TCM_RESULT_ERROR_INVALID_ARGUMENT;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

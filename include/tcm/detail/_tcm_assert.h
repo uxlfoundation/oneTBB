@@ -37,7 +37,7 @@ static void report_failed_assert(const char* location, int line, const char* con
   if (!message || *message == '\0')
     description = "<no assert description provided>";
 
-  std::fprintf(stderr, "Assertion %s failed (function %s, line %d)\n"
+  std::fprintf(stderr, "Assertion \"%s\" failed (function %s, line %d)\n"
                "\tDescription: %s\n", condition, location, line, description);
   std::fflush(stderr);
   std::abort();
