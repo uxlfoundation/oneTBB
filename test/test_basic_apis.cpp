@@ -871,14 +871,17 @@ bool test_incorrect_requests() {
 
   tcm_client_id_t client = connect_new_client();
 
+  auto has_tcm_returned_invalid_arg = [client] (const tcm_permit_request_t& req) {
+      tcm_permit_handle_t ph{nullptr};
+      auto r = tcmRequestPermit(client, req, /*callback_arg*/nullptr, &ph, /*permit*/nullptr);
+      return TCM_RESULT_ERROR_INVALID_ARGUMENT == r;
+  };
+
   { // default request with default constraints
     tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
     auto req = make_request(tcm_automatic, tcm_automatic, &constraints, /*size*/1);
-    tcm_permit_handle_t ph{nullptr};
-    auto r = tcmRequestPermit(client, req, /*callback_arg*/nullptr, &ph, /*permit*/nullptr);
-    if (!check(r == TCM_RESULT_ERROR_INVALID_ARGUMENT,
-               "Default request with default constraints returned invalid argument status"))
-    {
+    if (!check(has_tcm_returned_invalid_arg(req),
+               "Default request with default constraints returned invalid argument status")) {
       return test_fail(test_name);
     }
   }
@@ -886,11 +889,8 @@ bool test_incorrect_requests() {
   { // meaningful request with non-meaningful constraints
     tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
     auto req = make_request(tcm_automatic, num_total_resources, &constraints, /*size*/1);
-    tcm_permit_handle_t ph{nullptr};
-    auto r = tcmRequestPermit(client, req, /*callback_arg*/nullptr, &ph, /*permit*/nullptr);
-    if (!check(r == TCM_RESULT_ERROR_INVALID_ARGUMENT,
-               "Request with non-meaningful constraints returned invalid argument status"))
-    {
+    if (!check(has_tcm_returned_invalid_arg(req),
+               "Request with non-meaningful constraints returned invalid argument status")) {
       return test_fail(test_name);
     }
   }
@@ -899,11 +899,8 @@ bool test_incorrect_requests() {
     auto req = make_request(tcm_automatic, tcm_automatic, /*constraints*/nullptr, /*size*/0);
     std::uintptr_t dummy_constraints = 0xABCDEFED;
     req.cpu_constraints = (tcm_cpu_constraints_t*)dummy_constraints;
-    tcm_permit_handle_t ph{nullptr};
-    auto r = tcmRequestPermit(client, req, /*callback_arg*/nullptr, &ph, /*permit*/nullptr);
-    if (!check(r == TCM_RESULT_ERROR_INVALID_ARGUMENT,
-               "Request with constraints but zero size returned invalid argument status"))
-    {
+    if (!check(has_tcm_returned_invalid_arg(req),
+               "Request with constraints but zero size returned invalid argument status")) {
       return test_fail(test_name);
     }
   }
@@ -921,16 +918,91 @@ bool test_incorrect_requests() {
     release_permit(ph, "Failed to release permit handle");
   }
 
+  { // request with negative demand range
+    auto req = make_request(-10, -5);
+    if (!check(has_tcm_returned_invalid_arg(req),
+               "Request with negative demand range returned invalid argument status")) {
+      return test_fail(test_name);
+    }
+
+    tcm_cpu_constraints_t c = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+    c.min_concurrency = -10; c.max_concurrency = -5;
+    c.numa_id = tcm_any;
+    req.constraints_size = 1;
+    req.cpu_constraints = &c;
+    if (!check(has_tcm_returned_invalid_arg(req),
+               "Request with negative demand range returned invalid argument status")) {
+      return test_fail(test_name);
+    }
+  }
+
+  { // request with incorrect demand range
+    auto req = make_request(-10, 10);
+    if (!check(has_tcm_returned_invalid_arg(req),
+               "Request with incorrect demand range returned invalid argument status")) {
+      return test_fail(test_name);
+    }
+
+    tcm_cpu_constraints_t c = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+    c.min_concurrency = 0; c.max_concurrency = 100;
+    c.numa_id = tcm_any;
+    req.constraints_size = 1;
+    req.cpu_constraints = &c;
+    if (!check(has_tcm_returned_invalid_arg(req),
+               "Request with negative demand range returned invalid argument status")) {
+      return test_fail(test_name);
+    }
+  }
+
+
+  { // request with oversubscribed demand
+    auto req = make_request(2 * num_oversubscribed_resources, 2 * num_oversubscribed_resources);
+    if (!check(has_tcm_returned_invalid_arg(req),
+               "Request with oversubscribed demand returned invalid argument status")) {
+      return test_fail(test_name);
+    }
+
+    tcm_cpu_constraints_t c = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+    c.min_concurrency = 1; c.max_concurrency = 2 * num_oversubscribed_resources;
+    c.numa_id = tcm_any;
+    req.constraints_size = 1;
+    req.cpu_constraints = &c;
+    if (!check(has_tcm_returned_invalid_arg(req),
+               "Request with oversubscribing demand returned invalid argument status")) {
+      return test_fail(test_name);
+    }
+  }
+
+  { // request overflow
+    auto req = make_request();
+    const int size = 2;
+    tcm_cpu_constraints_t c[size];
+    for (int i = 0; i < size; ++i) {
+        c[i] = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+        c[i].min_concurrency = c[i].max_concurrency = std::numeric_limits<int32_t>::max() / 2 + 2;
+        c[i].numa_id = tcm_any;
+    }
+    req.constraints_size = size;
+    req.cpu_constraints = c;
+    if (!check(has_tcm_returned_invalid_arg(req),
+               "Request with overflow returned invalid argument status")) {
+      return test_fail(test_name);
+    }
+
+    c[0].min_concurrency = c[1].min_concurrency = 0;
+    if (!check(has_tcm_returned_invalid_arg(req), "Request with overflow for max_concurrency"
+               " in constraints returned invalid argument status")) {
+      return test_fail(test_name);
+    }
+
+    c[0].min_concurrency = c[1].min_concurrency = std::numeric_limits<int32_t>::max() / 2 + 2;
+    c[0].max_concurrency = c[1].max_concurrency = 10;
+    if (!check(has_tcm_returned_invalid_arg(req), "Request with overflow for min_concurrency"
+               " in constraints returned invalid argument status")) {
+      return test_fail(test_name);
+    }
+  }
   disconnect_client(client);
-
-  // TODO: to complete the tests below
-
-  // tcm_permit_request_t reqA =
-  //   make_request(2 * num_oversubscribed_resources, 2 * num_oversubscribed_resources);
-  // r = tcmRequestPermit(clid, reqA, nullptr, &phA, &pA);
-  // if (!(check(r == TCM_RESULT_ERROR_INVALID_ARGUMENT && !phA, "tcmRequestPermit for A")
-  //       && check_permit(eA, pA)))
-  //   return test_fail(test_name);
 
   return test_epilog(test_name);
 }

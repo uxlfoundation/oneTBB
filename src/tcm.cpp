@@ -274,6 +274,9 @@ bool sum_constraints_bounds(int32_t& sum_min, int32_t& sum_max, const tcm_permit
             if (c.min_concurrency < 0) {
                 is_request_sane = false;
                 break;
+            } else if (std::numeric_limits<int32_t>::max() - c.min_concurrency < sum_min) {
+                is_request_sane = false;
+                break;
             }
             adjusted_min = c.min_concurrency;
         }
@@ -282,6 +285,9 @@ bool sum_constraints_bounds(int32_t& sum_min, int32_t& sum_max, const tcm_permit
         int32_t adjusted_max = adjusted_max_initializer;
         if (c.max_concurrency != tcm_automatic) {
             if (c.max_concurrency < 0) {
+                is_request_sane = false;
+                break;
+            } else if (std::numeric_limits<int32_t>::max() - c.max_concurrency < sum_max) {
                 is_request_sane = false;
                 break;
             }
@@ -1007,8 +1013,8 @@ public:
                                                            /*fallback_value*/process_concurrency,
                                                            c.mask);
       __TCM_ASSERT(c.max_concurrency != tcm_automatic ||
-                   (tcm_any == c.numa_id || tcm_any == c.core_type_id &&
-                    tcm_any == c.threads_per_core || c.mask), "Incorrect invariant");
+                   (c.mask || tcm_any == c.numa_id || tcm_any == c.core_type_id ||
+                    tcm_any == c.threads_per_core), "Incorrect invariant");
 
       // If at least one constraint has automatic setting for its desired concurrency, then the
       // desired resources amount is inferred automatically while satisfying the request
@@ -2761,19 +2767,21 @@ extern "C" {
 /// @returns
 ///     - ::TCM_RESULT_SUCCESS
 ///     - ::TCM_RESULT_ERROR_UNKNOWN
-tcm_result_t tcmConnect(tcm_callback_t callback, tcm_client_id_t *client_id)
+tcm_result_t tcmConnect(tcm_callback_t callback, tcm_client_id_t* client_id)
 {
   using tcm::theTCM;
   tcm::internal::tracer t("tcmConnect");
 
-  if (theTCM::is_enabled() && client_id) {
-    theTCM::increase_ref_count();
-    auto& mgr = theTCM::instance();
-    *client_id = mgr.register_client(callback);
-    if (*client_id)
-      return TCM_RESULT_SUCCESS;
+  if (!theTCM::is_enabled()) {
+      return TCM_RESULT_ERROR_UNKNOWN;
+  } else if (!client_id) {
+      return TCM_RESULT_ERROR_INVALID_ARGUMENT;
   }
-  return TCM_RESULT_ERROR_UNKNOWN;
+
+  theTCM::increase_ref_count();
+  auto& mgr = theTCM::instance();
+  *client_id = mgr.register_client(callback);
+  return TCM_RESULT_SUCCESS;
 }
 
 /// @brief Terminate the connection with Thread Composability Manager
