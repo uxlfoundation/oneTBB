@@ -2639,7 +2639,7 @@ public:
     } else if (tcm_strategy == "FAIR") {
       impl_.reset(new internal::ThreadComposabilityFairBalance);
     } else {
-      __TCM_ASSERT(false, "Incorrect value of TCM_RESOURCE_DISTRIBUTION_STRATEGY environment variable.");
+      __TCM_ASSERT(false, "Incorrect value of resource distribution strategy.");
     }
   }
 
@@ -2749,7 +2749,7 @@ internal::environment theTCM::tcm_env{};
 float internal::tcm_oversubscription_factor() {
   static const float oversb_factor = theTCM::tcm_env.tcm_oversubscription_factor;
   __TCM_ASSERT(oversb_factor > std::numeric_limits<float>::epsilon(),
-                "Incorrect value of TCM_OVERSUBSCRIPTION_FACTOR environment variable.");
+                "Incorrect value of oversubscription factor.");
   return oversb_factor;
 }
 

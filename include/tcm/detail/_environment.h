@@ -30,8 +30,6 @@ namespace internal {
         environment() {
             process_env_var("TCM_VERSION", tcm_version);
             process_env_var("TCM_ENABLE", tcm_enable);
-            process_env_var("TCM_OVERSUBSCRIPTION_FACTOR", tcm_oversubscription_factor);
-            process_env_var("TCM_RESOURCE_DISTRIBUTION_STRATEGY", tcm_resource_distribution_strategy);
 
             print_version(*this);
         }

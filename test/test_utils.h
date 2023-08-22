@@ -181,17 +181,7 @@ inline bool check_success(tcm_result_t res, const std::string& msg = "",
   return check(succeeded(res), msg, /*num_indents*/0, report_msg);
 }
 
-const float tcm_oversubscription_factor = [] {
-  const char* oversb_factor_env_value = GetEnv("TCM_OVERSUBSCRIPTION_FACTOR");
-  float oversb_factor = 1.0f;
-  if (oversb_factor_env_value) {
-    // TODO: Consider alternative options for std::stof
-    oversb_factor = std::stof(oversb_factor_env_value);
-    __TCM_ASSERT(oversb_factor > std::numeric_limits<float>::epsilon(),
-                 "Incorrect value of TCM_OVERSUBSCRIPTION_FACTOR environment variable.");
-  }
-  return oversb_factor;
-}();
+const float tcm_oversubscription_factor = 1.0f;
 
 //! Returns available platform resources, taking into account the mask of the process.
 int32_t platform_resources(const tcm_test::system_topology& tp) {
