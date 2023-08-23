@@ -18,5 +18,8 @@ set(TCM_WARNING_LEVEL -Wall -Wextra -Wpedantic $<$<BOOL:${TCM_STRICT}>:-Werror>)
 set(TCM_TEST_WARNING_FLAGS -Wshadow -Wcast-qual -Woverloaded-virtual -Wnon-virtual-dtor)
 
 set(TCM_COMPILE_DEFINITIONS "")
+set(TCM_COMMON_COMPILE_FLAGS ${TCM_COMMON_COMPILE_FLAGS} $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2> 
+    -Wformat -Wformat-security -Werror=format-security -fPIC -fstack-protector-strong)
 
+set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} -Wl,-z,relro,-z,now)
 set(TCM_COMMON_LINK_LIBS ${CMAKE_DL_LIBS})

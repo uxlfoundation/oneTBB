@@ -51,10 +51,24 @@ target_include_directories(tcm PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
+
+# Prefer using target_link_options instead of target_link_libraries to specify link options because
+# target_link_libraries may incorrectly handle some options (on Windows, for example).
+if (COMMAND target_link_options)
+    target_link_options(tcm
+        PRIVATE
+        ${TCM_LIB_LINK_FLAGS}
+    )
+else()
+    target_link_libraries(tcm
+        PRIVATE
+        ${TCM_LIB_LINK_FLAGS}
+    )
+endif()
+
 target_link_libraries(tcm
   PRIVATE
   HWLOC::hwloc
-  ${TCM_LIB_LINK_FLAGS}
   ${TCM_COMMON_LINK_LIBS}
 )
 target_compile_definitions(tcm PUBLIC $<$<CONFIG:DEBUG>:TCM_DEBUG>)
