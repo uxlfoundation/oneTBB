@@ -511,12 +511,18 @@ void merge_callback_invocations(update_callbacks_t& callbacks, const update_call
             continue;
         }
 
+        bool is_permit_in_range = false;
         for (auto it = range.first; it != range.second; ++it) {
             callback_args_t& args = it->second;
             if (args.ph == other_args.ph) {
                 args.reason.new_concurrency |= other_args.reason.new_concurrency;
                 args.reason.new_state |= other_args.reason.new_state;
+                is_permit_in_range = true;
             }
+        }
+
+        if (!is_permit_in_range) {
+            callbacks.insert( {callback, other_args} );
         }
     }
 }
