@@ -942,47 +942,52 @@ public:
       client_to_callback_map.erase(clid);
   }
 
-    /**
-     * Allocates and copies constraints for the specified permit request.
-     *
-     * Assumes actual pointer to constraints is written to the passed constraints argument.
-     */
-  void allocate_constraints_by_copy(tcm_permit_request_t& req) {
-      __TCM_ASSERT(req.cpu_constraints, "Nothing to copy from.");
-      tcm_cpu_constraints_t* client_constraints = req.cpu_constraints;
-      req.cpu_constraints = new tcm_cpu_constraints_t[req.constraints_size];
-      for (uint32_t i = 0; i < req.constraints_size; ++i) {
-          req.cpu_constraints[i] = client_constraints[i];
-          if (client_constraints[i].mask)
-              req.cpu_constraints[i].mask = hwloc_bitmap_dup(client_constraints[i].mask);
+ /**
+  * Allocates and copies constraints for the specified permit request.
+  *
+  * Assumes actual pointer to constraints is written to the passed constraints argument.
+  */
+  void copy_constraints(tcm_cpu_constraints_t* dst, tcm_cpu_constraints_t* src, uint32_t size) {
+      __TCM_ASSERT(dst, "No constraints to copy to");
+      __TCM_ASSERT(src, "No constraints to copy from");
+      for (uint32_t i = 0; i < size; ++i) {
+          dst[i] = src[i];
+          if (src[i].mask) {
+              dst[i].mask = hwloc_bitmap_dup(src[i].mask);
+          }
       }
   }
 
-  void deallocate_constraints(tcm_permit_request_t& req) {
-      __TCM_ASSERT(req.cpu_constraints, "No permit constraints to deallocate");
-      for (uint32_t i = 0; i < req.constraints_size; ++i) {
-          hwloc_bitmap_free(req.cpu_constraints[i].mask);
+
+  /**
+   * Deallocates permit's CPU masks and masks in the constraints of the request.
+   */
+  void deallocate_masks(tcm_cpu_constraints_t* constraints, tcm_cpu_mask_t* masks, uint32_t size) {
+      __TCM_ASSERT(constraints && masks, "No constraints and CPU masks to deallocate");
+      for (uint32_t i = 0; i < size; ++i) {
+          hwloc_bitmap_free(constraints[i].mask);
+          hwloc_bitmap_free(masks[i]);
       }
-      delete[] req.cpu_constraints;
   }
 
   void deallocate_permit(tcm_permit_handle_t permit_handle) {
       __TCM_ASSERT(permit_handle, nullptr);
 
       tcm_permit_request_t& request = permit_handle->request;
+      tcm_permit_data_t& data = permit_handle->data;
+
       if (request.cpu_constraints) {
-          deallocate_constraints(request);
+          deallocate_masks(request.cpu_constraints, data.cpu_mask, data.size);
       }
 
-      tcm_permit_data_t& data = permit_handle->data;
-      if (data.cpu_mask) {
-          for (uint32_t i = 0 ; i < data.size; ++i) {
-              hwloc_bitmap_free(data.cpu_mask[i]);
-          }
-          delete[] data.cpu_mask;
+      using type = std::atomic<uint32_t>;
+      for (uint32_t i = 0; i < data.size; ++i) {
+          data.concurrency[i].~type();
       }
-      delete[] data.concurrency;
-      delete permit_handle;
+
+      permit_handle->~tcm_permit_rep_t();
+
+      std::free(permit_handle);
   }
 
   void copy_request_without_masks(tcm_permit_request_t& to, const tcm_permit_request_t& from) {
@@ -1039,27 +1044,21 @@ public:
     tracer t("ThreadComposabilityBase::request_permit");
     auto top_event_tracer = make_event_duration_tracer(time_tracer, tcm_events::request_permit);
 
-    // Check the ability to satisfy minimum requested concurrency
-    if (req.min_sw_threads > int32_t(initially_available_concurrency)) {
-      if (permit) {
-        permit->state = TCM_PERMIT_STATE_VOID;
-      }
-
-      return false;
-    }
-
     bool additional_concurrency_available = false;
 
-    tcm_permit_handle_t ph = *permit_handle;
+    tcm_permit_handle_t& ph = *permit_handle;
     const bool is_requesting_new_permit = bool(!ph);
     if (is_requesting_new_permit) {
       ph = make_new_permit(clid, req);
+      if (!ph) { // Could not allocate memory for the new permit
+          return false;
+      }
+
       // New permits should have PENDING state until its required/minimum parameters are satisfied.
       __TCM_ASSERT(
           TCM_PERMIT_STATE_PENDING == ph->data.state.load(std::memory_order_relaxed),
           "Non-pending state for new permits contributes to their premature negotiations."
       );
-      *permit_handle = ph;
     }
 
     update_callbacks_t callbacks;
@@ -2257,16 +2256,73 @@ protected:
     virtual std::vector<permit_change_t> adjust_existing_permit(const tcm_permit_request_t& req,
                                                                 tcm_permit_handle_t permit) = 0;
 
+    unsigned infer_permit_size(const tcm_permit_request_t& request) const {
+        unsigned permit_size = sizeof(tcm_permit_rep_t);
+        unsigned concurrency_array_size = sizeof(std::atomic<uint32_t>);
+        if (request.cpu_constraints) {
+            const uint32_t size = request.constraints_size;
+            permit_size += size * sizeof(tcm_cpu_constraints_t); // request's constraints
+            permit_size += size * sizeof(tcm_cpu_mask_t);        // permit's cpu_mask
+            concurrency_array_size *= size;                      // permit's concurrency
+        }
+        permit_size += concurrency_array_size;
+        return permit_size;
+    }
+
     tcm_permit_handle_t
     make_new_permit(const tcm_client_id_t clid, const tcm_permit_request_t& req) {
         tracer t("ThreadComposabilityManagerBase::make_new_permit");
 
-        tcm_permit_handle_t ph = new tcm_permit_rep_t;
+        unsigned permit_size = infer_permit_size(req);
+
+        // Pointing to a permit representation in memory as a byte array in order to simplify
+        // pointer arithmetic
+        char* permit_rep_as_byte_array = reinterpret_cast<char*>(std::malloc(permit_size));
+
+        if (!permit_rep_as_byte_array) {
+            return nullptr;
+        }
+        // No need for nullifying the allocated memory as it is fully initialized below. Some parts
+        // of it are initialized from the request (e.g., the masks in the constraints array), for
+        // the others - zero initializing constructors are called.
+
+        /*
+          Memory layout for internal permit representation (tcm_permit_rep_t):
+          0x00 (lower memory address)
+           ||
+           ||   tcm_permit_rep_t* (aka tcm_permit_handle_t)
+           || +---------------------------------------------+
+           || |              tcm_permit_rep_t               |
+           || +---------------------------------------------+
+           || |    tcm_permit_rep_t->data.concurrency[]     |
+           || +---------------------------------------------+
+           || |     tcm_permit_rep_t->data.cpu_mask[]       | <- allotted iff constraints specified
+           || +---------------------------------------------+
+           || | tcm_permit_rep_t->request.cpu_constraints[] | <- allotted iff constraints specified
+           || +---------------------------------------------+
+          \||/
+           \/
+          0xFF (higher memory address)
+        */
+
+        tcm_permit_handle_t ph = new(permit_rep_as_byte_array) tcm_permit_rep_t;
 
         ph->epoch.store(0, std::memory_order_relaxed);
         tcm_permit_data_t& pd = ph->data;
 
         pd.client_id = clid;
+
+        using concurrency_t = decltype(pd.concurrency);
+        using concurrency_item_t = std::remove_pointer_t<concurrency_t>;
+        using mask_t = decltype(pd.cpu_mask);
+        using constraints_t = decltype(req.cpu_constraints);
+
+        const unsigned concurrency_offset = sizeof(tcm_permit_rep_t);
+
+        pd.concurrency = reinterpret_cast<concurrency_t>(
+            permit_rep_as_byte_array + concurrency_offset
+        );
+
         pd.size = 1;
         pd.cpu_mask = nullptr;
 
@@ -2281,17 +2337,29 @@ protected:
         pr = req;               // Do shallow copy first
 
         if (bool(req.cpu_constraints)) {
-            allocate_constraints_by_copy(pr);
-
+            __TCM_ASSERT(req.constraints_size > 0, "Missing size for CPU constraints array");
             pd.size = req.constraints_size;
-            pd.cpu_mask = new tcm_cpu_mask_t[pd.size];
+
+            const unsigned concurrency_size = pd.size * sizeof(concurrency_item_t);
+            const unsigned mask_size = pd.size * sizeof(std::remove_pointer_t<mask_t>);
+            const unsigned mask_offset = concurrency_offset + concurrency_size;
+            const unsigned constraints_offset = mask_offset + mask_size;
+
+            pd.cpu_mask = reinterpret_cast<mask_t>(permit_rep_as_byte_array + mask_offset);
+            // cpu mask is a POD, don't need to call constructor for it
             for (uint32_t i = 0; i < pd.size; ++i) {
                 pd.cpu_mask[i] = hwloc_bitmap_alloc();
                 __TCM_ASSERT(hwloc_bitmap_iszero(pd.cpu_mask[i]), "Not empty mask");
             }
+
+            pr.cpu_constraints = reinterpret_cast<constraints_t>(
+                permit_rep_as_byte_array + constraints_offset
+            );
+            // CPU constraints is a POD, don't need to call constructor for it
+            copy_constraints(pr.cpu_constraints, req.cpu_constraints, req.constraints_size);
         }
 
-        pd.concurrency = new std::atomic<uint32_t>[pd.size]{0};
+        pd.concurrency = new(pd.concurrency) concurrency_item_t[pd.size]{0};
         pd.state.store(TCM_PERMIT_STATE_PENDING, std::memory_order_relaxed);
         pd.flags = req.flags;
 
@@ -2702,6 +2770,9 @@ public:
     return impl_->unregister_thread();
   }
 
+  uint32_t platform_resources() const {
+      return impl_->initially_available_concurrency;
+  }
 };
 
 class theTCM {
@@ -2856,8 +2927,11 @@ tcm_result_t tcmRequestPermit(tcm_client_id_t client_id,
   }
 
   auto& mgr = theTCM::instance();
+  if (request.min_sw_threads > static_cast<int32_t>(mgr.platform_resources())) {
+      return TCM_RESULT_ERROR_INVALID_ARGUMENT;
+  }
   bool result = mgr.request_permit(client_id, request, callback_arg, permit_handle, permit, sum_min);
-  return result? TCM_RESULT_SUCCESS : TCM_RESULT_ERROR_INVALID_ARGUMENT;
+  return result ? TCM_RESULT_SUCCESS : TCM_RESULT_ERROR_UNKNOWN;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -2895,9 +2969,8 @@ tcm_result_t tcmIdlePermit(tcm_permit_handle_t p) {
   using tcm::theTCM;
   tcm::internal::tracer t("tcmIdlePermit");
 
-  auto& mgr = theTCM::instance();
   if (p) {
-    return mgr.idle_permit(p);
+    return theTCM::instance().idle_permit(p);
   }
   return TCM_RESULT_ERROR_UNKNOWN;
 }
@@ -2915,9 +2988,8 @@ tcm_result_t tcmActivatePermit(tcm_permit_handle_t p) {
   using tcm::theTCM;
   tcm::internal::tracer t("zeReactivatePermit");
 
-  auto& mgr = theTCM::instance();
   if (p) {
-    return mgr.activate_permit(p);
+    return theTCM::instance().activate_permit(p);
   }
   return TCM_RESULT_ERROR_UNKNOWN;
 }
@@ -2935,9 +3007,8 @@ tcm_result_t tcmDeactivatePermit(tcm_permit_handle_t p) {
   using tcm::theTCM;
   tcm::internal::tracer t("zeReactivatePermit");
 
-  auto& mgr = theTCM::instance();
   if (p) {
-    return mgr.deactivate_permit(p);
+    return theTCM::instance().deactivate_permit(p);
   }
   return TCM_RESULT_ERROR_UNKNOWN;
 }
@@ -2974,9 +3045,8 @@ tcm_result_t tcmReleasePermit(tcm_permit_handle_t handle) {
 tcm_result_t tcmRegisterThread(tcm_permit_handle_t p) {
   using tcm::theTCM;
 
-  auto& mgr = theTCM::instance();
   if (p) {
-    return mgr.register_thread(p);
+    return theTCM::instance().register_thread(p);
   }
   return TCM_RESULT_ERROR_UNKNOWN;
 }
@@ -2994,8 +3064,7 @@ tcm_result_t tcmRegisterThread(tcm_permit_handle_t p) {
 tcm_result_t tcmUnregisterThread() {
   using tcm::theTCM;
 
-  auto& mgr = theTCM::instance();
-  return mgr.unregister_thread();
+  return theTCM::instance().unregister_thread();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
