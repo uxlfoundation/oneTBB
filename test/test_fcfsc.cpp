@@ -19,7 +19,7 @@
 #include <iostream>
 
 bool test_nested_clients() {
-  const char* test_name = "test_nested_clients";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clidA, clidB;
@@ -81,7 +81,7 @@ bool test_nested_clients() {
 }
 
 bool test_nested_clients_partial_consumption() {
-  const char* test_name = "test_nested_clients_partial_consumption";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clidA, clidB;
@@ -135,7 +135,7 @@ bool test_nested_clients_partial_consumption() {
 }
 
 bool test_overlapping_clients() {
-  const char* test_name = "test_overlapping_clients";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clidA, clidB;
@@ -192,7 +192,7 @@ bool test_overlapping_clients() {
 }
 
 bool test_overlapping_clients_two_callbacks() {
-  const char* test_name = "test_overlapping_clients_two_callbacks";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clidA, clidB, clidC;
@@ -281,7 +281,7 @@ bool test_overlapping_clients_two_callbacks() {
 }
 
 bool test_partial_release() {
-  const char* test_name = "test_partial_release";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clidA, clidB;
@@ -339,7 +339,7 @@ bool test_partial_release() {
 }
 
 bool test_permit_reactivation() {
-  const char* test_name = "test_permit_reactivation";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clidA, clidB;
@@ -423,7 +423,7 @@ std::atomic<bool> is_callback_invoked{false};
 tcm_permit_handle_t phS{nullptr};
 
 bool test_ridig_concurrency_permit() {
-  const char* test_name = "test_static_permit";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clid;
@@ -515,7 +515,7 @@ bool test_ridig_concurrency_permit() {
 }
 
 bool test_support_for_pending_state() {
-  const char* test_name = "test_support_for_pending_state";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clidA, clidB, clidC, clidD;

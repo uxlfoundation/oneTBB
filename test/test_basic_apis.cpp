@@ -17,7 +17,7 @@
 #include <cstdint>
 
 bool test_state_functions() {
-  const char* test_name = "test_state_functions";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clid;
@@ -87,7 +87,7 @@ bool test_state_functions() {
 }
 
 bool test_pending_state() {
-  const char* test_name = "test_pending_state";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clid;
@@ -131,7 +131,7 @@ bool test_pending_state() {
 }
 
 bool test_activate_pending_when_one_deactivates() {
-  const char* test_name = "test_activate_pending_when_one_deactivates";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clid;
@@ -346,7 +346,7 @@ bool test_no_new_resources_for_rigid_concurrency() {
   // change when this permit re-activates after its renegotiation while being in IDLE state (because
   // of a separate demand for its resources) that effectively deactivated it.
 
-  const char* test_name = "test_no_new_resources_for_rigid_concurrency";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clid{0};
@@ -444,7 +444,7 @@ bool test_renegotiation_order() {
   // 2) Negotiation of the IDLE permits (including rigid concurrency ones)
   // 3) Negotiation of the ACTIVE permits
 
-  const char* test_name = "test_renegotiation_order";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clid{0};
@@ -631,7 +631,7 @@ bool test_take_from_idle_when_required_is_satisfied() {
 }
 
 bool test_thread_registration() {
-  const char* test_name = "test_thread_registration";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clid;
@@ -674,7 +674,7 @@ bool test_thread_registration() {
 }
 
 bool test_default_constraints_construction() {
-  const char* test_name = "test_default_constraints_construction";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
@@ -689,7 +689,7 @@ bool test_default_constraints_construction() {
 }
 
 bool test_request_initializer() {
-  const char* test_name = "test_request_initializer";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_permit_request_t request = TCM_PERMIT_REQUEST_INITIALIZER;
@@ -718,7 +718,7 @@ bool test_request_initializer() {
 }
 
 bool test_get_stale_permit() {
-  const char* test_name = "test_get_stale_permit";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   // TODO: implement the test
@@ -730,7 +730,7 @@ static_assert(sizeof(tcm_permit_flags_t) == 4, "The permit flags type has wrong 
 static_assert(sizeof(tcm_callback_flags_t) == 4, "The callback flags type has wrong size");
 
 bool test_allow_not_specifying_client_callback() {
-  const char* test_name = "test_allow_not_specifying_client_callback";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t client_id;
@@ -789,7 +789,7 @@ bool test_requesting_zero_resources() {
   // to have actual permit handle value to make further, perhaps, concurrent
   // request updates on it.
 
-  const char* test_name = "test_requesting_zero_resources";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t client_id;
@@ -820,7 +820,7 @@ bool test_requesting_zero_resources() {
 }
 
 bool test_request_initialized_by_default() {
-  const char* test_name = "test_request_initialized_by_default";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   bool test_succeeded = false;
@@ -866,7 +866,7 @@ bool test_request_initialized_by_default() {
 
 
 bool test_incorrect_requests() {
-  const char* test_name = "test_incorrect_requests";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t client = connect_new_client();

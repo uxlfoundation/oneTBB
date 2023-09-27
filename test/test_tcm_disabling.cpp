@@ -28,7 +28,7 @@ bool is_tcm_enabled() {
 }
 
 bool test_tcm_connection(const bool is_success_expected) {
-  const char* test_name = "test_tcm_disabling";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clid = std::numeric_limits<tcm_client_id_t>::max();

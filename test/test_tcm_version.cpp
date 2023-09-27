@@ -16,7 +16,7 @@
 #include <cstring>
 
 bool test_runtime_version() {
-    const char* test_name = "test_runtime_version";
+    const char* test_name = __func__;
     test_prolog(test_name);
     bool res = true;
 

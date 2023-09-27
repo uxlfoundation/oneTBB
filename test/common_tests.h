@@ -22,11 +22,10 @@
 // TODO: wrap checking comparison in the tests into function with reporting
 std::set<tcm_permit_handle_t*> renegotiating_permits;
 
-tcm_result_t client_renegotiate(tcm_permit_handle_t ph, void* arg,
-                               tcm_callback_flags_t invocation_reason)
-{
-  std::cout << "Start renegotiation callback for permit=" << ph << ", arg=" << arg
-            << ", invocation reason={new_concurrency=" << invocation_reason.new_concurrency
+tcm_result_t
+client_renegotiate(tcm_permit_handle_t ph, void* arg, tcm_callback_flags_t invocation_reason) {
+  std::cout << "Start renegotiation callback \"" << __func__ << "\" for permit=" << ph << ", arg="
+            << arg << ", invocation reason={new_concurrency=" << invocation_reason.new_concurrency
             << ", new_state=" << invocation_reason.new_state << "}\n";
 
   bool r = true;
@@ -45,12 +44,12 @@ tcm_result_t client_renegotiate(tcm_permit_handle_t ph, void* arg,
   // happen twice for it.
   renegotiating_permits.erase(permit_via_arg);
 
-  std::cout << "End permit renegotiation callback" << std::endl;
+  std::cout << "End permit renegotiation callback \"" << __func__ << "\"" << std::endl;
   return r ? TCM_RESULT_SUCCESS : TCM_RESULT_ERROR_UNKNOWN;
 }
 
 bool test_alternating_clients() {
-  const char* test_name = "test_alternating_clients";
+  const char* test_name = __func__;
   test_prolog(test_name);
 
   tcm_client_id_t clidA, clidB;

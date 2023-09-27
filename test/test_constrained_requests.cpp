@@ -105,7 +105,7 @@ struct mask_deleter {
 
 
 bool test_allow_mask_omitting_during_permit_copy(/*tcm_test::system_topology& tp*/) {
-    const char* test_name = "test_allow_omitting_mask_in_permit_copy";
+    const char* test_name = __func__;
     test_prolog(test_name);
 
     tcm_client_id_t client_id;
@@ -247,17 +247,17 @@ struct test_one_request_low_level_constraints {
 };
 
 bool test_one_request_process_mask() {
-  std::string test_name = "test_one_request_process_mask";
+  std::string test_name = __func__;
   return test_one_request_low_level_constraints<process_mask>{}(test_name);
 }
 
 bool test_one_request_first_core_mask() {
-  std::string test_name = "test_one_request_process_mask";
+  std::string test_name = __func__;
   return test_one_request_low_level_constraints<first_core_mask>{}(test_name);
 }
 
 bool test_one_request_first_parsed_numa_mask() {
-  std::string test_name = "test_one_request_process_mask";
+  std::string test_name = __func__;
   return test_one_request_low_level_constraints<first_parsed_numa_mask>{}(test_name);
 }
 
@@ -276,7 +276,7 @@ bool test_one_request_first_parsed_numa_id() {
   cpu_constraints.numa_id = mask.id();
 
   one_request_config test_config{};
-  test_config.test_name = "test_one_request_first_parsed_numa_id";
+  test_config.test_name = __func__;
   test_config.exp_concurrency = &concurrency;
   test_config.min_concurrency = 0;
   test_config.max_concurrency = concurrency;
@@ -466,7 +466,7 @@ bool test_two_requests_oversubscribe_first_core() {
   uint32_t concurrencyA = uint32_t(tcm_oversubscription_factor * first_core_mask{}.size());
   uint32_t concurrencyB = concurrencyA;
   two_requests_config test_config{};
-  test_config.test_name = "test_two_requests_oversubscribe_first_core";
+  test_config.test_name = __func__;
   test_config.callback = client_renegotiate;
   test_config.exp_concurrencyA = concurrencyA;
   test_config.exp_concurrencyB = 0;
