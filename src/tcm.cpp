@@ -1315,6 +1315,10 @@ public:
     return TCM_RESULT_SUCCESS;
   }
 
+  uint32_t platform_resources() const {
+    return initially_available_concurrency;
+  }
+
 protected:
   tcm_permit_epoch_t prepare_permit_copying(tcm_permit_handle_t ph) const {
     return ph->epoch.load(std::memory_order_acquire);
@@ -2702,78 +2706,7 @@ protected:
 }; // ThreadComposabilityFairBalance
 } // namespace internal
 
-class ThreadComposabilityManager {
-  std::unique_ptr<internal::ThreadComposabilityManagerBase> impl_;
-public:
-  explicit ThreadComposabilityManager(const internal::environment& tcm_env) {
-    std::string tcm_strategy = tcm_env.tcm_resource_distribution_strategy;
-
-    if (tcm_strategy == "FCFS") {
-      impl_.reset(new internal::ThreadComposabilityFCFSCImpl);
-    } else if (tcm_strategy == "FAIR") {
-      impl_.reset(new internal::ThreadComposabilityFairBalance);
-    } else {
-      __TCM_ASSERT(false, "Incorrect value of resource distribution strategy.");
-    }
-  }
-
-  tcm_client_id_t register_client(tcm_callback_t r) {
-    internal::tracer t("ThreadComposability::register_client");
-    return impl_->register_client(r);
-  }
-
-  void unregister_client(tcm_client_id_t clid) {
-    internal::tracer t("ThreadComposability::unregister_client");
-    impl_->unregister_client(clid);
-  }
-
-  bool request_permit(tcm_client_id_t clid, tcm_permit_request_t& req,
-                      void* callback_arg, tcm_permit_handle_t* permit_handle,
-                      tcm_permit_t* permit, const int32_t sum_constraints_min) {
-    internal::tracer t("ThreadComposability::request_permit");
-    return impl_->request_permit(clid, req, callback_arg, permit_handle, permit,
-                                 sum_constraints_min);
-  }
-
-  tcm_result_t get_permit(tcm_permit_handle_t ph, tcm_permit_t* p) {
-    internal::tracer t("ThreadComposability::get_permit");
-    return impl_->get_permit(ph, p);
-  }
-
-  tcm_result_t idle_permit(tcm_permit_handle_t p) {
-    internal::tracer t("ThreadComposability::idle_permit");
-    return impl_->idle_permit(p);
-  }
-
-  tcm_result_t activate_permit(tcm_permit_handle_t p) {
-    internal::tracer t("ThreadComposability::activate_permit");
-    return impl_->activate_permit(p);
-  }
-
-  tcm_result_t deactivate_permit(tcm_permit_handle_t p) {
-    internal::tracer t("ThreadComposability::deactivate_permit");
-    return impl_->deactivate_permit(p);
-  }
-
-  tcm_result_t release_permit(tcm_permit_handle_t p) {
-    internal::tracer t("ThreadComposability::release_permit");
-    return impl_->release_permit(p);
-  }
-
-  tcm_result_t register_thread(tcm_permit_handle_t p) {
-    internal::tracer t("ThreadComposability::register_thread");
-    return impl_->register_thread(p);
-  }
-
-  tcm_result_t unregister_thread() {
-    internal::tracer t("ThreadComposability::register_thread");
-    return impl_->unregister_thread();
-  }
-
-  uint32_t platform_resources() const {
-      return impl_->initially_available_concurrency;
-  }
-};
+using ThreadComposabilityManager = internal::ThreadComposabilityFairBalance;
 
 class theTCM {
   static ThreadComposabilityManager* tcm_ptr;
@@ -2792,7 +2725,7 @@ public:
     std::lock_guard<std::mutex> l(tcm_mutex);
     if (reference_count++)
       return;
-    tcm_ptr = new ThreadComposabilityManager(tcm_env);
+    tcm_ptr = new ThreadComposabilityManager{};
   }
 
   static internal::environment& get_tcm_env() {
