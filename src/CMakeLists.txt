@@ -37,6 +37,7 @@ target_compile_options(tcm
   ${TCM_MMD_FLAG}
   ${TCM_DSE_FLAG}
   ${TCM_COMMON_COMPILE_FLAGS}
+  ${TCM_VISIBILITY_INLINES_HIDDEN_FLAG}
   ${TCM_PROFILE_FLAGS}
 )
 

@@ -16,4 +16,5 @@ else()
     set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} -static-intel -Wl,-z,relro,-z,now,)
     set(TCM_COMMON_COMPILE_FLAGS ${TCM_COMMON_COMPILE_FLAGS} -fstack-protector -Wformat -Wformat-security
                                  $<$<NOT:$<CONFIG:Debug>>:-qno-opt-report-embed -D_FORTIFY_SOURCE=2>)
+    set(TCM_VISIBILITY_INLINES_HIDDEN_FLAG -fvisibility-inlines-hidden)
 endif()
