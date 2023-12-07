@@ -23,6 +23,10 @@ add_library(tcm SHARED
   version.cpp
 )
 
+if (WIN32)
+    target_sources(tcm PRIVATE tcm.rc)
+endif()
+
 add_library(TCM::tcm ALIAS tcm)
 
 if (TCM_PROFILE STREQUAL "api-durations")
