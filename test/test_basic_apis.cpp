@@ -47,7 +47,7 @@ bool test_state_functions() {
     return test_fail(test_name);
 
   r = tcmDeactivatePermit(ph);
-  e_concurrency = 0;
+  e_concurrency = num_oversubscribed_resources; // lazy deactivate
   e.state = TCM_PERMIT_STATE_INACTIVE;
   if (!(check_success(r, "tcmDeactivatePermit") && check_permit(e, ph)))
     return test_fail(test_name);
@@ -64,7 +64,7 @@ bool test_state_functions() {
     return test_fail(test_name);
 
   r = tcmDeactivatePermit(ph);
-  e_concurrency = 0;
+  e_concurrency = num_oversubscribed_resources; // lazy deactivate
   e.state = TCM_PERMIT_STATE_INACTIVE;
   if (!(check_success(r, "tcmDeactivatePermit") && check_permit(e, ph)))
     return test_fail(test_name);
@@ -274,7 +274,7 @@ bool test_no_negotiation_for_active_rigid_concurrency() {
   }
 
   r = tcmDeactivatePermit(phS);
-  eS.concurrencies[0] = 0; eS.state = TCM_PERMIT_STATE_INACTIVE;
+  eS.state = TCM_PERMIT_STATE_INACTIVE;
   if (!(check_success(r, "tcmDeactivatePermit (rigid concurrency)") && check_permit(eS, phS) &&
       check(!is_callback_invoked, "Callback was not invoked for the rigid concurrency permit that "
             "was deactivated")))

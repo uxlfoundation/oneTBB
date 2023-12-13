@@ -48,6 +48,7 @@ struct tcm_permit_data_t {
   uint32_t size;
   std::atomic<tcm_permit_state_t> state;
   tcm_permit_flags_t flags;
+  uint32_t tcm_epoch_snapshot; // Updated whenever this permit asks for resources by itself (via request permit or activate)
 };
 
 extern "C" {
@@ -399,7 +400,6 @@ void commit_permit_modification(tcm_permit_handle_t ph) {
     suppress_unused_warning(prev_epoch);
 }
 
-
 uint32_t hardware_concurrency() { return (uint32_t)std::thread::hardware_concurrency(); }
 
 //! Returns available platform resources, taking into account possible degree
@@ -540,8 +540,22 @@ void invoke_callbacks(const update_callbacks_t& callbacks, time_tracer_type& tim
     }
 }
 
-
 // Permit changing helpers
+uint32_t release_resources(tcm_permit_handle_t ph) {
+    auto& pd = ph->data;
+    uint32_t current_grant = 0;
+
+    prepare_permit_modification(ph);
+    {
+        for (uint32_t i = 0; i < pd.size; ++i) {
+            current_grant += pd.concurrency[i].exchange(0, std::memory_order_relaxed);
+        }
+    }
+    commit_permit_modification(ph);
+
+    return current_grant;
+}
+
 uint32_t release_resources_moving_to_new_state(tcm_permit_handle_t ph,
                                                tcm_permit_state_t new_state)
 {
@@ -631,6 +645,11 @@ struct ThreadComposabilityManagerData {
   //! The count of resources that were available at the program start.
   uint32_t initially_available_concurrency;
 
+  //! The epoch that changes whenever the state of the TCM changes.
+  //!  Used to avoid unnecessary resource redistribution when nothing has changed
+  //!  from the previous permit update
+  uint32_t tcm_state_epoch = 0;
+
   //! The CPU mask of the process
   tcm_cpu_mask_t process_mask = nullptr;
 
@@ -638,6 +657,9 @@ struct ThreadComposabilityManagerData {
   std::set<tcm_permit_handle_t, less_min_request_t> pending_permits{};
   std::set<tcm_permit_handle_t, greater_idled_resources_t> idle_permits{};
   std::set<tcm_permit_handle_t, greater_negotiable_t> active_permits{};
+
+  //! The permit that was lazily deactivated
+  tcm_permit_handle_t lazy_inactive_permit = nullptr;
 
   //! The map of callbacks per each client. Callbacks are used during
   //! renegotiation of permits.
@@ -662,8 +684,10 @@ void remove_permit(ThreadComposabilityManagerData& data, tcm_permit_handle_t ph,
         n = data.pending_permits.erase(ph);
     } else if (is_idle(current_state)) {
         n = data.idle_permits.erase(ph);
-    } else {
+    } else if (is_active(current_state)) {
         n = data.active_permits.erase(ph);
+    } else if (ph == data.lazy_inactive_permit) {
+        data.lazy_inactive_permit = nullptr;
     }
     __TCM_ASSERT_EX(1 == n || is_inactive(current_state), "Incorrect invariant");
     __TCM_ASSERT(
@@ -706,6 +730,13 @@ bool has_unused_resources(const ThreadComposabilityManagerData& data) {
     return data.available_concurrency || !data.idle_permits.empty();
 }
 
+bool has_resource_demand(const ThreadComposabilityManagerData& data) {
+    return !data.active_permits.empty() || !data.pending_permits.empty();
+}
+
+void note_tcm_state_change(ThreadComposabilityManagerData& data) {
+    data.tcm_state_epoch++;
+}
 
 /**
  * Updates single permit according to the change. Records what is changed and returns concurrency
@@ -806,6 +837,7 @@ update_callbacks_t apply(ThreadComposabilityManagerData& data,
 #endif
 
     data.available_concurrency += concurrency_delta;
+    note_tcm_state_change(data);
 
     return callbacks;
 }
@@ -1087,6 +1119,7 @@ public:
           const uint32_t released = move_to_pending(ph);
           __TCM_ASSERT(available_concurrency <= available_concurrency + released, "Overflow detected");
           available_concurrency += released;
+          note_tcm_state_change(*this);
       }
       deduce_request_arguments(ph->request, sum_constraints_min);
 
@@ -1097,11 +1130,12 @@ public:
       if (!updates.empty()) {
           callbacks = apply(*this, updates, /*initiator*/ph, /*remove_initiator_first*/false);
       } else {
-          pending_permits.insert(ph);
+          add_permit(*this, ph, TCM_PERMIT_STATE_PENDING);
       }
 
       // Client might re-request for less number of resources
       additional_concurrency_available = available_concurrency > initially_available;
+      ph->data.tcm_epoch_snapshot = tcm_state_epoch;
     }
 
     invoke_callbacks(callbacks, time_tracer); // Invocation of the callbacks is happenning outside of the lock
@@ -1174,15 +1208,22 @@ public:
           return TCM_RESULT_ERROR_INVALID_ARGUMENT;
       }
 
+      // Activating in case when TCM state didn't change between idling/deactivation
+      // and activation so availability of resources wasn't updated
+      if (this->tcm_state_epoch == ph->data.tcm_epoch_snapshot) {
+        change_state_relaxed(ph->data, TCM_PERMIT_STATE_ACTIVE);
+        move_permit(*this, ph, curr_state, /*new_state*/TCM_PERMIT_STATE_ACTIVE);
+        return TCM_RESULT_SUCCESS;
+      }
+
       // Activating of INACTIVE might not find necessary amount of resources, change its state to
       // PENDING until its required/minimum parameters are satisfied.
-
-      if (is_idle(curr_state)) {
-          uint32_t grant = get_permit_grant(pd);
+      if (uint32_t grant = get_permit_grant(pd)) {
           __TCM_ASSERT(ph->request.max_sw_threads > 0, "Request's desired concurrency is unknown");
           if (grant == uint32_t(ph->request.max_sw_threads)) {
               ph->data.state.store(TCM_PERMIT_STATE_ACTIVE, std::memory_order_relaxed);
               move_permit(*this, ph, curr_state, /*new_state*/TCM_PERMIT_STATE_ACTIVE);
+              ph->data.tcm_epoch_snapshot = tcm_state_epoch;
               return TCM_RESULT_SUCCESS;
           }
 
@@ -1191,14 +1232,14 @@ public:
           const uint32_t released = move_to_pending(ph);
           __TCM_ASSERT(available_concurrency <= available_concurrency + released, "Overflow detected");
           available_concurrency += released;
+          note_tcm_state_change(*this);
       } else {
-          __TCM_ASSERT(is_inactive(pd) && 0 == get_permit_grant(pd),
-                       "INACTIVE state should not own resources");
           change_state_relaxed(ph->data, TCM_PERMIT_STATE_PENDING);
       }
       add_permit(*this, ph, TCM_PERMIT_STATE_PENDING);
       std::vector<permit_change_t> updates = adjust_existing_permit(ph->request, ph);
       callbacks = apply(*this, updates, ph);
+      ph->data.tcm_epoch_snapshot = tcm_state_epoch;
     }
     invoke_callbacks(callbacks, time_tracer);
 
@@ -1219,11 +1260,21 @@ public:
       tcm_permit_state_t curr_state = pd.state.load(std::memory_order_relaxed);
       if (is_owning_resources(curr_state)) {
           // TODO: consider using adjust_existing_permit
-          auto previously_available_concurrency = available_concurrency;
-          remove_permit(*this, ph, curr_state);
-          available_concurrency += move_to_inactive(ph);
-          __TCM_ASSERT(previously_available_concurrency <= available_concurrency, "Overflow detected");
-          shall_negotiate_resources = previously_available_concurrency < available_concurrency;
+          move_permit(*this, ph, curr_state, /*new_state*/TCM_PERMIT_STATE_INACTIVE);
+          if (has_resource_demand(*this)) {
+              auto previously_available_concurrency = available_concurrency;
+              available_concurrency += move_to_inactive(ph);
+              __TCM_ASSERT(previously_available_concurrency <= available_concurrency, "Overflow detected");
+              shall_negotiate_resources = previously_available_concurrency < available_concurrency;
+              note_tcm_state_change(*this);
+              // TODO: Consider reading the TCM epoch onto the stack here to compare it against the current epoch
+              // inside renegotite_permits() function. This might save unnecessary renegotiation in case of
+              // concurrent changes to permits.
+          } else {
+              change_state_relaxed(pd, TCM_PERMIT_STATE_INACTIVE);
+              lazy_inactive_permit = ph;
+              return TCM_RESULT_SUCCESS;
+          }
       } else {
           change_state_relaxed(pd, new_state);
           move_permit(*this, ph, curr_state, new_state);
@@ -1286,6 +1337,7 @@ public:
         const uint32_t initial_concurrency = available_concurrency;
         available_concurrency += released_concurrency;
         has_released_resources = initial_concurrency < available_concurrency;
+        note_tcm_state_change(*this);
     }
 
     // Permit representation has been erased from internal structures, i.e. TCM does not know about
@@ -2366,6 +2418,7 @@ protected:
         pd.concurrency = new(pd.concurrency) concurrency_item_t[pd.size]{0};
         pd.state.store(TCM_PERMIT_STATE_PENDING, std::memory_order_relaxed);
         pd.flags = req.flags;
+        pd.tcm_epoch_snapshot = tcm_state_epoch;
 
         return ph;
     }
@@ -2678,6 +2731,13 @@ protected:
         auto nested_tracer = make_event_duration_tracer(time_tracer, tcm_events::adjust_existing_permit);
 
         __TCM_ASSERT(is_pending(ph), "Invalid permit.");
+
+
+        if (lazy_inactive_permit) {
+            available_concurrency += release_resources(lazy_inactive_permit);
+            note_tcm_state_change(*this);
+            lazy_inactive_permit = nullptr;
+        }
 
         // Trying to squeeze resources out of the platform, returning permits that share
         // resources needed by that ph

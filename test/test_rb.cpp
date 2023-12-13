@@ -616,7 +616,7 @@ bool test_permit_reactivation() {
     return test_fail(test_name);
 
   eA.state = TCM_PERMIT_STATE_INACTIVE;
-  eA_concurrency = 0;
+  eA_concurrency = num_oversubscribed_resources;
   r = tcmDeactivatePermit(phA);
   if (!(check_success(r, "tcmDeactivatePermit (client A)") &&
         check_permit(eA, phA)))
@@ -633,10 +633,11 @@ bool test_permit_reactivation() {
   tcm_permit_t pB = make_void_permit(&pB_concurrency),
                 eB = make_active_permit(&eB_concurrency);
 
+  eA_concurrency = 0;
   tcm_permit_request_t rB = make_request(1, num_oversubscribed_resources/2);
   r = tcmRequestPermit(clidB, rB, &phB, &phB, &pB);
   if (!(check_success(r, "tcmRequestPermit (client B)") &&
-        check_permit(eB, pB)))
+        check_permit(eB, pB) && check_permit(eA, phA)))
     return test_fail(test_name);
 
 
