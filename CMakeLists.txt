@@ -87,6 +87,13 @@ include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 # --------------------------------------------------------------------------------------------------
 
+# --------------------------------------------------------------------------------------------------
+# Enable CMake plug-in mechanism
+file(GLOB FILES_WITH_EXTRA_TARGETS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/*.cmake)
+foreach(FILE_WITH_EXTRA_TARGETS ${FILES_WITH_EXTRA_TARGETS})
+    include(${FILE_WITH_EXTRA_TARGETS})
+endforeach()
+# --------------------------------------------------------------------------------------------------
 if (TCM_DIR)
   # Allow specifying external TCM to test with.
   # Do not add main targets and installation instructions in that case.
