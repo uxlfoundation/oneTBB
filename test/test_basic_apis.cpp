@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -1024,6 +1024,51 @@ bool test_releasing_nullptr() {
     return test_epilog(test_name);
 }
 
+bool test_releasing_inactive() {
+    const char* test_name = __func__;
+    test_prolog(test_name);
+
+    auto client_id = connect_new_client(nullptr);
+
+    tcm_permit_handle_t ph{nullptr};
+    uint32_t p_concurrency;
+    tcm_permit_t p = make_void_permit(&p_concurrency);
+    uint32_t e_concurrency = num_oversubscribed_resources;
+    tcm_permit_t e = make_active_permit(&e_concurrency);
+
+    // Check that lazy inactive permit is released successfully
+    tcm_permit_request_t req = make_request(0, num_oversubscribed_resources);
+    auto r = tcmRequestPermit(client_id, req, nullptr, &ph, &p);
+    if (!(check_success(r, "tcmRequestPermit") && check_permit(e, p)))
+        return test_fail(test_name);
+
+    r = tcmDeactivatePermit(ph);
+    e.state = TCM_PERMIT_STATE_INACTIVE;
+    if (!(check_success(r, "tcmDeactivatePermit") && check_permit(e, ph)))
+        return test_fail(test_name);
+
+    r = tcmReleasePermit(ph);
+    if (!check_success(r, "tcmReleasePermit")) {
+        return test_fail(test_name);
+    }
+
+    // Check that resources were released from released lazy inactive permit
+    ph = nullptr;
+    e.state = TCM_PERMIT_STATE_ACTIVE;
+    r = tcmRequestPermit(client_id, req, nullptr, &ph, &p);
+    if (!(check_success(r, "tcmRequestPermit") && check_permit(e, p)))
+        return test_fail(test_name);
+
+    r = tcmReleasePermit(ph);
+    if (!check_success(r, "tcmReleasePermit")) {
+        return test_fail(test_name);
+    }
+
+    disconnect_client(client_id);
+
+    return test_epilog(test_name);
+}
+
 int main() {
   bool res = true;
 
@@ -1045,6 +1090,7 @@ int main() {
 
   res &= test_incorrect_requests();
   res &= test_releasing_nullptr();
+  res &= test_releasing_inactive();
 
   return int(!res);
 }

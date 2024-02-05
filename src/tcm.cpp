@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -1298,7 +1298,7 @@ public:
 
       tcm_permit_data_t& data = permit_handle->data;
       tcm_permit_state_t state = data.state.load(std::memory_order_relaxed);
-
+      bool was_lazy = lazy_inactive_permit == permit_handle;
       remove_permit(*this, permit_handle, state);
       permit_to_callback_arg_map.erase(permit_handle);
       auto client_phs = client_to_permit_mmap.equal_range(data.client_id);
@@ -1310,7 +1310,7 @@ public:
       }
 
       uint32_t released_concurrency = 0;
-      if (is_idle(state) || is_active(state)) {
+      if (is_idle(state) || is_active(state) || was_lazy) {
           released_concurrency = get_permit_grant(data);
       }
 #if TCM_USE_ASSERT
