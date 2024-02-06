@@ -1,4 +1,4 @@
-# Copyright (C) 2023 Intel Corporation
+# Copyright (C) 2023-2024 Intel Corporation
 #
 # This software and the related documents are Intel copyrighted materials, and your use of them is
 # governed by the express license under which they were provided to you ("License"). Unless the
@@ -18,13 +18,21 @@ if (NOT TARGET HWLOC::hwloc)
 endif()
 # --------------------------------------------------------------------------------------------------
 
-add_library(tcm SHARED 
+add_library(tcm SHARED
   tcm.cpp
   version.cpp
 )
 
 if (WIN32)
-    target_sources(tcm PRIVATE tcm.rc)
+    string(TIMESTAMP tcm_build_year "%Y" UTC)
+    if (NOT tcm_build_year)
+        message(FATAL_ERROR "Cannot determine the current year to substitute it in resource file.")
+    endif()
+    # Copy resource file template tcm.rc.in to CMAKE_CURRENT_BINARY_DIR substituting defined
+    # variables
+    configure_file(tcm.rc.in tcm.rc)
+    unset(tcm_build_year)
+    target_sources(tcm PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/tcm.rc)
 endif()
 
 add_library(TCM::tcm ALIAS tcm)
