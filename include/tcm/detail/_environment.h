@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -49,16 +49,6 @@ namespace internal {
         void process_env_var(const char* env_var, int& dest) {
             if (const char* value = get_env(env_var)) {
                 dest = std::atoi(value);
-            }
-        }
-        void process_env_var(const char* env_var, float& dest) {
-            if (const char* value = get_env(env_var)) {
-                dest = static_cast<float>(std::atof(value));
-            }
-        }
-        void process_env_var(const char* env_var, char* dest) {
-            if (const char* value = get_env(env_var)) {
-                dest = std::strncpy(dest, value, string_size);
             }
         }
     };

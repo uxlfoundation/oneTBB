@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -415,52 +415,10 @@ public:
         hwloc_bitmap_free(constraints_mask);
     }
 
-    void fit_num_threads_per_core(affinity_mask result_mask, affinity_mask current_mask, affinity_mask constraints_mask) {
-        hwloc_bitmap_zero(result_mask);
-        hwloc_obj_t current_core = nullptr;
-        while ((current_core = hwloc_get_next_obj_by_type(topology, HWLOC_OBJ_CORE, current_core)) != nullptr) {
-            if (hwloc_bitmap_intersects(current_mask, current_core->cpuset)) {
-                hwloc_bitmap_or(result_mask, result_mask, current_core->cpuset);
-            }
-        }
-        hwloc_bitmap_and(result_mask, result_mask, constraints_mask);
-    }
-
-    int get_default_concurrency(int numa_node_index, int core_type_index, int max_threads_per_core) {
-        __TCM_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized system_topology");
-
-        hwloc_cpuset_t constraints_mask = hwloc_bitmap_alloc();
-        fill_constraints_affinity_mask(constraints_mask, numa_node_index, core_type_index, max_threads_per_core);
-
-        int default_concurrency = hwloc_bitmap_weight(constraints_mask);
-        hwloc_bitmap_free(constraints_mask);
-        return default_concurrency;
-    }
-
     affinity_mask allocate_process_affinity_mask() {
         if (is_topology_parsed())
           return hwloc_bitmap_dup(process_cpu_affinity_mask);
         return nullptr;
-    }
-
-    void free_affinity_mask( affinity_mask mask_to_free ) {
-        hwloc_bitmap_free(mask_to_free); // If bitmap is nullptr, no operation is performed.
-    }
-
-    void store_current_affinity_mask( affinity_mask current_mask ) {
-        auto result = hwloc_get_cpubind(topology, current_mask, HWLOC_CPUBIND_THREAD);
-        __TCM_ASSERT_EX(result >= 0, "hwloc_get_cpubind failed.");
-
-        hwloc_bitmap_and(current_mask, current_mask, process_cpu_affinity_mask);
-        __TCM_ASSERT(!hwloc_bitmap_iszero(current_mask),
-            "Current affinity mask must intersects with process affinity mask");
-    }
-
-    void set_affinity_mask( const_affinity_mask mask ) {
-        if (hwloc_bitmap_weight(mask) > 0) {
-          auto result = hwloc_set_cpubind(topology, mask, HWLOC_CPUBIND_THREAD);
-          __TCM_ASSERT_EX(result >= 0, "hwloc_set_cpubind failed.");
-        }
     }
 };
 

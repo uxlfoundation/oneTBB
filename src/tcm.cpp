@@ -94,117 +94,41 @@ std::stack<tcm_permit_handle_t>& get_active_permit_container() {
     return tls_active_permit;
 }
 
-bool operator==(const tcm_permit_flags_t& lhs, const tcm_permit_flags_t& rhs) {
-  return
-    lhs.stale == rhs.stale &&
-    lhs.rigid_concurrency == rhs.rigid_concurrency &&
-    lhs.exclusive == rhs.exclusive;
-}
-
-bool operator==(const tcm_permit_request_t& lhs, const tcm_permit_request_t& rhs) {
-  return
-    lhs.min_sw_threads == rhs.min_sw_threads &&
-    lhs.max_sw_threads == rhs.max_sw_threads &&
-    lhs.cpu_constraints == rhs.cpu_constraints &&
-    lhs.flags == rhs.flags;
-}
-
-
 /**
  *******************************************************************************
  * Permit state helpers
  *******************************************************************************
  */
+
+#if TCM_USE_ASSERT
 bool is_void(const tcm_permit_state_t& state) {
     return TCM_PERMIT_STATE_VOID == state;
 }
-
-bool is_void(const tcm_permit_data_t& data) {
-    return is_void(data.state.load(std::memory_order_relaxed));
-}
-
-bool is_void(const tcm_permit_handle_t& handle) {
-    return is_void(handle->data);
-}
-
+#endif
 
 bool is_active(const tcm_permit_state_t& state) {
     return TCM_PERMIT_STATE_ACTIVE == state;
 }
 
-bool is_active(const tcm_permit_data_t& data) {
-    return is_active(data.state.load(std::memory_order_relaxed));
-}
-
-bool is_active(const tcm_permit_handle_t& handle) {
-    return is_active(handle->data);
-}
-
-
 bool is_inactive(const tcm_permit_state_t& state) {
     return TCM_PERMIT_STATE_INACTIVE == state;
 }
-
-bool is_inactive(const tcm_permit_data_t& data) {
-    return is_inactive(data.state.load(std::memory_order_relaxed));
-}
-
-bool is_inactive(const tcm_permit_handle_t& handle) {
-    return is_inactive(handle->data);
-}
-
 
 bool is_idle(const tcm_permit_state_t& state) {
     return TCM_PERMIT_STATE_IDLE == state;
 }
 
-bool is_idle(const tcm_permit_data_t& data) {
-    return is_idle(data.state.load(std::memory_order_relaxed));
-}
-
-bool is_idle(const tcm_permit_handle_t& handle) {
-    return is_idle(handle->data);
-}
-
-
 bool is_pending(const tcm_permit_state_t& state) {
     return TCM_PERMIT_STATE_PENDING == state;
 }
-
-bool is_pending(const tcm_permit_data_t& data) {
-    return is_pending(data.state.load(std::memory_order_relaxed));
-}
-
-bool is_pending(const tcm_permit_handle_t& handle) {
-    return is_pending(handle->data);
-}
-
 
 bool is_owning_resources(const tcm_permit_state_t& state) {
     return is_active(state) || is_idle(state);
 }
 
-bool is_owning_resources(const tcm_permit_data_t& data) {
-    return is_owning_resources(data.state.load(std::memory_order_relaxed));
-}
-
-bool is_owning_resources(const tcm_permit_handle_t& handle) {
-    return is_owning_resources(handle->data);
-}
-
-
 bool is_rigid_concurrency(const tcm_permit_flags_t& flags) {
     return flags.rigid_concurrency;
 }
-
-bool is_rigid_concurrency(const tcm_permit_data_t& data) {
-    return is_rigid_concurrency(data.flags);
-}
-
-bool is_rigid_concurrency(const tcm_permit_handle_t& handle) {
-    return is_rigid_concurrency(handle->data);
-}
-
 
 bool is_negotiable(const tcm_permit_state_t& state, const tcm_permit_flags_t& flags) {
     if (is_active(state) && is_rigid_concurrency(flags)) {
@@ -213,29 +137,15 @@ bool is_negotiable(const tcm_permit_state_t& state, const tcm_permit_flags_t& fl
     return true;
 }
 
-bool is_negotiable(const tcm_permit_data_t& data) {
-    const tcm_permit_state_t& state = data.state.load(std::memory_order_relaxed);
-    return is_negotiable(state, data.flags);
-}
-
-bool is_negotiable(const tcm_permit_handle_t& handle) {
-    return is_negotiable(handle->data);
-}
-
-
-bool is_activating(const tcm_permit_state_t& curr_state, const tcm_permit_state_t& new_state) {
-    return is_inactive(curr_state) && is_active(new_state);
-}
-
-bool is_deactivating(const tcm_permit_state_t& curr_state, const tcm_permit_state_t& new_state) {
-    return is_owning_resources(curr_state) && is_inactive(new_state);
-}
-
-
 void change_state_relaxed(tcm_permit_data_t& permit_data, tcm_permit_state_t state) {
     // prepare and commit permit modification calls are not needed because only single atomic
     // variable is changed.
     permit_data.state.store(state, std::memory_order_relaxed);
+}
+
+inline tcm_permit_state_t get_permit_state(const tcm_permit_data_t& permit_data,
+                                           std::memory_order order = std::memory_order_relaxed) {
+    return permit_data.state.load(order);
 }
 
 /**
@@ -400,8 +310,6 @@ void commit_permit_modification(tcm_permit_handle_t ph) {
     suppress_unused_warning(prev_epoch);
 }
 
-uint32_t hardware_concurrency() { return (uint32_t)std::thread::hardware_concurrency(); }
-
 //! Returns available platform resources, taking into account possible degree
 //! of oversubscription.
 uint32_t platform_resources(unsigned int process_concurrency) {
@@ -559,9 +467,9 @@ uint32_t release_resources(tcm_permit_handle_t ph) {
 uint32_t release_resources_moving_to_new_state(tcm_permit_handle_t ph,
                                                tcm_permit_state_t new_state)
 {
-    __TCM_ASSERT(new_state == TCM_PERMIT_STATE_VOID ||
-                 new_state == TCM_PERMIT_STATE_PENDING ||
-                 new_state == TCM_PERMIT_STATE_INACTIVE, "Inconsistent request.");
+    __TCM_ASSERT(is_void(new_state)    ||
+                 is_pending(new_state) ||
+                 is_inactive(new_state), "Inconsistent request.");
 
     auto& pd = ph->data;
     uint32_t current_grant = 0;
@@ -621,7 +529,7 @@ struct ThreadComposabilityManagerData {
       process_concurrency = topology.get_process_concurrency();
     } else {
       // TODO: add manual parsing and weight calculation of the process mask
-      process_concurrency = hardware_concurrency();
+      process_concurrency = (uint32_t)std::thread::hardware_concurrency();
     }
     available_concurrency = platform_resources(process_concurrency);
     initially_available_concurrency = available_concurrency;
@@ -783,7 +691,7 @@ int32_t apply(const permit_change_t& change, ThreadComposabilityManagerData& dat
     tcm_callback_flags_t& reason = args.reason;
 
     tcm_permit_data_t& permit = permit_handle->data;
-    tcm_permit_state_t state = permit.state.load(std::memory_order_relaxed);
+    tcm_permit_state_t state = get_permit_state(permit);
 
     if (permit_handle != initiator || remove_initiator_first) {
         remove_permit(data, permit_handle, state);
@@ -891,22 +799,13 @@ struct negotiable_snapshot_t {
     renegotiable_resources_queue_t idle_permits() const { return m_permits_idle; }
     renegotiable_resources_queue_t active_permits() const { return m_permits_active; }
 
-    void add(const tcm_permit_handle_t& ph, uint32_t negotiable, int32_t constraint_index) {
-      /* negotiable == grant - minimum sw threads, if constraint_index equals to
-         among_all_constraints. Otherwise, negotiable == grant - minimum concurrency
-         within specific subconstraint, determined by the constraint_index in the array of
-         permit's constraints. */
-        add(stakeholder_t{ph, constraint_index, negotiable},
-            ph->data.state.load(std::memory_order_relaxed) );
-    }
-
     void add(const stakeholder_t& stakeholder, const tcm_permit_state_t& state) {
       /* negotiable == grant - minimum sw threads, if constraint_index equals to
          among_all_constraints. Otherwise, negotiable == grant - minimum concurrency
          within specific subconstraint, determined by the constraint_index in the array of
          permit's constraints. */
 
-        __TCM_ASSERT(is_owning_resources(stakeholder.ph->data.state.load(std::memory_order_relaxed)),
+        __TCM_ASSERT(is_owning_resources(get_permit_state(stakeholder.ph->data)),
                      "Only permits with owning resources can be added into negotiable snapshot." );
 
         const auto search_item = std::make_pair(stakeholder.ph, stakeholder.constraint_index);
@@ -1088,7 +987,7 @@ public:
 
       // New permits should have PENDING state until its required/minimum parameters are satisfied.
       __TCM_ASSERT(
-          TCM_PERMIT_STATE_PENDING == ph->data.state.load(std::memory_order_relaxed),
+          is_pending(get_permit_state(ph->data)),
           "Non-pending state for new permits contributes to their premature negotiations."
       );
     }
@@ -1109,7 +1008,7 @@ public:
           // either part of the representation (request or grant) leads to wrong position of the
           // permit inside its ordered container, which results in wrong implementational
           // assumptions and incorrect results
-          remove_permit(*this, ph, ph->data.state.load(std::memory_order_relaxed));
+          remove_permit(*this, ph, get_permit_state(ph->data));
 
           copy_request_without_masks(ph->request, req);
 
@@ -1177,7 +1076,7 @@ public:
       const std::lock_guard<std::mutex> l(data_mutex);
       __TCM_ASSERT(is_valid(ph), "Idling non-existing permit");
       tcm_permit_data_t& pd = ph->data;
-      tcm_permit_state_t curr_state = pd.state.load(std::memory_order_relaxed);
+      tcm_permit_state_t curr_state = get_permit_state(pd);
       if (!is_active(curr_state)) {
           return TCM_RESULT_ERROR_INVALID_ARGUMENT;
       }
@@ -1200,7 +1099,7 @@ public:
       __TCM_ASSERT(is_valid(ph), "Activating non-existing permit.");
 
       tcm_permit_data_t& pd = ph->data;
-      tcm_permit_state_t curr_state = pd.state.load(std::memory_order_relaxed);
+      tcm_permit_state_t curr_state = get_permit_state(pd);
 
       if (is_active(curr_state)) {
           return TCM_RESULT_SUCCESS;
@@ -1257,7 +1156,7 @@ public:
       const std::lock_guard<std::mutex> l(data_mutex);
       __TCM_ASSERT(is_valid(ph), "Deactivating non-existing permit.");
       tcm_permit_data_t& pd = ph->data;
-      tcm_permit_state_t curr_state = pd.state.load(std::memory_order_relaxed);
+      tcm_permit_state_t curr_state = get_permit_state(pd);
       if (is_owning_resources(curr_state)) {
           // TODO: consider using adjust_existing_permit
           move_permit(*this, ph, curr_state, /*new_state*/TCM_PERMIT_STATE_INACTIVE);
@@ -1297,7 +1196,7 @@ public:
       __TCM_ASSERT(permit_handle, nullptr);
 
       tcm_permit_data_t& data = permit_handle->data;
-      tcm_permit_state_t state = data.state.load(std::memory_order_relaxed);
+      tcm_permit_state_t state = get_permit_state(data);
       bool was_lazy = lazy_inactive_permit == permit_handle;
       remove_permit(*this, permit_handle, state);
       permit_to_callback_arg_map.erase(permit_handle);
@@ -1416,20 +1315,22 @@ protected:
     }
 
     permit->size = pd.size;
-    permit->state = pd.state.load(std::memory_order_relaxed);
+    permit->state = get_permit_state(pd);
     permit->flags = pd.flags;
 
     return has_copying_succeeded(ph, e);
   }
 
+#if TCM_USE_ASSERT
   // Helper to determine whether the permit is not released yet. Must be called under data_mutex.
   bool is_valid(tcm_permit_handle_t ph) const {
       return
           pending_permits.cend() != std::find(pending_permits.cbegin(), pending_permits.cend(), ph)
           || idle_permits.cend() != std::find(idle_permits.cbegin(), idle_permits.cend(), ph)
           || active_permits.cend() != std::find(active_permits.cbegin(), active_permits.cend(), ph)
-          || is_inactive(ph);
+          || is_inactive(get_permit_state(ph->data));
   }
+#endif
 
   bool skip_permit_negotiation(tcm_permit_handle_t ph, tcm_permit_handle_t initiator) const
   {
@@ -1437,7 +1338,7 @@ protected:
       return false;
 
     const tcm_permit_data_t& pd = ph->data;
-    const tcm_permit_state_t state = pd.state.load(std::memory_order_relaxed);
+    const tcm_permit_state_t state = get_permit_state(pd);
 
     if (!is_negotiable(state, pd.flags)) {
       return true;
@@ -1450,17 +1351,6 @@ protected:
       return false;
 
     return true;
-  }
-
-  bool skip_callback_invocation(tcm_permit_handle_t ph, tcm_permit_handle_t initiator,
-                                uint32_t previous_grant) const
-  {
-    if (ph == initiator)        // skip callback invocation for one that asked ...
-      return true;
-
-    // ... or if resources grant is not changed
-    const uint32_t new_grant = get_permit_grant(ph);
-    return previous_grant == new_grant;
   }
 
     // TODO: rename "try_satisfy" method into something like "calculate mask occupancy"
@@ -1525,7 +1415,7 @@ protected:
             for (const tcm_permit_handle_t& ph_i : permit_handles) {
                 tcm_permit_request_t& req = ph_i->request;
                 tcm_permit_data_t& pd_i = ph_i->data;
-                tcm_permit_state_t ph_i_state = pd_i.state.load(std::memory_order_relaxed);
+                tcm_permit_state_t ph_i_state = get_permit_state(pd_i);
 
                 __TCM_ASSERT(is_owning_resources(ph_i_state), "Nothing to negotiate resources from");
 
@@ -1638,7 +1528,7 @@ protected:
                         max_desired = std::max(max_desired, fitting_result.needed_concurrency);
                     }
 
-                    const tcm_permit_state_t ph_i_state = pd_i.state.load(std::memory_order_relaxed);
+                    const tcm_permit_state_t ph_i_state = get_permit_state(pd_i);
                     if (is_negotiable(ph_i_state, pd_i.flags)) {
                         stakeholders.add(stakeholder, ph_i_state);
                     }
@@ -2132,9 +2022,9 @@ protected:
 
                     new_concurrencies[st.constraint_index] -= current_negotiation;
 
-                    tcm_permit_state_t new_state = st_data.state.load(std::memory_order_relaxed);
+                    tcm_permit_state_t new_state = get_permit_state(st_data);
                     const bool shall_deactivate =
-                        is_rigid_concurrency(st_data) ||
+                        is_rigid_concurrency(st_data.flags) ||
                         new_concurrencies[st.constraint_index] < minimum;
                     if (shall_deactivate) {
                         std::fill(new_concurrencies.begin(), new_concurrencies.end(), 0);
@@ -2255,8 +2145,7 @@ protected:
                         continue;
                     }
 
-                    const tcm_permit_state_t ph_state =
-                        ph_i->data.state.load(std::memory_order_relaxed);
+                    const tcm_permit_state_t ph_state = get_permit_state(ph_i->data);
                     const tcm_permit_flags_t ph_flags = ph_i->data.flags;
 
                     __TCM_ASSERT(is_owning_resources(ph_state),
@@ -2424,227 +2313,11 @@ protected:
     }
 }; // class ThreadComposabilityBase
 
-class ThreadComposabilityFCFSCImpl : public ThreadComposabilityManagerBase {
-public:
-    void renegotiate_permits(tcm_permit_handle_t initiator) override {
-        tracer t("ThreadComposabilityFCFSCImpl::renegotiate_permits");
-        auto nested_tracer = make_event_duration_tracer(time_tracer, tcm_events::renegotiate_permits);
-
-        int32_t available_concurrency_snapshot;
-        {
-            const std::lock_guard<std::mutex> l(data_mutex);
-            available_concurrency_snapshot = available_concurrency;
-        }
-
-        // TODO: consider comparing performance with other containers such as
-        // std::deque.
-        std::vector<tcm_permit_handle_t> skipped_permits;
-
-        // we contact enough clients that could absorb
-        // available_concurrency_snapshot
-        // Not sure this is the best approach
-        while (available_concurrency_snapshot > 0) {
-            update_callbacks_t callbacks;
-            {
-                const std::lock_guard<std::mutex> l(data_mutex);
-                if (renegotiation_deque.empty() || !available_concurrency)
-                    break;
-                tcm_permit_handle_t current_ph = renegotiation_deque.front();
-                renegotiation_deque.pop_front();
-
-                if (!is_valid(current_ph))
-                    // permit is not valid anymore, skip it.
-                    continue;
-
-                tcm_permit_data_t& pd = current_ph->data;
-                if (skip_permit_negotiation(current_ph, initiator)) {
-                    skipped_permits.push_back(current_ph);
-                    continue;
-                }
-
-                const tcm_permit_request_t& req = current_ph->request;
-
-                __TCM_ASSERT(
-                    1 == client_to_callback_map.count(pd.client_id),
-                    "The group has no corresponding callback."
-                );
-                suppress_unused_warning(pd);
-
-                const uint32_t current_grant = get_permit_grant(current_ph);
-                __TCM_ASSERT(req.max_sw_threads > 0,
-                             "Desired cocnurrency should have been known at this point");
-                const uint32_t desired_concurrency = uint32_t(req.max_sw_threads);
-                __TCM_ASSERT(current_grant <= desired_concurrency,
-                             "Granted more than requested");
-                if (current_grant == desired_concurrency) {
-                    // The request has been fully satisfied already. Skipping it.
-                    continue;
-                }
-
-                __TCM_ASSERT(
-                    1 == permit_to_callback_arg_map.count(current_ph),
-                    "The permit has no argument for the client callback."
-                );
-
-                fulfillment_t ff = try_satisfy_request(req, current_ph, available_concurrency);
-                __TCM_ASSERT(ff.num_negotiable <= ff.num_satisfiable,
-                             "Number of negotiated must be included into total number of found resources.");
-                __TCM_ASSERT(req.min_sw_threads <= int32_t(ff.num_satisfiable) &&
-                                                   int32_t(ff.num_satisfiable) <= req.max_sw_threads,
-                             "Found resources should be within the requested limits.");
-
-                const int32_t satisfiable = ff.num_satisfiable - ff.num_negotiable_active;
-                if (satisfiable < req.min_sw_threads || !ff.pending_constraints_indices.empty()) {
-                    // Cannot satisfy minimum requested concurrency without negotiation from active
-                    // permits or failed to satisfy the minimum concurrency for at least one
-                    // constraint. The permit should be left in the PENDING state.
-
-                    // Push the request back to the renegotiation queue if it's still not
-                    // fully satisfied or there is no concurrency available.
-                    // TODO: Also, if we have an unsatisfied pending permit, we can return it
-                    // to the beginning of the queue until it be satisfied.
-                    // So, this approach may increase the amount of active permits in some cases.
-                    // It needs to be investigated.
-
-                    // Reuse the skipped permits container to avoid infinite looping.
-                    skipped_permits.push_back(current_ph);
-                } else {
-                    if (satisfiable < req.max_sw_threads) {
-                        // Cannot satisfy maximum requested (desired) concurrency. Put the permit
-                        // into renegotiation deque, so that the amount of resources given to it is
-                        // reconsidered whenever resource distribution state changes.
-
-                        // Reuse the skipped permits container to avoid infinite looping.
-                        skipped_permits.push_back(current_ph);
-                    }
-
-                    auto updates = negotiate(ff, req, current_ph);
-                    // Pass nullptr as the initiator value because the change in resource
-                    // distribution is not initiated by current permit. This helps to force callback
-                    // invocation for this permit, hence notifying it about the changes.
-                    callbacks = apply(*this, updates, /*initiator*/nullptr);
-                }
-                available_concurrency_snapshot = available_concurrency;
-            } // end of mutex lock scope
-
-            invoke_callbacks(callbacks, time_tracer);
-
-        } // end of while resources exist
-
-        // Return non-renegotiable permits back
-        const std::lock_guard<std::mutex> l(data_mutex);
-        renegotiation_deque.insert(
-            renegotiation_deque.end(),
-            skipped_permits.begin(), skipped_permits.end()
-        );
-    }
-
-    std::vector<permit_change_t> adjust_existing_permit(const tcm_permit_request_t &req,
-                                                        tcm_permit_handle_t ph) override
-    {
-        // The data_mutex lock must be taken
-        tracer t("ThreadComposabilityFCFSCImpl::adjust_existing_permit");
-
-        auto nested_tracer = make_event_duration_tracer(time_tracer, tcm_events::adjust_existing_permit);
-
-        __TCM_ASSERT(is_pending(ph), "Invalid permit.");
-
-        fulfillment_t ff = try_satisfy_request(req, ph, available_concurrency);
-
-        const int32_t immediately_satisfiable = ff.num_satisfiable - ff.num_negotiable_active;
-        if (immediately_satisfiable < req.min_sw_threads || !ff.pending_constraints_indices.empty())
-        {
-            // Cannot satisfy minimum requested (required) concurrency without negotiation from
-            // active permits or failed to satisfy the minimum concurrency for at least one
-            // constraint. The permit should be left in the PENDING state.
-            t.log("ThreadComposabilityFCFSCImpl::NOTE p is an unsatisfied permit");
-            renegotiation_deque.push_back(ph);
-            return {};
-        } else if (immediately_satisfiable < req.max_sw_threads) {
-            // Cannot satisfy maximum requested (desired) concurrency. Put the permit into
-            // renegotiation deque, so that the amount of resources given to it is reconsidered
-            // whenever resource distribution state changes.
-            renegotiation_deque.push_back(ph);
-        }
-
-        __TCM_ASSERT(ff.num_negotiable <= ff.num_satisfiable,
-                     "Number of negotiated must be included into total number of found resources.");
-        __TCM_ASSERT(req.min_sw_threads <= int32_t(ff.num_satisfiable) &&
-                     int32_t(ff.num_satisfiable) <= req.max_sw_threads,
-                     "Found resources should be within the requested limits.");
-
-        return negotiate(ff, req, ph);
-    }
-private:
-    std::deque<tcm_permit_handle_t> renegotiation_deque;
-
-    void nullify_negotiations(fulfillment_t& ff) {
-        ff.num_negotiable = 0;
-        for (auto& fd : ff.decisions) {
-            fd.to_assign -= fd.to_negotiate;
-            fd.to_negotiate = 0;
-            fd.active_permits = renegotiable_resources_queue_t{}; // drop contributing permits
-        }
-    }
-
-};
-
 class ThreadComposabilityFairBalance : public ThreadComposabilityManagerBase {
   // Stores the keys in the map of existing permits.
   std::deque<tcm_permit_handle_t> renegotiation_deque;
 
 protected:
-    //! Calculate concurrency for ACTIVE/IDLE permits in accordance with the FAIR approach.
-    //! If necessary, callback should be called separately.
-    permit_change_t renegotiate_active_idle_permit(uint32_t distributed_concurrency,
-                                                   uint32_t total_demand,
-                                                   const tcm_permit_request_t& pr,
-                                                   tcm_permit_handle_t ph,
-                                                   uint32_t& carry)
-    {
-        __TCM_ASSERT(pr.min_sw_threads >= 0, "Actual value of required concurrency is expected.");
-        permit_change_t update {
-            ph, ph->data.state.load(std::memory_order_relaxed),
-            /*new_concurrencies[0] = */{uint32_t(pr.min_sw_threads)}
-        };
-
-        // TODO: take account of the mask when computing allotment
-        tcm_permit_data_t& pd = ph->data;
-        int32_t undistributed_concurrency = 0;
-        if (pr.cpu_constraints) {
-            undistributed_concurrency = pr.min_sw_threads;
-            for (uint32_t i = 0; i < pd.size; ++i) {
-                update.new_concurrencies[i] = pr.cpu_constraints[i].min_concurrency;
-                undistributed_concurrency -= pr.cpu_constraints[i].min_concurrency;
-            }
-        }
-
-        distributed_concurrency = std::min(distributed_concurrency, total_demand);
-        const uint32_t demand = pr.max_sw_threads - pr.min_sw_threads;
-        uint32_t allotted = 0;
-        if (distributed_concurrency > 0 && total_demand > 0) {
-            const uint32_t v = distributed_concurrency * demand + carry;
-            allotted = v / total_demand;
-            carry = v % total_demand;
-            __TCM_ASSERT(allotted <= distributed_concurrency, "Distributing more than available.");
-        }
-
-        allotted += uint32_t(undistributed_concurrency);
-        for (uint32_t i = 0; i < pd.size && allotted; ++i) {
-            unsigned span = demand;
-            if (pr.cpu_constraints) {
-                // TODO: Consider distribution of allotted resources evenly between elements of
-                // constraints array
-                span = pr.cpu_constraints[i].max_concurrency - pr.cpu_constraints[i].min_concurrency;
-            }
-            const uint32_t additionally_assigned = std::min(allotted, span);
-            update.new_concurrencies[i] += additionally_assigned;
-            allotted -= additionally_assigned;
-        }
-
-        return update;
-    }
-
     // Called once there is possibility to better utilize resources (i.e. resources are released or
     // became idle).
     void renegotiate_permits(tcm_permit_handle_t initiator) override {
@@ -2730,7 +2403,7 @@ protected:
         tracer t("ThreadComposabilityFairBalance::adjust_existing_permit");
         auto nested_tracer = make_event_duration_tracer(time_tracer, tcm_events::adjust_existing_permit);
 
-        __TCM_ASSERT(is_pending(ph), "Invalid permit.");
+        __TCM_ASSERT(is_pending(get_permit_state(ph->data)), "Invalid permit.");
 
 
         if (lazy_inactive_permit) {
@@ -2979,7 +2652,7 @@ tcm_result_t tcmIdlePermit(tcm_permit_handle_t p) {
 ///     - ::TCM_RESULT_ERROR_UNKNOWN
 tcm_result_t tcmActivatePermit(tcm_permit_handle_t p) {
   using tcm::theTCM;
-  tcm::internal::tracer t("zeReactivatePermit");
+  tcm::internal::tracer t("tcmActivatePermit");
 
   if (p) {
     return theTCM::instance().activate_permit(p);
@@ -2998,7 +2671,7 @@ tcm_result_t tcmActivatePermit(tcm_permit_handle_t p) {
 ///     - ::TCM_RESULT_ERROR_UNKNOWN
 tcm_result_t tcmDeactivatePermit(tcm_permit_handle_t p) {
   using tcm::theTCM;
-  tcm::internal::tracer t("zeReactivatePermit");
+  tcm::internal::tracer t("tcmDeactivatePermit");
 
   if (p) {
     return theTCM::instance().deactivate_permit(p);
