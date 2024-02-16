@@ -1,4 +1,4 @@
-# Copyright (C) 2023 Intel Corporation
+# Copyright (C) 2023-2024 Intel Corporation
 #
 # This software and the related documents are Intel copyrighted materials, and your use of them is
 # governed by the express license under which they were provided to you ("License"). Unless the
@@ -22,7 +22,9 @@ set(TCM_LIB_COMPILE_FLAGS -D_CRT_SECURE_NO_WARNINGS /GS)
 set(TCM_COMMON_COMPILE_FLAGS /volatile:iso /FS /EHsc)
 set(TCM_COMMON_LINK_LIBS Kernel32.lib)
 
-set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} /DYNAMICBASE /NXCOMPAT)
+# The "/DEPENDENTLOADFLAG:0x2000" restricts the loader to look for dependencies in current working
+# directory only if it is in the so-called "Safe load list".
+set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} /DYNAMICBASE /NXCOMPAT /DEPENDENTLOADFLAG:0x2000)
 if (TCM_ARCH EQUAL 32)
     set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} /SAFESEH)
 endif()

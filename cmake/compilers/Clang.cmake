@@ -1,4 +1,4 @@
-# Copyright (C) 2023 Intel Corporation
+# Copyright (C) 2023-2024 Intel Corporation
 #
 # This software and the related documents are Intel copyrighted materials, and your use of them is
 # governed by the express license under which they were provided to you ("License"). Unless the
@@ -22,4 +22,11 @@ set(TCM_COMMON_COMPILE_FLAGS ${TCM_COMMON_COMPILE_FLAGS} $<$<NOT:$<CONFIG:Debug>
     -Wformat -Wformat-security -Werror=format-security -fPIC -fstack-protector-strong)
 
 set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} -Wl,-z,relro,-z,now)
+if (WIN32)
+   # The "/DEPENDENTLOADFLAG:0x2000" restricts the loader to look for dependencies in current
+   # working directory only if it is in the so-called "Safe load list".
+   set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS}
+       $<$<NOT:$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},18.0>>:-Xlinker /DEPENDENTLOADFLAG:0x2000>)
+endif()
+
 set(TCM_COMMON_LINK_LIBS ${CMAKE_DL_LIBS})
