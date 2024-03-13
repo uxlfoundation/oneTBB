@@ -47,7 +47,7 @@ BEGIN
             VALUE "CompanyName", "Intel Corporation\0"
             VALUE "FileDescription", "Thread Composability Manager\0"
             VALUE "FileVersion", TCM_VERSION "\0"
-            VALUE "LegalCopyright", "Copyright ${tcm_build_year} Intel Corporation.  All Rights Reserved.\0"
+            VALUE "LegalCopyright", "Copyright 2023-${tcm_build_year} Intel Corporation.  All Rights Reserved.\0"
             VALUE "LegalTrademarks", "\0"
 #ifndef TCM_DEBUG
             VALUE "OriginalFilename", "tcm.dll\0"
