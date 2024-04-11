@@ -137,6 +137,10 @@ bool is_negotiable(const tcm_permit_state_t& state, const tcm_permit_flags_t& fl
     return true;
 }
 
+bool is_constrained(const tcm_permit_handle_t ph) {
+    return bool(ph->request.cpu_constraints);
+}
+
 void change_state_relaxed(tcm_permit_data_t& permit_data, tcm_permit_state_t state) {
     // prepare and commit permit modification calls are not needed because only single atomic
     // variable is changed.
@@ -1095,6 +1099,7 @@ public:
 
     update_callbacks_t callbacks;
     {
+      // TODO: Consider permit activation without acquiring the lock.
       const std::lock_guard<std::mutex> l(data_mutex);
       __TCM_ASSERT(is_valid(ph), "Activating non-existing permit.");
 
@@ -1115,31 +1120,40 @@ public:
         return TCM_RESULT_SUCCESS;
       }
 
-      // Activating of INACTIVE might not find necessary amount of resources, change its state to
-      // PENDING until its required/minimum parameters are satisfied.
-      if (uint32_t grant = get_permit_grant(pd)) {
+      if (const uint32_t grant = get_permit_grant(pd)) {
+          // Activating without spending much time on resources search in case minimum is already
+          // satisfied
+          __TCM_ASSERT(ph == lazy_inactive_permit || is_idle(curr_state), "Broken invariant");
+          __TCM_ASSERT(grant >= uint32_t(ph->request.min_sw_threads),
+                       "Grant of resources cannot be less than the minimum");
           __TCM_ASSERT(ph->request.max_sw_threads > 0, "Request's desired concurrency is unknown");
-          if (grant == uint32_t(ph->request.max_sw_threads)) {
-              ph->data.state.store(TCM_PERMIT_STATE_ACTIVE, std::memory_order_relaxed);
-              move_permit(*this, ph, curr_state, /*new_state*/TCM_PERMIT_STATE_ACTIVE);
-              ph->data.tcm_epoch_snapshot = tcm_state_epoch;
-              return TCM_RESULT_SUCCESS;
+          const uint32_t desired_concurrency = uint32_t(ph->request.max_sw_threads);
+          // TODO: Re-distribute available concurrency for constrained permits as well instead of
+          // simply activating them
+          if (grant < desired_concurrency && available_concurrency > 0 && !is_constrained(ph)) {
+              const uint32_t concurrency_change = std::min(available_concurrency,
+                                                           desired_concurrency - grant);
+              available_concurrency -= concurrency_change;
+              ph->data.concurrency[0] += concurrency_change;
+              note_tcm_state_change(*this);
           }
-
-          __TCM_ASSERT(grant < uint32_t(ph->request.max_sw_threads), "Grant is more than requested");
-          remove_permit(*this, ph, curr_state);
-          const uint32_t released = move_to_pending(ph);
-          __TCM_ASSERT(available_concurrency <= available_concurrency + released, "Overflow detected");
-          available_concurrency += released;
-          note_tcm_state_change(*this);
+          ph->data.state.store(TCM_PERMIT_STATE_ACTIVE, std::memory_order_relaxed);
+          move_permit(*this, ph, curr_state, /*new_state*/TCM_PERMIT_STATE_ACTIVE);
       } else {
-          change_state_relaxed(ph->data, TCM_PERMIT_STATE_PENDING);
+          __TCM_ASSERT(is_inactive(curr_state), "Inactive permit is expected");
+          std::vector<permit_change_t> updates = adjust_existing_permit(ph->request, ph);
+          if (!updates.empty()) {
+              // Specifying not to remove the initiator first is only to save on unnecessary search
+              // in the containers as there is no container for inactive permits
+              callbacks = apply(*this, updates, /*initiator*/ph, /*remove_initiator_first*/false);
+          } else {
+              change_state_relaxed(ph->data, TCM_PERMIT_STATE_PENDING);
+              add_permit(*this, ph, TCM_PERMIT_STATE_PENDING);
+          }
       }
-      add_permit(*this, ph, TCM_PERMIT_STATE_PENDING);
-      std::vector<permit_change_t> updates = adjust_existing_permit(ph->request, ph);
-      callbacks = apply(*this, updates, ph);
       ph->data.tcm_epoch_snapshot = tcm_state_epoch;
     }
+
     invoke_callbacks(callbacks, time_tracer);
 
     return TCM_RESULT_SUCCESS;
@@ -1177,7 +1191,7 @@ public:
       } else {
           change_state_relaxed(pd, new_state);
           move_permit(*this, ph, curr_state, new_state);
-        }
+      }
     }
     if (shall_negotiate_resources) {
         // Specify 'nullptr' in order to notify the client in case the resources from this permit
@@ -2111,7 +2125,7 @@ protected:
         auto nested_tracer = make_event_duration_tracer(time_tracer, tcm_events::try_satisfy_request);
 
         stakeholder_cache sc{/*constraints array length*/ph->data.size};
-        if (req.cpu_constraints && process_mask) {
+        if (is_constrained(ph) && process_mask) {
             __TCM_ASSERT(req.constraints_size > 0, "Size of constraints array is not specified.");
             __TCM_ASSERT(req.min_sw_threads >= 0, "Wrong assumption");
             try_satisfy_constraints(sc, req, ph);
@@ -2402,9 +2416,6 @@ protected:
         // The data_mutex lock must be taken
         tracer t("ThreadComposabilityFairBalance::adjust_existing_permit");
         auto nested_tracer = make_event_duration_tracer(time_tracer, tcm_events::adjust_existing_permit);
-
-        __TCM_ASSERT(is_pending(get_permit_state(ph->data)), "Invalid permit.");
-
 
         if (lazy_inactive_permit) {
             available_concurrency += release_resources(lazy_inactive_permit);
