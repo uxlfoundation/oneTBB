@@ -439,8 +439,9 @@ void merge_callback_invocations(update_callbacks_t& callbacks, const update_call
     }
 }
 
-void invoke_callbacks(const update_callbacks_t& callbacks, time_tracer_type& time_tracer) {
-    auto nested_tracer = make_event_duration_tracer(time_tracer, tcm_events::invoke_callbacks);
+void invoke_callbacks(const update_callbacks_t& callbacks) {
+    __TCM_PROFILE_THIS_FUNCTION();
+
     for (const auto& n : callbacks) {
         const tcm_callback_t& callback = n.first;
         const callback_args_t& args = n.second;
@@ -583,8 +584,6 @@ struct ThreadComposabilityManagerData {
 
   //! The multimap of permits associated with the given client.
   std::unordered_multimap<tcm_client_id_t, tcm_permit_handle_t> client_to_permit_mmap{};
-
-  time_tracer_type time_tracer;
 };
 
 
@@ -728,7 +727,7 @@ update_callbacks_t apply(ThreadComposabilityManagerData& data,
                          const tcm_permit_handle_t initiator,
                          const bool remove_initiator_first = true)
 {
-    auto nested_tracer = make_event_duration_tracer(data.time_tracer, tcm_events::apply);
+    __TCM_PROFILE_THIS_FUNCTION();
     update_callbacks_t callbacks;
 
     int32_t concurrency_delta = 0;
@@ -977,7 +976,7 @@ public:
                       tcm_permit_t* permit, const int32_t sum_constraints_min)
   {
     tracer t("ThreadComposabilityBase::request_permit");
-    auto top_event_tracer = make_event_duration_tracer(time_tracer, tcm_events::request_permit);
+    __TCM_PROFILE_THIS_FUNCTION();
 
     bool additional_concurrency_available = false;
 
@@ -1041,7 +1040,7 @@ public:
       ph->data.tcm_epoch_snapshot = tcm_state_epoch;
     }
 
-    invoke_callbacks(callbacks, time_tracer); // Invocation of the callbacks is happenning outside of the lock
+    invoke_callbacks(callbacks); // Invocation of the callbacks is happenning outside of the lock
 
     if (additional_concurrency_available) {
         renegotiate_permits(/*initiator*/ph);
@@ -1073,7 +1072,7 @@ public:
 
   tcm_result_t idle_permit(tcm_permit_handle_t ph) {
     tracer t("ThreadComposabilityBase::idle_permit");
-    auto top_event_tracer = make_event_duration_tracer(time_tracer, tcm_events::idle_permit);
+    __TCM_PROFILE_THIS_FUNCTION();
 
     __TCM_ASSERT(ph, nullptr);
     {
@@ -1093,7 +1092,7 @@ public:
 
   tcm_result_t activate_permit(tcm_permit_handle_t ph) {
     tracer t("ThreadComposabilityBase::activate_permit");
-    auto top_event_tracer = make_event_duration_tracer(time_tracer, tcm_events::activate_permit);
+    __TCM_PROFILE_THIS_FUNCTION();
 
     __TCM_ASSERT(ph, nullptr);
 
@@ -1154,14 +1153,15 @@ public:
       ph->data.tcm_epoch_snapshot = tcm_state_epoch;
     }
 
-    invoke_callbacks(callbacks, time_tracer);
+    invoke_callbacks(callbacks);
 
     return TCM_RESULT_SUCCESS;
   }
 
   tcm_result_t deactivate_permit(tcm_permit_handle_t ph) {
     tracer t("ThreadComposabilityBase::deactivate_permit");
-    auto top_event_tracer = make_event_duration_tracer(time_tracer, tcm_events::deactivate_permit);
+    __TCM_PROFILE_THIS_FUNCTION();
+
     __TCM_ASSERT(ph, nullptr);
 
     const tcm_permit_state_t new_state = TCM_PERMIT_STATE_INACTIVE;
@@ -1236,7 +1236,7 @@ public:
 
   tcm_result_t release_permit(tcm_permit_handle_t handle) {
     tracer t("ThreadComposabilityBase::release_permit");
-    auto top_event_tracer = make_event_duration_tracer(time_tracer, tcm_events::release_permit);
+    __TCM_PROFILE_THIS_FUNCTION();
 
     bool has_released_resources = false;
     {
@@ -1831,7 +1831,8 @@ protected:
     fulfillment_t calculate_updates(const tcm_permit_request_t& req, tcm_permit_handle_t ph,
                                     const stakeholder_cache& cache)
     {
-        auto nested_tracer = make_event_duration_tracer(time_tracer, tcm_events::calculate_updates);
+        __TCM_PROFILE_THIS_FUNCTION();
+
         __TCM_ASSERT(0 <= req.max_sw_threads, "Maximum requested threads must be known.");
 
         const std::vector<negotiable_snapshot_t>& sh = cache.stakeholders;
@@ -1997,7 +1998,7 @@ protected:
     std::vector<permit_change_t> negotiate(fulfillment_t& f, const tcm_permit_request_t& /*req*/,
                                            const tcm_permit_handle_t& ph)
     {
-        auto nested_tracer = make_event_duration_tracer(time_tracer, tcm_events::negotiate);
+        __TCM_PROFILE_THIS_FUNCTION();
 
         std::vector<permit_change_t> result;
         permit_change_t requested_permit{ph, TCM_PERMIT_STATE_ACTIVE, {}};
@@ -2122,7 +2123,7 @@ protected:
         // unnecessary anywhere else except for the first time resources are
         // requested and representation of corresponding permit is allocated.
 
-        auto nested_tracer = make_event_duration_tracer(time_tracer, tcm_events::try_satisfy_request);
+        __TCM_PROFILE_THIS_FUNCTION();
 
         stakeholder_cache sc{/*constraints array length*/ph->data.size};
         if (is_constrained(ph) && process_mask) {
@@ -2200,8 +2201,6 @@ protected:
             sc.total_immediately_available = snapshot.num_immediately_available();
         }
 
-        nested_tracer.dismiss();
-
         const bool is_all_request_data_known = req.max_sw_threads > 0;
         if (is_all_request_data_known) {
             fulfillment_t fulfillment = calculate_updates(req, ph, sc);
@@ -2231,7 +2230,7 @@ protected:
     tcm_permit_handle_t
     make_new_permit(const tcm_client_id_t clid, const tcm_permit_request_t& req) {
         tracer t("ThreadComposabilityManagerBase::make_new_permit");
-
+        __TCM_PROFILE_THIS_FUNCTION();
         unsigned permit_size = infer_permit_size(req);
 
         // Pointing to a permit representation in memory as a byte array in order to simplify
@@ -2342,7 +2341,7 @@ protected:
         // - Saturate the demand starting from the least unhappy (i.e. the one with minimal
         //   'desired - current' value) active permit
         tracer t("ThreadComposabilityFairBalance::renegotiate_permits");
-        auto nested_tracer = make_event_duration_tracer(time_tracer, tcm_events::renegotiate_permits);
+        __TCM_PROFILE_THIS_FUNCTION();
 
         update_callbacks_t callbacks;
         {
@@ -2407,7 +2406,7 @@ protected:
         } // end of mutex section
 
     callback_invoke:
-        invoke_callbacks(callbacks, time_tracer);
+        invoke_callbacks(callbacks);
     }
 
     std::vector<permit_change_t> adjust_existing_permit(const tcm_permit_request_t &req,
@@ -2415,7 +2414,7 @@ protected:
     {
         // The data_mutex lock must be taken
         tracer t("ThreadComposabilityFairBalance::adjust_existing_permit");
-        auto nested_tracer = make_event_duration_tracer(time_tracer, tcm_events::adjust_existing_permit);
+        __TCM_PROFILE_THIS_FUNCTION();
 
         if (lazy_inactive_permit) {
             available_concurrency += release_resources(lazy_inactive_permit);
