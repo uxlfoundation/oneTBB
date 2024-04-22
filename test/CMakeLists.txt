@@ -52,6 +52,16 @@ function(add_tcm_test)
 endfunction()
 
 add_tcm_test(NAME test_basic_apis ENVIRONMENT "TCM_ENABLE=1")
+
+if (TCM_FUZZ_TESTING)
+  add_tcm_test(NAME test_fuzzing ENVIRONMENT "TCM_ENABLE=1")
+
+  set(TCM_FUZZ_OPTION -fsanitize=fuzzer)
+  target_compile_options(test_fuzzing PRIVATE ${TCM_FUZZ_OPTION} -DTEST_EXECUTABLE_DIR="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+  target_link_options(test_fuzzing PRIVATE ${TCM_FUZZ_OPTION})
+  return()
+endif()
+
 # FCFS distriubtion strategy will not be available for end user since TCM_RESOURCE_DISTRIBUTION_STRATEGY is disabled
 # add_tcm_test(NAME test_fcfsc ENVIRONMENT "TCM_ENABLE=1;TCM_RESOURCE_DISTRIBUTION_STRATEGY=FCFS")
 add_tcm_test(NAME test_rb ENVIRONMENT "TCM_ENABLE=1")

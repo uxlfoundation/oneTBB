@@ -31,6 +31,7 @@ endif()
 
 option(TCM_TEST "Enable testing" ON)
 option(TCM_STRICT "Treat compiler warnings as errors" ON)
+option(TCM_FUZZ_TESTING "Enable FUZZ testing of TCM" OFF)
 
 set(TCM_PROFILE ${TCM_PROFILE} CACHE STRING "Enable profiling of TCM functionality" FORCE)
 
@@ -84,6 +85,7 @@ set(CPACK_GENERATOR ZIP)
 
 include(CPack)
 include(CMakePackageConfigHelpers)
+include(CheckCXXCompilerFlag)
 include(GNUInstallDirs)
 # --------------------------------------------------------------------------------------------------
 
