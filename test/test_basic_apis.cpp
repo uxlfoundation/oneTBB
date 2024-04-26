@@ -11,6 +11,7 @@
 */
 
 #include "test_utils.h"
+#include "common_tests.h"
 
 #include "tcm.h"
 
@@ -783,40 +784,338 @@ bool test_allow_not_specifying_client_callback() {
   return test_epilog(test_name);
 }
 
-bool test_requesting_zero_resources() {
-  // The test checks that it is okay to ask for zero resources in order to get
-  // the permit handle initialized by the TCM. This is useful when client wants
-  // to have actual permit handle value to make further, perhaps, concurrent
-  // request updates on it.
+namespace request_as_inactive {
+    tcm_permit_flags_t request_as_inactive_flag{/*stale*/ false, /*rigid_concurrency*/ false,
+                                                /*exclusive*/ false, /*request_as_inactive*/ true,
+                                                /*reserved*/ 0};
 
-  const char* test_name = __func__;
-  test_prolog(test_name);
+    bool allow_request_as_inactive() {
+        const char* test_name = __func__;
+        test_prolog(test_name);
 
-  tcm_client_id_t client_id;
+        auto client_id = connect_new_client();
 
-  tcm_result_t r = tcmConnect(nullptr, &client_id);
-  if (!check_success(r, "tcmConnect"))
-    return test_fail(test_name);
+        tcm_permit_request_t req =
+            make_request(/*min_sw_threads*/ num_oversubscribed_resources,
+                         /*max_sw_threads*/ num_oversubscribed_resources,
+                         /*constraints*/ nullptr, /*size*/ 0,
+                         /*priority*/ TCM_REQUEST_PRIORITY_NORMAL, request_as_inactive_flag);
 
-  int min_sw_threads = 0, max_sw_threads = 0;
-  uint32_t p_concurrency = 0; tcm_permit_t p = make_void_permit(&p_concurrency);
-  uint32_t e_concurrency = max_sw_threads; tcm_permit_t e = make_active_permit(&e_concurrency);
+        auto expected_permit = make_inactive_permit(/*cpu_masks*/ nullptr, request_as_inactive_flag);
+        tcm_permit_handle_t ph = request_permit(client_id, req);
+        if (!check_permit(expected_permit, ph))
+            return test_fail(test_name);
+        release_permit(ph);
+        disconnect_client(client_id);
+        return test_epilog(test_name);
+    }
 
-  tcm_permit_request_t req = make_request(min_sw_threads, max_sw_threads);
-  tcm_permit_handle_t ph{nullptr};
-  r = tcmRequestPermit(client_id, req, nullptr, &ph, &p);
-  if (!(check_success(r, "tcmRequestPermit") && check_permit(e, ph)))
-    return test_fail(test_name);
+    bool allow_request_as_inactive_for_deactivated() {
+        const char* test_name = __func__;
+        test_prolog(test_name);
 
-  r = tcmReleasePermit(ph);
-  if (!check_success(r, "tcmReleasePermit"))
-    return test_fail(test_name);
+        renegotiating_permits = {};
 
-  r = tcmDisconnect(client_id);
-  if (!check_success(r, "tcmDisconnect"))
-    return test_fail(test_name);
+        tcm_client_id_t client_id = connect_new_client(client_renegotiate);
+        int32_t min_sw_threads = num_oversubscribed_resources/2;
+        int32_t max_sw_threads = num_oversubscribed_resources;
+        auto req = make_request(min_sw_threads, max_sw_threads);
+        auto ph = request_permit(client_id, req);
+        auto expected_permit = make_active_permit(max_sw_threads);
+        if (!check_permit(expected_permit, ph))
+            return test_fail(test_name);
 
-  return test_epilog(test_name);
+        // Request another that negotiates the first
+        auto req2 = make_request(/*min_sw_threads*/num_oversubscribed_resources/2,
+                                 /*max_sw_threads*/num_oversubscribed_resources/2);
+        renegotiating_permits = {ph}; allow_null_in_callback_arg = true;
+        is_client_renegotiate_callback_invoked = false;
+        tcm_permit_t& p = expected_permit;
+        p.concurrencies[0] = min_sw_threads;
+        auto ph2 = request_permit(client_id, req2);
+        auto expected_permit2 = make_active_permit(num_oversubscribed_resources/2);
+        if (!(check_permit(expected_permit, ph) && check_permit(expected_permit2, ph2) &&
+              is_client_renegotiate_callback_invoked))
+            return test_fail(test_name);
+
+        // Deactivate the first
+        is_client_renegotiate_callback_invoked = false;
+        allow_null_in_callback_arg = false;
+        deactivate_permit(ph);
+        p.concurrencies[0] = 0; // TODO: Set expected permit concurrency back to minimum here, i.e.,
+                                // to num_oversubscribed_resources/2, when "lazy inactive permit"
+                                // feature does not release the concurrency from the deactivated
+                                // permit if there is no actual demand from other stakeholders
+        p.state = TCM_PERMIT_STATE_INACTIVE;
+        if (!(check_permit(expected_permit, ph) && check_permit(expected_permit2, ph2) &&
+              !is_client_renegotiate_callback_invoked))
+            return test_fail(test_name);
+
+        // Update the first permit request parameters so that its minimum is still satisfied
+        req.min_sw_threads = 1; req.flags.request_as_inactive = true;
+        p.flags.request_as_inactive = true;
+        tcm_permit_handle_t ph_prev = ph;
+        ph = request_permit(client_id, req, /*callback*/nullptr, ph);
+        if (!(check_permit(expected_permit, ph) && check_permit(expected_permit2, ph2) &&
+              !is_client_renegotiate_callback_invoked && ph == ph_prev))
+            return test_fail(test_name);
+
+        // Activating the first and check that both permits have expected resources distribution
+        activate_permit(ph);
+        p.concurrencies[0] = max_sw_threads - num_oversubscribed_resources/2;
+        p.state = TCM_PERMIT_STATE_ACTIVE; p.flags.request_as_inactive = false;
+        if (!(check_permit(expected_permit, ph) && check_permit(expected_permit2, ph2) &&
+              !is_client_renegotiate_callback_invoked))
+            return test_fail(test_name);
+
+        release_permit(ph);
+        release_permit(ph2);
+
+        disconnect_client(client_id);
+        return test_epilog(test_name);
+    }
+
+    bool allow_change_constraints_for_requested_as_inactive() {
+        // Tests checks that it is allowed to change the constraints of a permit_handle that was
+        // initially requested as inactive with constraints.
+
+        const char* test_name = __func__;
+        test_prolog(test_name);
+
+        auto expected_permit = make_inactive_permit(/*cpu_masks*/ nullptr, request_as_inactive_flag);
+
+        // Request as inactive with one set of constraints
+        tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+        constraints.numa_id = tcm_any;
+
+        auto req = make_request(/*min_sw_threads*/1, /*max_sw_threads*/num_oversubscribed_resources/2,
+                                &constraints, /*size*/1, TCM_REQUEST_PRIORITY_NORMAL,
+                                request_as_inactive_flag);
+
+        auto client_id = connect_new_client();
+        auto ph = request_permit(client_id, req);
+        if (!check_permit(expected_permit, ph))
+            return test_fail(test_name);
+
+         // Request resources with changed constraints
+        constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+        constraints.min_concurrency = 0; constraints.max_concurrency = num_oversubscribed_resources;
+        req = make_request(/*min_sw_threads*/num_oversubscribed_resources/2,
+                           /*max_sw_threads*/num_oversubscribed_resources, &constraints, /*size*/1);
+
+        tcm_cpu_mask_t mask = hwloc_bitmap_alloc();
+        std::unique_ptr<tcm_cpu_mask_t, mask_deleter> req_mask_guard(&mask);
+        uint32_t p_concurrency = num_oversubscribed_resources;
+        auto p = make_permit(&p_concurrency, &mask);
+        auto ph_prev = ph;
+        tcm_result_t r = tcmRequestPermit(client_id, req, /*callback_arg*/nullptr, &ph, &p);
+        auto expected_permit2 = make_active_permit(num_oversubscribed_resources);
+        skip_checks_t skip_masks; skip_masks.mask = true;
+        if (!(check_success(r, "tcmRequestPermit on initialized permit with constraints") &&
+              check_permit(expected_permit2, p, skip_masks) && has_masks(p) && ph == ph_prev))
+        {
+            return test_fail(test_name);
+        }
+
+        release_permit(ph);
+        disconnect_client(client_id);
+        return test_epilog(test_name);
+    }
+
+    bool allow_change_callback_arg_for_requested_as_inactive() {
+        // The test checks that it is allowed to change callback argument for requested as inactive
+        // permit request
+        const char* test_name = __func__;
+        test_prolog(test_name);
+
+        tcm_client_id_t client_id = connect_new_client(client_renegotiate);
+
+        // Request as inactive first
+        auto expected_permit = make_inactive_permit(/*cpu_masks*/ nullptr, request_as_inactive_flag);
+        tcm_permit_request_t req = make_request(/*min_sw_threads*/num_oversubscribed_resources,
+                                                /*max_sw_threads*/num_oversubscribed_resources);
+        req.flags.request_as_inactive = true;
+        tcm_permit_handle_t ph = request_permit(client_id, req, /*callback_arg*/nullptr);
+        if (!check_permit(expected_permit, ph))
+            return test_fail(test_name);
+
+        // Update permit request with different request parameters including callback argument
+        tcm_permit_handle_t ph_prev = ph;
+        req.min_sw_threads = 1; req.max_sw_threads = num_oversubscribed_resources/2;
+        tcm_result_t r = tcmRequestPermit(client_id, req, /*callback_arg*/&ph, &ph, /*permit*/nullptr);
+        if (!(check_success(r, "Re-initializing permit_handle using different request and callback")
+              && check_permit(expected_permit, ph) && ph == ph_prev))
+            return test_fail(test_name);
+
+        tcm_permit_t& ep = expected_permit;
+        ep.concurrencies[0] = num_oversubscribed_resources/2; ep.state = TCM_PERMIT_STATE_ACTIVE;
+        ep.flags.request_as_inactive = false;
+        activate_permit(ph, "Error activating permit");
+        if (!check_permit(ep, ph))
+            return test_fail(test_name);
+
+        // Check updating callback argument works.
+        is_client_renegotiate_callback_invoked = false;
+        renegotiating_permits = {ph};
+        req = make_request(num_oversubscribed_resources - 1, num_oversubscribed_resources);
+        auto ph2 = request_permit(client_id, req, /*callback_arg*/ nullptr);
+        ep.concurrencies[0] = 1; auto e2 = make_active_permit(num_oversubscribed_resources - 1);
+        if (!(check_permit(ep, ph) && check_permit(e2, ph2) && is_client_renegotiate_callback_invoked))
+            return test_fail(test_name);
+
+        renegotiating_permits = {ph2}; allow_null_in_callback_arg = true;
+        release_permit(ph);
+        release_permit(ph2);
+        allow_null_in_callback_arg = false;
+        return test_epilog(test_name);
+    }
+
+    bool prohibit_request_as_inactive_for_activated() {
+        const char* test_name = __func__;
+        test_prolog(test_name);
+
+        auto client_id = connect_new_client();
+        tcm_permit_request_t req =
+            make_request(/*min_sw_threads*/ 1, /*max_sw_threads*/ num_oversubscribed_resources);
+
+        auto expected_permit = make_active_permit(num_oversubscribed_resources);
+        tcm_permit_handle_t ph = request_permit(client_id, req);
+        if (!check_permit(expected_permit, ph))
+            return test_fail(test_name);
+
+        req.min_sw_threads = req.max_sw_threads; req.flags.request_as_inactive = true;
+        auto prev_ph = ph;
+        auto r = tcmRequestPermit(client_id, req, /*callback_arg*/ nullptr, &ph, /*permit*/ nullptr);
+        if (!(check_fail(r, "Got error in re-initializing owning permit_handle") &&
+              check_permit(expected_permit, ph) && ph == prev_ph))
+            return test_fail(test_name);
+
+        release_permit(ph);
+        disconnect_client(client_id);
+
+        return test_epilog(test_name);
+    }
+
+    bool prohibit_request_as_inactive_for_pending() {
+        const char* test_name = __func__;
+        test_prolog(test_name);
+
+        tcm_client_id_t client_id = connect_new_client();
+        int32_t min_sw_threads = num_oversubscribed_resources;
+        int32_t max_sw_threads = num_oversubscribed_resources;
+        auto req = make_request(min_sw_threads, max_sw_threads);
+        auto ph = request_permit(client_id, req);
+        auto expected_permit = make_active_permit(max_sw_threads);
+        if (!check_permit(expected_permit, ph))
+            return test_fail(test_name);
+
+        // Request another that gets PENDING state
+        auto req2 = make_request(/*min_sw_threads*/num_oversubscribed_resources/2,
+                                 /*max_sw_threads*/num_oversubscribed_resources/2);
+        auto ph2 = request_permit(client_id, req2);
+        uint32_t e_concurrency = 0; auto expected_permit2 = make_pending_permit(&e_concurrency);
+        if (!(check_permit(expected_permit, ph) && check_permit(expected_permit2, ph2)))
+            return test_fail(test_name);
+
+        // Update pending permit request and expect error
+        req2.min_sw_threads = 1; req2.flags.request_as_inactive = true;
+        tcm_permit_handle_t ph2_prev = ph2;
+        tcm_result_t r = tcmRequestPermit(client_id, req2, /*callback_arg*/nullptr, &ph2, /*permit*/nullptr);
+        ph2 = request_permit(client_id, req, /*callback*/nullptr, ph2);
+        if (!(check_fail(r, "Got error when requesting as inactive for pending") && ph2 == ph2_prev
+              && check_permit(expected_permit, ph) && check_permit(expected_permit2, ph2)))
+            return test_fail(test_name);
+
+        release_permit(ph2);
+        release_permit(ph);
+        disconnect_client(client_id);
+        return test_epilog(test_name);
+    }
+
+    bool prohibit_permit_reallocation_for_requested_as_inactive() {
+        const char* test_name = __func__;
+        test_prolog(test_name);
+        auto client_id = connect_new_client();
+        tcm_permit_request_t req =
+            make_request(/*min_sw_threads*/ num_oversubscribed_resources,
+                         /*max_sw_threads*/ num_oversubscribed_resources,
+                         /*constraints*/ nullptr, /*size*/ 0,
+                         /*priority*/ TCM_REQUEST_PRIORITY_NORMAL, request_as_inactive_flag);
+
+        auto expected_permit = make_inactive_permit(/*cpu_masks*/ nullptr, request_as_inactive_flag);
+        tcm_permit_handle_t ph = request_permit(client_id, req);
+        if (!check_permit(expected_permit, ph))
+            return test_fail(test_name);
+
+        auto ph_prev = ph;
+        tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+        constraints.core_type_id = tcm_any;
+        req.cpu_constraints = &constraints; req.constraints_size = 1;
+        tcm_result_t r = tcmRequestPermit(client_id, req, /*callback*/nullptr, &ph, /*permit*/nullptr);
+        if (!(check_fail(r, "Got error in re-initializing permit_handle with constraints") &&
+              ph == ph_prev))
+            return test_fail(test_name);
+
+        release_permit(ph);
+        disconnect_client(client_id);
+
+        return test_epilog(test_name);
+    }
+
+    bool erroneous_request_as_inactive_does_not_change_request_parameters() {
+        const char* test_name = __func__;
+        test_prolog(test_name);
+
+        auto client_id = connect_new_client();
+        tcm_permit_request_t req =
+            make_request(/*min_sw_threads*/ 1, /*max_sw_threads*/ num_oversubscribed_resources,
+                         /*constraints*/ nullptr, /*size*/ 0,
+                         /*priority*/ TCM_REQUEST_PRIORITY_NORMAL, request_as_inactive_flag);
+        tcm_permit_handle_t ph = request_permit(client_id, req);
+        auto expected_permit = make_inactive_permit(/*cpu_masks*/ nullptr, request_as_inactive_flag);
+        if (!check_permit(expected_permit, ph))
+            return test_fail(test_name);
+
+        auto ph_prev = ph;
+        req.min_sw_threads = req.max_sw_threads = 1;
+        tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+        constraints.max_concurrency = 2;
+        // Avoid MSVC C4312: 'operation' : conversion from 'unsigned int' to 'tcm_cpu_mask_t' of
+        // greater size
+        constraints.mask = (tcm_cpu_mask_t)(unsigned long long)(0xDEADBEEF);
+        req.cpu_constraints = &constraints; req.constraints_size = 1;
+        tcm_result_t r = tcmRequestPermit(client_id, req, /*callback*/nullptr, &ph, /*permit*/nullptr);
+        if (!(check_fail(r, "Got error while updating permit parameters that require reallocation")
+              && ph == ph_prev))
+            return test_fail(test_name);
+
+        uint32_t p_concurrency = 0; tcm_permit_t p = make_void_permit(&p_concurrency);
+        r = tcmGetPermitData(ph, &p);
+        if (!(check_success(r, "Reading permit data") && check_permit(expected_permit, p)))
+            return test_fail(test_name);
+
+        auto e = make_active_permit(num_oversubscribed_resources);
+        activate_permit(ph, "Error activating permit");
+        if (!check_permit(e, ph))
+            return test_fail(test_name);
+
+        release_permit(ph);
+        disconnect_client(client_id);
+        return test_epilog(test_name);
+    }
+
+    bool test() {
+        bool res = true;
+        res &= allow_request_as_inactive();
+        res &= allow_request_as_inactive_for_deactivated();
+        res &= allow_change_constraints_for_requested_as_inactive();
+        res &= prohibit_request_as_inactive_for_activated();
+        res &= prohibit_request_as_inactive_for_pending();
+        res &= prohibit_permit_reallocation_for_requested_as_inactive();
+        res &= erroneous_request_as_inactive_does_not_change_request_parameters();
+        res &= allow_change_callback_arg_for_requested_as_inactive();
+        return res;
+    }
 }
 
 bool test_request_initialized_by_default() {
@@ -1085,7 +1384,7 @@ int main() {
   res &= test_get_stale_permit();
 
   res &= test_allow_not_specifying_client_callback();
-  res &= test_requesting_zero_resources();
+  res &= request_as_inactive::test();
   res &= test_request_initialized_by_default();
 
   res &= test_incorrect_requests();

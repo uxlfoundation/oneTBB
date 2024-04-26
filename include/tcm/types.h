@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -43,10 +43,11 @@ typedef uint8_t tcm_permit_state_t;
 // Support for permit flags
 
 typedef struct _tcm_permit_flags_t {
-  uint32_t stale : 1;
-  uint32_t rigid_concurrency : 1;
-  uint32_t exclusive : 1;
-  uint32_t reserved : 29;
+  uint32_t stale : 1;               /* Indicates permit data is outdated and must not be trusted   */
+  uint32_t rigid_concurrency : 1;   /* Does not allow negotiation while permit is in active state  */
+  uint32_t exclusive : 1;           /* Allows requesting resources for exclusive use (unsupp. yet) */
+  uint32_t request_as_inactive : 1; /* Allows deferring search for resources to subsequent calls   */
+  uint32_t reserved : 28;           /* Reserved for the future use */
 } tcm_permit_flags_t;
 
 typedef struct _tcm_callback_flags_t {

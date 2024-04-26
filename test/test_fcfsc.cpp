@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -168,7 +168,7 @@ bool test_overlapping_clients() {
         check_permit(eB, pB)))
     return test_fail(test_name);
 
-  renegotiating_permits = {&phB};
+  renegotiating_permits = {phB};
 
   r = tcmReleasePermit(phA);
   eB_concurrency = num_oversubscribed_resources;
@@ -239,16 +239,16 @@ bool test_overlapping_clients_two_callbacks() {
         check_permit(eC, pC)))
     return test_fail(test_name);
 
-  renegotiating_permits = {&phB, &phC};
+  renegotiating_permits = {phB, phC};
   eC.concurrencies[0] = num_oversubscribed_resources - num_oversubscribed_resources / 2;
 
   r = tcmReleasePermit(phA);
-  auto unchanged_permits = list_unchanged_permits({{&phB, &pB}, {&phC, &pC}});
+  auto unchanged_permits = list_unchanged_permits({{phB, &pB}, {phC, &pC}});
   if (!(check_success(r, "tcmReleasePermit A") &&
         check_permit(eC, phC) && renegotiating_permits == unchanged_permits))
     return test_fail(test_name);
 
-  renegotiating_permits = {&phC};
+  renegotiating_permits = {phC};
   eC.concurrencies[0] = num_oversubscribed_resources;
 
   if (!check_success(tcmGetPermitData(phC, &pC),
@@ -256,7 +256,7 @@ bool test_overlapping_clients_two_callbacks() {
     return test_fail(test_name);
 
   r = tcmReleasePermit(phB);
-  unchanged_permits = list_unchanged_permits({{&phC, &pC}});
+  unchanged_permits = list_unchanged_permits({{phC, &pC}});
   if (!(check_success(r, "tcmReleasePermit B") &&
         check_permit(eC, phC) && renegotiating_permits == unchanged_permits))
     return test_fail(test_name);
@@ -390,7 +390,7 @@ bool test_permit_reactivation() {
         check_permit(eA, phA)))
     return test_fail(test_name);
 
-  renegotiating_permits = {&phA};
+  renegotiating_permits = {phA};
   eA_concurrency = num_oversubscribed_resources;
 
   if (!check_success(tcmGetPermitData(phA, &pA),
@@ -398,7 +398,7 @@ bool test_permit_reactivation() {
     return test_fail(test_name);
 
   r = tcmReleasePermit(phB);
-  auto unchanged_permits = list_unchanged_permits({{&phA, &pA}});
+  auto unchanged_permits = list_unchanged_permits({{phA, &pA}});
   if (!(check_success(r, "tcmReleasePermit (client B)") &&
         check_permit(eA, phA) && renegotiating_permits == unchanged_permits))
     return test_fail(test_name);
@@ -576,21 +576,21 @@ bool test_support_for_pending_state() {
   if (!(check_success(r, "tcmRequestPermit for client D") && check_permit(eD, pD)))
     return test_fail(test_name);
 
-  renegotiating_permits = {&phA, &phC, &phD};
+  renegotiating_permits = {phA, phC, phD};
   r = tcmReleasePermit(phB);
-  auto unchanged_permits = list_unchanged_permits({{&phA, &pA}, {&phC, &pC}, {&phD, &pD}});
+  auto unchanged_permits = list_unchanged_permits({{phA, &pA}, {phC, &pC}, {phD, &pD}});
   if (!(check_success(r, "tcmReleasePermit for client B")
         && check(renegotiating_permits.size() == 3, "Check there are no renegotiated permits")
         && check(renegotiating_permits == unchanged_permits, "Check incorrect permit renegotiation")))
     return test_fail(test_name);
 
   reqA = make_request(0, num_oversubscribed_resources / 2);
-  renegotiating_permits = {&phC, &phD};
+  renegotiating_permits = {phC, phD};
   eA.concurrencies[0] = num_oversubscribed_resources / 2;
   eC.concurrencies[0] = num_oversubscribed_resources - num_oversubscribed_resources / 2;
   eC.state = TCM_PERMIT_STATE_ACTIVE;
   r = tcmRequestPermit(clidA, reqA, &phA, &phA, &pA);
-  unchanged_permits = list_unchanged_permits({{&phC, &pC}, {&phD, &pD}});
+  unchanged_permits = list_unchanged_permits({{phC, &pC}, {phD, &pD}});
   if (!(check_success(r, "tcmRequestPermit for client A (re-requesting)")
         && check_permit(eA, phA) && check_permit(eC, phC) && check_permit(eD, phD)
         && check(renegotiating_permits == unchanged_permits, "Check incorrect permit renegotiation")))
@@ -600,19 +600,19 @@ bool test_support_for_pending_state() {
                      "Reading data from permit " + std::to_string(uintptr_t(phC))))
     return test_fail(test_name);
 
-  renegotiating_permits = {&phC, &phD};
+  renegotiating_permits = {phC, phD};
   eD.concurrencies[0] = num_oversubscribed_resources / 2;
   r = tcmReleasePermit(phA);
-  unchanged_permits = list_unchanged_permits({{&phC, &pC}, {&phD, &pD}});
+  unchanged_permits = list_unchanged_permits({{phC, &pC}, {phD, &pD}});
   if (!(check_success(r, "tcmReleasePermit for client A")
         && check_permit(eC, phC) && check_permit(eD, phD)
         && check(renegotiating_permits == unchanged_permits, "Check incorrect permit renegotiation")))
     return test_fail(test_name);
 
-  renegotiating_permits = {&phC};
+  renegotiating_permits = {phC};
   eC.concurrencies[0] = num_oversubscribed_resources;
   r = tcmReleasePermit(phD);
-  unchanged_permits = list_unchanged_permits({{&phC, &pC}});
+  unchanged_permits = list_unchanged_permits({{phC, &pC}});
   if (!(check_success(r, "tcmReleasePermit for client D")
         && check_permit(eC, phC)
         && check(renegotiating_permits == unchanged_permits, "Check incorrect permit renegotiation")))

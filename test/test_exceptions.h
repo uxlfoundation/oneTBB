@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -18,43 +18,54 @@
  */
 
 #include <exception>
+#include <string>
 
 class tcm_exception : public std::exception {
 public:
-  tcm_exception(const char* message) : m_message(message) {}
-  const char* what() const noexcept override { return m_message; }
+  tcm_exception(const std::string& message) : m_message(message) {}
+  const char* what() const noexcept override { return m_message.c_str(); }
 private:
-  const char* m_message = nullptr;
+  std::string m_message = "";
 };
 
 class tcm_connect_error : public tcm_exception {
 public:
-  tcm_connect_error(const char* message = nullptr) : tcm_exception(message) {}
+  tcm_connect_error(const std::string& message = "") : tcm_exception(message) {}
 };
 
 class tcm_request_permit_error : public tcm_exception {
 public:
-  tcm_request_permit_error(const char* message = nullptr) : tcm_exception(message) {}
+  tcm_request_permit_error(const std::string& message = "") : tcm_exception(message) {}
+};
+
+class tcm_activate_permit_error : public tcm_exception {
+public:
+  tcm_activate_permit_error(const std::string& message = "") : tcm_exception(message) {}
+};
+
+class tcm_deactivate_permit_error : public tcm_exception {
+public:
+  tcm_deactivate_permit_error(const std::string& message = "") : tcm_exception(message) {}
 };
 
 class tcm_idle_permit_error : public tcm_exception {
 public:
-  tcm_idle_permit_error(const char* message = nullptr) : tcm_exception(message) {}
+  tcm_idle_permit_error(const std::string& message = "") : tcm_exception(message) {}
 };
 
 class tcm_get_permit_data_error : public tcm_exception {
 public:
-  tcm_get_permit_data_error(const char* message = nullptr) : tcm_exception(message) {}
+  tcm_get_permit_data_error(const std::string& message = "") : tcm_exception(message) {}
 };
 
 class tcm_release_permit_error : public tcm_exception {
 public:
-  tcm_release_permit_error(const char* message = nullptr) : tcm_exception(message) {}
+  tcm_release_permit_error(const std::string& message = "") : tcm_exception(message) {}
 };
 
 class tcm_disconnect_error : public tcm_exception {
 public:
-  tcm_disconnect_error(const char* message = nullptr) : tcm_exception(message) {}
+  tcm_disconnect_error(const std::string& message = "") : tcm_exception(message) {}
 };
 
 #endif // __TCM_TESTS_TEST_EXCEPTIONS_HEADER

@@ -59,6 +59,7 @@ struct tcm_permit_rep_t {
   std::atomic<tcm_permit_epoch_t> epoch;
   tcm_permit_request_t request; // Holds latest corresponding request
   tcm_permit_data_t data;
+  void* callback_arg;
 };
 
 } // extern "C"
@@ -578,10 +579,6 @@ struct ThreadComposabilityManagerData {
   //! renegotiation of permits.
   std::unordered_map<tcm_client_id_t, tcm_callback_t> client_to_callback_map{};
 
-  //! The map of callback arguments associated with permits. Used during
-  //! callback invocation.
-  std::unordered_map<tcm_permit_handle_t, void*> permit_to_callback_arg_map{};
-
   //! The multimap of permits associated with the given client.
   std::unordered_multimap<tcm_client_id_t, tcm_permit_handle_t> client_to_permit_mmap{};
 };
@@ -708,7 +705,7 @@ int32_t apply(const permit_change_t& change, ThreadComposabilityManagerData& dat
     if (permit_handle != initiator && (reason.new_concurrency || reason.new_state)) {
         tcm_callback_t callback = data.client_to_callback_map[permit.client_id];
         if (callback) {
-            args.callback_arg = data.permit_to_callback_arg_map[permit_handle];
+            args.callback_arg = permit_handle->callback_arg;
             callbacks.insert( {callback, args} );
         }
     }
@@ -924,7 +921,9 @@ public:
       std::free(permit_handle);
   }
 
-  void copy_request_without_masks(tcm_permit_request_t& to, const tcm_permit_request_t& from) {
+  void copy_request(tcm_permit_request_t& to, const tcm_permit_request_t& from,
+                    const bool copy_masks)
+  {
     tcm_cpu_constraints_t* internal_cpu_constraints = to.cpu_constraints;
     __TCM_ASSERT(to.constraints_size == from.constraints_size, "Constraints sizes are different.");
     to = from;
@@ -934,13 +933,21 @@ public:
         tcm_cpu_mask_t internal_mask = to.cpu_constraints[i].mask;
 
         __TCM_ASSERT(
-          internal_mask == nullptr ||
+          copy_masks || internal_mask == nullptr ||
           0 == hwloc_bitmap_compare(internal_mask, from.cpu_constraints[i].mask),
           "Changing of the mask when re-requesting resources for existing permit is not supported."
         );
 
         to.cpu_constraints[i] = from.cpu_constraints[i];
         to.cpu_constraints[i].mask = internal_mask;
+
+        if (copy_masks && from.cpu_constraints[i].mask) {
+            if (to.cpu_constraints[i].mask) {
+                hwloc_bitmap_copy(to.cpu_constraints[i].mask, from.cpu_constraints[i].mask);
+            } else {
+                to.cpu_constraints[i].mask = hwloc_bitmap_dup(from.cpu_constraints[i].mask);
+            }
+        }
     }
   }
 
@@ -971,9 +978,9 @@ public:
     }
   }
 
-  bool request_permit(tcm_client_id_t clid, const tcm_permit_request_t& req,
-                      void* callback_arg, tcm_permit_handle_t* permit_handle,
-                      tcm_permit_t* permit, const int32_t sum_constraints_min)
+  tcm_result_t request_permit(tcm_client_id_t clid, const tcm_permit_request_t& req,
+                              void* callback_arg, tcm_permit_handle_t* permit_handle,
+                              tcm_permit_t* permit, const int32_t sum_constraints_min)
   {
     tracer t("ThreadComposabilityBase::request_permit");
     __TCM_PROFILE_THIS_FUNCTION();
@@ -982,21 +989,35 @@ public:
 
     tcm_permit_handle_t& ph = *permit_handle;
     const bool is_requesting_new_permit = bool(!ph);
+    const tcm_permit_state_t new_permit_state =
+        req.flags.request_as_inactive
+        ? tcm_permit_state_t(TCM_PERMIT_STATE_INACTIVE)
+        : tcm_permit_state_t(TCM_PERMIT_STATE_PENDING);
     if (is_requesting_new_permit) {
-      ph = make_new_permit(clid, req);
+      ph = make_new_permit(clid, req, new_permit_state);
       if (!ph) { // Could not allocate memory for the new permit
-          return false;
+          return TCM_RESULT_ERROR_UNKNOWN;
       }
+    } else if (req.flags.request_as_inactive) {
+        // It is client responsibility to ensure permit re-initialization happens serially
+        __TCM_ASSERT(ph->epoch.load(std::memory_order_relaxed) % 2 == 0,
+                     "Permit is being concurrently modified");
+        tcm_permit_state_t state = get_permit_state(ph->data);
+        if (is_owning_resources(state) || is_pending(state) ||
+            req.constraints_size != ph->request.constraints_size)
+        {
+            return TCM_RESULT_ERROR_INVALID_ARGUMENT;
+        }
+        copy_request(ph->request, req, /*allow_updating_masks*/true);
+        ph->callback_arg = callback_arg;
+        ph->data.flags = req.flags;
 
-      // New permits should have PENDING state until its required/minimum parameters are satisfied.
-      __TCM_ASSERT(
-          is_pending(get_permit_state(ph->data)),
-          "Non-pending state for new permits contributes to their premature negotiations."
-      );
+        // TODO: Allow permit handle re-allocation even if sizes of constraints do not match
+        // (may require updating handle in client-to-permit multimap)
     }
 
     update_callbacks_t callbacks;
-    {
+    if (!req.flags.request_as_inactive) {
       const std::lock_guard<std::mutex> l(data_mutex);
 
       uint32_t initially_available = available_concurrency;
@@ -1013,7 +1034,7 @@ public:
           // assumptions and incorrect results
           remove_permit(*this, ph, get_permit_state(ph->data));
 
-          copy_request_without_masks(ph->request, req);
+          copy_request(ph->request, req, /*copy_masks*/false);
 
           // Request is being updated for existing permit. To avoid in-the-middle
           // negotiations for that permit change its state to PENDING until its new
@@ -1025,7 +1046,8 @@ public:
       }
       deduce_request_arguments(ph->request, sum_constraints_min);
 
-      permit_to_callback_arg_map[ph] = callback_arg;
+      ph->data.flags.request_as_inactive = false;
+      ph->callback_arg = callback_arg;
 
       std::vector<permit_change_t> updates = adjust_existing_permit(ph->request, ph);
 
@@ -1053,7 +1075,7 @@ public:
       }
     }
 
-    return true;
+    return TCM_RESULT_SUCCESS;
   }
 
   tcm_result_t get_permit(tcm_permit_handle_t ph, tcm_permit_t* permit) {
@@ -1113,10 +1135,14 @@ public:
 
       // Activating in case when TCM state didn't change between idling/deactivation
       // and activation so availability of resources wasn't updated
-      if (this->tcm_state_epoch == ph->data.tcm_epoch_snapshot) {
-        change_state_relaxed(ph->data, TCM_PERMIT_STATE_ACTIVE);
-        move_permit(*this, ph, curr_state, /*new_state*/TCM_PERMIT_STATE_ACTIVE);
-        return TCM_RESULT_SUCCESS;
+      if (this->tcm_state_epoch == ph->data.tcm_epoch_snapshot &&
+          !ph->data.flags.request_as_inactive) // Not initially requested as inactive hence has some
+                                               // grant, but getting the grant at this point is an
+                                               // overkill
+      {
+         change_state_relaxed(ph->data, TCM_PERMIT_STATE_ACTIVE);
+         move_permit(*this, ph, curr_state, /*new_state*/TCM_PERMIT_STATE_ACTIVE);
+         return TCM_RESULT_SUCCESS;
       }
 
       if (const uint32_t grant = get_permit_grant(pd)) {
@@ -1140,6 +1166,7 @@ public:
           move_permit(*this, ph, curr_state, /*new_state*/TCM_PERMIT_STATE_ACTIVE);
       } else {
           __TCM_ASSERT(is_inactive(curr_state), "Inactive permit is expected");
+          ph->data.flags.request_as_inactive = false;
           std::vector<permit_change_t> updates = adjust_existing_permit(ph->request, ph);
           if (!updates.empty()) {
               // Specifying not to remove the initiator first is only to save on unnecessary search
@@ -1174,15 +1201,15 @@ public:
       if (is_owning_resources(curr_state)) {
           // TODO: consider using adjust_existing_permit
           move_permit(*this, ph, curr_state, /*new_state*/TCM_PERMIT_STATE_INACTIVE);
-          if (has_resource_demand(*this)) {
+          if (has_resource_demand(*this)) {  // TODO: Consider releasing only in demand resources
               auto previously_available_concurrency = available_concurrency;
               available_concurrency += move_to_inactive(ph);
               __TCM_ASSERT(previously_available_concurrency <= available_concurrency, "Overflow detected");
               shall_negotiate_resources = previously_available_concurrency < available_concurrency;
               note_tcm_state_change(*this);
-              // TODO: Consider reading the TCM epoch onto the stack here to compare it against the current epoch
-              // inside renegotite_permits() function. This might save unnecessary renegotiation in case of
-              // concurrent changes to permits.
+              // TODO: Consider reading the TCM epoch onto the stack here to compare it against the
+              // current epoch inside renegotite_permits() function. This might save unnecessary
+              // renegotiation in case of concurrent changes to permits.
           } else {
               change_state_relaxed(pd, TCM_PERMIT_STATE_INACTIVE);
               lazy_inactive_permit = ph;
@@ -1213,7 +1240,6 @@ public:
       tcm_permit_state_t state = get_permit_state(data);
       bool was_lazy = lazy_inactive_permit == permit_handle;
       remove_permit(*this, permit_handle, state);
-      permit_to_callback_arg_map.erase(permit_handle);
       auto client_phs = client_to_permit_mmap.equal_range(data.client_id);
       for (auto it = client_phs.first; it != client_phs.second; ++it) {
           if (it->second == permit_handle) {
@@ -1312,7 +1338,6 @@ protected:
 
     for (uint32_t i = 0; i < pd.size; ++i) {
       permit->concurrencies[i] = pd.concurrency[i].load(std::memory_order_relaxed);
-
 
       if (copy_masks) {
         __TCM_ASSERT(
@@ -2228,7 +2253,9 @@ protected:
     }
 
     tcm_permit_handle_t
-    make_new_permit(const tcm_client_id_t clid, const tcm_permit_request_t& req) {
+    make_new_permit(const tcm_client_id_t clid, const tcm_permit_request_t& req,
+                    const tcm_permit_state_t state)
+    {
         tracer t("ThreadComposabilityManagerBase::make_new_permit");
         __TCM_PROFILE_THIS_FUNCTION();
         unsigned permit_size = infer_permit_size(req);
@@ -2318,7 +2345,7 @@ protected:
         }
 
         pd.concurrency = new(pd.concurrency) concurrency_item_t[pd.size]{0};
-        pd.state.store(TCM_PERMIT_STATE_PENDING, std::memory_order_relaxed);
+        pd.state.store(state, std::memory_order_relaxed);
         pd.flags = req.flags;
         pd.tcm_epoch_snapshot = tcm_state_epoch;
 
@@ -2606,8 +2633,7 @@ tcm_result_t tcmRequestPermit(tcm_client_id_t client_id,
   if (request.min_sw_threads > static_cast<int32_t>(mgr.platform_resources())) {
       return TCM_RESULT_ERROR_INVALID_ARGUMENT;
   }
-  bool result = mgr.request_permit(client_id, request, callback_arg, permit_handle, permit, sum_min);
-  return result ? TCM_RESULT_SUCCESS : TCM_RESULT_ERROR_UNKNOWN;
+  return mgr.request_permit(client_id, request, callback_arg, permit_handle, permit, sum_min);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

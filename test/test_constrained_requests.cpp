@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -96,13 +96,6 @@ public:
   int32_t size() { return weight; }
   int32_t id() { return numa_id; }
 };
-
-struct mask_deleter {
-  void operator()(tcm_cpu_mask_t* mask) {
-    hwloc_bitmap_free(*mask);
-  }
-};
-
 
 bool test_allow_mask_omitting_during_permit_copy(/*tcm_test::system_topology& tp*/) {
     const char* test_name = __func__;
@@ -416,11 +409,11 @@ struct test_two_requests {
     if (!(check_success(r, "tcmRequestPermit for client B") && check_permit(eB, pB)))
       return test_fail(config.test_name);
 
-    renegotiating_permits = {&phB};
+    renegotiating_permits = {phB};
     r = tcmReleasePermit(phA);
     eB.concurrencies[0] = config.new_concurrencyB;
     eB.state = config.new_stateB;
-    auto unchanged_permits = list_unchanged_permits({{&phB, &pB}});
+    auto unchanged_permits = list_unchanged_permits({{phB, &pB}});
 
     if (!(check_success(r, "tcmReleasePermit for client A") && check_permit(eB, phB) &&
           check(renegotiating_permits == unchanged_permits,

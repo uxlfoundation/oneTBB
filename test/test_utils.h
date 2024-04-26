@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -114,6 +114,12 @@ tcm_permit_t make_active_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_mas
   return make_permit(concurrencies, cpu_masks, size, TCM_PERMIT_STATE_ACTIVE, flags);
 }
 
+tcm_permit_t make_inactive_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
+                                  uint32_t size = 1, tcm_permit_flags_t flags = {})
+{
+  return make_permit(concurrencies, cpu_masks, size, TCM_PERMIT_STATE_INACTIVE, flags);
+}
+
 tcm_permit_t make_pending_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
                                   uint32_t size = 1, tcm_permit_flags_t flags = {})
 {
@@ -130,7 +136,8 @@ std::string bitmap_to_string(const tcm_cpu_mask_t mask) {
 std::string to_string(const tcm_permit_flags_t flags) {
   return std::string("stale=" + std::to_string(flags.stale) +
                      ", rigid_concurrecy=" + std::to_string(flags.rigid_concurrency) +
-                     ", exclusive=" + std::to_string(flags.exclusive));
+                     ", exclusive=" + std::to_string(flags.exclusive) +
+                     ", request_as_inactive=" + std::to_string(flags.request_as_inactive));
 }
 
 const char* single_indent = "  ";    // default indent in the test output
@@ -181,6 +188,12 @@ inline bool check_success(tcm_result_t res, const std::string& msg = "",
   return check(succeeded(res), msg, /*num_indents*/0, report_msg);
 }
 
+inline bool check_fail(tcm_result_t res, const std::string& msg = "",
+                       const std::string& report_msg = "")
+{
+  return check(!succeeded(res), msg, /*num_indents*/0, report_msg);
+}
+
 const float tcm_oversubscription_factor = 1.0f;
 
 //! Returns available platform resources, taking into account the mask of the process.
@@ -210,6 +223,28 @@ const int32_t num_oversubscribed_resources = []() {
 int32_t get_mask_concurrency(tcm_cpu_mask_t mask) {
   return hwloc_bitmap_weight(mask);
 }
+
+bool has_masks(tcm_permit_t const& p) {
+    if (!p.size)
+        return false;
+
+    for (unsigned i = 0; i < p.size; ++i) {
+        if (!p.cpu_masks[i])
+            return false;
+
+        auto c = get_mask_concurrency(p.cpu_masks[i]);
+        if (!c) {
+            return false;
+        }
+    }
+    return true;
+}
+
+struct mask_deleter {
+  void operator()(tcm_cpu_mask_t* mask) {
+    hwloc_bitmap_free(*mask);
+  }
+};
 
 int32_t get_mask_oversubscribed_concurrency(tcm_cpu_mask_t mask) {
   return int32_t(tcm_oversubscription_factor * get_mask_concurrency(mask));
@@ -311,6 +346,7 @@ bool check_permit_flags(const tcm_permit_t& expected, const tcm_permit_t& actual
   result &= e.stale == a.stale;
   result &= e.rigid_concurrency == a.rigid_concurrency;
   result &= e.exclusive == a.exclusive;
+  result &= e.request_as_inactive == a.request_as_inactive;
 
   std::string report_str("Check flags, expected: " + to_string(e) +
                          " equals to actual: " + to_string(a));
@@ -404,7 +440,7 @@ bool check_permits(std::initializer_list<tcm_permit_and_handle_pair_t> expected_
 // TODO: Make use of these helpers in all the tests, utilizing RAII for releasing permits, closing
 // connections that remain after exception occurs.
 tcm_client_id_t connect_new_client(tcm_callback_t callback = nullptr,
-                                   const char* error_message = nullptr) {
+                                   const std::string& error_message = "") {
   tcm_client_id_t client_id;
 
   tcm_result_t r = tcmConnect(callback, &client_id);
@@ -414,34 +450,57 @@ tcm_client_id_t connect_new_client(tcm_callback_t callback = nullptr,
   return client_id;
 }
 
-void disconnect_client(const tcm_client_id_t& client_id, const char* error_message = nullptr) {
+void disconnect_client(const tcm_client_id_t& client_id, const std::string& error_message = "") {
   tcm_result_t r = tcmDisconnect(client_id);
   if (!check_success(r, "tcmDisconnect"))
     throw tcm_disconnect_error(error_message);
 }
 
-tcm_permit_handle_t request_permit(tcm_client_id_t client, tcm_permit_request_t request,
-                                   void* callback_arg = nullptr,
-                                   const char* error_message = nullptr) {
-  tcm_permit_handle_t permit_handle{nullptr};
+tcm_permit_handle_t
+request_permit(tcm_client_id_t client, const tcm_permit_request_t& req, void* callback_arg = nullptr,
+               tcm_permit_handle_t permit_handle = nullptr, const std::string& error_message = "",
+               const std::string& log_message = "")
+{
+  auto r = tcmRequestPermit(client, req, callback_arg, &permit_handle, /*permit*/nullptr);
 
-  auto r = tcmRequestPermit(client, request, callback_arg, &permit_handle, /*permit*/nullptr);
+  std::string actual_log_message = log_message;
+  if ("" == log_message) {
+      if (!permit_handle) {
+          actual_log_message = std::string("tcmRequestPermit on new permit_handle");
+      } else {
+          actual_log_message = std::string("tcmRequestPermit on existing permit_handle");
+      }
+  }
 
-  if (!check_success(r, "tcmRequestPermit")) {
+  if (!check_success(r, actual_log_message)) {
     throw tcm_request_permit_error(error_message);
   }
 
   return permit_handle;
 }
 
-void idle_permit(tcm_permit_handle_t permit_handle, const char* error_message = nullptr) {
+void activate_permit(tcm_permit_handle_t permit_handle, const std::string& error_message = "") {
+  auto r = tcmActivatePermit(permit_handle);
+  if (!check_success(r, "tcmActivatePermit")) {
+    throw tcm_activate_permit_error(error_message);
+  }
+}
+
+void deactivate_permit(tcm_permit_handle_t permit_handle, const std::string& error_message = "") {
+  auto r = tcmDeactivatePermit(permit_handle);
+  if (!check_success(r, "tcmDeactivatePermit")) {
+    throw tcm_deactivate_permit_error(error_message);
+  }
+}
+
+void idle_permit(tcm_permit_handle_t permit_handle, const std::string& error_message = "") {
   auto r = tcmIdlePermit(permit_handle);
   if (!check_success(r, "tcmIdlePermit")) {
     throw tcm_idle_permit_error(error_message);
   }
 }
 
-void release_permit(tcm_permit_handle_t ph, const char* error_message = nullptr) {
+void release_permit(tcm_permit_handle_t ph, const std::string& error_message = "") {
   auto r = tcmReleasePermit(ph);
 
   if (!check_success(r, "tcmReleasePermit")) {
@@ -454,6 +513,9 @@ class permit_t {
 public:
     permit_t(bool allocate_mask = false)
         : concurrencies(new uint32_t[size]{0}),
+        // TODO: Fix the bug with copying over all the array elements received bitmap from the
+        // HWLOC, while the intention is to allocate separate mask for each element of cpu_masks
+        // array
           cpu_masks(allocate_mask? new tcm_cpu_mask_t[size]{hwloc_bitmap_alloc()} : nullptr,
                     masks_guard_t(size)),
           permit{
@@ -470,7 +532,7 @@ private:
 };
 
 template <int size = 1>
-permit_t<size> get_permit_data(tcm_permit_handle_t ph, const char* error_message = nullptr) {
+permit_t<size> get_permit_data(tcm_permit_handle_t ph, const std::string& error_message = "") {
   // TODO: propagate 'allocate_mask' flag to the permit_t class
   permit_t<size> permit_wrapper;
   tcm_permit_t& permit = permit_wrapper;
@@ -507,7 +569,7 @@ permit_t</*size*/1> make_inactive_permit(tcm_cpu_mask_t* cpu_masks = nullptr,
   return permit_wrapper;
 }
 
-typedef std::vector< std::pair<tcm_permit_handle_t*, tcm_permit_t*> > permits_data_t;
+typedef std::vector< std::pair<tcm_permit_handle_t, tcm_permit_t*> > permits_data_t;
 
 /**
  * \brief Returns a set of permit handles, whose data is equal to corresponding
@@ -516,13 +578,13 @@ typedef std::vector< std::pair<tcm_permit_handle_t*, tcm_permit_t*> > permits_da
  * Thus, if existing permits are passed as a parameter, the function returns
  * permit handles, for which the renegotiation should not have taken place.
  */
-std::set<tcm_permit_handle_t*> list_unchanged_permits(const permits_data_t& pds,
-                                                      const unsigned num_indents = 0)
+std::set<tcm_permit_handle_t> list_unchanged_permits(const permits_data_t& pds,
+                                                     const unsigned num_indents = 0)
 {
-  std::set<tcm_permit_handle_t*> result;
+  std::set<tcm_permit_handle_t> result;
 
   for (auto& pd : pds) {
-    const tcm_permit_handle_t ph = *pd.first;
+    const tcm_permit_handle_t ph = pd.first;
     const tcm_permit_t& expected = *pd.second;
 
     if (check_permit(expected, ph, skip_checks_t{}, num_indents, /*report*/false))
