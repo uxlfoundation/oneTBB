@@ -250,6 +250,24 @@ int32_t get_mask_oversubscribed_concurrency(tcm_cpu_mask_t mask) {
   return int32_t(tcm_oversubscription_factor * get_mask_concurrency(mask));
 }
 
+tcm_cpu_mask_t extract_n_bits_from_process_mask(int n_threads, tcm_cpu_mask_t hint = nullptr) {
+  tcm_test::system_topology::construct();
+  auto& topology_ptr = tcm_test::system_topology::instance();
+
+  hwloc_bitmap_t output_mask = hwloc_bitmap_alloc();
+  hwloc_bitmap_t process_mask = topology_ptr.allocate_process_affinity_mask();
+  int start_id = hwloc_bitmap_first(process_mask);
+  if (hint) {
+    start_id = hwloc_bitmap_next(process_mask, hwloc_bitmap_last(hint));
+  }
+  for (int idx = start_id; idx != -1 && n_threads-- > 0; idx = hwloc_bitmap_next(process_mask, idx)) {
+    hwloc_bitmap_set(output_mask, idx);
+  }
+  hwloc_bitmap_free(process_mask);
+  return output_mask;
+}
+
+
 bool check_permit_size(const tcm_permit_t& expected, const tcm_permit_t& actual,
                        const unsigned num_indents = 0, const bool report = true)
 {
@@ -283,6 +301,16 @@ bool check_permit_concurrency(const tcm_permit_t& expected, const tcm_permit_t& 
   }
 
   return report ? check(result, report_str, num_indents) : result;
+}
+
+uint32_t get_permit_concurrency(const tcm_permit_t& permit) {
+  uint32_t total_grant = 0;
+  for (unsigned i = 0; i < permit.size; ++i) {
+    const auto& e = permit.concurrencies[i];
+    total_grant += e;
+  }
+
+  return total_grant;
 }
 
 bool check_permit_mask(const tcm_permit_t& expected, const tcm_permit_t& actual,
@@ -382,8 +410,9 @@ bool check_permit(const tcm_permit_t& expected, tcm_permit_handle_t ph,
                   const skip_checks_t skip = {}, const unsigned num_indents = 1,
                   const bool report = true)
 {
-  if (!check(ph, "check permit handle is not nullptr.", num_indents))
-    return false;
+    std::stringstream ss; ss << ph;
+    if (!check(ph, "check permit_handle=" + ss.str() + " is not nullptr", num_indents))
+      return false;
 
   __TCM_ASSERT(expected.size > 0, "Permit size cannot be zero.");
   std::vector<uint32_t> concurrencies(expected.size, 0);
@@ -440,20 +469,25 @@ bool check_permits(std::initializer_list<tcm_permit_and_handle_pair_t> expected_
 // TODO: Make use of these helpers in all the tests, utilizing RAII for releasing permits, closing
 // connections that remain after exception occurs.
 tcm_client_id_t connect_new_client(tcm_callback_t callback = nullptr,
-                                   const std::string& error_message = "") {
+                                   const std::string& error_message = "",
+                                   const std::string& log_message = "tcmConnect") 
+{
   tcm_client_id_t client_id;
 
   tcm_result_t r = tcmConnect(callback, &client_id);
-  if (!check_success(r, "tcmConnect"))
-    throw tcm_connect_error(error_message);
+  if (!check_success(r, log_message))
+    throw tcm_connect_error(error_message.c_str());
 
   return client_id;
 }
 
-void disconnect_client(const tcm_client_id_t& client_id, const std::string& error_message = "") {
+void disconnect_client(const tcm_client_id_t& client_id, 
+                       const std::string& error_message = "", 
+                      const std::string& log_message = "tcmDisconnect") 
+{
   tcm_result_t r = tcmDisconnect(client_id);
-  if (!check_success(r, "tcmDisconnect"))
-    throw tcm_disconnect_error(error_message);
+  if (!check_success(r, log_message))
+    throw tcm_disconnect_error(error_message.c_str());
 }
 
 tcm_permit_handle_t
@@ -465,11 +499,14 @@ request_permit(tcm_client_id_t client, const tcm_permit_request_t& req, void* ca
 
   std::string actual_log_message = log_message;
   if ("" == log_message) {
-      if (!permit_handle) {
-          actual_log_message = std::string("tcmRequestPermit on new permit_handle");
-      } else {
-          actual_log_message = std::string("tcmRequestPermit on existing permit_handle");
+      const std::string num_resources_msg = "[" + std::to_string(req.min_sw_threads) + ", " +
+                                            std::to_string(req.max_sw_threads) + "]";
+      std::string ph_type_msg = "new";
+      if (permit_handle) {
+          ph_type_msg = "existing";
       }
+      actual_log_message = std::string("tcmRequestPermit on ") + ph_type_msg + " permit_handle for "
+                           + num_resources_msg + " resources";
   }
 
   if (!check_success(r, actual_log_message)) {
@@ -479,16 +516,20 @@ request_permit(tcm_client_id_t client, const tcm_permit_request_t& req, void* ca
   return permit_handle;
 }
 
-void activate_permit(tcm_permit_handle_t permit_handle, const std::string& error_message = "") {
+void activate_permit(tcm_permit_handle_t permit_handle, 
+  const std::string& error_message = "", const std::string& log_message = "tcmActivatePermit") 
+{
   auto r = tcmActivatePermit(permit_handle);
-  if (!check_success(r, "tcmActivatePermit")) {
+  if (!check_success(r, log_message)) {
     throw tcm_activate_permit_error(error_message);
   }
 }
 
-void deactivate_permit(tcm_permit_handle_t permit_handle, const std::string& error_message = "") {
+void deactivate_permit(tcm_permit_handle_t permit_handle, 
+  const std::string& error_message = "", const std::string& log_message = "tcmDeactivatePermit") 
+{
   auto r = tcmDeactivatePermit(permit_handle);
-  if (!check_success(r, "tcmDeactivatePermit")) {
+  if (!check_success(r, log_message)) {
     throw tcm_deactivate_permit_error(error_message);
   }
 }
@@ -500,11 +541,27 @@ void idle_permit(tcm_permit_handle_t permit_handle, const std::string& error_mes
   }
 }
 
-void release_permit(tcm_permit_handle_t ph, const std::string& error_message = "") {
+void release_permit(tcm_permit_handle_t ph, const std::string& error_message = "", const std::string& log_message = "tcmReleasePermit") {
   auto r = tcmReleasePermit(ph);
 
-  if (!check_success(r, "tcmReleasePermit")) {
+  if (!check_success(r, log_message)) {
     throw tcm_release_permit_error(error_message);
+  }
+}
+
+void register_thread(tcm_permit_handle_t ph, const std::string& error_message = "", const std::string& log_message = "tcmRegisterThread") {
+  auto r = tcmRegisterThread(ph);
+
+  if (!check_success(r, log_message)) {
+    throw tcm_register_thread_error(error_message);
+  }
+}
+
+void unregister_thread(const std::string& error_message = "", const std::string& log_message = "tcmUnregisterThread") {
+  auto r = tcmUnregisterThread();
+
+  if (!check_success(r, log_message)) {
+    throw tcm_unregister_thread_error(error_message);
   }
 }
 
@@ -523,13 +580,24 @@ public:
               tcm_permit_flags_t{}
           }
     {}
-
+    size_t concurrency() {
+      return get_permit_concurrency(permit);
+    }
     operator tcm_permit_t&() { return permit; }
 private:
     std::unique_ptr<uint32_t[]> concurrencies;
     std::unique_ptr<tcm_cpu_mask_t[], masks_guard_t> cpu_masks;
     tcm_permit_t permit;
 };
+
+void get_permit_data(tcm_permit_handle_t ph, tcm_permit_t& permit, 
+  const std::string& error_message = "", const std::string& log_message = "tcmGetPermitData") 
+{
+  auto r = tcmGetPermitData(ph, &permit);
+  if (!check_success(r, log_message)) {
+    throw tcm_get_permit_data_error(error_message.c_str());
+  }
+}
 
 template <int size = 1>
 permit_t<size> get_permit_data(tcm_permit_handle_t ph, const std::string& error_message = "") {

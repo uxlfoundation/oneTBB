@@ -11,6 +11,7 @@
 */
 
 #include "test_utils.h"
+#include "concurrency_utils.h"
 
 #include "tcm.h"
 
@@ -23,7 +24,6 @@
 #include <sstream>
 #include <thread>
 #include <string>
-
 
 constexpr skip_checks_t skip_concurrenency_check = {
   /*size*/ false, /*concurrency*/true, /*state*/false, /*flags*/false, /*mask*/false
@@ -135,6 +135,102 @@ bool test_nested_clients() {
   const char* test_name = __func__;
   test_prolog(test_name);
 
+  try {
+    auto client_a = connect_new_client(client_renegotiate);
+    auto client_b = connect_new_client(client_renegotiate);
+
+    uint32_t eA_concurrency = num_oversubscribed_resources,
+             eB_concurrency = 1;
+
+    tcm_permit_t eA = make_active_permit(&eA_concurrency),
+                 eB = make_active_permit(&eB_concurrency);
+
+    for (int outer_num_thr = 1; outer_num_thr <= num_oversubscribed_resources; ++outer_num_thr) {
+      tcm_permit_handle_t phA = nullptr;
+      tcm_permit_request_t reqA = make_request(outer_num_thr, outer_num_thr);
+      phA = request_permit(client_a, reqA, &phA);
+      eA_concurrency = outer_num_thr;
+      if (!check_permit(eA, phA)) {
+        throw tcm_exception{nullptr};
+      }
+
+      register_thread(phA);
+      uint32_t resources_left = num_oversubscribed_resources - outer_num_thr;
+      for (uint32_t inner_thr = 1; inner_thr <= resources_left+1; ++inner_thr) {
+        // TODO: Prohibit requests having zero min_sw_threads
+        for (uint32_t min_inner_thr = 0; min_inner_thr <= inner_thr; ++min_inner_thr) {
+          tcm_permit_handle_t phB = nullptr;
+          tcm_permit_request_t reqB = make_request(min_inner_thr, inner_thr);
+          phB = request_permit(client_b, reqB, &phB);
+          eB_concurrency = inner_thr;
+          if (!(check_permit(eB, phB) && check_permit(eA, phA))) {
+            std::cout << min_inner_thr << " " << inner_thr << std::endl;
+            auto outer_permit = get_permit_data(phA);
+            auto inner_permit = get_permit_data(phB);
+            check(false, "Outer permit concurrency: " + std::to_string(outer_permit.concurrency()) +
+                         ", Inner permit concurrency: " + std::to_string(inner_permit.concurrency()));
+            throw tcm_exception{nullptr};
+          }
+
+          register_thread(phB);
+          renegotiating_permits = {};
+          tcm_permit_handle_t phC = nullptr;
+          bool expect_negotiation_in_release = false;
+          if (min_inner_thr == resources_left + 1) { // All resources should have been taken
+              uint32_t eC_concurrency = 0; tcm_permit_t eC = make_pending_permit(&eC_concurrency);
+              // Requesting [2, 2] because of having one resource from outer permit
+              phC = request_permit(client_a, make_request(/*min_sw_threads*/2, /*max_sw_threads*/2));
+              if (!check_permit(eC, phC)) {
+                  throw tcm_exception{"Found unallocated resources"};
+              }
+          } else {              // There are unoccupied resources still
+              const uint32_t num_free = resources_left - (inner_thr - /*inherited*/1);
+              uint32_t eC_concurrency = 0; tcm_permit_t eC = make_active_permit(&eC_concurrency);
+              if (min_inner_thr == inner_thr) { // Cannot negotiate anything
+                  eC_concurrency = num_free + /*inherited*/1;
+                  phC = request_permit(client_a, make_request(/*min_sw_threads*/1,
+                                                              num_oversubscribed_resources));
+              } else {
+                  expect_negotiation_in_release = true;
+                  renegotiating_permits = {phB};
+                  uint32_t num_negotiable = inner_thr - min_inner_thr;
+                  if (min_inner_thr == 0)
+                      num_negotiable -= 1; // Cannot negotiate inherited
+
+                  eC_concurrency = num_free + num_negotiable + /*inherited*/1;
+                  eB_concurrency = std::max(min_inner_thr, uint32_t(1));
+                  phC = request_permit(client_a,
+                                       make_request(/*min_sw_threads*/eC_concurrency,
+                                                    /*max_sw_threads*/num_oversubscribed_resources));
+              }
+              if (!(check_permit(eC, phC) && check_permit(eB, phB) && check_permit(eA, phA))) {
+                  throw tcm_exception{"Found unallocated resources"};
+              }
+          }
+          unregister_thread();  // Unregister phB
+          if (expect_negotiation_in_release)
+              renegotiating_permits = {phB};
+          release_permit(phC);
+          release_permit(phB);
+        }
+      }
+      unregister_thread();
+
+      release_permit(phA);
+    }
+    disconnect_client(client_a);
+    disconnect_client(client_b);
+  } catch (tcm_exception&) {
+    return test_fail(test_name);
+  }
+
+  return test_epilog(test_name);
+}
+
+bool test_nested_clients_renegotiation() {
+  const char* test_name = __func__;
+  test_prolog(test_name);
+
   renegotiating_permits = {};    // no renegotiation is expected
   tcm_client_id_t clidA,  clidB;
 
@@ -172,7 +268,7 @@ bool test_nested_clients() {
   tcm_permit_request_t rB = make_request(num_oversubscribed_resources/2, num_oversubscribed_resources);
 
   r = tcmRequestPermit(clidB, rB, &phB, &phB, &pB);
-  eA_concurrency = num_oversubscribed_resources - num_oversubscribed_resources/2;
+  eA_concurrency = num_oversubscribed_resources - num_oversubscribed_resources/2 + /*nested*/ 1;
   eB_concurrency = num_oversubscribed_resources/2;
   auto unchanged_permits = list_unchanged_permits({{phA, &pA}});
 
@@ -219,6 +315,229 @@ bool test_nested_clients() {
   return test_epilog(test_name);
 }
 
+bool test_nested_clients_constrained() {
+  const char* test_name = __func__;
+  test_prolog(test_name);
+
+  constexpr int num_threads_per_constraint = 2;
+  constexpr int num_constraints = 2;
+  if (num_oversubscribed_resources < num_threads_per_constraint*num_constraints) {
+    return test_epilog(test_name);
+  }
+
+  try {
+    tcm_test::system_topology::construct();
+
+    auto client_a = connect_new_client(client_renegotiate);
+    auto client_b = connect_new_client(client_renegotiate);
+    tcm_permit_handle_t phA = nullptr, phB = nullptr;
+
+    tcm_cpu_mask_t* cpu_masks = new tcm_cpu_mask_t[num_constraints];
+    cpu_masks[0] = extract_n_bits_from_process_mask(num_threads_per_constraint);
+    for (int i = 1; i < num_constraints; ++i) {
+      cpu_masks[i] = extract_n_bits_from_process_mask(num_threads_per_constraint, cpu_masks[i - 1]);
+    }
+    std::unique_ptr<tcm_cpu_mask_t[], masks_guard_t> mask_guard{cpu_masks, num_constraints};
+
+    uint32_t eA_concurrency[num_constraints];
+    uint32_t eB_concurrency[num_constraints];
+    tcm_permit_t eA = make_active_permit(eA_concurrency, cpu_masks, num_constraints),
+                 eB = make_active_permit(eB_concurrency, cpu_masks, num_constraints);
+
+    tcm_cpu_constraints_t cpu_constraintsA[num_constraints];
+    tcm_cpu_constraints_t cpu_constraintsB[num_constraints];
+    for (int i = 0; i < num_constraints-1; ++i) {
+      cpu_constraintsA[i] = {num_threads_per_constraint-1, num_threads_per_constraint-1, cpu_masks[i], tcm_automatic, tcm_automatic, tcm_automatic};
+      cpu_constraintsB[i] = {1, 1, cpu_masks[i], tcm_automatic, tcm_automatic, tcm_automatic};
+    }
+    cpu_constraintsA[num_constraints-1] = 
+      {1, 1, cpu_masks[num_constraints-1], tcm_automatic, tcm_automatic, tcm_automatic};
+
+    cpu_constraintsB[num_constraints-1] = 
+      {num_threads_per_constraint, num_threads_per_constraint, cpu_masks[num_constraints-1], tcm_automatic, tcm_automatic, tcm_automatic};
+
+    tcm_permit_request_t reqA =
+      make_request((num_constraints-1)*(num_threads_per_constraint-1)+1, (num_constraints-1)*(num_threads_per_constraint-1)+1, cpu_constraintsA, num_constraints);
+
+    phA = request_permit(client_a, reqA, &phA);
+    std::fill(eA_concurrency, eA_concurrency + num_constraints, num_threads_per_constraint-1);
+    eA_concurrency[num_constraints-1] = 1;
+    if (!check_permit(eA, phA)) {
+      throw tcm_exception{nullptr};
+    }
+
+    register_thread(phA);
+
+    tcm_permit_request_t reqB =
+      make_request(num_constraints+num_threads_per_constraint-1, num_constraints+num_threads_per_constraint-1, cpu_constraintsB, num_constraints);
+    phB = request_permit(client_b, reqB, &phB);
+
+    std::fill(eB_concurrency, eB_concurrency + num_constraints, 1);
+    eB_concurrency[num_constraints-1] = num_threads_per_constraint;
+    if (!(check_permit(eB, phB) && check_permit(eA, phA))) {
+      throw tcm_exception{nullptr};
+    }
+
+    unregister_thread();
+
+    release_permit(phA);
+    release_permit(phB);
+
+    disconnect_client(client_a);
+    disconnect_client(client_b);
+  } catch (tcm_exception&) {
+    return test_fail(test_name);
+  }
+
+  return test_epilog(test_name);
+}
+
+bool test_nested_activation_with_deactivated_outer() {
+  const char* test_name = __func__;
+  test_prolog(test_name);
+
+  try {
+    auto client_a = connect_new_client(client_renegotiate);
+    auto client_b = connect_new_client(client_renegotiate);
+
+    tcm_permit_handle_t phA = nullptr, phB = nullptr;
+
+    uint32_t eA_concurrency = num_oversubscribed_resources, 
+             eB_concurrency = 1;
+
+    tcm_permit_t eA = make_active_permit(&eA_concurrency),
+                 eB = make_active_permit(&eB_concurrency);
+
+    tcm_permit_request_t reqA = make_request(1, num_oversubscribed_resources);
+    phA = request_permit(client_a, reqA, &phA);
+    if (!check_permit(eA, phA)) {
+      throw tcm_exception{nullptr};
+    }
+
+    register_thread(phA);
+
+    tcm_permit_request_t reqB = make_request(1, num_oversubscribed_resources);
+    phB = request_permit(client_b, reqB, &phB);
+
+    if (!(check_permit(eB, phB) && check_permit(eA, phA))) {
+      throw tcm_exception{nullptr};
+    }
+
+    deactivate_permit(phB);
+    eB_concurrency = 1; // Implicit thread from outer permit
+    eB.state = TCM_PERMIT_STATE_INACTIVE;
+    if (!(check_permit(eB, phB) && check_permit(eA, phA))) {
+	      throw tcm_exception{nullptr};
+    }
+
+    activate_permit(phB);
+    eB_concurrency = 1;
+    eB.state = TCM_PERMIT_STATE_ACTIVE;
+    if (!check_permit(eB, phB)) {
+      throw tcm_exception{nullptr};
+    }
+
+    deactivate_permit(phB);
+
+    eB_concurrency = 1; // Implicit thread from outer permit
+    eB.state = TCM_PERMIT_STATE_INACTIVE;
+    if (!check_permit(eB, phB)) {
+      throw tcm_exception{nullptr};
+    }
+
+    unregister_thread();
+
+    deactivate_permit(phA);
+    eA_concurrency = num_oversubscribed_resources; // Lazy inactive
+    eA.state = TCM_PERMIT_STATE_INACTIVE;
+    if (!check_permit(eA, phA)) {
+      throw tcm_exception{nullptr};
+    }
+
+    activate_permit(phB);
+    eA_concurrency = 0;
+    eB_concurrency = num_oversubscribed_resources;
+    eB.state = TCM_PERMIT_STATE_ACTIVE;
+    if (!(check_permit(eB, phB) && check_permit(eA, phA))) {
+      throw tcm_exception{nullptr};
+    }
+
+    release_permit(phA);
+    release_permit(phB);
+
+    disconnect_client(client_a);
+    disconnect_client(client_b);
+  } catch (tcm_exception&) {
+    return test_fail(test_name);
+  }
+
+  return test_epilog(test_name);
+}
+
+bool test_nested_clients_concurrent() {
+  const char* test_name = __func__;
+  test_prolog(test_name);
+
+  try {
+    std::string runtime_name = "outer client";
+    uint32_t min_sw_threads = 1; uint32_t max_sw_threads = num_oversubscribed_resources;
+    uint32_t expected_outer_concurrency = max_sw_threads;
+    client_thread_pool outer{runtime_name, min_sw_threads, max_sw_threads};
+
+    int data_size = num_oversubscribed_resources*10;
+    std::vector<int> data(data_size, 0);
+
+    tcm_permit_t expected_outer_permit = make_active_permit(&expected_outer_concurrency);
+    outer.parallel_for(0, data_size, [&data, min_sw_threads, max_sw_threads](int begin, int end) {
+      client_thread_pool inner{"inner client " + std::to_string(begin), min_sw_threads, max_sw_threads};
+      uint32_t expected_inner_concurrency = 1;
+      tcm_permit_t expected_inner_permit = make_active_permit(&expected_inner_concurrency);
+      inner.parallel_for(begin, end, [&data] (int s, int e) {
+        for (int i = s; i < e; ++ i) {
+          data[i] += 1;
+        }
+      }, expected_inner_permit);
+    }, expected_outer_permit);
+
+    bool is_data_valid = std::all_of(data.begin(), data.end(), [](int x) { return x == 1; });
+    if (!check(is_data_valid, "Data is valid")) {
+      return test_fail(test_name);
+    }
+  } catch (tcm_exception&) {
+    return test_fail(test_name);
+  }
+
+  // test perfect nesting
+  try {
+    uint32_t expected_outer_concurrency = std::max(1, num_oversubscribed_resources / 4);
+    client_thread_pool outer{"outer client", expected_outer_concurrency, expected_outer_concurrency};
+
+    int data_size = num_oversubscribed_resources*10;
+    std::vector<int> data(data_size, 0);
+
+    tcm_permit_t expected_outer_permit = make_active_permit(&expected_outer_concurrency);
+    outer.parallel_for(0, data_size, [&data, expected_outer_concurrency](int begin, int end) {
+      uint32_t expected_inner_concurrency = /*nested*/ 1 + (num_oversubscribed_resources - expected_outer_concurrency) / expected_outer_concurrency;
+      client_thread_pool inner{"inner client" + std::to_string(begin), expected_inner_concurrency, expected_inner_concurrency};
+      tcm_permit_t expected_inner_permit = make_active_permit(&expected_inner_concurrency);
+      inner.parallel_for(begin, end, [&data] (int s, int e) {
+        for (int i = s; i < e; ++ i) {
+          data[i] += 1;
+        }
+      }, expected_inner_permit);
+    }, expected_outer_permit);
+
+    bool is_data_valid = std::all_of(data.begin(), data.end(), [](int x) { return x == 1; });
+    if (!check(is_data_valid, "Data is valid")) {
+      return test_fail(test_name);
+    }
+  } catch (tcm_exception&) {
+    return test_fail(test_name);
+  }
+
+  return test_epilog(test_name);
+}
+
 bool test_nested_clients_partial_consumption() {
   const char* test_name = __func__;
   test_prolog(test_name);
@@ -257,10 +576,10 @@ bool test_nested_clients_partial_consumption() {
   uint32_t eB_concurrency = 0;
   tcm_permit_t eB = make_active_permit(&eB_concurrency);
 
-  tcm_permit_request_t rB = make_request(num_oversubscribed_resources/4*3, num_oversubscribed_resources);
+  tcm_permit_request_t rB = make_request(int((float)num_oversubscribed_resources/4*3), num_oversubscribed_resources);
   r = tcmRequestPermit(clidB, rB, &phB, &phB, &pB);
 
-  eA_concurrency = num_oversubscribed_resources - rB.min_sw_threads; eB_concurrency = rB.min_sw_threads;
+  eA_concurrency = num_oversubscribed_resources - rB.min_sw_threads + /*nested*/ 1; eB_concurrency = rB.min_sw_threads;
   auto unchanged_permits = list_unchanged_permits({{phA, &pA}});
   if (!(check_success(r, "tcmRequestPermit B all threads") &&
         check_permit(eA, phA) && check_permit(eB, pB) &&
@@ -846,6 +1165,10 @@ int main() {
 
   res &= test_alternating_clients();
   res &= test_nested_clients();
+  res &= test_nested_clients_renegotiation();
+  res &= test_nested_clients_constrained();
+  res &= test_nested_activation_with_deactivated_outer();
+  res &= test_nested_clients_concurrent();
   res &= test_nested_clients_partial_consumption();
   res &= test_overlapping_clients();
   res &= test_overlapping_clients_two_callbacks();

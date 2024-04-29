@@ -42,7 +42,7 @@ function(add_tcm_test)
   target_compile_definitions(${_tcm_test_NAME} PRIVATE ${TCM_COMPILE_DEFINITIONS})
 
   target_link_libraries(${_tcm_test_NAME} PUBLIC 
-    TCM::tcm HWLOC::hwloc 
+    TCM::tcm HWLOC::hwloc Threads::Threads
     ${_tcm_test_DEPENDENCIES}
     ${TCM_COMMON_LINK_LIBS}
   )

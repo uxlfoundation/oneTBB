@@ -68,4 +68,14 @@ public:
   tcm_disconnect_error(const std::string& message = "") : tcm_exception(message) {}
 };
 
+class tcm_register_thread_error : public tcm_exception {
+public:
+  tcm_register_thread_error(const std::string& message = "") : tcm_exception(message) {}
+};
+
+class tcm_unregister_thread_error : public tcm_exception {
+public:
+  tcm_unregister_thread_error(const std::string& message = "") : tcm_exception(message) {}
+};
+
 #endif // __TCM_TESTS_TEST_EXCEPTIONS_HEADER
