@@ -254,6 +254,12 @@ uint32_t get_permit_grant(tcm_permit_handle_t ph) { return get_permit_grant(ph->
 uint32_t get_num_negotiable(const tcm_permit_handle_t& handle) {
     __TCM_ASSERT(0 <= handle->request.min_sw_threads,
                  "Exact number for required threads must be known.");
+
+    // WARNING: This function is used in a container comparator. Therefore, the permit state
+    // affecting the results of this function should not be modified before the permit is removed
+    // from the corresponding container. Otherwise, accessing containers using the updated permit
+    // might lead to undefined behavior.
+
     // Expectations:
     // - Inherited resource cannot be negotiated as it does not belong to the nested request.
     // - If requested minimum equals to zero, then negotiable part is permit's grant w/o inherited.
@@ -290,6 +296,8 @@ uint32_t permit_unhappiness(const tcm_permit_handle_t& ph) {
 // permit. Both permits must be in the IDLE state.
 struct greater_idled_resources_t {
     bool operator()(const tcm_permit_handle_t& lhs, const tcm_permit_handle_t& rhs) const {
+        __TCM_ASSERT(is_idle(get_permit_state(lhs->data)) && is_idle(get_permit_state(rhs->data)),
+                     "Expecting permits in IDLE state");
         const auto lhs_value = get_permit_grant(lhs);
         const auto rhs_value = get_permit_grant(rhs);
         return lhs_value != rhs_value ? lhs_value > rhs_value : lhs > rhs;
@@ -606,6 +614,28 @@ struct ThreadComposabilityManagerData {
 };
 
 
+#if TCM_USE_ASSERT
+/**
+ * Checks for existence of an item within a container that allows iterator-based access.
+ *
+ * Algorithm is linear to avoid the use of container's custom-comparators.
+ */
+template <typename Container>
+bool iterating_over_inclusion_check(Container const& c, tcm_permit_handle_t ph) {
+    for (auto const& e : c) {
+        if (e == ph)
+            return true;
+    }
+    return false;
+}
+#endif    // TCM_USE_ASSERT
+
+/**
+ * Removes permit handle from the corresponding container.
+ *
+ * Make sure the state of the permit that affects containers' comparators is not modified while it
+ * was inside. Otherwise, container might not be able to find that permit.
+ */
 void remove_permit(ThreadComposabilityManagerData& data, tcm_permit_handle_t ph,
                    const tcm_permit_state_t& current_state)
 {
@@ -621,28 +651,31 @@ void remove_permit(ThreadComposabilityManagerData& data, tcm_permit_handle_t ph,
     }
 
     __TCM_ASSERT_EX(1 == n || is_inactive(current_state), "Incorrect invariant");
-    __TCM_ASSERT(
-        0 == data.active_permits.count(ph) + data.idle_permits.count(ph) + data.pending_permits.count(ph),
-        "Incorrect invariant"
-    );
+    __TCM_ASSERT(!iterating_over_inclusion_check(data.active_permits, ph) &&
+                 !iterating_over_inclusion_check(data.idle_permits, ph) &&
+                 !iterating_over_inclusion_check(data.pending_permits, ph),
+                 "Incorrect invariant");
 }
 
+/**
+ * Adds permit handle to the corresponding container.
+ *
+ * Make sure the state of the permit that affects containers' comparators is not modified after it
+ * is added. Otherwise, container might not be able to find that permit on subsequent calls.
+ */
 void add_permit(ThreadComposabilityManagerData& data, tcm_permit_handle_t ph,
                 const tcm_permit_state_t& new_state)
 {
-    __TCM_ASSERT(
-        0 == data.active_permits.count(ph) + data.idle_permits.count(ph) + data.pending_permits.count(ph),
-        "Incorrect invariant"
-    );
+    __TCM_ASSERT(!iterating_over_inclusion_check(data.active_permits, ph) &&
+                 !iterating_over_inclusion_check(data.idle_permits, ph) &&
+                 !iterating_over_inclusion_check(data.pending_permits, ph),
+                 "permit_handle is expected to be absent from containers");
 
     if (is_pending(new_state)) {
-        __TCM_ASSERT(0 == data.pending_permits.count(ph), "Incorrect invariant");
         data.pending_permits.insert(ph);
     } else if (is_idle(new_state)) {
-        __TCM_ASSERT(0 == data.idle_permits.count(ph), "Incorrect invariant");
         data.idle_permits.insert(ph);
     } else if (is_active(new_state)) {
-        __TCM_ASSERT(0 == data.active_permits.count(ph), "Incorrect invariant");
         data.active_permits.insert(ph);
     }
 }
@@ -1186,8 +1219,8 @@ public:
                                                // grant, but getting the grant at this point is an
                                                // overkill
       {
-         change_state_relaxed(ph->data, TCM_PERMIT_STATE_ACTIVE);
          remove_permit(*this, ph, curr_state);
+         change_state_relaxed(ph->data, TCM_PERMIT_STATE_ACTIVE);
          determine_nested_permit(ph);
          add_permit(*this, ph, TCM_PERMIT_STATE_ACTIVE);
          return TCM_RESULT_SUCCESS;

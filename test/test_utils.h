@@ -410,8 +410,9 @@ bool check_permit(const tcm_permit_t& expected, tcm_permit_handle_t ph,
                   const skip_checks_t skip = {}, const unsigned num_indents = 1,
                   const bool report = true)
 {
-    std::stringstream ss; ss << ph;
-    if (!check(ph, "check permit_handle=" + ss.str() + " is not nullptr", num_indents))
+    constexpr unsigned str_size = 128; char msg[str_size]{'\0'};
+    std::snprintf(msg, str_size, "check permit_handle=%p is not nullptr", (void*)ph);
+    if (!check(ph, msg, num_indents))
       return false;
 
   __TCM_ASSERT(expected.size > 0, "Permit size cannot be zero.");
