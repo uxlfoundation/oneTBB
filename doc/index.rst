@@ -189,8 +189,9 @@ Possible scenarios:
 
 1. *Agnostic nesting*.
 
-   Each level requests parallelism independently, as if it was alone.
-   This is the typical case of MKL calls nested in TBB calls.
+   Each level requests parallelism independently, as if it was alone. This
+   is the typical case of oneAPI Math Kernel Library (oneMKL) calls nested
+   in oneAPI Threading Building Blocks (oneTBB) calls.
 
 2. *Perfect or hierarchical nesting*.
 
