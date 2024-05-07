@@ -122,7 +122,8 @@ private:
         if (permit.state == TCM_PERMIT_STATE_PENDING) {
             while (permit.state == TCM_PERMIT_STATE_PENDING) {
                 std::this_thread::yield();
-                get_permit_data(ph, permit, "", "tcmGetPermitData " + runtime_name);
+                get_permit_data(ph, permit, "", "tcmGetPermitData for ph=" + to_string(ph) + " by "
+                                                + runtime_name);
             }
         }
         std::lock_guard<std::mutex> join_lock(thread_pool_mutex);

@@ -251,8 +251,7 @@ bool test_overlapping_clients_two_callbacks() {
   renegotiating_permits = {phC};
   eC.concurrencies[0] = num_oversubscribed_resources;
 
-  if (!check_success(tcmGetPermitData(phC, &pC),
-                     "Reading data from permit " + std::to_string(uintptr_t(phC))))
+  if (!check_success(tcmGetPermitData(phC, &pC), "Reading data from permit " + to_string(phC)))
     return test_fail(test_name);
 
   r = tcmReleasePermit(phB);
@@ -393,8 +392,7 @@ bool test_permit_reactivation() {
   renegotiating_permits = {phA};
   eA_concurrency = num_oversubscribed_resources;
 
-  if (!check_success(tcmGetPermitData(phA, &pA),
-                     "Reading data from permit " + std::to_string(uintptr_t(phA))))
+  if (!check_success(tcmGetPermitData(phA, &pA), "Reading data from permit " + to_string(phA)))
     return test_fail(test_name);
 
   r = tcmReleasePermit(phB);
@@ -596,8 +594,7 @@ bool test_support_for_pending_state() {
         && check(renegotiating_permits == unchanged_permits, "Check incorrect permit renegotiation")))
     return test_fail(test_name);
 
-  if (!check_success(tcmGetPermitData(phC, &pC),
-                     "Reading data from permit " + std::to_string(uintptr_t(phC))))
+  if (!check_success(tcmGetPermitData(phC, &pC), "Reading data from permit " + to_string(phC)))
     return test_fail(test_name);
 
   renegotiating_permits = {phC, phD};

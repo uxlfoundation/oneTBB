@@ -125,7 +125,7 @@ bool test_allow_mask_omitting_during_permit_copy(/*tcm_test::system_topology& tp
         return test_fail(test_name);
 
     r = tcmGetPermitData(ph, &p);
-    if (!(check_success(r, "tcmGetPermitData succeeded") && check_permit(eP, p) &&
+    if (!(check_success(r, "tcmGetPermitData for " + to_string(ph)) && check_permit(eP, p) &&
           check(!p.cpu_masks, "The mask has not been allocated by TCM in tcmGetPermitData")))
         return test_fail(test_name);
 
@@ -138,7 +138,7 @@ bool test_allow_mask_omitting_during_permit_copy(/*tcm_test::system_topology& tp
 
     r = tcmGetPermitData(ph, &p);
     eP.cpu_masks = &req.cpu_constraints->mask; // Expecting the requested mask
-    if (!(check_success(r, "tcmGetPermitData succeeded") && check_permit(eP, p)))
+    if (!(check_success(r, "tcmGetPermitData for " + to_string(ph)) && check_permit(eP, p)))
         return test_fail(test_name);
 
     r = tcmReleasePermit(ph);
@@ -583,38 +583,38 @@ bool test_request_all_numas_one_by_one() {
     }
   }
 
-  // Find a competitor with the last permit
+  // Find a rival with the last permit
   unsigned num_intersects = 0;
-  int competitor_idx = -1;
+  int rival_idx = -1;
   for (int i = 0; i < numa_count; ++i) {
       if (hwloc_bitmap_intersects(permits[i].cpu_masks[0], permits[numa_count].cpu_masks[0])) {
           ++num_intersects;
-          competitor_idx = i;
+          rival_idx = i;
       }
   }
   if (!check(1 == num_intersects, "Only one permit intersects with the last one")) {
       return test_fail(test_name);
   }
 
-  if (!check(permits[competitor_idx].concurrencies[0] == mask_concurrency,
-             "Competitor permit occupies whole concurrency of the given mask"))
+  if (!check(permits[rival_idx].concurrencies[0] == mask_concurrency,
+             "Rival permit occupies whole concurrency of the given mask"))
   {
       return test_fail(test_name);
   }
 
-  const uint32_t competitor_previous_concurrency = permits[competitor_idx].concurrencies[0];
+  const uint32_t rival_previous_concurrency = permits[rival_idx].concurrencies[0];
   tcm_cpu_mask_t mask = hwloc_bitmap_alloc();
   std::unique_ptr<tcm_cpu_mask_t, mask_deleter> cpu_mask(&mask);
-  if (!check(hwloc_bitmap_copy(mask, permits[competitor_idx].cpu_masks[0]) == 0, "Copied the mask")) {
+  if (!check(hwloc_bitmap_copy(mask, permits[rival_idx].cpu_masks[0]) == 0, "Copied the mask")) {
       return test_fail(test_name);
   }
-  r = tcmGetPermitData(permit_handles[competitor_idx], &permits[competitor_idx]);
+  r = tcmGetPermitData(permit_handles[rival_idx], &permits[rival_idx]);
   const uint32_t used_concurrency =
-      permits[competitor_idx].concurrencies[0] + permits[numa_count].concurrencies[0];
-  if (!(check_success(r, "Copied competitor permit data") &&
-        check(hwloc_bitmap_compare(mask, permits[competitor_idx].cpu_masks[0]) == 0,
+      permits[rival_idx].concurrencies[0] + permits[numa_count].concurrencies[0];
+  if (!(check_success(r, "tcmGetPermitData for ph=" + to_string(permit_handles[rival_idx])) &&
+        check(hwloc_bitmap_compare(mask, permits[rival_idx].cpu_masks[0]) == 0,
               "Masks compare equally", /*num_indents*/1) &&
-        check(competitor_previous_concurrency <= used_concurrency &&
+        check(rival_previous_concurrency <= used_concurrency &&
               used_concurrency <= mask_oversubscribed_concurrency,
               "The resources of the NUMA node is shared between intersecting permits",
               /*num_indents*/1)))
@@ -622,10 +622,10 @@ bool test_request_all_numas_one_by_one() {
       return test_fail(test_name);
   }
 
-  uint32_t expected_concurrency = competitor_previous_concurrency;
+  uint32_t expected_concurrency = rival_previous_concurrency;
   tcm_permit_t expected_permit = make_active_permit(&expected_concurrency, &mask);
-  r = tcmReleasePermit(permit_handles[competitor_idx]);
-  if (!(check_success(r, "tcmReleasePermit for client " + std::to_string(competitor_idx)) &&
+  r = tcmReleasePermit(permit_handles[rival_idx]);
+  if (!(check_success(r, "tcmReleasePermit for client " + std::to_string(rival_idx)) &&
         check_permit(expected_permit, permit_handles[numa_count])))
   {
       return test_fail(test_name);
@@ -633,7 +633,7 @@ bool test_request_all_numas_one_by_one() {
 
   // release all permits and disconnect the clients
   for (int i = 0; i < numa_count + 1; ++i) {
-    if (competitor_idx != i) {
+    if (rival_idx != i) {
       r = tcmReleasePermit(permit_handles[i]);
       if (!check_success(r, "tcmReleasePermit for client " + std::to_string(i)))
           return test_fail(test_name);

@@ -86,7 +86,7 @@ bool check_permits_concurrencies(const std::set<tcm_permit_handle_t>& phs,
 
   for (const auto& ph : phs) {
     result &= check_success(tcmGetPermitData(ph, &permits[i]),
-                            "Reading data from permit " + std::to_string(uintptr_t(ph)));
+                            "Reading data from permit " + to_string(ph));
 
     auto pos = std::find(concurrencies.begin(), concurrencies.end(), permits[i].concurrencies[0]);
 
@@ -595,8 +595,7 @@ bool test_nested_clients_partial_consumption() {
     return test_fail(test_name);
 
   renegotiating_permits = {phA};
-  if (!check_success(tcmGetPermitData(phA, &pA),
-                     "Reading permit " + std::to_string(uintptr_t(phA)))) {
+  if (!check_success(tcmGetPermitData(phA, &pA), "Reading permit " + to_string(phA))) {
     return test_fail(test_name);
   }
   eA.concurrencies[0] = num_oversubscribed_resources/2;
@@ -717,22 +716,26 @@ bool test_overlapping_clients_two_callbacks() {
            eA_concurrency = num_oversubscribed_resources/2;
 
   tcm_permit_t pA = make_void_permit(&pA_concurrency),
-                pB = make_void_permit(&pB_concurrency),
-                pC = make_void_permit(&pC_concurrency),
-                eA = make_active_permit(&eA_concurrency);
+               pB = make_void_permit(&pB_concurrency),
+               pC = make_void_permit(&pC_concurrency),
+               eA = make_active_permit(&eA_concurrency);
 
-  tcm_permit_request_t rA = make_request(0, num_oversubscribed_resources/2);
+  uint32_t min_sw_threads_phA = 1, min_sw_threads_phB = 1,
+           max_sw_threads_phA = num_oversubscribed_resources / 2,
+           max_sw_threads_phB = num_oversubscribed_resources - max_sw_threads_phA;
+
+  tcm_permit_request_t rA = make_request(min_sw_threads_phA, max_sw_threads_phA);
   r = tcmRequestPermit(clidA, rA, &phA, &phA, &pA);
-  if (!(check_success(r, "tcmRequestPermit A half threads") &&
+  if (!(check_success(r, "tcmRequestPermit half platform resources, phA=" + to_string(phA)) &&
         check_permit(eA, pA)))
     return test_fail(test_name);
 
-  uint32_t eB_concurrency = num_oversubscribed_resources - eA_concurrency;
+  uint32_t eB_concurrency = max_sw_threads_phB;
   tcm_permit_t eB = make_active_permit(&eB_concurrency);
 
-  tcm_permit_request_t rB = make_request(0, eB_concurrency);
+  tcm_permit_request_t rB = make_request(min_sw_threads_phB, max_sw_threads_phB);
   r = tcmRequestPermit(clidB, rB, &phB, &phB, &pB);
-  if (!(check_success(r, "tcmRequestPermit B half threads") &&
+  if (!(check_success(r, "tcmRequestPermit the rest resources, phB=" + to_string(phB)) &&
         check_permit(eA, phA) && check_permit(eB, pB)))
     return test_fail(test_name);
 
@@ -741,80 +744,70 @@ bool test_overlapping_clients_two_callbacks() {
   uint32_t eC_concurrency;
   tcm_permit_t eC = make_active_permit(&eC_concurrency);
 
-  tcm_permit_request_t rC = make_request(num_oversubscribed_resources/2, num_oversubscribed_resources);
+  uint32_t min_sw_threads_phC = num_oversubscribed_resources / 4;
+  tcm_permit_request_t rC = make_request(min_sw_threads_phC, num_oversubscribed_resources);
 
   r = tcmRequestPermit(clidC, rC, &phC, &phC, &pC);
-  if (!check_success(r, "tcmRequestPermit C all threads"))
+  if (!check_success(r, "tcmRequestPermit all platform, phC=" + to_string(phC)))
       return test_fail(test_name);
 
   auto unchanged_permits = list_unchanged_permits({{phA, &pA}, {phB, &pB}});
 
-  // The concurrencies of permit A and B can be borrowed since they specified that they can have
-  // them zero at the minimum. The request for permit C requires negotiation from one of them to
-  // satisfy its minimum. However, it is not known which one is chosen for negotiation. So we check
-  // first the determined value in permit C and that expected negotiation happened.
-  eC_concurrency = num_oversubscribed_resources/2;
+  // The concurrencies of permit A and B can be borrowed since they have room for negotiation. The
+  // request for permit C requires negotiation from only one of them to satisfy its minimum.
+  // However, it is not known which one is chosen for negotiation. So we check first the expected
+  // concurrency for permit C and then that the negotiation happened with only one of the permits.
+  eC_concurrency = min_sw_threads_phC;
   if (!(check_permit(eC, phC) && renegotiating_permits == unchanged_permits))
     return test_fail(test_name);
 
-  if (!check_success(tcmGetPermitData(phA, &pA),
-                     "Reading permit " + std::to_string(uintptr_t(phA))))
+  if (!check_success(tcmGetPermitData(phA, &pA), "Reading permit " + to_string(phA)))
     return test_fail(test_name);
-  if (!check_success(tcmGetPermitData(phB, &pB),
-                     "Reading permit " + std::to_string(uintptr_t(phB))))
+
+  if (!check_success(tcmGetPermitData(phB, &pB), "Reading permit " + to_string(phB)))
     return test_fail(test_name);
 
   if (!(check_permit(eA, pA, skip_concurrenency_check) &&
         check_permit(eB, pB, skip_concurrenency_check)))
     return test_fail(test_name);
 
-  // Then we check that negotiation succeeds for one of the existing permits
-  const uint32_t &A_concurrency = pA.concurrencies[0], &B_concurrency = pB.concurrencies[0];
+  // Then we check that negotiation succeeds for only one of the existing permits
+  auto const& A_concurrency = pA.concurrencies[0]; auto const& B_concurrency = pB.concurrencies[0];
   bool succeeded =
-      (A_concurrency == 0 && B_concurrency == eB_concurrency) ||
-      (A_concurrency == eA_concurrency && B_concurrency == eB_concurrency - eC_concurrency);
+      (A_concurrency == eA_concurrency - min_sw_threads_phC && B_concurrency == eB_concurrency) ||
+      (A_concurrency == eA_concurrency && B_concurrency == eB_concurrency - min_sw_threads_phC);
 
-  if (!succeeded) {
-    check(false, "Unexpected resource distribution.");
+  if (!check(succeeded, "Only one permit had been negotiated."))
     return test_fail(test_name);
-  }
 
-  // When A is released, we should get a callback for others only if their
-  // permits has changed.
+  // When A is released, we should get a callback for others only if their permits has changed.
   renegotiating_permits = {phB, phC};
-  if (!check_success(tcmGetPermitData(phC, &pC), "Reading permit phC"))
-    test_fail(test_name);
 
+  // Reading current permits' data to expect them after release of phA
+  if (!check_success(tcmGetPermitData(phB, &eB), "Reading permit phB=" + to_string(phB)))
+    return test_fail(test_name);
+  if (!check_success(tcmGetPermitData(phC, &eC), "Reading permit phC=" + to_string(phC)))
+    return test_fail(test_name);
+
+  // The A's resources should also be given to only one permit to minimize the disruption.
+  // Determine the number of resources to be given additionally to another permit
+  if (!check_success(tcmGetPermitData(phA, &pA), "Reading permit phA=" + to_string(phA)))
+    return test_fail(test_name);
+  const uint32_t released_concurrency = pA.concurrencies[0];
   r = tcmReleasePermit(phA);
   unchanged_permits = list_unchanged_permits({{phB, &pB}, {phC, &pC}});
-  if (!(check_success(r, "tcmReleasePermit A") && renegotiating_permits == unchanged_permits))
+  if (!(check_success(r, "tcmReleasePermit A=" + to_string(phA)) &&
+        check(renegotiating_permits == unchanged_permits && unchanged_permits.size() == 1,
+              "Unexpected negotiation during release of phA")))
     return test_fail(test_name);
 
-  if (A_concurrency == 0) {
-      // Nothing has changed for permits B and C, since no additional concurrency appears by the
-      // release of A
+  if (*unchanged_permits.cbegin() == phB) {
+      eC_concurrency += released_concurrency;
   } else {
-      // The permit A released number_oversubscribed_resources/2 of resources. They are distributed
-      // to the permit B since it is the one with the smallest (desired - current) concurrency gap
-      eB_concurrency += eA_concurrency;
+      eB_concurrency += released_concurrency;
   }
-  if (!check_success(tcmGetPermitData(phB, &pB),
-                     "Reading permit " + std::to_string(uintptr_t(phB))))
+  if (!(check_permit(eB, phB) && check_permit(eC, phC)))
     return test_fail(test_name);
-  if (!check_success(tcmGetPermitData(phC, &pC),
-                     "Reading permit " + std::to_string(uintptr_t(phC))))
-    return test_fail(test_name);
-
-  if (!(check_permit(eB, pB, skip_concurrenency_check) &&
-        check_permit(eC, pC, skip_concurrenency_check)))
-    return test_fail(test_name);
-
-  succeeded = (eB_concurrency == pB.concurrencies[0] && eC_concurrency == pC.concurrencies[0]) ||
-      (eC_concurrency == pB.concurrencies[0] && eB_concurrency == pC.concurrencies[0]);
-  if (!succeeded) {
-    check(false, "Unexpected resource distribution.", /*num_indents*/1);
-    test_fail(test_name);
-  }
 
   // When B is released, all the resources should be given to C since no other demand exists
   renegotiating_permits = {phC};
@@ -1064,8 +1057,7 @@ bool test_support_for_pending_state() {
         check(renegotiating_permits == unchanged_permits, "Check incorrect permit renegotiation")))
     return test_fail(test_name);
 
-  if (!check_success(tcmGetPermitData(phA, &pA),
-             "Reading data from permit " + std::to_string(uintptr_t(phA))))
+  if (!check_success(tcmGetPermitData(phA, &pA), "Reading data from permit " + to_string(phA)))
     return test_fail(test_name);
 
   tcm_permit_request_t reqC = make_request(num_oversubscribed_resources, num_oversubscribed_resources);
@@ -1100,8 +1092,7 @@ bool test_support_for_pending_state() {
         && check(renegotiating_permits == unchanged_permits, "Check incorrect permit renegotiation")))
     return test_fail(test_name);
 
-  if (!check_success(tcmGetPermitData(phD, &pD),
-             "Reading data from permit " + std::to_string(uintptr_t(phD))))
+  if (!check_success(tcmGetPermitData(phD, &pD), "Reading data from permit " + to_string(phD)))
     return test_fail(test_name);
 
   renegotiating_permits = {phC, phD};
@@ -1115,8 +1106,7 @@ bool test_support_for_pending_state() {
         && check(renegotiating_permits == unchanged_permits, "Check incorrect permit renegotiation")))
     return test_fail(test_name);
 
-  if (!check_success(tcmGetPermitData(phD, &pD),
-                     "Reading data from permit " + std::to_string(uintptr_t(phD))))
+  if (!check_success(tcmGetPermitData(phD, &pD), "Reading data from permit " + to_string(phD)))
     return test_fail(test_name);
 
   renegotiating_permits = {phC, phD};

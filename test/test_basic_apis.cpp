@@ -1091,7 +1091,8 @@ namespace request_as_inactive {
 
         uint32_t p_concurrency = 0; tcm_permit_t p = make_void_permit(&p_concurrency);
         r = tcmGetPermitData(ph, &p);
-        if (!(check_success(r, "Reading permit data") && check_permit(expected_permit, p)))
+        if (!(check_success(r, "Reading permit data for " + to_string(ph)) &&
+              check_permit(expected_permit, p)))
             return test_fail(test_name);
 
         auto e = make_active_permit(num_oversubscribed_resources);

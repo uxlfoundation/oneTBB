@@ -140,11 +140,19 @@ std::string to_string(const tcm_permit_flags_t flags) {
                      ", request_as_inactive=" + std::to_string(flags.request_as_inactive));
 }
 
-const char* single_indent = "  ";    // default indent in the test output
+inline std::string to_string(tcm_permit_handle_t ph) {
+    constexpr unsigned max_string_length = 32; // Sufficiently large size to hold 64-bit HEX pointer
+    std::string result(max_string_length, ' ');
+    const int num_bytes_written = std::snprintf(result.data(), result.length(), "%p", (void*)ph);
+    if (num_bytes_written > 0)
+        result.resize(num_bytes_written);
+    return result;
+}
 
 bool check(bool b, const std::string& msg, unsigned num_indents = 0,
            const std::string& report_msg = "")
 {
+  const std::string single_indent = "  ";    // default indent in the test output
   std::stringstream ss;
   for (unsigned i = 0; i < num_indents; ++i) {
       ss << single_indent;
@@ -428,9 +436,8 @@ bool check_permit(const tcm_permit_t& expected, tcm_permit_handle_t ph,
   tcm_permit_t actual = make_void_permit(concurrencies.data(), cpu_masks.get(), expected.size);
   tcm_result_t reading_result = tcmGetPermitData(ph, &actual);
   if (!check_success(reading_result)) {
-      return check(false, "Reading data from permit " + std::to_string(uintptr_t(ph)),
-                   num_indents, "tcmGetPermitData() returns status " +
-                   std::to_string(reading_result));
+      return check(false, "Reading data from ph=" + to_string(ph), num_indents,
+                   "tcmGetPermitData() returns status " + std::to_string(reading_result));
   }
 
   bool result = check_permit(expected, actual, skip, num_indents, report);
@@ -591,8 +598,8 @@ private:
     tcm_permit_t permit;
 };
 
-void get_permit_data(tcm_permit_handle_t ph, tcm_permit_t& permit, 
-  const std::string& error_message = "", const std::string& log_message = "tcmGetPermitData") 
+void get_permit_data(tcm_permit_handle_t ph, tcm_permit_t& permit,
+  const std::string& error_message = "", const std::string& log_message = "tcmGetPermitData")
 {
   auto r = tcmGetPermitData(ph, &permit);
   if (!check_success(r, log_message)) {
@@ -607,7 +614,7 @@ permit_t<size> get_permit_data(tcm_permit_handle_t ph, const std::string& error_
   tcm_permit_t& permit = permit_wrapper;
 
   auto r = tcmGetPermitData(ph, &permit);
-  if (!check_success(r, "tcmGetPermitData")) {
+  if (!check_success(r, "tcmGetPermitData for ph=" + to_string(ph))) {
     throw tcm_get_permit_data_error(error_message);
   }
 
@@ -657,7 +664,7 @@ std::set<tcm_permit_handle_t> list_unchanged_permits(const permits_data_t& pds,
     const tcm_permit_t& expected = *pd.second;
 
     if (check_permit(expected, ph, skip_checks_t{}, num_indents, /*report*/false))
-      result.insert(pd.first);
+      result.insert(ph);
   }
 
   return result;
