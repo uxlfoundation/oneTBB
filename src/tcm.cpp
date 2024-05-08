@@ -162,6 +162,16 @@ inline tcm_permit_state_t get_permit_state(const tcm_permit_data_t& permit_data,
 }
 
 /**
+ * Determines whether placing a permit data structure in internals can be avoided because the
+ * permit's data is not considered further directly, but had been reflected in other invariants.
+ *
+ * Example: Unconstrained rigid concurrency permits cannot be negotiated while in ACTIVE state.
+ */
+bool participates_in_subscription_compute(const tcm_permit_handle_t ph) {
+    return !is_rigid_concurrency(ph->data.flags) || is_constrained(ph);
+}
+
+/**
  *******************************************************************************
  * End of permit state helpers
  *******************************************************************************
@@ -644,13 +654,14 @@ void remove_permit(ThreadComposabilityManagerData& data, tcm_permit_handle_t ph,
         n = data.pending_permits.erase(ph);
     } else if (is_idle(current_state)) {
         n = data.idle_permits.erase(ph);
-    } else if (is_active(current_state)) {
+    } else if (is_active(current_state) && participates_in_subscription_compute(ph)) {
         n = data.active_permits.erase(ph);
     } else if (ph == data.lazy_inactive_permit) {
         data.lazy_inactive_permit = nullptr;
     }
 
-    __TCM_ASSERT_EX(1 == n || is_inactive(current_state), "Incorrect invariant");
+    __TCM_ASSERT_EX(1 == n || is_inactive(current_state) ||
+                    !participates_in_subscription_compute(ph), "Incorrect invariant");
     __TCM_ASSERT(!iterating_over_inclusion_check(data.active_permits, ph) &&
                  !iterating_over_inclusion_check(data.idle_permits, ph) &&
                  !iterating_over_inclusion_check(data.pending_permits, ph),
@@ -675,7 +686,12 @@ void add_permit(ThreadComposabilityManagerData& data, tcm_permit_handle_t ph,
         data.pending_permits.insert(ph);
     } else if (is_idle(new_state)) {
         data.idle_permits.insert(ph);
-    } else if (is_active(new_state)) {
+    } else if (is_active(new_state) &&
+               // Rigid concurrency permits are not negotiable while in ACTIVE state, so don't need
+               // to store them for further consideration, except for constrained rigid concurrency
+               // permits that are used for calculating mask subscription.
+               participates_in_subscription_compute(ph))
+    {
         data.active_permits.insert(ph);
     }
 }
@@ -1455,7 +1471,7 @@ protected:
           pending_permits.cend() != std::find(pending_permits.cbegin(), pending_permits.cend(), ph)
           || idle_permits.cend() != std::find(idle_permits.cbegin(), idle_permits.cend(), ph)
           || active_permits.cend() != std::find(active_permits.cbegin(), active_permits.cend(), ph)
-          || is_inactive(get_permit_state(ph->data));
+          || is_inactive(get_permit_state(ph->data)) || !participates_in_subscription_compute(ph);
   }
 #endif
 

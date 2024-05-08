@@ -762,7 +762,6 @@ bool test_request_all_numas_rigid_one_by_one() {
       return test_fail(test_name);
   }
 
-
   // Release one and expect the pending permit activates
   r = tcmReleasePermit(permit_handles[0]);
   bool result = false;
