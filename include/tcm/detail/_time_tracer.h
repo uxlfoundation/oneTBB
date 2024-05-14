@@ -419,7 +419,7 @@ inline void output_func_statistic(std::ostream& out, std::vector<unsigned> const
 inline std::string prettify(std::string const& s)
 {
     unsigned braces_nesting_level = 0;
-    int idx = s.length() - 1;
+    int idx = int(s.length() - 1);
     while (idx >= 0) {
         char c = s[idx--];
         if (c == ')') {
