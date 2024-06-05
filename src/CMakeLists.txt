@@ -37,8 +37,14 @@ endif()
 
 add_library(TCM::tcm ALIAS tcm)
 
-if (TCM_PROFILE STREQUAL "api-durations")
-  set(TCM_PROFILE_FLAGS -D__TCM_ENABLE_TIME_TRACER=1)
+if (TCM_PROFILE MATCHES ",*api-durations,*")
+  set(TCM_PROFILE_FLAGS ${TCM_PROFILE_FLAGS} -D__TCM_ENABLE_CALLSTACK_TRACER=1)
+endif()
+if (TCM_PROFILE MATCHES ",*permits,*")
+  set(TCM_PROFILE_FLAGS ${TCM_PROFILE_FLAGS} -D__TCM_ENABLE_PERMIT_TRACER=1)
+endif()
+if (TCM_PROFILE_FLAGS)
+  message(STATUS "Internal profiling is enabled for ${TCM_PROFILE}")
 endif()
 
 target_compile_options(tcm

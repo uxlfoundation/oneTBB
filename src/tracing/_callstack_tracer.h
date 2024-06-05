@@ -13,9 +13,10 @@
 #ifndef __TCM_TIME_TRACER_HEADER
 #define __TCM_TIME_TRACER_HEADER
 
-#if __TCM_ENABLE_TIME_TRACER
+#if __TCM_ENABLE_CALLSTACK_TRACER
 
-#include "_tcm_assert.h"
+#include "tcm/detail/_tcm_assert.h"
+#include "_tracing_utils.h"
 
 #include <algorithm>
 #include <chrono>
@@ -33,43 +34,22 @@
 namespace tcm {
 namespace internal {
 namespace profiling {
+namespace callstack {
 
-using tm_point = std::chrono::steady_clock::time_point;
-
-/**
- * Gets the current point in time.
- *
- * @return An entity of \c tm_point type having the value of current point in time.
- */
-inline tm_point current_time_point()
-{
-    return std::chrono::steady_clock::now();
-}
+using common::print_table_row;
+using common::determine_column_widths;
+using common::thread_logger;
+using common::tracer;
+using common::tm_point;
+using common::current_time_point;
+using common::fit_column_widths;
 
 /**
  * The information dumped at every cutoff.
  */
-struct log_record {
+struct function_call_event {
     const char* func_name = nullptr;
     const tm_point time_point;
-};
-
-/**
- * Interface allowing logging the data.
- */
-class logger {
-public:
-    void log(const char* func_name, const tm_point& time_point)
-    {
-        // TODO: Determine why compiler produces error when only constructor args are specified
-        // separated by commas and not using braced list.
-        trace.emplace_back(log_record{func_name, time_point});
-    }
-
-    const std::deque<log_record>& get_logs() const { return trace; }
-
-private:
-    std::deque<log_record> trace;
 };
 
 /**
@@ -127,7 +107,7 @@ using callstacks_statistics = std::map<callstack, frames_statistics>;
 using functions_data = std::map<std::string, function_durations>;
 using functions_statistics = std::map<std::string, func_statistic>;
 
-using callstack_iterator = std::deque<log_record>::const_iterator;
+using callstack_iterator = std::deque<function_call_event>::const_iterator;
 
 /**
  * Adds function name of a frame, its nesting level and duration into corresponding parameters.
@@ -255,11 +235,11 @@ inline void append_callstack_durations_piecewise(frames_durations& per_frame_dur
  *
  * @return A map of callstacks and their per-frame durations.
  */
-inline callstacks_data build_callstack_map(const std::deque<logger>& trace)
+inline callstacks_data build_callstack_map(const std::deque<thread_logger<function_call_event>>& trace)
 {
     callstacks_data data;
-    for (const auto& logger : trace) {
-        const std::deque<log_record>& logs = logger.get_logs();
+    for (const auto& per_thread_logger : trace) {
+        const std::deque<function_call_event>& logs = per_thread_logger.get_logs();
         callstack_iterator next_callstack_it = logs.cbegin();
         while (next_callstack_it != logs.cend()) {
             callstack calls;
@@ -381,35 +361,6 @@ compute_statistics(callstacks_data const& callstacks, functions_data const& func
 using func_statistic_view = std::vector<std::string>; // a node in functions_statistics as strings
 
 /**
- * Outputs function statistic into stream. Name of the function is adjusted to the left, while other
- * fields - to the right.
- *
- * @param out An output stream where to send the data.
- *
- * @param fields_widths Widths of columns with which to format corresponding values from \p
- *                      fn_stats_view
- *
- * @param intercolumn_space Space to use between the columns.
- *
- * @param fn_stats_view Statistic of the function to print.
- */
-inline void output_func_statistic(std::ostream& out, std::vector<unsigned> const& fields_widths,
-                                  std::string const& intercolumn_space,
-                                  func_statistic_view const& fn_stats_view)
-{
-    __TCM_ASSERT(fields_widths.size() == fn_stats_view.size(), "Incorrect invariant");
-    __TCM_ASSERT(!fields_widths.empty() && !fn_stats_view.empty(), "Incorrect invariant");
-
-    out << std::left << std::setw(fields_widths[0]) << fn_stats_view[0] << intercolumn_space;
-
-    out << std::right;
-    for (unsigned i = 1; i < fields_widths.size(); ++i) {
-        out << intercolumn_space << std::setw(fields_widths[i]) << fn_stats_view[i];
-    }
-    out << std::endl;
-}
-
-/**
  * Extracts the name of the function from its signature.
  *
  * @param s A function signature, from which to extract the name of the function.
@@ -439,55 +390,6 @@ inline std::string prettify(std::string const& s)
     auto begin_idx = idx + 1;
 
     return s.substr(begin_idx, end_idx - begin_idx);
-}
-
-/**
- * Outputs the table header in accordance with formatting.
- *
- * @param out An output stream where to send the data.
- *
- * @param fields_widths Formatting for table columns.
- *
- * @param intercolumn_space Space to use between the columns.
- *
- * @param columns_names Name of each column.
- */
-inline void
-print_header(std::ostream& out, std::vector<unsigned> const& fields_widths,
-             std::string const& intercolumn_space, std::vector<std::string> columns_names)
-{
-    __TCM_ASSERT(fields_widths.size() == columns_names.size(), "Mismatched sizes");
-    out << std::left;
-    out << std::setw(fields_widths[0]) << columns_names[0] << intercolumn_space;
-    out << std::right;
-    for (unsigned i = 1; i < columns_names.size(); ++i) {
-        out << intercolumn_space << std::setw(fields_widths[i]) << columns_names[i];
-    }
-    out << std::endl;
-}
-
-/**
- * Calculates the widths of table columns given their textual representation.
- *
- * @param columns Textual representation of columns' values in a table row.
- *
- * @param common_width_column_start_idx Index in \p columns starting from which to assign common
- *                                      width of subsequent columns.
- *
- * @return Widths of columns in resulting table representation.
- */
-inline std::vector<unsigned> determine_column_widths(std::vector<std::string> const& columns,
-                                                     unsigned const common_width_column_start_idx)
-{
-    std::vector<unsigned> columns_widths(columns.size(), 0);
-    for (unsigned i = 0; i < columns.size(); ++i) {
-        columns_widths[i] = unsigned(columns[i].size());
-    }
-    unsigned common_width = *std::max_element(columns_widths.cbegin() + common_width_column_start_idx,
-                                              columns_widths.cend());
-    std::fill(columns_widths.begin() + common_width_column_start_idx, columns_widths.end(),
-              common_width);
-    return columns_widths;
 }
 
 using functions_statistics_view = std::vector<func_statistic_view>;
@@ -570,11 +472,6 @@ inline func_statistic_view make_func_statistic_view(std::string const& function_
     view.push_back(std::to_string(fn_stats.mean.count()));
     view.push_back(std::to_string(fn_stats.max.count()));
 
-    // Update the columns widths to fit the data
-    for (unsigned i = 0; i < columns_widths.size(); ++i) {
-        columns_widths[i] = std::max(columns_widths[i], unsigned(view[i].size()));
-    }
-
     return view;
 }
 
@@ -602,7 +499,7 @@ prepare_for_presentation(callstacks_statistics const& cs_stats, functions_statis
                          std::vector<std::string> const& columns)
 {
     std::vector<unsigned> columns_widths = determine_column_widths(
-        columns, /*common_width_column_start_idx*/2
+        columns, /*common_width_start_column*/2
     );
 
     auto sorted_cs_stats = sort_callstacks_stats(cs_stats);
@@ -620,6 +517,7 @@ prepare_for_presentation(callstacks_statistics const& cs_stats, functions_statis
                 prettify(cs.function_names[i]);
             auto frame_view = make_func_statistic_view(function_name, frames_stats[i],
                                                        columns_widths);
+            fit_column_widths(columns_widths, frame_view);
             cs_representation.push_back(std::move(frame_view));
         }
         callstacks_representation.push_back(std::move(cs_representation));
@@ -630,6 +528,7 @@ prepare_for_presentation(callstacks_statistics const& cs_stats, functions_statis
         func_statistic const& stat = fn_stat.second;
         auto fn_view = make_func_statistic_view(/*function name*/prettify(fn_stat.first), stat,
                                                 columns_widths);
+        fit_column_widths(columns_widths, fn_view);
         fns_view.push_back(std::move(fn_view));
     }
 
@@ -659,89 +558,65 @@ print(std::ostream& out, callstacks_statistics const& cs_stats, functions_statis
         cs_stats, fn_stats, indent, indent_symbol, columns
     );
     unsigned const table_width = std::accumulate(fields_widths.cbegin(), fields_widths.cend(), 0) +
-        unsigned((fields_widths.size()) * intercolumn_space.size());
+                                 unsigned((fields_widths.size() - 1) * intercolumn_space.size());
     std::string const table_row_separator = std::string(table_width, '-');
 
     out << "\nCallstacks statistics in nanoseconds from the least to the most contributors "
-        "(number of calls * mean):\n";
-    print_header(out, fields_widths, intercolumn_space, columns);
+           "(number of calls * mean):\n";
+    print_table_row(out, fields_widths, intercolumn_space, columns);
     out << table_row_separator << std::endl;
 
     for (auto const& cs_view : cs_stats_view) {
         for (auto const& func_stats_view : cs_view) {
-            output_func_statistic(out, fields_widths, intercolumn_space, func_stats_view);
+            print_table_row(out, fields_widths, intercolumn_space, func_stats_view);
         }
         out << table_row_separator << std::endl;
     }
 
     out << "\nFunctions statistics in nanoseconds from the most to least contributors "
-        "(number of calls * mean):\n";
-    print_header(out, fields_widths, intercolumn_space, columns);
+           "(number of calls * mean):\n";
+    print_table_row(out, fields_widths, intercolumn_space, columns);
     out << table_row_separator << std::endl;
 
     for (auto const& fn_view : fn_stats_view) {
-        output_func_statistic(out, fields_widths, intercolumn_space, fn_view);
+        print_table_row(out, fields_widths, intercolumn_space, fn_view);
     }
 }
 
 /**
- * Per thread logger and data analyzer. Allows receiving the \c logger interface. Do the analysis
- * and printing of analyzed data.
+ * Analyzes the gathered data and presents it to the user.
+ *
+ * @param trace Gathered data
  */
-class trace_log {
-public:
-    ~trace_log()
-    {
-        callstacks_data callstacks = build_callstack_map(trace);
-        functions_data functions = build_function_map(callstacks);
-        sort_measurements(callstacks, functions);
-        auto [cs_stats, fn_stats] = compute_statistics(callstacks, functions);
-        print(std::cout, cs_stats, fn_stats);
-    }
+inline void post_process(const std::deque<thread_logger<function_call_event>>& trace)
+{
+    callstacks_data callstacks = build_callstack_map(trace);
+    functions_data functions = build_function_map(callstacks);
+    sort_measurements(callstacks, functions);
+    auto [cs_stats, fn_stats] = compute_statistics(callstacks, functions);
+    print(std::cout, cs_stats, fn_stats);
+}
 
-    logger& get_logger()
-    {
-        if (m_logger) {
-            return *m_logger;
-        }
-        m_logger = allocate_logger();
-        return *m_logger;
-    }
-
-private:
-    logger* allocate_logger()
-    {
-        std::lock_guard<std::mutex> lock_guard(mutex);
-        trace.emplace_back();
-        return &trace[trace.size() - 1];
-    }
-
-    std::mutex mutex;
-    std::deque<logger> trace;   // per thread logs
-    static thread_local logger* m_logger;
-};
-
-thread_local logger* trace_log::m_logger = nullptr;
-
-inline trace_log g_trace_log;   // The global object that gathers data for analysis and presenting
-                                // to the user.
+// The global object that gathers data for analysis and presenting to the user
+inline tracer<function_call_event> g_trace_log(post_process);
 
 class tcm_function_profiling_guard {
 public:
-    tcm_function_profiling_guard(const char* unique_func_name, trace_log& log = g_trace_log)
-        : m_func_name(unique_func_name), m_log(log)
+    tcm_function_profiling_guard(const char* unique_func_name,
+                                 tracer<function_call_event>& t = g_trace_log)
+        : m_func_name(unique_func_name), m_tracer(t)
     {
-        m_log.get_logger().log(m_func_name, current_time_point());
+        m_tracer.get_thread_logger().log(m_func_name, current_time_point());
     }
 
     ~tcm_function_profiling_guard()
     {
-        m_log.get_logger().log(m_func_name, current_time_point());
+        m_tracer.get_thread_logger().log(m_func_name, current_time_point());
     }
 
 private:
     const char* m_func_name = nullptr;
-    trace_log& m_log;
+    tracer<function_call_event>& m_tracer;
 };
 
 inline tcm_function_profiling_guard make_function_profiling_guard(const char* func_name)
@@ -749,24 +624,25 @@ inline tcm_function_profiling_guard make_function_profiling_guard(const char* fu
     return tcm_function_profiling_guard(func_name);
 }
 
-#define __TCM_PROFILE_THIS_FUNCTION_AUX(function_name)                         \
-  const auto tcm_function_profiling_guard_obj =                                \
-      ::tcm::internal::profiling::make_function_profiling_guard(function_name)
+#define __TCM_PROFILE_THIS_FUNCTION_AUX(function_name)                                    \
+  const auto tcm_function_profiling_guard_obj =                                           \
+    ::tcm::internal::profiling::callstack::make_function_profiling_guard(function_name)
 
 #if _WIN32
-#define __TCM_PROFILE_THIS_FUNCTION()                                          \
+#define __TCM_PROFILE_THIS_FUNCTION()                                                     \
   __TCM_PROFILE_THIS_FUNCTION_AUX((const char *)(&__FUNCSIG__))
 #else // _WIN32
-#define __TCM_PROFILE_THIS_FUNCTION()                                          \
+#define __TCM_PROFILE_THIS_FUNCTION()                                                     \
   __TCM_PROFILE_THIS_FUNCTION_AUX((const char *)(&__PRETTY_FUNCTION__))
 #endif // _WIN32
 
+} // callstack
 } // profiling
 } // internal
 } // tcm
 
-#else  // __TCM_ENABLE_TIME_TRACER
+#else  // __TCM_ENABLE_CALLSTACK_TRACER
 #define __TCM_PROFILE_THIS_FUNCTION()
-#endif // __TCM_ENABLE_TIME_TRACER
+#endif // __TCM_ENABLE_CALLSTACK_TRACER
 
 #endif // __TCM_TIME_TRACER_HEADER

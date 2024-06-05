@@ -11,10 +11,11 @@
 */
 
 #include "tcm/detail/_tcm_assert.h"
-#include "tcm/detail/_time_tracer.h"
 #include "tcm/detail/hwloc_utils.h"
 #include "tcm/detail/_environment.h"
 #include "tcm.h"
+#include "tcm_permit_rep.h"
+#include "tracing/_tracer.h"
 
 // MSVC Warning: unreferenced formal parameter
 __TCM_SUPPRESS_WARNING_WITH_PUSH(4100)
@@ -41,56 +42,8 @@ __TCM_SUPPRESS_WARNING_POP
 #include <iostream>
 #endif
 
-struct tcm_permit_data_t {
-  tcm_client_id_t client_id;
-  std::atomic<uint32_t>* concurrency;
-  tcm_cpu_mask_t* cpu_mask;
-  uint32_t size;
-  std::atomic<tcm_permit_state_t> state;
-  tcm_permit_flags_t flags;
-  uint32_t tcm_epoch_snapshot; // Updated whenever this permit asks for resources by itself (via request permit or activate)
-  std::atomic<bool> is_nested; // Indicates whether this permit is nested
-  std::atomic<uint32_t> inherited_concurrency_idx; // Index of constraint where inherited concurrency will be stored
-};
-
-extern "C" {
-
-typedef uint64_t tcm_permit_epoch_t;
-
-struct tcm_permit_rep_t {
-  std::atomic<tcm_permit_epoch_t> epoch;
-  tcm_permit_request_t request; // Holds latest corresponding request
-  tcm_permit_data_t data;
-  void* callback_arg;
-};
-
-} // extern "C"
-
 namespace tcm {
 namespace internal {
-
-#if __TCM_ENABLE_TRACER
-struct tracer {
-  const std::string s_;
-  tracer(const std::string &s) : s_(s) {
-    std::cout << "Entering " << s_ << std::endl;
-  }
-
-  void log(const std::string &msg) {
-    std::cout << msg << std::endl;
-  }
-
-  ~tracer() {
-    std::cout << "Leaving " << s_ << std::endl;
-  }
-};
-#else
-struct tracer {
-  tracer(const std::string &) {}
-  void log(const std::string&) {}
-  ~tracer() {}
-};
-#endif
 
 std::stack<tcm_permit_handle_t>& get_active_permit_container() {
     thread_local std::stack<tcm_permit_handle_t> tls_active_permit;
@@ -805,6 +758,10 @@ update_callbacks_t apply(ThreadComposabilityManagerData& data,
         __TCM_ASSERT(updates[i].ph != initiator || updates.size() - 1 == i,
                      "Initiator of updates should be the last in the list");
         concurrency_delta += apply(updates[i], data, initiator, remove_initiator_first, callbacks);
+#if __TCM_ENABLE_PERMIT_TRACER
+        if (i < updates.size() - 1)
+            __TCM_PROFILE_PERMIT(updates[i].ph, "negotiated");
+#endif
     }
 
 #if TCM_USE_ASSERT
@@ -931,7 +888,6 @@ public:
   virtual ~ThreadComposabilityManagerBase() {}
 
   tcm_client_id_t register_client(tcm_callback_t r) {
-      tracer t("ThreadComposabilityBase::register_client");
       const std::lock_guard<std::mutex> l(data_mutex);
       tcm_client_id_t clid = client_id++;
       client_to_callback_map[clid] = r;
@@ -939,7 +895,6 @@ public:
   }
 
   void unregister_client(tcm_client_id_t clid) {
-      tracer t("ThreadComposabilityBase::unregister_client");
       const std::lock_guard<std::mutex> l(data_mutex);
       __TCM_ASSERT(client_to_permit_mmap.count(clid) == 0, "Deactivating the client with associated permits.");
       __TCM_ASSERT(client_to_callback_map.count(clid) == 1, "The client_id was not registered.");
@@ -1076,7 +1031,6 @@ public:
                               void* callback_arg, tcm_permit_handle_t* permit_handle,
                               tcm_permit_t* permit, const int32_t sum_constraints_min)
   {
-    tracer t("ThreadComposabilityBase::request_permit");
     __TCM_PROFILE_THIS_FUNCTION();
 
     bool additional_concurrency_available = false;
@@ -1105,6 +1059,7 @@ public:
         copy_request(ph->request, req, /*allow_updating_masks*/true);
         ph->callback_arg = callback_arg;
         ph->data.flags = req.flags;
+        __TCM_PROFILE_PERMIT(ph, "requested as inactive");
 
         // TODO: Allow permit handle re-allocation even if sizes of constraints do not match
         // (may require updating handle in client-to-permit multimap)
@@ -1155,6 +1110,8 @@ public:
           add_permit(*this, ph, TCM_PERMIT_STATE_PENDING);
       }
 
+      __TCM_PROFILE_PERMIT(ph, "requested");
+
       // Client might re-request for less number of resources
       additional_concurrency_available = available_concurrency > initially_available;
       ph->data.tcm_epoch_snapshot = tcm_state_epoch;
@@ -1174,7 +1131,6 @@ public:
   }
 
   tcm_result_t get_permit(tcm_permit_handle_t ph, tcm_permit_t* permit) {
-    tracer t("ThreadComposabilityBase::get_permit");
     __TCM_ASSERT(ph && permit, nullptr);
 
     // NOTE: expected that ph is valid - but direct call is_valid() can lead to races
@@ -1188,7 +1144,6 @@ public:
   }
 
   tcm_result_t idle_permit(tcm_permit_handle_t ph) {
-    tracer t("ThreadComposabilityBase::idle_permit");
     __TCM_PROFILE_THIS_FUNCTION();
 
     __TCM_ASSERT(ph, nullptr);
@@ -1202,13 +1157,13 @@ public:
       }
       change_state_relaxed(pd, TCM_PERMIT_STATE_IDLE);
       move_permit(*this, ph, curr_state, /*new_state*/TCM_PERMIT_STATE_IDLE);
+      __TCM_PROFILE_PERMIT(ph, "idled");
     }
     renegotiate_permits(/*initiator*/nullptr);
     return TCM_RESULT_SUCCESS;
   }
 
   tcm_result_t activate_permit(tcm_permit_handle_t ph) {
-    tracer t("ThreadComposabilityBase::activate_permit");
     __TCM_PROFILE_THIS_FUNCTION();
 
     __TCM_ASSERT(ph, nullptr);
@@ -1239,6 +1194,7 @@ public:
          change_state_relaxed(ph->data, TCM_PERMIT_STATE_ACTIVE);
          determine_nested_permit(ph);
          add_permit(*this, ph, TCM_PERMIT_STATE_ACTIVE);
+         __TCM_PROFILE_PERMIT(ph, "lazily activated");
          return TCM_RESULT_SUCCESS;
       }
 
@@ -1278,6 +1234,7 @@ public:
               add_permit(*this, ph, TCM_PERMIT_STATE_PENDING);
           }
       }
+      __TCM_PROFILE_PERMIT(ph, "activated");
       ph->data.tcm_epoch_snapshot = tcm_state_epoch;
     }
 
@@ -1287,7 +1244,6 @@ public:
   }
 
   tcm_result_t deactivate_permit(tcm_permit_handle_t ph) {
-    tracer t("ThreadComposabilityBase::deactivate_permit");
     __TCM_PROFILE_THIS_FUNCTION();
 
     __TCM_ASSERT(ph, nullptr);
@@ -1314,12 +1270,14 @@ public:
           } else {
               change_state_relaxed(pd, TCM_PERMIT_STATE_INACTIVE);
               lazy_inactive_permit = ph;
+              __TCM_PROFILE_PERMIT(ph, "lazily deactivated");
               return TCM_RESULT_SUCCESS;
           }
       } else {
           change_state_relaxed(pd, new_state);
           move_permit(*this, ph, curr_state, new_state);
       }
+      __TCM_PROFILE_PERMIT(ph, "deactivated");
     }
     if (shall_negotiate_resources) {
         // Specify 'nullptr' in order to notify the client in case the resources from this permit
@@ -1362,7 +1320,6 @@ public:
   }
 
   tcm_result_t release_permit(tcm_permit_handle_t handle) {
-    tracer t("ThreadComposabilityBase::release_permit");
     __TCM_PROFILE_THIS_FUNCTION();
 
     bool has_released_resources = false;
@@ -1378,6 +1335,7 @@ public:
         available_concurrency += released_concurrency;
         has_released_resources = initial_concurrency < available_concurrency;
         note_tcm_state_change(*this);
+        __TCM_PROFILE_PERMIT(handle, "released");
     }
 
     // Permit representation has been erased from internal structures, i.e. TCM does not know about
@@ -1392,17 +1350,17 @@ public:
   }
 
   tcm_result_t register_thread(tcm_permit_handle_t ph) {
-    tracer t("ThreadComposabilityBase::register_thread");
     __TCM_ASSERT(ph, nullptr);
+    // TODO: profile only permit_handle and thread_id
     get_active_permit_container().push(ph);
     return TCM_RESULT_SUCCESS;
   }
 
   tcm_result_t unregister_thread() {
-    tracer t("ThreadComposabilityBase::unregister_thread");
     auto& permit_stack = get_active_permit_container();
     __TCM_ASSERT(!permit_stack.empty(), "Attempt unregistering non-registered thread.");
     permit_stack.pop();
+    // TODO: profile only permit_handle and thread_id
     return TCM_RESULT_SUCCESS;
   }
 
@@ -2392,7 +2350,6 @@ protected:
     make_new_permit(const tcm_client_id_t clid, const tcm_permit_request_t& req,
                     const tcm_permit_state_t state)
     {
-        tracer t("ThreadComposabilityManagerBase::make_new_permit");
         __TCM_PROFILE_THIS_FUNCTION();
         unsigned permit_size = infer_permit_size(req);
 
@@ -2505,7 +2462,6 @@ protected:
         // - Determine other demand for resources (compute desired minus current for active permits)
         // - Saturate the demand starting from the least unhappy (i.e. the one with minimal
         //   'desired - current' value) active permit
-        tracer t("ThreadComposabilityFairBalance::renegotiate_permits");
         __TCM_PROFILE_THIS_FUNCTION();
 
         update_callbacks_t callbacks;
@@ -2580,7 +2536,6 @@ protected:
                                                         tcm_permit_handle_t ph) override
     {
         // The data_mutex lock must be taken
-        tracer t("ThreadComposabilityFairBalance::adjust_existing_permit");
         __TCM_PROFILE_THIS_FUNCTION();
 
         if (lazy_inactive_permit) {
@@ -2609,8 +2564,6 @@ protected:
         __TCM_ASSERT(adjusted_min_sw_threads <= int32_t(ff.num_satisfiable) &&
                                            int32_t(ff.num_satisfiable) <= req.max_sw_threads,
                      "Found resources should be within the requested limits.");
-
-        t.log("ThreadComposabilityFairBalance::NOTE satisfying the permit requires renegotiation.");
 
         std::vector<permit_change_t> updates = negotiate(ff, req, ph);
         return updates;
@@ -2692,7 +2645,6 @@ extern "C" {
 tcm_result_t tcmConnect(tcm_callback_t callback, tcm_client_id_t* client_id)
 {
   using tcm::theTCM;
-  tcm::internal::tracer t("tcmConnect");
 
   if (!theTCM::is_enabled()) {
       return TCM_RESULT_ERROR_UNKNOWN;
@@ -2720,7 +2672,6 @@ tcm_result_t tcmConnect(tcm_callback_t callback, tcm_client_id_t* client_id)
 tcm_result_t tcmDisconnect(tcm_client_id_t client_id)
 {
   using tcm::theTCM;
-  tcm::internal::tracer t("tcmDisconnect");
 
   auto& mgr = theTCM::instance();
   mgr.unregister_client(client_id);
@@ -2745,7 +2696,6 @@ tcm_result_t tcmRequestPermit(tcm_client_id_t client_id,
                               tcm_permit_t* permit)
 {
   using tcm::theTCM;
-  tcm::internal::tracer t("tcmRequestPermit");
 
   int32_t sum_min = 0, sum_max = request.max_sw_threads;
   if (request.cpu_constraints) {
@@ -2791,7 +2741,6 @@ tcm_result_t tcmRequestPermit(tcm_client_id_t client_id,
 ///     - ::TCM_RESULT_ERROR_UNKNOWN
 tcm_result_t tcmGetPermitData(tcm_permit_handle_t permit_handle, tcm_permit_t* permit) {
   using tcm::theTCM;
-  tcm::internal::tracer t("tcmGetPermitData");
 
   if (!permit_handle || !permit)
     return TCM_RESULT_ERROR_UNKNOWN;
@@ -2811,7 +2760,6 @@ tcm_result_t tcmGetPermitData(tcm_permit_handle_t permit_handle, tcm_permit_t* p
 ///     - ::TCM_RESULT_ERROR_UNKNOWN
 tcm_result_t tcmIdlePermit(tcm_permit_handle_t p) {
   using tcm::theTCM;
-  tcm::internal::tracer t("tcmIdlePermit");
 
   if (p) {
     return theTCM::instance().idle_permit(p);
@@ -2830,7 +2778,6 @@ tcm_result_t tcmIdlePermit(tcm_permit_handle_t p) {
 ///     - ::TCM_RESULT_ERROR_UNKNOWN
 tcm_result_t tcmActivatePermit(tcm_permit_handle_t p) {
   using tcm::theTCM;
-  tcm::internal::tracer t("tcmActivatePermit");
 
   if (p) {
     return theTCM::instance().activate_permit(p);
@@ -2849,7 +2796,6 @@ tcm_result_t tcmActivatePermit(tcm_permit_handle_t p) {
 ///     - ::TCM_RESULT_ERROR_UNKNOWN
 tcm_result_t tcmDeactivatePermit(tcm_permit_handle_t p) {
   using tcm::theTCM;
-  tcm::internal::tracer t("tcmDeactivatePermit");
 
   if (p) {
     return theTCM::instance().deactivate_permit(p);
@@ -2868,7 +2814,6 @@ tcm_result_t tcmDeactivatePermit(tcm_permit_handle_t p) {
 ///     - ::TCM_RESULT_ERROR_UNKNOWN
 tcm_result_t tcmReleasePermit(tcm_permit_handle_t handle) {
   using tcm::theTCM;
-  tcm::internal::tracer t("tcmReleasePermit");
 
   if (handle) {
     return theTCM::instance().release_permit(handle);

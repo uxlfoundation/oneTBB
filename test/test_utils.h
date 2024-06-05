@@ -16,13 +16,14 @@
 #include "test_exceptions.h"
 
 #include "hwloc_test_utils.h"
+#include "../src/utils.h"
 #include "tcm/detail/_tcm_assert.h"
 #include "tcm.h"
 // MSVC Warning: unreferenced formal parameter
 __TCM_SUPPRESS_WARNING_WITH_PUSH(4100)
 #include "hwloc.h"
 __TCM_SUPPRESS_WARNING_POP
-#include <stdlib.h>
+#include <cstdio>
 #include <vector>
 #include <set>
 #include <iostream>
@@ -131,22 +132,6 @@ std::string bitmap_to_string(const tcm_cpu_mask_t mask) {
   char buf[max_size] = {0};
   hwloc_bitmap_snprintf(buf, max_size, (hwloc_const_bitmap_t)mask);
   return std::string(buf);
-}
-
-std::string to_string(const tcm_permit_flags_t flags) {
-  return std::string("stale=" + std::to_string(flags.stale) +
-                     ", rigid_concurrecy=" + std::to_string(flags.rigid_concurrency) +
-                     ", exclusive=" + std::to_string(flags.exclusive) +
-                     ", request_as_inactive=" + std::to_string(flags.request_as_inactive));
-}
-
-inline std::string to_string(tcm_permit_handle_t ph) {
-    constexpr unsigned max_string_length = 32; // Sufficiently large size to hold 64-bit HEX pointer
-    std::string result(max_string_length, ' ');
-    const int num_bytes_written = std::snprintf(result.data(), result.length(), "%p", (void*)ph);
-    if (num_bytes_written > 0)
-        result.resize(num_bytes_written);
-    return result;
 }
 
 bool check(bool b, const std::string& msg, unsigned num_indents = 0,
@@ -296,14 +281,15 @@ bool check_permit_concurrency(const tcm_permit_t& expected, const tcm_permit_t& 
   bool result = false;
   std::string report_str{};
 
+  auto const& expected_concurrencies = to_string(expected.concurrencies, expected.size);
+  auto const& actual_concurrencies = to_string(actual.concurrencies, actual.size);
+
+  report_str = "Check concurrencies, expected " + expected_concurrencies + " equals to actual "
+               + actual_concurrencies;
+
   for (unsigned i = 0; i < expected.size; ++i) {
     const auto& e = expected.concurrencies[i]; const auto& a = actual.concurrencies[i];
     result = (e == a);
-    // TODO: print not only the wrong element, but the whole range
-    report_str = "Check concurrency, expected " + std::to_string(e) +
-      " equals to actual " + std::to_string(a) + ", concurrency array index of "
-        + std::to_string(i);
-
     if (!result)
       break;
   }
@@ -358,18 +344,13 @@ bool check_permit_mask(const tcm_permit_t& expected, const tcm_permit_t& actual,
   return result;
 }
 
-static const char* states[] = {
-  "VOID", "INACTIVE", "PENDING", "IDLE", "ACTIVE"
-};
-
 bool check_permit_state(const tcm_permit_t& expected, const tcm_permit_t& actual,
                         const unsigned num_indents = 0, const bool report = true)
 {
   const auto& e = expected.state; const auto& a = actual.state;
   const bool result = (e == a);
-  std::string report_str = "Check state, expected " + std::to_string(e) +
-    " (" + std::string(states[e]) + ") equals to actual " + std::to_string(a) +
-    " (" + std::string(states[a]) + ")";
+  std::string report_str = "Check state, expected " + to_string(e) + " (" + std::to_string(e) +
+                           ") equals to actual " + to_string(a) + " (" + std::to_string(a) + ")";
 
   return report ? check(result, report_str, num_indents) : result;
 }
