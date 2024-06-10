@@ -1146,7 +1146,6 @@ public:
   tcm_result_t idle_permit(tcm_permit_handle_t ph) {
     __TCM_PROFILE_THIS_FUNCTION();
 
-    __TCM_ASSERT(ph, nullptr);
     {
       const std::lock_guard<std::mutex> l(data_mutex);
       __TCM_ASSERT(is_valid(ph), "Idling non-existing permit");
@@ -1165,8 +1164,6 @@ public:
 
   tcm_result_t activate_permit(tcm_permit_handle_t ph) {
     __TCM_PROFILE_THIS_FUNCTION();
-
-    __TCM_ASSERT(ph, nullptr);
 
     update_callbacks_t callbacks;
     {
@@ -1246,8 +1243,6 @@ public:
   tcm_result_t deactivate_permit(tcm_permit_handle_t ph) {
     __TCM_PROFILE_THIS_FUNCTION();
 
-    __TCM_ASSERT(ph, nullptr);
-
     const tcm_permit_state_t new_state = TCM_PERMIT_STATE_INACTIVE;
     bool shall_negotiate_resources = false;
     {
@@ -1325,7 +1320,7 @@ public:
     bool has_released_resources = false;
     {
         const std::lock_guard<std::mutex> l(data_mutex);
-        __TCM_ASSERT(handle && is_valid(handle), "Releasing of an invalid permit");
+        __TCM_ASSERT(is_valid(handle), "Releasing of an invalid permit");
 
         const uint32_t released_concurrency = clear_up_internals_from(handle);
 
@@ -1426,10 +1421,11 @@ protected:
   // Helper to determine whether the permit is not released yet. Must be called under data_mutex.
   bool is_valid(tcm_permit_handle_t ph) const {
       return
-          pending_permits.cend() != std::find(pending_permits.cbegin(), pending_permits.cend(), ph)
-          || idle_permits.cend() != std::find(idle_permits.cbegin(), idle_permits.cend(), ph)
-          || active_permits.cend() != std::find(active_permits.cbegin(), active_permits.cend(), ph)
-          || is_inactive(get_permit_state(ph->data)) || !participates_in_subscription_compute(ph);
+          ph &&
+          (pending_permits.cend() != std::find(pending_permits.cbegin(), pending_permits.cend(), ph)
+           || idle_permits.cend() != std::find(idle_permits.cbegin(), idle_permits.cend(), ph)
+           || active_permits.cend() != std::find(active_permits.cbegin(), active_permits.cend(), ph)
+           || is_inactive(get_permit_state(ph->data)) || !participates_in_subscription_compute(ph));
   }
 #endif
 
