@@ -429,7 +429,10 @@ bool test_nested_activation_with_deactivated_outer() {
     if (!(check_permit(eB, phB) && check_permit(eA, phA))) {
 	      throw tcm_exception{nullptr};
     }
-
+    // Callback of a nested permit is invoked because its activation involves regular procedure for
+    // resources search rather than doing that lazily. Lazy activation is allowed here since
+    // there is no actual resources demand other than that comes from the nested permit
+    renegotiating_permits = {phB};
     activate_permit(phB);
     eB_concurrency = 1;
     eB.state = TCM_PERMIT_STATE_ACTIVE;
@@ -453,7 +456,10 @@ bool test_nested_activation_with_deactivated_outer() {
     if (!check_permit(eA, phA)) {
       throw tcm_exception{nullptr};
     }
-
+    // Expecting callback invocation since the permit is no longer nested,
+    // and must be involved in resource search and getting a new concurrency value,
+    // hence the client should be notified about permit's new concurrency.
+    renegotiating_permits = {phB};
     activate_permit(phB);
     eA_concurrency = 0;
     eB_concurrency = num_oversubscribed_resources;
@@ -955,10 +961,11 @@ bool test_permit_reactivation() {
 
   // Activate previously deactivated request from client A. Since the amount of
   // previously held resources are not available, the renegotiation mechanism
-  // should take place for client A, but its callback should not be invoked.
-  // Since, however, the renegotiation should happen for client B as well,
-  // its callback should be invoked.
-  renegotiating_permits = {phB};
+  // should take place for client A. The callback should be invoked for client A
+  // to notify about the state/concurrency change.
+  // Since the renegotiation should happen for client B as well,
+  // its callback should also be invoked.
+  renegotiating_permits = {phA, phB};
 
   eA.state = TCM_PERMIT_STATE_ACTIVE;
   eB_concurrency = rB.max_sw_threads;

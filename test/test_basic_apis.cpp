@@ -283,14 +283,20 @@ bool test_no_negotiation_for_active_rigid_concurrency() {
     return test_fail(test_name);
   }
 
+  allow_rigid_concurrency_permit_negotiation = true;
+
   r = tcmActivatePermit(phS);
   eS.concurrencies[0] = num_oversubscribed_resources; eS.state = TCM_PERMIT_STATE_ACTIVE;
   if (!(check_success(r, "tcmActivatePermit (rigid concurrency)") && check_permit(eS, phS) &&
-      check(!is_callback_invoked, "Callback was not invoked for the rigid concurrency permit that "
-            "was activated")))
+      check(is_callback_invoked, "Callback was invoked for the rigid concurrency permit since "
+            "it got additional concurrency during re-activation")))
   {
     return test_fail(test_name);
   }
+
+  allow_rigid_concurrency_permit_negotiation = false;
+
+  is_callback_invoked = false;
 
   r = tcmIdlePermit(phS);
   eS.state = TCM_PERMIT_STATE_IDLE;
@@ -311,7 +317,6 @@ bool test_no_negotiation_for_active_rigid_concurrency() {
         check(is_callback_invoked, "Rigid concurrency permit in idle state was negotiated.")))
     return test_fail(test_name);
 
-  allow_rigid_concurrency_permit_negotiation = false;
   is_callback_invoked = false;
   r = tcmActivatePermit(phS);
   // Expected not getting previously given amount of resources as they are not available at the
@@ -320,10 +325,14 @@ bool test_no_negotiation_for_active_rigid_concurrency() {
   eS.state = TCM_PERMIT_STATE_ACTIVE;
   if (!(check_success(r, "tcmActivatePermit (rigid concurrency)") &&
         check_permit(eS, phS) && check_permit(eA, phA) &&
-        check(!is_callback_invoked, "Activated rigid concurrency permit was not negotiated.")))
+        check(is_callback_invoked, "Callback was invoked during re-activation of "
+            "a rigid concurrency permit since it got less concurrency than it previously had.")))
   {
     return test_fail(test_name);
   }
+
+  is_callback_invoked = false;
+  allow_rigid_concurrency_permit_negotiation = false;
 
   r = tcmReleasePermit(phA);
   if (!(check_success(r, "tcmReleasePermit (regular)") && check_permit(eS, phS) &&
@@ -417,15 +426,20 @@ bool test_no_new_resources_for_rigid_concurrency() {
         check(!is_callback_invoked, "INACTIVE rigid concurrency permit was not negotiated.")))
     return test_fail(test_name);
 
+  allow_rigid_concurrency_permit_negotiation = true;
+
   r = tcmActivatePermit(phS);
   eS_concurrency = num_oversubscribed_resources;
   eS.state = TCM_PERMIT_STATE_ACTIVE;
   if (!(check_success(r, "tcmActivatePermit (rigid concurrency)") && check_permit(eS, phS) &&
-      check(!is_callback_invoked, "Callback was not invoked for the rigid concurrency permit that "
-            "was activated")))
+      check(is_callback_invoked, "Callback was invoked for the rigid concurrency permit since "
+            "it got additional concurrency during its re-activation")))
   {
     return test_fail(test_name);
   }
+
+  is_callback_invoked = false;
+  allow_rigid_concurrency_permit_negotiation = false;
 
   r = tcmReleasePermit(phS);
   if (!check_success(r, "tcmReleasePermit (rigid concurrency)"))
@@ -727,6 +741,158 @@ bool test_get_stale_permit() {
   return test_epilog(test_name);
 }
 
+namespace callback_expectations_during_activation {
+struct runtime_permit_wrapper {
+  runtime_permit_wrapper(tcm_permit_t& p) : permit(p) {}
+  static tcm_result_t callback_function(tcm_permit_handle_t permit_handle, void* arg, tcm_callback_flags_t reason) {
+    std::cout << "Invocation of callback for permit " << to_string(permit_handle) << " : { arg=" << to_string(arg)
+          << ", reason={new_concurrency=" << reason.new_concurrency
+          << ", new_state=" << reason.new_state << "}\n";
+    bool res = true;
+    res &= check(arg, "Callback arg is not nullptr");
+    res &= check(permit_handle, "Permit handle is not nullptr");
+    runtime_permit_wrapper* self = static_cast<runtime_permit_wrapper*>(arg);
+    self->callback_invoked = true;
+    get_permit_data(permit_handle, self->permit,
+                    /*error message*/"Failed to update permit data");
+    res &= check((reason.new_state && !reason.new_concurrency && self->permit.state == TCM_PERMIT_STATE_PENDING ) 
+      || (reason.new_state && reason.new_concurrency), "Expected callback reason during activation");
+
+    return res ? TCM_RESULT_SUCCESS : TCM_RESULT_ERROR_UNKNOWN;
+  }
+  tcm_permit_t& permit;
+  bool callback_invoked = false;
+};
+
+bool test_callback_invocation_when_activating_idle() {
+  const char* test_name = __func__;
+  test_prolog(test_name);
+
+  uint32_t min_sw_threads = 1;
+  uint32_t max_sw_threads = num_oversubscribed_resources;
+
+  auto permit = make_inactive_permit();
+  runtime_permit_wrapper wrapper{permit};
+
+  auto client = connect_new_client(runtime_permit_wrapper::callback_function);
+  auto ph = request_permit(client, make_request(min_sw_threads, max_sw_threads), /*callback_arg*/&wrapper);
+  permit->state = TCM_PERMIT_STATE_ACTIVE;
+  permit->concurrencies[0] = max_sw_threads;
+  if (!check_permit(permit, ph))
+    return test_fail(test_name);
+
+  idle_permit(ph);
+  permit->state = TCM_PERMIT_STATE_IDLE;
+  if (!check_permit(permit, ph))
+    return test_fail(test_name);
+
+  // Lazy activation, only permit's state has been changed.
+  // Updating client's permit copy before the call to activate to avoid data races
+  // in real-life scenarios
+  permit->state = TCM_PERMIT_STATE_ACTIVE;
+  activate_permit(ph);
+  if (!(check_permit(permit, ph) &&
+        check(!wrapper.callback_invoked, "Callback for " + to_string(ph) + " was not invoked during the permit activation")))
+    return test_fail(test_name);
+
+  auto other_permit = make_inactive_permit();
+  runtime_permit_wrapper other_wrapper{other_permit};
+  auto other_ph = request_permit(client, make_request(max_sw_threads, max_sw_threads), /*callback_arg*/&other_wrapper);
+  other_permit->state = TCM_PERMIT_STATE_PENDING;
+  if (!check_permit(other_permit, other_ph))
+    return test_fail(test_name);
+
+  idle_permit(ph);
+  if (!(check_permit(permit, ph) &&
+        check(wrapper.callback_invoked, "Callback for " + to_string(ph) +" was invoked during negotiaton") &&
+        check_permit(other_permit, other_ph) &&
+        check(other_wrapper.callback_invoked, "Callback for " + to_string(other_ph) + " was invoked during negotiaton")))
+    return test_fail(test_name);
+
+  wrapper.callback_invoked = false;
+
+  activate_permit(ph);
+  if (!(check_permit(permit, ph) &&
+        check(wrapper.callback_invoked, "Callback for " + to_string(ph) + " was invoked during the permit activation")))
+    return test_fail(test_name);
+
+  release_permit(ph);
+  release_permit(other_ph);
+  disconnect_client(client);
+
+  return test_epilog(test_name);
+}
+
+bool test_callback_invocation_when_activating_inactive() {
+  const char* test_name = __func__;
+  test_prolog(test_name);
+
+  uint32_t min_sw_threads = 1;
+  uint32_t max_sw_threads = num_oversubscribed_resources;
+
+  auto permit = make_inactive_permit();
+  runtime_permit_wrapper wrapper{permit};
+
+  auto client = connect_new_client(runtime_permit_wrapper::callback_function);
+  auto ph = request_permit(client, make_request(min_sw_threads, max_sw_threads), &wrapper);
+  permit->state = TCM_PERMIT_STATE_ACTIVE;
+  permit->concurrencies[0] = max_sw_threads;
+  if (!check_permit(permit, ph))
+    return test_fail(test_name);
+
+  deactivate_permit(ph);
+  permit->state = TCM_PERMIT_STATE_INACTIVE;
+  skip_checks_t skip_concurrency_check; skip_concurrency_check.concurrency = true;
+  if (!check_permit(permit, ph, skip_concurrency_check))
+    return test_fail(test_name);
+
+  // Lazy activation, only permit's state has been changed.
+  // Updating client's permit copy before the call to activate to avoid data races
+  // in real-life scenarios
+  permit->state = TCM_PERMIT_STATE_ACTIVE;
+  activate_permit(ph);
+  if (!(check_permit(permit, ph) &&
+        check(!wrapper.callback_invoked, "Callback for " + to_string(ph) + " was not invoked during the permit activation")))
+    return test_fail(test_name);
+
+  auto other_permit = make_inactive_permit();
+  runtime_permit_wrapper other_wrapper{other_permit};
+  auto other_ph = request_permit(client, make_request(max_sw_threads, max_sw_threads), &other_wrapper);
+  other_permit->state = TCM_PERMIT_STATE_PENDING;
+  if (!check_permit(other_permit, other_ph))
+    return test_fail(test_name);
+
+  deactivate_permit(ph);
+  permit->state = TCM_PERMIT_STATE_INACTIVE;
+  if (!(check_permit(permit, ph, skip_concurrency_check) &&
+        check(!wrapper.callback_invoked, "Callback for " + to_string(ph) +" was not invoked due to deactivated state") &&
+        check_permit(other_permit, other_ph) &&
+        check(other_wrapper.callback_invoked, "Callback for " + to_string(other_ph) + " was invoked during negotiaton")))
+    return test_fail(test_name);
+
+  wrapper.callback_invoked = false;
+
+  activate_permit(ph);
+  if (!(check_permit(permit, ph) &&
+        check(wrapper.callback_invoked, "Callback for " + to_string(ph) + " was invoked during the permit activation")))
+    return test_fail(test_name);
+
+  release_permit(ph);
+  release_permit(other_ph);
+  disconnect_client(client);
+
+  return test_epilog(test_name);
+}
+
+bool test() {
+  bool res = true;
+  res &= test_callback_invocation_when_activating_idle();
+  res &= test_callback_invocation_when_activating_inactive();
+  return res;
+}
+
+} // namespace permit_up_to_date
+
 static_assert(sizeof(tcm_permit_flags_t) == 4, "The permit flags type has wrong size");
 static_assert(sizeof(tcm_callback_flags_t) == 4, "The callback flags type has wrong size");
 
@@ -861,12 +1027,15 @@ namespace request_as_inactive {
             return test_fail(test_name);
 
         // Activating the first and check that both permits have expected resources distribution
+        renegotiating_permits = {ph}; allow_null_in_callback_arg = true;
         activate_permit(ph);
         p.concurrencies[0] = max_sw_threads - num_oversubscribed_resources/2;
         p.state = TCM_PERMIT_STATE_ACTIVE; p.flags.request_as_inactive = false;
         if (!(check_permit(expected_permit, ph) && check_permit(expected_permit2, ph2) &&
-              !is_client_renegotiate_callback_invoked))
+              is_client_renegotiate_callback_invoked)) // Callback invoked to notify about resource/state changes
             return test_fail(test_name);
+        is_client_renegotiate_callback_invoked = false;
+        allow_null_in_callback_arg = false;
 
         release_permit(ph);
         release_permit(ph2);
@@ -950,8 +1119,10 @@ namespace request_as_inactive {
         tcm_permit_t& ep = expected_permit;
         ep.concurrencies[0] = num_oversubscribed_resources/2; ep.state = TCM_PERMIT_STATE_ACTIVE;
         ep.flags.request_as_inactive = false;
+        // Expecting callback invocation since TCM has to notify client about resource search result.
+        renegotiating_permits = {ph}; is_client_renegotiate_callback_invoked = false;
         activate_permit(ph, "Error activating permit");
-        if (!check_permit(ep, ph))
+        if (!(check_permit(ep, ph) && is_client_renegotiate_callback_invoked))
             return test_fail(test_name);
 
         // Check updating callback argument works.
@@ -1383,6 +1554,7 @@ int main() {
   res &= test_default_constraints_construction();
   res &= test_request_initializer();
   res &= test_get_stale_permit();
+  res &= callback_expectations_during_activation::test();
 
   res &= test_allow_not_specifying_client_callback();
   res &= request_as_inactive::test();
