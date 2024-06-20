@@ -24,9 +24,14 @@
 #include <sstream>
 #include <thread>
 #include <string>
+#include <numeric>
 
 constexpr skip_checks_t skip_concurrenency_check = {
   /*size*/ false, /*concurrency*/true, /*state*/false, /*flags*/false, /*mask*/false
+};
+
+constexpr skip_checks_t skip_flags_check {
+  /*size*/ false, /*concurrency*/false, /*state*/false, /*flags*/true, /*mask*/false
 };
 
 int32_t compute_concurrency(int32_t total_demand, uint32_t demand, int32_t& carry) {
@@ -1157,6 +1162,59 @@ bool test_support_for_pending_state() {
   return test_epilog(test_name);
 }
 
+bool test_simultaneous_permits_deactivations() {
+  const char* test_name = __func__;
+  test_prolog(test_name);
+
+  std::size_t num_permits = std::min(3, num_oversubscribed_resources);
+  auto client = connect_new_client();
+  
+  // Determine share of rigid permits
+  for (std::size_t rigid_share = 0; rigid_share < num_permits; ++rigid_share) {
+    std::vector<tcm_permit_handle_t> phs;
+    for (std::size_t i = 0; i < num_permits; ++i) {
+      auto request = make_request(1, 1);
+      if (i < rigid_share) {
+        request.flags.rigid_concurrency = true;
+      }
+
+      auto ph = request_permit(client, request);
+      auto expected_permit = make_active_permit(1, /*cpu_masks=*/nullptr, request.flags);
+      if (!check_permit(expected_permit, ph))
+        return test_fail(test_name);
+
+      phs.push_back(ph);
+    }
+
+    std::vector<std::size_t> activate_idx(num_permits);
+    std::vector<std::size_t> deactivate_idx(num_permits);
+    std::iota(deactivate_idx.begin(), deactivate_idx.end(), 0);
+    do {
+      std::iota(activate_idx.begin(), activate_idx.end(), 0);
+      do {
+        for (auto deactivate_i : deactivate_idx) {
+          auto permit = make_inactive_permit();
+          deactivate_permit(phs[deactivate_i], "", "tcmDeactivatePermit for " + to_string(phs[deactivate_i]));
+          if (!check_permit(permit, phs[deactivate_i], skip_flags_check | skip_concurrenency_check))
+            return test_fail(test_name);
+        }
+        for (auto activate_i : activate_idx) {
+          auto permit = make_active_permit(1);
+          activate_permit(phs[activate_i], "", "tcmActivatePermit for " + to_string(phs[activate_i]));
+          if (!check_permit(permit, phs[activate_i], skip_flags_check))
+            return test_fail(test_name);
+        }
+      } while (std::next_permutation(activate_idx.begin(), activate_idx.end()));
+    } while (std::next_permutation(deactivate_idx.begin(), deactivate_idx.end()));
+
+    for (auto& x : phs) {
+      release_permit(x);
+    }
+  }
+  disconnect_client(client);
+  return test_epilog(test_name);
+}
+
 int main() {
   bool res = true;
 
@@ -1172,6 +1230,7 @@ int main() {
   res &= test_partial_release();
   res &= test_permit_reactivation();
   res &= test_support_for_pending_state();
+  res &= test_simultaneous_permits_deactivations();
 
   return int(!res);
 }

@@ -1272,7 +1272,9 @@ public:
       if (is_owning_resources(curr_state)) {
           // TODO: consider using adjust_existing_permit
           move_permit(*this, ph, curr_state, /*new_state*/TCM_PERMIT_STATE_INACTIVE);
-          if (has_resource_demand(*this)) {  // TODO: Consider releasing only in demand resources
+          bool has_another_lazy_inactive_permit = lazy_inactive_permit != nullptr && lazy_inactive_permit != ph;
+          if (has_another_lazy_inactive_permit || has_resource_demand(*this)) {
+              // TODO: Consider releasing only in demand resources
               auto previously_available_concurrency = available_concurrency;
               available_concurrency += move_to_inactive(ph);
               __TCM_ASSERT(previously_available_concurrency <= available_concurrency, "Overflow detected");

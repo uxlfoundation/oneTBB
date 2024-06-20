@@ -379,6 +379,16 @@ struct skip_checks_t {
   bool mask = false;
 };
 
+skip_checks_t operator|(const skip_checks_t& lhs, const skip_checks_t& rhs) {
+  return {
+    lhs.size || rhs.size,
+    lhs.concurrency || rhs.concurrency,
+    lhs.state || rhs.state,
+    lhs.flags || rhs.flags,
+    lhs.mask || rhs.mask
+  };
+}
+
 // Compares two permits' data. Returns true if the data is equal, false -
 // otherwise. Function allows skipping check of specific permit data fields.
 bool check_permit(const tcm_permit_t& expected, const tcm_permit_t& actual,
