@@ -583,8 +583,6 @@ public:
       return get_permit_concurrency(permit);
     }
     operator tcm_permit_t&() { return permit; }
-    tcm_permit_t& operator*() { return permit; }
-    tcm_permit_t* operator->() { return &permit; }
 private:
     std::unique_ptr<uint32_t[]> concurrencies;
     std::unique_ptr<tcm_cpu_mask_t[], masks_guard_t> cpu_masks;

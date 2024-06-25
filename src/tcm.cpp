@@ -1166,10 +1166,6 @@ public:
     __TCM_PROFILE_THIS_FUNCTION();
 
     update_callbacks_t callbacks;
-    callback_args_t args{ph, ph->callback_arg, /*reason invoking callback*/{}};
-    tcm_callback_flags_t& reason = args.reason;
-    reason.new_state = true;
-    bool should_invoke_callback = false;
     {
       // TODO: Consider permit activation without acquiring the lock.
       const std::lock_guard<std::mutex> l(data_mutex);
@@ -1218,10 +1214,6 @@ public:
               available_concurrency -= concurrency_change;
               ph->data.concurrency[0] += concurrency_change;
               note_tcm_state_change(*this);
-              // Since TCM found additional resources for permit,
-              // we need to notify the client about it.
-              reason.new_concurrency = true;
-              should_invoke_callback = true;
           }
           ph->data.state.store(TCM_PERMIT_STATE_ACTIVE, std::memory_order_relaxed);
           add_permit(*this, ph, TCM_PERMIT_STATE_ACTIVE);
@@ -1234,21 +1226,10 @@ public:
               // Specifying not to remove the initiator first is only to save on unnecessary search
               // in the containers as there is no container for inactive permits
               callbacks = apply(*this, updates, /*initiator*/ph, /*remove_initiator_first*/false);
-              reason.new_concurrency = true;
           } else {
               change_state_relaxed(ph->data, TCM_PERMIT_STATE_PENDING);
               add_permit(*this, ph, TCM_PERMIT_STATE_PENDING);
           }
-          // At this point permit might be activated (and was given resources) or set to PENDING state.
-          // The callback should be invoked in both cases.
-          // Note that the callback is called even if the same number of resources was found.
-          should_invoke_callback = true;
-      }
-      
-      if (should_invoke_callback) {
-        auto callback = client_to_callback_map[ph->data.client_id];
-        if (callback)
-          callbacks.insert({callback, args});
       }
       __TCM_PROFILE_PERMIT(ph, "activated");
       ph->data.tcm_epoch_snapshot = tcm_state_epoch;
