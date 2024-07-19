@@ -90,7 +90,7 @@ inline table_t get_user_presentation(std::vector<permits_info const*> data) {
         row.emplace_back(to_string(info.state));
         row.emplace_back(to_string(info.flags));
         row.emplace_back(info.is_nested ? "yes" : "no");
-        row.emplace_back(to_string(info.concurrencies.data(), info.concurrencies.size()));
+        row.emplace_back(to_string(info.concurrencies.data(), uint32_t(info.concurrencies.size())));
 
         tcm_permit_request_t const& req = info.request;
         row.emplace_back("[" + std::to_string(req.min_sw_threads) +
