@@ -120,8 +120,11 @@ add_executable(${TCM_TEST_PREMATURE_EXIT} test_premature_exit.cpp)
 target_compile_options(${TCM_TEST_PREMATURE_EXIT} PRIVATE ${TCM_WARNING_LEVEL})
 target_compile_definitions(${TCM_TEST_PREMATURE_EXIT}
   PRIVATE ${TCM_COMPILE_DEFINITIONS}
-  PRIVATE TCM_LIB_PATH="$<TARGET_FILE:TCM::tcm>"
+  PRIVATE TCM_LIB_NAME="$<TARGET_FILE_NAME:TCM::tcm>"
 )
+if (UNIX)
+  target_link_options(${TCM_TEST_PREMATURE_EXIT} PRIVATE -Wl,-rpath,${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+endif (UNIX)
 target_include_directories(${TCM_TEST_PREMATURE_EXIT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 target_link_libraries(${TCM_TEST_PREMATURE_EXIT} PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
 add_test(NAME ${TCM_TEST_PREMATURE_EXIT} COMMAND ${TCM_TEST_PREMATURE_EXIT})

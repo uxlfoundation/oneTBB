@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -10,8 +10,8 @@
     warranties, other than those that are expressly stated in the License.
 */
 
-#ifndef TCM_LIB_PATH
-#error TCM_LIB_PATH must be defined to the path of the TCM library for this test to work.
+#ifndef TCM_LIB_NAME
+#error TCM_LIB_NAME must be defined to the path of the TCM library for this test to work.
 #endif
 
 #include <thread>
@@ -30,7 +30,6 @@
 
 #include "tcm.h"
 
-
 typedef tcm_result_t (*tcm_connect_t)(tcm_callback_t, tcm_client_id_t*);
 typedef tcm_result_t (*tcm_request_permit_t)(tcm_client_id_t, tcm_permit_request_t,
                                              void* /*callback_arg*/, tcm_permit_handle_t*,
@@ -41,9 +40,9 @@ tcm_request_permit_t tcm_request_permit{nullptr};
 
 void load_tcm() {
 #if __linux__
-    void* tcm_handler = dlopen(TCM_LIB_PATH, /*flags*/ RTLD_NOW | RTLD_LOCAL);
+    void* tcm_handler = dlopen(TCM_LIB_NAME, /*flags*/ RTLD_NOW | RTLD_LOCAL);
 #elif _WIN32
-    HMODULE tcm_handler = LoadLibrary(TEXT(TCM_LIB_PATH));
+    HMODULE tcm_handler = LoadLibrary(TEXT(TCM_LIB_NAME));
 #endif
     if (NULL == tcm_handler)
         return;
