@@ -1243,13 +1243,19 @@ public:
   tcm_result_t deactivate_permit(tcm_permit_handle_t ph) {
     __TCM_PROFILE_THIS_FUNCTION();
 
+    __TCM_ASSERT(ph, "Invalid permit handle");
+
+    tcm_permit_data_t& pd = ph->data;
+    const tcm_permit_state_t curr_state = get_permit_state(pd);
+
+    if (is_inactive(curr_state))
+        return TCM_RESULT_SUCCESS;
+
     const tcm_permit_state_t new_state = TCM_PERMIT_STATE_INACTIVE;
     bool shall_negotiate_resources = false;
     {
       const std::lock_guard<std::mutex> l(data_mutex);
       __TCM_ASSERT(is_valid(ph), "Deactivating non-existing permit.");
-      tcm_permit_data_t& pd = ph->data;
-      tcm_permit_state_t curr_state = get_permit_state(pd);
       if (is_owning_resources(curr_state)) {
           // TODO: consider using adjust_existing_permit
           move_permit(*this, ph, curr_state, /*new_state*/TCM_PERMIT_STATE_INACTIVE);

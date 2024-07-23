@@ -1369,6 +1369,48 @@ bool test_releasing_inactive() {
     return test_epilog(test_name);
 }
 
+bool test_deactivating_inactive(const bool release_while_active) {
+    const char* test_name = __func__;
+    test_prolog(test_name);
+
+    constexpr unsigned num_deactivations = 3;
+
+    auto client_id = connect_new_client(nullptr);
+
+    uint32_t e_concurrency = num_oversubscribed_resources;
+    tcm_permit_t e = make_active_permit(&e_concurrency);
+
+    tcm_permit_request_t req = make_request(0, num_oversubscribed_resources);
+    auto ph = request_permit(client_id, req);
+    if (!check_permit(e, ph))
+        return test_fail(test_name);
+
+    e.state = TCM_PERMIT_STATE_INACTIVE; // concurrency is not changed since it is lazy deactivation
+    for (unsigned i = 0; i < num_deactivations; ++i) {
+        deactivate_permit(ph);
+        if (!check_permit(e, ph))
+            return test_fail(test_name);
+    }
+
+    if (release_while_active) {
+        activate_permit(ph);
+        e.state = TCM_PERMIT_STATE_ACTIVE;
+        if (!check_permit(e, ph))
+            return test_fail(test_name);
+    }
+
+    release_permit(ph);
+
+    disconnect_client(client_id);
+
+    return test_epilog(test_name);
+}
+
+bool test_deactivating_inactive() {
+    return test_deactivating_inactive(/*release_while_active*/true) &&
+           test_deactivating_inactive(/*release_while_active*/false);
+}
+
 int main() {
   bool res = true;
 
@@ -1391,6 +1433,7 @@ int main() {
   res &= test_incorrect_requests();
   res &= test_releasing_nullptr();
   res &= test_releasing_inactive();
+  res &= test_deactivating_inactive();
 
   return int(!res);
 }
