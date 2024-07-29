@@ -1145,7 +1145,7 @@ public:
 
   tcm_result_t idle_permit(tcm_permit_handle_t ph) {
     __TCM_PROFILE_THIS_FUNCTION();
-
+    bool shall_negotiate_resources = false;
     {
       const std::lock_guard<std::mutex> l(data_mutex);
       __TCM_ASSERT(is_valid(ph), "Idling non-existing permit");
@@ -1157,8 +1157,11 @@ public:
       change_state_relaxed(pd, TCM_PERMIT_STATE_IDLE);
       move_permit(*this, ph, curr_state, /*new_state*/TCM_PERMIT_STATE_IDLE);
       __TCM_PROFILE_PERMIT(ph, "idled");
+      shall_negotiate_resources = has_resource_demand(*this);
     }
-    renegotiate_permits(/*initiator*/nullptr);
+    if (shall_negotiate_resources) {
+      renegotiate_permits(/*initiator*/nullptr);
+    }
     return TCM_RESULT_SUCCESS;
   }
 
