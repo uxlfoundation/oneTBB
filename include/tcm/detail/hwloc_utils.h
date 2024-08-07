@@ -48,14 +48,24 @@ public:
         if (hwloc_topology_init(&topology) != 0) {
           return;
         }
-        // Setting these flags allows HWLOC to parse process mask correctly
-        // with respect to process affinity set by user.
-        // However, on Windows, it omits other processor groups
-        // from topology parsing because HWLOC considers only
-        // process mask of calling processor group.
-        auto parsing_flags = HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM |
-            HWLOC_TOPOLOGY_FLAG_RESTRICT_TO_CPUBINDING;
-        if (get_num_proc_groups() == 1 && hwloc_topology_set_flags(topology, parsing_flags) != 0) {
+        // Before Windows 11, the system with more than one processor group automatically
+        // constraints process mask to be bound within single processor group. This does not allow
+        // to differentiate whether the process mask is set by a user or automatically, which might
+        // break the intended behavior - respect user setting.
+        unsigned long parsing_flags = 0;
+        if (get_num_proc_groups() > 1) {
+            // HWLOC x86 backend might interfere with process affinity mask on
+            // Windows systems with multiple processor groups.
+            parsing_flags = HWLOC_TOPOLOGY_FLAG_DONT_CHANGE_BINDING;
+        } else {
+            // Setting these flags allows HWLOC to parse process mask correctly
+            // with respect to process affinity set by user.
+            // However, on Windows, it omits other processor groups
+            // from topology parsing because HWLOC considers only
+            // process mask of calling processor group.
+            parsing_flags = HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM | HWLOC_TOPOLOGY_FLAG_RESTRICT_TO_CPUBINDING;
+        }
+        if (hwloc_topology_set_flags(topology, parsing_flags) != 0) {
             return;
         }
         if (hwloc_topology_load(topology) != 0) {
