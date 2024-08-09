@@ -1178,6 +1178,10 @@ public:
       tcm_permit_state_t curr_state = get_permit_state(pd);
 
       if (is_active(curr_state)) {
+          // TODO: Consider this call as an invitation to renegotiate resources and make one more
+          // try to satisfy passed permit handle (especially, if there is an opportunity to
+          // re-distribute significantly more/less resources), even if it is a rigid concurrency
+          // permit.
           return TCM_RESULT_SUCCESS;
       } else if (!is_inactive(curr_state) && !is_idle(curr_state)) {
           return TCM_RESULT_ERROR_INVALID_ARGUMENT;
@@ -1249,20 +1253,30 @@ public:
     __TCM_ASSERT(ph, "Invalid permit handle");
 
     tcm_permit_data_t& pd = ph->data;
-    const tcm_permit_state_t curr_state = get_permit_state(pd);
+    tcm_permit_state_t curr_state = get_permit_state(pd);
 
-    if (is_inactive(curr_state))
-        return TCM_RESULT_SUCCESS;
+    if (is_inactive(curr_state)) {
+        __TCM_PROFILE_PERMIT(ph, "deactivated inactive (lockless)");
+        return TCM_RESULT_SUCCESS; // Quick response avoiding taking the lock
+    }
 
-    const tcm_permit_state_t new_state = TCM_PERMIT_STATE_INACTIVE;
     bool shall_negotiate_resources = false;
     {
       const std::lock_guard<std::mutex> l(data_mutex);
       __TCM_ASSERT(is_valid(ph), "Deactivating non-existing permit.");
+
+      curr_state = get_permit_state(pd);
+      if (is_inactive(curr_state)) {
+          __TCM_PROFILE_PERMIT(ph, "deactivated inactive");
+          return TCM_RESULT_SUCCESS;
+      }
+
+      remove_permit(*this, ph, curr_state);
+
       if (is_owning_resources(curr_state)) {
           // TODO: consider using adjust_existing_permit
-          move_permit(*this, ph, curr_state, /*new_state*/TCM_PERMIT_STATE_INACTIVE);
-          bool has_another_lazy_inactive_permit = lazy_inactive_permit != nullptr && lazy_inactive_permit != ph;
+          const bool has_another_lazy_inactive_permit =
+              lazy_inactive_permit != nullptr && lazy_inactive_permit != ph;
           if (has_another_lazy_inactive_permit || has_resource_demand(*this)) {
               // TODO: Consider releasing only in demand resources
               auto previously_available_concurrency = available_concurrency;
@@ -1273,17 +1287,17 @@ public:
               // TODO: Consider reading the TCM epoch onto the stack here to compare it against the
               // current epoch inside renegotite_permits() function. This might save unnecessary
               // renegotiation in case of concurrent changes to permits.
+              __TCM_PROFILE_PERMIT(ph, "deactivated");
           } else {
-              change_state_relaxed(pd, TCM_PERMIT_STATE_INACTIVE);
               lazy_inactive_permit = ph;
+              change_state_relaxed(pd, /*new_state*/TCM_PERMIT_STATE_INACTIVE);
               __TCM_PROFILE_PERMIT(ph, "lazily deactivated");
-              return TCM_RESULT_SUCCESS;
           }
       } else {
-          change_state_relaxed(pd, new_state);
-          move_permit(*this, ph, curr_state, new_state);
+          __TCM_ASSERT(is_pending(curr_state), "Unexpected permit state");
+          change_state_relaxed(pd, /*new_state*/TCM_PERMIT_STATE_INACTIVE);
+          __TCM_PROFILE_PERMIT(ph, "deactivated pending");
       }
-      __TCM_PROFILE_PERMIT(ph, "deactivated");
     }
     if (shall_negotiate_resources) {
         // Specify 'nullptr' in order to notify the client in case the resources from this permit
