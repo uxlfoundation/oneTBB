@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2005-2023 Intel Corporation
+    Copyright (C) 2005-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -63,9 +63,9 @@ SeismicVideo::SeismicVideo(Universe &u,
                            int number_of_frames,
                            int threads_high,
                            bool init_is_parallel)
-        : numberOfFrames_(number_of_frames),
-          initIsParallel(init_is_parallel),
+        : initIsParallel(init_is_parallel),
           u_(u),
+          numberOfFrames_(number_of_frames),
           threadsHigh(threads_high) {
     title = titles[initIsParallel ? 1 : 0];
 #if defined(_WINDOWS) && !defined(_CONSOLE)

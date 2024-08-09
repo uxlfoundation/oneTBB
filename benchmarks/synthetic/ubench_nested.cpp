@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -28,7 +28,7 @@ int run_composition(duration_logger& stat, const std::string& chain_name,
   std::vector<Type> input(data_size * data_size, 1);
   Type* a = input.data();
   stat.start();
-  for(int i = 0; i < repetitions; i++) {
+  for(int k = 0; k < repetitions; k++) {
     nested<C0, C1>([a, data_size](int i , int j) {
         int offset = i * data_size + j;
         a[offset] = a[offset] * a[offset];

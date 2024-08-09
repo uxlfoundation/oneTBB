@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2005-2023 Intel Corporation
+    Copyright (C) 2005-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -14,11 +14,6 @@
 #include <stdio.h>
 
 #include "video.hpp"
-
-unsigned int *g_pImg = nullptr;
-int g_sizex, g_sizey;
-static video *g_video = nullptr;
-static int g_fps = 0;
 
 #if _WIN32 || _WIN64
 
@@ -38,6 +33,13 @@ struct timeval g_time;
 #endif //_WIN32||_WIN64
 
 #define CALC_FPS_ENABLED ((WINAPI_FAMILY != WINAPI_FAMILY_APP) && (!__ANDROID__))
+
+unsigned int *g_pImg = nullptr;
+int g_sizex, g_sizey;
+static video *g_video = nullptr;
+#if CALC_FPS_ENABLED
+static int g_fps = 0;
+#endif
 
 video::video()
         // OpenGL* RGBA byte order for little-endian CPU

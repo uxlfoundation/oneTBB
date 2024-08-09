@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -29,7 +29,7 @@ int run_composition(duration_logger& stat, const std::string& chain_name, std::s
 
   stat.iterations = repetitions;
   stat.start();
-  for(int i = 0; i < repetitions; i++){
+  for(int k = 0; k < repetitions; k++){
     sequenced(std::make_tuple(data_size, c0, [a0](int i) { a0[i] = a0[i] * a0[i]; }),
               std::make_tuple(data_size, c1, [a1](int i) { a1[i] = a1[i] * a1[i]; }),
               std::make_tuple(data_size, c2, [a2](int i) { a2[i] = a2[i] * a2[i]; })

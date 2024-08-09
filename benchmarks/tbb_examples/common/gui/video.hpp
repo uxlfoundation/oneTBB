@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2005-2023 Intel Corporation
+    Copyright (C) 2005-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -96,9 +96,9 @@ public:
     //! code of the ESCape key
     static const int esc_key = 27;
     //! Mouse events handler.
-    virtual void on_mouse(int x, int y, int key) {}
+    virtual void on_mouse(int /*x*/, int /*y*/, int /*key*/) {}
     //! Mouse events handler.
-    virtual void on_key(int key) {}
+    virtual void on_key(int /*key*/) {}
     //! Main processing loop. Redefine with your own
     virtual void on_process() {
         while (next_frame())

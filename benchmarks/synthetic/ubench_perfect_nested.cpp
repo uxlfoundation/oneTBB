@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -28,8 +28,8 @@ int run_composition(duration_logger& stat, std::size_t data_size, const C0& clie
 
     for (int i = 0; i < repetitions; ++i) {
         client0.bulk_execute(UpperRange{0, static_cast<int>(data_size)}, [&client1, &numbers](auto& range) {
-            client1.bulk_execute(range.begin(), range.end(), [&numbers] (int i ) {
-                numbers[i] = numbers[i] * numbers[i];
+            client1.bulk_execute(range.begin(), range.end(), [&numbers] (int j) {
+                numbers[j] = numbers[j] * numbers[j];
             });
         }, UpperPartition{});
     }

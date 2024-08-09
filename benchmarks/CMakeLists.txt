@@ -17,10 +17,14 @@ endif()
 
 set(TCM_OPENMP_FLAG -qopenmp)
 if (NOT CMAKE_CXX_COMPILER_ID MATCHES "IntelLLVM")
+  include(FindOpenMP)
+  if (NOT OpenMP_FOUND)
+    message(SEND_ERROR "Cannot find OpenMP")
+  endif()
+  set(TCM_OPENMP_FLAG -fopenmp)
+
   message(WARNING "C++ compiler ID does not match the IntelLLVM, "
     "the OpenMP library might be not aware of Thread Composability Manager")
-  include(FindOpenMP)
-  set(TCM_OPENMP_FLAG -fopenmp)
 endif()
 
 add_subdirectory(synthetic)
