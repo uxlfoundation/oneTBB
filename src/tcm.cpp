@@ -449,17 +449,12 @@ void invoke_callbacks(const update_callbacks_t& callbacks) {
 }
 
 // Permit changing helpers
-uint32_t release_resources(tcm_permit_handle_t ph) {
-    auto& pd = ph->data;
+uint32_t grab_permit_resources(tcm_permit_handle_t ph) {
     uint32_t current_grant = 0;
 
-    prepare_permit_modification(ph);
-    {
-        for (uint32_t i = 0; i < pd.size; ++i) {
-            current_grant += pd.concurrency[i].exchange(0, std::memory_order_relaxed);
-        }
-    }
-    commit_permit_modification(ph);
+    auto& pd = ph->data;
+    for (uint32_t i = 0; i < pd.size; ++i)
+        current_grant += pd.concurrency[i].exchange(0, std::memory_order_relaxed);
 
     return current_grant;
 }
@@ -888,17 +883,46 @@ public:
   virtual ~ThreadComposabilityManagerBase() {}
 
   tcm_client_id_t register_client(tcm_callback_t r) {
+      __TCM_PROFILE_THIS_FUNCTION();
       const std::lock_guard<std::mutex> l(data_mutex);
       tcm_client_id_t clid = client_id++;
       client_to_callback_map[clid] = r;
       return clid;
   }
 
+  struct client_resources_t {
+      uint32_t concurrency = 0;
+      std::vector<tcm_permit_handle_t> permit_handles;
+  };
+
   void unregister_client(tcm_client_id_t clid) {
-      const std::lock_guard<std::mutex> l(data_mutex);
-      __TCM_ASSERT(client_to_permit_mmap.count(clid) == 0, "Deactivating the client with associated permits.");
-      __TCM_ASSERT(client_to_callback_map.count(clid) == 1, "The client_id was not registered.");
-      client_to_callback_map.erase(clid);
+      __TCM_PROFILE_THIS_FUNCTION();
+
+      bool should_renegotiate = false;
+      std::vector<tcm_permit_handle_t> client_permits;
+      client_resources_t client_resources;
+      {
+          const std::lock_guard<std::mutex> l(data_mutex);
+          client_resources = clear_up_internals_from(clid);
+          __TCM_ASSERT(available_concurrency <= available_concurrency + client_resources.concurrency,
+                     "Overflow detected");
+          available_concurrency += client_resources.concurrency;
+          should_renegotiate = client_resources.concurrency > 0 && has_resource_demand(*this);
+
+          __TCM_ASSERT(client_to_callback_map.count(clid) == 1, "The client_id was not registered.");
+          client_to_callback_map.erase(clid);
+          note_tcm_state_change(*this);
+#if __TCM_ENABLE_PERMIT_TRACER
+          for (const auto& ph : client_resources.permit_handles)
+              __TCM_PROFILE_PERMIT(ph, "abandoned");
+#endif
+      }
+
+      for (const auto& ph : client_resources.permit_handles)
+          deallocate_permit(ph);
+
+      if (should_renegotiate)
+          renegotiate_permits(/*initiator*/nullptr);
   }
 
  /**
@@ -1309,17 +1333,13 @@ public:
   }
 
   /**
-   * Clears internal structures from so that TCM does not know about the given permit anymore.
-   * Returns concurrency that permit possessed.
+   * Clears internal structures from permit handle so that TCM does not know about the given permit
+   * anymore. Returns concurrency that permit possessed.
    */
   uint32_t clear_up_internals_from(tcm_permit_handle_t permit_handle) {
       __TCM_ASSERT(permit_handle, nullptr);
 
-      tcm_permit_data_t& data = permit_handle->data;
-      tcm_permit_state_t state = get_permit_state(data);
-      bool was_lazy = lazy_inactive_permit == permit_handle;
-      remove_permit(*this, permit_handle, state);
-      auto client_phs = client_to_permit_mmap.equal_range(data.client_id);
+      auto client_phs = client_to_permit_mmap.equal_range(permit_handle->data.client_id);
       for (auto it = client_phs.first; it != client_phs.second; ++it) {
           if (it->second == permit_handle) {
               client_to_permit_mmap.erase(it);
@@ -1327,22 +1347,38 @@ public:
           }
       }
 
-      uint32_t released_concurrency = 0;
-      if (is_idle(state) || is_active(state) || was_lazy) {
-          released_concurrency = get_permit_grant(data);
+      remove_permit(*this, permit_handle, get_permit_state(permit_handle->data));
+
+      return get_permit_grant(permit_handle);
+  }
+
+  /**
+   * Clears internal structures from permits of a client so that TCM does not know about them
+   * anymore. Returns overall concurrency a client has and permit handles to delete.
+   */
+  client_resources_t clear_up_internals_from(tcm_client_id_t clid) {
+      __TCM_PROFILE_THIS_FUNCTION();
+
+      __TCM_ASSERT(clid < client_id && client_to_callback_map.count(clid) == 1,
+                   "The client_id is not known.");
+
+      client_resources_t overall_resources;
+      auto range = client_to_permit_mmap.equal_range(clid);
+      for (auto i = range.first; i != range.second; ++i) {
+          tcm_permit_handle_t permit_handle = i->second;
+          overall_resources.concurrency += get_permit_grant(permit_handle);
+          overall_resources.permit_handles.push_back(permit_handle);
+          remove_permit(*this, permit_handle, get_permit_state(permit_handle->data));
       }
-#if TCM_USE_ASSERT
-      else {
-          __TCM_ASSERT(get_permit_grant(data) == 0, "Permit state prohibits resource ownership");
-      }
-#endif
-      return released_concurrency;
+      client_to_permit_mmap.erase(range.first, range.second);
+
+      return overall_resources;
   }
 
   tcm_result_t release_permit(tcm_permit_handle_t handle) {
     __TCM_PROFILE_THIS_FUNCTION();
 
-    bool has_released_resources = false;
+    bool should_renegotiate = false;
     {
         const std::lock_guard<std::mutex> l(data_mutex);
         __TCM_ASSERT(is_valid(handle), "Releasing of an invalid permit");
@@ -1351,9 +1387,8 @@ public:
 
         __TCM_ASSERT(available_concurrency <= available_concurrency + released_concurrency,
                      "Overflow detected");
-        const uint32_t initial_concurrency = available_concurrency;
         available_concurrency += released_concurrency;
-        has_released_resources = initial_concurrency < available_concurrency;
+        should_renegotiate = released_concurrency > 0 && has_resource_demand(*this);
         note_tcm_state_change(*this);
         __TCM_PROFILE_PERMIT(handle, "released");
     }
@@ -1362,7 +1397,7 @@ public:
     // it anymore. Thus, can deallocate permit representation without holding a lock.
     deallocate_permit(handle);
 
-    if (has_released_resources) {
+    if (should_renegotiate) {
         renegotiate_permits(/*initiator*/nullptr);
     }
 
@@ -2560,7 +2595,7 @@ protected:
         __TCM_PROFILE_THIS_FUNCTION();
 
         if (lazy_inactive_permit) {
-            available_concurrency += release_resources(lazy_inactive_permit);
+            available_concurrency += grab_permit_resources(lazy_inactive_permit);
             note_tcm_state_change(*this);
             lazy_inactive_permit = nullptr;
         }
