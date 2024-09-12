@@ -8,7 +8,7 @@
 # This software and the related documents are provided as is, with no express or implied
 # warranties, other than those that are expressly stated in the License.
 
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.5)
 
 file(READ include/tcm/version.h _tcm_version_info)
 string(REGEX REPLACE ".*#define TCM_VERSION_MAJOR ([0-9]+).*" "\\1" _tcm_ver_major "${_tcm_version_info}")

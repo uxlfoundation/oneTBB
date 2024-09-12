@@ -8,7 +8,7 @@
 # This software and the related documents are provided as is, with no express or implied
 # warranties, other than those that are expressly stated in the License.
 
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.5)
 
 project(seismic CXX)
 
