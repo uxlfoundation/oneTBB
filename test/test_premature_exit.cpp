@@ -14,9 +14,14 @@
 #error TCM_LIB_NAME must be defined to the path of the TCM library for this test to work.
 #endif
 
+#include "tcm.h"
+
+#include "basic_test_utils.h"
+
 #include <thread>
 #include <atomic>
 #include <cstdlib>              // for std::exit
+#include <string>
 
 #include <iostream>             // for std::cerr
 
@@ -28,7 +33,6 @@
 #error Implementation of the test is not provided for this kind of OS.
 #endif
 
-#include "tcm.h"
 
 typedef tcm_result_t (*tcm_connect_t)(tcm_callback_t, tcm_client_id_t*);
 typedef tcm_result_t (*tcm_request_permit_t)(tcm_client_id_t, tcm_permit_request_t,
@@ -37,6 +41,8 @@ typedef tcm_result_t (*tcm_request_permit_t)(tcm_client_id_t, tcm_permit_request
 
 tcm_connect_t tcm_connect{nullptr};
 tcm_request_permit_t tcm_request_permit{nullptr};
+
+const char* api_names[] = {"tcmConnect()", "tcmRequestPermit()"};
 
 void load_tcm() {
 #if __linux__
@@ -56,30 +62,25 @@ void load_tcm() {
 #endif
 }
 
-bool is_tcm_load_failed() {
-    bool load_failed = false;
+bool is_tcm_loaded_successfully() {
+    bool load_successfully = true;
 
-    const char* api_names[] = {"tcmConnect()", "tcmRequestPermit()"};
     void* api_pointers[] = {(void*)tcm_connect, (void*)tcm_request_permit};
 
     for (unsigned i = 0; i < sizeof(api_pointers) / sizeof(void*); ++i) {
-        if ( !api_pointers[i] ) {
-            // TODO: reuse 'check' test facilities to check and report errors
-            std::cerr << "******** ERROR ********: " << api_names[i] << " symbol was not found."
-                      << std::endl;
-            load_failed = true;
-        }
+        load_successfully &= check(api_pointers[i], std::string(api_names[i]) + " symbol was found");
     }
 
-    return load_failed;
+    return load_successfully;
 }
 
 struct test_hang_guard {
     test_hang_guard(std::atomic<bool>& release_main_thread_flag)
       : m_release_main_thread_flag(release_main_thread_flag)
     {
-        if (m_release_main_thread_flag.load(std::memory_order_relaxed)) {
-            std::cerr << "******** ERROR ********: The test_hang_guard guards nothing" << std::endl;
+        if (!check(!m_release_main_thread_flag.load(std::memory_order_relaxed),
+                   "The test_hang_guard correctly initialized"))
+        {
             std::exit(-1);
         }
     }
@@ -93,44 +94,41 @@ struct test_hang_guard {
 
 int main() {
     std::atomic<bool> release_main_thread{false};
-    bool is_test_failed{false};
+    bool is_test_succeeded{true};
 
     std::thread thr([&] {
         test_hang_guard thg(release_main_thread);
 
         load_tcm();
-        if (is_tcm_load_failed()) {
-            is_test_failed = true;
-            return;
-        }
+        is_test_succeeded &= check(is_tcm_loaded_successfully(), "TCM library loaded successfully");
 
         tcm_client_id_t id{};
         tcm_result_t r = tcm_connect(/*callback*/nullptr, &id);
-        if (r != TCM_RESULT_SUCCESS) {
-            std::cerr << "******** ERROR ********: call to tcmConnect() failed." << std::endl;
-            is_test_failed = true;
-            return;
-        }
+        is_test_succeeded &= check_success(r, "Call to " + std::string(api_names[0]) + " succeeded");
 
         tcm_permit_request_t req = TCM_PERMIT_REQUEST_INITIALIZER;
-        req.min_sw_threads = 0;
-        req.max_sw_threads = 1;
+        req.min_sw_threads = req.max_sw_threads = 1;
         tcm_permit_handle_t permit_handle{nullptr};
         uint32_t concurrency = 0;
         tcm_permit_t permit{
             &concurrency, /*cpu_masks*/nullptr, /*size*/1, TCM_PERMIT_STATE_VOID, /*flags*/{}
         };
+
         r = tcm_request_permit(id, req, /*callback_arg*/nullptr, &permit_handle, &permit);
-        if (r != TCM_RESULT_SUCCESS || !permit_handle) {
-            std::cerr << "******** ERROR ********: call to tcmRequestPermit() failed." << std::endl;
-            is_test_failed = true;
-            return;
-        }
+
+        is_test_succeeded &= check_success(r, "Call to " + std::string(api_names[1]) + " succeeded");
+        is_test_succeeded &= check(permit_handle,
+                                   std::string(api_names[1]) + " returned valid permit handle");
+        is_test_succeeded &= check(unsigned(req.max_sw_threads) == concurrency,
+                                   "TCM distributed resources correctly");
     });
 
     thr.detach();
 
     while (!release_main_thread) { std::this_thread::yield(); }
 
-    return int(is_test_failed);
+    std::cout << "\nReleasing main thread hence terminating the test\n  while having "
+        "TCM state initialized and resources distributed\n  to check if it results in error...\n";
+
+    return is_test_succeeded ? 0 : -1;
 }

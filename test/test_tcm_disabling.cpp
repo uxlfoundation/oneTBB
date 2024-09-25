@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -10,9 +10,10 @@
     warranties, other than those that are expressly stated in the License.
 */
 
-#include "test_utils.h"
+#include "basic_test_utils.h"
 
 #include "tcm.h"
+
 #include <limits>
 
 const char* tcm_enable_env_name = "TCM_ENABLE";

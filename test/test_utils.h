@@ -13,6 +13,8 @@
 #ifndef __TCM_TESTS_TEST_UTILS_HEADER
 #define __TCM_TESTS_TEST_UTILS_HEADER
 
+#include "basic_test_utils.h"
+
 #include "test_exceptions.h"
 
 #include "hwloc_test_utils.h"
@@ -27,44 +29,12 @@ __TCM_SUPPRESS_WARNING_POP
 #include <vector>
 #include <set>
 #include <iostream>
-#include <sstream>
 #include <algorithm>
 #include <thread>
 #include <string>
 #include <limits>
 #include <initializer_list>
 #include <utility>
-
-// MSVC Warning: Args can be incorrect: this does not match function name specification
-__TCM_SUPPRESS_WARNING_WITH_PUSH(6387)
-// TODO: Function SetEnv() is borrowed from oneTBB project. Check the license.
-inline int SetEnv( const char *envname, const char *envval ) {
-  __TCM_ASSERT( (envname && envval), "SetEnv requires two valid C strings" );
-#if !(_MSC_VER || __MINGW32__ || __MINGW64__)
-  // On POSIX systems use setenv
-  return setenv(envname, envval, /*overwrite=*/1);
-#elif __STDC_SECURE_LIB__>=200411
-  // this macro is set in VC & MinGW if secure API functions are present
-  return _putenv_s(envname, envval);
-#else
-  // If no secure API on Windows, use _putenv
-  size_t namelen = strlen(envname), valuelen = strlen(envval);
-  char* buf = new char[namelen+valuelen+2];
-  strncpy(buf, envname, namelen);
-  buf[namelen] = '=';
-  strncpy(buf+namelen+1, envval, valuelen);
-  buf[namelen+1+valuelen] = char(0);
-  int status = _putenv(buf);
-  delete[] buf;
-  return status;
-#endif
-}
-
-char* GetEnv(const char* envname) {
-    __TCM_ASSERT(envname, "GetEnv requires valid C string");
-    return std::getenv(envname);
-}
-__TCM_SUPPRESS_WARNING_POP
 
 
 struct masks_guard_t {
@@ -79,54 +49,6 @@ private:
   const uint32_t m_size;
 };
 
-
-tcm_permit_request_t make_request(int min_sw_threads = tcm_automatic,
-                                  int max_sw_threads = tcm_automatic,
-                                  tcm_cpu_constraints_t* constraints = nullptr, uint32_t size = 0,
-                                  tcm_request_priority_t priority = TCM_REQUEST_PRIORITY_NORMAL,
-                                  tcm_permit_flags_t flags = {})
-{
-    __TCM_ASSERT(!(!constraints ^ !size), "Inconsistent request.");
-
-    return tcm_permit_request_t{
-        min_sw_threads, max_sw_threads, constraints, size, priority, flags, /*reserved*/{0}
-    };
-}
-
-// TODO: rename to make_permit
-
-tcm_permit_t make_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
-                         uint32_t size = 1, tcm_permit_state_t state = TCM_PERMIT_STATE_VOID,
-                         tcm_permit_flags_t flags = {})
-{
-  __TCM_ASSERT(concurrencies, "Array of concurrencies cannot be nullptr.");
-  return tcm_permit_t{concurrencies, cpu_masks, size, state, flags};
-}
-
-tcm_permit_t make_void_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
-                               uint32_t size = 1, tcm_permit_flags_t flags = {})
-{
-    return make_permit(concurrencies, cpu_masks, size, TCM_PERMIT_STATE_VOID, flags);
-}
-
-tcm_permit_t make_active_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
-                                 uint32_t size = 1, tcm_permit_flags_t flags = {})
-{
-  return make_permit(concurrencies, cpu_masks, size, TCM_PERMIT_STATE_ACTIVE, flags);
-}
-
-tcm_permit_t make_inactive_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
-                                  uint32_t size = 1, tcm_permit_flags_t flags = {})
-{
-  return make_permit(concurrencies, cpu_masks, size, TCM_PERMIT_STATE_INACTIVE, flags);
-}
-
-tcm_permit_t make_pending_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
-                                  uint32_t size = 1, tcm_permit_flags_t flags = {})
-{
-  return make_permit(concurrencies, cpu_masks, size, TCM_PERMIT_STATE_PENDING, flags);
-}
-
 std::string bitmap_to_string(const tcm_cpu_mask_t mask) {
   const unsigned max_size = 1024;
   char buf[max_size] = {0};
@@ -134,58 +56,6 @@ std::string bitmap_to_string(const tcm_cpu_mask_t mask) {
   return std::string(buf);
 }
 
-bool check(bool b, const std::string& msg, unsigned num_indents = 0,
-           const std::string& report_msg = "")
-{
-  const std::string single_indent = "  ";    // default indent in the test output
-  std::stringstream ss;
-  for (unsigned i = 0; i < num_indents; ++i) {
-      ss << single_indent;
-  }
-  std::string indent = ss.str();
-
-  if (!b) {
-    std::cout << "***************** " << indent << msg << std::endl;
-    std::cout << "*     ERROR     * " << indent << msg << std::endl;
-    std::cout << "***************** " << indent << msg << std::endl;
-    std::cout << report_msg;
-  }  else if (!msg.empty()){
-    std::cout << "SUCCESS: " << indent << msg << std::endl;
-  }
-  return b;
-}
-
-inline void test_prolog(const std::string& msg) {
-  std::cout << "\n\nSUCCESS: begin " << msg << std::endl;
-}
-
-inline bool test_stop(bool b, const std::string& msg) {
-  return check(b, "end " + msg);
-}
-
-inline bool test_fail(const std::string& msg) {
-  return test_stop(false, msg);
-}
-
-inline bool test_epilog(const std::string& msg) {
-  return test_stop(true, msg);
-}
-
-inline bool succeeded(tcm_result_t res) {
-  return (TCM_RESULT_SUCCESS == res);
-}
-
-inline bool check_success(tcm_result_t res, const std::string& msg = "",
-                          const std::string& report_msg = "")
-{
-  return check(succeeded(res), msg, /*num_indents*/0, report_msg);
-}
-
-inline bool check_fail(tcm_result_t res, const std::string& msg = "",
-                       const std::string& report_msg = "")
-{
-  return check(!succeeded(res), msg, /*num_indents*/0, report_msg);
-}
 
 const float tcm_oversubscription_factor = 1.0f;
 
@@ -462,6 +332,33 @@ bool check_permits(std::initializer_list<tcm_permit_and_handle_pair_t> expected_
     return result;
 }
 
+
+typedef std::vector< std::pair<tcm_permit_handle_t, tcm_permit_t*> > permits_data_t;
+
+/**
+ * \brief Returns a set of permit handles, whose data is equal to corresponding
+ * (expected) permit data passed as a sequence of pairs.
+ *
+ * Thus, if existing permits are passed as a parameter, the function returns
+ * permit handles, for which the renegotiation should not have taken place.
+ */
+std::set<tcm_permit_handle_t> list_unchanged_permits(const permits_data_t& pds,
+                                                     const unsigned num_indents = 0)
+{
+  std::set<tcm_permit_handle_t> result;
+
+  for (auto& pd : pds) {
+    const tcm_permit_handle_t ph = pd.first;
+    const tcm_permit_t& expected = *pd.second;
+
+    if (check_permit(expected, ph, skip_checks_t{}, num_indents, /*report*/false))
+      result.insert(ph);
+  }
+
+  return result;
+}
+
+
 /*
  * Test helpers to simplify regular work with the TCM.
  */
@@ -540,7 +437,9 @@ void idle_permit(tcm_permit_handle_t permit_handle, const std::string& error_mes
   }
 }
 
-void release_permit(tcm_permit_handle_t ph, const std::string& error_message = "", const std::string& log_message = "tcmReleasePermit") {
+void release_permit(tcm_permit_handle_t ph, const std::string& error_message = "",
+                    const std::string& log_message = "tcmReleasePermit")
+{
   auto r = tcmReleasePermit(ph);
 
   if (!check_success(r, log_message)) {
@@ -548,7 +447,9 @@ void release_permit(tcm_permit_handle_t ph, const std::string& error_message = "
   }
 }
 
-void register_thread(tcm_permit_handle_t ph, const std::string& error_message = "", const std::string& log_message = "tcmRegisterThread") {
+void register_thread(tcm_permit_handle_t ph, const std::string& error_message = "",
+                     const std::string& log_message = "tcmRegisterThread")
+{
   auto r = tcmRegisterThread(ph);
 
   if (!check_success(r, log_message)) {
@@ -556,7 +457,9 @@ void register_thread(tcm_permit_handle_t ph, const std::string& error_message = 
   }
 }
 
-void unregister_thread(const std::string& error_message = "", const std::string& log_message = "tcmUnregisterThread") {
+void unregister_thread(const std::string& error_message = "",
+                       const std::string& log_message = "tcmUnregisterThread")
+{
   auto r = tcmUnregisterThread();
 
   if (!check_success(r, log_message)) {
@@ -578,7 +481,9 @@ public:
               concurrencies.get(), cpu_masks.get(), size, TCM_PERMIT_STATE_VOID,
               tcm_permit_flags_t{}
           }
-    {}
+    {
+      static_assert(size == 1, "Unsupported code due to wrong initialization of cpu_masks array");
+    }
     size_t concurrency() {
       return get_permit_concurrency(permit);
     }
@@ -634,31 +539,6 @@ permit_t</*size*/1> make_inactive_permit(tcm_cpu_mask_t* cpu_masks = nullptr,
   permit.state = TCM_PERMIT_STATE_INACTIVE;
   permit.flags = flags;
   return permit_wrapper;
-}
-
-typedef std::vector< std::pair<tcm_permit_handle_t, tcm_permit_t*> > permits_data_t;
-
-/**
- * \brief Returns a set of permit handles, whose data is equal to corresponding
- * (expected) permit data passed as a sequence of pairs.
- *
- * Thus, if existing permits are passed as a parameter, the function returns
- * permit handles, for which the renegotiation should not have taken place.
- */
-std::set<tcm_permit_handle_t> list_unchanged_permits(const permits_data_t& pds,
-                                                     const unsigned num_indents = 0)
-{
-  std::set<tcm_permit_handle_t> result;
-
-  for (auto& pd : pds) {
-    const tcm_permit_handle_t ph = pd.first;
-    const tcm_permit_t& expected = *pd.second;
-
-    if (check_permit(expected, ph, skip_checks_t{}, num_indents, /*report*/false))
-      result.insert(ph);
-  }
-
-  return result;
 }
 
 #endif // __TCM_TESTS_TEST_UTILS_HEADER

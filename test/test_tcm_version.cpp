@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2024 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -10,31 +10,32 @@
     warranties, other than those that are expressly stated in the License.
 */
 
-#include "test_utils.h"
 #include "tcm.h"
 
+#include "basic_test_utils.h"
+
+#include <iostream>
 #include <cstring>
 
 bool test_runtime_version() {
     const char* test_name = __func__;
     test_prolog(test_name);
-    bool res = true;
+    bool test_result = true;
 
     static_assert(TCM_INTERFACE_VERSION / 1000 == TCM_INTERFACE_VERSION_MAJOR);
     static_assert(TCM_INTERFACE_VERSION % 1000 / 10 == TCM_INTERFACE_VERSION_MINOR);
 
     const char* runtime_version_string = tcmRuntimeVersion();
     bool is_equal = std::strcmp(runtime_version_string, TCM_VERSION) == 0;
-    res &= check(is_equal, "Test runtime version", /*num_indents*/0,
-                 "Running with the library of different version than the test was compiled against.");
+    test_result &= check(is_equal, "Runtime version equals macro-based version", /*num_indents*/0,
+                         "Test runs using library of different version than it was compiled with.");
 
     unsigned api_version = tcmRuntimeInterfaceVersion();
-    is_equal = api_version == TCM_INTERFACE_VERSION;
-    res &= check(is_equal,
-                 "Test runtime API version", /*num_indents*/0,
-                 "Running with the library of different version than the test was compiled against.");
+    is_equal &= api_version == TCM_INTERFACE_VERSION;
+    test_result &= check(is_equal, "Runtime API version equals macro-based version", /*num_indents*/0,
+                         "Test runs using library of different version than it was compiled with.");
 
-    return test_stop(res, test_name);
+    return test_stop(test_result, test_name);
 }
 
 int main() {

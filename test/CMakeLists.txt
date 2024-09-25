@@ -41,8 +41,8 @@ function(add_tcm_test)
   )
   target_compile_definitions(${_tcm_test_NAME} PRIVATE ${TCM_COMPILE_DEFINITIONS})
 
-  target_link_libraries(${_tcm_test_NAME} PUBLIC 
-    TCM::tcm HWLOC::hwloc Threads::Threads
+  target_link_libraries(${_tcm_test_NAME} PUBLIC
+    TCM::tcm Threads::Threads
     ${_tcm_test_DEPENDENCIES}
     ${TCM_COMMON_LINK_LIBS}
   )
@@ -51,7 +51,7 @@ function(add_tcm_test)
   set_tests_properties(${_tcm_test_NAME} PROPERTIES ENVIRONMENT "${_tcm_test_ENVIRONMENT}")
 endfunction()
 
-add_tcm_test(NAME test_basic_apis ENVIRONMENT "TCM_ENABLE=1")
+add_tcm_test(NAME test_basic_apis ENVIRONMENT "TCM_ENABLE=1" DEPENDENCIES HWLOC::hwloc)
 
 if (TCM_FUZZ_TESTING)
   add_tcm_test(NAME test_fuzzing ENVIRONMENT "TCM_ENABLE=1")
@@ -64,8 +64,8 @@ endif()
 
 # FCFS distriubtion strategy will not be available for end user since TCM_RESOURCE_DISTRIBUTION_STRATEGY is disabled
 # add_tcm_test(NAME test_fcfsc ENVIRONMENT "TCM_ENABLE=1;TCM_RESOURCE_DISTRIBUTION_STRATEGY=FCFS")
-add_tcm_test(NAME test_rb ENVIRONMENT "TCM_ENABLE=1")
-add_tcm_test(NAME test_constrained_requests ENVIRONMENT "TCM_ENABLE=1")
+add_tcm_test(NAME test_rb ENVIRONMENT "TCM_ENABLE=1" DEPENDENCIES HWLOC::hwloc)
+add_tcm_test(NAME test_constrained_requests ENVIRONMENT "TCM_ENABLE=1" DEPENDENCIES HWLOC::hwloc)
 add_tcm_test(NAME test_tcm_version)
 add_tcm_test(NAME test_tcm_environment)
 
