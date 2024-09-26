@@ -419,6 +419,11 @@ public:
         return 1; // fallback case
     }
 
+    const_affinity_mask process_affinity_mask() {
+        __TCM_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized system_topology");
+        return process_cpu_affinity_mask;
+    }
+
     affinity_mask allocate_process_affinity_mask() {
         __TCM_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized system_topology");
         return hwloc_bitmap_dup(process_cpu_affinity_mask);

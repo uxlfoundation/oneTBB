@@ -68,14 +68,14 @@ bool test_alternating_clients() {
 
   tcm_permit_handle_t phA = nullptr, phB = nullptr;
   uint32_t pA_concurrency, pB_concurrency,
-           e_concurrency = num_oversubscribed_resources;
+           e_concurrency = platform_tcm_concurrency();
 
   tcm_permit_t pA = make_void_permit(&pA_concurrency),
                 pB = make_void_permit(&pB_concurrency);
 
   tcm_permit_t e = make_active_permit(&e_concurrency);
 
-  tcm_permit_request_t req = make_request(0, num_oversubscribed_resources);
+  tcm_permit_request_t req = make_request(0, platform_tcm_concurrency());
   r = tcmRequestPermit(clidA, req, &phA, &phA, &pA);
   if (!(check_success(r, "tcmRequestPermit A") && check_permit(e, pA)))
     return test_fail(test_name);

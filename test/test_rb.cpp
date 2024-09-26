@@ -35,7 +35,7 @@ constexpr skip_checks_t skip_flags_check {
 };
 
 int32_t compute_concurrency(int32_t total_demand, uint32_t demand, int32_t& carry) {
-  int32_t distributed_threads = std::min(total_demand, num_oversubscribed_resources);
+  int32_t distributed_threads = std::min(total_demand, platform_tcm_concurrency());
   int32_t permit = 0;
   if (total_demand > 0)
   {
@@ -50,7 +50,7 @@ int32_t compute_concurrency(int32_t total_demand, uint32_t demand, int32_t& carr
 // Given a set of demands the function returns a set of permits (no order
 // implied) that should be given by the Thread Composability Manager.
 std::vector<uint32_t> compute_concurrencies(const std::vector<int32_t>& demands,
-                                            int32_t available_threads = num_oversubscribed_resources)
+                                            int32_t available_threads = platform_tcm_concurrency())
 {
   int32_t total_demand = 0;
   for(std::size_t i = 0; i < demands.size(); ++i) {
@@ -144,13 +144,13 @@ bool test_nested_clients() {
     auto client_a = connect_new_client(client_renegotiate);
     auto client_b = connect_new_client(client_renegotiate);
 
-    uint32_t eA_concurrency = num_oversubscribed_resources,
+    uint32_t eA_concurrency = platform_tcm_concurrency(),
              eB_concurrency = 1;
 
     tcm_permit_t eA = make_active_permit(&eA_concurrency),
                  eB = make_active_permit(&eB_concurrency);
 
-    for (int outer_num_thr = 1; outer_num_thr <= num_oversubscribed_resources; ++outer_num_thr) {
+    for (int outer_num_thr = 1; outer_num_thr <= platform_tcm_concurrency(); ++outer_num_thr) {
       tcm_permit_handle_t phA = nullptr;
       tcm_permit_request_t reqA = make_request(outer_num_thr, outer_num_thr);
       phA = request_permit(client_a, reqA, &phA);
@@ -160,7 +160,7 @@ bool test_nested_clients() {
       }
 
       register_thread(phA);
-      uint32_t resources_left = num_oversubscribed_resources - outer_num_thr;
+      uint32_t resources_left = platform_tcm_concurrency() - outer_num_thr;
       for (uint32_t inner_thr = 1; inner_thr <= resources_left+1; ++inner_thr) {
         // TODO: Prohibit requests having zero min_sw_threads
         for (uint32_t min_inner_thr = 0; min_inner_thr <= inner_thr; ++min_inner_thr) {
@@ -194,7 +194,7 @@ bool test_nested_clients() {
               if (min_inner_thr == inner_thr) { // Cannot negotiate anything
                   eC_concurrency = num_free + /*inherited*/1;
                   phC = request_permit(client_a, make_request(/*min_sw_threads*/1,
-                                                              num_oversubscribed_resources));
+                                                              platform_tcm_concurrency()));
               } else {
                   expect_negotiation_in_release = true;
                   renegotiating_permits = {phB};
@@ -206,7 +206,7 @@ bool test_nested_clients() {
                   eB_concurrency = std::max(min_inner_thr, uint32_t(1));
                   phC = request_permit(client_a,
                                        make_request(/*min_sw_threads*/eC_concurrency,
-                                                    /*max_sw_threads*/num_oversubscribed_resources));
+                                                    /*max_sw_threads*/platform_tcm_concurrency()));
               }
               if (!(check_permit(eC, phC) && check_permit(eB, phB) && check_permit(eA, phA))) {
                   throw tcm_exception{"Found unallocated resources"};
@@ -250,13 +250,13 @@ bool test_nested_clients_renegotiation() {
   tcm_permit_handle_t phA = nullptr, phB = nullptr;
 
   uint32_t pA_concurrency, pB_concurrency,
-           eA_concurrency = num_oversubscribed_resources;
+           eA_concurrency = platform_tcm_concurrency();
 
   tcm_permit_t pA = make_void_permit(&pA_concurrency),
                 pB = make_void_permit(&pB_concurrency),
                 eA = make_active_permit(&eA_concurrency);
 
-  tcm_permit_request_t rA = make_request(0, num_oversubscribed_resources);
+  tcm_permit_request_t rA = make_request(0, platform_tcm_concurrency());
   r = tcmRequestPermit(clidA, rA, &phA, &phA, &pA);
   if (!(check_success(r, "tcmRequestPermit A") && check_permit(eA, pA)))
     return test_fail(test_name);
@@ -270,11 +270,11 @@ bool test_nested_clients_renegotiation() {
   uint32_t eB_concurrency = 0;
   tcm_permit_t eB = make_active_permit(&eB_concurrency);
 
-  tcm_permit_request_t rB = make_request(num_oversubscribed_resources/2, num_oversubscribed_resources);
+  tcm_permit_request_t rB = make_request(platform_tcm_concurrency()/2, platform_tcm_concurrency());
 
   r = tcmRequestPermit(clidB, rB, &phB, &phB, &pB);
-  eA_concurrency = num_oversubscribed_resources - num_oversubscribed_resources/2 + /*nested*/ 1;
-  eB_concurrency = num_oversubscribed_resources/2;
+  eA_concurrency = platform_tcm_concurrency() - platform_tcm_concurrency()/2 + /*nested*/ 1;
+  eB_concurrency = platform_tcm_concurrency()/2;
   auto unchanged_permits = list_unchanged_permits({{phA, &pA}});
 
   if (!(check_success(r, "tcmRequestPermit B") &&
@@ -293,7 +293,7 @@ bool test_nested_clients_renegotiation() {
     return test_fail(test_name);
 
   renegotiating_permits = {phA};
-  eA.concurrencies[0] = num_oversubscribed_resources;
+  eA.concurrencies[0] = platform_tcm_concurrency();
 
   r = tcmReleasePermit(phB);
   if (!(check_success(r, "tcmReleasePermit B") &&
@@ -326,21 +326,22 @@ bool test_nested_clients_constrained() {
 
   constexpr int num_threads_per_constraint = 2;
   constexpr int num_constraints = 2;
-  if (num_oversubscribed_resources < num_threads_per_constraint*num_constraints) {
+  if (platform_tcm_concurrency() < num_threads_per_constraint * num_constraints) {
     return test_epilog(test_name);
   }
 
   try {
-    tcm_test::system_topology::construct();
-
     auto client_a = connect_new_client(client_renegotiate);
     auto client_b = connect_new_client(client_renegotiate);
     tcm_permit_handle_t phA = nullptr, phB = nullptr;
 
     tcm_cpu_mask_t* cpu_masks = new tcm_cpu_mask_t[num_constraints];
-    cpu_masks[0] = extract_n_bits_from_process_mask(num_threads_per_constraint);
+    cpu_masks[0] = allocate_cpu_mask();
+    extract_first_n_bits_from_process_affinity_mask(cpu_masks[0], num_threads_per_constraint);
     for (int i = 1; i < num_constraints; ++i) {
-      cpu_masks[i] = extract_n_bits_from_process_mask(num_threads_per_constraint, cpu_masks[i - 1]);
+      cpu_masks[i] = allocate_cpu_mask();
+      extract_first_n_bits_from_process_affinity_mask(cpu_masks[i], num_threads_per_constraint,
+                                                      cpu_masks[i - 1]);
     }
     std::unique_ptr<tcm_cpu_mask_t[], masks_guard_t> mask_guard{cpu_masks, num_constraints};
 
@@ -407,13 +408,13 @@ bool test_nested_activation_with_deactivated_outer() {
 
     tcm_permit_handle_t phA = nullptr, phB = nullptr;
 
-    uint32_t eA_concurrency = num_oversubscribed_resources, 
+    uint32_t eA_concurrency = platform_tcm_concurrency(),
              eB_concurrency = 1;
 
     tcm_permit_t eA = make_active_permit(&eA_concurrency),
                  eB = make_active_permit(&eB_concurrency);
 
-    tcm_permit_request_t reqA = make_request(1, num_oversubscribed_resources);
+    tcm_permit_request_t reqA = make_request(1, platform_tcm_concurrency());
     phA = request_permit(client_a, reqA, &phA);
     if (!check_permit(eA, phA)) {
       throw tcm_exception{nullptr};
@@ -421,7 +422,7 @@ bool test_nested_activation_with_deactivated_outer() {
 
     register_thread(phA);
 
-    tcm_permit_request_t reqB = make_request(1, num_oversubscribed_resources);
+    tcm_permit_request_t reqB = make_request(1, platform_tcm_concurrency());
     phB = request_permit(client_b, reqB, &phB);
 
     if (!(check_permit(eB, phB) && check_permit(eA, phA))) {
@@ -453,7 +454,7 @@ bool test_nested_activation_with_deactivated_outer() {
     unregister_thread();
 
     deactivate_permit(phA);
-    eA_concurrency = num_oversubscribed_resources; // Lazy inactive
+    eA_concurrency = platform_tcm_concurrency(); // Lazy inactive
     eA.state = TCM_PERMIT_STATE_INACTIVE;
     if (!check_permit(eA, phA)) {
       throw tcm_exception{nullptr};
@@ -461,7 +462,7 @@ bool test_nested_activation_with_deactivated_outer() {
 
     activate_permit(phB);
     eA_concurrency = 0;
-    eB_concurrency = num_oversubscribed_resources;
+    eB_concurrency = platform_tcm_concurrency();
     eB.state = TCM_PERMIT_STATE_ACTIVE;
     if (!(check_permit(eB, phB) && check_permit(eA, phA))) {
       throw tcm_exception{nullptr};
@@ -485,11 +486,11 @@ bool test_nested_clients_concurrent() {
 
   try {
     std::string runtime_name = "outer client";
-    uint32_t min_sw_threads = 1; uint32_t max_sw_threads = num_oversubscribed_resources;
+    uint32_t min_sw_threads = 1; uint32_t max_sw_threads = platform_tcm_concurrency();
     uint32_t expected_outer_concurrency = max_sw_threads;
     client_thread_pool outer{runtime_name, min_sw_threads, max_sw_threads};
 
-    int data_size = num_oversubscribed_resources*10;
+    int data_size = platform_tcm_concurrency()*10;
     std::vector<int> data(data_size, 0);
 
     tcm_permit_t expected_outer_permit = make_active_permit(&expected_outer_concurrency);
@@ -514,15 +515,15 @@ bool test_nested_clients_concurrent() {
 
   // test perfect nesting
   try {
-    uint32_t expected_outer_concurrency = std::max(1, num_oversubscribed_resources / 4);
+    uint32_t expected_outer_concurrency = std::max(1, platform_tcm_concurrency() / 4);
     client_thread_pool outer{"outer client", expected_outer_concurrency, expected_outer_concurrency};
 
-    int data_size = num_oversubscribed_resources*10;
+    int data_size = platform_tcm_concurrency()*10;
     std::vector<int> data(data_size, 0);
 
     tcm_permit_t expected_outer_permit = make_active_permit(&expected_outer_concurrency);
     outer.parallel_for(0, data_size, [&data, expected_outer_concurrency](int begin, int end) {
-      uint32_t expected_inner_concurrency = /*nested*/ 1 + (num_oversubscribed_resources - expected_outer_concurrency) / expected_outer_concurrency;
+      uint32_t expected_inner_concurrency = /*nested*/ 1 + (platform_tcm_concurrency() - expected_outer_concurrency) / expected_outer_concurrency;
       client_thread_pool inner{"inner client" + std::to_string(begin), expected_inner_concurrency, expected_inner_concurrency};
       tcm_permit_t expected_inner_permit = make_active_permit(&expected_inner_concurrency);
       inner.parallel_for(begin, end, [&data] (int s, int e) {
@@ -560,13 +561,14 @@ bool test_nested_clients_partial_consumption() {
   tcm_permit_handle_t phA = nullptr, phB = nullptr;
 
   uint32_t pA_concurrency, pB_concurrency,
-           eA_concurrency = num_oversubscribed_resources/2;
+           eA_concurrency = platform_tcm_concurrency()/2;
 
   tcm_permit_t pA = make_void_permit(&pA_concurrency),
                 pB = make_void_permit(&pB_concurrency),
                 eA = make_active_permit(&eA_concurrency);
 
-  tcm_permit_request_t rA = make_request(num_oversubscribed_resources/4, num_oversubscribed_resources/2);
+  tcm_permit_request_t rA = make_request(platform_tcm_concurrency()/4,
+                                         platform_tcm_concurrency()/2);
   r = tcmRequestPermit(clidA, rA, &phA, &phA, &pA);
   if (!(check_success(r, "tcmRequestPermit A half threads") && check_permit(eA, pA)))
     return test_fail(test_name);
@@ -581,10 +583,12 @@ bool test_nested_clients_partial_consumption() {
   uint32_t eB_concurrency = 0;
   tcm_permit_t eB = make_active_permit(&eB_concurrency);
 
-  tcm_permit_request_t rB = make_request(int((float)num_oversubscribed_resources/4*3), num_oversubscribed_resources);
+  tcm_permit_request_t rB = make_request(int((float)platform_tcm_concurrency()/4*3),
+                                         platform_tcm_concurrency());
   r = tcmRequestPermit(clidB, rB, &phB, &phB, &pB);
 
-  eA_concurrency = num_oversubscribed_resources - rB.min_sw_threads + /*nested*/ 1; eB_concurrency = rB.min_sw_threads;
+  eA_concurrency = platform_tcm_concurrency() - rB.min_sw_threads + /*nested*/ 1;
+  eB_concurrency = rB.min_sw_threads;
   auto unchanged_permits = list_unchanged_permits({{phA, &pA}});
   if (!(check_success(r, "tcmRequestPermit B all threads") &&
         check_permit(eA, phA) && check_permit(eB, pB) &&
@@ -603,7 +607,7 @@ bool test_nested_clients_partial_consumption() {
   if (!check_success(tcmGetPermitData(phA, &pA), "Reading permit " + to_string(phA))) {
     return test_fail(test_name);
   }
-  eA.concurrencies[0] = num_oversubscribed_resources/2;
+  eA.concurrencies[0] = platform_tcm_concurrency()/2;
 
   r = tcmReleasePermit(phB);
   unchanged_permits = list_unchanged_permits({{phA, &pA}});
@@ -648,13 +652,13 @@ bool test_overlapping_clients() {
   tcm_permit_handle_t phA = nullptr, phB = nullptr;
 
   uint32_t pA_concurrency, pB_concurrency,
-           eA_concurrency = num_oversubscribed_resources;
+           eA_concurrency = platform_tcm_concurrency();
 
   tcm_permit_t pA = make_void_permit(&pA_concurrency),
                 pB = make_void_permit(&pB_concurrency),
                 eA = make_active_permit(&eA_concurrency);
 
-  tcm_permit_request_t rA = make_request(num_oversubscribed_resources/2, num_oversubscribed_resources);
+  tcm_permit_request_t rA = make_request(platform_tcm_concurrency()/2, platform_tcm_concurrency());
   r = tcmRequestPermit(clidA, rA, &phA, &phA, &pA);
   if (!(check_success(r, "tcmRequestPermit A all threads") &&
         check_permit(eA, pA)))
@@ -664,7 +668,7 @@ bool test_overlapping_clients() {
   uint32_t eB_concurrency;
   tcm_permit_t eB = make_active_permit(&eB_concurrency);
 
-  tcm_permit_request_t rB = make_request(num_oversubscribed_resources/2, num_oversubscribed_resources);
+  tcm_permit_request_t rB = make_request(platform_tcm_concurrency()/2, platform_tcm_concurrency());
   eA_concurrency = rA.max_sw_threads - rB.min_sw_threads;
   eB_concurrency = rB.min_sw_threads;
 
@@ -675,7 +679,7 @@ bool test_overlapping_clients() {
     return test_fail(test_name);
 
   renegotiating_permits = {phB};
-  eB.concurrencies[0] = num_oversubscribed_resources;
+  eB.concurrencies[0] = platform_tcm_concurrency();
 
   r = tcmReleasePermit(phA);
   if (!(check_success(r, "tcmReleasePermit A") &&
@@ -718,7 +722,7 @@ bool test_overlapping_clients_two_callbacks() {
 
   tcm_permit_handle_t phA = nullptr, phB = nullptr, phC = nullptr;
   uint32_t pA_concurrency, pB_concurrency, pC_concurrency,
-           eA_concurrency = num_oversubscribed_resources/2;
+           eA_concurrency = platform_tcm_concurrency()/2;
 
   tcm_permit_t pA = make_void_permit(&pA_concurrency),
                pB = make_void_permit(&pB_concurrency),
@@ -726,8 +730,8 @@ bool test_overlapping_clients_two_callbacks() {
                eA = make_active_permit(&eA_concurrency);
 
   uint32_t min_sw_threads_phA = 1, min_sw_threads_phB = 1,
-           max_sw_threads_phA = num_oversubscribed_resources / 2,
-           max_sw_threads_phB = num_oversubscribed_resources - max_sw_threads_phA;
+           max_sw_threads_phA = platform_tcm_concurrency() / 2,
+           max_sw_threads_phB = platform_tcm_concurrency() - max_sw_threads_phA;
 
   tcm_permit_request_t rA = make_request(min_sw_threads_phA, max_sw_threads_phA);
   r = tcmRequestPermit(clidA, rA, &phA, &phA, &pA);
@@ -749,8 +753,8 @@ bool test_overlapping_clients_two_callbacks() {
   uint32_t eC_concurrency;
   tcm_permit_t eC = make_active_permit(&eC_concurrency);
 
-  uint32_t min_sw_threads_phC = num_oversubscribed_resources / 4;
-  tcm_permit_request_t rC = make_request(min_sw_threads_phC, num_oversubscribed_resources);
+  uint32_t min_sw_threads_phC = platform_tcm_concurrency() / 4;
+  tcm_permit_request_t rC = make_request(min_sw_threads_phC, platform_tcm_concurrency());
 
   r = tcmRequestPermit(clidC, rC, &phC, &phC, &pC);
   if (!check_success(r, "tcmRequestPermit all platform, phC=" + to_string(phC)))
@@ -816,7 +820,7 @@ bool test_overlapping_clients_two_callbacks() {
 
   // When B is released, all the resources should be given to C since no other demand exists
   renegotiating_permits = {phC};
-  eC.concurrencies[0] = num_oversubscribed_resources;
+  eC.concurrencies[0] = platform_tcm_concurrency();
   r = tcmReleasePermit(phB);
   if (!(check_success(r, "tcmReleasePermit B") && check_permit(eC, phC)))
     return test_fail(test_name);
@@ -852,12 +856,12 @@ bool test_partial_release() {
     return test_fail(test_name);
 
   tcm_permit_handle_t phA = nullptr;
-  uint32_t pA_concurrency, eA_concurrency = num_oversubscribed_resources;
+  uint32_t pA_concurrency, eA_concurrency = platform_tcm_concurrency();
 
   tcm_permit_t pA = make_void_permit(&pA_concurrency),
                 eA = make_active_permit(&eA_concurrency);
 
-  tcm_permit_request_t rA = make_request(0, num_oversubscribed_resources);
+  tcm_permit_request_t rA = make_request(0, platform_tcm_concurrency());
 
   r = tcmRequestPermit(clidA, rA, &phA, &phA, &pA);
   if (!(check_success(r, "tcmRequestPermit (client A)") &&
@@ -865,7 +869,7 @@ bool test_partial_release() {
     return test_fail(test_name);
 
   // Release some of the resources by re-requesting for less
-  eA.concurrencies[0] = rA.max_sw_threads = num_oversubscribed_resources/2;
+  eA.concurrencies[0] = rA.max_sw_threads = platform_tcm_concurrency()/2;
   r = tcmRequestPermit(clidA, rA, &phA, &phA, &pA);
   if (!(check_success(r, "tcmRequestPermit (re-request client A)") &&
         check_permit(eA, pA)))
@@ -877,12 +881,12 @@ bool test_partial_release() {
     return test_fail(test_name);
 
   tcm_permit_handle_t phB = nullptr;
-  uint32_t pB_concurrency, eB_concurrency = num_oversubscribed_resources/2;
+  uint32_t pB_concurrency, eB_concurrency = platform_tcm_concurrency()/2;
 
   tcm_permit_t pB = make_void_permit(&pB_concurrency),
                 eB = make_active_permit(&eB_concurrency);
 
-  tcm_permit_request_t rB = make_request(0, num_oversubscribed_resources/2);
+  tcm_permit_request_t rB = make_request(0, platform_tcm_concurrency()/2);
   r = tcmRequestPermit(clidB, rB, &phB, &phB, &pB);
   if (!(check_success(r, "tcmRequestPermit (client B)") &&
         check_permit(eA, phA) && check_permit(eB, phB)))
@@ -921,19 +925,19 @@ bool test_permit_reactivation() {
     return test_fail(test_name);
 
   tcm_permit_handle_t phA = nullptr;
-  uint32_t pA_concurrency, eA_concurrency = num_oversubscribed_resources;
+  uint32_t pA_concurrency, eA_concurrency = platform_tcm_concurrency();
 
   tcm_permit_t pA = make_void_permit(&pA_concurrency),
                 eA = make_active_permit(&eA_concurrency);
 
-  tcm_permit_request_t rA = make_request(0, num_oversubscribed_resources);
+  tcm_permit_request_t rA = make_request(0, platform_tcm_concurrency());
   r = tcmRequestPermit(clidA, rA, &phA, &phA, &pA);
   if (!(check_success(r, "tcmRequestPermit (client A)") &&
         check_permit(eA, pA)))
     return test_fail(test_name);
 
   eA.state = TCM_PERMIT_STATE_INACTIVE;
-  eA_concurrency = num_oversubscribed_resources;
+  eA_concurrency = platform_tcm_concurrency();
   r = tcmDeactivatePermit(phA);
   if (!(check_success(r, "tcmDeactivatePermit (client A)") &&
         check_permit(eA, phA)))
@@ -945,13 +949,13 @@ bool test_permit_reactivation() {
     return test_fail(test_name);
 
   tcm_permit_handle_t phB = nullptr;
-  uint32_t pB_concurrency, eB_concurrency = num_oversubscribed_resources/2;
+  uint32_t pB_concurrency, eB_concurrency = platform_tcm_concurrency()/2;
 
   tcm_permit_t pB = make_void_permit(&pB_concurrency),
                 eB = make_active_permit(&eB_concurrency);
 
   eA_concurrency = 0;
-  tcm_permit_request_t rB = make_request(1, num_oversubscribed_resources/2);
+  tcm_permit_request_t rB = make_request(1, platform_tcm_concurrency()/2);
   r = tcmRequestPermit(clidB, rB, &phB, &phB, &pB);
   if (!(check_success(r, "tcmRequestPermit (client B)") &&
         check_permit(eB, pB) && check_permit(eA, phA)))
@@ -969,7 +973,7 @@ bool test_permit_reactivation() {
   eB_concurrency = rB.max_sw_threads;
   // Permit A won't negotiate since its minimum is satisfied. However, it will use the remaining
   // resources since its desired number is full machine
-  eA_concurrency = num_oversubscribed_resources - rB.max_sw_threads;
+  eA_concurrency = platform_tcm_concurrency() - rB.max_sw_threads;
 
   r = tcmActivatePermit(phA);
   auto unchanged_permits = list_unchanged_permits({{phB, &pB}});
@@ -980,7 +984,7 @@ bool test_permit_reactivation() {
 
   renegotiating_permits = {phA};
 
-  eA_concurrency = num_oversubscribed_resources;
+  eA_concurrency = platform_tcm_concurrency();
   r = tcmReleasePermit(phB);
   if (!(check_success(r, "tcmReleasePermit (client B)") &&
         check_permit(eA, phA) && renegotiating_permits.size() == 0))
@@ -1037,9 +1041,9 @@ bool test_support_for_pending_state() {
   tcm_permit_t eD = make_active_permit(&eD_concurrency);
 
   tcm_permit_request_t reqA = make_request(
-      num_oversubscribed_resources / 2, num_oversubscribed_resources
+      platform_tcm_concurrency() / 2, platform_tcm_concurrency()
   );
-  eA.concurrencies[0] = num_oversubscribed_resources;
+  eA.concurrencies[0] = platform_tcm_concurrency();
   r = tcmRequestPermit(clidA, reqA, &phA, &phA, &pA);
   if (!(check_success(r, "tcmRequestPermit for client A for {" +
                       std::to_string(reqA.min_sw_threads) + ", " +
@@ -1049,10 +1053,10 @@ bool test_support_for_pending_state() {
 
   renegotiating_permits = {phA};
   tcm_permit_request_t reqB = make_request(
-      num_oversubscribed_resources - num_oversubscribed_resources / 2, num_oversubscribed_resources
+      platform_tcm_concurrency() - platform_tcm_concurrency() / 2, platform_tcm_concurrency()
   );
-  eA.concurrencies[0] = num_oversubscribed_resources / 2;
-  eB.concurrencies[0] = num_oversubscribed_resources - eA_concurrency;
+  eA.concurrencies[0] = platform_tcm_concurrency() / 2;
+  eB.concurrencies[0] = platform_tcm_concurrency() - eA_concurrency;
   r = tcmRequestPermit(clidB, reqB, &phB, &phB, &pB);
   auto unchanged_permits = list_unchanged_permits({{phA, &pA}});
   if (!(check_success(r, "tcmRequestPermit for client B for {" +
@@ -1065,7 +1069,7 @@ bool test_support_for_pending_state() {
   if (!check_success(tcmGetPermitData(phA, &pA), "Reading data from permit " + to_string(phA)))
     return test_fail(test_name);
 
-  tcm_permit_request_t reqC = make_request(num_oversubscribed_resources, num_oversubscribed_resources);
+  tcm_permit_request_t reqC = make_request(platform_tcm_concurrency(), platform_tcm_concurrency());
   eC.concurrencies[0] = 0;
   eC.state = TCM_PERMIT_STATE_PENDING;
   r = tcmRequestPermit(clidC, reqC, &phC, &phC, &pC);
@@ -1075,7 +1079,7 @@ bool test_support_for_pending_state() {
     return test_fail(test_name);
 
   tcm_permit_request_t reqD = make_request(
-      num_oversubscribed_resources - num_oversubscribed_resources / 2, num_oversubscribed_resources
+      platform_tcm_concurrency() - platform_tcm_concurrency() / 2, platform_tcm_concurrency()
   );
   eD.concurrencies[0] = 0;
   eD.state = TCM_PERMIT_STATE_PENDING;
@@ -1088,7 +1092,7 @@ bool test_support_for_pending_state() {
     return test_fail(test_name);
 
   renegotiating_permits = {phA, phC, phD};
-  eD.concurrencies[0] = num_oversubscribed_resources - num_oversubscribed_resources / 2;
+  eD.concurrencies[0] = platform_tcm_concurrency() - platform_tcm_concurrency() / 2;
   eD.state = TCM_PERMIT_STATE_ACTIVE;
   r = tcmReleasePermit(phB);
   unchanged_permits = list_unchanged_permits({{phA, &pA}, {phC, &pC}, {phD, &pD}});
@@ -1101,9 +1105,9 @@ bool test_support_for_pending_state() {
     return test_fail(test_name);
 
   renegotiating_permits = {phC, phD};
-  reqA = make_request(num_oversubscribed_resources, num_oversubscribed_resources);
+  reqA = make_request(platform_tcm_concurrency(), platform_tcm_concurrency());
   eA.concurrencies[0] = 0; eA.state = TCM_PERMIT_STATE_PENDING;
-  eD.concurrencies[0] = num_oversubscribed_resources;
+  eD.concurrencies[0] = platform_tcm_concurrency();
   r = tcmRequestPermit(clidA, reqA, &phA, &phA, &pA);
   unchanged_permits = list_unchanged_permits({{phC, &pC}, {phD, &pD}});
   if (!(check_success(r, "tcmRequestPermit for client A (re-requesting)")
@@ -1123,7 +1127,7 @@ bool test_support_for_pending_state() {
     return test_fail(test_name);
 
   renegotiating_permits = {phC};
-  eC.concurrencies[0] = num_oversubscribed_resources;
+  eC.concurrencies[0] = platform_tcm_concurrency();
   eC.state = TCM_PERMIT_STATE_ACTIVE;
   r = tcmReleasePermit(phD);
   unchanged_permits = list_unchanged_permits({{phC, &pC}});
@@ -1159,7 +1163,7 @@ bool test_simultaneous_permits_deactivations() {
   const char* test_name = __func__;
   test_prolog(test_name);
 
-  std::size_t num_permits = std::min(3, num_oversubscribed_resources);
+  std::size_t num_permits = std::min(3, platform_tcm_concurrency());
   auto client = connect_new_client();
   
   // Determine share of rigid permits
