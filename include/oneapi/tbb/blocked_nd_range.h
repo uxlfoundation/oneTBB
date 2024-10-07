@@ -142,7 +142,12 @@ private:
 };
 
 template<typename Value, unsigned int N>
-using blocked_nd_range = blocked_nd_range_impl<Value, N>;
+class blocked_nd_range : public blocked_nd_range_impl<Value, N> {
+    using base = blocked_nd_range_impl<Value, N>;
+
+    // Making constructors of base class visible
+    using base::base;
+};
 
 } // namespace d1
 } // namespace detail
