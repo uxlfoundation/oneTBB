@@ -417,8 +417,6 @@ request_permit(tcm_client_id_t client, const tcm_permit_request_t& req, void* ca
                tcm_permit_handle_t permit_handle = nullptr, const std::string& error_message = "",
                const std::string& log_message = "")
 {
-  auto r = tcmRequestPermit(client, req, callback_arg, &permit_handle, /*permit*/nullptr);
-
   std::string actual_log_message = log_message;
   if ("" == log_message) {
       const std::string num_resources_msg = "[" + std::to_string(req.min_sw_threads) + ", " +
@@ -431,6 +429,7 @@ request_permit(tcm_client_id_t client, const tcm_permit_request_t& req, void* ca
                            + num_resources_msg + " resources";
   }
 
+  auto r = tcmRequestPermit(client, req, callback_arg, &permit_handle, /*permit*/nullptr);
   if (!check_success(r, actual_log_message)) {
     throw tcm_request_permit_error(error_message);
   }
