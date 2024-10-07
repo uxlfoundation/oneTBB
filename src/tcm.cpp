@@ -158,10 +158,7 @@ bool sum_constraints_bounds(int32_t& sum_min, int32_t& sum_max, const tcm_permit
         const tcm_cpu_constraints_t& c = request.cpu_constraints[i];
         int32_t adjusted_min = 0;
         if (c.min_concurrency != tcm_automatic) {
-            if (c.min_concurrency < 0) {
-                is_request_sane = false;
-                break;
-            } else if (std::numeric_limits<int32_t>::max() - c.min_concurrency < sum_min) {
+            if (c.min_concurrency < 0 || std::numeric_limits<int32_t>::max() - sum_min < c.min_concurrency) {
                 is_request_sane = false;
                 break;
             }
@@ -171,10 +168,7 @@ bool sum_constraints_bounds(int32_t& sum_min, int32_t& sum_max, const tcm_permit
 
         int32_t adjusted_max = adjusted_max_initializer;
         if (c.max_concurrency != tcm_automatic) {
-            if (c.max_concurrency < 0) {
-                is_request_sane = false;
-                break;
-            } else if (std::numeric_limits<int32_t>::max() - c.max_concurrency < sum_max) {
+            if (c.max_concurrency < 0 || std::numeric_limits<int32_t>::max() - sum_max < c.max_concurrency) {
                 is_request_sane = false;
                 break;
             }
@@ -198,6 +192,7 @@ bool sum_constraints_bounds(int32_t& sum_min, int32_t& sum_max, const tcm_permit
             break;
         }
     }
+    __TCM_ASSERT(0 <= sum_min && 0 <= sum_max, "Incorrect invariant");
     return is_request_sane;
 }
 
