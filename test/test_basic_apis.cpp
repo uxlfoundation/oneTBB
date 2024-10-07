@@ -1413,6 +1413,61 @@ bool test_deactivating_inactive() {
            test_deactivating_inactive(/*release_while_active*/false);
 }
 
+bool test_disconnecting_owning_client() {
+  const char* test_name = __func__;
+  test_prolog(test_name);
+
+  tcm_client_id_t client_id = connect_new_client(/*callback*/nullptr);
+
+  const unsigned num_requests = platform_tcm_concurrency() + /*INACTIVE*/1 + /*PENDING*/1;
+  auto req = make_request(/*min_sw_threads*/1);
+
+  uint32_t concurrency = platform_tcm_concurrency();
+  auto expected = make_active_permit(&concurrency);
+  skip_checks_t skip_concurrency_check{
+    /*size*/false, /*concurrency*/true, /*state*/false, /*flags*/false, /*mask*/false
+  };
+  for (auto i = 0u; i < num_requests; ++i) {
+    auto ph = request_permit(client_id, req);
+
+    expected.state = TCM_PERMIT_STATE_ACTIVE;
+    if (i > uint32_t(platform_tcm_concurrency()))
+      expected.state = TCM_PERMIT_STATE_PENDING;
+
+    if (!check_permit(expected, ph, skip_concurrency_check))
+      return test_fail(test_name);
+
+    if (i == 0) {
+      deactivate_permit(ph);
+      expected.state = TCM_PERMIT_STATE_INACTIVE;
+      if (!check_permit(expected, ph, skip_concurrency_check))
+        return test_fail(test_name);
+    }
+  }
+
+  disconnect_client(client_id);
+
+  assert_all_resources_available();
+
+  // Test disconnecting while holding IDLE permit
+  client_id = connect_new_client();
+  int32_t min_sw_threads = platform_tcm_concurrency(), max_sw_threads = min_sw_threads;
+  auto ph = request_permit(client_id, make_request(min_sw_threads, max_sw_threads));
+  permit_t</*size*/1> expected_permit_wrapper = make_active_permit(max_sw_threads);
+  tcm_permit_t& expected_permit = expected_permit_wrapper;
+  if (!check_permit(expected_permit, ph))
+    return test_fail(test_name);
+  idle_permit(ph);
+  expected_permit.state = TCM_PERMIT_STATE_IDLE;
+  if (!check_permit(expected_permit, ph))
+    return test_fail(test_name);
+  disconnect_client(client_id);
+
+  assert_all_resources_available();
+
+  return test_epilog(test_name);
+}
+
 int main() {
   bool res = true;
 
@@ -1436,6 +1491,7 @@ int main() {
   res &= test_releasing_nullptr();
   res &= test_releasing_inactive();
   res &= test_deactivating_inactive();
+  res &= test_disconnecting_owning_client();
 
   return int(!res);
 }

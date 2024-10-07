@@ -18,7 +18,6 @@
 #include <string>
 #include <sstream>
 #include <vector>
-#include <map>
 
 #include "tcm/types.h"
 #include "tcm/detail/_tcm_assert.h"

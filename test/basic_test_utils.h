@@ -121,7 +121,7 @@ bool check(bool b, const std::string& msg, unsigned num_indents = 0,
     std::cout << "*     ERROR     * " << indent << msg << std::endl;
     std::cout << "***************** " << indent << msg << std::endl;
     std::cout << report_msg;
-  }  else if (!msg.empty()){
+  } else if (!msg.empty()) {
     std::cout << "SUCCESS: " << indent << msg << std::endl;
   }
   return b;
@@ -141,6 +141,10 @@ inline bool test_fail(const std::string& msg) {
 
 inline bool test_epilog(const std::string& msg) {
   return test_stop(true, msg);
+}
+
+inline void test_log(const std::string& msg) {
+  std::cout << msg << std::endl;
 }
 
 inline bool succeeded(tcm_result_t res) {

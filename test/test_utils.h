@@ -207,7 +207,7 @@ inline bool check_permit_mask(const tcm_permit_t& expected, const tcm_permit_t& 
   std::string report_str{};
   // check the cpu_masks pointers
   if (expected.cpu_masks == nullptr && actual.cpu_masks == nullptr) {
-    return check(true, "Both masks are null pointers", num_indents);
+    return check(true, report ? "Both masks are null pointers" : "", num_indents);
   } else if (expected.cpu_masks == nullptr || actual.cpu_masks == nullptr) {
     report_str = "Check CPU mask, expected cpu_masks pointer '" +
         std::to_string(uintptr_t(expected.cpu_masks)) + "' equals to actual cpu_masks pointer '" +
@@ -304,8 +304,9 @@ inline bool check_permit(const tcm_permit_t& expected, tcm_permit_handle_t ph,
                          const skip_checks_t skip = {}, const unsigned num_indents = 1,
                          const bool report = true)
 {
-    constexpr unsigned str_size = 128; char msg[str_size]{'\0'};
-    std::snprintf(msg, str_size, "check permit_handle=%p is not nullptr", (void*)ph);
+    std::string msg;
+    if (report)
+      msg = "check permit_handle=" + to_string(ph) + " is not nullptr";
     if (!check(ph, msg, num_indents))
       return false;
 
@@ -569,6 +570,39 @@ inline permit_t</*size*/1> make_inactive_permit(tcm_cpu_mask_t* cpu_masks = null
   permit.state = TCM_PERMIT_STATE_INACTIVE;
   permit.flags = flags;
   return permit_wrapper;
+}
+
+/**
+ * The following set of helper functions allow checking for high-level expectations in the tests
+ * such as whether platform resources are available or not.
+ *
+ * The checks are based on the TCM invariants. For example, if all platform resources are occupied
+ * then requesting even for any single resource should not be successful.
+ *
+ * The functions return the state of the TCM as it was before they were started. If the check fails
+ * the functions throw an exception.
+ */
+
+/**
+ * Requests permit for all platform resources. Checks that it was granted and releases the permit
+ * back.
+ */
+inline void assert_all_resources_available(const std::string& log_message =
+                                           "checking all resources are available")
+{
+  test_log("Begin " + log_message);
+
+  tcm_client_id_t client_id = connect_new_client();
+
+  const int32_t min_sw_threads = platform_tcm_concurrency(), max_sw_threads = min_sw_threads;
+  tcm_permit_handle_t ph = request_permit(client_id, make_request(min_sw_threads, max_sw_threads));
+  auto expected_permit = make_active_permit(max_sw_threads);
+  if (!check_permit(expected_permit, ph, skip_checks_t{}, /*num_indents*/1, /*report*/false))
+    throw tcm_exception{"Not all platform resources are available"};
+
+  disconnect_client(client_id);
+
+  test_log("End " + log_message);
 }
 
 #endif // __TCM_TESTS_TEST_UTILS_HEADER
