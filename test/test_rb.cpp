@@ -151,9 +151,12 @@ bool test_nested_clients() {
                  eB = make_active_permit(&eB_concurrency);
 
     for (int outer_num_thr = 1; outer_num_thr <= platform_tcm_concurrency(); ++outer_num_thr) {
-      tcm_permit_handle_t phA = nullptr;
       tcm_permit_request_t reqA = make_request(outer_num_thr, outer_num_thr);
-      phA = request_permit(client_a, reqA, &phA);
+      tcm_permit_handle_t phA = nullptr;
+      phA = request_permit(
+        client_a, reqA, /*callback_arg*/&phA, /*permit_handle*/nullptr, /*error_message*/"",
+        /*log_message*/"[client A] Requesting outer non-negotiable permit as [" +
+        std::to_string(outer_num_thr) + ", " + std::to_string(outer_num_thr) + "]");
       eA_concurrency = outer_num_thr;
       if (!check_permit(eA, phA)) {
         throw tcm_exception{nullptr};
@@ -164,9 +167,12 @@ bool test_nested_clients() {
       for (uint32_t inner_thr = 1; inner_thr <= resources_left+1; ++inner_thr) {
         // TODO: Prohibit requests having zero min_sw_threads
         for (uint32_t min_inner_thr = 0; min_inner_thr <= inner_thr; ++min_inner_thr) {
-          tcm_permit_handle_t phB = nullptr;
           tcm_permit_request_t reqB = make_request(min_inner_thr, inner_thr);
-          phB = request_permit(client_b, reqB, &phB);
+          tcm_permit_handle_t phB = nullptr;
+          phB = request_permit(
+            client_b, reqB, /*callback_arg*/&phB, /*permit_handle*/nullptr,
+            /*error_message*/"", /*log_message*/"[client B] requesting nested permit [" +
+            std::to_string(min_inner_thr) + ", " + std::to_string(inner_thr) + "]");
           eB_concurrency = inner_thr;
           if (!(check_permit(eB, phB) && check_permit(eA, phA))) {
             std::cout << min_inner_thr << " " << inner_thr << std::endl;
@@ -184,9 +190,12 @@ bool test_nested_clients() {
           if (min_inner_thr == resources_left + 1) { // All resources should have been taken
               uint32_t eC_concurrency = 0; tcm_permit_t eC = make_pending_permit(&eC_concurrency);
               // Requesting [2, 2] because of having one resource from outer permit
-              phC = request_permit(client_a, make_request(/*min_sw_threads*/2, /*max_sw_threads*/2));
+              phC = request_permit(
+                client_a, make_request(/*min_sw_threads*/2, /*max_sw_threads*/2),
+                /*callback_arg*/nullptr, /*permit_handle*/nullptr,
+                /*error_message*/"", /*log_message*/"[client A] requesting nested permit [2, 2]");
               if (!check_permit(eC, phC)) {
-                  throw tcm_exception{"Found unallocated resources"};
+                  throw tcm_exception{"Found resources on a presumably fully utilized platform."};
               }
           } else {              // There are unoccupied resources still
               const uint32_t num_free = resources_left - (inner_thr - /*inherited*/1);
@@ -204,9 +213,12 @@ bool test_nested_clients() {
 
                   eC_concurrency = num_free + num_negotiable + /*inherited*/1;
                   eB_concurrency = std::max(min_inner_thr, uint32_t(1));
-                  phC = request_permit(client_a,
-                                       make_request(/*min_sw_threads*/eC_concurrency,
-                                                    /*max_sw_threads*/platform_tcm_concurrency()));
+                  phC = request_permit(
+                    client_a, make_request(/*min_sw_threads*/eC_concurrency, /*max_sw_threads*/platform_tcm_concurrency()),
+                    /*callback_arg*/nullptr, /*permit_handle*/nullptr, /*error_message*/"",
+                    /*log_message*/"[client A] requesting nested permit [" +
+                    std::to_string(eC_concurrency) + ", " +
+                    std::to_string(platform_tcm_concurrency()) + "]");
               }
               if (!(check_permit(eC, phC) && check_permit(eB, phB) && check_permit(eA, phA))) {
                   throw tcm_exception{"Found unallocated resources"};
@@ -225,7 +237,8 @@ bool test_nested_clients() {
     }
     disconnect_client(client_a);
     disconnect_client(client_b);
-  } catch (tcm_exception&) {
+  } catch (tcm_exception& e) {
+    std::cerr << "Exception: " << e.what() << std::endl;
     return test_fail(test_name);
   }
 
