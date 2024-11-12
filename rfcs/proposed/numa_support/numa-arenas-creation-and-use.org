@@ -1,0 +1,147 @@
+#+title: API to Facilitate Instantiation and Use of oneTBB's Task Arenas Constrained to NUMA Nodes
+
+*Note:* This is a sub-RFC of the https://github.com/oneapi-src/oneTBB/pull/1535.
+
+* Introduction
+Let's consider the example from "Setting the preferred NUMA node" section of the
+[[https://oneapi-src.github.io/oneTBB/main/tbb_userguide/Guiding_Task_Scheduler_Execution.html][Guiding Task Scheduler Execution]] page of oneTBB Developer Guide.
+
+** Motivating example
+#+begin_src C++
+std::vector<tbb::numa_node_id> numa_indexes = tbb::info::numa_nodes();   // [0]
+std::vector<tbb::task_arena> arenas(numa_indexes.size());                // [1]
+std::vector<tbb::task_group> task_groups(numa_indexes.size());           // [2]
+
+for(unsigned j = 0; j < numa_indexes.size(); j++) {
+    arenas[j].initialize(tbb::task_arena::constraints(numa_indexes[j])); // [3]
+    arenas[j].execute([&task_groups, &j](){                              // [4]
+        task_groups[j].run([](){/*some parallel stuff*/});
+    });
+}
+
+for(unsigned j = 0; j < numa_indexes.size(); j++) {
+    arenas[j].execute([&task_groups, &j](){ task_groups[j].wait(); });   // [5]
+}
+#+end_src
+
+Usually the users of oneTBB employ this technique to tie oneTBB worker threads
+up within NUMA nodes and yet have all the parallelism of a platform utilized.
+The pattern allows to find out how many NUMA nodes are on the system. With that
+number user creates that many ~tbb::task_arena~ objects, constraining each to a
+dedicated NUMA node. Along with ~tbb::task_arena~ objects user instantiates the
+same number of ~tbb::task_group~ objects, with which the oneTBB tasks are going
+to be associated. The ~tbb::task_group~ objects are needed because they allow
+waiting for the work completion as the ~tbb::task_arena~ class does not provide
+synchronization semantics on its own. Then the work gets submitted in each of
+arena objects, and waited upon their finish at the end.
+
+** Interface issues and inconveniences:
+- [0] - Getting the number of NUMA nodes is not the task by itself, but rather a
+  necessity to know how many objects to initialize further.
+- [1] - Explicit step for creating the number of ~tbb::task_arena~ objects per
+  each NUMA node. Note that by default the arena objects are constructed with a
+  slot reserved for master thread, which in this particular example usually
+  results in undersubscription issue as the master thread can join only one
+  arena at a time to help with work processing.
+- [2] - Separate step for instantiation the same number of ~tbb::task_group~
+  objects, in which the actual work is going to be submitted. Note that user
+  also needs to make sure the size of ~arenas~ matches the size of
+  ~task_groups~.
+- [3] - Actual tying of ~tbb::task_arena~ instances with corresponding NUMA
+  nodes. Note that user needs to make sure the indices of ~tbb::task_arena~
+  objects match corresponding indices of NUMA nodes.
+- [4] - Actual work submission point. It is relatively easy to make a mistake
+  here by using the ~tbb::task_arena::enqueue~ method instead. In this case not
+  only the work submission might be done after the synchronization point [5],
+  but also the loop counter ~j~ can be mistakenly captured by reference, which
+  at least results in submission of the work into incorrect ~tbb::task_group~,
+  and at most a segmentation fault, since the loop counter might not exist by
+  the time the functor starts its execution.
+- [5] - Synchronization point, where user needs to again make sure corresponding
+  indices are used. Otherwise, the waiting might be done in unrelated
+  ~tbb::task_arena~. It is also possible to mistakenly use
+  ~tbb::task_arena::enqueue~ method with the same consequences as were outlined
+  in the previous bullet, but since it is a synchronization point, usually the
+  blocking call is used.
+
+The proposal below addresses these issues.
+
+* Proposal
+Introduce simplified interface to:
+- Contstrain a task arena to specific NUMA node,
+- Submit work into constrained task arenas, and
+- To wait for completion of the submitted work.
+
+Since the new interface represents a constrained ~tbb::task_arena~ , the
+proposed name is ~tbb::constrained_task_arena~. Not including the word "numa"
+into the name would allow it for extension in the future for other types of
+constraints.
+
+** Usage Example
+#+begin_src C++
+std::vector<tbb::constrained_task_arena> numa_arenas =
+    tbb::initialize_numa_constrained_arenas();
+
+for(unsigned j = 0; j < numa_arenas.size(); j++) {
+    numa_arenas[j].enqueue( (){/*some parallel stuff*/} );
+}
+
+for(unsigned j = 0; j < numa_arenas.size(); j++) {
+    numa_arenas[j].wait();
+}
+#+end_src
+
+** New arena interface
+The example above requires new class named ~tbb::constrained_task_arena~. On one
+hand, it is a ~tbb::task_arena~ class that isolates the work execution from
+other parallel stuff executed by oneTBB. On the other hand, it is a constrained
+arena that represents an arena associated to a certain NUMA node and allows
+efficient and error-prone work submission in this particular usage scenario.
+
+#+begin_src C++
+namespace tbb {
+
+class constrained_task_arena : protected task_arena {
+public:
+    using task_arena::is_active();
+    using task_arena::terminate();
+
+    using task_arena::max_concurrency();
+
+    using task_arena::enqueue;
+
+    void wait();
+private:
+    constrained_task_arena(tbb::task_arena::constraints);
+    friend std::vector<constrained_task_arena> initialize_numa_constrained_arenas();
+};
+
+}
+#+end_src
+
+The interface exposes only necessary methods to allow submission and waiting of
+a parallel work. Most of the exposed function members are taken from the base
+~tbb::task_arena~ class. Implementation-wise, the new task arena would include
+associated ~tbb::task_group~ instance, with which enqueued work will be
+implicitly associated.
+
+The ~tbb::constrained_task_arena::wait~ method waits for the work in associated
+~tbb::task_group~ to finish, if any was submitted using the
+~tbb::constrained_task_arena::enqueue~ method.
+
+The instance of the ~tbb::constrained_task_arena~ class can be created only by
+~tbb::initialize_numa_constrained_arenas~ function, whose sole purpose is to
+instantiate a ~std::vector~ of initialized ~tbb::constrained_task_arena~
+instances, each constrained to its own NUMA node of the platform and does not
+include reserved slots, and return this vector back to caller.
+
+* Open Questions
+1. Should the interface for creation of constrained task arenas support other
+   construction parameters (e.g., max_concurrency, number of reserved slots,
+   priority, other constraints) from the very beginning or it is enough as the
+   first iteration and these parameters can be added in the future when the need
+   arise?
+2. Should the new task arena allow initializing it with, probably, different
+   parameters after its creation?
+3. Should the new task arena interface allow copying of its settings by exposing
+   its copy-constructor similarly to what ~tbb::task_arena~ does.
