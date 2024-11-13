@@ -8,7 +8,7 @@ While oneTBB has core support that enables developers to tune for Non-Uniform Me
 Access (NUMA) systems, we believe this support can be simplified and improved to provide 
 an improved user experience.  
 
-This early proposal recommends addressing for areas for improvement:
+This early proposal recommends addressing four areas for improvement:
 
 1. improved reliability of HWLOC-dependent topology and pinning support in,
 2. addition of a NUMA-aware allocation,
