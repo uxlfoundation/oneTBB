@@ -107,7 +107,7 @@ example and be unaware that a HWLOC installation error (or lack of HWLOC) has un
 can see in the preceding example, if we want to spread work across the NUMA nodes in 
 a system we need to query the topology using functions in the `tbb::info` namespace, create
 one `task_arena` per NUMA node, along with one `task_group` per NUMA node, and then add an
-extra loop that iterates overs these `task_arena` and `task_group` objects to execute the
+extra loop that iterates over these `task_arena` and `task_group` objects to execute the
 work on the desired NUMA nodes. We also need to handle all container allocations using OS-specific
 APIs (or behaviors, such as first-touch) to allocator or place them on the appropriate NUMA nodes.
 
