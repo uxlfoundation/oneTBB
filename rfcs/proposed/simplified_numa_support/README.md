@@ -147,7 +147,7 @@ will return a vector with a single element of `task_arena::automatic`. This beha
 through user questions, can lead to unexpected performance from NUMA optimizations. When running
 on a NUMA system, a developer that has not fully read the documentation may expect that `numa_nodes()`
 will give a proper accounting of the NUMA nodes. When the code, without raising any alarm, returns only 
-a single, valid element due to the environmental configuation (such as lack of HWLOCK), it is too easy 
+a single, valid element due to the environmental configuation (such as lack of HWLOC), it is too easy 
 for developers to not notice that the code is acting in a valid, but unexpected way.
 
 We propose that the oneTBB library implementation include, wherever possibly, a statically-linked fallback 
