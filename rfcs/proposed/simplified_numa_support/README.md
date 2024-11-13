@@ -112,7 +112,7 @@ work on the desired NUMA nodes. We also need to handle all container allocations
 APIs (or behaviors, such as first-touch) to allocator or place them on the appropriate NUMA nodes.
 
 **The out-of-the-box performance of the generic TBB APIs on NUMA systems is not good enough.**
-Should the oneTBB library do anything special be default if the system is a NUMA system?  Or should 
+Should the oneTBB library do anything special by default if the system is a NUMA system?  Or should 
 regular random stealing distribute the work across all of the cores, regardless of which NUMA first 
 touched the data?
 
