@@ -26,8 +26,8 @@ for(unsigned j = 0; j < numa_indexes.size(); j++) {
 
 Usually the users of oneTBB employ this technique to tie oneTBB worker threads
 up within NUMA nodes and yet have all the parallelism of a platform utilized.
-The pattern allows to find out how many NUMA nodes are on the system. With that
-number user creates that many ~tbb::task_arena~ objects, constraining each to a
+The pattern starts by finding the number of NUMA nodes on the system. With that
+number, user creates that many ~tbb::task_arena~ objects, constraining each to a
 dedicated NUMA node. Along with ~tbb::task_arena~ objects user instantiates the
 same number of ~tbb::task_group~ objects, with which the oneTBB tasks are going
 to be associated. The ~tbb::task_group~ objects are needed because they allow
