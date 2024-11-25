@@ -94,5 +94,8 @@ else()
     set(TBB_IPO_LINK_FLAGS $<$<NOT:$<CONFIG:Debug>>:-LTCG> $<$<NOT:$<CONFIG:Debug>>:-INCREMENTAL:NO>)
 endif()
 
+set(TBB_LIB_COMPILE_FLAGS ${TBB_LIB_COMPILE_FLAGS} /guard:cf)
+set(TBB_LIB_LINK_FLAGS ${TBB_LIB_LINK_FLAGS} /guard:cf)
+
 set(TBB_OPENMP_FLAG /openmp)
 set(TBB_OPENMP_NO_LINK_FLAG TRUE) # TBB_OPENMP_FLAG will be used only on compilation but not on linkage
