@@ -915,6 +915,7 @@ void run_deep_stealing(tbb::task_group& tg1, tbb::task_group& tg2, int num_tasks
     }
 }
 
+#if !EMSCRIPTEN
 // TODO: move to the conformance test
 //! Test for stack overflow avoidance mechanism.
 //! \brief \ref requirement
@@ -1001,6 +1002,7 @@ TEST_CASE("Test for stack overflow avoidance mechanism within arena") {
         CHECK(tasks_executed == 10000 + second_thread_executed);
     });
 }
+#endif
 
 //! Test checks that we can submit work to task_group asynchronously with waiting.
 //! \brief \ref regression

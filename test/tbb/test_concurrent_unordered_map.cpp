@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2023 Intel Corporation
+    Copyright (c) 2005-2024 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -103,6 +103,7 @@ void test_specific_types() {
                        (new int, new int);
 }
 
+#if !EMSCRIPTEN
 //! \brief \ref stress \ref error_guessing
 TEST_CASE("basic test for concurrent_unordered_map with degenerate hash") {
     test_basic<degenerate_map_type>();
@@ -264,3 +265,4 @@ TEST_CASE("reserve(0) issue regression test") {
     test_reserve_regression<oneapi::tbb::concurrent_unordered_map<int, int>>();
     test_reserve_regression<oneapi::tbb::concurrent_unordered_multimap<int, int>>();
 }
+#endif
