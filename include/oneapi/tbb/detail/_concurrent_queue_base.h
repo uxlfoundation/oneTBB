@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2005-2024 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -103,7 +103,7 @@ protected:
     using page_allocator_traits = tbb::detail::allocator_traits<page_allocator_type>;
 
 public:
-    using item_constructor_type = void (*)(value_type* location, const void* src);
+    using item_constructor_type = void (*)(queue_allocator_type&, value_type* location, const void* src);
     micro_queue() = default;
     micro_queue( const micro_queue& ) = delete;
     micro_queue& operator=( const micro_queue& ) = delete;
@@ -254,7 +254,7 @@ public:
         new_page->mask.store(src_page->mask.load(std::memory_order_relaxed), std::memory_order_relaxed);
         for (; begin_in_page!=end_in_page; ++begin_in_page, ++g_index) {
             if (new_page->mask.load(std::memory_order_relaxed) & uintptr_t(1) << begin_in_page) {
-                copy_item(*new_page, begin_in_page, *src_page, begin_in_page, construct_item);
+                copy_item(allocator, *new_page, begin_in_page, *src_page, begin_in_page, construct_item);
             }
         }
         return new_page;
@@ -324,11 +324,11 @@ private:
         ~destroyer() {my_value.~T();}
     }; // class destroyer
 
-    void copy_item( padded_page& dst, size_type dindex, const padded_page& src, size_type sindex,
+    void copy_item( queue_allocator_type& allocator, padded_page& dst, size_type dindex, const padded_page& src, size_type sindex,
         item_constructor_type construct_item )
     {
         auto& src_item = src[sindex];
-        construct_item( &dst[dindex], static_cast<const void*>(&src_item) );
+        construct_item( allocator, &dst[dindex], static_cast<const void*>(&src_item) );
     }
 
     void assign_and_destroy_item( void* dst, padded_page& src, size_type index ) {

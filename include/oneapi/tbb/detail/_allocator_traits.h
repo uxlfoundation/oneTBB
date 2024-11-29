@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2005-2024 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -91,7 +91,14 @@ void swap_allocators_impl( Allocator& lhs, Allocator& rhs, /*pocs = */ std::true
 }
 
 template <typename Allocator>
-void swap_allocators_impl( Allocator&, Allocator&, /*pocs = */ std::false_type ) {}
+void swap_allocators_impl( Allocator& lhs, Allocator& rhs, /*pocs = */ std::false_type ) {
+    // If the lhs and rhs are not equal, the behavior is undefined
+    if (!allocator_traits<Allocator>::is_always_equal::value) {
+        __TBB_ASSERT(lhs == rhs, "Swapping with unequal allocators is not allowed");
+    }
+    tbb::detail::suppress_unused_warning(lhs);
+    tbb::detail::suppress_unused_warning(rhs);
+}
 
 // Swaps allocators only if propagate_on_container_swap is true
 template <typename Allocator>
