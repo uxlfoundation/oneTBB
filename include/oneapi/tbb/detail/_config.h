@@ -534,4 +534,8 @@
 #define __TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
 #endif
 
+#if TBB_PREVIEW_PARALLEL_BLOCK || __TBB_BUILD
+#define __TBB_PREVIEW_PARALLEL_BLOCK 1
+#endif
+
 #endif // __TBB_detail__config_H

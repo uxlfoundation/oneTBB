@@ -54,11 +54,18 @@ class outermost_worker_waiter : public waiter_base {
 public:
     using waiter_base::waiter_base;
 
-    bool continue_execution(arena_slot& slot, d1::task*& t) const {
+    bool continue_execution(arena_slot& slot, d1::task*& t) {
         __TBB_ASSERT(t == nullptr, nullptr);
 
         if (is_worker_should_leave(slot)) {
-            if (!governor::hybrid_cpu()) {
+            if (
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+                !my_arena.my_thread_leave.should_leave()
+#else
+            !governor::hybrid_cpu()
+#endif
+               )
+            {
                 static constexpr std::chrono::microseconds worker_wait_leave_duration(1000);
                 static_assert(worker_wait_leave_duration > std::chrono::steady_clock::duration(1), "Clock resolution is not enough for measured interval.");
 
@@ -70,7 +77,13 @@ public:
                         return true;
                     }
 
-                    if (my_arena.my_threading_control->is_any_other_client_active()) {
+                    if (
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+                        my_arena.my_thread_leave.should_leave() ||
+#endif
+                        my_arena.my_threading_control->is_any_other_client_active()
+                       )
+                    {
                         break;
                     }
                     d0::yield();

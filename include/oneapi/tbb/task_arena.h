@@ -95,6 +95,11 @@ TBB_EXPORT void __TBB_EXPORTED_FUNC isolate_within_arena(d1::delegate_base& d, s
 TBB_EXPORT void __TBB_EXPORTED_FUNC enqueue(d1::task&, d1::task_arena_base*);
 TBB_EXPORT void __TBB_EXPORTED_FUNC enqueue(d1::task&, d1::task_group_context&, d1::task_arena_base*);
 TBB_EXPORT void __TBB_EXPORTED_FUNC submit(d1::task&, d1::task_group_context&, arena*, std::uintptr_t);
+
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+TBB_EXPORT void __TBB_EXPORTED_FUNC register_parallel_block(d1::task_arena_base&);
+TBB_EXPORT void __TBB_EXPORTED_FUNC unregister_parallel_block(d1::task_arena_base&, bool);
+#endif
 } // namespace r1
 
 namespace d2 {
@@ -122,6 +127,15 @@ public:
         normal = 2 * priority_stride,
         high   = 3 * priority_stride
     };
+
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+    enum class workers_leave : int {
+        automatic = 0,
+        fast = 1,
+        delayed = 2
+    };
+#endif
+
 #if __TBB_ARENA_BINDING
     using constraints = tbb::detail::d1::constraints;
 #endif /*__TBB_ARENA_BINDING*/
@@ -154,6 +168,11 @@ protected:
     //! Number of threads per core
     int my_max_threads_per_core;
 
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+    //! Defines the initial behavior of the workers_leave state machine
+    workers_leave my_workers_leave;
+#endif
+
     // Backward compatibility checks.
     core_type_id core_type() const {
         return (my_version_and_traits & core_type_support_flag) == core_type_support_flag ? my_core_type : automatic;
@@ -167,7 +186,11 @@ protected:
         , core_type_support_flag = 1
     };
 
-    task_arena_base(int max_concurrency, unsigned reserved_for_masters, priority a_priority)
+    task_arena_base(int max_concurrency, unsigned reserved_for_masters, priority a_priority
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+                    , workers_leave wl
+#endif
+    )
         : my_version_and_traits(default_flags | core_type_support_flag)
         , my_initialization_state(do_once_state::uninitialized)
         , my_arena(nullptr)
@@ -177,10 +200,17 @@ protected:
         , my_numa_id(automatic)
         , my_core_type(automatic)
         , my_max_threads_per_core(automatic)
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+        , my_workers_leave(wl)
+#endif
         {}
 
 #if __TBB_ARENA_BINDING
-    task_arena_base(const constraints& constraints_, unsigned reserved_for_masters, priority a_priority)
+    task_arena_base(const constraints& constraints_, unsigned reserved_for_masters, priority a_priority
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+                    , workers_leave wl
+#endif
+    )
         : my_version_and_traits(default_flags | core_type_support_flag)
         , my_initialization_state(do_once_state::uninitialized)
         , my_arena(nullptr)
@@ -190,6 +220,9 @@ protected:
         , my_numa_id(constraints_.numa_id)
         , my_core_type(constraints_.core_type)
         , my_max_threads_per_core(constraints_.max_threads_per_core)
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+        , my_workers_leave(wl)
+#endif
         {}
 #endif /*__TBB_ARENA_BINDING*/
 public:
@@ -259,31 +292,55 @@ public:
      *       Value of 1 is default and reflects behavior of implicit arenas.
      **/
     task_arena(int max_concurrency_ = automatic, unsigned reserved_for_masters = 1,
-               priority a_priority = priority::normal)
-        : task_arena_base(max_concurrency_, reserved_for_masters, a_priority)
+               priority a_priority = priority::normal
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+                    , workers_leave wl = workers_leave::automatic
+#endif
+    )
+        : task_arena_base(max_concurrency_, reserved_for_masters, a_priority
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+                         , wl
+#endif
+          )
     {}
 
 #if __TBB_ARENA_BINDING
     //! Creates task arena pinned to certain NUMA node
     task_arena(const constraints& constraints_, unsigned reserved_for_masters = 1,
-               priority a_priority = priority::normal)
-        : task_arena_base(constraints_, reserved_for_masters, a_priority)
+               priority a_priority = priority::normal
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+               , workers_leave wl = workers_leave::automatic
+#endif
+    )
+        : task_arena_base(constraints_, reserved_for_masters, a_priority
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+                         , wl
+#endif
+          )
     {}
 
     //! Copies settings from another task_arena
-    task_arena(const task_arena &s) // copy settings but not the reference or instance
+    task_arena(const task_arena &a) // copy settings but not the reference or instance
         : task_arena_base(
             constraints{}
-                .set_numa_id(s.my_numa_id)
-                .set_max_concurrency(s.my_max_concurrency)
-                .set_core_type(s.my_core_type)
-                .set_max_threads_per_core(s.my_max_threads_per_core)
-            , s.my_num_reserved_slots, s.my_priority)
+                .set_numa_id(a.my_numa_id)
+                .set_max_concurrency(a.my_max_concurrency)
+                .set_core_type(a.my_core_type)
+                .set_max_threads_per_core(a.my_max_threads_per_core)
+            , a.my_num_reserved_slots, a.my_priority
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+            , a.my_workers_leave
+#endif
+          )
     {}
 #else
     //! Copies settings from another task_arena
     task_arena(const task_arena& a) // copy settings but not the reference or instance
-        : task_arena_base(a.my_max_concurrency, a.my_num_reserved_slots, a.my_priority)
+        : task_arena_base(a.my_max_concurrency, a.my_num_reserved_slots, a.my_priority
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+            , a.my_workers_leave
+#endif
+          )
     {}
 #endif /*__TBB_ARENA_BINDING*/
 
@@ -292,7 +349,11 @@ public:
 
     //! Creates an instance of task_arena attached to the current arena of the thread
     explicit task_arena( attach )
-        : task_arena_base(automatic, 1, priority::normal) // use default settings if attach fails
+        : task_arena_base(automatic, 1, priority::normal
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+        , workers_leave::automatic
+#endif
+        ) // use default settings if attach fails
     {
         if (r1::attach(*this)) {
             mark_initialized();
@@ -311,13 +372,20 @@ public:
 
     //! Overrides concurrency level and forces initialization of internal representation
     void initialize(int max_concurrency_, unsigned reserved_for_masters = 1,
-                    priority a_priority = priority::normal)
+                    priority a_priority = priority::normal
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+                    , workers_leave wl = workers_leave::automatic
+#endif
+    )
     {
         __TBB_ASSERT(!my_arena.load(std::memory_order_relaxed), "Impossible to modify settings of an already initialized task_arena");
         if( !is_active() ) {
             my_max_concurrency = max_concurrency_;
             my_num_reserved_slots = reserved_for_masters;
             my_priority = a_priority;
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+            my_workers_leave = wl;
+#endif
             r1::initialize(*this);
             mark_initialized();
         }
@@ -325,7 +393,11 @@ public:
 
 #if __TBB_ARENA_BINDING
     void initialize(constraints constraints_, unsigned reserved_for_masters = 1,
-                    priority a_priority = priority::normal)
+                    priority a_priority = priority::normal
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+                    , workers_leave wl = workers_leave::automatic
+#endif
+    )
     {
         __TBB_ASSERT(!my_arena.load(std::memory_order_relaxed), "Impossible to modify settings of an already initialized task_arena");
         if( !is_active() ) {
@@ -335,6 +407,9 @@ public:
             my_max_threads_per_core = constraints_.max_threads_per_core;
             my_num_reserved_slots = reserved_for_masters;
             my_priority = a_priority;
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+            my_workers_leave = wl;
+#endif
             r1::initialize(*this);
             mark_initialized();
         }
@@ -403,6 +478,33 @@ public:
     auto execute(F&& f) -> decltype(f()) {
         return execute_impl<decltype(f())>(f);
     }
+
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+    void start_parallel_block() {
+        initialize();
+        r1::register_parallel_block(*this);
+        // Trigger worker threads to join arena
+        enqueue([]{});
+    }
+    void end_parallel_block(bool set_one_time_fast_leave = false) {
+        __TBB_ASSERT(my_initialization_state.load(std::memory_order_relaxed) == do_once_state::initialized, nullptr);
+        r1::unregister_parallel_block(*this, set_one_time_fast_leave);
+    }
+
+    class scoped_parallel_block {
+        task_arena& arena;
+        bool one_time_fast_leave;
+    public:
+        scoped_parallel_block(task_arena& ta, bool set_one_time_fast_leave = true) 
+            : arena(ta), one_time_fast_leave(set_one_time_fast_leave)
+        {
+            arena.start_parallel_block();
+        }
+        ~scoped_parallel_block() {
+            arena.end_parallel_block(one_time_fast_leave);
+        }
+    };
+#endif
 
 #if __TBB_EXTRA_DEBUG
     //! Returns my_num_reserved_slots

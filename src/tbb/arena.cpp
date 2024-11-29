@@ -241,7 +241,12 @@ void arena::process(thread_data& tls) {
     __TBB_ASSERT(tls.my_arena == this, "my_arena is used as a hint when searching the arena to join");
 }
 
-arena::arena(threading_control* control, unsigned num_slots, unsigned num_reserved_slots, unsigned priority_level) {
+arena::arena(threading_control* control, unsigned num_slots, unsigned num_reserved_slots, unsigned priority_level
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+             , tbb::task_arena::workers_leave wl
+#endif
+)
+{
     __TBB_ASSERT( !my_guard, "improperly allocated arena?" );
     __TBB_ASSERT( sizeof(my_slots[0]) % cache_line_size()==0, "arena::slot size not multiple of cache line size" );
     __TBB_ASSERT( is_aligned(this, cache_line_size()), "arena misaligned" );
@@ -276,10 +281,18 @@ arena::arena(threading_control* control, unsigned num_slots, unsigned num_reserv
     my_critical_task_stream.initialize(my_num_slots);
 #endif
     my_mandatory_requests = 0;
+
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+    my_thread_leave.set_initial_state(wl);
+#endif
 }
 
 arena& arena::allocate_arena(threading_control* control, unsigned num_slots, unsigned num_reserved_slots,
-                              unsigned priority_level)
+                             unsigned priority_level
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+                             , tbb::task_arena::workers_leave wl
+#endif
+)
 {
     __TBB_ASSERT( sizeof(base_type) + sizeof(arena_slot) == sizeof(arena), "All arena data fields must go to arena_base" );
     __TBB_ASSERT( sizeof(base_type) % cache_line_size() == 0, "arena slots area misaligned: wrong padding" );
@@ -290,7 +303,11 @@ arena& arena::allocate_arena(threading_control* control, unsigned num_slots, uns
     std::memset( storage, 0, n );
 
     return *new( storage + num_arena_slots(num_slots, num_reserved_slots) * sizeof(mail_outbox) )
-        arena(control, num_slots, num_reserved_slots, priority_level);
+        arena(control, num_slots, num_reserved_slots, priority_level
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+              , wl
+#endif
+        );
 }
 
 void arena::free_arena () {
@@ -340,6 +357,9 @@ bool arena::has_enqueued_tasks() {
 }
 
 void arena::request_workers(int mandatory_delta, int workers_delta, bool wakeup_threads) {
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+    my_thread_leave.restore_state_if_needed();
+#endif
     my_threading_control->adjust_demand(my_tc_client, mandatory_delta, workers_delta);
 
     if (wakeup_threads) {
@@ -443,11 +463,20 @@ void arena::enqueue_task(d1::task& t, d1::task_group_context& ctx, thread_data& 
     advertise_new_work<work_enqueued>();
 }
 
-arena& arena::create(threading_control* control, unsigned num_slots, unsigned num_reserved_slots, unsigned arena_priority_level, d1::constraints constraints) {
+arena& arena::create(threading_control* control, unsigned num_slots, unsigned num_reserved_slots, unsigned arena_priority_level, d1::constraints constraints
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+                     , tbb::task_arena::workers_leave wl
+#endif
+)
+{
     __TBB_ASSERT(num_slots > 0, NULL);
     __TBB_ASSERT(num_reserved_slots <= num_slots, NULL);
     // Add public market reference for an external thread/task_arena (that adds an internal reference in exchange).
-    arena& a = arena::allocate_arena(control, num_slots, num_reserved_slots, arena_priority_level);
+    arena& a = arena::allocate_arena(control, num_slots, num_reserved_slots, arena_priority_level
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+                                     , wl
+#endif
+    );
     a.my_tc_client = control->create_client(a);
     // We should not publish arena until all fields are initialized
     control->publish_client(a.my_tc_client, constraints);
@@ -500,6 +529,8 @@ struct task_arena_impl {
     static int max_concurrency(const d1::task_arena_base*);
     static void enqueue(d1::task&, d1::task_group_context*, d1::task_arena_base*);
     static d1::slot_id execution_slot(const d1::task_arena_base&);
+    static void register_parallel_block(d1::task_arena_base&);
+    static void unregister_parallel_block(d1::task_arena_base&, bool);
 };
 
 void __TBB_EXPORTED_FUNC initialize(d1::task_arena_base& ta) {
@@ -532,6 +563,14 @@ void __TBB_EXPORTED_FUNC enqueue(d1::task& t, d1::task_group_context& ctx, d1::t
 
 d1::slot_id __TBB_EXPORTED_FUNC execution_slot(const d1::task_arena_base& arena) {
     return task_arena_impl::execution_slot(arena);
+}
+
+void __TBB_EXPORTED_FUNC register_parallel_block(d1::task_arena_base& ta) {
+    task_arena_impl::register_parallel_block(ta);
+}
+
+void __TBB_EXPORTED_FUNC unregister_parallel_block(d1::task_arena_base& ta, bool one_time_fast_leave) {
+    task_arena_impl::unregister_parallel_block(ta, one_time_fast_leave);
 }
 
 void task_arena_impl::initialize(d1::task_arena_base& ta) {
@@ -568,7 +607,11 @@ void task_arena_impl::initialize(d1::task_arena_base& ta) {
     __TBB_ASSERT(ta.my_arena.load(std::memory_order_relaxed) == nullptr, "Arena already initialized");
     unsigned priority_level = arena_priority_level(ta.my_priority);
     threading_control* thr_control = threading_control::register_public_reference();
-    arena& a = arena::create(thr_control, unsigned(ta.my_max_concurrency), ta.my_num_reserved_slots, priority_level, arena_constraints);
+    arena& a = arena::create(thr_control, unsigned(ta.my_max_concurrency), ta.my_num_reserved_slots, priority_level, arena_constraints
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+                             , ta.my_workers_leave
+#endif
+    );
 
     ta.my_arena.store(&a, std::memory_order_release);
 #if __TBB_CPUBIND_PRESENT
@@ -874,6 +917,16 @@ int task_arena_impl::max_concurrency(const d1::task_arena_base *ta) {
     __TBB_ASSERT(!ta || ta->my_max_concurrency==d1::task_arena_base::automatic, nullptr);
     return int(governor::default_num_threads());
 }
+
+#if __TBB_PREVIEW_PARALLEL_BLOCK
+void task_arena_impl::register_parallel_block(d1::task_arena_base& ta) {
+    ta.my_arena.load(std::memory_order_relaxed)->my_thread_leave.register_parallel_block();
+}
+
+void task_arena_impl::unregister_parallel_block(d1::task_arena_base& ta, bool one_time_fast_leave) {
+    ta.my_arena.load(std::memory_order_relaxed)->my_thread_leave.unregister_parallel_block(one_time_fast_leave);
+}
+#endif
 
 void isolate_within_arena(d1::delegate_base& d, std::intptr_t isolation) {
     // TODO: Decide what to do if the scheduler is not initialized. Is there a use case for it?
