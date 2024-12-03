@@ -14,6 +14,7 @@
     limitations under the License.
 */
 
+#include "common/dummy_body.h"
 #include "common/test.h"
 
 #define __TBB_EXTRA_DEBUG 1
@@ -41,6 +42,7 @@
 #include <stdexcept>
 #include <thread>
 #include <vector>
+#include <numeric>
 
 //#include "harness_fp.h"
 
@@ -2068,3 +2070,133 @@ TEST_CASE("worker threads occupy slots in correct range") {
 
     while (counter < 42) { utils::yield(); }
 }
+
+#if TBB_PREVIEW_PARALLEL_PHASE
+
+struct dummy_func {
+    void operator()() const {
+    }
+};
+
+template <typename F1 = dummy_func, typename F2 = dummy_func> 
+std::size_t measure_avg_start_time(tbb::task_arena& ta, const F1& start = F1{}, const F2& end = F2{}) {
+    std::size_t num_threads = ta.max_concurrency();
+    std::size_t num_runs = 1000;
+    std::vector<std::size_t> longest_start_times;
+    longest_start_times.reserve(num_runs);
+
+    std::vector<std::chrono::steady_clock::time_point> start_times(num_threads);
+    utils::SpinBarrier barrier(num_threads);
+    auto measure_start_time = [&] (std::size_t) {
+        start_times[tbb::this_task_arena::current_thread_index()] = std::chrono::steady_clock::now();
+        barrier.wait();
+    };
+
+    auto get_longest_start = [&] (std::chrono::steady_clock::time_point start_time) {
+        std::size_t longest_time = 0;
+        for (auto& time : start_times) {
+            longest_time = std::max(longest_time, (std::size_t)std::chrono::duration_cast<std::chrono::microseconds>(time - start_time).count());
+        }
+        return longest_time;
+    };
+
+    for (std::size_t i = 0; i < num_runs; ++i) {
+        ta.execute([&] {
+            auto start_time = std::chrono::steady_clock::now();
+            start();
+            tbb::parallel_for(std::size_t(0), num_threads, measure_start_time, tbb::static_partitioner{});
+            end();
+            longest_start_times.push_back(get_longest_start(start_time));
+        });
+        utils::doDummyWork(i*100);
+    }
+    return utils::median(longest_start_times.begin(), longest_start_times.end());
+}
+
+//! \brief \ref interface \ref requirement
+TEST_CASE("Check that workers leave faster with leave_policy::fast") {
+    std::size_t num_threads = utils::get_platform_max_threads();
+    std::size_t num_trials = 20;
+    std::vector<std::size_t> avg_start_time_delayed(num_trials);
+    {
+        tbb::task_arena ta((int)num_threads, 1, tbb::task_arena::priority::normal, tbb::task_arena::leave_policy::automatic);
+        for (std::size_t i = 0; i < num_trials; ++i) {
+            auto avg_start_time = measure_avg_start_time(ta);
+            avg_start_time_delayed[i] = avg_start_time;
+        }
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::vector<std::size_t> avg_start_time_fast(num_trials);
+    {
+        tbb::task_arena ta((int)num_threads, 1, tbb::task_arena::priority::normal, tbb::task_arena::leave_policy::fast);
+        for (std::size_t i = 0; i < num_trials; ++i) {
+            auto avg_start_time = measure_avg_start_time(ta);
+            avg_start_time_fast[i] = avg_start_time;
+        }
+    }
+    std::sort(avg_start_time_delayed.begin(), avg_start_time_delayed.end());
+    std::sort(avg_start_time_fast.begin(), avg_start_time_fast.end());
+    auto delayed_avg = std::accumulate(avg_start_time_delayed.begin(), avg_start_time_delayed.begin() + int(num_trials * 0.9), 0ull) / num_trials;
+    auto fast_avg = std::accumulate(avg_start_time_fast.begin(), avg_start_time_fast.begin() + int(num_trials * 0.9), 0ull) / num_trials;
+    WARN_MESSAGE(delayed_avg < fast_avg, "Expected workers start new work faster with delayed leave");
+}
+
+TEST_CASE("parallel_block retains workers in task_arena") {
+    std::size_t num_threads = utils::get_platform_max_threads();
+    std::size_t num_trials = 20;
+    std::vector<std::size_t> avg_start_time_delayed(num_trials);
+    {
+        tbb::task_arena ta((int)num_threads, 1, tbb::task_arena::priority::normal, tbb::task_arena::leave_policy::fast);
+        for (std::size_t i = 0; i < num_trials; ++i) {
+            ta.start_parallel_phase();
+            auto avg_start_time = measure_avg_start_time(ta); 
+            ta.end_parallel_phase(/*with_fast_leave=*/true);
+            avg_start_time_delayed[i] = avg_start_time;
+        }
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::vector<std::size_t> avg_start_time_fast(num_trials);
+    {
+        tbb::task_arena ta((int)num_threads, 1, tbb::task_arena::priority::normal, tbb::task_arena::leave_policy::fast);
+        for (std::size_t i = 0; i < num_trials; ++i) {
+            auto avg_start_time = measure_avg_start_time(ta);
+            avg_start_time_fast[i] = avg_start_time;
+        }
+    }
+    std::sort(avg_start_time_delayed.begin(), avg_start_time_delayed.end());
+    std::sort(avg_start_time_fast.begin(), avg_start_time_fast.end());
+    auto delayed_avg = std::accumulate(avg_start_time_delayed.begin(), avg_start_time_delayed.begin() + int(num_trials * 0.9), 0ull) / num_trials;
+    auto fast_avg = std::accumulate(avg_start_time_fast.begin(), avg_start_time_fast.begin() + int(num_trials * 0.9), 0ull) / num_trials;
+    WARN_MESSAGE(delayed_avg < fast_avg, "Expected workers start new work faster when using parallel_block");
+}
+
+TEST_CASE("Test one-time fast leave") {
+    std::size_t num_threads = utils::get_platform_max_threads();
+    std::size_t num_trials = 20;
+    std::vector<std::size_t> avg_start_time_delayed(num_trials);
+    {
+        tbb::task_arena ta((int)num_threads, 1, tbb::task_arena::priority::normal, tbb::task_arena::leave_policy::automatic);
+        for (std::size_t i = 0; i < num_trials; ++i) {
+            auto avg_start_time = measure_avg_start_time(ta); 
+            avg_start_time_delayed[i] = avg_start_time;
+        }
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::vector<std::size_t> avg_start_time_fast(num_trials);
+    {
+        tbb::task_arena ta((int)num_threads, 1, tbb::task_arena::priority::normal, tbb::task_arena::leave_policy::automatic);
+        auto start_phase = [&ta] { ta.start_parallel_phase(); };
+        auto end_phase = [&ta] { ta.end_parallel_phase(/*with_fast_leave=*/true); };
+        for (std::size_t i = 0; i < num_trials; ++i) {
+            auto avg_start_time = measure_avg_start_time(ta, start_phase, end_phase);
+            avg_start_time_fast[i] = avg_start_time;
+        }
+    }
+    std::sort(avg_start_time_delayed.begin(), avg_start_time_delayed.end());
+    std::sort(avg_start_time_fast.begin(), avg_start_time_fast.end());
+    auto delayed_avg = std::accumulate(avg_start_time_delayed.begin(), avg_start_time_delayed.begin() + int(num_trials * 0.9), 0ull) / num_trials;
+    auto fast_avg = std::accumulate(avg_start_time_fast.begin(), avg_start_time_fast.begin() + int(num_trials * 0.9), 0ull) / num_trials;
+    WARN_MESSAGE(delayed_avg < fast_avg, "Expected one-time fast leave setting to slow workers to start new work");
+}
+
+#endif

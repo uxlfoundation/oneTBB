@@ -39,6 +39,9 @@
 #ifndef TBB_PREVIEW_ISOLATED_TASK_GROUP
 #define TBB_PREVIEW_ISOLATED_TASK_GROUP 1
 #endif
+#ifndef TBB_PREVIEW_PARALLEL_PHASE
+#define TBB_PREVIEW_PARALLEL_PHASE 1
+#endif
 #endif
 
 #include "oneapi/tbb/detail/_config.h"
