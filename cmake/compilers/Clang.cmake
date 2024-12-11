@@ -21,7 +21,9 @@ set(TCM_COMPILE_DEFINITIONS "")
 set(TCM_COMMON_COMPILE_FLAGS ${TCM_COMMON_COMPILE_FLAGS} $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2> 
     -Wformat -Wformat-security -Werror=format-security -fPIC -fstack-protector-strong)
 
-set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} -Wl,-z,relro,-z,now)
+set(TCM_LIB_COMPILE_FLAGS $<$<NOT:$<CONFIG:Debug>>:-flto>)
+
+set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} $<$<NOT:$<CONFIG:Debug>>:-flto> -Wl,-z,relro,-z,now)
 if (WIN32)
    # The "/DEPENDENTLOADFLAG:0x2000" restricts the loader to look for dependencies in current
    # working directory only if it is in the so-called "Safe load list".

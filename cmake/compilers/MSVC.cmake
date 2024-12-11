@@ -18,13 +18,13 @@ set(TCM_WARNING_LEVEL $<$<NOT:$<CXX_COMPILER_ID:Intel>>:/W4> $<$<BOOL:${TCM_STRI
 # suppress warning: Prefer 'enum class' over 'enum'
 set(TCM_WARNING_SUPPRESS /wd6011 /wd26812)
 
-set(TCM_LIB_COMPILE_FLAGS -D_CRT_SECURE_NO_WARNINGS /GS)
+set(TCM_LIB_COMPILE_FLAGS -D_CRT_SECURE_NO_WARNINGS /GS /Gy /GL /sdl)
 set(TCM_COMMON_COMPILE_FLAGS /volatile:iso /FS /EHsc)
 set(TCM_COMMON_LINK_LIBS Kernel32.lib)
 
 # The "/DEPENDENTLOADFLAG:0x2000" restricts the loader to look for dependencies in current working
 # directory only if it is in the so-called "Safe load list".
-set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} /DYNAMICBASE /NXCOMPAT /DEPENDENTLOADFLAG:0x2000)
+set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} /DYNAMICBASE /NXCOMPAT /DEPENDENTLOADFLAG:0x2000 /LTCG /INCREMENTAL:NO)
 if (TCM_ARCH EQUAL 32)
     set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} /SAFESEH)
 endif()

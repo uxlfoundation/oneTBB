@@ -1,4 +1,4 @@
-# Copyright (C) 2023 Intel Corporation
+# Copyright (C) 2023-2024 Intel Corporation
 #
 # This software and the related documents are Intel copyrighted materials, and your use of them is
 # governed by the express license under which they were provided to you ("License"). Unless the
@@ -31,5 +31,7 @@ endif()
 set(TCM_COMMON_COMPILE_FLAGS ${TCM_COMMON_COMPILE_FLAGS} -fno-strict-overflow -fno-delete-null-pointer-checks -fwrapv
     -Wformat -Wformat-security -Werror=format-security -fstack-protector-strong $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>)
 
-set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} -Wl,-z,relro,-z,now,-z,noexecstack)
+set(TCM_LIB_COMPILE_FLAGS $<$<NOT:$<CONFIG:Debug>>:-flto>)
+
+set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} $<$<NOT:$<CONFIG:Debug>>:-flto>  -Wl,-z,relro,-z,now,-z,noexecstack)
 set(TCM_COMPILE_DEFINITIONS "")
