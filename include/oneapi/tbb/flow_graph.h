@@ -305,7 +305,7 @@ public:
         bool res = internal_try_put(t, message_metainfo{message_metainfo::waiters_type{&msg_wait_vertex}});
         if (res) {
             __TBB_ASSERT(graph_reference().my_context != nullptr, "No wait_context associated with the Flow Graph");
-            wait(msg_wait_vertex.get_context(), *graph_reference().my_context);
+            d1::wait(msg_wait_vertex.get_context(), *graph_reference().my_context);
         }
         return res;
     }

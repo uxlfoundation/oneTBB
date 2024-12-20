@@ -172,7 +172,6 @@ static void TestExceptionClassesExports () {
 // These names are only tested in "preview" configuration
 // When a feature becomes fully supported, its names should be moved to the main test
 static void TestPreviewNames() {
-    TestTypeDefinitionPresence2( blocked_rangeNd<int,4> );
     TestTypeDefinitionPresence2( concurrent_lru_cache<int, int> );
     TestTypeDefinitionPresence( isolated_task_group );
 }
@@ -238,6 +237,7 @@ static void DefinitionPresence() {
     TestTypeDefinitionPresence( blocked_range<int> );
     TestTypeDefinitionPresence( blocked_range2d<int> );
     TestTypeDefinitionPresence( blocked_range3d<int> );
+    TestTypeDefinitionPresence2( blocked_nd_range<int,4> );
     TestTypeDefinitionPresence( collaborative_once_flag );
     TestFuncDefinitionPresence( collaborative_call_once, (tbb::collaborative_once_flag&, const Body&), void );
     TestFuncDefinitionPresence( parallel_invoke, (const Body&, const Body&, const Body&), void );

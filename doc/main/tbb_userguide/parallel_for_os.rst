@@ -55,8 +55,9 @@ before each identifier. The rest of the examples assume that such a
 Note the argument to ``operator()``. A ``blocked_range<T>`` is a
 template class provided by the library. It describes a one-dimensional
 iteration space over type ``T``. Class ``parallel_for`` works with other
-kinds of iteration spaces too. The library provides ``blocked_range2d``
-for two-dimensional spaces. You can define your own spaces as explained
+kinds of iteration spaces too. The library provides ``blocked_range2d``,
+``blocked_range3d``, and ``blocked_nd_range`` for multidimensional spaces.
+You can define your own spaces as explained
 in :ref:`Advanced_Topic_Other_Kinds_of_Iteration_Spaces`.
 
 

@@ -47,7 +47,7 @@ Where:
 * ``-DCMAKE_C_COMPILER=emcc`` - specifies the C compiler as Emscripten* C compiler.
 
 
-> **_NOTE:_** See [CMake documentation](https://github.com/oneapi-src/oneTBB/blob/master/cmake/README.md) to learn about other options. 
+> **_NOTE:_** See [CMake documentation](https://github.com/uxlfoundation/oneTBB/blob/master/cmake/README.md) to learn about other options. 
 
 
 ## Run Test

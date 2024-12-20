@@ -347,7 +347,7 @@ public:
         caught_exception = false;
         try_call([this] {
             my_task_arena->execute([this] {
-                wait(my_wait_context_vertex.get_context(), *my_context);
+                d1::wait(my_wait_context_vertex.get_context(), *my_context);
             });
             cancelled = my_context->is_group_execution_cancelled();
         }).on_exception([this] {
