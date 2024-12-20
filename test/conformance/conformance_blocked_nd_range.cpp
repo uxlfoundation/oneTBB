@@ -296,35 +296,66 @@ TEST_CASE("blocked_nd_range proportional splitting") {
 //! Testing blocked_rangeNd deduction guides
 //! \brief \ref interface
 TEST_CASE("blocked_rangeNd deduction guides") {
+    using oneapi::tbb::blocked_nd_range;
+
     std::vector<const unsigned long*> v;
     using iterator = typename decltype(v)::iterator;
 
-    oneapi::tbb::blocked_range<int> br(0, 100);
+    oneapi::tbb::blocked_range<int> dim_range(0, 100);
 
-    oneapi::tbb::blocked_rangeNd r1({v.begin(), v.end()});
-    static_assert(std::is_same<decltype(r1),
-        oneapi::tbb::blocked_rangeNd<iterator, 1>>::value);
+    blocked_nd_range<int, 2> source_range(dim_range, dim_range);
 
-    oneapi::tbb::blocked_rangeNd r2({v.begin(), v.end()}, {v.begin(), v.end()});
-    static_assert(std::is_same<decltype(r2),
-        oneapi::tbb::blocked_rangeNd<iterator, 2>>::value);
-
-    oneapi::tbb::blocked_rangeNd r3({0, 100}, {0, 100}, {0, 100}, {0, 100});
-    static_assert(std::is_same<decltype(r3),
-        oneapi::tbb::blocked_rangeNd<int, 4>>::value);
-
-    oneapi::tbb::blocked_rangeNd r4(br);
-    static_assert(std::is_same<decltype(r4),
-        oneapi::tbb::blocked_rangeNd<int, 1>>::value);
-
-    oneapi::tbb::blocked_rangeNd r5(br, br, br);
-    static_assert(std::is_same<decltype(r5),
-        oneapi::tbb::blocked_rangeNd<int, 3>>::value);
-
-    oneapi::tbb::blocked_rangeNd rc(r1);
-    static_assert(std::is_same<decltype(rc), decltype(r1)>::value);
-
-    oneapi::tbb::blocked_rangeNd rm(std::move(r2));
-    static_assert(std::is_same<decltype(rm), decltype(r2)>::value);
+    {
+        blocked_nd_range range(dim_range, dim_range, dim_range);
+        static_assert(std::is_same_v<decltype(range), blocked_nd_range<int, 3>>);
+    }
+    {
+        blocked_nd_range range({v.begin(), v.end()}, {v.begin(), v.end()});
+        static_assert(std::is_same_v<decltype(range), blocked_nd_range<iterator, 2>>);
+    }
+    {
+        blocked_nd_range range({0, 100}, {0, 100, 5}, {0, 100}, {0, 100, 5});
+        static_assert(std::is_same_v<decltype(range), blocked_nd_range<int, 4>>);
+    }
+    {
+        blocked_nd_range range({100});
+        static_assert(std::is_same_v<decltype(range), blocked_nd_range<int, 1>>);
+    }
+    {
+        blocked_nd_range range({100}, 5);
+        static_assert(std::is_same_v<decltype(range), blocked_nd_range<int, 1>>);
+    }
+    {
+        blocked_nd_range range({100, 200}, 5);
+        static_assert(std::is_same_v<decltype(range), blocked_nd_range<int, 2>>);
+    }
+    {
+        blocked_nd_range range({100, 200, 300}, 5);
+        static_assert(std::is_same_v<decltype(range), blocked_nd_range<int, 3>>);
+    }
+    {
+        blocked_nd_range range({100, 200, 300, 400});
+        static_assert(std::is_same_v<decltype(range), blocked_nd_range<int, 4>>);
+    }
+    {
+        blocked_nd_range range({100, 200, 300, 400}, 5);
+        static_assert(std::is_same_v<decltype(range), blocked_nd_range<int, 4>>);
+    }
+    {
+        blocked_nd_range range(source_range, oneapi::tbb::split{});
+        static_assert(std::is_same_v<decltype(range), decltype(source_range)>);
+    }
+    {
+        blocked_nd_range range(source_range, oneapi::tbb::proportional_split{1, 3});
+        static_assert(std::is_same_v<decltype(range), decltype(source_range)>);
+    }
+    {
+        blocked_nd_range range(source_range);
+        static_assert(std::is_same_v<decltype(range), decltype(source_range)>);
+    }
+    {
+        blocked_nd_range range(std::move(source_range));
+        static_assert(std::is_same_v<decltype(range), decltype(source_range)>);
+    }
 }
 #endif // __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
