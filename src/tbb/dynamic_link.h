@@ -68,13 +68,16 @@ using dynamic_link_handle = HMODULE;
 using dynamic_link_handle = void*;
 #endif /* _WIN32 */
 
-const int DYNAMIC_LINK_GLOBAL        = 0x01;
-const int DYNAMIC_LINK_LOAD          = 0x02;
-const int DYNAMIC_LINK_WEAK          = 0x04;
-const int DYNAMIC_LINK_LOCAL         = 0x08;
+const int DYNAMIC_LINK_GLOBAL                 = 0x01;
+const int DYNAMIC_LINK_LOAD                   = 0x02;
+const int DYNAMIC_LINK_WEAK                   = 0x04;
+const int DYNAMIC_LINK_LOCAL                  = 0x08;
+const int DYNAMIC_LINK_BUILD_ABSOLUTE_PATH    = 0x10;
 
-const int DYNAMIC_LINK_LOCAL_BINDING = DYNAMIC_LINK_LOCAL | DYNAMIC_LINK_LOAD;
-const int DYNAMIC_LINK_DEFAULT       = DYNAMIC_LINK_GLOBAL | DYNAMIC_LINK_LOAD | DYNAMIC_LINK_WEAK;
+const int DYNAMIC_LINK_LOCAL_BINDING = DYNAMIC_LINK_BUILD_ABSOLUTE_PATH | DYNAMIC_LINK_LOCAL
+                                       | DYNAMIC_LINK_LOAD;
+const int DYNAMIC_LINK_DEFAULT       = DYNAMIC_LINK_BUILD_ABSOLUTE_PATH | DYNAMIC_LINK_GLOBAL
+                                       | DYNAMIC_LINK_LOAD | DYNAMIC_LINK_WEAK;
 
 //! Fill in dynamically linked handlers.
 /** 'library' is the name of the requested library. It should not contain a full
