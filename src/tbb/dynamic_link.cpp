@@ -32,7 +32,7 @@
     #include <malloc.h>
 
     // Unify system calls
-    #define dlopen( name, flags )   LoadLibrary( name )
+    #define dlopen( name, flags )   LoadLibraryEx( name, NULL, LOAD_LIBRARY_SAFE_CURRENT_DIRS )
     #define dlsym( handle, name )   GetProcAddress( handle, name )
     // FreeLibrary return bool value that is not used.
     #define dlclose( handle )       (void)( ! FreeLibrary( handle ) )
@@ -337,7 +337,7 @@ namespace r1 {
     #if __USE_STATIC_DL_INIT
     // ap_data structure is initialized with current directory on Linux.
     // So it should be initialized as soon as possible since the current directory may be changed.
-    // static_init_ap_data object provides this initialization during library loading.
+    // static_init_dl_data_t object provides this initialization during library loading.
     static struct static_init_dl_data_t {
         static_init_dl_data_t() {
             init_dynamic_link_data();
@@ -378,7 +378,10 @@ namespace r1 {
     #endif
     }
 
-    static dynamic_link_handle global_symbols_link( const char* library, const dynamic_link_descriptor descriptors[], std::size_t required ) {
+    static dynamic_link_handle global_symbols_link(const char* library,
+                                                   const dynamic_link_descriptor descriptors[],
+                                                   std::size_t required )
+    {
         dynamic_link_handle library_handle{};
 #if _WIN32
         auto res = GetModuleHandleEx(0, library, &library_handle);
@@ -427,7 +430,9 @@ namespace r1 {
     }
 #endif
 
-    dynamic_link_handle dynamic_load( const char* library, const dynamic_link_descriptor descriptors[], std::size_t required, bool local_binding ) {
+    dynamic_link_handle dynamic_load( const char* library, const dynamic_link_descriptor descriptors[],
+                                      std::size_t required, bool local_binding )
+    {
         ::tbb::detail::suppress_unused_warning( library, descriptors, required, local_binding );
 #if __TBB_DYNAMIC_LOAD_ENABLED
         std::size_t const len = PATH_MAX + 1;
@@ -461,11 +466,14 @@ namespace r1 {
             return nullptr;
     }
 
-    bool dynamic_link( const char* library, const dynamic_link_descriptor descriptors[], std::size_t required, dynamic_link_handle *handle, int flags ) {
+    bool dynamic_link( const char* library, const dynamic_link_descriptor descriptors[],
+                       std::size_t required, dynamic_link_handle* handle, int flags )
+    {
         init_dynamic_link_data();
 
         // TODO: May global_symbols_link find weak symbols?
-        dynamic_link_handle library_handle = ( flags & DYNAMIC_LINK_GLOBAL ) ? global_symbols_link( library, descriptors, required ) : nullptr;
+        dynamic_link_handle library_handle = ( flags & DYNAMIC_LINK_GLOBAL ) ?
+            global_symbols_link( library, descriptors, required ) : nullptr;
 
 #if defined(_MSC_VER) && _MSC_VER <= 1900
 #pragma warning (push)
