@@ -147,6 +147,39 @@ class blocked_nd_range : public blocked_nd_range_impl<Value, N> {
     using base::base;
 };
 
+#if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
+template <typename Value, unsigned int N0,
+          typename... Values, unsigned int... Ns,
+          typename = std::enable_if_t<(sizeof...(Values) > 0)>,
+          typename = std::enable_if_t<(... && std::is_same_v<Value, Values>)>,
+          typename = std::enable_if_t<(N0 == 2 || N0 == 3) && (... && (Ns == 2 || Ns == 3))>>
+blocked_nd_range(const Value (&)[N0], const Values (&... dim)[Ns])
+-> blocked_nd_range<Value, 1 + sizeof...(Values)>;
+
+template <typename Value, typename... Values,
+          typename = std::enable_if_t<(... && std::is_same_v<Value, Values>)>>
+blocked_nd_range(blocked_range<Value>, blocked_range<Values>...)
+-> blocked_nd_range<Value, 1 + sizeof...(Values)>;
+
+template <typename Value, unsigned int N,
+          typename = std::enable_if_t<(N != 2 && N != 3)>>
+blocked_nd_range(const Value (&)[N])
+-> blocked_nd_range<Value, N>;
+
+template <typename Value, unsigned int N>
+blocked_nd_range(const Value (&)[N], typename blocked_nd_range<Value, N>::size_type)
+-> blocked_nd_range<Value, N>;
+
+template <typename Value, unsigned int N>
+blocked_nd_range(blocked_nd_range<Value, N>, oneapi::tbb::split)
+-> blocked_nd_range<Value, N>;
+
+template <typename Value, unsigned int N>
+blocked_nd_range(blocked_nd_range<Value, N>, oneapi::tbb::proportional_split)
+-> blocked_nd_range<Value, N>;
+
+#endif // __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
+
 } // namespace d1
 } // namespace detail
 
