@@ -151,12 +151,7 @@ private:
     friend class blocked_range3d;
 
     template<typename DimValue, unsigned int N, typename>
-<<<<<<< HEAD
-        __TBB_requires(blocked_range_value<DimValue>)
     friend class blocked_nd_range_impl;
-=======
-    friend class blocked_rangeNd_impl;
->>>>>>> 3fe65dcb (Fix constraits test failure)
 };
 
 } // namespace d1
