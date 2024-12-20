@@ -179,6 +179,81 @@ public:
     }
 };
 
+#if __TBB_PREVIEW_PARALLEL_PHASE
+class thread_leave_manager {
+    static const std::uint64_t FAST_LEAVE = 1;
+    static const std::uint64_t ONE_TIME_FAST_LEAVE = 1 << 1;
+    static const std::uint64_t DELAYED_LEAVE = 1 << 2;
+    static const std::uint64_t PARALLEL_PHASE = 1 << 3;
+
+    std::atomic<std::uint64_t> my_state{0};
+public:
+    void set_initial_state(tbb::task_arena::leave_policy lp) {
+        if (lp == tbb::task_arena::leave_policy::automatic) {
+            std::uint64_t platform_policy = governor::hybrid_cpu() ? FAST_LEAVE : DELAYED_LEAVE;
+            my_state.store(platform_policy, std::memory_order_relaxed);
+        } else {
+            __TBB_ASSERT(lp == tbb::task_arena::leave_policy::fast,
+                         "Was the new value introduced for leave policy?");
+            my_state.store(FAST_LEAVE, std::memory_order_relaxed);
+        }
+    }
+
+    void restore_default_policy_if_needed() {
+        std::uint64_t curr = ONE_TIME_FAST_LEAVE;
+        if (my_state.load(std::memory_order_relaxed) == curr) {
+            // Potentially can override decision of the parallel block from future epoch
+            // but it is not a problem because it does not violate the correctness
+            my_state.compare_exchange_strong(curr, DELAYED_LEAVE);
+        }
+    }
+    
+    // Indicate start of parallel phase in the state machine
+    void register_parallel_phase() {
+        std::uint64_t prev = my_state.load(std::memory_order_relaxed);
+        __TBB_ASSERT(prev != 0, "The initial state was not set");
+
+        std::uint64_t desired{};
+        do {
+            // Need to add a reference for this start of a parallel phase, preserving the leave
+            // policy. Except for the case when one time fast leave was requested at the end of a
+            // previous phase.
+            desired = prev;
+            if (prev == ONE_TIME_FAST_LEAVE) {
+                // State was previously transitioned to "One-time Fast leave", thus with the start
+                // of new parallel phase, it should be transitioned to "Delayed leave"
+                desired = DELAYED_LEAVE;
+            }
+            __TBB_ASSERT(desired + PARALLEL_PHASE > desired, "Overflow detected");
+            desired += PARALLEL_PHASE; // Take into account this start of a parallel phase
+        } while (!my_state.compare_exchange_strong(prev, desired));
+    }
+
+    // Indicate the end of parallel phase in the state machine
+    void unregister_parallel_phase(bool enable_fast_leave) {
+        std::uint64_t prev = my_state.load(std::memory_order_relaxed);
+        __TBB_ASSERT(prev != 0, "The initial state was not set");
+
+        std::uint64_t desired{};
+        do {
+            __TBB_ASSERT(prev - PARALLEL_PHASE < prev,
+                         "A call to unregister without its register complement");
+            desired = prev - PARALLEL_PHASE; // Mark the end of this phase in reference counter
+            if (enable_fast_leave && /*it was the last parallel phase*/desired == DELAYED_LEAVE) {
+                desired = ONE_TIME_FAST_LEAVE;
+            }
+        } while (!my_state.compare_exchange_strong(prev, desired));
+    }
+
+    bool is_retention_allowed() {
+        std::uint64_t curr = my_state.load(std::memory_order_relaxed);
+        __TBB_ASSERT(curr != 0, "The initial state was not set");
+
+        return curr != FAST_LEAVE && curr != ONE_TIME_FAST_LEAVE;
+    }
+};
+#endif /* __TBB_PREVIEW_PARALLEL_PHASE */
+
 //! The structure of an arena, except the array of slots.
 /** Separated in order to simplify padding.
     Intrusive list node base class is used by market to form a list of arenas. **/
@@ -245,6 +320,11 @@ struct arena_base : padded<intrusive_list_node> {
     //! Waiting object for external threads that cannot join the arena.
     concurrent_monitor my_exit_monitors;
 
+#if __TBB_PREVIEW_PARALLEL_PHASE
+    //! Manages state of thread_leave state machine
+    thread_leave_manager my_thread_leave;
+#endif
+
     //! Coroutines (task_dispathers) cache buffer
     arena_co_cache my_co_cache;
 
@@ -281,13 +361,27 @@ public:
     };
 
     //! Constructor
-    arena(threading_control* control, unsigned max_num_workers, unsigned num_reserved_slots, unsigned priority_level);
+    arena(threading_control* control, unsigned max_num_workers, unsigned num_reserved_slots, unsigned priority_level
+#if __TBB_PREVIEW_PARALLEL_PHASE
+          , tbb::task_arena::leave_policy lp
+#endif
+    );
 
     //! Allocate an instance of arena.
     static arena& allocate_arena(threading_control* control, unsigned num_slots, unsigned num_reserved_slots,
-                                  unsigned priority_level);
+                                 unsigned priority_level
+#if __TBB_PREVIEW_PARALLEL_PHASE
+                                 , tbb::task_arena::leave_policy lp
+#endif
+    );
 
-    static arena& create(threading_control* control, unsigned num_slots, unsigned num_reserved_slots, unsigned arena_priority_level, d1::constraints constraints = d1::constraints{});
+    static arena& create(threading_control* control, unsigned num_slots, unsigned num_reserved_slots,
+                         unsigned arena_priority_level,
+                         d1::constraints constraints = d1::constraints{}
+#if __TBB_PREVIEW_PARALLEL_PHASE
+                         , tbb::task_arena::leave_policy lp = tbb::task_arena::leave_policy::automatic
+#endif
+    );
 
     static int unsigned num_arena_slots ( unsigned num_slots, unsigned num_reserved_slots ) {
         return num_reserved_slots == 0 ? num_slots : max(2u, num_slots);
