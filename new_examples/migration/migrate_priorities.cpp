@@ -38,9 +38,9 @@ void enqueueSeveralTasks(int num_iterations) {
   tbb::task_arena high_arena{P, 0, tbb::task_arena::priority::high};
 
   for (int i = 0; i < num_iterations; ++i) {
-    low_arena.enqueue([i]() { taskFunction("L", i); }); 
-    normal_arena.enqueue([i]() { taskFunction("N", i); }); 
-    high_arena.enqueue([i]() { taskFunction("H", i); }); 
+    low_arena.enqueue([i]() { taskFunction("L", i); });
+    normal_arena.enqueue([i]() { taskFunction("N", i); });
+    high_arena.enqueue([i]() { taskFunction("H", i); });
   }
   doWork(1.0);
 }
@@ -51,9 +51,9 @@ void runParallelForWithHighPriority() {
   std::thread t0([]() {
     waitUntil(2);
     tbb::task_arena normal_arena{P, 0, tbb::task_arena::priority::normal};
-    normal_arena.execute([]() { 
-      tbb::parallel_for(0, 10, [](int i) { 
-        std::printf("N"); 
+    normal_arena.execute([]() {
+      tbb::parallel_for(0, 10, [](int i) {
+        std::printf("N");
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
       });
     });
@@ -61,7 +61,7 @@ void runParallelForWithHighPriority() {
   std::thread t1([]() {
     waitUntil(2);
     tbb::task_arena high_arena{P, 0, tbb::task_arena::priority::high};
-    high_arena.execute([]() { 
+    high_arena.execute([]() {
       tbb::parallel_for(0, 10, [](int i) { std::printf("H"); });
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     });
@@ -80,7 +80,7 @@ public:
   MyTask(const char *m, int i) : msg(m), messageId(i) { }
 
   tbb::task *execute() override {
-    taskFunction(msg, messageId); 
+    taskFunction(msg, messageId);
     return NULL;
   }
 
@@ -93,11 +93,11 @@ void enqueueSeveralTasks(int num_iterations) {
   std::printf("Using older TBB\n");
 
   for (int i = 0; i < num_iterations; ++i) {
-    tbb::task::enqueue(*new( tbb::task::allocate_root() ) 
+    tbb::task::enqueue(*new( tbb::task::allocate_root() )
                          MyTask( "L", i ), tbb::priority_low);
-    tbb::task::enqueue(*new( tbb::task::allocate_root() ) 
+    tbb::task::enqueue(*new( tbb::task::allocate_root() )
                          MyTask( "N", i ), tbb::priority_normal);
-    tbb::task::enqueue(*new( tbb::task::allocate_root() ) 
+    tbb::task::enqueue(*new( tbb::task::allocate_root() )
                          MyTask( "H", i ), tbb::priority_high);
   }
   doWork(1.0);
@@ -110,9 +110,9 @@ void runParallelForWithHighPriority() {
     waitUntil(2);
     tbb::task_group_context tgc;
     tgc.set_priority(tbb::priority_normal);
-    tbb::parallel_for(0, 10, 
-                      [](int i) { 
-                          std::printf("N"); 
+    tbb::parallel_for(0, 10,
+                      [](int i) {
+                          std::printf("N");
                           std::this_thread::sleep_for(std::chrono::milliseconds(10));
                       }, tgc);
   });
@@ -120,9 +120,9 @@ void runParallelForWithHighPriority() {
     waitUntil(2);
     tbb::task_group_context tgc;
     tgc.set_priority(tbb::priority_high);
-    tbb::parallel_for(0, 10, 
-                      [](int i) { 
-                          std::printf("H"); 
+    tbb::parallel_for(0, 10,
+                      [](int i) {
+                          std::printf("H");
                           std::this_thread::sleep_for(std::chrono::milliseconds(10));
                       }, tgc);
   });
@@ -149,10 +149,10 @@ void printTrace() {
 
 void taskFunction(const std::string& msg, int id) {
   sout.local() << msg.c_str() << ":" << id << " ";
-  doWork(0.01); 
+  doWork(0.01);
 }
 
-std::atomic<int> count_up = 0;
+std::atomic<int> count_up(0);
 
 void waitUntil(int N) {
   ++count_up;
@@ -171,12 +171,11 @@ static void warmupTBB() {
   // This is a simple loop that should get workers started.
   // oneTBB creates workers lazily on first use of the library
   // so this hides the startup time when looking at trivial
-  // examples that do little real work. 
-  tbb::parallel_for(0, P, 
+  // examples that do little real work.
+  tbb::parallel_for(0, P,
    [=](int) {
       tbb::tick_count t0 = tbb::tick_count::now();
       while ((tbb::tick_count::now() - t0).seconds() < 0.01);
     }
   );
 }
-

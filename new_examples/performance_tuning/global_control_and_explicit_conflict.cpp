@@ -29,7 +29,7 @@ void doWork(int offset, double seconds) {
   while ((tbb::tick_count::now() - t0).seconds() < seconds);
 }
 
-counter_t counter1 = 0, counter2 = 0;
+counter_t counter1(0), counter2(0);
 
 void arenaGlobalControlExplicitArena(int p, int offset) {
   tbb::global_control gc(tbb::global_control::max_allowed_parallelism, p);
@@ -39,8 +39,8 @@ void arenaGlobalControlExplicitArena(int p, int offset) {
   tbb::task_arena a{2*tbb::info::default_concurrency()};
 
   a.execute([=]() {
-    tbb::parallel_for(0, 
-                      10*tbb::info::default_concurrency(), 
+    tbb::parallel_for(0,
+                      10*tbb::info::default_concurrency(),
                       [=](int) { doWork(offset, 0.01); });
   });
 
@@ -102,5 +102,3 @@ void waitUntil(int N, counter_t& c) {
   ++c;
   while (c != N);
 }
-
-

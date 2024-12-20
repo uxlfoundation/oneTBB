@@ -71,7 +71,7 @@ private:
 	  16777216.0  //  24
   };
 
-  
+
 public:
 //
 // ------- Compute 16^p mod ak
@@ -81,14 +81,14 @@ public:
   double expm(double p, double ak) {
     double p1, pt, r;
     int i;
-    
+
     if (ak == 1.0)  return 0.0;
-    
+
     for (i = 0; tp[i] <= p; i++)  ; // Find the greatest power of two <= p.
     pt = tp[i-1];
     p1 = p;
     r = 1.0;
-    
+
     while (pt >= 1.0) { // Perform binary exponentiation algorithm modulo ak.
       if (p1 >= pt) {
 	r = fmod( 16.0 * r, ak);
@@ -100,7 +100,7 @@ public:
     }
     return fmod(r, ak);
   } // expm
-  
+
   //
   // Evaluate the series sum_k 16^(ic-k)/(8*k+m)
   // using the modular exponentiation technique.
@@ -109,7 +109,7 @@ public:
     const double eps = 1.0e-17;
     double ak, p, s, t;
     long k;
-    
+
     s = 0.0;
     for (k = 0; k < ic; k++) { // Sum the series up to ic.
       ak = 8 * k + m;
@@ -137,38 +137,39 @@ public:
     long fractionalposition;
     double pid, s1, s2, s3, s4, y;
     unsigned result = 0;
-    
+
     fractionalposition = startposition - 1;
-    
+
     if (!startposition)
       return 0x3243f6a8;
-    
+
     if (startposition < 0)
       return 0xFEFEFEFE;
-    
+
     if (fractionalposition > 16777216L)
       return 0xBEBEBEBE;
-    
+
     s1 = series(1, fractionalposition);
     s2 = series(4, fractionalposition);
     s3 = series(5, fractionalposition);
     s4 = series(6, fractionalposition);
     pid = fmod( 4.0 * s1 - 2.0 * s2 - s3 - s4, 1.0);
-    
+
     if (pid < 0)
       pid += 1.0;
-    
+
     y = fabs(pid);
-    
+
     for (int i = 0; i < octo8; i++) {
       y = 16.0 * (y - floor(y));
       result = (result << 4) + ((unsigned) y);
     }
-    
+
     return result;
   }
 }; // Class bbpHexPi
 
+constexpr double bbpHexPi::tp[bbpHexPi::ntp];
 
 // The existance of "BBP-type formulas" for mathematical constants
 // were first discovered for pi by Simon Plouffe.
@@ -186,7 +187,7 @@ int main(int argc, char **argv)
 
   {
     bbpHexPi bbp;
-    
+
     tbb::parallel_for(tbb::blocked_range<int>(0,values.size()),
 		      [&](tbb::blocked_range<int> r) {
 			for (int i=r.begin(); i<r.end(); ++i) {
@@ -198,8 +199,8 @@ int main(int argc, char **argv)
       printf("%.8x", eightdigits);
 
   }
-  
+
   printf("\n");
-  
+
   return 0;
 }

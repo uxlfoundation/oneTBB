@@ -35,10 +35,10 @@ void serialCalls(int depth) {
 
 void treeCallsToRun(tbb::task_group& g, int depth) {
   if (depth>1) {
-    g.run([&g, depth]() { 
-      treeCallsToRun(g, depth-1); 
+    g.run([&g, depth]() {
+      treeCallsToRun(g, depth-1);
     });
-    g.run([&, depth]() { 
+    g.run([&, depth]() {
       treeCallsToRun(g, depth-1);
     });
   }
@@ -51,7 +51,7 @@ void treeCalls(int depth) {
   g.wait();
 }
 
-std::atomic<int> count = 0;
+std::atomic<int> count(0);
 static void warmupTBB();
 
 int main() {
@@ -80,7 +80,7 @@ int main() {
   return 0;
 }
 
-void f() { 
+void f() {
   ++count;
 }
 
@@ -88,12 +88,11 @@ static void warmupTBB() {
   // This is a simple loop that should get workers started.
   // oneTBB creates workers lazily on first use of the library
   // so this hides the startup time when looking at trivial
-  // examples that do little real work. 
-  tbb::parallel_for(0, tbb::info::default_concurrency(), 
+  // examples that do little real work.
+  tbb::parallel_for(0, tbb::info::default_concurrency(),
    [=](int) {
       tbb::tick_count t0 = tbb::tick_count::now();
       while ((tbb::tick_count::now() - t0).seconds() < 0.01);
     }
   );
 }
-
