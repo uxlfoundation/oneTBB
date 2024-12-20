@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.5.0...3.31.2)
 
 # Enable CMake policies
 
@@ -33,6 +33,11 @@ if (POLICY CMP0091)
     cmake_policy(SET CMP0091 NEW)
 elseif (DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
     message(FATAL_ERROR "CMAKE_MSVC_RUNTIME_LIBRARY was defined while policy CMP0091 is not available. Use CMake 3.15 or newer.")
+endif()
+
+if (POLICY CMP0148)
+    # CMake 3.27: The FindPythonInterp and FindPythonLibs modules are removed
+    cmake_policy(SET CMP0148 OLD)
 endif()
 
 if (TBB_WINDOWS_DRIVER AND (NOT ("${CMAKE_MSVC_RUNTIME_LIBRARY}" STREQUAL MultiThreaded OR "${CMAKE_MSVC_RUNTIME_LIBRARY}" STREQUAL MultiThreadedDebug)))
