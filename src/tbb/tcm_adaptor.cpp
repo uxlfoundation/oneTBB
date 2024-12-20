@@ -243,7 +243,9 @@ tcm_result_t renegotiation_callback(tcm_permit_handle_t, void* client_ptr, tcm_c
 
 void tcm_adaptor::initialize() {
     constexpr std::size_t tcm_link_table_size = sizeof(tcm_link_table) / sizeof(tcm_link_table[0]);
-    tcm_functions_loaded = dynamic_link(TCMLIB_NAME, tcm_link_table, tcm_link_table_size);
+    constexpr int flags = DYNAMIC_LINK_DEFAULT & ~DYNAMIC_LINK_BUILD_ABSOLUTE_PATH;
+    tcm_functions_loaded = dynamic_link(TCMLIB_NAME, tcm_link_table, tcm_link_table_size,
+                                        /*handle*/nullptr, flags);
 }
 
 bool tcm_adaptor::is_initialized() {
