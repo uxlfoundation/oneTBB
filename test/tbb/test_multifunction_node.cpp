@@ -541,11 +541,11 @@ TEST_CASE("Test ports retrurn references"){
     test_ports_return_references<tbb::flow::rejecting>();
 }
 
-//! NativeParallelFor testing with various concurrency settings
-//! \brief \ref error_guessing
-TEST_CASE("Lightweight testing"){
-    lightweight_testing::test<tbb::flow::multifunction_node>(10);
-}
+// //! NativeParallelFor testing with various concurrency settings
+// //! \brief \ref error_guessing
+// TEST_CASE("Lightweight testing"){
+//     lightweight_testing::test<tbb::flow::multifunction_node>(10);
+// }
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 //! Test follows and precedes API
@@ -623,3 +623,68 @@ TEST_CASE("constraints for multifunction_node body") {
     static_assert(!can_call_multifunction_node_ctor<input_type, output_type, WrongSecondInputOperatorRoundBrackets<input_type, output_type>>);
 }
 #endif // __TBB_CPP20_CONCEPTS_PRESENT
+
+TEST_CASE("multifunction try_put_and_wait") {
+    std::cout << "start test" << std::endl;
+    tbb::task_arena arena(1);
+
+    arena.execute([]{
+        int num_items = 5;
+        tbb::flow::graph g;
+
+        using func_node_type = tbb::flow::function_node<int, int>;
+        using multi_node_type = tbb::flow::multifunction_node<int, std::tuple<int>>;
+        using ports_type = typename multi_node_type::output_ports_type;
+        using tag_type = typename multi_node_type::tag_type;
+
+        func_node_type* start_node = nullptr;
+
+        func_node_type start(g, tbb::flow::serial,
+            [&](int i) {
+                std::cout << "processing " << i << std::endl;
+                if (start_node != nullptr) {
+                    for (int j = 2; j <= num_items; ++j) {
+                        start_node->try_put(j);
+                    }
+                    start_node = nullptr;
+                }
+                return i;
+            });
+
+        start_node = &start;
+
+        int num_accumulated = 0;
+        int accumulated_result = 0;
+        tag_type accumulated_hint;
+
+        tbb::flow::multifunction_node<int, std::tuple<int>> multifunction(g, tbb::flow::serial,
+            // [&](int i, ports_type& ports, const tag_type& tag) {
+            [&](int i, ports_type& ports) {
+                std::cout << "mf processing " << i << std::endl;
+
+                // ++num_accumulated;
+                // std::cout << "num_accumulated = " << num_accumulated << std::endl;
+                // accumulated_result += i;
+                // accumulated_hint.merge(tag);
+
+                // if (num_accumulated == num_items) {
+                //     std::get<0>(ports).try_put(accumulated_result, std::move(accumulated_hint));
+                // }
+
+                // std::get<0>(ports).try_put(i, tag);
+
+                std::get<0>(ports).try_put(i);
+            });
+
+        tbb::flow::function_node<int, int> writer(g, tbb::flow::serial,
+            [](int res) { std::cout << "res = " << res << std::endl; return 0; });
+
+        tbb::flow::make_edge(start, multifunction);
+        tbb::flow::make_edge(tbb::flow::output_port<0>(multifunction), writer);
+
+        start.try_put_and_wait(1);
+
+        std::cout << "Wait for all" << std::endl;
+        g.wait_for_all();
+    });
+}

@@ -554,6 +554,44 @@ struct init_output_ports {
     }
 }; // struct init_output_ports
 
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+class multifunction_node_tag {
+public:
+    multifunction_node_tag() = default;
+    multifunction_node_tag(const message_metainfo& metainfo) : my_metainfo(metainfo) {
+        for (auto waiter : my_metainfo.waiters()) {
+            waiter->reserve();
+        }
+    }
+
+    multifunction_node_tag(const multifunction_node_tag& other) : my_metainfo(other.my_metainfo) {
+        for (auto waiter : my_metainfo.waiters()) {
+            waiter->reserve();
+        }
+    }
+
+    multifunction_node_tag(multifunction_node_tag&& other) = default;
+
+    ~multifunction_node_tag() {
+        for (auto waiter : my_metainfo.waiters()) {
+            waiter->release();
+        }
+    }
+
+    void merge(const multifunction_node_tag& other_tag) {
+        for (auto waiter : other_tag.my_metainfo.waiters()) {
+            waiter->reserve();
+        }
+        my_metainfo.merge(other_tag.my_metainfo);
+    }
+private:
+    template <typename Output>
+    friend class multifunction_output;
+
+    message_metainfo my_metainfo;
+};
+#endif
+
 //! Implements methods for a function node that takes a type Input as input
 //  and has a tuple of output ports specified.
 template< typename Input, typename OutputPortSet, typename Policy, typename A>
@@ -562,6 +600,9 @@ public:
     static const int N = std::tuple_size<OutputPortSet>::value;
     typedef Input input_type;
     typedef OutputPortSet output_ports_type;
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+    typedef multifunction_node_tag tag_type;
+#endif
     typedef multifunction_body<input_type, output_ports_type> multifunction_body_type;
     typedef multifunction_input<Input, OutputPortSet, Policy, A> my_class;
     typedef function_input_base<Input, Policy, A, my_class> base_type;
@@ -570,7 +611,7 @@ public:
     // constructor
     template<typename Body>
     multifunction_input(graph &g, size_t max_concurrency,Body& body, node_priority_t a_priority )
-      : base_type(g, max_concurrency, a_priority, noexcept(tbb::detail::invoke(body, input_type(), my_output_ports)))
+      : base_type(g, max_concurrency, a_priority, noexcept(1))
       , my_body( new multifunction_body_leaf<input_type, output_ports_type, Body>(body) )
       , my_init_body( new multifunction_body_leaf<input_type, output_ports_type, Body>(body) )
       , my_output_ports(init_output_ports<output_ports_type>::call(g, my_output_ports)){
@@ -599,10 +640,11 @@ public:
     // the task we were successful.
     //TODO: consider moving common parts with implementation in function_input into separate function
     graph_task* apply_body_impl_bypass( const input_type &i
-                                        __TBB_FLOW_GRAPH_METAINFO_ARG(const message_metainfo&) )
+                                        __TBB_FLOW_GRAPH_METAINFO_ARG(const message_metainfo& metainfo) )
     {
+        multifunction_node_tag tag(metainfo);
         fgt_begin_body( my_body );
-        (*my_body)(i, my_output_ports);
+        (*my_body)(i, my_output_ports, tag);
         fgt_end_body( my_body );
         graph_task* ttask = nullptr;
         if(base_type::my_max_concurrency != 0) {
@@ -851,7 +893,25 @@ public:
     multifunction_output(const multifunction_output& other) : base_type(other.my_graph_ref) {}
 
     bool try_put(const output_type &i) {
-        graph_task *res = try_put_task(i);
+        return try_put_impl(i __TBB_FLOW_GRAPH_METAINFO_ARG(message_metainfo{}));
+    }
+
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+    bool try_put(const output_type& i, const multifunction_node_tag& tag) {
+        return try_put_impl(i, tag.my_metainfo);
+    }
+
+    bool try_put(const output_type& i, multifunction_node_tag&& tag) {
+        multifunction_node_tag local_tag = std::move(tag);
+        return try_put_impl(i, local_tag.my_metainfo);
+    }
+#endif
+
+    using base_type::graph_reference;
+
+protected:
+    bool try_put_impl(const output_type& i __TBB_FLOW_GRAPH_METAINFO_ARG(const message_metainfo& metainfo)) {
+        graph_task *res = try_put_task(i __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo));
         if( !res ) return false;
         if( res != SUCCESSFULLY_ENQUEUED ) {
             // wrapping in task_arena::execute() is not needed since the method is called from
@@ -860,10 +920,6 @@ public:
         }
         return true;
     }
-
-    using base_type::graph_reference;
-
-protected:
 
     graph_task* try_put_task(const output_type &i) {
         return my_successors.try_put_task(i);

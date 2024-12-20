@@ -168,23 +168,47 @@ private:
     B body;
 };
 
+class multifunction_node_tag;
+
 //! function_body that takes an Input and a set of output ports
 template<typename Input, typename OutputSet>
 class multifunction_body : no_assign {
 public:
     virtual ~multifunction_body () {}
-    virtual void operator()(const Input &/* input*/, OutputSet &/*oset*/) = 0;
+    virtual void operator()(const Input &/* input*/, OutputSet &/*oset*/ __TBB_FLOW_GRAPH_METAINFO_ARG(const multifunction_node_tag& /*tag*/)) = 0;
     virtual multifunction_body* clone() = 0;
     virtual void* get_body_ptr() = 0;
 };
 
 //! leaf for multifunction.  OutputSet can be a std::tuple or a vector.
-template<typename Input, typename OutputSet, typename B >
+template<typename Input, typename OutputSet, typename B>
 class multifunction_body_leaf : public multifunction_body<Input, OutputSet> {
+    using first_priority = int;
+    using second_priority = double;
+
+    // body may explicitly put() to one or more of oset.
+    void invoke_body_impl(const Input& input, OutputSet& oset __TBB_FLOW_GRAPH_METAINFO_ARG(const multifunction_node_tag&), second_priority)
+    {
+        tbb::detail::invoke(body, input, oset);
+    }
+
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+    template <typename InputT, typename OutputSetT>
+    auto invoke_body_impl(const InputT& input, OutputSetT& oset, const multifunction_node_tag& tag, first_priority)
+    -> decltype(tbb::detail::invoke(std::declval<B>(), input, oset, tag), void())
+    {
+        tbb::detail::invoke(body, input, oset, tag);
+    }
+#endif
+
+    void invoke_body(const Input& input, OutputSet& oset __TBB_FLOW_GRAPH_METAINFO_ARG(const multifunction_node_tag& tag)) {
+        invoke_body_impl(input, oset __TBB_FLOW_GRAPH_METAINFO_ARG(tag), 1);
+    }
+
 public:
     multifunction_body_leaf(const B &_body) : body(_body) { }
-    void operator()(const Input &input, OutputSet &oset) override {
-        tbb::detail::invoke(body, input, oset); // body may explicitly put() to one or more of oset.
+    void operator()(const Input &input, OutputSet &oset __TBB_FLOW_GRAPH_METAINFO_ARG(const multifunction_node_tag& tag)) override {
+        invoke_body(input, oset __TBB_FLOW_GRAPH_METAINFO_ARG(tag));
     }
     void* get_body_ptr() override { return &body; }
     multifunction_body_leaf* clone() override {
