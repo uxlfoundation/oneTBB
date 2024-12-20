@@ -151,7 +151,6 @@ private:
     friend class blocked_range3d;
 
     template<typename DimValue, unsigned int N, typename>
-        __TBB_requires(blocked_range_value<DimValue>)
     friend class blocked_nd_range_impl;
 };
 
