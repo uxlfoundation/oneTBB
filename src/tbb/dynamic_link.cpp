@@ -431,39 +431,46 @@ namespace r1 {
 #endif
 
     dynamic_link_handle dynamic_load( const char* library, const dynamic_link_descriptor descriptors[],
-                                      std::size_t required, bool local_binding )
+                                      std::size_t required, int flags )
     {
-        ::tbb::detail::suppress_unused_warning( library, descriptors, required, local_binding );
+        ::tbb::detail::suppress_unused_warning( library, descriptors, required, flags );
 #if __TBB_DYNAMIC_LOAD_ENABLED
+        const char* path = library;
         std::size_t const len = PATH_MAX + 1;
-        char path[ len ];
-        std::size_t rc = abs_path( library, path, len );
-        if ( 0 < rc && rc <= len ) {
-#if _WIN32
-            // Prevent Windows from displaying silly message boxes if it fails to load library
-            // (e.g. because of MS runtime problems - one of those crazy manifest related ones)
-            UINT prev_mode = SetErrorMode (SEM_FAILCRITICALERRORS);
-#endif /* _WIN32 */
-            // The second argument (loading_flags) is ignored on Windows
-            dynamic_link_handle library_handle = dlopen( path, loading_flags(local_binding) );
-#if _WIN32
-            SetErrorMode (prev_mode);
-#endif /* _WIN32 */
-            if( library_handle ) {
-                if( !resolve_symbols( library_handle, descriptors, required ) ) {
-                    // The loaded library does not contain all the expected entry points
-                    dynamic_unlink( library_handle );
-                    library_handle = nullptr;
-                }
-            } else
-                DYNAMIC_LINK_WARNING( dl_lib_not_found, path, dlerror() );
-            return library_handle;
-        } else if ( rc>len )
+        char absolute_path[ len ];
+        if (flags & DYNAMIC_LINK_BUILD_ABSOLUTE_PATH) {
+            std::size_t rc = abs_path( library, absolute_path, len );
+            if (rc > len) {
                 DYNAMIC_LINK_WARNING( dl_buff_too_small );
+                return nullptr;
+            } else if (rc == 0) {
                 // rc == 0 means failing of init_ap_data so the warning has already been issued.
-
+                return nullptr;
+            }
+            path = absolute_path;
+        }
+        std::fprintf(stdout, "Loading filename \"%s\"\n", path);
+#if _WIN32
+        // Prevent Windows from displaying silly message boxes if it fails to load library
+        // (e.g. because of MS runtime problems - one of those crazy manifest related ones)
+        UINT prev_mode = SetErrorMode (SEM_FAILCRITICALERRORS);
+#endif /* _WIN32 */
+        // The second argument (loading_flags) is ignored on Windows
+        dynamic_link_handle library_handle = dlopen( path,
+                                                     loading_flags(flags & DYNAMIC_LINK_LOCAL) );
+#if _WIN32
+        SetErrorMode (prev_mode);
+#endif /* _WIN32 */
+        if( library_handle ) {
+            if( !resolve_symbols( library_handle, descriptors, required ) ) {
+                // The loaded library does not contain all the expected entry points
+                dynamic_unlink( library_handle );
+                library_handle = nullptr;
+            }
+        } else
+            DYNAMIC_LINK_WARNING( dl_lib_not_found, path, dlerror() );
+        return library_handle;
 #endif /* __TBB_DYNAMIC_LOAD_ENABLED */
-            return nullptr;
     }
 
     bool dynamic_link( const char* library, const dynamic_link_descriptor descriptors[],
@@ -481,7 +488,7 @@ namespace r1 {
 #pragma warning (disable: 4800)
 #endif
         if ( !library_handle && ( flags & DYNAMIC_LINK_LOAD ) )
-            library_handle = dynamic_load( library, descriptors, required, flags & DYNAMIC_LINK_LOCAL );
+            library_handle = dynamic_load( library, descriptors, required, flags );
 
 #if defined(_MSC_VER) && _MSC_VER <= 1900
 #pragma warning (pop)
