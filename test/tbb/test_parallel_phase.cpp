@@ -2,6 +2,7 @@
 
 #include "common/test.h"
 #include "common/utils.h"
+#include "common/utils_concurrency_limit.h"
 #include "common/spin_barrier.h"
 
 #include "tbb/task_arena.h"
@@ -49,7 +50,7 @@ std::size_t measure_median_start_time(tbb::task_arena* ta, const F1& start = F1{
         } else {
             work();
         }
-        utils::doDummyWork(i*500);
+        utils::doDummyWork(i*250);
     }
     return utils::median(longest_start_times.begin(), longest_start_times.end());
 }
@@ -180,6 +181,11 @@ public:
 
 //! \brief \ref interface \ref requirement
 TEST_CASE("Check that workers leave faster with leave_policy::fast") {
+    // Test measures workers start time, so no there is no point to
+    // measure it with workerless arena
+    if (utils::get_platform_max_threads() < 2) {
+        return;
+    }
     tbb::task_arena ta_automatic_leave {
         tbb::task_arena::automatic, 1,
         tbb::task_arena::priority::normal,
@@ -200,11 +206,14 @@ TEST_CASE("Check that workers leave faster with leave_policy::fast") {
     auto median_fast = utils::median(times_fast.begin(), times_fast.end());
 
     WARN_MESSAGE(median_automatic < median_fast,
-        "Expected workers to start new work faster with delayed leave");
+        "Expected workers to start new work slower with fast leave policy");
 }
 
 //! \brief \ref interface \ref requirement
 TEST_CASE("Parallel Phase retains workers in task_arena") {
+    if (utils::get_platform_max_threads() < 2) {
+        return;
+    }
     tbb::task_arena ta_fast1 {
         tbb::task_arena::automatic, 1,
         tbb::task_arena::priority::normal,
@@ -236,6 +245,9 @@ TEST_CASE("Parallel Phase retains workers in task_arena") {
 
 //! \brief \ref interface \ref requirement
 TEST_CASE("Test one-time fast leave") {
+    if (utils::get_platform_max_threads() < 2) {
+        return;
+    }
     tbb::task_arena ta1{};
     tbb::task_arena ta2{};
     start_time_collection_sequenced_phases st_collector1{ta1, /*num_trials=*/10};
@@ -259,6 +271,9 @@ TEST_CASE("Test one-time fast leave") {
 
 //! \brief \ref interface \ref requirement
 TEST_CASE("Test parallel phase with this_task_arena") {
+    if (utils::get_platform_max_threads() < 2) {
+        return;
+    }
     start_time_collection_sequenced_phases st_collector1{/*num_trials=*/10};
     start_time_collection_sequenced_phases st_collector2{/*num_trials=*/10, /*fast_leave*/true};
 
