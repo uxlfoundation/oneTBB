@@ -121,6 +121,7 @@ endif()
 
 target_link_libraries(tbb
     PRIVATE
+    ittapi::ittnotify
     Threads::Threads
     ${TBB_LIB_LINK_LIBS}
     ${TBB_COMMON_LINK_LIBS}
