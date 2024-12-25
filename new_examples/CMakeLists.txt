@@ -15,27 +15,17 @@ check_cxx_compiler_flag(${FSYCL_OPTION} _cxx_compiler_has_fsycl_option)
 
 if (_cxx_compiler_has_fsycl_option)
   CHECK_INCLUDE_FILE_CXX("sycl/sycl.hpp" _cxx_compiler_has_sycl_header ${FSYCL_OPTION})
-
-  set(_cxx_compiler_supports_sycl ${cxx_compiler_has_sycl_header})
+  set(_cxx_compiler_supports_sycl BOOL(${cxx_compiler_has_sycl_header}))
 else()
   set(_cxx_compiler_supports_sycl FALSE)
 endif()
 
 set(_regexp_exclude_current_binary_dir "(${CMAKE_CURRENT_BINARY_DIR})")
-set(_regexp_cxx17_required "(task_group_with_dependencies.cpp|parallel_for_each_fwd_substitution|graph_limiting_messages.cpp|graph_loops.cpp|graph_node_priorities.cpp|graph_reestablish_order.cpp|graph_small_nodes.cpp|graph_two_nodes_deduced.cpp|graph_with_join.cpp|migrate_bypass_tasks.cpp|migrate_parallel_do.cpp|migrate_recycling.cpp|migrate_tasks_adding_work.cpp)")
-set(_regexp_cxx20_required "(intro_parallel_for_transform.cpp)")
+set(_regexp_cxx17_required "(parallel_for_each_fwd_substitution.cpp|graph_limiting_messages.cpp|graph_loops.cpp|graph_node_priorities.cpp|graph_reestablish_order.cpp|graph_small_nodes.cpp|graph_two_nodes_deduced.cpp|graph_with_join.cpp|migrate_parallel_do.cpp|migrate_recycling.cpp)")
+set(_regexp_cxx20_required "(task_group_with_dependencies.cpp|migrate_bypass_tasks.cpp|intro_parallel_for_transform.cpp|migrate_tasks_adding_work.cpp)")
 set(_regexp_sycl_required "(graph_async_sycl.cpp|resumable_tasks.cpp)")
 set(_regexp_tbbmalloc_required "(memalloc)")
 set(_regexp_tbbmalloc_windows_only "(memalloc/windows_proxy.cpp)")
-
-add_custom_target(build-tbb-examples
-  COMMENT "Build all examples")
-
-add_custom_target(run-tbb-examples
-  COMMENT "Build and run all examples"
-  COMMAND "${CMAKE_CTEST_COMMAND}" --output-on-failure
-  USES_TERMINAL
-  DEPENDS build-tbb-examples)
 
 macro(tbb_tutorials_add_example _example_source_file)
     if (NOT _example_source_file MATCHES "${_regexp_exclude_current_binary_dir}")
@@ -51,7 +41,7 @@ macro(tbb_tutorials_add_example _example_source_file)
         continue()
       endif()
 
-      if ((NOT _cxx_compiler_supports_sycl) AND
+      if (NOT _cxx_compiler_supports_sycl AND
           _example_source_file MATCHES "${_regexp_sycl_required}")
         message(STATUS "Skip ${_example_source_file} since the compiler does not support SYCL")
         continue()
@@ -75,10 +65,14 @@ macro(tbb_tutorials_add_example _example_source_file)
         target_link_libraries(${_example_name} TBB::tbbmalloc)
       endif()
 
+      if (_example_source_file MATCHES "${_regexp_sycl_required}")
+        target_compile_options(${_example_name} PRIVATE "${FSYCL_OPTION}")
+        target_link_options(${_example_name} PRIVATE "${FSYCL_OPTION}")
+      endif()
+
       target_include_directories(${_example_name} PRIVATE
           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../common>)
       add_test(${_example_name} ${_example_name})
-      add_dependencies(build-tbb-examples ${_example_name})
     endif()
 endmacro()
 

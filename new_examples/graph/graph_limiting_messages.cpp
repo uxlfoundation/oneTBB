@@ -62,7 +62,7 @@ stats concurrencyAsControl() {
         return make_msg(id);
       }
     }};
-  tbb::flow::function_node<MsgPtr, int, tbb::flow::rejecting> 
+  tbb::flow::function_node<MsgPtr, int, tbb::flow::rejecting>
   limited_to_3_node{g, 3, [](const MsgPtr& m) {
       doWork("L3", m);
       return 0;
@@ -91,24 +91,24 @@ stats limiterNodeAsControl() {
       }
     }};
   tbb::flow::limiter_node<MsgPtr> limiter{g, 3};
-  tbb::flow::function_node unlimited_node_1{g, 
+  tbb::flow::function_node unlimited_node_1{g,
                                           tbb::flow::unlimited,
     [] (const MsgPtr& m) {
       doWork("U1", m);
       return m;
     }
   };
-  tbb::flow::function_node unlimited_node_2{g, 
+  tbb::flow::function_node unlimited_node_2{g,
                                           tbb::flow::unlimited,
     [] (const MsgPtr& m) {
       doWork("U2", m);
       return m;
     }
   };
-  
+
   tbb::flow::join_node<std::tuple<MsgPtr, MsgPtr>, tbb::flow::key_matching<int>>
   join{ g, [](const MsgPtr& p) { return p->get_id(); },
-           [](const MsgPtr& p) { return p->get_id(); }}; 
+           [](const MsgPtr& p) { return p->get_id(); }};
 
   tbb::flow::function_node
   unlimited_node_3{g, tbb::flow::unlimited,
@@ -149,33 +149,33 @@ stats tokensAsControl() {
     }};
 
   tbb::flow::buffer_node<MsgPtr> token_buffer{g};
-  tbb::flow::join_node<std::tuple<int, token_t>, 
+  tbb::flow::join_node<std::tuple<int, token_t>,
                        tbb::flow::reserving> token_join{g};
 
-  tbb::flow::function_node<std::tuple<int,token_t>, MsgPtr, tbb::flow::lightweight> 
+  tbb::flow::function_node<std::tuple<int,token_t>, MsgPtr, tbb::flow::lightweight>
   reuse_node{g, tbb::flow::unlimited,
   [] (const  std::tuple<int, token_t>& m) -> MsgPtr {
     return recycle_token_as_msg(std::get<1>(m), std::get<0>(m));
   }};
 
-tbb::flow::function_node unlimited_node_1{g, 
+tbb::flow::function_node unlimited_node_1{g,
                                           tbb::flow::unlimited,
     [] (const MsgPtr& m) {
       doWork("U1", m);
       return m;
     }
   };
-  tbb::flow::function_node unlimited_node_2{g, 
+  tbb::flow::function_node unlimited_node_2{g,
                                           tbb::flow::unlimited,
     [] (const MsgPtr& m) {
       doWork("U2", m);
       return m;
     }
   };
-  
+
   tbb::flow::join_node<std::tuple<MsgPtr, MsgPtr>, tbb::flow::tag_matching>
-  join{ g, [](const MsgPtr& p) { return p->get_id(); },
-           [](const MsgPtr& p) { return p->get_id(); }}; 
+  join{ g, [](const MsgPtr& p) -> tbb::flow::tag_value { return p->get_id(); },
+           [](const MsgPtr& p) -> tbb::flow::tag_value { return p->get_id(); }};
 
   tbb::flow::function_node
   unlimited_node_3{g, tbb::flow::unlimited,
@@ -197,7 +197,7 @@ tbb::flow::function_node unlimited_node_1{g,
 
   for (int i = 0; i < 3; ++i)
     token_buffer.try_put(make_msg(-1));
-  
+
   input.activate();
   g.wait_for_all();
   return make_stats("tokenbufferAsControl", t0);
@@ -231,7 +231,7 @@ std::atomic<int> maxWorkTasks = 0;
 stats make_stats(const std::string& str, const tbb::tick_count& t0) {
   tbb::tick_count t1 = tbb::tick_count::now();
   std::printf("\n");
-  stats s = { str, (t1-t0).seconds(), 
+  stats s = { str, (t1-t0).seconds(),
               trackedMsgAllocations,
               trackedMsgCount, maxTrackedMsgs,
               workTaskCount, maxWorkTasks };
@@ -248,7 +248,7 @@ void increment(std::atomic<int>& c, std::atomic<int>& m) {
   int maxValue = m;
   while (cnt > maxValue) {
     m.compare_exchange_strong(maxValue, cnt);
-  } 
+  }
 }
 
 void decrement(std::atomic<int>& c) { --c; }
@@ -257,7 +257,7 @@ class TrackedMsg : public Msg {
    int id;
 
 public:
-   TrackedMsg() : id(-1) { } 
+   TrackedMsg() : id(-1) { }
    TrackedMsg(int i) : id(i) { increment(trackedMsgCount,maxTrackedMsgs); }
    TrackedMsg(const TrackedMsg& b) : id(b.id) { increment(trackedMsgCount,maxTrackedMsgs); }
    ~TrackedMsg() override { decrement(trackedMsgCount); }
@@ -291,16 +291,16 @@ static void doWork(const std::string& s, const MsgPtr& m) {
 
 void stats::dump_header() {
   std::printf("\n%-25s %-15s %-15s %-15s %-15s\n",
-              "example", "time", "allocs", 
-              "max Msgs", "max Tasks"); 
+              "example", "time", "allocs",
+              "max Msgs", "max Tasks");
   std::printf("%-25s %-15s %-15s %-15s %-15s\n",
-              "-------", "----", "------", 
-              "--------", "---------"); 
+              "-------", "----", "------",
+              "--------", "---------");
 }
 
 void stats::dump() {
-  std::printf("%-25s %-15f %-15d %-15d %-15d\n", 
-              s.c_str(), time, 
+  std::printf("%-25s %-15f %-15d %-15d %-15d\n",
+              s.c_str(), time,
               totalAllocations,
               maxConcurrentMsgs,
               maxConcurrentWorkTasks);
@@ -310,12 +310,11 @@ static void warmupTBB() {
   // This is a simple loop that should get workers started.
   // oneTBB creates workers lazily on first use of the library
   // so this hides the startup time when looking at trivial
-  // examples that do little real work. 
-  tbb::parallel_for(0, tbb::info::default_concurrency(), 
+  // examples that do little real work.
+  tbb::parallel_for(0, tbb::info::default_concurrency(),
     [=](int) {
       tbb::tick_count t0 = tbb::tick_count::now();
       while ((tbb::tick_count::now() - t0).seconds() < 0.01);
     }
   );
 }
-
