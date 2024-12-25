@@ -26,25 +26,8 @@ that operates on a chunk. The form is an STL-style function object,
 called the *body* object, in which ``operator()`` processes a chunk. The
 following code declares the body object.
 
-::
-
-   #include "oneapi/tbb.h"
-
-   using namespace oneapi::tbb;
-
-   class ApplyFoo {
-       float *const my_a;
-   public:
-       void operator()( const blocked_range<size_t>& r ) const {
-           float *a = my_a;
-           for( size_t i=r.begin(); i!=r.end(); ++i ) 
-              Foo(a[i]);
-       }
-       ApplyFoo( float a[] ) :
-           my_a(a)
-       {}
-   };
-
+.. literalinclude:: ./examples/parallel_for_os_example_1.h
+    :language: c++
 
 The ``using`` directive in the example enables you to use the library
 identifiers without having to write out the namespace prefix ``oneapi::tbb``
@@ -97,17 +80,8 @@ example:
 Once you have the loop body written as a body object, invoke the
 template function ``parallel_for``, as follows:
 
-
-::
-
-
-   #include "oneapi/tbb.h"
-    
-
-   void ParallelApplyFoo( float a[], size_t n ) {
-       parallel_for(blocked_range<size_t>(0,n), ApplyFoo(a));
-   }
-
+.. literalinclude:: ./examples/parallel_for_os_example_2.h
+    :language: c++
 
 The ``blocked_range`` constructed here represents the entire iteration
 space from 0 to n-1, which ``parallel_for`` divides into subspaces for
@@ -121,4 +95,3 @@ example uses the default grainsize of 1 because by default
 grainsize.
 
 .. include:: parallel_for_toctree.rst
-   

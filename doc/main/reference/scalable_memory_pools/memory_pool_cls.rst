@@ -70,11 +70,5 @@ Examples
 
 The code below provides a simple example of allocation from an extensible memory pool.
 
-.. code:: cpp
-
-    #define TBB_PREVIEW_MEMORY_POOL 1
-    #include "oneapi/tbb/memory_pool.h"
-    ...
-    oneapi::tbb::memory_pool<std::allocator<char> > my_pool;
-    void* my_ptr = my_pool.malloc(10);
-    my_pool.free(my_ptr);
+.. literalinclude:: ../examples/memory_pool_example.cpp
+    :language: c++
