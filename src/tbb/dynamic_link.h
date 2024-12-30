@@ -111,7 +111,15 @@ enum dynamic_link_error_t {
     dl_sym_not_found,     // char const * sym, dlerr_t err
                           // Note: dlerr_t depends on OS: it is char const * on Linux* and macOS*, int on Windows*.
     dl_sys_fail,          // char const * func, int err
-    dl_buff_too_small     // none
+    dl_buff_too_small,    // none
+    dl_unload_fail,
+    dl_lib_unsigned,
+    dl_sig_err_unknown,
+    dl_sig_explicit_distrust,
+    dl_sig_untrusted_root,
+    dl_sig_distrusted,
+    dl_sig_security_settings,
+    dl_sig_other_error
 }; // dynamic_link_error_t
 
 } // namespace r1
