@@ -27,16 +27,19 @@
 */
 
 #include <cstdarg>          // va_list etc.
-#include <cstring>          // strrchr
+#include <cstring>          // strrchr, memset
 #if _WIN32
-    #include <malloc.h>
-
     // Unify system calls
     #define dlopen( name, flags )   LoadLibraryEx( name, NULL, LOAD_LIBRARY_SAFE_CURRENT_DIRS )
     #define dlsym( handle, name )   GetProcAddress( handle, name )
     // FreeLibrary return bool value that is not used.
     #define dlclose( handle )       (void)( ! FreeLibrary( handle ) )
     #define dlerror()               GetLastError()
+#if __TBB_VERIFY_DEPENDENCY_SIGNATURE
+    #include <Softpub.h>
+    #include <wintrust.h>
+    #pragma comment (lib, "wintrust")     // Link with the Wintrust.lib file.
+#endif
 #ifndef PATH_MAX
     #define PATH_MAX                MAX_PATH
 #endif
@@ -430,6 +433,125 @@ namespace r1 {
     }
 #endif
 
+#if __TBB_VERIFY_DEPENDENCY_SIGNATURE
+    /**
+     * Obtains full path to the specified filename and stores it inside passed buffer.
+     *
+     * Returns the actual length of the buffer required to hold the full path to the specified file,
+     * including terminating NULL character.
+     */
+    unsigned get_module_full_path(char* path_buffer, const unsigned buffer_length,
+                                  const char* filename)
+    {
+        __TBB_ASSERT( buffer_length > 0, "Cannot write the path to the buffer with zero length" );
+
+        // TODO: Load using non-deprecated flags
+        // Searching for module name skipping working directory as it is considered unsafe. Here, however, it is necessary because the same
+        dynamic_link_handle handle = LoadLibraryExA(
+            filename, NULL, DONT_RESOLVE_DLL_REFERENCES | LOAD_LIBRARY_SAFE_CURRENT_DIRS
+        );
+        if (nullptr == handle) {
+            DYNAMIC_LINK_WARNING( dl_lib_not_found, filename, dlerror() );
+            return /*actual_length*/0;
+        }
+
+        unsigned actual_length = GetModuleFileNameA( handle, path_buffer,
+                                                     static_cast<DWORD>(buffer_length) );
+        if (0 == actual_length)
+            DYNAMIC_LINK_WARNING( dl_lib_not_found, filename, dlerror() );
+        else if (buffer_length == actual_length)
+            // The buffer length was insufficient. The terminating NULL character is automatically
+            // counted in this case.
+            DYNAMIC_LINK_WARNING( dl_buff_too_small );
+        else
+            actual_length += 1;   // Count terminating NULL character as part of string length
+
+        if (!FreeLibrary(handle))
+            DYNAMIC_LINK_WARNING( dl_unload_fail, filename, dlerror() );
+
+        return actual_length;
+    }
+
+    void report_signature_validation_status(const LONG retval, const char* filepath) {
+        switch (retval) {
+        case ERROR_SUCCESS:
+            // The file is signed:
+            //   - Hash representing a file is trusted.
+            //   - Trusted publisher without any verification errors.
+            //   - No publisher or time stamp chain errors.
+            break;
+        case TRUST_E_NOSIGNATURE:
+        {
+            // The file is not signed or has an invalid signature.
+            auto lerr = dlerror();
+            if (lerr == TRUST_E_NOSIGNATURE || lerr == TRUST_E_SUBJECT_FORM_UNKNOWN ||
+                lerr == TRUST_E_PROVIDER_UNKNOWN)
+            {
+                DYNAMIC_LINK_WARNING( dl_lib_unsigned, filepath );
+            } else {
+                DYNAMIC_LINK_WARNING( dl_sig_err_unknown, filepath, lerr );
+            }
+            break;
+        }
+        case TRUST_E_EXPLICIT_DISTRUST:
+            // The hash representing the subject is explicitly disallowed by the admin or user.
+            DYNAMIC_LINK_WARNING( dl_sig_explicit_distrust, filepath );
+            break;
+        case CERT_E_UNTRUSTEDROOT:
+            DYNAMIC_LINK_WARNING( dl_sig_untrusted_root, filepath );
+            break;
+        case TRUST_E_SUBJECT_NOT_TRUSTED:
+            DYNAMIC_LINK_WARNING( dl_sig_distrusted, filepath );
+            break;
+        case CRYPT_E_SECURITY_SETTINGS:
+            DYNAMIC_LINK_WARNING( dl_sig_security_settings, filepath );
+            break;
+        default:
+            DYNAMIC_LINK_WARNING( dl_sig_other_error, filepath, retval);
+            break;
+        }
+    }
+
+    bool has_signature_pass_validation(const char* filepath, const unsigned length) {
+        wchar_t wfilepath[PATH_MAX] = {0};
+        size_t num_converted = 0;
+        // TODO: Replace with std::mbsrtowcs
+        const errno_t error = mbstowcs_s(&num_converted, wfilepath, length, filepath, _TRUNCATE);
+        if (error) // Cannot convert filepath to wide char string
+            return false;
+
+        WINTRUST_FILE_INFO fdata;
+        std::memset(&fdata, 0, sizeof(fdata));
+        fdata.cbStruct       = sizeof(WINTRUST_FILE_INFO);
+        fdata.pcwszFilePath  = wfilepath;
+
+        // Check that the certificate used to sign the specified file chains up to a root
+        // certificate located in the trusted root certificate store, implying that the identity of
+        // the publisher has been verified by a certification authority.
+        GUID pgActionID = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+
+        WINTRUST_DATA pWVTData;
+        std::memset(&pWVTData, 0, sizeof(pWVTData));
+        pWVTData.cbStruct            = sizeof(WINTRUST_DATA);
+        pWVTData.dwUIChoice          = WTD_UI_NONE;                    // Disable WVT UI
+        pWVTData.fdwRevocationChecks = WTD_REVOKE_WHOLECHAIN;          // Check the whole chain
+        pWVTData.dwUnionChoice       = WTD_CHOICE_FILE;                // Verify file signature
+        pWVTData.pFile               = &fdata;
+        pWVTData.dwStateAction       = WTD_STATEACTION_VERIFY;         // Verify action
+        // Perform revocation checking on the entire certificate chain but use only the local cache
+        pWVTData.dwProvFlags         = WTD_CACHE_ONLY_URL_RETRIEVAL | WTD_REVOCATION_CHECK_CHAIN;
+        pWVTData.dwUIContext         = WTD_UICONTEXT_EXECUTE;          // UI Context to run the file
+
+        const auto rc = WinVerifyTrust((HWND)INVALID_HANDLE_VALUE, &pgActionID, &pWVTData);
+        report_signature_validation_status(rc, filepath);
+
+        pWVTData.dwStateAction = WTD_STATEACTION_CLOSE;       // Release WVT state data
+        (void)WinVerifyTrust(NULL, &pgActionID, &pWVTData);
+
+        return ERROR_SUCCESS == rc;
+    }
+#endif  // __TBB_VERIFY_DEPENDENCY_SIGNATURE
+
     dynamic_link_handle dynamic_load( const char* library, const dynamic_link_descriptor descriptors[],
                                       std::size_t required, int flags )
     {
@@ -450,15 +572,29 @@ namespace r1 {
             path = absolute_path;
         }
         std::fprintf(stdout, "Loading filename \"%s\"\n", path);
+        dynamic_link_handle library_handle = nullptr;
 #if _WIN32
         // Prevent Windows from displaying silly message boxes if it fails to load library
         // (e.g. because of MS runtime problems - one of those crazy manifest related ones)
         UINT prev_mode = SetErrorMode (SEM_FAILCRITICALERRORS);
+#if __TBB_VERIFY_DEPENDENCY_SIGNATURE
+        // TODO: Process DYNAMIC_LINK_BUILD_ABSOLUTE_PATH
+        char buff[PATH_MAX] = {0};
+
+        const unsigned length = get_module_full_path(buff, /*buffer_length*/PATH_MAX, path);
+        if (length == 0) // The full path to the module has not been retrieved for some reason
+            return library_handle;
+
+        if (has_signature_pass_validation(buff, length)) {
+#endif
 #endif /* _WIN32 */
-        // The second argument (loading_flags) is ignored on Windows
-        dynamic_link_handle library_handle = dlopen( path,
-                                                     loading_flags(flags & DYNAMIC_LINK_LOCAL) );
+            // The second argument (loading_flags) is ignored on Windows
+            library_handle = dlopen( path, loading_flags(flags & DYNAMIC_LINK_LOCAL) );
 #if _WIN32
+#if __TBB_VERIFY_DEPENDENCY_SIGNATURE
+        } else
+            return library_handle; // Warning (if any) has already been reported
+#endif
         SetErrorMode (prev_mode);
 #endif /* _WIN32 */
         if( library_handle ) {
