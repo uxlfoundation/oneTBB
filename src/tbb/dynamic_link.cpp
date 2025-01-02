@@ -113,9 +113,102 @@ namespace r1 {
 #if !defined(DYNAMIC_LINK_WARNING) && !__TBB_WIN8UI_SUPPORT && __TBB_DYNAMIC_LOAD_ENABLED
     // Report runtime errors and continue.
     #define DYNAMIC_LINK_WARNING dynamic_link_warning
+#if TBB_DYNAMIC_LINK_WARNING
+    static void dynamic_link_warning( dynamic_link_error_t code, ... ) {
+        const char* prefix = "oneTBB dynamic link error:";
+        const char* str = nullptr;
+        // Note: dlerr_t depends on OS: it is char const * on Linux* and macOS*, int on Windows*.
+#if _WIN32
+        #define DLERROR_SPECIFIER "%d"
+        typedef long dlerr_t;
+#else
+        #define DLERROR_SPECIFIER "%s"
+        typedef const char* dlerr_t;
+#endif
+        dlerr_t error = 0;
+
+        std::va_list args;
+        va_start(args, code);
+
+        switch (code) {
+        case dl_lib_not_found:
+            str = va_arg(args, const char*);
+            error = va_arg(args, dlerr_t);
+            // TODO: Use fprintf_s once dynamic link functionality is extracted into a separate
+            // module (e.g., a static library)
+            std::fprintf(stdout, "%s The module \"%s\" was not loaded because it was not found. "
+                         "System error: " DLERROR_SPECIFIER "\n", prefix, str, error);
+            break;
+        case dl_sym_not_found:     // char const * sym, dlerr_t err:
+            // TODO: Print not found symbol once it is used by the implementation
+            break;
+        case dl_sys_fail:
+            str = va_arg(args, const char*);
+            error = va_arg(args, dlerr_t);
+            std::fprintf(stdout, "oneTBB: A call to \"%s\" failed with error " DLERROR_SPECIFIER
+                         "\n", str, error);
+            break;
+        case dl_buff_too_small:
+            std::fprintf(stdout, "oneTBB: An internal buffer representing a path to dynamically "
+                         "loaded module is small. Consider compile with larger value for PATH_MAX "
+                         "macro.\n");
+            break;
+        case dl_unload_fail:
+            str = va_arg(args, const char*);
+            error = va_arg(args, dlerr_t);
+            std::fprintf(stdout, "%s Error unloading the module \"%s\": " DLERROR_SPECIFIER "\n",
+                         prefix, str, error);
+            break;
+        case dl_lib_unsigned:
+            str = va_arg(args, const char*);
+            std::fprintf(stdout, "%s The module \"%s\" was not loaded because it is unsigned or has "
+                         "invalid signature.\n", prefix, str);
+            break;
+        case dl_sig_err_unknown:
+            str = va_arg(args, const char*);
+            error = va_arg(args, dlerr_t);
+            std::fprintf(stdout, "%s The module \"%s\" was not loaded because its signature "
+                         "verification results in unknown error:" DLERROR_SPECIFIER "\n",
+                         prefix, str, error);
+            break;
+        case dl_sig_explicit_distrust:
+            str = va_arg(args, const char*);
+            std::fprintf(stdout, "%s The module \"%s\" was not loaded because the certificate "
+                         "with which it was signed is explicitly distrusted by an admin or user.\n",
+                         prefix, str);
+            break;
+        case dl_sig_untrusted_root:
+            str = va_arg(args, const char*);
+            std::fprintf(stdout, "%s The module \"%s\" was not loaded because during the signature "
+                         "verification process, the certificate chain is terminated in a root "
+                         "certificate which is not trusted.\n", prefix, str);
+            break;
+        case dl_sig_distrusted:
+            str = va_arg(args, const char*);
+            std::fprintf(stdout, "%s The module \"%s\" was not loaded because its signature is not "
+                         "trusted.\n", prefix, str);
+            break;
+        case dl_sig_security_settings:
+            str = va_arg(args, const char*);
+            std::fprintf(stdout, "%s The module \"%s\" was not loaded because the hash or publisher "
+                         "was not explicitly trusted and user trust was not allowed.", prefix, str);
+            break;
+        case dl_sig_other_error:
+            str = va_arg(args, const char*);
+            error = va_arg(args, dlerr_t);
+            std::fprintf(stdout, "%s The module \"%s\" was not loaded. System error code "
+                         DLERROR_SPECIFIER "\n", prefix, str, error);
+            break;
+        }
+
+        va_end(args);
+    } // library_warning
+#undef DLERROR_SPECIFIER
+#else
     static void dynamic_link_warning( dynamic_link_error_t code, ... ) {
         suppress_unused_warning(code);
     } // library_warning
+#endif  // TBB_DYNAMIC_LINK_WARNING
 #endif /* !defined(DYNAMIC_LINK_WARNING) && !__TBB_WIN8UI_SUPPORT && __TBB_DYNAMIC_LOAD_ENABLED */
 
     static bool resolve_symbols( dynamic_link_handle module, const dynamic_link_descriptor descriptors[], std::size_t required )
@@ -448,7 +541,7 @@ namespace r1 {
         // TODO: Load using non-deprecated flags
         // Searching for module name skipping working directory as it is considered unsafe. Here, however, it is necessary because the same
         dynamic_link_handle handle = LoadLibraryExA(
-            filename, NULL, DONT_RESOLVE_DLL_REFERENCES | LOAD_LIBRARY_SAFE_CURRENT_DIRS
+            filename, /*reserved*/NULL, LOAD_LIBRARY_SAFE_CURRENT_DIRS | DONT_RESOLVE_DLL_REFERENCES
         );
         if (nullptr == handle) {
             DYNAMIC_LINK_WARNING( dl_lib_not_found, filename, dlerror() );
