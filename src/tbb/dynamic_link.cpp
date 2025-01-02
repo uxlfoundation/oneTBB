@@ -581,16 +581,15 @@ namespace r1 {
         // (e.g. because of MS runtime problems - one of those crazy manifest related ones)
         UINT prev_mode = SetErrorMode (SEM_FAILCRITICALERRORS);
 #if __TBB_VERIFY_DEPENDENCY_SIGNATURE
-        const char* filepath = path;
         char buff[PATH_MAX] = {0};
         if ( !(flags & DYNAMIC_LINK_BUILD_ABSOLUTE_PATH) ) { // Get the path if it is not yet built
             length = get_module_full_path(buff, /*buffer_length*/PATH_MAX, path);
             if (length == 0) // The full path to the module has not been retrieved
                 return library_handle;
-            filepath = buff;
+            path = buff;
         }
 
-        if (has_valid_signature(filepath, length)) {
+        if (has_valid_signature(path, length)) {
 #endif /* __TBB_VERIFY_DEPENDENCY_SIGNATURE */
 #endif /* _WIN32 */
             // The second argument (loading_flags) is ignored on Windows
