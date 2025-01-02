@@ -443,7 +443,7 @@ namespace r1 {
     unsigned get_module_full_path(char* path_buffer, const unsigned buffer_length,
                                   const char* filename)
     {
-        __TBB_ASSERT( buffer_length > 0, "Cannot write the path to the buffer with zero length" );
+        __TBB_ASSERT_EX( buffer_length > 0, "Cannot write the path to the buffer with zero length" );
 
         // TODO: Load using non-deprecated flags
         // Searching for module name skipping working directory as it is considered unsafe. Here, however, it is necessary because the same
@@ -457,13 +457,13 @@ namespace r1 {
 
         unsigned actual_length = GetModuleFileNameA( handle, path_buffer,
                                                      static_cast<DWORD>(buffer_length) );
-        if (0 == actual_length)
+        if (0 == actual_length) {
             DYNAMIC_LINK_WARNING( dl_lib_not_found, filename, dlerror() );
-        else if (buffer_length == actual_length)
+        } else if (buffer_length == actual_length) {
             // The buffer length was insufficient. The terminating NULL character is automatically
             // counted in this case.
             DYNAMIC_LINK_WARNING( dl_buff_too_small );
-        else
+        } else
             actual_length += 1;   // Count terminating NULL character as part of string length
 
         if (!FreeLibrary(handle))
@@ -513,13 +513,15 @@ namespace r1 {
     }
 
     bool has_valid_signature(const char* filepath, const std::size_t length) {
+        __TBB_ASSERT_EX(length <= PATH_MAX, "Too small buffer for path conversion");
         wchar_t wfilepath[PATH_MAX] = {0};
-        size_t num_converted = 0;
-        // TODO: Replace with std::mbsrtowcs
-        const errno_t error = mbstowcs_s(&num_converted, wfilepath, length, filepath, _TRUNCATE);
-        if (error) // Cannot convert filepath to wide char string
-            return false;
-
+        {
+            std::mbstate_t state{};
+            const char* ansi_filepath = filepath; // mbsrtowcs moves original pointer
+            const size_t num_converted = mbsrtowcs(wfilepath, &ansi_filepath, length, &state);
+            if (num_converted == std::size_t(-1))
+                return false;
+        }
         WINTRUST_FILE_INFO fdata;
         std::memset(&fdata, 0, sizeof(fdata));
         fdata.cbStruct       = sizeof(WINTRUST_FILE_INFO);
@@ -581,7 +583,7 @@ namespace r1 {
 #if __TBB_VERIFY_DEPENDENCY_SIGNATURE
         const char* filepath = path;
         char buff[PATH_MAX] = {0};
-        if ( !(flags & DYNAMIC_LINK_BUILD_ABSOLUTE_PATH) ) { // Rely on a path built above
+        if ( !(flags & DYNAMIC_LINK_BUILD_ABSOLUTE_PATH) ) { // Get the path if it is not yet built
             length = get_module_full_path(buff, /*buffer_length*/PATH_MAX, path);
             if (length == 0) // The full path to the module has not been retrieved
                 return library_handle;
@@ -589,7 +591,7 @@ namespace r1 {
         }
 
         if (has_valid_signature(filepath, length)) {
-#endif
+#endif /* __TBB_VERIFY_DEPENDENCY_SIGNATURE */
 #endif /* _WIN32 */
             // The second argument (loading_flags) is ignored on Windows
             library_handle = dlopen( path, loading_flags(flags & DYNAMIC_LINK_LOCAL) );
@@ -597,7 +599,7 @@ namespace r1 {
 #if __TBB_VERIFY_DEPENDENCY_SIGNATURE
         } else
             return library_handle; // Warning (if any) has already been reported
-#endif
+#endif /* __TBB_VERIFY_DEPENDENCY_SIGNATURE */
         SetErrorMode (prev_mode);
 #endif /* _WIN32 */
         if( library_handle ) {
