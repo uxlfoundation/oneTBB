@@ -512,7 +512,7 @@ namespace r1 {
         }
     }
 
-    bool has_signature_pass_validation(const char* filepath, const unsigned length) {
+    bool has_valid_signature(const char* filepath, const std::size_t length) {
         wchar_t wfilepath[PATH_MAX] = {0};
         size_t num_converted = 0;
         // TODO: Replace with std::mbsrtowcs
@@ -560,13 +560,14 @@ namespace r1 {
         const char* path = library;
         std::size_t const len = PATH_MAX + 1;
         char absolute_path[ len ];
+        std::size_t length = 0;
         if (flags & DYNAMIC_LINK_BUILD_ABSOLUTE_PATH) {
-            std::size_t rc = abs_path( library, absolute_path, len );
-            if (rc > len) {
+            length = abs_path( library, absolute_path, len );
+            if (length > len) {
                 DYNAMIC_LINK_WARNING( dl_buff_too_small );
                 return nullptr;
-            } else if (rc == 0) {
-                // rc == 0 means failing of init_ap_data so the warning has already been issued.
+            } else if (length == 0) {
+                // length == 0 means failing of init_ap_data so the warning has already been issued.
                 return nullptr;
             }
             path = absolute_path;
@@ -578,14 +579,16 @@ namespace r1 {
         // (e.g. because of MS runtime problems - one of those crazy manifest related ones)
         UINT prev_mode = SetErrorMode (SEM_FAILCRITICALERRORS);
 #if __TBB_VERIFY_DEPENDENCY_SIGNATURE
-        // TODO: Process DYNAMIC_LINK_BUILD_ABSOLUTE_PATH
+        const char* filepath = path;
         char buff[PATH_MAX] = {0};
+        if ( !(flags & DYNAMIC_LINK_BUILD_ABSOLUTE_PATH) ) { // Rely on a path built above
+            length = get_module_full_path(buff, /*buffer_length*/PATH_MAX, path);
+            if (length == 0) // The full path to the module has not been retrieved
+                return library_handle;
+            filepath = buff;
+        }
 
-        const unsigned length = get_module_full_path(buff, /*buffer_length*/PATH_MAX, path);
-        if (length == 0) // The full path to the module has not been retrieved for some reason
-            return library_handle;
-
-        if (has_signature_pass_validation(buff, length)) {
+        if (has_valid_signature(filepath, length)) {
 #endif
 #endif /* _WIN32 */
             // The second argument (loading_flags) is ignored on Windows
