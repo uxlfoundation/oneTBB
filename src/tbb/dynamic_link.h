@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -81,19 +81,18 @@ const int DYNAMIC_LINK_DEFAULT       = DYNAMIC_LINK_BUILD_ABSOLUTE_PATH | DYNAMI
 
 //! Fill in dynamically linked handlers.
 /** 'library' is the name of the requested library. It should not contain a full
-    path since dynamic_link adds the full path (from which the runtime itself
-    was loaded) to the library name.
-    'required' is the number of the initial entries in the array descriptors[]
-    that have to be found in order for the call to succeed. If the library and
-    all the required handlers are found, then the corresponding handler
-    pointers are set, and the return value is true.  Otherwise the original
-    array of descriptors is left untouched and the return value is false.
-    'required' is limited by 20 (exceeding of this value will result in failure
-    to load the symbols and the return value will be false).
-    'handle' is the handle of the library if it is loaded. Otherwise it is left
-    untouched.
-    'flags' is the set of DYNAMIC_LINK_* flags. Each of the DYNAMIC_LINK_* flags
-    allows its corresponding linking stage.
+    path. If DYNAMIC_LINK_BUILD_ABSOLUTE_PATH is specified in the 'flags' then
+    the function adds the full path to the 'library' name by prepending the path
+    from which the runtime itself was loaded. 'required' is the number of the
+    initial entries in the array descriptors[] that have to be found in order
+    for the call to succeed. If the library and all the required handlers are
+    found, then the corresponding handler pointers are set, and the return value
+    is true. Otherwise the original array of descriptors is left untouched and
+    the return value is false. 'required' is limited by 20 (exceeding of this
+    value will result in failure to load the symbols and the return value will
+    be false). 'handle' is the handle of the library if it is loaded. Otherwise
+    it is left untouched. 'flags' is the set of DYNAMIC_LINK_* flags. Each of
+    the DYNAMIC_LINK_* flags allows its corresponding linking stage.
 **/
 bool dynamic_link( const char* library,
                    const dynamic_link_descriptor descriptors[],
@@ -105,21 +104,57 @@ void dynamic_unlink( dynamic_link_handle handle );
 
 void dynamic_unlink_all();
 
+// The enum lists possible errors that can appear during dynamic linking. To
+// print detailed information when the errors appear, DYNAMIC_LINK_WARNING macro
+// needs to be defined, accepting one of these enum values as its first
+// parameter and a variable parameter args. The parameters in this list are
+// described below per each error along with the situation when it arises.
+//
+// To use the default implementation for DYNAMIC_LINK_WARNING macro,
+// TBB_DYNAMIC_LINK_WARNING macro needs to be set during compilation.
+//
+// Note: dlerr_t depends on OS: it is char const * on Linux* and macOS*, int on
+// Windows*.
 enum dynamic_link_error_t {
     dl_success = 0,
-    dl_lib_not_found,     // char const * lib, dlerr_t err
-    dl_sym_not_found,     // char const * sym, dlerr_t err
-                          // Note: dlerr_t depends on OS: it is char const * on Linux* and macOS*, int on Windows*.
-    dl_sys_fail,          // char const * func, int err
-    dl_buff_too_small,    // none
-    dl_unload_fail,
-    dl_lib_unsigned,
-    dl_sig_err_unknown,
-    dl_sig_explicit_distrust,
-    dl_sig_untrusted_root,
-    dl_sig_distrusted,
-    dl_sig_security_settings,
-    dl_sig_other_error
+
+    // Library is not found
+    dl_lib_not_found,           // char const * lib, dlerr_t err
+
+    // Symbol is not found
+    dl_sym_not_found,           // char const * sym, dlerr_t err
+
+    // System call returned error status
+    dl_sys_fail,                // char const * func, dlerr_t err
+
+    // Internal intermediate buffer is too small, consider setting PATH_MAX
+    // macro to a larger value
+    dl_buff_too_small,          // none
+
+    // An error during library unload
+    dl_unload_fail,             // char const * lib, dlerr_t err
+
+    // Library is unsinged or has invalid signature
+    dl_lib_unsigned,            // char const * lib
+
+    // Unknown error during signature verification
+    dl_sig_err_unknown,         // char const * lib, dlerr_t err
+
+    // Signing certificate is explicitly distrusted by admin or user
+    dl_sig_explicit_distrust,   // char const * lib
+
+    // Certificate chain is terminated in a untrusted root certificate
+    dl_sig_untrusted_root,      // char const * lib
+
+    // Signature is not trusted
+    dl_sig_distrusted,          // char const * lib
+
+    // Hash or publisher was not explicitly trusted and user trust was not
+    // allowed
+    dl_sig_security_settings,   // char const * lib
+
+    // Other error, 'err' contains system error code
+    dl_sig_other_error          // char const * lib, dlerr_t err
 }; // dynamic_link_error_t
 
 } // namespace r1
