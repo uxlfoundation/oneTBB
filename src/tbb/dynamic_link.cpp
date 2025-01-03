@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -71,9 +71,10 @@ dynamic_link provides certain guarantees:
   symbols are not resolved, the dynamic_link_descriptor table is not modified;
   2. All returned symbols have secured lifetime: this means that none of them
   can be invalidated until dynamic_unlink is called;
-  3. Any loaded library is loaded only via the full path. The full path is that
-  from which the runtime itself was loaded. (This is done to avoid security
-  issues caused by loading libraries from insecure paths).
+  3. To avoid security issues caused by loading libraries from insecure paths,
+  the loading can be made via the full path and/or with validatiion of a
+  signature on Windows platforms. In any case, current working directory is
+  excluded from the loader consideration.
 
 dynamic_link searches for the requested symbols in three stages, stopping as
 soon as all of the symbols have been resolved.
@@ -87,7 +88,7 @@ soon as all of the symbols have been resolved.
     anything about the library from which they are exported). Therefore it
     tries to "pin" the symbols by obtaining the library name and reopening it.
     dlopen may fail to reopen the library in two cases:
-       i. The symbols are exported from the executable. Currently dynamic _link
+       i. The symbols are exported from the executable. Currently dynamic_link
       cannot handle this situation, so it will not find these symbols in this
       step.
       ii. The necessary library has been unloaded and cannot be reloaded. It
@@ -96,10 +97,11 @@ soon as all of the symbols have been resolved.
 
   2. Dynamic load: an attempt is made to load the requested library via the
   full path.
-    The full path used is that from which the runtime itself was loaded. If the
-    library can be loaded, then an attempt is made to resolve the requested
-    symbols in the newly loaded library.
-    If the symbols are not found the library is unloaded.
+    By default, the full path used is that from which the runtime itself was
+    loaded. On Windows the full path is determined by using system facilities
+    with subsequent signature validation. If the library can be loaded, then an
+    attempt is made to resolve the requested symbols in the newly loaded
+    library. If the symbols are not found the library is unloaded.
 
   3. Weak symbols: if weak symbols are available they are returned.
 */
@@ -259,11 +261,20 @@ namespace r1 {
 #else
 #if __TBB_DYNAMIC_LOAD_ENABLED
 /*
-    There is a security issue on Windows: LoadLibrary() may load and execute malicious code.
-    See http://www.microsoft.com/technet/security/advisory/2269637.mspx for details.
-    To avoid the issue, we have to pass full path (not just library name) to LoadLibrary. This
-    function constructs full path to the specified library (it is assumed the library located
-    side-by-side with the tbb.dll.
+    TODO: Update this vulnerability description and what is done with the latest patch.
+    A couple of moments to mention:
+     - SAFE_CURRENT_DIRS is used on Windows (always)
+     - Signature verification (by default)
+
+    There is a security issue on Windows: LoadLibrary() may load and execute
+    malicious code. To avoid the issue, we have to exclude working directory
+    from the list of directories in which loader searches for the library. This
+    is done by passing LOAD_LIBRARY_SAFE_CURRENT_DIRS flag to LoadLibraryEx. To
+    futher strengthen the security, library signature is verified.
+
+    Also, the default approach is to load the library via full path. This
+    function constructs full path to the specified library (it is assumed the
+    library located side-by-side with the tbb.dll.
 
     The function constructs absolute path for given relative path. Important: Base directory is not
     current one, it is the directory tbb.dll loaded from.
