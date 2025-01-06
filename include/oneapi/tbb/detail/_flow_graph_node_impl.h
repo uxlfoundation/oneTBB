@@ -555,41 +555,51 @@ struct init_output_ports {
 }; // struct init_output_ports
 
 #if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+
 class multifunction_node_tag {
 public:
     multifunction_node_tag() = default;
+
+    multifunction_node_tag(const multifunction_node_tag&) = delete;
+
+    multifunction_node_tag(multifunction_node_tag&&);
+
     multifunction_node_tag(const message_metainfo& metainfo) : my_metainfo(metainfo) {
         for (auto waiter : my_metainfo.waiters()) {
             waiter->reserve();
         }
     }
 
-    multifunction_node_tag(const multifunction_node_tag& other) : my_metainfo(other.my_metainfo) {
-        for (auto waiter : my_metainfo.waiters()) {
-            waiter->reserve();
-        }
-    }
-
-    multifunction_node_tag(multifunction_node_tag&& other) = default;
+    multifunction_node_tag& operator=(const multifunction_node_tag&) = delete;
+    multifunction_node_tag& operator=(multifunction_node_tag&&) = delete;
 
     ~multifunction_node_tag() {
-        for (auto waiter : my_metainfo.waiters()) {
-            waiter->release();
-        }
+        reset();
     }
 
     void merge(const multifunction_node_tag& other_tag) {
+        tbb::spin_mutex::scoped_lock lock(my_mutex);
+
+        // TODO: add comment
         for (auto waiter : other_tag.my_metainfo.waiters()) {
             waiter->reserve();
         }
         my_metainfo.merge(other_tag.my_metainfo);
+    }
+
+    void reset() {
+        for (auto waiter : my_metainfo.waiters()) {
+            waiter->release();
+        }
     }
 private:
     template <typename Output>
     friend class multifunction_output;
 
     message_metainfo my_metainfo;
+    tbb::spin_mutex  my_mutex;
 };
+
 #endif
 
 //! Implements methods for a function node that takes a type Input as input
