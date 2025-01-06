@@ -16,6 +16,12 @@ cmake_minimum_required(VERSION 3.5)
 
 # Enable CMake policies
 
+if (POLICY CMP0063)
+    # The NEW behavior for this policy is to honor the visibility properties for all target types.
+    cmake_policy(SET CMP0063 NEW)
+    set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
+endif()
+
 if (POLICY CMP0068)
     # RPATH settings do not affect install_name on macOS since CMake 3.9
     cmake_policy(SET CMP0068 NEW)
@@ -49,7 +55,7 @@ string(REGEX REPLACE ".*#define TBB_VERSION_MINOR ([0-9]+).*" "\\1" _tbb_ver_min
 string(REGEX REPLACE ".*#define TBB_VERSION_PATCH ([0-9]+).*" "\\1" _tbb_ver_patch "${_tbb_version_info}")
 string(REGEX REPLACE ".*#define TBB_INTERFACE_VERSION ([0-9]+).*" "\\1" TBB_INTERFACE_VERSION "${_tbb_version_info}")
 string(REGEX REPLACE ".*#define __TBB_BINARY_VERSION ([0-9]+).*" "\\1" TBB_BINARY_VERSION "${_tbb_version_info}")
-set(TBB_BINARY_MINOR_VERSION ${_tbb_ver_minor})
+string(REGEX REPLACE "..(..)." "\\1" TBB_BINARY_MINOR_VERSION "${TBB_INTERFACE_VERSION}")
 set(TBBMALLOC_BINARY_VERSION 2)
 set(TBBBIND_BINARY_VERSION 3)
 
@@ -84,6 +90,11 @@ endif()
 
 set(CMAKE_CXX_EXTENSIONS OFF) # use -std=c++... instead of -std=gnu++...
 # ---------------------------------------------------------------------------------------------------------
+# Setup symbol visibility properties.
+
+set(CMAKE_VISIBILITY_INLINES_HIDDEN TRUE)
+set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
+# ---------------------------------------------------------------------------------------------------------
 
 # Detect architecture (bitness).
 if (CMAKE_SIZEOF_VOID_P EQUAL 4)
@@ -105,8 +116,13 @@ option(TBB_CPF "Enable preview features of the library" OFF)
 option(TBB_FIND_PACKAGE "Enable search for external oneTBB using find_package instead of build from sources" OFF)
 option(TBB_DISABLE_HWLOC_AUTOMATIC_SEARCH "Disable HWLOC automatic search by pkg-config tool" ${CMAKE_CROSSCOMPILING})
 option(TBB_ENABLE_IPO "Enable Interprocedural Optimization (IPO) during the compilation" ON)
+option(TBB_CONTROL_FLOW_GUARD "Enable Control Flow Guard (CFG) during the compilation" OFF)
 option(TBB_FUZZ_TESTING "Enable fuzz testing" OFF)
 option(TBB_INSTALL "Enable installation" ON)
+option(TBB_FILE_TRIM "Enable __FILE__ trim" ON)
+if(LINUX)
+option(TBB_LINUX_SEPARATE_DBG "Enable separation of the debug symbols during the build" OFF)
+endif()
 if(APPLE)
 option(TBB_BUILD_APPLE_FRAMEWORKS "Build as Apple Frameworks" OFF)
 endif()
@@ -224,6 +240,16 @@ if (TBB_ENABLE_IPO AND BUILD_SHARED_LIBS AND NOT ANDROID_PLATFORM AND NOT TBB_SA
     if (TBB_IPO_PROPERTY OR TBB_IPO_FLAGS)
         message(STATUS "IPO enabled")
     endif()
+endif()
+
+if (TBB_FILE_TRIM)
+    file(RELATIVE_PATH TBB_RELATIVE_BIN_PATH ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_SOURCE_DIR})
+    file(TO_NATIVE_PATH ${CMAKE_SOURCE_DIR} NATIVE_TBB_PROJECT_ROOT_DIR)
+    file(TO_NATIVE_PATH ${TBB_RELATIVE_BIN_PATH} NATIVE_TBB_RELATIVE_BIN_PATH)
+endif ()
+
+if (TBB_CONTROL_FLOW_GUARD)
+    message(STATUS "Control Flow Guard (CFG) enabled")
 endif()
 
 set(TBB_COMPILER_SETTINGS_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/compilers/${CMAKE_CXX_COMPILER_ID}.cmake)

@@ -255,4 +255,3 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
 } // namespace r1
 } // namespace detail
 } // namespace tbb
-

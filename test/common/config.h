@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2005-2024 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -35,9 +35,6 @@
 #endif
 #ifndef TBB_PREVIEW_VARIADIC_PARALLEL_INVOKE
 #define TBB_PREVIEW_VARIADIC_PARALLEL_INVOKE 1
-#endif
-#ifndef TBB_PREVIEW_BLOCKED_RANGE_ND
-#define TBB_PREVIEW_BLOCKED_RANGE_ND 1
 #endif
 #ifndef TBB_PREVIEW_ISOLATED_TASK_GROUP
 #define TBB_PREVIEW_ISOLATED_TASK_GROUP 1

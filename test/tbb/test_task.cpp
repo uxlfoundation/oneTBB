@@ -861,3 +861,44 @@ TEST_CASE("Try to force Leaked proxy observers warning") {
         });
     });
 }
+
+//! \brief \ref error_guessing
+TEST_CASE("Force thread limit on per-thread reference_vertex") {
+    int num_threads = std::thread::hardware_concurrency();
+    int num_groups = 1000;
+
+    // Force thread limit on per-thread reference_vertex
+    std::vector<tbb::task_group> groups(num_groups);
+    tbb::parallel_for(0, num_threads, [&] (int) {
+        std::vector<tbb::task_group> local_groups(num_groups);
+        for (int i = 0; i < num_groups; ++i) {
+            groups[i].run([] {});
+            local_groups[i].run([] {});
+            local_groups[i].wait();
+        }
+    }, tbb::static_partitioner{});
+
+    // Enforce extra reference on each task_group
+    std::deque<tbb::task_handle> handles{};
+    for (int i = 0; i < num_groups; ++i) {
+        handles.emplace_back(groups[i].defer([] {}));
+    }
+
+    // Check correctness of the execution
+    tbb::task_group group;
+
+    std::atomic<int> final_sum{};
+    for (int i = 0; i < num_groups; ++i) {
+        group.run([&] { ++final_sum; });
+    }
+    group.wait();
+    REQUIRE_MESSAGE(final_sum == num_groups, "Some tasks were not executed");
+
+    for (int i = 0; i < num_groups; ++i) {
+        groups[i].run(std::move(handles[i]));
+    }
+
+    for (int i = 0; i < num_groups; ++i) {
+        groups[i].wait();
+    }
+}

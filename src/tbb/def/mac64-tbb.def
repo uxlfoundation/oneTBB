@@ -108,6 +108,7 @@ __ZN3tbb6detail2r120isolate_within_arenaERNS0_2d113delegate_baseEl
 __ZN3tbb6detail2r17enqueueERNS0_2d14taskEPNS2_15task_arena_baseE
 __ZN3tbb6detail2r17enqueueERNS0_2d14taskERNS2_18task_group_contextEPNS2_15task_arena_baseE
 __ZN3tbb6detail2r14waitERNS0_2d115task_arena_baseE
+__ZN3tbb6detail2r114execution_slotERKNS0_2d115task_arena_baseE
 
 # System topology parsing and threads pinning (governor.cpp)
 __ZN3tbb6detail2r115numa_node_countEv
@@ -157,4 +158,3 @@ __ZN3tbb6detail2r121notify_by_address_allEPv
 # Versioning (version.cpp)
 _TBB_runtime_interface_version
 _TBB_runtime_version
-

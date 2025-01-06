@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2005-2024 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -152,7 +152,7 @@ private:
 
     template<typename DimValue, unsigned int N, typename>
         __TBB_requires(blocked_range_value<DimValue>)
-    friend class blocked_rangeNd_impl;
+    friend class blocked_nd_range_impl;
 };
 
 } // namespace d1

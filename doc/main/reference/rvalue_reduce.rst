@@ -33,7 +33,8 @@ or
 
 .. cpp:function:: Value Func::operator()(const Range& range, const Value& x) const
 
-    Accumulates the result for a subrange, starting with initial value ``x``. The ``Range`` type must meet the `Range requirements <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/named_requirements/algorithms/range>_`.
+    Accumulates the result for a subrange, starting with initial value ``x``. The ``Range`` type must meet the 
+    `Range requirements <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/named_requirements/algorithms/range>`_. 
     The ``Value`` type must be the same as a corresponding template parameter for the `parallel_reduce algorithm <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/algorithms/functions/parallel_reduce_func>`_.
 
     If both ``rvalue`` and ``lvalue`` forms are provided, the ``rvalue`` is preferred.
@@ -55,6 +56,7 @@ Example
 *******
 
 .. code:: cpp
+    
     // C++17
     #include <oneapi/tbb/parallel_reduce.h>
     #include <oneapi/tbb/blocked_range.h>

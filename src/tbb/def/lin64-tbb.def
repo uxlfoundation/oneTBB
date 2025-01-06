@@ -106,6 +106,7 @@ _ZN3tbb6detail2r120isolate_within_arenaERNS0_2d113delegate_baseEl;
 _ZN3tbb6detail2r17enqueueERNS0_2d14taskEPNS2_15task_arena_baseE;
 _ZN3tbb6detail2r17enqueueERNS0_2d14taskERNS2_18task_group_contextEPNS2_15task_arena_baseE;
 _ZN3tbb6detail2r14waitERNS0_2d115task_arena_baseE;
+_ZN3tbb6detail2r114execution_slotERKNS0_2d115task_arena_baseE;
 
 /* System topology parsing and threads pinning (governor.cpp) */
 _ZN3tbb6detail2r115numa_node_countEv;

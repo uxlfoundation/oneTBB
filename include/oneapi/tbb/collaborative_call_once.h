@@ -172,7 +172,7 @@ class collaborative_once_flag : no_copy {
             spin_wait_until_eq(m_state, expected);
         } while (!m_state.compare_exchange_strong(expected, desired));
     }
-    
+
     template <typename Fn>
     void do_collaborative_call_once(Fn&& f) {
         std::uintptr_t expected = m_state.load(std::memory_order_acquire);

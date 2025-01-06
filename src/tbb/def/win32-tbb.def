@@ -100,6 +100,7 @@ EXPORTS
 ?terminate@r1@detail@tbb@@YAXAAVtask_arena_base@d1@23@@Z
 ?wait@r1@detail@tbb@@YAXAAVtask_arena_base@d1@23@@Z
 ?enqueue@r1@detail@tbb@@YAXAAVtask@d1@23@AAVtask_group_context@523@PAVtask_arena_base@523@@Z
+?execution_slot@r1@detail@tbb@@YAGABVtask_arena_base@d1@23@@Z
 
 ; System topology parsing and threads pinning (governor.cpp)
 ?numa_node_count@r1@detail@tbb@@YAIXZ

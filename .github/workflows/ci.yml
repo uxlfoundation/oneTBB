@@ -37,7 +37,7 @@ jobs:
     runs-on: [ubuntu-20.04]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Run scan
         run: |
           sudo apt update && sudo apt install -y codespell
@@ -47,7 +47,7 @@ jobs:
     runs-on: [ubuntu-20.04]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Run scan
         run: |
           command -v clang-format-10
@@ -62,7 +62,7 @@ jobs:
     runs-on: [ubuntu-22.04]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Install prerequisites
         run: |
           pip3 install -U Jinja2
@@ -75,7 +75,7 @@ jobs:
           export BUILD_TYPE=${BUILD_TYPE} && sphinx-build doc html
           tar -czvf html.tar.gz html/
       - name: Save docs
-        uses: actions/upload-artifact@v2.2.1
+        uses: actions/upload-artifact@v4
         with:
           name: oneTBB-html-docs-${{ env.GITHUB_SHA_SHORT }}
           path: html.tar.gz
@@ -90,14 +90,14 @@ jobs:
     needs: [documentation]
     steps:
       - name: Checkout gh-pages
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           ref: gh-pages
           path: gh-pages
       - name: Set env
         run: echo GITHUB_SHA_SHORT=${GITHUB_SHA::8} >> $GITHUB_ENV
       - name: Download documetation
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: oneTBB-html-docs-${{ env.GITHUB_SHA_SHORT }}
       - name: Publish to github pages
@@ -117,7 +117,7 @@ jobs:
     if: ${{ github.ref != 'refs/heads/master' }}
     runs-on: [ubuntu-20.04]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Run check
@@ -137,7 +137,7 @@ jobs:
     runs-on: [ubuntu-latest]
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Run testing
         run: |
           mkdir build && cd build
@@ -179,7 +179,7 @@ jobs:
             preview: 'ON'
             cmake_static: -DBUILD_SHARED_LIBS=OFF
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Run testing
         shell: bash
         run: |
@@ -198,7 +198,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-12
+          - os: macos-14
             c_compiler: clang
             cxx_compiler: clang++
             std: 14
@@ -212,7 +212,7 @@ jobs:
             preview: 'ON'
             cmake_static: -DBUILD_SHARED_LIBS=OFF
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Run testing
         shell: bash
         run: |
@@ -257,7 +257,7 @@ jobs:
             preview: 'OFF'
             job_name: windows_cl2022_cxx17_relwithdebinfo_preview=OFF
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Run testing
         run: |
           mkdir build
@@ -295,7 +295,7 @@ jobs:
             build_type: debug
             preview: 'ON'
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Run testing
         shell: bash
         run: |
@@ -314,14 +314,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-12
+          - os: macos-15
             c_compiler: clang
             cxx_compiler: clang++
             std: 14
             build_type: relwithdebinfo
             preview: 'ON'
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Run testing
         shell: bash
         run: |
@@ -357,7 +357,7 @@ jobs:
             preview: 'OFF'
             job_name: examples_windows_cl2022_cxx17_relwithdebinfo_preview=OFF
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Run testing
         run: |
           mkdir build

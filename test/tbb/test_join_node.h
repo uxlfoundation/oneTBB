@@ -245,10 +245,10 @@ struct my_struct_key<K&, V> {
     }
 };
 
-using tbb::detail::d1::type_to_key_function_body;
-using tbb::detail::d1::hash_buffer;
+using tbb::detail::d2::type_to_key_function_body;
+using tbb::detail::d2::type_to_key_function_body_leaf;
+using tbb::detail::d2::hash_buffer;
 using tbb::detail::d1::tbb_hash_compare;
-using tbb::detail::d1::type_to_key_function_body_leaf;
 
 template<class K, class V> struct VtoKFB {
     typedef type_to_key_function_body<V, K> type;

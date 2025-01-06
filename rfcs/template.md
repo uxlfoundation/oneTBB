@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Short description of the idea proposed with explained motivation. 
+Short description of the idea proposed with explained motivation.
 
 The motivation could be:
 - Improved users experience for API changes and extensions. Code snippets to
@@ -21,12 +21,12 @@ A full and detailed description of the proposal with highlighted consequences.
 Depending on the kind of the proposal, the description should cover:
 
 - New use cases supported by the extension.
-- The expected performance benefit for a modification. 
-- The interface of extensions including class definitions or function 
+- The expected performance benefit for a modification.
+- The interface of extensions including class definitions or function
 declarations.
 
-A proposal should clearly outline the alternatives that were considered, 
-along with their pros and cons. Each alternative should be clearly separated 
+A proposal should clearly outline the alternatives that were considered,
+along with their pros and cons. Each alternative should be clearly separated
 to make discussions easier to follow.
 
 Pay close attention to the following aspects of the library:
@@ -50,19 +50,7 @@ Some other common subsections here are:
   without the original proposal, you can have it in the RFC.
 - Execution plan (next steps), if approved.
 
-## Process Specific Information
-
-Depending on the state of the proposal, additional information should be
-included.
+## Open Questions
 
 For new proposals (i.e., those in the `rfcs/proposed` directory), list any
 open questions.
-
-For proposals released as preview features that are in the `rfcs/experimental`
-directory, list the exit conditions to move from preview to fully supported.
-These conditions might include demonstrated performance improvements,
-acceptance of specification changes, etc.
-
-For proposals in the `rfcs/supported` directory, provide a link to the
-any section(s) in the oneTBB specification that related to the proposal.
-For modifications that do not affect the public API, no link is needed.
