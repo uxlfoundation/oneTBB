@@ -678,7 +678,6 @@ namespace r1 {
             }
             path = absolute_path;
         }
-        std::fprintf(stdout, "Loading filename \"%s\"\n", path);
         dynamic_link_handle library_handle = nullptr;
 #if _WIN32
         // Prevent Windows from displaying silly message boxes if it fails to load library
