@@ -32,15 +32,15 @@ tbb::filter<int,int> makeMiddleFilters(int num_filters, tbb::filter_mode m, doub
                                       [=](int i) -> int {
                                         doWork(w);
                                         return i;
-                                      }); 
+                                      });
   if (num_filters > 1)
-    return f & makeMiddleFilters(num_filters-1, m, usec, 
+    return f & makeMiddleFilters(num_filters-1, m, usec,
                                  imbalanced_filter, imbalance_factor);
   else
     return f;
 }
 
-tbb::filter<void,void> buildFilterChain(std::atomic<int>& counter, std::vector<int>& data, 
+tbb::filter<void,void> buildFilterChain(std::atomic<int>& counter, std::vector<int>& data,
                                         int num_filters, tbb::filter_mode m, double usec,
                                         double imbalance_factor = 1) {
   counter = data.size() - 1;
@@ -49,7 +49,7 @@ tbb::filter<void,void> buildFilterChain(std::atomic<int>& counter, std::vector<i
   int imbalanced_filter = (imbalance_factor == 1) ? -1 : num_filters - 3;
 
   if (num_filters > 1) {
-    tbb::filter<void,int> start = 
+    tbb::filter<void,int> start =
       tbb::make_filter<void, int>(m,
                                   [&counter, &data, usec](tbb::flow_control& fc) -> int {
                                     int i = counter--;
@@ -63,7 +63,7 @@ tbb::filter<void,void> buildFilterChain(std::atomic<int>& counter, std::vector<i
                                   });
 
 
-      tbb::filter<int, void> end = 
+      tbb::filter<int, void> end =
         tbb::make_filter<int, void>(m,
                                     [=](int i) {
                                       doWork(usec);
@@ -101,17 +101,17 @@ double runSerial(std::vector<int>& data, int num_filters, double usec, int num_i
     }
   }
   double total_time = (tbb::tick_count::now() - t0).seconds();
-  return total_time;   
+  return total_time;
 }
 
 std::vector<int> makeVector(int N);
 static void warmupTBB();
 
-std::vector<tbb::filter_mode> modes = {tbb::filter_mode::serial_in_order, 
-                                        tbb::filter_mode::serial_out_of_order, 
+std::vector<tbb::filter_mode> modes = {tbb::filter_mode::serial_in_order,
+                                        tbb::filter_mode::serial_out_of_order,
                                         tbb::filter_mode::parallel };
-std::vector<std::string> mode_name = {"serial_in_order", 
-                                      "serial_out_of_order", 
+std::vector<std::string> mode_name = {"serial_in_order",
+                                      "serial_out_of_order",
                                       "parallel"};
 
 
@@ -129,12 +129,12 @@ void runEightFiltersOneTokenBalanced(int N, std::vector<int>& data) {
   }
 
   std::cout << "\nmode";
-  for (double spin_time : spin_times) 
+  for (double spin_time : spin_times)
     std::cout << ", " << spin_time;
   std::cout << std::endl;
 
   for (int m = 0; m < modes.size(); ++m) {
-    std::atomic<int> counter = 0;
+    std::atomic<int> counter(0);
     std::cout << mode_name[m];
     for (int st = 0; st < spin_times.size(); ++st) {
       double spin_time = spin_times[st];
@@ -148,7 +148,7 @@ void runEightFiltersOneTokenBalanced(int N, std::vector<int>& data) {
       double t = (tbb::tick_count::now() - t0).seconds();
       std::cout << ", " << serial_time[st]/t;
     }
-    std::cout << std::endl; 
+    std::cout << std::endl;
   }
 }
 
@@ -170,7 +170,7 @@ void runEightTokensIncreasingFilters(int N, std::vector<int>& data) {
   std::cout << std::endl;
 
   for (int m = 0; m < modes.size(); ++m) {
-    std::atomic<int> counter = 0;
+    std::atomic<int> counter(0);
     std::cout << mode_name[m];
     for (int num_filters = 1; num_filters <= max_threads; ++num_filters) {
       auto chain =
@@ -182,7 +182,7 @@ void runEightTokensIncreasingFilters(int N, std::vector<int>& data) {
       double t = (tbb::tick_count::now() - t0).seconds();
       std::cout << ", " << serial_time[num_filters-1]/t;
     }
-    std::cout << std::endl; 
+    std::cout << std::endl;
   }
 }
 
@@ -201,7 +201,7 @@ void runEightFiltersIncreasingTokens(int N, std::vector<int>& data) {
   std::cout << std::endl;
 
   for (int m = 0; m < modes.size(); ++m) {
-    std::atomic<int> counter = 0;
+    std::atomic<int> counter(0);
     std::cout << mode_name[m];
     for (int num_tokens = 1; num_tokens <= 2*max_threads; ++num_tokens) {
       auto chain =
@@ -213,7 +213,7 @@ void runEightFiltersIncreasingTokens(int N, std::vector<int>& data) {
       double t = (tbb::tick_count::now() - t0).seconds();
       std::cout << ", " << serial_time/t;
     }
-    std::cout << std::endl; 
+    std::cout << std::endl;
   }
 }
 
@@ -237,7 +237,7 @@ void runEightFiltersImbalanced(int N, std::vector<int>& data) {
   std::cout << std::endl;
 
   for (int m = 0; m < modes.size(); ++m) {
-    std::atomic<int> counter = 0;
+    std::atomic<int> counter(0);
     std::cout << mode_name[m];
     for (int imb = 0; imb < imbalance.size(); ++imb) {
       double imbalance_factor = imbalance[imb];
@@ -250,7 +250,7 @@ void runEightFiltersImbalanced(int N, std::vector<int>& data) {
       double t = (tbb::tick_count::now() - t0).seconds();
       std::cout << ", " << serial_time[imb]/t;
     }
-    std::cout << std::endl; 
+    std::cout << std::endl;
   }
 }
 
@@ -292,8 +292,8 @@ static void warmupTBB() {
   // This is a simple loop that should get workers started.
   // oneTBB creates workers lazily on first use of the library
   // so this hides the startup time when looking at trivial
-  // examples that do little real work. 
-  tbb::parallel_for(0, tbb::this_task_arena::max_concurrency(), 
+  // examples that do little real work.
+  tbb::parallel_for(0, tbb::this_task_arena::max_concurrency(),
     [=](int) {
       tbb::tick_count t0 = tbb::tick_count::now();
       while ((tbb::tick_count::now() - t0).seconds() < 0.01);

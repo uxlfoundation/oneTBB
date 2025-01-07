@@ -21,7 +21,7 @@
 void printArrival(tbb::task_arena::priority priority);
 
 using counter_t = std::atomic<int>;
-counter_t counter = 0;
+counter_t counter(0);
 void waitUntil(int N, counter_t& c) {
   ++c;
   while (c != N);
@@ -30,13 +30,13 @@ void waitUntil(int N, counter_t& c) {
 void explicitArenaWithPriority(tbb::task_arena::priority priority) {
   tbb::task_arena a{tbb::info::default_concurrency(), 1, priority};
   a.execute([=]() {
-    tbb::parallel_for(0, 
-                      2*tbb::info::default_concurrency(), 
+    tbb::parallel_for(0,
+                      2*tbb::info::default_concurrency(),
                       [=](int) { printArrival(priority); });
   });
 }
 
-void runTwoThreads(tbb::task_arena::priority priority0, 
+void runTwoThreads(tbb::task_arena::priority priority0,
                    tbb::task_arena::priority priority1) {
   std::thread t0([=]() {
     waitUntil(2, counter);
@@ -86,6 +86,3 @@ void printArrival(tbb::task_arena::priority priority) {
   tbb::tick_count t0 = tbb::tick_count::now();
   while ((tbb::tick_count::now() - t0).seconds() < 0.01);
 }
-
-
-

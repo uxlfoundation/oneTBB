@@ -30,7 +30,7 @@ void set_thread_affinity( int tid, const affinity_mask_t& mask ) {
 }
 void restore_thread_affinity() {
   std::ostringstream buffer;
-  buffer <<  std::this_thread::get_id() 
+  buffer <<  std::this_thread::get_id()
          << " -> (restored)\n";
   std::cout << buffer.str();
 }
@@ -58,7 +58,7 @@ double w = 0.01;
 double f(double v);
 
 using counter_t = std::atomic<int>;
-counter_t counter = 0;
+counter_t counter(0);
 void waitUntil(int N, counter_t& c) {
   ++c;
   while (c != N);
@@ -86,13 +86,13 @@ void observeTwoArenas() {
 
   // Execute concurrent loops
   std::cout << "Execute a0 and a1 concurrently\n";
-  std::thread t0([&]() { 
+  std::thread t0([&]() {
     waitUntil(2, counter);
     a0.execute([] {
       tbb::parallel_for(0, N, [](int j) { f(w); });
     });
   });
-  std::thread t1([&]() { 
+  std::thread t1([&]() {
     waitUntil(2, counter);
     a1.execute([] {
       tbb::parallel_for(0, N, [](int j) { f(w); });

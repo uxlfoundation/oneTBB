@@ -31,7 +31,7 @@ void doWork(int offset, double seconds) {
   while ((tbb::tick_count::now() - t0).seconds() < seconds);
 }
 
-counter_t counter1 = 0, counter2 = 0;
+counter_t counter1(0), counter2(0);
 
 void arenaGlobalControlImplicitArena(int p, int offset) {
   tbb::global_control gc(tbb::global_control::max_allowed_parallelism, p);
@@ -39,10 +39,10 @@ void arenaGlobalControlImplicitArena(int p, int offset) {
   // we use waitUntil to force overlap of the gc lifetimes
   waitUntil(2, counter1);
 
-  tbb::parallel_for(0, 
-                    10*default_P, 
-                    [=](int) { 
-                      doWork(offset, 0.01); 
+  tbb::parallel_for(0,
+                    10*default_P,
+                    [=](int) {
+                      doWork(offset, 0.01);
                     });
 
   // we prevent either gc from being destroyed until both are done
@@ -102,5 +102,3 @@ void waitUntil(int N, counter_t& c) {
   ++c;
   while (c != N);
 }
-
-
