@@ -30,7 +30,7 @@
 #include <cstring>          // strrchr, memset
 #if _WIN32
     // Unify system calls
-    #define dlopen( name, flags )   LoadLibraryEx( name, NULL, LOAD_LIBRARY_SAFE_CURRENT_DIRS )
+    #define dlopen( name, flags )   LoadLibraryEx( name, /*reserved*/NULL, flags )
     #define dlsym( handle, name )   GetProcAddress( handle, name )
     // FreeLibrary return bool value that is not used.
     #define dlclose( handle )       (void)( ! FreeLibrary( handle ) )
@@ -261,11 +261,6 @@ namespace r1 {
 #else
 #if __TBB_DYNAMIC_LOAD_ENABLED
 /*
-    TODO: Update this vulnerability description and what is done with the latest patch.
-    A couple of moments to mention:
-     - SAFE_CURRENT_DIRS is used on Windows (always)
-     - Signature verification (by default)
-
     There is a security issue on Windows: LoadLibrary() may load and execute
     malicious code. To avoid the issue, we have to exclude working directory
     from the list of directories in which loader searches for the library. This
@@ -520,10 +515,15 @@ namespace r1 {
     #endif /* __TBB_DYNAMIC_LOAD_ENABLED */
     }
 
-#if !_WIN32
-    int loading_flags(bool local_binding) {
+#if _WIN32
+    DWORD loading_flags(int) {
+        // Do not search in working directory if it is considered unsafe
+        return LOAD_LIBRARY_SAFE_CURRENT_DIRS;
+    }
+#else
+    int loading_flags(int requested_flags) {
         int flags = RTLD_NOW;
-        if (local_binding) {
+        if (requested_flags & DYNAMIC_LINK_LOCAL) {
             flags = flags | RTLD_LOCAL;
 #if (__linux__ && __GLIBC__) && !__TBB_USE_SANITIZERS
             if( !GetBoolEnvironmentVariable("TBB_ENABLE_SANITIZERS") ) {
@@ -549,11 +549,13 @@ namespace r1 {
     {
         __TBB_ASSERT_EX( buffer_length > 0, "Cannot write the path to the buffer with zero length" );
 
-        // TODO: Load using non-deprecated flags
-        // Searching for module name skipping working directory as it is considered unsafe. Here, however, it is necessary because the same
-        dynamic_link_handle handle = LoadLibraryExA(
-            filename, /*reserved*/NULL, LOAD_LIBRARY_SAFE_CURRENT_DIRS | DONT_RESOLVE_DLL_REFERENCES
-        );
+        // TODO: DONT_RESOLVE_DLL_REFERENCES is deprecated and can lead to errors since the "loaded"
+        // library can be seen by other threads, which might decide to call its functions. Consider
+        // determining full file path the other way still using system loader search order.
+
+        // Use default flags but also do not load dependencies nor execute any code
+        DWORD flags = loading_flags(DYNAMIC_LINK_DEFAULT) | DONT_RESOLVE_DLL_REFERENCES;
+        dynamic_link_handle handle = LoadLibraryExA(filename, /*reserved*/NULL, flags);
         if (nullptr == handle) {
             DYNAMIC_LINK_WARNING( dl_lib_not_found, filename, dlerror() );
             return /*actual_length*/0;
@@ -695,7 +697,7 @@ namespace r1 {
         if (has_valid_signature(path, length)) {
 #endif /* __TBB_VERIFY_DEPENDENCY_SIGNATURE */
 #endif /* _WIN32 */
-            // The second argument (loading_flags) is ignored on Windows
+            // The argument of loading_flags is ignored on Windows
             library_handle = dlopen( path, loading_flags(flags & DYNAMIC_LINK_LOCAL) );
 #if _WIN32
 #if __TBB_VERIFY_DEPENDENCY_SIGNATURE
