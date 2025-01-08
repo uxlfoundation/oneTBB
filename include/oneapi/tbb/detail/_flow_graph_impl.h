@@ -526,7 +526,8 @@ inline graph_task* prioritize_task(graph& g, graph_task& gt) {
     //! priority queue, and a new critical task is created to take and execute a work item with
     //! the highest known priority. The reference counting responsibility is transferred to
     //! the new task.
-    d1::task* critical_task = gt.my_allocator.new_object<priority_task_selector>(g.my_priority_queue, gt.my_allocator);
+    d1::small_object_allocator allocator;
+    d1::task* critical_task = allocator.new_object<priority_task_selector>(g.my_priority_queue, allocator);
     __TBB_ASSERT( critical_task, "bad_alloc?" );
     g.my_priority_queue.push(&gt);
     using tbb::detail::d1::submit;
