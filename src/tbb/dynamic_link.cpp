@@ -537,7 +537,8 @@ namespace r1 {
     }
 #endif
 
-#if __TBB_VERIFY_DEPENDENCY_SIGNATURE
+
+#if _WIN32 && __TBB_VERIFY_DEPENDENCY_SIGNATURE
     /**
      * Obtains full path to the specified filename and stores it inside passed buffer.
      *
