@@ -261,11 +261,10 @@ namespace r1 {
 #else
 #if __TBB_DYNAMIC_LOAD_ENABLED
 /*
-    There is a security issue on Windows: LoadLibrary() may load and execute
-    malicious code. To avoid the issue, we have to exclude working directory
-    from the list of directories in which loader searches for the library. This
-    is done by passing LOAD_LIBRARY_SAFE_CURRENT_DIRS flag to LoadLibraryEx. To
-    futher strengthen the security, library signature is verified.
+    There is a security issue on Windows: LoadLibrary() may load and execute malicious code. To
+    avoid the issue, we have to exclude working directory from the list of directories in which
+    loader searches for the library. This is done by passing LOAD_LIBRARY_SAFE_CURRENT_DIRS flag to
+    LoadLibraryEx. To further strengthen the security, library signature is verified.
 
     Also, the default approach is to load the library via full path. This
     function constructs full path to the specified library (it is assumed the
@@ -665,6 +664,7 @@ namespace r1 {
                                       std::size_t required, int flags )
     {
         ::tbb::detail::suppress_unused_warning( library, descriptors, required, flags );
+        dynamic_link_handle library_handle = nullptr;
 #if __TBB_DYNAMIC_LOAD_ENABLED
         const char* path = library;
         std::size_t const len = PATH_MAX + 1;
@@ -681,7 +681,6 @@ namespace r1 {
             }
             path = absolute_path;
         }
-        dynamic_link_handle library_handle = nullptr;
 #if _WIN32
         // Prevent Windows from displaying silly message boxes if it fails to load library
         // (e.g. because of MS runtime problems - one of those crazy manifest related ones)
@@ -715,8 +714,8 @@ namespace r1 {
             }
         } else
             DYNAMIC_LINK_WARNING( dl_lib_not_found, path, dlerror() );
-        return library_handle;
 #endif /* __TBB_DYNAMIC_LOAD_ENABLED */
+        return library_handle;
     }
 
     bool dynamic_link( const char* library, const dynamic_link_descriptor descriptors[],

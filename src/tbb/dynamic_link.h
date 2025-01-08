@@ -134,7 +134,7 @@ enum dynamic_link_error_t {
     // An error during library unload
     dl_unload_fail,             // char const * lib, dlerr_t err
 
-    // Library is unsinged or has invalid signature
+    // Library is unsigned or has invalid signature
     dl_lib_unsigned,            // char const * lib
 
     // Unknown error during signature verification
