@@ -657,7 +657,7 @@ void test_try_put_and_wait_rejecting(size_t concurrency_limit) {
         std::vector<int> processed_items;
         std::vector<int> new_work_items;
 
-        int wait_message = 0;
+        int wait_message = 10;
 
         for (int i = 1; i < wait_message; ++i) {
             new_work_items.emplace_back(i);

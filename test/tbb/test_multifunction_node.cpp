@@ -624,8 +624,165 @@ TEST_CASE("constraints for multifunction_node body") {
 }
 #endif // __TBB_CPP20_CONCEPTS_PRESENT
 
-TEST_CASE("multifunction try_put_and_wait") {
-    std::cout << "start test" << std::endl;
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+
+void test_tag_type() {
+    using multinode_type = tbb::flow::multifunction_node<int, std::tuple<int, int>>;
+    using ports_type = typename multinode_type::output_ports_type;
+    using tag_type = typename multinode_type::tag_type;
+
+    int processed = 0;
+
+    tbb::flow::graph g;
+    multinode_type node(g, tbb::flow::unlimited,
+        [&](int input, ports_type&, tag_type&& tag) {
+            processed = input;
+            tag_type tag1;
+            tag_type tag2(std::move(tag));
+
+            tag1 = std::move(tag2);
+            tag = std::move(tag1);
+        });
+
+    node.try_put_and_wait(1);
+    CHECK_MESSAGE(processed == 1, "Body wait not called in try_put_and_wait call");
+    g.wait_for_all();
+}
+
+void test_simple_broadcast() {
+    tbb::task_arena arena(1);
+
+    using funcnode_type = tbb::flow::function_node<int, int, tbb::flow::lightweight>;
+    using multinode_type = tbb::flow::multifunction_node<int, std::tuple<int, int>>;
+    using ports_type = typename multinode_type::output_ports_type;
+    using tag_type = typename multinode_type::tag_type;
+
+    arena.execute([&] {
+        tbb::flow::graph g;
+
+        std::vector<int> processed_items1;
+        std::vector<int> processed_items2;
+        std::vector<int> new_work_items;
+
+        int wait_message = 10;
+
+        for (int i = 0; i < wait_message; ++i) {
+            new_work_items.emplace_back(i);
+        }
+
+        multinode_type* start_node = nullptr;
+
+        multinode_type node(g, tbb::flow::unlimited,
+            [&](int input, ports_type& ports, tag_type&& tag) {
+                if (input == wait_message) {
+                    for (int item : new_work_items) {
+                        start_node->try_put(item);
+                    }
+                }
+                
+                std::get<0>(ports).try_put(input, tag);
+                std::get<1>(ports).try_put(input, std::move(tag));
+            });
+
+        start_node = &node;
+
+        funcnode_type func1(g, tbb::flow::unlimited,
+            [&](int input) noexcept {
+                processed_items1.emplace_back(input);
+                return 0;
+            });
+
+        funcnode_type func2(g, tbb::flow::unlimited,
+            [&](int input) noexcept {
+                processed_items2.emplace_back(input);
+                return 0;
+            });
+
+        tbb::flow::make_edge(tbb::flow::output_port<0>(node), func1);
+        tbb::flow::make_edge(tbb::flow::output_port<1>(node), func2);
+
+        bool result = node.try_put_and_wait(wait_message);
+        CHECK_MESSAGE(result, "unexpected try_put_and_wait result");
+
+        CHECK(processed_items1.size() == 1);
+        CHECK(processed_items2.size() == 1);
+        CHECK_MESSAGE(processed_items1[0] == wait_message, "Only the wait message should be processed by try_put_and_wait");
+        CHECK_MESSAGE(processed_items2[0] == wait_message, "Only the wait message should be processed by try_put_and_wait");
+
+        g.wait_for_all();
+
+        CHECK(processed_items1.size() == new_work_items.size() + 1);
+        CHECK(processed_items2.size() == new_work_items.size() + 1);
+
+        std::size_t check_index = 1;
+        for (std::size_t i = new_work_items.size(); i != 0; --i) {
+            CHECK_MESSAGE(processed_items1[check_index] == new_work_items[i - 1], "Unexpected items processing order");
+            CHECK_MESSAGE(processed_items2[check_index] == new_work_items[i - 1], "Unexpected items processing order");
+            ++check_index;
+        }
+        CHECK(check_index == processed_items1.size());
+    });
+}
+
+void test_no_broadcast() {
+    using multinode_type = tbb::flow::multifunction_node<int, std::tuple<int>>;
+    using ports_type = typename multinode_type::output_ports_type;
+    using tag_type = typename multinode_type::tag_type;
+
+    std::size_t num_items = 10;
+    std::atomic<std::size_t> num_processed_items = 0;
+    int wait_message = 42;
+    tag_type global_tag;
+
+    std::vector<int> processed_items;
+    multinode_type* this_node = nullptr;
+
+    tbb::flow::graph g;
+    multinode_type node(g, tbb::flow::unlimited,
+        [&](int input, ports_type& ports, tag_type&& local_tag) {
+            // std::cout << "Process " << input << std::endl;
+            printf("Processed %li items\n", num_processed_items.load());
+            if (num_processed_items < num_items) {
+                if (input == wait_message) {
+                    global_tag = std::move(local_tag);
+                    for (int i = 0; i < int(num_items - 1); ++i) {
+                        this_node->try_put(i);
+                    }
+                }
+                std::get<0>(ports).try_put(input);
+            } else {
+                global_tag.reset();
+            }
+            ++num_processed_items;
+        });
+
+    this_node = &node;
+
+    tbb::flow::function_node<int, int, tbb::flow::lightweight> write_node(g, tbb::flow::unlimited,
+        [&](int value) noexcept { processed_items.emplace_back(value); return 0; });
+
+    tbb::flow::make_edge(tbb::flow::output_port<0>(node), write_node);
+
+    node.try_put_and_wait(wait_message);
+
+    CHECK(num_items == num_processed_items);
+    CHECK(processed_items.size() == num_items - 1);
+    std::sort(processed_items.begin(), processed_items.end());
+
+    for (auto item : processed_items) {
+        std::cout << item << " ";
+    }
+    std::cout << std::endl;
+
+    for (std::size_t i = 0; i < num_items - 1; ++i) {
+        CHECK_MESSAGE(processed_items[i] == i, "Incorrect items processing order");
+    }
+    CHECK_MESSAGE(processed_items.back() == wait_message, "Incorrect items processing");
+
+    g.wait_for_all();
+}
+
+void test_reduction() {
     tbb::task_arena arena(1);
 
     arena.execute([]{
@@ -639,14 +796,15 @@ TEST_CASE("multifunction try_put_and_wait") {
 
         func_node_type* start_node = nullptr;
 
-        func_node_type start(g, tbb::flow::serial,
+        func_node_type start(g, tbb::flow::unlimited,
             [&](int i) {
                 std::cout << "processing " << i << std::endl;
-                if (start_node != nullptr) {
-                    for (int j = 2; j <= num_items; ++j) {
+                static bool extra_work_added = false;
+                if (!extra_work_added) {
+                    extra_work_added = true;
+                    for (int j = i + 1; j < i + num_items; ++j) {
                         start_node->try_put(j);
                     }
-                    start_node = nullptr;
                 }
                 return i;
             });
@@ -657,27 +815,31 @@ TEST_CASE("multifunction try_put_and_wait") {
         int accumulated_result = 0;
         tag_type accumulated_hint;
 
-        tbb::flow::multifunction_node<int, std::tuple<int>> multifunction(g, tbb::flow::serial,
-            // [&](int i, ports_type& ports, const tag_type& tag) {
-            [&](int i, ports_type& ports) {
-                std::cout << "mf processing " << i << std::endl;
+        tbb::flow::multifunction_node<int, std::tuple<int>> multifunction(g, tbb::flow::unlimited,
+            [&](int i, ports_type& ports, const tag_type& tag) {
+                ++num_accumulated;
+                accumulated_result += i;
+                accumulated_hint.merge(tag);
 
-                // ++num_accumulated;
-                // std::cout << "num_accumulated = " << num_accumulated << std::endl;
-                // accumulated_result += i;
-                // accumulated_hint.merge(tag);
-
-                // if (num_accumulated == num_items) {
-                //     std::get<0>(ports).try_put(accumulated_result, std::move(accumulated_hint));
-                // }
-
-                // std::get<0>(ports).try_put(i, tag);
-
-                std::get<0>(ports).try_put(i);
+                if (num_accumulated == num_items) {
+                    std::get<0>(ports).try_put(accumulated_result, std::move(accumulated_hint));
+                    num_accumulated = 0;
+                }
             });
 
-        tbb::flow::function_node<int, int> writer(g, tbb::flow::serial,
-            [](int res) { std::cout << "res = " << res << std::endl; return 0; });
+        tbb::flow::function_node<int, int> writer(g, tbb::flow::unlimited,
+            [&](int res) {
+                std::cout << "Write = " << res << std::endl;
+                static bool extra_loop_added = false;
+
+                if (!extra_loop_added) {
+                    extra_loop_added = true;
+                    for (int i = 100; i < 100 + num_items; ++i) {
+                        multifunction.try_put(i);
+                    }
+                }
+                return 0;
+            });
 
         tbb::flow::make_edge(start, multifunction);
         tbb::flow::make_edge(tbb::flow::output_port<0>(multifunction), writer);
@@ -688,3 +850,12 @@ TEST_CASE("multifunction try_put_and_wait") {
         g.wait_for_all();
     });
 }
+
+TEST_CASE("multifunction_node try_put_and_wait") {
+    test_tag_type();
+    test_simple_broadcast();
+    test_no_broadcast();
+    // test_reduction();
+}
+
+#endif

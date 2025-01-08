@@ -562,7 +562,8 @@ public:
 
     multifunction_node_tag(const multifunction_node_tag&) = delete;
 
-    multifunction_node_tag(multifunction_node_tag&&);
+    multifunction_node_tag(multifunction_node_tag&& other)
+        : my_metainfo(std::move(other.my_metainfo)) {}
 
     multifunction_node_tag(const message_metainfo& metainfo) : my_metainfo(metainfo) {
         for (auto waiter : my_metainfo.waiters()) {
@@ -571,7 +572,13 @@ public:
     }
 
     multifunction_node_tag& operator=(const multifunction_node_tag&) = delete;
-    multifunction_node_tag& operator=(multifunction_node_tag&&) = delete;
+    multifunction_node_tag& operator=(multifunction_node_tag&& other) {
+        if (this != &other) {
+            reset();
+            my_metainfo = std::move(other.my_metainfo);
+        }
+        return *this;
+    }
 
     ~multifunction_node_tag() {
         reset();
@@ -591,6 +598,7 @@ public:
         for (auto waiter : my_metainfo.waiters()) {
             waiter->release();
         }
+        my_metainfo = message_metainfo{};
     }
 private:
     template <typename Output>
@@ -654,7 +662,7 @@ public:
     {
         multifunction_node_tag tag(metainfo);
         fgt_begin_body( my_body );
-        (*my_body)(i, my_output_ports, tag);
+        (*my_body)(i, my_output_ports, std::move(tag));
         fgt_end_body( my_body );
         graph_task* ttask = nullptr;
         if(base_type::my_max_concurrency != 0) {
