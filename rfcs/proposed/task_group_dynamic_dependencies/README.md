@@ -1,4 +1,4 @@
-# Extending task_group to manage dynamic dependencies between tasks
+# Extend ``task_group`` for Dynamic Task Dependencies
 
 ## Introduction
 
