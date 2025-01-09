@@ -19,6 +19,12 @@
 
 // Support for dynamic loading entry points from other shared libraries.
 
+#if TBB_DYNAMIC_LINK_WARNING && __STDC_LIB_EXT1__
+// Optional TBB-based messaging in case of dynamic link errors was requested. fprintf_s is also
+// supported. So, enabling it.
+#define __STDC_WANT_LIB_EXT1__ 1
+#endif
+
 #include "oneapi/tbb/detail/_config.h"
 
 #include <atomic>

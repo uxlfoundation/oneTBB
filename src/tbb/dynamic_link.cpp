@@ -28,6 +28,7 @@
 
 #include <cstdarg>          // va_list etc.
 #include <cstring>          // strrchr, memset
+
 #if _WIN32
     // Unify system calls
     #define dlopen( name, flags )   LoadLibraryEx( name, /*reserved*/NULL, flags )
@@ -106,6 +107,15 @@ soon as all of the symbols have been resolved.
   3. Weak symbols: if weak symbols are available they are returned.
 */
 
+#if __STDC_WANT_LIB_EXT1__
+#include <stdio.h>              // fprintf_s
+#define TBB_FPRINTF fprintf_s
+#else
+// fprintf_s is not supported by the implementation, fallback to standard fprintf
+#include <cstdio>               // fprintf
+#define TBB_FPRINTF std::fprintf
+#endif
+
 namespace tbb {
 namespace detail {
 namespace r1 {
@@ -136,10 +146,8 @@ namespace r1 {
         case dl_lib_not_found:
             str = va_arg(args, const char*);
             error = va_arg(args, dlerr_t);
-            // TODO: Use fprintf_s once dynamic link functionality is extracted into a separate
-            // module (e.g., a static library)
-            std::fprintf(stdout, "%s The module \"%s\" was not loaded because it was not found. "
-                         "System error: " DLERROR_SPECIFIER "\n", prefix, str, error);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded because it was not found. "
+                        "System error: " DLERROR_SPECIFIER "\n", prefix, str, error);
             break;
         case dl_sym_not_found:     // char const * sym, dlerr_t err:
             // TODO: Print not found symbol once it is used by the implementation
@@ -147,59 +155,59 @@ namespace r1 {
         case dl_sys_fail:
             str = va_arg(args, const char*);
             error = va_arg(args, dlerr_t);
-            std::fprintf(stdout, "oneTBB: A call to \"%s\" failed with error " DLERROR_SPECIFIER
-                         "\n", str, error);
+            TBB_FPRINTF(stdout, "oneTBB: A call to \"%s\" failed with error " DLERROR_SPECIFIER
+                        "\n", str, error);
             break;
         case dl_buff_too_small:
-            std::fprintf(stdout, "oneTBB: An internal buffer representing a path to dynamically "
-                         "loaded module is small. Consider compile with larger value for PATH_MAX "
-                         "macro.\n");
+            TBB_FPRINTF(stdout, "oneTBB: An internal buffer representing a path to dynamically "
+                        "loaded module is small. Consider compile with larger value for PATH_MAX "
+                        "macro.\n");
             break;
         case dl_unload_fail:
             str = va_arg(args, const char*);
             error = va_arg(args, dlerr_t);
-            std::fprintf(stdout, "%s Error unloading the module \"%s\": " DLERROR_SPECIFIER "\n",
-                         prefix, str, error);
+            TBB_FPRINTF(stdout, "%s Error unloading the module \"%s\": " DLERROR_SPECIFIER "\n",
+                        prefix, str, error);
             break;
         case dl_lib_unsigned:
             str = va_arg(args, const char*);
-            std::fprintf(stdout, "%s The module \"%s\" was not loaded because it is unsigned or has "
-                         "invalid signature.\n", prefix, str);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded because it is unsigned or has "
+                        "invalid signature.\n", prefix, str);
             break;
         case dl_sig_err_unknown:
             str = va_arg(args, const char*);
             error = va_arg(args, dlerr_t);
-            std::fprintf(stdout, "%s The module \"%s\" was not loaded because its signature "
-                         "verification results in unknown error:" DLERROR_SPECIFIER "\n",
-                         prefix, str, error);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded because its signature "
+                        "verification results in unknown error:" DLERROR_SPECIFIER "\n",
+                        prefix, str, error);
             break;
         case dl_sig_explicit_distrust:
             str = va_arg(args, const char*);
-            std::fprintf(stdout, "%s The module \"%s\" was not loaded because the certificate "
-                         "with which it was signed is explicitly distrusted by an admin or user.\n",
-                         prefix, str);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded because the certificate "
+                        "with which it was signed is explicitly distrusted by an admin or user.\n",
+                        prefix, str);
             break;
         case dl_sig_untrusted_root:
             str = va_arg(args, const char*);
-            std::fprintf(stdout, "%s The module \"%s\" was not loaded because during the signature "
-                         "verification process, the certificate chain is terminated in a root "
-                         "certificate which is not trusted.\n", prefix, str);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded because during the signature "
+                        "verification process, the certificate chain is terminated in a root "
+                        "certificate which is not trusted.\n", prefix, str);
             break;
         case dl_sig_distrusted:
             str = va_arg(args, const char*);
-            std::fprintf(stdout, "%s The module \"%s\" was not loaded because its signature is not "
-                         "trusted.\n", prefix, str);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded because its signature is not "
+                        "trusted.\n", prefix, str);
             break;
         case dl_sig_security_settings:
             str = va_arg(args, const char*);
-            std::fprintf(stdout, "%s The module \"%s\" was not loaded because the hash or publisher "
-                         "was not explicitly trusted and user trust was not allowed.", prefix, str);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded because the hash or publisher "
+                        "was not explicitly trusted and user trust was not allowed.", prefix, str);
             break;
         case dl_sig_other_error:
             str = va_arg(args, const char*);
             error = va_arg(args, dlerr_t);
-            std::fprintf(stdout, "%s The module \"%s\" was not loaded. System error code "
-                         DLERROR_SPECIFIER "\n", prefix, str, error);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded. System error code "
+                        DLERROR_SPECIFIER "\n", prefix, str, error);
             break;
         }
 
