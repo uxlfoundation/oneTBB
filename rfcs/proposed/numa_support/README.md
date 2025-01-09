@@ -31,44 +31,32 @@ on a system, submit work across those `task_arena` objects and into associated
 `task_group`` objects, and then wait for work again using both the `task_arena` 
 and `task_group` objects.
 
-    #include "oneapi/tbb/task_group.h"
-    #include "oneapi/tbb/task_arena.h"
+    void constrain_for_numa_nodes() {
+      std::vector<tbb::numa_node_id> numa_nodes = tbb::info::numa_nodes();
+      std::vector<tbb::task_arena> arenas(numa_nodes.size());
+      std::vector<tbb::task_group> task_groups(numa_nodes.size());
 
-    #include <vector>
+      // initialize each arena, each constrained to a different NUMA node
+      for (int i = 0; i < numa_nodes.size(); i++)
+        arenas[i].initialize(tbb::task_arena::constraints(numa_nodes[i]), 0);
 
-    int main() {
-        std::vector<oneapi::tbb::numa_node_id> numa_nodes = oneapi::tbb::info::numa_nodes();
-        std::vector<oneapi::tbb::task_arena> arenas(numa_nodes.size());
-        std::vector<oneapi::tbb::task_group> task_groups(numa_nodes.size());
+      // enqueue work to all but the first arena, using the task_group to track work
+      // by using defer, the task_group reference count is incremented immediately
+      for (int i = 1; i < numa_nodes.size(); i++)
+        arenas[i].enqueue(
+          task_groups[i].defer([] { 
+            tbb::parallel_for(0, N, [](int j) { f(w); }); 
+          })
+        );
 
-        // Initialize the arenas and place memory
-        for (int i = 0; i < numa_nodes.size(); i++) {
-            arenas[i].initialize(oneapi::tbb::task_arena::constraints(numa_nodes[i]),0);
-            arenas[i].execute([i] {
-              // allocate/place memory on NUMA node i
-            });
-        }
-        
-        for (int j 0; j < NUM_STEPS; ++i) {
+      // directly execute the work to completion in the remaining arena
+      arenas[0].execute([] {
+        tbb::parallel_for(0, N, [](int j) { f(w); });
+      });
 
-          // Distribute work across the arenas / NUMA nodes
-          for (int i = 0; i < numa_nodes.size(); i++) {
-            arenas[i].execute([&task_groups, i] {
-              task_groups[i].run([] {
-                /* executed by the thread pinned to specified NUMA node */
-              });
-            });
-          }
-
-          // Wait for the work in each arena / NUMA node to complete
-          for (int i = 0; i < numa_nodes.size(); i++) {
-            arenas[i].execute([&task_groups, i] {
-                task_groups[i].wait();
-            });
-          }
-        }
-
-        return 0;
+      // join the other arenas to wait on their task_groups
+      for (int i = 1; i < numa_nodes.size(); i++)
+        arenas[i].execute([&task_groups, i] { task_groups[i].wait(); });
     }
 
 ### The need for application-specific knowledge
@@ -96,17 +84,17 @@ section **[info_namespace]** of the oneTBB specification that describes
 the function `std::vector<numa_node_id> numa_nodes()`, "If error occurs during system topology 
 parsing, returns vector containing single element that equals to `task_arena::automatic`."  
 
-In practice, the error often occurs because HWLOC is not detected on the system. While the 
+In practice, the error can occurs because HWLOC is not detected on the system. While the 
 oneTBB documentation states in several places that HWLOC is required for NUMA support and 
 even provides guidance on 
 [how to check for HWLOC](https://www.intel.com/content/www/us/en/docs/onetbb/get-started-guide/2021-12/next-steps.html), 
-the failure to resolve HWLOC at runtime silently returns a default of `task_arena::automatic`. This
+the inability to resolve HWLOC at runtime silently returns a default of `task_arena::automatic`. This
 default does not pin threads to NUMA nodes. It is too easy to write code similar to the preceding 
 example and be unaware that a HWLOC installation error (or lack of HWLOC) has undone all your effort.
 
 **Getting good performance using these tools requires notable manual coding effort by users.** As we 
 can see in the preceding example, if we want to spread work across the NUMA nodes in 
-a system we need to query the topology using functions in the `tbb::info` namespace, create
+a system we might need to query the topology using functions in the `tbb::info` namespace, create
 one `task_arena` per NUMA node, along with one `task_group` per NUMA node, and then add an
 extra loop that iterates over these `task_arena` and `task_group` objects to execute the
 work on the desired NUMA nodes. We also need to handle all container allocations using OS-specific
@@ -132,31 +120,20 @@ in the two loops are from the same NUMA nodes? Or is this too much to expect wit
         a[i] = b[i] + c[i]; 
       });
 
-## Proposal
+## Possible Sub-Proposals
 
 ### Increased availability of NUMA support
 
-The oneTBB 1.3 specification states for `tbb::info::numa_nodes`, "If error occurs during system 
-topology parsing, returns vector containing single element that equals to task_arena::automatic."
+See [sub-RFC for increased availability of NUMA API](https://github.com/uxlfoundation/oneTBB/pull/1545)
 
-Since the oneTBB library dynamically loads the HWLOC library, a misconfiguration can cause the HWLOC
-to fail to be found. In that case, a call like:
 
-    std::vector<oneapi::tbb::numa_node_id> numa_nodes = oneapi::tbb::info::numa_nodes();
+### Add NUMA-constrained arenas
 
-will return a vector with a single element of `task_arena::automatic`. This behavior, as we have noticed
-through user questions, can lead to unexpected performance from NUMA optimizations. When running
-on a NUMA system, a developer that has not fully read the documentation may expect that `numa_nodes()`
-will give a proper accounting of the NUMA nodes. When the code, without raising any alarm, returns only 
-a single, valid element due to the environmental configuation (such as lack of HWLOC), it is too easy 
-for developers to not notice that the code is acting in a valid, but unexpected way.
-
-We propose that the oneTBB library implementation include, wherever possibly, a statically-linked fallback 
-to decrease that likelihood of such failures. The oneTBB specification will remain unchanged.
+See [sub-RFC for creation and use of NUMA-constrained arenas](https://github.com/uxlfoundation/oneTBB/pull/1559)
 
 ### NUMA-aware allocation
 
-We will define allocators or other features that simplify the process of allocating or placing data onto
+Define allocators or other features that simplify the process of allocating or placing data onto
 specific NUMA nodes.
 
 ### Simplified approaches to associate task distribution with data placement
@@ -169,7 +146,7 @@ flow graph and containers where appropriate.
 
 ### Improved out-of-the-box performance for high-level oneTBB features.
 
-For high-level oneTBB features that are modified to provide improved NUMA support, we should try to 
+For high-level oneTBB features that are modified to provide improved NUMA support, we can try to 
 align default behaviors for those features with user-expectations when used on NUMA systems.
 
 ## Open Questions
