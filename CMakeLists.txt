@@ -236,9 +236,9 @@ endforeach()
 
 if (NOT TBB_VERIFY_DEPENDENCY_SIGNATURE)
     message(WARNING
-        "Dependency signature verification during dynamic run-time linking is disabled. This may "
-        "lead to security vulnerabilities. It is recommended to leave it enabled in production "
-        "environment. Unset TBB_VERIFY_DEPENDENCY_SIGNATURE or set it ON to enable it again.")
+        "Verification of a dependency signature during dynamic run-time linking is explicitly disabled."
+        "This may lead to security vulnerabilities. It is recommended to leave it enabled by default"
+        " or set TBB_VERIFY_DEPENDENCY_SIGNATURE ON to enable it explicitly.")
 endif()
 
 # - Enabling LTO on Android causes the NDK bug.
