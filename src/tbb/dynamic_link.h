@@ -30,10 +30,6 @@
 #include <atomic>
 #include <mutex>
 
-/** By default, symbols declared and defined here go into namespace tbb::internal.
-    To put them in other namespace, define macros OPEN_INTERNAL_NAMESPACE
-    and CLOSE_INTERNAL_NAMESPACE to override the following default definitions. **/
-
 #include <cstddef>
 #ifdef _WIN32
 #include <windows.h>
