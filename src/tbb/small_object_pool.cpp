@@ -40,13 +40,13 @@ void* __TBB_EXPORTED_FUNC allocate(d1::small_object_pool*& allocator, std::size_
     // TODO: optimize if the allocator contains a valid pool.
     auto tls = governor::get_thread_data();
     auto pool = tls->my_small_object_pool;
-    __TBB_ASSERT(allocator == nullptr || pool == allocator,
-                 "An attempt was made to allocate using another thread's small memory pool");
     return pool->allocate_impl(allocator, number_of_bytes);
 }
 
 void* small_object_pool_impl::allocate_impl(d1::small_object_pool*& allocator, std::size_t number_of_bytes)
 {
+    __TBB_ASSERT(allocator == nullptr || allocator == this,
+                 "An attempt was made to allocate using another thread's small memory pool");
     small_object* obj{nullptr};
 
     if (number_of_bytes <= small_object_size) {
