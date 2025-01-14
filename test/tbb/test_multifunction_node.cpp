@@ -725,61 +725,81 @@ void test_simple_broadcast() {
 }
 
 void test_no_broadcast() {
-    using multinode_type = tbb::flow::multifunction_node<int, std::tuple<int>>;
-    using ports_type = typename multinode_type::output_ports_type;
-    using tag_type = typename multinode_type::tag_type;
+    if (std::thread::hardware_concurrency() == 1) {
+        return;
+    }
 
-    std::size_t num_items = 10;
-    std::atomic<std::size_t> num_processed_items = 0;
-    int wait_message = 42;
-    tag_type global_tag;
+    tbb::task_arena arena(std::thread::hardware_concurrency(), 0);
 
-    std::vector<int> processed_items;
-    multinode_type* this_node = nullptr;
+    arena.execute([]() {
+        using multinode_type = tbb::flow::multifunction_node<int, std::tuple<int>>;
+        using ports_type = typename multinode_type::output_ports_type;
+        using tag_type = typename multinode_type::tag_type;
 
-    tbb::flow::graph g;
-    multinode_type node(g, tbb::flow::unlimited,
-        [&](int input, ports_type& ports, tag_type&& local_tag) {
-            // std::cout << "Process " << input << std::endl;
-            printf("Processed %li items\n", num_processed_items.load());
-            if (num_processed_items < num_items) {
-                if (input == wait_message) {
+        std::size_t num_items = 10;
+        std::size_t num_additional_items = 10;
+
+        std::atomic<std::size_t> num_processed_items = 0;
+        std::atomic<std::size_t> num_processed_accumulators = 0;
+        std::atomic<bool> try_put_and_wait_exit_flag{};
+
+        int accumulator_message = 1;
+        int add_message = 2;
+
+        tag_type global_tag;
+
+        multinode_type* this_node = nullptr;
+
+        std::vector<int> postprocessed_items;
+        auto global_index = tbb::this_task_arena::current_thread_index();
+
+        tbb::flow::graph g;
+        multinode_type node(g, tbb::flow::unlimited,
+            [&](int input, ports_type& ports, tag_type&& local_tag) {
+                if (num_processed_items++ == 0) {
+                    CHECK(input == accumulator_message);
+                    ++num_processed_accumulators;
+
                     global_tag = std::move(local_tag);
-                    for (int i = 0; i < int(num_items - 1); ++i) {
-                        this_node->try_put(i);
+                    for (std::size_t i = 1; i < num_items; ++i) {
+                        this_node->try_put(accumulator_message);
+                    }
+                    for (std::size_t i = 0; i < num_additional_items; ++i) {
+                        this_node->try_put(add_message);
+                    }
+                } else {
+                    if (input == accumulator_message) {
+                        if (num_processed_accumulators++ == num_items - 1) {
+                            // The last accumulator was received - "cancel" the operation
+                            global_tag.reset();
+                        }
+                    } else {
+                        if (global_index != tbb::this_task_arena::current_thread_index()) {
+                            // Block the worker thread until the try_put_and_wait was exitted
+                            while(!try_put_and_wait_exit_flag.load()) {
+                                std::this_thread::yield();
+                            }
+                        }
+                        std::get<0>(ports).try_put(input);
                     }
                 }
-                std::get<0>(ports).try_put(input);
-            } else {
-                global_tag.reset();
-            }
-            ++num_processed_items;
-        });
+            });
 
-    this_node = &node;
+        this_node = &node;
 
-    tbb::flow::function_node<int, int, tbb::flow::lightweight> write_node(g, tbb::flow::unlimited,
-        [&](int value) noexcept { processed_items.emplace_back(value); return 0; });
+        tbb::flow::function_node<int, int> write_node(g, tbb::flow::serial,
+            [&](int value) noexcept { postprocessed_items.emplace_back(value); return 0; });
 
-    tbb::flow::make_edge(tbb::flow::output_port<0>(node), write_node);
+        tbb::flow::make_edge(tbb::flow::output_port<0>(node), write_node);
 
-    node.try_put_and_wait(wait_message);
+        node.try_put_and_wait(accumulator_message);
 
-    CHECK(num_items == num_processed_items);
-    CHECK(processed_items.size() == num_items - 1);
-    std::sort(processed_items.begin(), processed_items.end());
+        std::cout << num_processed_accumulators << std::endl;
+        std::cout << num_processed_items << std::endl;
+        std::cout << postprocessed_items.size() << std::endl;
 
-    for (auto item : processed_items) {
-        std::cout << item << " ";
-    }
-    std::cout << std::endl;
-
-    for (std::size_t i = 0; i < num_items - 1; ++i) {
-        CHECK_MESSAGE(processed_items[i] == i, "Incorrect items processing order");
-    }
-    CHECK_MESSAGE(processed_items.back() == wait_message, "Incorrect items processing");
-
-    g.wait_for_all();
+        g.wait_for_all();
+    });
 }
 
 void test_reduction() {

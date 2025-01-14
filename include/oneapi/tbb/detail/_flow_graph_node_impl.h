@@ -573,6 +573,7 @@ public:
 
     multifunction_node_tag& operator=(const multifunction_node_tag&) = delete;
     multifunction_node_tag& operator=(multifunction_node_tag&& other) {
+        // TODO: should this method be thread-safe?
         if (this != &other) {
             reset();
             my_metainfo = std::move(other.my_metainfo);
@@ -595,6 +596,8 @@ public:
     }
 
     void reset() {
+        tbb::spin_mutex::scoped_lock lock(my_mutex);
+
         for (auto waiter : my_metainfo.waiters()) {
             waiter->release();
         }
@@ -660,9 +663,11 @@ public:
     graph_task* apply_body_impl_bypass( const input_type &i
                                         __TBB_FLOW_GRAPH_METAINFO_ARG(const message_metainfo& metainfo) )
     {
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
         multifunction_node_tag tag(metainfo);
+#endif
         fgt_begin_body( my_body );
-        (*my_body)(i, my_output_ports, std::move(tag));
+        (*my_body)(i, my_output_ports __TBB_FLOW_GRAPH_METAINFO_ARG(std::move(tag)));
         fgt_end_body( my_body );
         graph_task* ttask = nullptr;
         if(base_type::my_max_concurrency != 0) {
