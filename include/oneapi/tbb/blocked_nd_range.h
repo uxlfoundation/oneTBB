@@ -148,13 +148,10 @@ class blocked_nd_range : public blocked_nd_range_impl<Value, N> {
 };
 
 #if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
-template <typename Value, unsigned int N0,
-          typename... Values, unsigned int... Ns,
-          typename = std::enable_if_t<(sizeof...(Values) > 0)>,
-          typename = std::enable_if_t<(... && std::is_same_v<Value, Values>)>,
-          typename = std::enable_if_t<(N0 == 2 || N0 == 3) && (... && (Ns == 2 || Ns == 3))>>
-blocked_nd_range(const Value (&)[N0], const Values (&... dim)[Ns])
--> blocked_nd_range<Value, 1 + sizeof...(Values)>;
+template <typename Value, unsigned int... Ns,
+          typename = std::enable_if_t<(... && (Ns == 2 || Ns == 3))>>
+blocked_nd_range(const Value (&... dim)[Ns])
+-> blocked_nd_range<Value, sizeof...(Ns)>;
 
 template <typename Value, typename... Values,
           typename = std::enable_if_t<(... && std::is_same_v<Value, Values>)>>
