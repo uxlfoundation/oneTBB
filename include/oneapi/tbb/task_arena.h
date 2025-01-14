@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -177,16 +177,15 @@ protected:
 
 #if __TBB_PREVIEW_PARALLEL_PHASE
     leave_policy get_leave_policy() const {
-        bool fast_policy_set = (my_version_and_traits & fast_leave_policy_flag) == fast_leave_policy_flag;
-        return fast_policy_set ? leave_policy::fast : leave_policy::automatic;
+        return (my_version_and_traits & fast_leave_policy_flag) ? leave_policy::fast : leave_policy::automatic;
     }
 
-    int leave_policy_to_traits(leave_policy lp) const {
+    int leave_policy_trait(leave_policy lp) const {
         return lp == leave_policy::fast ? fast_leave_policy_flag : 0;
     }
 
     void set_leave_policy(leave_policy lp) {
-        my_version_and_traits |= leave_policy_to_traits(lp);
+        my_version_and_traits |= leave_policy_trait(lp);
     }
 #endif
 
@@ -203,7 +202,7 @@ protected:
     )
         : my_version_and_traits(default_flags | core_type_support_flag
 #if __TBB_PREVIEW_PARALLEL_PHASE
-                | leave_policy_to_traits(lp)
+                | leave_policy_trait(lp)
 #endif
         )
         , my_initialization_state(do_once_state::uninitialized)
@@ -224,7 +223,7 @@ protected:
     )
         : my_version_and_traits(default_flags | core_type_support_flag 
 #if __TBB_PREVIEW_PARALLEL_PHASE
-                | leave_policy_to_traits(lp)
+                | leave_policy_trait(lp)
 #endif
                 )
         , my_initialization_state(do_once_state::uninitialized)
@@ -306,7 +305,7 @@ public:
     task_arena(int max_concurrency_ = automatic, unsigned reserved_for_masters = 1,
                priority a_priority = priority::normal
 #if __TBB_PREVIEW_PARALLEL_PHASE
-                    , leave_policy lp = leave_policy::automatic
+               , leave_policy lp = leave_policy::automatic
 #endif
     )
         : task_arena_base(max_concurrency_, reserved_for_masters, a_priority

@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -358,7 +358,7 @@ bool arena::has_enqueued_tasks() {
 
 void arena::request_workers(int mandatory_delta, int workers_delta, bool wakeup_threads) {
 #if __TBB_PREVIEW_PARALLEL_PHASE
-    my_thread_leave.restore_default_policy_if_needed();
+    my_thread_leave.reset_if_needed();
 #endif
     my_threading_control->adjust_demand(my_tc_client, mandatory_delta, workers_delta);
 

@@ -1,5 +1,5 @@
-/*
-    Copyright (c) 2005-2024 Intel Corporation
+/*arena
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -181,16 +181,18 @@ public:
 
 #if __TBB_PREVIEW_PARALLEL_PHASE
 class thread_leave_manager {
-    static const std::uint64_t FAST_LEAVE = 1;
-    static const std::uint64_t ONE_TIME_FAST_LEAVE = 1 << 1;
-    static const std::uint64_t DELAYED_LEAVE = 1 << 2;
-    static const std::uint64_t PARALLEL_PHASE = 1 << 3;
+    static const std::size_t DELAYED_LEAVE       = 0;
+    static const std::size_t FAST_LEAVE          = 1;
+    static const std::size_t ONE_TIME_FAST_LEAVE = 1 << 1;
+    static const std::size_t PARALLEL_PHASE      = 1 << 2;
 
-    std::atomic<std::uint64_t> my_state{0};
+    std::atomic<std::size_t> my_state{static_cast<std::size_t>(-1)};
 public:
+    // This method is not thread-safe!
+    // Required to be called after construction to set initial state of the state machine.
     void set_initial_state(tbb::task_arena::leave_policy lp) {
         if (lp == tbb::task_arena::leave_policy::automatic) {
-            std::uint64_t platform_policy = governor::hybrid_cpu() ? FAST_LEAVE : DELAYED_LEAVE;
+            std::size_t platform_policy = governor::hybrid_cpu() ? FAST_LEAVE : DELAYED_LEAVE;
             my_state.store(platform_policy, std::memory_order_relaxed);
         } else {
             __TBB_ASSERT(lp == tbb::task_arena::leave_policy::fast,
@@ -199,21 +201,21 @@ public:
         }
     }
 
-    void restore_default_policy_if_needed() {
-        std::uint64_t curr = ONE_TIME_FAST_LEAVE;
+    void reset_if_needed() {
+        std::size_t curr = ONE_TIME_FAST_LEAVE;
         if (my_state.load(std::memory_order_relaxed) == curr) {
             // Potentially can override decision of the parallel block from future epoch
             // but it is not a problem because it does not violate the correctness
             my_state.compare_exchange_strong(curr, DELAYED_LEAVE);
         }
     }
-    
+
     // Indicate start of parallel phase in the state machine
     void register_parallel_phase() {
-        std::uint64_t prev = my_state.load(std::memory_order_relaxed);
-        __TBB_ASSERT(prev != 0, "The initial state was not set");
+        std::size_t prev = my_state.load(std::memory_order_relaxed);
+        __TBB_ASSERT(prev != std::size_t(-1), "The initial state was not set");
 
-        std::uint64_t desired{};
+        std::size_t desired{};
         do {
             // Need to add a reference for this start of a parallel phase, preserving the leave
             // policy. Except for the case when one time fast leave was requested at the end of a
@@ -231,10 +233,10 @@ public:
 
     // Indicate the end of parallel phase in the state machine
     void unregister_parallel_phase(bool enable_fast_leave) {
-        std::uint64_t prev = my_state.load(std::memory_order_relaxed);
-        __TBB_ASSERT(prev != 0, "The initial state was not set");
+        std::size_t prev = my_state.load(std::memory_order_relaxed);
+        __TBB_ASSERT(prev != std::size_t(-1), "The initial state was not set");
 
-        std::uint64_t desired{};
+        std::size_t desired{};
         do {
             __TBB_ASSERT(prev - PARALLEL_PHASE < prev,
                          "A call to unregister without its register complement");
@@ -246,9 +248,8 @@ public:
     }
 
     bool is_retention_allowed() {
-        std::uint64_t curr = my_state.load(std::memory_order_relaxed);
-        __TBB_ASSERT(curr != 0, "The initial state was not set");
-
+        std::size_t curr = my_state.load(std::memory_order_relaxed);
+        __TBB_ASSERT(curr != std::size_t(-1), "The initial state was not set");
         return curr != FAST_LEAVE && curr != ONE_TIME_FAST_LEAVE;
     }
 };
