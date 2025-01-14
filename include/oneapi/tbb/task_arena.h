@@ -177,8 +177,7 @@ protected:
 
 #if __TBB_PREVIEW_PARALLEL_PHASE
     leave_policy get_leave_policy() const {
-        bool fast_policy_set = (my_version_and_traits & fast_leave_policy_flag) == fast_leave_policy_flag;
-        return fast_policy_set ? leave_policy::fast : leave_policy::automatic;
+        return (my_version_and_traits & fast_leave_policy_flag) ? leave_policy::fast : leave_policy::automatic;
     }
 
     int leave_policy_to_traits(leave_policy lp) const {
