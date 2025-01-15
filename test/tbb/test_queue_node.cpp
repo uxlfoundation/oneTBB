@@ -30,7 +30,7 @@
 
 #include <cstdio>
 
-#include "test_buffering_try_put_and_wait.h"
+#include "test_try_put_and_wait.h"
 
 //! \file test_queue_node.cpp
 //! \brief Test for [flow_graph.queue_node] specification

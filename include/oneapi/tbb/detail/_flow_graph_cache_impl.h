@@ -425,7 +425,7 @@ public:
         typename mutex_type::scoped_lock l(this->my_mutex, /*write=*/true);
         typename successors_type::iterator i = this->my_successors.begin();
         while ( i != this->my_successors.end() ) {
-            graph_task * new_task = (*i)->try_put_task(t, metainfo);
+            graph_task * new_task = (*i)->try_put_task(t __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo));
             if(new_task) {
                 ++i;
                 if(new_task != SUCCESSFULLY_ENQUEUED) {

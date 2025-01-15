@@ -24,7 +24,7 @@
 #include "common/graph_utils.h"
 #include "common/test_follows_and_precedes_api.h"
 
-#include "test_buffering_try_put_and_wait.h"
+#include "test_try_put_and_wait.h"
 
 //! \file test_buffer_node.cpp
 //! \brief Test for [flow_graph.buffer_node] specification
