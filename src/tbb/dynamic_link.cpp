@@ -626,6 +626,14 @@ namespace r1 {
         }
     }
 
+    /**
+     * Validates signature of specified file.
+     *
+     * @param filepath Path to a file, whose signature to be validated.
+     * @param length Length of the path buffer, including the terminating NULL character.
+     * @return 'true' if file signature has been successfully validated. 'false' - if any error
+     *         occurs, in which case the error is optionally reported.
+     */
     bool has_valid_signature(const char* filepath, const std::size_t length) {
         __TBB_ASSERT_EX(length <= PATH_MAX, "Too small buffer for path conversion");
         wchar_t wfilepath[PATH_MAX] = {0};
