@@ -16,6 +16,8 @@
 
 #define TBB_PREVIEW_PARALLEL_PHASE 1
 
+#include <chrono>
+
 #include "common/test.h"
 #include "common/utils.h"
 #include "common/utils_concurrency_limit.h"
@@ -23,6 +25,15 @@
 
 #include "tbb/task_arena.h"
 #include "tbb/parallel_for.h"
+
+void active_wait_for(std::chrono::microseconds duration) {
+    for (auto t1 = std::chrono::steady_clock::now(), t2 = t1;
+        std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1) < duration;
+        t2 = std::chrono::steady_clock::now())
+    {
+        utils::doDummyWork(100);
+    }
+}
 
 struct dummy_func {
     void operator()() const {
@@ -66,7 +77,7 @@ std::size_t measure_median_start_time(tbb::task_arena* ta, const F1& start = F1{
         } else {
             work();
         }
-        utils::doDummyWork(i*250);
+        active_wait_for(std::chrono::microseconds(i));
     }
     return utils::median(longest_start_times.begin(), longest_start_times.end());
 }
@@ -101,7 +112,7 @@ class start_time_collection : public start_time_collection_base<start_time_colle
 
     std::size_t measure_impl() {
         return measure_median_start_time(arena);
-    };
+    }
 };
 
 class start_time_collection_phase_wrapped
@@ -116,7 +127,7 @@ class start_time_collection_phase_wrapped
         auto median_start_time = measure_median_start_time(arena);
         arena->end_parallel_phase(/*with_fast_leave*/true);
         return median_start_time;
-    };
+    }
 };
 
 class start_time_collection_scoped_phase_wrapped
@@ -130,7 +141,7 @@ class start_time_collection_scoped_phase_wrapped
         tbb::task_arena::scoped_parallel_phase phase{*arena};
         auto median_start_time = measure_median_start_time(arena);
         return median_start_time;
-    };
+    }
 };
 
 class start_time_collection_sequenced_phases
@@ -143,17 +154,35 @@ class start_time_collection_sequenced_phases
 
     std::size_t measure_impl() {
         std::size_t median_start_time;
+        utils::SpinBarrier barrier;
+        auto body = [&] (std::size_t) {
+            barrier.wait();
+        };
         if (arena) {
+            barrier.initialize(arena->max_concurrency());
             median_start_time = measure_median_start_time(arena,
-                [this] { arena->start_parallel_phase(); },
-                [this] { arena->end_parallel_phase(with_fast_leave); });
+                [&] {
+                    std::size_t num_threads = arena->max_concurrency();
+                    arena->start_parallel_phase();
+                    arena->execute([&] {
+                        tbb::parallel_for(std::size_t(0), num_threads, body, tbb::static_partitioner{});
+                    });
+                    arena->end_parallel_phase(with_fast_leave);
+                }
+            );
         } else {
+            barrier.initialize(tbb::this_task_arena::max_concurrency());
             median_start_time = measure_median_start_time(arena,
-                [] { tbb::this_task_arena::start_parallel_phase(); },
-                [this] { tbb::this_task_arena::end_parallel_phase(with_fast_leave); });
+                [&] {
+                    std::size_t num_threads = tbb::this_task_arena::max_concurrency();
+                    tbb::this_task_arena::start_parallel_phase();
+                    tbb::parallel_for(std::size_t(0), num_threads, body, tbb::static_partitioner{});
+                    tbb::this_task_arena::end_parallel_phase(with_fast_leave); 
+                }
+            );
         }
         return median_start_time;
-    };
+    }
 
 public:
     start_time_collection_sequenced_phases(tbb::task_arena& ta, std::size_t ntrials, bool fast_leave = false) :
@@ -168,31 +197,38 @@ public:
 class start_time_collection_sequenced_scoped_phases
     : public start_time_collection_base<start_time_collection_sequenced_scoped_phases>
 {
-  using base = start_time_collection_base<start_time_collection_sequenced_scoped_phases>;
-  friend base;
+    using base = start_time_collection_base<start_time_collection_sequenced_scoped_phases>;
+    friend base;
 
-  bool with_fast_leave;
+    bool with_fast_leave;
 
-  std::size_t measure_impl() {
-      tbb::task_arena::scoped_parallel_phase* phase = nullptr;
-      auto median_start_time = measure_median_start_time(arena,
-          [this, &phase] {
-              phase = new tbb::task_arena::scoped_parallel_phase{*arena, with_fast_leave};
-          },
-          [&phase] {
-              delete phase;
-      });
-    return median_start_time;
-  };
+    std::size_t measure_impl() {
+        utils::SpinBarrier barrier{static_cast<std::size_t>(arena->max_concurrency())};
+        auto body = [&] (std::size_t) {
+            barrier.wait();
+        };
+        auto median_start_time = measure_median_start_time(arena,
+            [&] {
+                std::size_t num_threads = arena->max_concurrency();
+                {
+                    tbb::task_arena::scoped_parallel_phase phase{*arena, with_fast_leave};
+                    arena->execute([&] {
+                        tbb::parallel_for(std::size_t(0), num_threads, body, tbb::static_partitioner{});
+                    });
+                }
+            }
+        );
+        return median_start_time;
+    }
 
 public:
-  start_time_collection_sequenced_scoped_phases(tbb::task_arena& ta, std::size_t ntrials, bool fast_leave = false) :
-      base(ta, ntrials), with_fast_leave(fast_leave)
-  {}
+    start_time_collection_sequenced_scoped_phases(tbb::task_arena& ta, std::size_t ntrials, bool fast_leave = false) :
+        base(ta, ntrials), with_fast_leave(fast_leave)
+    {}
 
-  explicit start_time_collection_sequenced_scoped_phases(std::size_t ntrials, bool fast_leave = false) :
-      base(ntrials), with_fast_leave(fast_leave)
-  {}
+    explicit start_time_collection_sequenced_scoped_phases(std::size_t ntrials, bool fast_leave = false) :
+        base(ntrials), with_fast_leave(fast_leave)
+    {}
 };
 
 //! \brief \ref interface \ref requirement
