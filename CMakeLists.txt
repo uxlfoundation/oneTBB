@@ -122,6 +122,7 @@ cmake_dependent_option(TBBMALLOC_PROXY_BUILD "Enable tbbmalloc_proxy build" ON "
 option(TBB_CPF "Enable preview features of the library" OFF)
 option(TBB_FIND_PACKAGE "Enable search for external oneTBB using find_package instead of build from sources" OFF)
 option(TBB_DISABLE_HWLOC_AUTOMATIC_SEARCH "Disable HWLOC automatic search by pkg-config tool" ${CMAKE_CROSSCOMPILING})
+option(TBB_VERIFY_DEPENDENCY_SIGNATURE "Verify signature of a dependency during its dynamic run-time linking" ON)
 option(TBB_ENABLE_IPO "Enable Interprocedural Optimization (IPO) during the compilation" ON)
 option(TBB_CONTROL_FLOW_GUARD "Enable Control Flow Guard (CFG) during the compilation" OFF)
 option(TBB_FUZZ_TESTING "Enable fuzz testing" OFF)
@@ -232,6 +233,13 @@ file(GLOB FILES_WITH_EXTRA_TARGETS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/*.cmake)
 foreach(FILE_WITH_EXTRA_TARGETS ${FILES_WITH_EXTRA_TARGETS})
     include(${FILE_WITH_EXTRA_TARGETS})
 endforeach()
+
+if (NOT TBB_VERIFY_DEPENDENCY_SIGNATURE)
+    message(WARNING
+        "Verification of a dependency signature during dynamic run-time linking is explicitly disabled."
+        "This may lead to security vulnerabilities. It is recommended to leave it enabled by default"
+        " or set TBB_VERIFY_DEPENDENCY_SIGNATURE ON to enable it explicitly.")
+endif()
 
 # - Enabling LTO on Android causes the NDK bug.
 #   NDK throws the warning: "argument unused during compilation: '-Wa,--noexecstack'"

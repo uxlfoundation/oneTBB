@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -27,16 +27,20 @@
 */
 
 #include <cstdarg>          // va_list etc.
-#include <cstring>          // strrchr
-#if _WIN32
-    #include <malloc.h>
+#include <cstring>          // strrchr, memset
 
+#if _WIN32
     // Unify system calls
-    #define dlopen( name, flags )   LoadLibrary( name )
+    #define dlopen( name, flags )   LoadLibraryEx( name, /*reserved*/NULL, flags )
     #define dlsym( handle, name )   GetProcAddress( handle, name )
     // FreeLibrary return bool value that is not used.
     #define dlclose( handle )       (void)( ! FreeLibrary( handle ) )
     #define dlerror()               GetLastError()
+#if __TBB_VERIFY_DEPENDENCY_SIGNATURE
+    #include <Softpub.h>
+    #include <wintrust.h>
+    #pragma comment (lib, "wintrust")     // Link with the Wintrust.lib file.
+#endif
 #ifndef PATH_MAX
     #define PATH_MAX                MAX_PATH
 #endif
@@ -68,9 +72,10 @@ dynamic_link provides certain guarantees:
   symbols are not resolved, the dynamic_link_descriptor table is not modified;
   2. All returned symbols have secured lifetime: this means that none of them
   can be invalidated until dynamic_unlink is called;
-  3. Any loaded library is loaded only via the full path. The full path is that
-  from which the runtime itself was loaded. (This is done to avoid security
-  issues caused by loading libraries from insecure paths).
+  3. To avoid security issues caused by loading libraries from insecure paths,
+  the loading can be made via the full path and/or with validatiion of a
+  signature on Windows platforms. In any case, current working directory is
+  excluded from the loader consideration.
 
 dynamic_link searches for the requested symbols in three stages, stopping as
 soon as all of the symbols have been resolved.
@@ -84,7 +89,7 @@ soon as all of the symbols have been resolved.
     anything about the library from which they are exported). Therefore it
     tries to "pin" the symbols by obtaining the library name and reopening it.
     dlopen may fail to reopen the library in two cases:
-       i. The symbols are exported from the executable. Currently dynamic _link
+       i. The symbols are exported from the executable. Currently dynamic_link
       cannot handle this situation, so it will not find these symbols in this
       step.
       ii. The necessary library has been unloaded and cannot be reloaded. It
@@ -93,13 +98,23 @@ soon as all of the symbols have been resolved.
 
   2. Dynamic load: an attempt is made to load the requested library via the
   full path.
-    The full path used is that from which the runtime itself was loaded. If the
-    library can be loaded, then an attempt is made to resolve the requested
-    symbols in the newly loaded library.
-    If the symbols are not found the library is unloaded.
+    By default, the full path used is that from which the runtime itself was
+    loaded. On Windows the full path is determined by using system facilities
+    with subsequent signature validation. If the library can be loaded, then an
+    attempt is made to resolve the requested symbols in the newly loaded
+    library. If the symbols are not found the library is unloaded.
 
   3. Weak symbols: if weak symbols are available they are returned.
 */
+
+#if __STDC_WANT_LIB_EXT1__
+#include <stdio.h>              // fprintf_s
+#define TBB_FPRINTF fprintf_s
+#else
+// fprintf_s is not supported by the implementation, fallback to standard fprintf
+#include <cstdio>               // fprintf
+#define TBB_FPRINTF std::fprintf
+#endif
 
 namespace tbb {
 namespace detail {
@@ -110,9 +125,100 @@ namespace r1 {
 #if !defined(DYNAMIC_LINK_WARNING) && !__TBB_WIN8UI_SUPPORT && __TBB_DYNAMIC_LOAD_ENABLED
     // Report runtime errors and continue.
     #define DYNAMIC_LINK_WARNING dynamic_link_warning
+#if TBB_DYNAMIC_LINK_WARNING
+    static void dynamic_link_warning( dynamic_link_error_t code, ... ) {
+        const char* prefix = "oneTBB dynamic link error:";
+        const char* str = nullptr;
+        // Note: dlerr_t depends on OS: it is char const * on Linux* and macOS*, int on Windows*.
+#if _WIN32
+        #define DLERROR_SPECIFIER "%d"
+        typedef long dlerr_t;
+#else
+        #define DLERROR_SPECIFIER "%s"
+        typedef const char* dlerr_t;
+#endif
+        dlerr_t error = 0;
+
+        std::va_list args;
+        va_start(args, code);
+
+        switch (code) {
+        case dl_lib_not_found:
+            str = va_arg(args, const char*);
+            error = va_arg(args, dlerr_t);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded because it was not found. "
+                        "System error: " DLERROR_SPECIFIER "\n", prefix, str, error);
+            break;
+        case dl_sym_not_found:     // char const * sym, dlerr_t err:
+            // TODO: Print not found symbol once it is used by the implementation
+            break;
+        case dl_sys_fail:
+            str = va_arg(args, const char*);
+            error = va_arg(args, dlerr_t);
+            TBB_FPRINTF(stdout, "oneTBB: A call to \"%s\" failed with error " DLERROR_SPECIFIER
+                        "\n", str, error);
+            break;
+        case dl_buff_too_small:
+            TBB_FPRINTF(stdout, "oneTBB: An internal buffer representing a path to dynamically "
+                        "loaded module is small. Consider compile with larger value for PATH_MAX "
+                        "macro.\n");
+            break;
+        case dl_unload_fail:
+            str = va_arg(args, const char*);
+            error = va_arg(args, dlerr_t);
+            TBB_FPRINTF(stdout, "%s Error unloading the module \"%s\": " DLERROR_SPECIFIER "\n",
+                        prefix, str, error);
+            break;
+        case dl_lib_unsigned:
+            str = va_arg(args, const char*);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded because it is unsigned or has "
+                        "invalid signature.\n", prefix, str);
+            break;
+        case dl_sig_err_unknown:
+            str = va_arg(args, const char*);
+            error = va_arg(args, dlerr_t);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded because its signature "
+                        "verification results in unknown error:" DLERROR_SPECIFIER "\n",
+                        prefix, str, error);
+            break;
+        case dl_sig_explicit_distrust:
+            str = va_arg(args, const char*);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded because the certificate "
+                        "with which it was signed is explicitly distrusted by an admin or user.\n",
+                        prefix, str);
+            break;
+        case dl_sig_untrusted_root:
+            str = va_arg(args, const char*);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded because during the signature "
+                        "verification process, the certificate chain is terminated in a root "
+                        "certificate which is not trusted.\n", prefix, str);
+            break;
+        case dl_sig_distrusted:
+            str = va_arg(args, const char*);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded because its signature is not "
+                        "trusted.\n", prefix, str);
+            break;
+        case dl_sig_security_settings:
+            str = va_arg(args, const char*);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded because the hash or publisher "
+                        "was not explicitly trusted and user trust was not allowed.", prefix, str);
+            break;
+        case dl_sig_other_error:
+            str = va_arg(args, const char*);
+            error = va_arg(args, dlerr_t);
+            TBB_FPRINTF(stdout, "%s The module \"%s\" was not loaded. System error code "
+                        DLERROR_SPECIFIER "\n", prefix, str, error);
+            break;
+        }
+
+        va_end(args);
+    } // library_warning
+#undef DLERROR_SPECIFIER
+#else
     static void dynamic_link_warning( dynamic_link_error_t code, ... ) {
         suppress_unused_warning(code);
     } // library_warning
+#endif  // TBB_DYNAMIC_LINK_WARNING
 #endif /* !defined(DYNAMIC_LINK_WARNING) && !__TBB_WIN8UI_SUPPORT && __TBB_DYNAMIC_LOAD_ENABLED */
 
     static bool resolve_symbols( dynamic_link_handle module, const dynamic_link_descriptor descriptors[], std::size_t required )
@@ -163,11 +269,14 @@ namespace r1 {
 #else
 #if __TBB_DYNAMIC_LOAD_ENABLED
 /*
-    There is a security issue on Windows: LoadLibrary() may load and execute malicious code.
-    See http://www.microsoft.com/technet/security/advisory/2269637.mspx for details.
-    To avoid the issue, we have to pass full path (not just library name) to LoadLibrary. This
-    function constructs full path to the specified library (it is assumed the library located
-    side-by-side with the tbb.dll.
+    There is a security issue on Windows: LoadLibrary() may load and execute malicious code. To
+    avoid the issue, we have to exclude working directory from the list of directories in which
+    loader searches for the library. This is done by passing LOAD_LIBRARY_SAFE_CURRENT_DIRS flag to
+    LoadLibraryEx. To further strengthen the security, library signature is verified.
+
+    Also, the default approach is to load the library via full path. This
+    function constructs full path to the specified library (it is assumed the
+    library located side-by-side with the tbb.dll.
 
     The function constructs absolute path for given relative path. Important: Base directory is not
     current one, it is the directory tbb.dll loaded from.
@@ -337,7 +446,7 @@ namespace r1 {
     #if __USE_STATIC_DL_INIT
     // ap_data structure is initialized with current directory on Linux.
     // So it should be initialized as soon as possible since the current directory may be changed.
-    // static_init_ap_data object provides this initialization during library loading.
+    // static_init_dl_data_t object provides this initialization during library loading.
     static struct static_init_dl_data_t {
         static_init_dl_data_t() {
             init_dynamic_link_data();
@@ -378,7 +487,10 @@ namespace r1 {
     #endif
     }
 
-    static dynamic_link_handle global_symbols_link( const char* library, const dynamic_link_descriptor descriptors[], std::size_t required ) {
+    static dynamic_link_handle global_symbols_link(const char* library,
+                                                   const dynamic_link_descriptor descriptors[],
+                                                   std::size_t required )
+    {
         dynamic_link_handle library_handle{};
 #if _WIN32
         auto res = GetModuleHandleEx(0, library, &library_handle);
@@ -410,10 +522,15 @@ namespace r1 {
     #endif /* __TBB_DYNAMIC_LOAD_ENABLED */
     }
 
-#if !_WIN32
-    int loading_flags(bool local_binding) {
+#if _WIN32
+    DWORD loading_flags(int) {
+        // Do not search in working directory if it is considered unsafe
+        return LOAD_LIBRARY_SAFE_CURRENT_DIRS;
+    }
+#else
+    int loading_flags(int requested_flags) {
         int flags = RTLD_NOW;
-        if (local_binding) {
+        if (requested_flags & DYNAMIC_LINK_LOCAL) {
             flags = flags | RTLD_LOCAL;
 #if (__linux__ && __GLIBC__) && !__TBB_USE_SANITIZERS
             if( !GetBoolEnvironmentVariable("TBB_ENABLE_SANITIZERS") ) {
@@ -427,45 +544,196 @@ namespace r1 {
     }
 #endif
 
-    dynamic_link_handle dynamic_load( const char* library, const dynamic_link_descriptor descriptors[], std::size_t required, bool local_binding ) {
-        ::tbb::detail::suppress_unused_warning( library, descriptors, required, local_binding );
-#if __TBB_DYNAMIC_LOAD_ENABLED
-        std::size_t const len = PATH_MAX + 1;
-        char path[ len ];
-        std::size_t rc = abs_path( library, path, len );
-        if ( 0 < rc && rc <= len ) {
-#if _WIN32
-            // Prevent Windows from displaying silly message boxes if it fails to load library
-            // (e.g. because of MS runtime problems - one of those crazy manifest related ones)
-            UINT prev_mode = SetErrorMode (SEM_FAILCRITICALERRORS);
-#endif /* _WIN32 */
-            // The second argument (loading_flags) is ignored on Windows
-            dynamic_link_handle library_handle = dlopen( path, loading_flags(local_binding) );
-#if _WIN32
-            SetErrorMode (prev_mode);
-#endif /* _WIN32 */
-            if( library_handle ) {
-                if( !resolve_symbols( library_handle, descriptors, required ) ) {
-                    // The loaded library does not contain all the expected entry points
-                    dynamic_unlink( library_handle );
-                    library_handle = nullptr;
-                }
-            } else
-                DYNAMIC_LINK_WARNING( dl_lib_not_found, path, dlerror() );
-            return library_handle;
-        } else if ( rc>len )
-                DYNAMIC_LINK_WARNING( dl_buff_too_small );
-                // rc == 0 means failing of init_ap_data so the warning has already been issued.
 
-#endif /* __TBB_DYNAMIC_LOAD_ENABLED */
-            return nullptr;
+#if _WIN32 && __TBB_VERIFY_DEPENDENCY_SIGNATURE
+    /**
+     * Obtains full path to the specified filename and stores it inside passed buffer.
+     *
+     * Returns the actual length of the buffer required to hold the full path to the specified file,
+     * including terminating NULL character.
+     */
+    unsigned get_module_full_path(char* path_buffer, const unsigned buffer_length,
+                                  const char* filename)
+    {
+        __TBB_ASSERT_EX( buffer_length > 0, "Cannot write the path to the buffer with zero length" );
+
+        // TODO: DONT_RESOLVE_DLL_REFERENCES is deprecated and can lead to errors since the "loaded"
+        // library can be seen by other threads, which might decide to call its functions. Consider
+        // determining full file path the other way still using system loader search order.
+
+        // Use default flags but also do not load dependencies nor execute any code
+        DWORD flags = loading_flags(DYNAMIC_LINK_DEFAULT) | DONT_RESOLVE_DLL_REFERENCES;
+        dynamic_link_handle handle = LoadLibraryExA(filename, /*reserved*/NULL, flags);
+        if (nullptr == handle) {
+            DYNAMIC_LINK_WARNING( dl_lib_not_found, filename, dlerror() );
+            return /*actual_length*/0;
+        }
+
+        unsigned actual_length = GetModuleFileNameA( handle, path_buffer,
+                                                     static_cast<DWORD>(buffer_length) );
+        if (0 == actual_length) {
+            DYNAMIC_LINK_WARNING( dl_lib_not_found, filename, dlerror() );
+        } else if (buffer_length == actual_length) {
+            // The buffer length was insufficient. The terminating NULL character is automatically
+            // counted in this case.
+            DYNAMIC_LINK_WARNING( dl_buff_too_small );
+        } else
+            actual_length += 1;   // Count terminating NULL character as part of string length
+
+        if (!FreeLibrary(handle))
+            DYNAMIC_LINK_WARNING( dl_unload_fail, filename, dlerror() );
+
+        return actual_length;
     }
 
-    bool dynamic_link( const char* library, const dynamic_link_descriptor descriptors[], std::size_t required, dynamic_link_handle *handle, int flags ) {
+    void report_signature_validation_status(const LONG retval, const char* filepath) {
+        switch (retval) {
+        case ERROR_SUCCESS:
+            // The file is signed:
+            //   - Hash representing a file is trusted.
+            //   - Trusted publisher without any verification errors.
+            //   - No publisher or time stamp chain errors.
+            break;
+        case TRUST_E_NOSIGNATURE:
+        {
+            // The file is not signed or has an invalid signature.
+            auto lerr = dlerror();
+            if (lerr == TRUST_E_NOSIGNATURE || lerr == TRUST_E_SUBJECT_FORM_UNKNOWN ||
+                lerr == TRUST_E_PROVIDER_UNKNOWN)
+            {
+                DYNAMIC_LINK_WARNING( dl_lib_unsigned, filepath );
+            } else {
+                DYNAMIC_LINK_WARNING( dl_sig_err_unknown, filepath, lerr );
+            }
+            break;
+        }
+        case TRUST_E_EXPLICIT_DISTRUST:
+            // The hash representing the subject is explicitly disallowed by the admin or user.
+            DYNAMIC_LINK_WARNING( dl_sig_explicit_distrust, filepath );
+            break;
+        case CERT_E_UNTRUSTEDROOT:
+            DYNAMIC_LINK_WARNING( dl_sig_untrusted_root, filepath );
+            break;
+        case TRUST_E_SUBJECT_NOT_TRUSTED:
+            DYNAMIC_LINK_WARNING( dl_sig_distrusted, filepath );
+            break;
+        case CRYPT_E_SECURITY_SETTINGS:
+            DYNAMIC_LINK_WARNING( dl_sig_security_settings, filepath );
+            break;
+        default:
+            DYNAMIC_LINK_WARNING( dl_sig_other_error, filepath, retval);
+            break;
+        }
+    }
+
+    bool has_valid_signature(const char* filepath, const std::size_t length) {
+        __TBB_ASSERT_EX(length <= PATH_MAX, "Too small buffer for path conversion");
+        wchar_t wfilepath[PATH_MAX] = {0};
+        {
+            std::mbstate_t state{};
+            const char* ansi_filepath = filepath; // mbsrtowcs moves original pointer
+            const size_t num_converted = mbsrtowcs(wfilepath, &ansi_filepath, length, &state);
+            if (num_converted == std::size_t(-1))
+                return false;
+        }
+        WINTRUST_FILE_INFO fdata;
+        std::memset(&fdata, 0, sizeof(fdata));
+        fdata.cbStruct       = sizeof(WINTRUST_FILE_INFO);
+        fdata.pcwszFilePath  = wfilepath;
+
+        // Check that the certificate used to sign the specified file chains up to a root
+        // certificate located in the trusted root certificate store, implying that the identity of
+        // the publisher has been verified by a certification authority.
+        GUID pgActionID = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+
+        WINTRUST_DATA pWVTData;
+        std::memset(&pWVTData, 0, sizeof(pWVTData));
+        pWVTData.cbStruct            = sizeof(WINTRUST_DATA);
+        pWVTData.dwUIChoice          = WTD_UI_NONE;                    // Disable WVT UI
+        pWVTData.fdwRevocationChecks = WTD_REVOKE_WHOLECHAIN;          // Check the whole chain
+        pWVTData.dwUnionChoice       = WTD_CHOICE_FILE;                // Verify file signature
+        pWVTData.pFile               = &fdata;
+        pWVTData.dwStateAction       = WTD_STATEACTION_VERIFY;         // Verify action
+        // Perform revocation checking on the entire certificate chain but use only the local cache
+        pWVTData.dwProvFlags         = WTD_CACHE_ONLY_URL_RETRIEVAL | WTD_REVOCATION_CHECK_CHAIN;
+        pWVTData.dwUIContext         = WTD_UICONTEXT_EXECUTE;          // UI Context to run the file
+
+        const auto rc = WinVerifyTrust((HWND)INVALID_HANDLE_VALUE, &pgActionID, &pWVTData);
+        report_signature_validation_status(rc, filepath);
+
+        pWVTData.dwStateAction = WTD_STATEACTION_CLOSE;       // Release WVT state data
+        (void)WinVerifyTrust(NULL, &pgActionID, &pWVTData);
+
+        return ERROR_SUCCESS == rc;
+    }
+#endif  // __TBB_VERIFY_DEPENDENCY_SIGNATURE
+
+    dynamic_link_handle dynamic_load( const char* library, const dynamic_link_descriptor descriptors[],
+                                      std::size_t required, int flags )
+    {
+        ::tbb::detail::suppress_unused_warning( library, descriptors, required, flags );
+        dynamic_link_handle library_handle = nullptr;
+#if __TBB_DYNAMIC_LOAD_ENABLED
+        const char* path = library;
+        std::size_t const len = PATH_MAX + 1;
+        char absolute_path[ len ];
+        std::size_t length = 0;
+        if (flags & DYNAMIC_LINK_BUILD_ABSOLUTE_PATH) {
+            length = abs_path( library, absolute_path, len );
+            if (length > len) {
+                DYNAMIC_LINK_WARNING( dl_buff_too_small );
+                return nullptr;
+            } else if (length == 0) {
+                // length == 0 means failing of init_ap_data so the warning has already been issued.
+                return nullptr;
+            }
+            path = absolute_path;
+        }
+#if _WIN32
+        // Prevent Windows from displaying silly message boxes if it fails to load library
+        // (e.g. because of MS runtime problems - one of those crazy manifest related ones)
+        UINT prev_mode = SetErrorMode (SEM_FAILCRITICALERRORS);
+#if __TBB_VERIFY_DEPENDENCY_SIGNATURE
+        char buff[PATH_MAX] = {0};
+        if ( !(flags & DYNAMIC_LINK_BUILD_ABSOLUTE_PATH) ) { // Get the path if it is not yet built
+            length = get_module_full_path(buff, /*buffer_length*/PATH_MAX, path);
+            if (length == 0) // The full path to the module has not been retrieved
+                return library_handle;
+            path = buff;
+        }
+
+        if (has_valid_signature(path, length)) {
+#endif /* __TBB_VERIFY_DEPENDENCY_SIGNATURE */
+#endif /* _WIN32 */
+            // The argument of loading_flags is ignored on Windows
+            library_handle = dlopen( path, loading_flags(flags & DYNAMIC_LINK_LOCAL) );
+#if _WIN32
+#if __TBB_VERIFY_DEPENDENCY_SIGNATURE
+        } else
+            return library_handle; // Warning (if any) has already been reported
+#endif /* __TBB_VERIFY_DEPENDENCY_SIGNATURE */
+        SetErrorMode (prev_mode);
+#endif /* _WIN32 */
+        if( library_handle ) {
+            if( !resolve_symbols( library_handle, descriptors, required ) ) {
+                // The loaded library does not contain all the expected entry points
+                dynamic_unlink( library_handle );
+                library_handle = nullptr;
+            }
+        } else
+            DYNAMIC_LINK_WARNING( dl_lib_not_found, path, dlerror() );
+#endif /* __TBB_DYNAMIC_LOAD_ENABLED */
+        return library_handle;
+    }
+
+    bool dynamic_link( const char* library, const dynamic_link_descriptor descriptors[],
+                       std::size_t required, dynamic_link_handle* handle, int flags )
+    {
         init_dynamic_link_data();
 
         // TODO: May global_symbols_link find weak symbols?
-        dynamic_link_handle library_handle = ( flags & DYNAMIC_LINK_GLOBAL ) ? global_symbols_link( library, descriptors, required ) : nullptr;
+        dynamic_link_handle library_handle = ( flags & DYNAMIC_LINK_GLOBAL ) ?
+            global_symbols_link( library, descriptors, required ) : nullptr;
 
 #if defined(_MSC_VER) && _MSC_VER <= 1900
 #pragma warning (push)
@@ -473,7 +741,7 @@ namespace r1 {
 #pragma warning (disable: 4800)
 #endif
         if ( !library_handle && ( flags & DYNAMIC_LINK_LOAD ) )
-            library_handle = dynamic_load( library, descriptors, required, flags & DYNAMIC_LINK_LOCAL );
+            library_handle = dynamic_load( library, descriptors, required, flags );
 
 #if defined(_MSC_VER) && _MSC_VER <= 1900
 #pragma warning (pop)
