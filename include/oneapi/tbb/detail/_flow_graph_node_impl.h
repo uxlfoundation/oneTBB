@@ -604,7 +604,7 @@ public:
         my_metainfo = message_metainfo{};
     }
 private:
-    friend class metainfo_tag_accessor;
+    friend struct metainfo_tag_accessor;
 
     message_metainfo my_metainfo;
     tbb::spin_mutex  my_mutex;
@@ -637,7 +637,10 @@ public:
     // constructor
     template<typename Body>
     multifunction_input(graph &g, size_t max_concurrency,Body& body, node_priority_t a_priority )
-      : base_type(g, max_concurrency, a_priority, noexcept(1))
+      : base_type(g, max_concurrency, a_priority,
+                //   noexcept(1))
+                  noexcept(invoke_body_with_tag(body __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo_tag_type{}),
+                                                input_type(), my_output_ports)))
       , my_body( new multifunction_body_leaf<input_type, output_ports_type, Body>(body) )
       , my_init_body( new multifunction_body_leaf<input_type, output_ports_type, Body>(body) )
       , my_output_ports(init_output_ports<output_ports_type>::call(g, my_output_ports)){

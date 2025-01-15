@@ -3132,7 +3132,7 @@ public:
 
     void operator()( const Input &v, Ports & __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo_tag_type&& tag) )
         noexcept(noexcept(invoke_body_with_tag(my_body __TBB_FLOW_GRAPH_METAINFO_ARG(std::move(tag)),
-                                               v, *this->my_gateway)))
+                                               v, std::declval<gateway_type&>())))
     {
         invoke_body_with_tag(my_body __TBB_FLOW_GRAPH_METAINFO_ARG(std::move(tag)), v, *this->my_gateway);
     }

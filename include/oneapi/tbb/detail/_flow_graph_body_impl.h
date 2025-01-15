@@ -180,18 +180,18 @@ struct invoke_body_with_tag_helper {
 #if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
     template <typename Body, typename... Args>
     static auto invoke(first_priority, Body&& body, metainfo_tag_type&& tag, Args&&... args)
-        noexcept(noexcept(tbb::detail::invoke(body, std::forward<Args>(args)..., std::move(tag))))
-        -> decltype(tbb::detail::invoke(body, std::forward<Args>(args)..., std::move(tag)))
+        noexcept(noexcept(tbb::detail::invoke(std::forward<Body>(body), std::forward<Args>(args)..., std::move(tag))))
+        -> decltype(tbb::detail::invoke(std::forward<Body>(body), std::forward<Args>(args)..., std::move(tag)), void())
     {
-        tbb::detail::invoke(body, std::forward<Args>(args)..., std::move(tag));
+        tbb::detail::invoke(std::forward<Body>(body), std::forward<Args>(args)..., std::move(tag));
     }
 #endif
     template <typename Body, typename... Args>
     static void invoke(second_priority, Body&& body __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo_tag_type&&),
                        Args&&... args)
-        noexcept(noexcept(tbb::detail::invoke(body, std::forward<Args>(args)...)))
+        noexcept(noexcept(tbb::detail::invoke(std::forward<Body>(body), std::forward<Args>(args)...)))
     {
-        tbb::detail::invoke(body, std::forward<Args>(args)...);
+        tbb::detail::invoke(std::forward<Body>(body), std::forward<Args>(args)...);
     }
 };
 
