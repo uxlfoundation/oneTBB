@@ -72,12 +72,7 @@ if (NOT ("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "(armv7-a|aarch64|mips|arm64|riscv)
 endif()
 
 if (TBB_VERIFY_DEPENDENCY_SIGNATURE)
-    if (MSVC)
-        set(TBB_COMPILER_MACRO_SWITCH /D)
-    else()
-        set(TBB_COMPILER_MACRO_SWITCH -D)
-    endif()
-    set(TBB_LIB_COMPILE_FLAGS ${TBB_LIB_COMPILE_FLAGS} ${TBB_COMPILER_MACRO_SWITCH}__TBB_VERIFY_DEPENDENCY_SIGNATURE)
+    target_compile_definitions(tbb PRIVATE __TBB_VERIFY_DEPENDENCY_SIGNATURE)
 endif()
 
 target_include_directories(tbb
