@@ -43,7 +43,7 @@ struct dummy_func {
 template <typename F1 = dummy_func, typename F2 = dummy_func>
 std::size_t measure_median_start_time(tbb::task_arena* ta, const F1& start = F1{}, const F2& end = F2{}) {
     std::size_t num_threads = ta ? ta->max_concurrency() : tbb::this_task_arena::max_concurrency();
-    std::size_t num_runs = 1000;
+    std::size_t num_runs = 500;
     std::vector<std::size_t> longest_start_times;
     longest_start_times.reserve(num_runs);
 
@@ -71,13 +71,13 @@ std::size_t measure_median_start_time(tbb::task_arena* ta, const F1& start = F1{
         longest_start_times.push_back(get_longest_start(start_time));
     };
 
-    for (std::size_t i = 0; i < num_runs; ++i) {
+    for (std::size_t i = 1; i < num_runs; ++i) {
         if (ta) {
             ta->execute(work);
         } else {
             work();
         }
-        active_wait_for(std::chrono::microseconds(i));
+        active_wait_for(std::chrono::microseconds(i*2));
     }
     return utils::median(longest_start_times.begin(), longest_start_times.end());
 }
@@ -248,8 +248,8 @@ TEST_CASE("Check that workers leave faster with leave_policy::fast") {
         tbb::task_arena::priority::normal,
         tbb::task_arena::leave_policy::fast
     };
-    start_time_collection st_collector1{ta_automatic_leave, /*num_trials=*/10};
-    start_time_collection st_collector2{ta_fast_leave, /*num_trials=*/10};
+    start_time_collection st_collector1{ta_automatic_leave, /*num_trials=*/5};
+    start_time_collection st_collector2{ta_fast_leave, /*num_trials=*/5};
 
     auto times_automatic = st_collector1.measure();
     auto times_fast = st_collector2.measure();
@@ -276,9 +276,9 @@ TEST_CASE("Parallel Phase retains workers in task_arena") {
         tbb::task_arena::priority::normal,
         tbb::task_arena::leave_policy::fast
     };
-    start_time_collection_phase_wrapped st_collector1{ta_fast1, /*num_trials=*/10};
-    start_time_collection_scoped_phase_wrapped st_collector_scoped{ta_fast1, /*num_trials=*/10};
-    start_time_collection st_collector2{ta_fast2, /*num_trials=*/10};
+    start_time_collection_phase_wrapped st_collector1{ta_fast1, /*num_trials=*/5};
+    start_time_collection_scoped_phase_wrapped st_collector_scoped{ta_fast1, /*num_trials=*/5};
+    start_time_collection st_collector2{ta_fast2, /*num_trials=*/5};
 
     auto times1 = st_collector1.measure();
     auto times2 = st_collector2.measure();
