@@ -556,23 +556,23 @@ struct init_output_ports {
 
 #if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
 
-class multifunction_node_tag {
+class metainfo_tag_type {
 public:
-    multifunction_node_tag() = default;
+    metainfo_tag_type() = default;
 
-    multifunction_node_tag(const multifunction_node_tag&) = delete;
+    metainfo_tag_type(const metainfo_tag_type&) = delete;
 
-    multifunction_node_tag(multifunction_node_tag&& other)
+    metainfo_tag_type(metainfo_tag_type&& other)
         : my_metainfo(std::move(other.my_metainfo)) {}
 
-    multifunction_node_tag(const message_metainfo& metainfo) : my_metainfo(metainfo) {
+    metainfo_tag_type(const message_metainfo& metainfo) : my_metainfo(metainfo) {
         for (auto waiter : my_metainfo.waiters()) {
             waiter->reserve();
         }
     }
 
-    multifunction_node_tag& operator=(const multifunction_node_tag&) = delete;
-    multifunction_node_tag& operator=(multifunction_node_tag&& other) {
+    metainfo_tag_type& operator=(const metainfo_tag_type&) = delete;
+    metainfo_tag_type& operator=(metainfo_tag_type&& other) {
         // TODO: should this method be thread-safe?
         if (this != &other) {
             reset();
@@ -581,11 +581,11 @@ public:
         return *this;
     }
 
-    ~multifunction_node_tag() {
+    ~metainfo_tag_type() {
         reset();
     }
 
-    void merge(const multifunction_node_tag& other_tag) {
+    void merge(const metainfo_tag_type& other_tag) {
         tbb::spin_mutex::scoped_lock lock(my_mutex);
 
         // TODO: add comment
@@ -604,11 +604,16 @@ public:
         my_metainfo = message_metainfo{};
     }
 private:
-    template <typename Output>
-    friend class multifunction_output;
+    friend class metainfo_tag_accessor;
 
     message_metainfo my_metainfo;
     tbb::spin_mutex  my_mutex;
+};
+
+struct metainfo_tag_accessor {
+    static const message_metainfo& get_metainfo(const metainfo_tag_type& tag) {
+        return tag.my_metainfo;
+    }
 };
 
 #endif
@@ -622,7 +627,7 @@ public:
     typedef Input input_type;
     typedef OutputPortSet output_ports_type;
 #if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
-    typedef multifunction_node_tag tag_type;
+    typedef metainfo_tag_type tag_type;
 #endif
     typedef multifunction_body<input_type, output_ports_type> multifunction_body_type;
     typedef multifunction_input<Input, OutputPortSet, Policy, A> my_class;
@@ -664,7 +669,7 @@ public:
                                         __TBB_FLOW_GRAPH_METAINFO_ARG(const message_metainfo& metainfo) )
     {
 #if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
-        multifunction_node_tag tag(metainfo);
+        metainfo_tag_type tag(metainfo);
 #endif
         fgt_begin_body( my_body );
         (*my_body)(i, my_output_ports __TBB_FLOW_GRAPH_METAINFO_ARG(std::move(tag)));
@@ -920,13 +925,13 @@ public:
     }
 
 #if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
-    bool try_put(const output_type& i, const multifunction_node_tag& tag) {
-        return try_put_impl(i, tag.my_metainfo);
+    bool try_put(const output_type& i, const metainfo_tag_type& tag) {
+        return try_put_impl(i, metainfo_tag_accessor::get_metainfo(tag));
     }
 
-    bool try_put(const output_type& i, multifunction_node_tag&& tag) {
-        multifunction_node_tag local_tag = std::move(tag);
-        return try_put_impl(i, local_tag.my_metainfo);
+    bool try_put(const output_type& i, metainfo_tag_type&& tag) {
+        metainfo_tag_type local_tag = std::move(tag);
+        return try_put_impl(i, metainfo_tag_accessor::get_metainfo(local_tag));
     }
 #endif
 

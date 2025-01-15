@@ -419,12 +419,13 @@ public:
 #endif
 
     // call try_put_task and return list of received tasks
-    bool gather_successful_try_puts( const T &t, graph_task_list& tasks ) {
+    bool gather_successful_try_puts( const T &t, graph_task_list& tasks
+                                     __TBB_FLOW_GRAPH_METAINFO_ARG(const message_metainfo& metainfo) ) {
         bool is_at_least_one_put_successful = false;
         typename mutex_type::scoped_lock l(this->my_mutex, /*write=*/true);
         typename successors_type::iterator i = this->my_successors.begin();
         while ( i != this->my_successors.end() ) {
-            graph_task * new_task = (*i)->try_put_task(t);
+            graph_task * new_task = (*i)->try_put_task(t, metainfo);
             if(new_task) {
                 ++i;
                 if(new_task != SUCCESSFULLY_ENQUEUED) {

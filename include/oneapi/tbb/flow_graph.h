@@ -3130,8 +3130,11 @@ public:
     async_body(const Body &body, gateway_type *gateway)
         : base_type(gateway), my_body(body) { }
 
-    void operator()( const Input &v, Ports & ) noexcept(noexcept(tbb::detail::invoke(my_body, v, std::declval<gateway_type&>()))) {
-        tbb::detail::invoke(my_body, v, *this->my_gateway);
+    void operator()( const Input &v, Ports & __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo_tag_type&& tag) )
+        noexcept(noexcept(invoke_body_with_tag(my_body __TBB_FLOW_GRAPH_METAINFO_ARG(std::move(tag)),
+                                               v, *this->my_gateway)))
+    {
+        invoke_body_with_tag(my_body __TBB_FLOW_GRAPH_METAINFO_ARG(std::move(tag)), v, *this->my_gateway);
     }
 
     Body get_body() { return my_body; }
@@ -3176,8 +3179,19 @@ private:
 
         //! Implements gateway_type::try_put for an external activity to submit a message to FG
         bool try_put(const Output &i) override {
-            return my_node->try_put_impl(i);
+            return my_node->try_put_impl(i __TBB_FLOW_GRAPH_METAINFO_ARG(message_metainfo{}));
         }
+
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+        bool try_put(const Output &i, const metainfo_tag_type& tag) override {
+            return my_node->try_put_impl(i, metainfo_tag_accessor::get_metainfo(tag));
+        }
+
+        bool try_put(const Output &i, metainfo_tag_type&& tag) override {
+            metainfo_tag_type local_tag = std::move(tag);
+            return my_node->try_put_impl(i, metainfo_tag_accessor::get_metainfo(local_tag));
+        }
+#endif
 
     private:
         async_node* my_node;
@@ -3187,13 +3201,14 @@ private:
     async_node* self() { return this; }
 
     //! Implements gateway_type::try_put for an external activity to submit a message to FG
-    bool try_put_impl(const Output &i) {
+    bool try_put_impl(const Output &i __TBB_FLOW_GRAPH_METAINFO_ARG(const message_metainfo& metainfo)) {
         multifunction_output<Output> &port_0 = output_port<0>(*this);
         broadcast_cache<output_type>& port_successors = port_0.successors();
         fgt_async_try_put_begin(this, &port_0);
         // TODO revamp: change to std::list<graph_task*>
         graph_task_list tasks;
-        bool is_at_least_one_put_successful = port_successors.gather_successful_try_puts(i, tasks);
+        bool is_at_least_one_put_successful =
+            port_successors.gather_successful_try_puts(i, tasks __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo));
         __TBB_ASSERT( is_at_least_one_put_successful || tasks.empty(),
                       "Return status is inconsistent with the method operation." );
 

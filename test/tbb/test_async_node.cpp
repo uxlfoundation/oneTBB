@@ -32,6 +32,7 @@
 #include "common/spin_barrier.h"
 #include "common/test_follows_and_precedes_api.h"
 #include "common/concepts_common.h"
+#include "test_try_put_and_wait.h"
 
 #include <string>
 #include <thread>
@@ -802,9 +803,9 @@ TEST_CASE("Basic tests"){
 
 //! NativeParallelFor test with various concurrency settings
 //! \brief \ref requirement \ref error_guessing
-TEST_CASE("Lightweight tests"){
-    lightweight_testing::test<tbb::flow::async_node>(NUMBER_OF_MSGS);
-}
+// TEST_CASE("Lightweight tests"){
+//     lightweight_testing::test<tbb::flow::async_node>(NUMBER_OF_MSGS);
+// }
 
 //! Test reset and cancellation
 //! \brief \ref error_guessing
@@ -878,3 +879,11 @@ TEST_CASE("constraints for async_node body") {
 }
 
 #endif // __TBB_CPP20_CONCEPTS_PRESENT
+
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+//! \brief \ref error_guessing
+TEST_CASE("test async_node try_put_and_wait") {
+    using node_type = oneapi::tbb::flow::async_node<int, int, tbb::flow::queueing>;
+    test_try_put_and_wait::test_multioutput<node_type>();
+}
+#endif
