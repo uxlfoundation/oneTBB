@@ -810,7 +810,7 @@ TEST_CASE("test function_node try_put_and_wait") {
 // It was an issue when the critical task wrapper was allocated using the small object pool
 // of the task being wrapped. Since the original task creates under the aggregator, there is no
 // guarantee that the thread that requested the task creating is the same as actually created the task
-// Mismatch between memory pull caused internal assertion failure while deallocating the task
+// Mismatch between memory pool caused internal assertion failure while deallocating the task
 //! \brief \ref regression
 TEST_CASE("test critical tasks memory pool correctness") {
     using node_type = tbb::flow::function_node<int, tbb::flow::continue_msg>;
