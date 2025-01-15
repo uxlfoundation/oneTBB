@@ -526,7 +526,7 @@ inline graph_task* prioritize_task(graph& g, graph_task& gt) {
     //! priority queue, and a new critical task is created to take and execute a work item with
     //! the highest known priority. The reference counting responsibility is transferred to
     //! the new task.
-    // The newly created small_object_allocator should be used to allocate the priority_task_selector
+    // A newly created small_object_allocator should be used to allocate the priority_task_selector
     // instead of the allocator, associated with gt since gt can be allocated by another thread
     d1::small_object_allocator allocator;
     d1::task* critical_task = allocator.new_object<priority_task_selector>(g.my_priority_queue, allocator);
