@@ -48,7 +48,7 @@ endif()
 # information is written to either stdout or stderr. To not make any
 # assumptions, both are captured.
 execute_process(
-    COMMAND ${CMAKE_COMMAND} -E env "LANG=C" ${CMAKE_CXX_COMPILER} -xc -c /dev/null -Wa,-v -o/dev/null
+    COMMAND ${CMAKE_COMMAND} -E env "LC_ALL=C" "LANG=C" ${CMAKE_CXX_COMPILER} -xc -c /dev/null -Wa,-v -o/dev/null
     OUTPUT_VARIABLE ASSEMBLER_VERSION_LINE_OUT
     ERROR_VARIABLE ASSEMBLER_VERSION_LINE_ERR
     OUTPUT_STRIP_TRAILING_WHITESPACE
