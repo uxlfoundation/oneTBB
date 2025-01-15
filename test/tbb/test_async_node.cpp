@@ -41,7 +41,6 @@
 
 //! \file test_async_node.cpp
 //! \brief Test for [flow_graph.async_node] specification
-
 class minimal_type {
     template<typename T>
     friend struct place_wrapper;
@@ -803,11 +802,7 @@ TEST_CASE("Basic tests"){
 //! NativeParallelFor test with various concurrency settings
 //! \brief \ref requirement \ref error_guessing
 TEST_CASE("Lightweight tests"){
-    tbb::task_arena arena(1);
-
-    arena.execute([]() {
-        lightweight_testing::test<tbb::flow::async_node>(NUMBER_OF_MSGS);
-    });
+    lightweight_testing::test<tbb::flow::async_node>(NUMBER_OF_MSGS);
 }
 
 //! Test reset and cancellation

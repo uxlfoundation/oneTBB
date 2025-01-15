@@ -212,7 +212,8 @@ template<typename Input, typename OutputSet>
 class multifunction_body : no_assign {
 public:
     virtual ~multifunction_body () {}
-    virtual void operator()(const Input &/* input*/, OutputSet &/*oset*/ __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo_tag_type&& /*tag*/)) = 0;
+    virtual void operator()(const Input &/* input*/, OutputSet &/*oset*/
+                            __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo_tag_type&& /*tag*/)) = 0;
     virtual multifunction_body* clone() = 0;
     virtual void* get_body_ptr() = 0;
 };

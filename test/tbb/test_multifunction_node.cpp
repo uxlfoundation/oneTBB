@@ -542,11 +542,11 @@ TEST_CASE("Test ports retrurn references"){
     test_ports_return_references<tbb::flow::rejecting>();
 }
 
-// //! NativeParallelFor testing with various concurrency settings
-// //! \brief \ref error_guessing
-// TEST_CASE("Lightweight testing"){
-//     lightweight_testing::test<tbb::flow::multifunction_node>(10);
-// }
+//! NativeParallelFor testing with various concurrency settings
+//! \brief \ref error_guessing
+TEST_CASE("Lightweight testing"){
+    lightweight_testing::test<tbb::flow::multifunction_node>(10);
+}
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 //! Test follows and precedes API
