@@ -315,8 +315,8 @@ void test_multioutput_no_broadcast() {
     std::size_t num_items = 10;
     std::size_t num_additional_items = 10;
 
-    std::atomic<std::size_t> num_processed_items = 0;
-    std::atomic<std::size_t> num_processed_accumulators = 0;
+    std::atomic<std::size_t> num_processed_items{0};
+    std::atomic<std::size_t> num_processed_accumulators{0};
 
     int accumulator_message = 1;
     int add_message = 2;
