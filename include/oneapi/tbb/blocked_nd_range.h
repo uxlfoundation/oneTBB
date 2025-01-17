@@ -148,7 +148,13 @@ class blocked_nd_range : public blocked_nd_range_impl<Value, N> {
 };
 
 #if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
+// Deduction guide for 
+// blocked_nd_range(const dim_range_type& dim0, const dim_range_type& dim1, ...)
+// while passing the arguments as braced-init-lists
+// Supports only 2 and more arguments since passing one braced-init-list argument
+// is ambiguous with the constructor with single C-array argument
 template <typename Value, unsigned int... Ns,
+          typename = std::enable_if_t<sizeof...(Ns) >= 2>,
           typename = std::enable_if_t<(... && (Ns == 2 || Ns == 3))>>
 blocked_nd_range(const Value (&... dim)[Ns])
 -> blocked_nd_range<Value, sizeof...(Ns)>;

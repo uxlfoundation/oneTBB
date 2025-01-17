@@ -357,5 +357,9 @@ TEST_CASE("blocked_rangeNd deduction guides") {
         blocked_nd_range range(std::move(source_range));
         static_assert(std::is_same_v<decltype(range), decltype(source_range)>);
     }
+    {
+        int array[3] = {1, 2, 3};
+        blocked_nd_range range(array);
+    }
 }
 #endif // __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
