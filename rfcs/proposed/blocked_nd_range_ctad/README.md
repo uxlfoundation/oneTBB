@@ -6,7 +6,7 @@
 This document proposes extending its API with the deduction guides since C++17 to allow dropping the explicit template arguments specification while
 creating the object if they can be determined using the arguments provided:
 
-#+intro_src C++
+```cpp
 oneapi::tbb::blocked_range<int> range1(0, 100);
 oneapi::tbb::blocked_range<int> range2(0, 200);
 oneapi::tbb::blocked_range<int> range3(0, 300);
@@ -14,6 +14,7 @@ oneapi::tbb::blocked_range<int> range3(0, 300);
 // Since 3 ranges of type int are provided, the type of nd_range
 // can be deduced as oneapi::tbb::blocked_nd_range<int, 3>
 oneapi::tbb::blocked_nd_range nd_range(range1, range2, range3);
+```
 
 ## Proposal
 
@@ -21,8 +22,7 @@ oneapi::tbb::blocked_nd_range nd_range(range1, range2, range3);
 
 The `oneapi::tbb::blocked_nd_range` supports the following set of constructors:
 
-#+constructors_src C++
-
+```cpp
 template <typename T, unsigned int N>\
 class blocked_nd_range {
 public:
@@ -35,12 +35,13 @@ public:
     blocked_nd_range(blocked_nd_range& r, split);                                                        // [3]
     blocked_nd_range(blocked_nd_range& r, proportional_split proportion);                                // [4]
 };
+```
 
 The constructor `[1]` is intended to create an n-dimensional interval by providing N one-dimensional ranges. Each element represents the
 dimension of the N-dimensional interval being constructed.
 It also allows to construct these one-dimensional intervals in-place from braced-inclosed initializer lists:
 
-#+range_constructor C++
+```cpp
 // Passing blocked_range objects itself
 tbb::blocked_range<int> dim_range(0, 100);
 
@@ -51,12 +52,12 @@ tbb::blocked_nd_range<int, 2> nd_range_2({0, 100}, {0, 200, 5});
 
 // Combined approach
 tbb::blocked_nd_range<int, 2> nd_range_3(dim_range, {0, 200, 5});
-#+end_src
+```
 
 The constructor `[2]` is intended to create an interval by providing a C-array each element of which represents a size of the corresponding
 dimension of the interval being created. This constructor also allows to pass braced-init-list instead of the array from stack:
 
-#+ array_constructor C++
+```cpp
 // Passing array object itself
 int sizes[3] = {100, 200, 300};
 
@@ -68,7 +69,7 @@ tbb::blocked_nd_range<int, 3> nd_range_2(sizes, 5);
 
 // Passing the braced-init-list
 tbb::blocked_nd_range<int, 3> nd_range_3({100, 200, 300});
-#+end_src
+```
 
 In case of passing the template arguments explicitly, using a braced-init-list in both constructors `[1]` and `[2]` does not introduce any 
 ambiguity since if the number of braced-init lists provided is always equal to the number of dimensions of the range for constructor `[1]` and
@@ -81,12 +82,12 @@ implementation of oneTBB parallel algorithms.
 
 This paper proposes to add explicit deduction guides for `blocked_nd_range` class:
 
-#+ deduction_guide_1_src C++
+```cpp
 // [g1]
 template <typename Value, typename... Values>
 blocked_nd_range(blocked_range<Value>, blocked_range<Values>...)
 -> blocked_nd_range<Value, 1 + sizeof...(Values)>;
-#+end_src
+```
 
 This deduction guide corresponds to the constructor `[1]` for the case of passing _N_ `blocked_range` objects itself.
 It only participates in overload resolution if all of the types in `Values` are same as `Value`.
@@ -98,12 +99,12 @@ There are currently two options how to define the deduction guide (or a function
 of any type- C-array and `std::initializer_list`. The issue with `std::initializer_list` is that it does not allow
 tracking the size in compile-time. 
 
-#+deduction_guide_2_src C++
+```cpp
 // [g2]
 template <typename Value, unsigned int... Ns>
 blocked_nd_range(const Value (&...)[Ns])
 -> blocked_nd_range<Value, sizeof...(Ns)>;
-#+end_src
+```
 
 This deduction guide only participates in overload resolution if
 1. the number of C-arrays provided is more than 1 (`sizeof...(Ns) > 1`),
@@ -118,18 +119,18 @@ additional _grainsize_ parameter.
 
 For the constructor `[2]`, the following deduction guide is proposed:
 
-#+deduction_guide_3_src C++
+```cpp
 // [g3]
 template <typename Value, unsigned int N>
 blocked_nd_range(const Value (&)[N])
-#+end_src
+```
 
 This deduction guide only participates in overload resolution if `N` is not equal to neither 2 nor 3 to disambiguate between `[1]` and `[2]`.
 See [separate section](#ambiguity-while-passing-the-single-braced-init-list-of-size-2-or-3) for more details.
 
 For service constructors `[3]` and `[4]`, the following guides are proposed:
 
-#+deduction_guide_service_src C++
+```cpp
 // [g4]
 template <typename Value, unsigned int N>
 blocked_nd_range(blocked_nd_range<Value, N>, split)
@@ -139,7 +140,7 @@ blocked_nd_range(blocked_nd_range<Value, N>, split)
 template <typename Value, unsigned int N>
 blocked_nd_range(blocked_nd_range<Value, N>, proportional_split)
 -> blocked_nd_range<Value, N>;
-#+end_src
+```
 
 From the specification perspective, such a deduction guides can be generated as implicit deduction guides, in the same manner as copy and move constructors.
 But the current oneTBB implementation, these deduction guides are not generated implicitly, so the explicit guides are required.
@@ -151,10 +152,10 @@ Guides `[g4]` and `[g5]` are not proposed to be a part of the spec, only a part 
 
 While using the CTAD with `blocked_nd_range`, there is an ambiguity between two approaches while using a single braced-init-list of size 2 or 3:
 
-#+ambiguity_src C++
+```cpp
 blocked_nd_range range1({10, 20});
 blocked_nd_range range2({10, 20, 5});
-#+end_src
+```
 
 Since the template arguments for `blocked_nd_range` are not specified, there can be two possible resolutions:
 1. Be interpreted as one-dimensional range _[10, 20)_ (with grainsize 1 or 5). In this case it should be deduced as `blocked_nd_range<int, 1>` and 
@@ -169,10 +170,10 @@ specialize the template arguments, or to use array or `blocked_range` type itsel
 
 Another interesting issue that should be resolved, is passing the single C-array object of size 2 or 3 to the constructor:
 
-#+single_array_src C++
+```cpp
 int array[2] = {100, 200};
 tbb::blocked_nd_range range(array);
-#+end_src
+```
 
 Since the `blocked_range` is not constructible from C-array and the braced-init-list is not used, the user expects the range to be deduced as
 `blocked_nd_range<int, 2>` and the constructor `[2]` to be used.
@@ -193,10 +194,10 @@ There are the following options how this issue can be resolved:
 There is a limitation of the deduction guides proposed if the constructor `[1]` is used with both arguments of exact `tbb::blocked_range` type
 and the braced-init-lists:
 
-#+mixed_limitation_src C++
+```cpp
 tbb::blocked_range<int> dim_range(0, 100);
 tbb::blocked_nd_range nd_range(dim_range, {0, 200}, {0, 300}, dim_range);
-#+end_src
+```
 
 These arguments would not match nether on the `[g1]` not `[g2]` and it is unclear how to define the deduction guide that covers this case.
 Current proposal is to keep this scenario a limitation for using the CTAD and always require using the consistent set of parameters - or 
