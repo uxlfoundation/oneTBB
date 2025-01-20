@@ -79,8 +79,8 @@ endif()
 
 if (TBB_FILE_TRIM)
     add_compile_options(
-        "$<$<$AND:$<COMPILE_LANGUAGE:CXX>,$<NOT:$<CXX_COMPILER_ID:Intel>>>:/d1trimfile:${NATIVE_TBB_PROJECT_ROOT_DIR}\\>"
-        "$<$<$AND:$<COMPILE_LANGUAGE:CXX>,$<NOT:$<CXX_COMPILER_ID:Intel>>>:/d1trimfile:${CMAKE_SOURCE_DIR}/>")
+        "$<$<COMPILE_LANGUAGE:CXX>:/d1trimfile:${NATIVE_TBB_PROJECT_ROOT_DIR}\\>"
+        "$<$<COMPILE_LANGUAGE:CXX>:/d1trimfile:${CMAKE_SOURCE_DIR}/>")
 endif()
 
 if (TBB_CONTROL_FLOW_GUARD)
