@@ -528,6 +528,9 @@ void arena::advertise_new_work() {
             workers_delta = 1;
         }
 
+#if __TBB_PREVIEW_PARALLEL_PHASE
+        my_thread_leave.reset_if_needed();
+#endif
         request_workers(mandatory_delta, workers_delta, /* wakeup_threads = */ true);
     }
 }

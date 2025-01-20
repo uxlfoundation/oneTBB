@@ -357,9 +357,6 @@ bool arena::has_enqueued_tasks() {
 }
 
 void arena::request_workers(int mandatory_delta, int workers_delta, bool wakeup_threads) {
-#if __TBB_PREVIEW_PARALLEL_PHASE
-    my_thread_leave.reset_if_needed();
-#endif
     my_threading_control->adjust_demand(my_tc_client, mandatory_delta, workers_delta);
 
     if (wakeup_threads) {
