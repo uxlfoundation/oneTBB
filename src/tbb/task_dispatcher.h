@@ -190,6 +190,7 @@ d1::task* task_dispatcher::receive_or_steal_task(
     inbox.set_is_idle(true);
 
     bool stealing_is_allowed = can_steal();
+    observer_proxy* last_notified_idle = nullptr;
 
     // Stealing loop mailbox/enqueue/other_slots
     for (;;) {
@@ -228,9 +229,13 @@ d1::task* task_dispatcher::receive_or_steal_task(
             a.my_observers.notify_entry_observers(tls.my_last_observer, tls.my_is_worker);
             break; // Stealing success, end of stealing attempt
         }
-        // Nothing to do, pause a little.
+        // Nothing to do, notify idle watchers and pause a little.
+        a.my_observers.notify_idle_observers(last_notified_idle, tls.my_is_worker);
         waiter.pause(slot);
     } // end of nonlocal task retrieval loop
+
+    // Found a task to run, notify activity watchers
+    a.my_observers.notify_active_observers(last_notified_idle, tls.my_is_worker);
 
     __TBB_ASSERT(is_alive(a.my_guard), nullptr);
     if (inbox.is_idle_state(true)) {

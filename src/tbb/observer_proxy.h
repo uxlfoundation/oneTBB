@@ -50,11 +50,14 @@ class observer_list {
     /** In case of success sets p to nullptr. Must be invoked from under the list lock. **/
     inline static void remove_ref_fast( observer_proxy*& p );
 
-    //! Implements notify_entry_observers functionality.
-    void do_notify_entry_observers( observer_proxy*& last, bool worker );
+    //! Implements notify_entry_observers and notify_idle_observers functionality.
+    /** Notifies the observers from last (excluded) to the end of the list.
+        A nullptr indicates the beginning of the list. **/
+    void do_notify_observers_first_pass( observer_proxy*& last, void (d1::task_scheduler_observer::* notification)(bool), bool worker );
 
-    //! Implements notify_exit_observers functionality.
-    void do_notify_exit_observers( observer_proxy* last, bool worker );
+    //! Implements notify_exit_observers and notify_active_observers functionality.
+    /** Notifies the observers the beginning of the list to last (included). **/
+    void do_notify_observers_second_pass( observer_proxy* last, void (d1::task_scheduler_observer::* notification)(bool), bool worker );
 
 public:
     observer_list () = default;
@@ -86,6 +89,12 @@ public:
 
     //! Call exit notifications on last and observers added before it.
     inline void notify_exit_observers( observer_proxy*& last, bool worker );
+
+    //! Call idle notifications on observers added after last was notified.
+    inline void notify_idle_observers( observer_proxy*& last, bool worker );
+
+    //! Call activity notifications on last and observers added before it.
+    inline void notify_active_observers( observer_proxy*& last, bool worker );
 }; // class observer_list
 
 //! Wrapper for an observer object
@@ -130,17 +139,35 @@ void observer_list::remove_ref_fast( observer_proxy*& p ) {
 }
 
 void observer_list::notify_entry_observers(observer_proxy*& last, bool worker) {
-    if (last == my_tail.load(std::memory_order_relaxed))
+    if (last == my_tail.load(std::memory_order_relaxed)) {
         return;
-    do_notify_entry_observers(last, worker);
+    }
+    do_notify_observers_first_pass(last, &d1::task_scheduler_observer::on_scheduler_entry, worker);
 }
 
-void observer_list::notify_exit_observers( observer_proxy*& last, bool worker ) {
+void observer_list::notify_exit_observers(observer_proxy*& last, bool worker) {
     if (last == nullptr) {
         return;
     }
     __TBB_ASSERT(!is_poisoned(last), nullptr);
-    do_notify_exit_observers( last, worker );
+    do_notify_observers_second_pass(last, &d1::task_scheduler_observer::on_scheduler_exit, worker);
+    __TBB_ASSERT(last != nullptr, nullptr);
+    poison_pointer(last);
+}
+
+void observer_list::notify_idle_observers(observer_proxy*& last, bool worker) {
+    if (last == my_tail.load(std::memory_order_relaxed)) {
+        return;
+    }
+    do_notify_observers_first_pass(last, &d1::task_scheduler_observer::on_scheduler_idle, worker);
+}
+
+void observer_list::notify_active_observers(observer_proxy*& last, bool worker) {
+    if (last == nullptr) {
+        return;
+    }
+    __TBB_ASSERT(!is_poisoned(last), nullptr);
+    do_notify_observers_second_pass(last, &d1::task_scheduler_observer::on_scheduler_active, worker);
     __TBB_ASSERT(last != nullptr, nullptr);
     poison_pointer(last);
 }

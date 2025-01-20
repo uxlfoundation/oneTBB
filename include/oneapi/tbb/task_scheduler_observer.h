@@ -71,6 +71,15 @@ public:
         arena this observer is associated with. **/
     virtual void on_scheduler_exit( bool /*is_worker*/ ) {}
 
+    //! Idle notification
+    /** Invoked when a worker does not have any tasks to run and fails to steal
+        any other tasks, and goes to sleep. **/
+    virtual void on_scheduler_idle( bool /*is_worker*/ ) {}
+
+    //! Activity notification
+    /** Invoked when an idle worker finds a task to run. **/
+    virtual void on_scheduler_active( bool /*is_worker*/ ) {}
+
     //! Construct local or global observer in inactive state (observation disabled).
     /** For a local observer entry/exit notifications are invoked whenever a worker
         thread joins/leaves the arena of the observer's owner thread. If a thread is

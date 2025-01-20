@@ -143,8 +143,8 @@ void observer_list::remove_ref(observer_proxy* p) {
     }
 }
 
-void observer_list::do_notify_entry_observers(observer_proxy*& last, bool worker) {
-    // Pointer p marches though the list from last (exclusively) to the end.
+void observer_list::do_notify_observers_first_pass(observer_proxy*& last, void (d1::task_scheduler_observer::* notification)(bool), bool worker) {
+    // Pointer p marches through the list from last (exclusively) to the end.
     observer_proxy* p = last, * prev = p;
     for (;;) {
         d1::task_scheduler_observer* tso = nullptr;
@@ -196,7 +196,7 @@ void observer_list::do_notify_entry_observers(observer_proxy*& last, bool worker
         // Do not hold any locks on the list while calling user's code.
         // Do not intercept any exceptions that may escape the callback so that
         // they are either handled by the TBB scheduler or passed to the debugger.
-        tso->on_scheduler_entry(worker);
+        (tso->*notification)(worker);
         __TBB_ASSERT(p->my_ref_count.load(std::memory_order_relaxed), nullptr);
         intptr_t bc = --tso->my_busy_count;
         __TBB_ASSERT_EX(bc >= 0, "my_busy_count underflowed");
@@ -204,8 +204,8 @@ void observer_list::do_notify_entry_observers(observer_proxy*& last, bool worker
     }
 }
 
-void observer_list::do_notify_exit_observers(observer_proxy* last, bool worker) {
-    // Pointer p marches though the list from the beginning to last (inclusively).
+void observer_list::do_notify_observers_second_pass(observer_proxy* last, void (d1::task_scheduler_observer::* notification)(bool), bool worker) {
+    // Pointer p marches through the list from the beginning to last (inclusively).
     observer_proxy* p = nullptr, * prev = nullptr;
     for (;;) {
         d1::task_scheduler_observer* tso = nullptr;
@@ -240,7 +240,7 @@ void observer_list::do_notify_exit_observers(observer_proxy* last, bool worker) 
                 tso = p->my_observer;
             } while (!tso);
             // The item is already refcounted
-            if (p != last) // the last is already referenced since entry notification
+            if (p != last) // the last is already referenced since entry or idle notification
                 ++p->my_ref_count;
             ++tso->my_busy_count;
         }
@@ -250,7 +250,7 @@ void observer_list::do_notify_exit_observers(observer_proxy* last, bool worker) 
         // Do not hold any locks on the list while calling user's code.
         // Do not intercept any exceptions that may escape the callback so that
         // they are either handled by the TBB scheduler or passed to the debugger.
-        tso->on_scheduler_exit(worker);
+        (tso->*notification)(worker);
         __TBB_ASSERT(p->my_ref_count || p == last, nullptr);
         intptr_t bc = --tso->my_busy_count;
         __TBB_ASSERT_EX(bc >= 0, "my_busy_count underflowed");
