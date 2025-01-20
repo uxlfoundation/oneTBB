@@ -14,6 +14,9 @@
     limitations under the License.
 */
 
+//! \file test_parallel_phase.cpp
+//! \brief Test for [preview] functionality
+
 #define TBB_PREVIEW_PARALLEL_PHASE 1
 
 #include <chrono>
