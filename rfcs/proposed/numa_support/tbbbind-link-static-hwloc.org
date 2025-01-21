@@ -2,32 +2,31 @@
 
 #+title: Link ~tbbbind~ with static HWLOC to improve predictability of NUMA support API
 
-*Note:* This is a sub-RFC of the https://github.com/oneapi-src/oneTBB/pull/1535.
-Specifically, its section about "Increased availability of NUMA support".
+*Note:* This document is a sub-RFC of the https://github.com/oneapi-src/oneTBB/pull/1535.
+Specifically, the "Increased availability of NUMA support" section. 
 
 * Introduction
-oneTBB has a soft dependency on several variants of ~tbbbind~, which are loaded
-by the library as part of its initialization stage. In turn, each ~tbbbind~ has
-a hard dependency on a concrete version of the HWLOC library [1, 2]. The soft
-dependency of oneTBB on ~tbbbind~ allows the library to continue its execution
-even if the system loader is unable to resolve the hard dependency on HWLOC for
-~tbbbind~. In this case, the HW topology is not discovered and the machine is
-seen as if all CPU cores were uniform, which is the default TBB behavior when
-NUMA constraints are not used. Thus, the following code returns the values that
-do not reflect the real topology and do not matter:
+oneTBB has a soft dependency on several variants of ~tbbbind~, which 
+the library loads during the initialization stage. Each ~tbbbind~, in turn, has
+a hard dependency on a specific version of the HWLOC library [1, 2]. The soft
+dependency means that the library continues the execution
+even if the system loader fails to resolve the hard dependency on HWLOC for
+~tbbbind~. In this case, oneTBB does not discover the hardware topology. 
+Instead, it defaults to viewing all CPU cores as uniform, consistent with TBB behavior when
+NUMA constraints are not used. As a result, the following code returns the irrelevant values that
+do not reflect the actual topology:
 
 #+begin_src C++
 std::vector<oneapi::tbb::numa_node_id> numa_nodes = oneapi::tbb::info::numa_nodes();
 std::vector<oneapi::tbb::core_type_id> core_types = oneapi::tbb::info::core_types();
 #+end_src
 
-This lack of valid HW topology data due to absence of a third party library is
-the major problem with the current oneTBB behavior. There is no diagnostics for
-the issue, which likely makes it unnoticeable by developers, and the code that
-uses oneTBB NUMA support facilities continues running but does not use NUMA as
-intended.
+This lack of valid HW topology, caused by the absence of a third-party library, is
+the major problem with the current oneTBB behavior. The problem lies in the lack of diagnostics
+making it difficult for developers to detect. 
+As a result, the code continues to run but fails to use NUMA as intended. 
 
-Having a dependency on a shared HWLOC library has advantages:
+Dependency on a shared HWLOC library has the following benefits:
 1. Code reuse with all of the positive consequences out of this, including
    relying on the same code that has been tested and debugged, allowing the OS
    to share it among different processes, which consequently improves on cache
@@ -57,45 +56,45 @@ important, it is not always obvious that one of these steps is needed.
 Especially, due to silent behavior in case HWLOC library cannot be found in the
 environment.
 
-This proposal suggests an improvement to reduce the effect of the disadvantage
-being dependent on a dynamic version of HWLOC library by having it linked
-statically with one of the ~tbbbind~ libraries that are distributed together
-with oneTBB, yet leaving possibility to specify another version of HWLOC library
-if users see the need.
+The proposal is to reduce the effect of the disadvantage
+of relying on a dynamic HWLOC library. 
+The improvements involve statically linking HWLOC with one of the ~tbbbind~ libraries distributed together
+with oneTBB. At the same time, you retain the flexibility to specify different version of HWLOC library
+if needed.
 
-Since HWLOC 1.x is an old version of HWLOC and modern versions of operating
-systems install HWLOC 2.x by default, the probability of someone who is
-constrained by using only HWLOC 1.x on their system is relatively small. Thus,
-the filename of the ~tbbbind~ library that is linked against HWLOC 1.x can be
-re-used for the library that is linked against static HWLOC version 2.x.
+Since HWLOC 1.x is an older version and modern operating
+systems install HWLOC 2.x by default, the probability of users being
+restricted to HWLOC 1.x is relatively small. Thus,
+we can reuse the filename of the ~tbbbind~ library linked to HWLOC 1.x 
+for the library linked against a static HWLOC 2.x.
 
 * Proposal
-1. Replace the dynamic link of ~tbbbind~ library which is currently linked
-   against HWLOC 1.x with the link to a static HWLOC library version 2.x.
+1. Replace the dynamic link of ~tbbbind~ library currently linked
+   against HWLOC 1.x with a link to a static HWLOC library version 2.x.
 2. Add loading of that ~tbbbind~ variant as the last attempt to resolve the
-   dependency on functionality provided by ~tbbbind~ layer.
-3. Update the oneTBB documentation considering [[https://oneapi-src.github.io/oneTBB/search.html?q=tbb%3A%3Ainfo][these documentation pages]] to
-   include steps determining the variant of ~tbbbind~ being used.
+   dependency on functionality provided by the ~tbbbind~ layer.
+3. Update the oneTBB documentation, including [[https://oneapi-src.github.io/oneTBB/search.html?q=tbb%3A%3Ainfo][these pages]], to
+   detail the steps for identifying which ~tbbbind~ is being used.
 
 ** Advantages
-1. The proposed behavior allows having a mechanism for resolving a dependency on
-   HWLOC library in case it cannot be found in the environment, while still
-   preferring user-provided version of HWLOC. As a result, the problematic use of
-   oneTBB API mentioned above should work as expected, returning enumerated list
+1. The proposed behavior introduces a fallback mechanism for resolving
+   the HWLOC library dependency when it is not in the environment, while still
+   preferring user-provided versions. As a result, the problematic oneTBB API usage
+   works as expected, returning an enumerated list
    of actual NUMA nodes and core types on the system the code is running on,
    provided that the loaded HWLOC library works on that system and that an
    application properly distributes all binaries of oneTBB, sets the environment
    so that the necessary variant of ~tbbbind~ library can be found and loaded.
 2. The drop of support for HWLOC 1.x allows to not introducing additional
-   ~tbbbind~ variant of the library, yet maintaining support for popular
+   ~tbbbind~ variant while maintaining support for widely used
    versions of HWLOC.
 
 ** Disadvantages
-By default still no diagnostics if users failed to setup environment with their
-own version of HWLOC library correctly. Although, specifying ~TBB_VERSION=1~
-envar will help identifying an issue with setup of environment pretty quickly.
+By default, there is still no diagnostics if you fail to correctly setup an environment with your
+version of HWLOC. Although, specifying the ~TBB_VERSION=1~
+environment variable helps identify configuration issues quickly.
 
-* Alternative handling of inability to parse system topology
+* Alternative Handling for Missing System Topology
 The other behavior in case HWLOC library cannot be found is to be more explicit
 about the problem of a missing component and to either issue a warning or to
 refuse working requiring one of the ~tbbbind~ variant to be loaded (e.g., throw
@@ -103,21 +102,20 @@ an exception).
 
 Comparing these alternative approaches to the one proposed.
 ** Common Advantages
-- Explicitly tells that the functionality being used is not going to work
-  instead of just being silent.
-- Does not require additional variant of ~tbbbind~ library to be distributed
-  along with the others.
+- Explicitly indicates that the functionality being used does not work,
+  instead of failing silently.
+- Avoids the need to distribute an additional variant of ~tbbbind~ library. 
 
 ** Common Disadvantages
 - Requires additional step from the user side to resolve the problem. In other
   words, it does not provide complete solution to the problem.
 
 ** Disadvantages of Issuing a Warning
-- The warning may still not be visible, especially if standard streams are
+- The warning may be unnoticed, especially if standard streams are
   closed.
 
 ** Disadvantages of Throwing an Exception
-- May break existing code as it does not expect an exception to be thrown.
+- May break existing code that does not expect an exception to be thrown.
 - Requires introduction of an additional exception hierarchy.
 
 * References
