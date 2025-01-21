@@ -147,41 +147,52 @@ class blocked_nd_range : public blocked_nd_range_impl<Value, N> {
     using base::base;
 };
 
-#if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
-// Deduction guide for 
+#if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT && __TBB_PREVIEW_BLOCKED_ND_RANGE_DEDUCTION_GUIDES
 // blocked_nd_range(const dim_range_type& dim0, const dim_range_type& dim1, ...)
-// while passing the arguments as braced-init-lists
-// Supports only 2 and more arguments since passing one braced-init-list argument
-// is ambiguous with the constructor with single C-array argument
+// while the arguments are passed as braced-init-lists
+// Works only for 2 and more arguments since the deduction from
+// single braced-init-list argument is ambiguous with the single C-array argument
+// Only braced-init-lists of size 2 and 3 are allowed since dim_range_type may only
+// be constructed from 2 or 3 arguments
 template <typename Value, unsigned int... Ns,
           typename = std::enable_if_t<sizeof...(Ns) >= 2>,
           typename = std::enable_if_t<(... && (Ns == 2 || Ns == 3))>>
 blocked_nd_range(const Value (&... dim)[Ns])
 -> blocked_nd_range<Value, sizeof...(Ns)>;
 
+// blocked_nd_range(const dim_range_type& dim0, const dim_range_type& dim1, ...)
+// while the arguments are passed as blocked_range objects of the same type
 template <typename Value, typename... Values,
           typename = std::enable_if_t<(... && std::is_same_v<Value, Values>)>>
 blocked_nd_range(blocked_range<Value>, blocked_range<Values>...)
 -> blocked_nd_range<Value, 1 + sizeof...(Values)>;
 
+// blocked_nd_range(const value_type (&size)[N], size_type grainsize = 1)
+// while the grainsize is not passed
+// Does not work for arrays of size 2 or 3 since it is ambiguous with deducing
+// for dim_range_type constructor taking the single braced-init-list
 template <typename Value, unsigned int N,
           typename = std::enable_if_t<(N != 2 && N != 3)>>
 blocked_nd_range(const Value (&)[N])
 -> blocked_nd_range<Value, N>;
 
+// blocked_nd_range(const value_type (&size)[N], size_type grainsize = 1)
+// while using the non-default grainsize
 template <typename Value, unsigned int N>
 blocked_nd_range(const Value (&)[N], typename blocked_nd_range<Value, N>::size_type)
 -> blocked_nd_range<Value, N>;
 
+// blocked_nd_range(blocked_nd_range<Value, N>&, oneapi::tbb::split)
 template <typename Value, unsigned int N>
 blocked_nd_range(blocked_nd_range<Value, N>, oneapi::tbb::split)
 -> blocked_nd_range<Value, N>;
 
+// blocked_nd_range(blocked_nd_range<Value, N>&, oneapi::tbb::proportional_split)
 template <typename Value, unsigned int N>
 blocked_nd_range(blocked_nd_range<Value, N>, oneapi::tbb::proportional_split)
 -> blocked_nd_range<Value, N>;
 
-#endif // __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
+#endif // __TBB_CPP17_DEDUCTION_GUIDES_PRESENT && __TBB_PREVIEW_BLOCKED_ND_RANGE_DEDUCTION_GUIDES
 
 } // namespace d1
 } // namespace detail
