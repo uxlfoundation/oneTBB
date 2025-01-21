@@ -293,7 +293,7 @@ TEST_CASE("test capacity on modifying operations") {
     capacity_type desired_capacity = 64;
 
     q.set_capacity(desired_capacity);
-    REQUIRE_MESSAGE(q.capacity()  == desired_capacity, "Capacity is not set correctly");
+    REQUIRE_MESSAGE(q.capacity() == desired_capacity, "Capacity is not set correctly");
 
     queue_type q_copy(q);
     REQUIRE_MESSAGE(q_copy.capacity() == desired_capacity, "Capacity is not preserved on copying");
