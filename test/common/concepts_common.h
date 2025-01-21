@@ -385,7 +385,7 @@ struct ParallelScanFunction {
     T operator()( Dummy, const T& a, bool ) const requires (EnableFunctionCallOperator == State::incorrect_first_input) { return a; }
     T operator()( const Range&, Dummy, bool ) const requires (EnableFunctionCallOperator == State::incorrect_second_input) { return T{}; }
     T operator()( const Range&, const T& a, Dummy ) const requires (EnableFunctionCallOperator == State::incorrect_third_input) { return a; }
-    Dummy operator()( const Range&, const T& a, bool ) const requires (EnableFunctionCallOperator == State::incorrect_return_type) { return Dummy{}; }
+    Dummy operator()( const Range&, const T&, bool ) const requires (EnableFunctionCallOperator == State::incorrect_return_type) { return Dummy{}; }
 };
 
 template <typename R, typename T> using Correct = ParallelScanFunction<R, T, /*() = */State::correct>;
