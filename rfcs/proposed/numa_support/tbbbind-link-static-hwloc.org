@@ -85,7 +85,7 @@ for the library linked against a static HWLOC 2.x.
    provided that the loaded HWLOC library works on that system and that an
    application properly distributes all binaries of oneTBB, sets the environment
    so that the necessary variant of ~tbbbind~ library can be found and loaded.
-2. The drop of support for HWLOC 1.x allows to not introducing additional
+2. Dropping support for HWLOC 1.x, does not introduce an additional
    ~tbbbind~ variant while maintaining support for widely used
    versions of HWLOC.
 
@@ -110,11 +110,11 @@ Comparing these alternative approaches to the one proposed.
 - Requires additional step from the user side to resolve the problem. In other
   words, it does not provide complete solution to the problem.
 
-** Disadvantages of Issuing a Warning
+*** Disadvantages of Issuing a Warning
 - The warning may be unnoticed, especially if standard streams are
   closed.
 
-** Disadvantages of Throwing an Exception
+*** Disadvantages of Throwing an Exception
 - May break existing code that does not expect an exception to be thrown.
 - Requires introduction of an additional exception hierarchy.
 
