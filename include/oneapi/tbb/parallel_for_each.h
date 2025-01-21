@@ -409,7 +409,7 @@ public:
 template<typename It>
 using tag = typename std::iterator_traits<It>::iterator_category;
 
-#if __TBB_CPP20_PRESENT
+#if __TBB_CPP20_CONCEPTS_PRESENT
 template <typename It>
 struct move_iterator_dispatch_helper {
     using type = It;
@@ -448,7 +448,7 @@ using iterator_tag_dispatch = typename
             std::input_iterator_tag
         >::type
     >::type;
-#endif // __TBB_CPP20_PRESENT
+#endif // __TBB_CPP20_CONCEPTS_PRESENT
 
 template <typename Body, typename Iterator, typename Item>
 using feeder_is_required = tbb::detail::void_t<decltype(tbb::detail::invoke(std::declval<const Body>(),
