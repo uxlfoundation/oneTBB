@@ -233,10 +233,8 @@
 #if __INTEL_COMPILER && (!_MSC_VER || __INTEL_CXX11_MOVE__)
     #define __TBB_CPP14_VARIABLE_TEMPLATES_PRESENT (__TBB_LANG >= 201402L)
     #define __TBB_CPP17_DEDUCTION_GUIDES_PRESENT   (__INTEL_COMPILER > 2021 && __TBB_LANG >= 201703L)
-    #define __TBB_CPP20_CONCEPTS_PRESENT           0 // TODO: add a mechanism for future addition
 #elif __clang__
     #define __TBB_CPP14_VARIABLE_TEMPLATES_PRESENT (__has_feature(cxx_variable_templates))
-    #define __TBB_CPP20_CONCEPTS_PRESENT           0 // TODO: add a mechanism for future addition
     #ifdef __cpp_deduction_guides
         #define __TBB_CPP17_DEDUCTION_GUIDES_PRESENT (__cpp_deduction_guides >= 201611L)
     #else
@@ -245,15 +243,12 @@
 #elif __GNUC__
     #define __TBB_CPP14_VARIABLE_TEMPLATES_PRESENT (__TBB_LANG >= 201402L && __TBB_GCC_VERSION >= 50000)
     #define __TBB_CPP17_DEDUCTION_GUIDES_PRESENT   (__cpp_deduction_guides >= 201606L)
-    #define __TBB_CPP20_CONCEPTS_PRESENT           (__TBB_LANG >= 201709L && __TBB_GCC_VERSION >= 100201)
 #elif _MSC_VER
     #define __TBB_CPP14_VARIABLE_TEMPLATES_PRESENT (_MSC_FULL_VER >= 190023918 && (!__INTEL_COMPILER || __INTEL_COMPILER >= 1700))
     #define __TBB_CPP17_DEDUCTION_GUIDES_PRESENT   (_MSC_VER >= 1914 && __TBB_LANG >= 201703L && (!__INTEL_COMPILER || __INTEL_COMPILER > 2021))
-    #define __TBB_CPP20_CONCEPTS_PRESENT           (_MSC_VER >= 1923 && __TBB_LANG >= 202002L) // TODO: INTEL_COMPILER?
 #else
     #define __TBB_CPP14_VARIABLE_TEMPLATES_PRESENT (__TBB_LANG >= 201402L)
     #define __TBB_CPP17_DEDUCTION_GUIDES_PRESENT   (__TBB_LANG >= 201703L)
-    #define __TBB_CPP20_CONCEPTS_PRESENT           (__TBB_LANG >= 202002L)
 #endif
 
 // GCC4.8 on RHEL7 does not support std::get_new_handler
@@ -267,6 +262,12 @@
 #define __TBB_CPP17_LOGICAL_OPERATIONS_PRESENT          (__TBB_LANG >= 201703L)
 #define __TBB_CPP17_ALLOCATOR_IS_ALWAYS_EQUAL_PRESENT   (__TBB_LANG >= 201703L)
 #define __TBB_CPP17_IS_SWAPPABLE_PRESENT                (__TBB_LANG >= 201703L)
+
+#if defined(__cpp_concepts) && defined(__cpp_lib_concepts)
+    #define __TBB_CPP20_CONCEPTS_PRESENT ((__cpp_concepts >= 201907L) && (__cpp_lib_concepts >= 202002L))
+#else
+    #define __TBB_CPP20_CONCEPTS_PRESENT 0
+#endif
 
 #if defined(__cpp_impl_three_way_comparison) && defined(__cpp_lib_three_way_comparison)
     #define __TBB_CPP20_COMPARISONS_PRESENT ((__cpp_impl_three_way_comparison >= 201907L) && (__cpp_lib_three_way_comparison >= 201907L))
