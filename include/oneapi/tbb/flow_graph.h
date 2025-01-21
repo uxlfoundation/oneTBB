@@ -85,7 +85,7 @@ class continue_msg {};
 } // namespace d2
 
 #if __TBB_CPP20_CONCEPTS_PRESENT
-namespace d0 {
+inline namespace d0 {
 
 template <typename ReturnType, typename OutputType>
 concept node_body_return_type = std::same_as<OutputType, tbb::detail::d2::continue_msg> ||
@@ -127,7 +127,7 @@ template <typename Body, typename Input, typename GatewayType>
 concept async_node_body = std::copy_constructible<Body> &&
                           std::invocable<Body&, const Input&, GatewayType&>;
 
-} // namespace d0
+} // inline namespace d0
 #endif // __TBB_CPP20_CONCEPTS_PRESENT
 
 namespace d2 {
