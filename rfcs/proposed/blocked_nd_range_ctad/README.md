@@ -117,6 +117,21 @@ The second constraint is intended to accept only the braced-init-lists that can 
 Currently it supports the constructor with 2 parameters, taking _begin_ and _end_ of the interval, and the constructor with 3 parameters, taking
 additional _grainsize_ parameter.
 
+The important limitation of the deduction guide `[g2]` is that all of the elements in the braced-init-list should be of the same type. 
+It would be impossible to use this constructor for initializing the `blocked_range` objects of types that are not convertible to `size_type`
+together with the grainsize:
+
+```cpp
+std::vector<int> vector;
+
+// OK, deduced as blocked_nd_range<iterator, 1>
+blocked_nd_range range1({vector.begin(), vector.end()});
+
+// FAIL, all items in braced-init-lists should be objects of the same type
+// It is impossible to provide grainsize as iterator since iterator is not convertible to size_type
+blocked_nd_range range({vector.begin(), vector.end(), /*grainsize = */5});
+```
+
 For the constructor `[2]`, the following deduction guide is proposed:
 
 ```cpp
