@@ -48,7 +48,6 @@ std::pair<bool, ticket_type> internal_try_pop_impl(void* dst, QueueRep& queue, A
 
 // A high-performance thread-safe non-blocking concurrent queue.
 // Multiple threads may each push and pop concurrently.
-// Assignment construction is not allowed.
 template <typename T, typename Allocator = tbb::cache_aligned_allocator<T>>
 class concurrent_queue {
     using allocator_traits_type = tbb::detail::allocator_traits<Allocator>;
@@ -317,7 +316,6 @@ namespace d2 {
 // A high-performance thread-safe blocking concurrent bounded queue.
 // Supports boundedness and blocking semantics.
 // Multiple threads may each push and pop concurrently.
-// Assignment construction is not allowed.
 template <typename T, typename Allocator = tbb::cache_aligned_allocator<T>>
 class concurrent_bounded_queue {
     using allocator_traits_type = tbb::detail::allocator_traits<Allocator>;
