@@ -186,7 +186,7 @@ class thread_leave_manager {
     static const std::uintptr_t ONE_TIME_FAST_LEAVE = 1 << 1;
     static const std::uintptr_t PARALLEL_PHASE      = 1 << 2;
 
-    std::atomic<std::uintptr_t> my_state{static_cast<std::uintptr_t>(-1)};
+    std::atomic<std::uintptr_t> my_state{UINTPTR_MAX};
 public:
     // This method is not thread-safe!
     // Required to be called after construction to set initial state of the state machine.
@@ -202,39 +202,31 @@ public:
     }
 
     void reset_if_needed() {
-        std::uintptr_t curr = ONE_TIME_FAST_LEAVE;
-        if (my_state.load(std::memory_order_relaxed) == curr) {
-            // Potentially can override decision of the parallel block from future epoch
+        std::uintptr_t curr = my_state.load(std::memory_order_relaxed);
+        if (curr == ONE_TIME_FAST_LEAVE) {
+            // Potentially can override decision of the parallel phase from future epoch
             // but it is not a problem because it does not violate the correctness
-            my_state.compare_exchange_strong(curr, DELAYED_LEAVE);
+            my_state.fetch_and(~ONE_TIME_FAST_LEAVE);
         }
     }
 
     // Indicate start of parallel phase in the state machine
     void register_parallel_phase() {
-        std::uintptr_t prev = my_state.load(std::memory_order_relaxed);
-        __TBB_ASSERT(prev != std::uintptr_t(-1), "The initial state was not set");
+        __TBB_ASSERT(my_state.load(std::memory_order_relaxed) != UINTPTR_MAX, "The initial state was not set");
 
-        std::uintptr_t desired{};
-        do {
-            // Need to add a reference for this start of a parallel phase, preserving the leave
-            // policy. Except for the case when one time fast leave was requested at the end of a
-            // previous phase.
-            desired = prev;
-            if (prev == ONE_TIME_FAST_LEAVE) {
-                // State was previously transitioned to "One-time Fast leave", thus with the start
-                // of new parallel phase, it should be transitioned to "Delayed leave"
-                desired = DELAYED_LEAVE;
-            }
-            __TBB_ASSERT(desired + PARALLEL_PHASE > desired, "Overflow detected");
-            desired += PARALLEL_PHASE; // Take into account this start of a parallel phase
-        } while (!my_state.compare_exchange_strong(prev, desired));
+        std::uintptr_t prev = my_state.fetch_add(PARALLEL_PHASE);
+        __TBB_ASSERT(prev + PARALLEL_PHASE > prev, "Overflow detected");
+        if (prev & ONE_TIME_FAST_LEAVE) {
+            // State was previously transitioned to "One-time Fast leave", thus with the start
+            // of new parallel phase, it should be reset
+            my_state.fetch_and(~ONE_TIME_FAST_LEAVE);
+        }
     }
 
     // Indicate the end of parallel phase in the state machine
     void unregister_parallel_phase(bool enable_fast_leave) {
         std::uintptr_t prev = my_state.load(std::memory_order_relaxed);
-        __TBB_ASSERT(prev != std::uintptr_t(-1), "The initial state was not set");
+        __TBB_ASSERT(prev != UINTPTR_MAX, "The initial state was not set");
 
         std::uintptr_t desired{};
         do {
@@ -249,7 +241,7 @@ public:
 
     bool is_retention_allowed() {
         std::uintptr_t curr = my_state.load(std::memory_order_relaxed);
-        __TBB_ASSERT(curr != std::uintptr_t(-1), "The initial state was not set");
+        __TBB_ASSERT(curr != UINTPTR_MAX, "The initial state was not set");
         return curr != FAST_LEAVE && curr != ONE_TIME_FAST_LEAVE;
     }
 };

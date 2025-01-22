@@ -261,9 +261,9 @@ To implement the proposed feature, the following changes were made:
 * Added a new entity `thread_leave_manager` to the `r1::arena` which is responsible for
   for managing the state of workers' arena leaving behaviour.
 * Introduced two new entry points to the library.
-  * `r1::register_parallel_phase(d1::task_arena_base*, std::uintptr_t)` - used to communicate
+  * `r1::enter_parallel_phase(d1::task_arena_base*, std::uintptr_t)` - used to communicate
     the start of parallel phase with the library.
-  * `r1::unregister_parallel_phase(d1::task_arena_base*, std::uintptr_t)` - used to communicate
+  * `r1::exit_parallel_phase(d1::task_arena_base*, std::uintptr_t)` - used to communicate
     the end of parallel phase with the library.
 
 ### Thread Leave Manager

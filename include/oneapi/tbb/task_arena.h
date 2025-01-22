@@ -97,8 +97,8 @@ TBB_EXPORT void __TBB_EXPORTED_FUNC enqueue(d1::task&, d1::task_group_context&, 
 TBB_EXPORT void __TBB_EXPORTED_FUNC submit(d1::task&, d1::task_group_context&, arena*, std::uintptr_t);
 
 #if __TBB_PREVIEW_PARALLEL_PHASE
-TBB_EXPORT void __TBB_EXPORTED_FUNC register_parallel_phase(d1::task_arena_base*, std::uintptr_t);
-TBB_EXPORT void __TBB_EXPORTED_FUNC unregister_parallel_phase(d1::task_arena_base*, std::uintptr_t);
+TBB_EXPORT void __TBB_EXPORTED_FUNC enter_parallel_phase(d1::task_arena_base*, std::uintptr_t);
+TBB_EXPORT void __TBB_EXPORTED_FUNC exit_parallel_phase(d1::task_arena_base*, std::uintptr_t);
 #endif
 } // namespace r1
 
@@ -496,12 +496,12 @@ public:
 #if __TBB_PREVIEW_PARALLEL_PHASE
     void start_parallel_phase() {
         initialize();
-        r1::register_parallel_phase(this, /*reserved*/0);
+        r1::enter_parallel_phase(this, /*reserved*/0);
     }
     void end_parallel_phase(bool with_fast_leave = false) {
         __TBB_ASSERT(my_initialization_state.load(std::memory_order_relaxed) == do_once_state::initialized, nullptr);
         // It is guaranteed by the standard that conversion of boolean to integral type will result in either 0 or 1
-        r1::unregister_parallel_phase(this, static_cast<std::uintptr_t>(with_fast_leave));
+        r1::exit_parallel_phase(this, static_cast<std::uintptr_t>(with_fast_leave));
     }
 
     class scoped_parallel_phase {
@@ -589,12 +589,12 @@ inline void enqueue(F&& f) {
 
 #if __TBB_PREVIEW_PARALLEL_PHASE
 inline void start_parallel_phase() {
-    r1::register_parallel_phase(nullptr, /*reserved*/0);
+    r1::enter_parallel_phase(nullptr, /*reserved*/0);
 }
 
 inline void end_parallel_phase(bool with_fast_leave) {
     // It is guaranteed by the standard that conversion of boolean to integral type will result in either 0 or 1
-    r1::unregister_parallel_phase(nullptr, static_cast<std::uintptr_t>(with_fast_leave));
+    r1::exit_parallel_phase(nullptr, static_cast<std::uintptr_t>(with_fast_leave));
 }
 #endif
 
