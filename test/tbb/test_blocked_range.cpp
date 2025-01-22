@@ -297,7 +297,7 @@ void test_deduction_guides() {
 
 class fancy_value {
 public:
-    fancy_value(int real_value) : my_real_value(real_value) {}
+    fancy_value(std::size_t real_value) : my_real_value(real_value) {}
     fancy_value(const fancy_value&) = default;
     ~fancy_value() = default;
     fancy_value& operator=(const fancy_value&) = default;
@@ -319,7 +319,7 @@ public:
         return my_real_value;
     }
 private:
-    int my_real_value;
+    std::size_t my_real_value;
 };
 
 //! Testing blocked_nd_range deduction guides
