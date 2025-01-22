@@ -70,7 +70,7 @@ in `rfcs/proposed`, adding the requested information.
 A proposal that is subsequently implemented and released as an experimental feature
 is moved into the `rfcs/experimental` directory.
 The RFC for such a feature should include a description
-of what is required to move it from experimental to fully supported -- for 
+of what is required to move it from experimental to fully supported - for 
 example, feedback from users, demonstrated performance improvements, etc.
 
 A proposal that is implemented as a fully supported feature appears
