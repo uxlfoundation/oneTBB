@@ -151,7 +151,7 @@ class blocked_nd_range : public blocked_nd_range_impl<Value, N> {
 // blocked_nd_range(const dim_range_type& dim0, const dim_range_type& dim1, ...)
 // while the arguments are passed as braced-init-lists
 // Works only for 2 and more arguments since the deduction from
-// single braced-init-list argument is ambiguous with the single C-array argument
+// single braced-init-list or single C-array argument prefers the multi-dimensional range
 // Only braced-init-lists of size 2 and 3 are allowed since dim_range_type may only
 // be constructed from 2 or 3 arguments
 template <typename Value, unsigned int... Ns,
@@ -168,18 +168,8 @@ blocked_nd_range(blocked_range<Value>, blocked_range<Values>...)
 -> blocked_nd_range<Value, 1 + sizeof...(Values)>;
 
 // blocked_nd_range(const value_type (&size)[N], size_type grainsize = 1)
-// while the grainsize is not passed
-// Does not work for arrays of size 2 or 3 since it is ambiguous with deducing
-// for dim_range_type constructor taking the single braced-init-list
-template <typename Value, unsigned int N,
-          typename = std::enable_if_t<(N != 2 && N != 3)>>
-blocked_nd_range(const Value (&)[N])
--> blocked_nd_range<Value, N>;
-
-// blocked_nd_range(const value_type (&size)[N], size_type grainsize = 1)
-// while using the non-default grainsize
 template <typename Value, unsigned int N>
-blocked_nd_range(const Value (&)[N], typename blocked_nd_range<Value, N>::size_type)
+blocked_nd_range(const Value (&)[N], typename blocked_nd_range<Value, N>::size_type = 1)
 -> blocked_nd_range<Value, N>;
 
 // blocked_nd_range(blocked_nd_range<Value, N>&, oneapi::tbb::split)

@@ -245,12 +245,20 @@ void test_deduction_guides() {
         static_assert(std::is_same_v<decltype(range), blocked_nd_range<T, 2>>);
     }
     {
+        blocked_nd_range range({T{100}, T{200}});
+        static_assert(std::is_same_v<decltype(range), blocked_nd_range<T, 2>>);
+    }
+    {
         T array[2] = {100, 200};
         blocked_nd_range range(array, 5);
         static_assert(std::is_same_v<decltype(range), blocked_nd_range<T, 2>>);
     }
     {
         blocked_nd_range range({T{100}, T{200}, T{300}}, 5);
+        static_assert(std::is_same_v<decltype(range), blocked_nd_range<T, 3>>);
+    }
+    {
+        blocked_nd_range range({T{100}, T{200}, T{300}});
         static_assert(std::is_same_v<decltype(range), blocked_nd_range<T, 3>>);
     }
     {
