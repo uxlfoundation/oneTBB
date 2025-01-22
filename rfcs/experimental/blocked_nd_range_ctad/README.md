@@ -220,7 +220,8 @@ the set of braced-init-lists or the set of `tbb::blocked_range` objects.
 The following conditions need to be met to move the feature from experimental to fully supported:
 * Collecting feedback on user experience confirming the choices made on the open questions and limitations:
   * Preference of multi-dimensional range while deducing from the C-array or braced-init-list of size 2 or 3.
-    See [separate section](#passing-single-c-array-object-of-size-2-or-3).
+    See [separate section](#passing-single-c-array-object-of-size-2-or-3) for more details.
   * Limitation for the deduction from the braced-init-list to accept only the lists of items of the same type.
   * Limitation for the deduction guide `1` in case of mixing `blocked_range` objects and braced-init-lists.
+    See [separate section](#using-the-constructor-1-with-mixed-arguments) for more details.
 * The corresponding oneTBB specification update should be done backed by the user feedback provided.
