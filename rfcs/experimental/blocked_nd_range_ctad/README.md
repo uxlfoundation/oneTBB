@@ -110,7 +110,7 @@ This deduction guide only participates in overload resolution if
 1. the number of C-arrays provided is more than 1 (`sizeof...(Ns) > 1`),
 2. Each C-array has the size 2 or 3.
 
-The first constraint is intended to resolve disambiguate between `[1]` and `[2]`.
+The first constraint is intended to disambiguate between `[1]` and `[2]`.
 See [separate section](#ambiguity-while-passing-the-single-braced-init-list-of-size-2-or-3) for more details.
 
 The second constraint is intended to accept only the braced-init-lists that can be used to initialize the `blocked_range` object.
@@ -139,9 +139,6 @@ For the constructor `[2]`, the following deduction guide is proposed:
 template <typename Value, unsigned int N>
 blocked_nd_range(const Value (&)[N])
 ```
-
-This deduction guide only participates in overload resolution if `N` is not equal to neither 2 nor 3 to disambiguate between `[1]` and `[2]`.
-See [separate section](#ambiguity-while-passing-the-single-braced-init-list-of-size-2-or-3) for more details.
 
 For service constructors `[3]` and `[4]`, the following guides are proposed:
 
@@ -217,3 +214,12 @@ tbb::blocked_nd_range nd_range(dim_range, {0, 200}, {0, 300}, dim_range);
 These arguments would not match nether on the `[g1]` not `[g2]` and it is unclear how to define the deduction guide that covers this case.
 Current proposal is to keep this scenario a limitation for using the CTAD and always require using the consistent set of parameters - or 
 the set of braced-init-lists or the set of `tbb::blocked_range` objects.
+
+## Exit criteria
+
+The following conditions need to be met to move the feature from experimental to fully supported:
+* Collecting feedback on user experience confirming the choices made on the open questions and limitations:
+  * Preference of multi-dimensional range while deducing from the C-array or braced-init-list of size 2 or 3.
+    See [separate section](#passing-single-c-array-object-of-size-2-or-3).
+  * Limitation for the deduction from the braced-init-list to accept only the lists of items of the same type.
+* The corresponding oneTBB specification update should be done backed by the user feedback provided.
