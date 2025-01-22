@@ -74,7 +74,7 @@ of what is required to move it from experimental to fully supported - for
 example, feedback from users, demonstrated performance improvements, etc.
 
 A proposal that is implemented as a fully supported feature appears
-in the `rfcs/supported` directory. It typically involves the oneDPL specification
+in the `rfcs/supported` directory. It typically involves the oneTBB specification
 changes and should therefore have a link to the section in the specification
 with its formal wording.
 
