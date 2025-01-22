@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2024 Intel Corporation
+    Copyright (C) 2023-2025 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -23,10 +23,10 @@
 #endif
 
 #define TCM_VERSION_MAJOR 1
-#define TCM_VERSION_MINOR 2
+#define TCM_VERSION_MINOR 3
 #define TCM_VERSION_PATCH 0
 
-#define TCM_INTERFACE_VERSION 1020
+#define TCM_INTERFACE_VERSION 1030
 #define TCM_INTERFACE_VERSION_MAJOR (TCM_INTERFACE_VERSION/1000)
 #define TCM_INTERFACE_VERSION_MINOR ((TCM_INTERFACE_VERSION%1000)/10)
 
