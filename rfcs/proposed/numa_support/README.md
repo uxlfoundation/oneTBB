@@ -123,12 +123,12 @@ in the two loops are from the same NUMA nodes? Or is this too much to expect wit
 
 ### Increased availability of NUMA support
 
-See [sub-RFC for increased availability of NUMA API](https://github.com/uxlfoundation/oneTBB/pull/1545)
+See [sub-RFC for increased availability of NUMA API](tbbbind-link-static-hwloc.org)
 
 
 ### Add NUMA-constrained arenas
 
-See [sub-RFC for creation and use of NUMA-constrained arenas](https://github.com/uxlfoundation/oneTBB/pull/1559)
+See [sub-RFC for creation and use of NUMA-constrained arenas](numa-arenas-creation-and-use.org)
 
 ### NUMA-aware allocation
 
