@@ -25,11 +25,10 @@ The features for NUMA tuning already available in the oneTBB 1.3 specification i
   - `int default_concurrency(numa_node_id id = oneapi::tbb::task_arena::automatic)`
 - `tbb::task_arena::constraints` in **[scheduler.task_arena]**
 
-Below is the example based on existing oneTBB documentation that demonstrates the use 
-of these APIs to pin threads to different arenas to each of the NUMA nodes available 
-on a system, submit work across those `task_arena` objects and into associated 
-`task_group`` objects, and then wait for work again using both the `task_arena` 
-and `task_group` objects.
+Below is the example based on existing oneTBB documentation that demonstrates the use of these APIs
+to pin threads to different arenas to each of the NUMA nodes available on a system, submit work
+across those `task_arena` objects and into associated `task_group` objects, and then wait for work
+again using both the `task_arena` and `task_group` objects.
 
     void constrain_for_numa_nodes() {
       std::vector<tbb::numa_node_id> numa_nodes = tbb::info::numa_nodes();

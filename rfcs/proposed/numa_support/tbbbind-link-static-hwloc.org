@@ -71,8 +71,9 @@ linked to HWLOC 1.x for the library linked against a static HWLOC 2.x.
    against HWLOC 1.x with a link to a static HWLOC library version 2.x.
 2. Add loading of that ~tbbbind~ variant as the last attempt to resolve the
    dependency on functionality provided by the ~tbbbind~ layer.
-3. Update the oneTBB documentation, including [[https://oneapi-src.github.io/oneTBB/search.html?q=tbb%3A%3Ainfo][these pages]], to
-   detail the steps for identifying which ~tbbbind~ is being used.
+3. Update the oneTBB documentation, including
+   [[https://uxlfoundation.github.io/oneTBB/search.html?q=tbb%3A%3Ainfo][these
+   pages]], to detail the steps for identifying which ~tbbbind~ is being used.
 
 ** Advantages
 1. The proposed behavior introduces a fallback mechanism for resolving the HWLOC
