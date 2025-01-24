@@ -1,4 +1,4 @@
-# Copyright (C) 2023 Intel Corporation
+# Copyright (C) 2023-2025 Intel Corporation
 #
 # This software and the related documents are Intel copyrighted materials, and your use of them is
 # governed by the express license under which they were provided to you ("License"). Unless the
@@ -35,7 +35,8 @@ endif()
 # Parse the HWLOC version using hwloc-info executable
 find_program(_hwloc_info_exe
     NAMES hwloc-info
-    PATHS ENV HWLOC_ROOT ENV PATH
+    HINTS ENV HWLOCROOT
+    PATHS ENV PATH
     PATH_SUFFIXES bin
 )
 
@@ -59,8 +60,9 @@ if (HWLOC_VERSION VERSION_GREATER_EQUAL "2.0")
     # Search for the includes path
     find_path(_hwloc_include_dirs
         NAMES hwloc.h
+        HINTS ENV HWLOCROOT
         PATHS ${_additional_include_dirs}
-        PATH_SUFFIXES "hwloc"
+        PATH_SUFFIXES "include" "hwloc"
     )
 
     if (_hwloc_include_dirs)
@@ -70,8 +72,8 @@ if (HWLOC_VERSION VERSION_GREATER_EQUAL "2.0")
 
         # Search for the library
         if (WIN32)
-            find_library(_hwloc_lib libhwloc PATHS ${_additional_lib_dirs})
-            find_file(_hwloc_dll libhwloc-15.dll PATHS ${ADDITIONAL_LIB_DIRS})
+            find_library(_hwloc_lib libhwloc HINTS ENV HWLOCROOT PATHS ${_additional_lib_dirs} PATH_SUFFIXES "lib")
+            find_file(_hwloc_dll libhwloc-15.dll HINTS ENV HWLOCROOT PATHS ${_additional_lib_dirs} PATH_SUFFIXES "bin")
             if (_hwloc_lib AND _hwloc_dll)
                 set_target_properties(
                     HWLOC::hwloc PROPERTIES
@@ -81,7 +83,7 @@ if (HWLOC_VERSION VERSION_GREATER_EQUAL "2.0")
             endif()
             unset(_hwloc_dll)
         else()
-            find_library(_hwloc_lib hwloc PATHS ${_additional_lib_dirs})
+            find_library(_hwloc_lib hwloc HINTS ENV HWLOCROOT PATHS ${_additional_lib_dirs} PATH_SUFFIXES "lib")
             if (_hwloc_lib)
                 set_target_properties(
                     HWLOC::hwloc PROPERTIES
