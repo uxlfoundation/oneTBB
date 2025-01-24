@@ -47,6 +47,8 @@ class atomic_backoff {
     /** Should be equal to approximately the number of "pause" instructions
       that take the same time as an context switch. Must be a power of two.*/
     static constexpr std::int32_t LOOPS_BEFORE_YIELD = 16;
+    //! The number of time slice yields before switching to a long yield
+    static constexpr std::int32_t LOOPS_BEFORE_LONG_YIELD = LOOPS_BEFORE_YIELD + 4;
     std::int32_t count;
 
 public:
@@ -67,9 +69,12 @@ public:
             machine_pause(count);
             // Pause twice as long the next time.
             count *= 2;
-        } else {
+        } else if (count <= LOOPS_BEFORE_LONG_YIELD) {
             // Pause is so long that we might as well yield CPU to scheduler.
             yield();
+            ++count;
+        } else {
+            long_yield();
         }
     }
 
