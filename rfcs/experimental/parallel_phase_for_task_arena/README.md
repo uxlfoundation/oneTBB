@@ -235,7 +235,6 @@ void scoped_parallel_phase_example() {
         // Computation
     }
 }
-
 ```
 
 ## Considerations
@@ -256,6 +255,32 @@ it might introduce performance problems if:
   Heavier involvement of less performant core types might result in artificial work
   imbalance in the arena.
 
+## Technical Details
+
+To implement the proposed feature, the following changes were made:
+* Added a new entity `thread_leave_manager` to the `r1::arena` which is responsible for
+  for managing the state of workers' arena leaving behaviour.
+* Introduced two new entry points to the library.
+  * `r1::enter_parallel_phase(d1::task_arena_base*, std::uintptr_t)` - used to communicate
+    the start of parallel phase with the library.
+  * `r1::exit_parallel_phase(d1::task_arena_base*, std::uintptr_t)` - used to communicate
+    the end of parallel phase with the library.
+
+### Thread Leave Manager
+
+`thread_leave_manager` class implements the state machine described in proposal.
+Specifically, it controls when worker threads are allowed to be retained in the arena.
+`thread_leave_manager` is initialized with a state that determines the default
+behavior for workers leaving the arena.
+
+To support `start/end_parallel_phase` API, it provides functionality to override the default
+state with a "Parallel Phase" state. It also keeps track of the number of active parallel phases.
+
+The following sequence diagram illustrates the interaction between the user and
+the `thread_leave_manager` during the execution of parallel phases. It shows how the
+`thread_leave_manager` manages the state transitions when using `start/end_parallel_phase`.
+
+<img src="parallel_phase_sequence_diagram.png" width=1000>
 
 ## Open Questions in Design
 
@@ -272,3 +297,10 @@ Some open questions that remain:
 * Do we see any value if arena potentially can transition from one to another state?
   * What if different types of workloads are mixed in one application?
   * What if there concurrent calls to this API?
+
+## Conditions to become fully supported
+
+Following conditions need to be met for the feature to move from experimental to fully supported:
+* Open questions regarding API should be resolved.
+* The feature should demonstrate performance improvements in scenarios mentioned.
+* oneTBB specification needs to be updated to reflect the new feature.

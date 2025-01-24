@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2024 Intel Corporation
+# Copyright (c) 2020-2025 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -66,6 +66,7 @@ function(tbb_add_test)
     endif()
 
     set_property(TEST ${_tbb_test_TARGET_NAME} PROPERTY ENVIRONMENT ${TBB_TESTS_ENVIRONMENT} APPEND)
+    set_property(TEST ${_tbb_test_TARGET_NAME} PROPERTY RUN_SERIAL TRUE)
 
     # Prefer using target_link_options instead of target_link_libraries to specify link options because
     # target_link_libraries may incorrectly handle some options (on Windows, for example).
@@ -111,6 +112,7 @@ function(tbb_add_c_test)
     endif()
 
     set_property(TEST ${_tbb_test_NAME} PROPERTY ENVIRONMENT ${TBB_TESTS_ENVIRONMENT} APPEND)
+    set_property(TEST ${_tbb_test_NAME} PROPERTY RUN_SERIAL TRUE)
 
     target_compile_definitions(${_tbb_test_NAME} PRIVATE
         $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>
@@ -416,6 +418,7 @@ if (TARGET TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_task_group DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_concurrent_hash_map DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_task_arena DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR tbb NAME test_parallel_phase DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_enumerable_thread_specific DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_concurrent_queue DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_resumable_tasks DEPENDENCIES TBB::tbb)

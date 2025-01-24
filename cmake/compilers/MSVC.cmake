@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2024 Intel Corporation
+# Copyright (c) 2020-2025 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -77,7 +77,7 @@ if (TBB_WINDOWS_DRIVER)
     set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} /D _UNICODE /DUNICODE /DWINAPI_FAMILY=WINAPI_FAMILY_APP /D__WRL_NO_DEFAULT_LIB__)
 endif()
 
-if (TBB_FILE_TRIM)
+if (TBB_FILE_TRIM AND NOT CMAKE_CXX_COMPILER_ID MATCHES "(Intel|IntelLLVM)")
     add_compile_options(
         "$<$<COMPILE_LANGUAGE:CXX>:/d1trimfile:${NATIVE_TBB_PROJECT_ROOT_DIR}\\>"
         "$<$<COMPILE_LANGUAGE:CXX>:/d1trimfile:${CMAKE_SOURCE_DIR}/>")
