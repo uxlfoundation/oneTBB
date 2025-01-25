@@ -467,9 +467,11 @@ private:
     friend class concurrent_hash_map;
 
     hash_map_iterator( const Container &map, std::size_t index, const bucket *b, node_base *n ) :
-        my_map(&map), my_index(index), my_bucket(b), my_node(static_cast<node*>(n))
+        my_map(&map), my_index(index), my_bucket(b), my_node(nullptr)
     {
-        if( b && !map_base::is_valid(n) )
+        if( map_base::is_valid(n) )
+            my_node = static_cast<node*>(n);
+        else if( b )
             advance_to_next_bucket();
     }
 
