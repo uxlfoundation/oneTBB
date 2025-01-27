@@ -547,42 +547,22 @@ namespace r1 {
 
 #if _WIN32 && __TBB_VERIFY_DEPENDENCY_SIGNATURE
     /**
-     * Obtains full path to the specified filename and stores it inside passed buffer.
+     * Obtains full path to the specified filename and stores it inside passed buffer. Returns the
+     * actual length of the buffer required to hold the full path to the specified file, not
+     * including the terminating NULL character.
      *
-     * Returns the actual length of the buffer required to hold the full path to the specified file,
-     * including terminating NULL character.
+     * If the buffer is too small to hold the full path, the returned value indicates the needed
+     * length of the buffer including the terminating NULL character. In case of error, zero is
+     * returned.
      */
     unsigned get_module_full_path(char* path_buffer, const unsigned buffer_length,
                                   const char* filename)
     {
         __TBB_ASSERT_EX( buffer_length > 0, "Cannot write the path to the buffer with zero length" );
 
-        // TODO: DONT_RESOLVE_DLL_REFERENCES is deprecated and can lead to errors since the "loaded"
-        // library can be seen by other threads, which might decide to call its functions. Consider
-        // determining full file path the other way still using system loader search order.
-
-        // Use default flags but also do not load dependencies nor execute any code
-        DWORD flags = loading_flags(DYNAMIC_LINK_DEFAULT) | DONT_RESOLVE_DLL_REFERENCES;
-        dynamic_link_handle handle = LoadLibraryExA(filename, /*reserved*/NULL, flags);
-        if (nullptr == handle) {
-            DYNAMIC_LINK_WARNING( dl_lib_not_found, filename, dlerror() );
-            return /*actual_length*/0;
-        }
-
-        unsigned actual_length = GetModuleFileNameA( handle, path_buffer,
-                                                     static_cast<DWORD>(buffer_length) );
-        if (0 == actual_length) {
-            DYNAMIC_LINK_WARNING( dl_lib_not_found, filename, dlerror() );
-        } else if (buffer_length == actual_length) {
-            // The buffer length was insufficient. The terminating NULL character is automatically
-            // counted in this case.
-            DYNAMIC_LINK_WARNING( dl_buff_too_small );
-        } else
-            actual_length += 1;   // Count terminating NULL character as part of string length
-
-        if (!FreeLibrary(handle))
-            DYNAMIC_LINK_WARNING( dl_unload_fail, filename, dlerror() );
-
+        const DWORD actual_length = SearchPathA(/*lpPath*/NULL, filename, /*lpExtension*/NULL,
+                                                static_cast<DWORD>(buffer_length), path_buffer,
+                                                /*lpFilePart*/NULL);
         return actual_length;
     }
 
@@ -705,8 +685,14 @@ namespace r1 {
         char buff[PATH_MAX] = {0};
         if ( !(flags & DYNAMIC_LINK_BUILD_ABSOLUTE_PATH) ) { // Get the path if it is not yet built
             length = get_module_full_path(buff, /*buffer_length*/PATH_MAX, path);
-            if (length == 0) // The full path to the module has not been retrieved
+            if (length == 0) {
+                DYNAMIC_LINK_WARNING( dl_lib_not_found, path, dlerror() );
                 return library_handle;
+            } else if (length >= PATH_MAX) { // The buffer length was insufficient
+                DYNAMIC_LINK_WARNING( dl_buff_too_small );
+                return library_handle;
+            }
+            length += 1;   // Count terminating NULL character as part of string length
             path = buff;
         }
 
