@@ -555,11 +555,8 @@ namespace r1 {
      * length of the buffer including the terminating NULL character. In case of error, zero is
      * returned.
      */
-    unsigned get_module_full_path(char* path_buffer, const unsigned buffer_length,
-                                  const char* filename)
-    {
-        __TBB_ASSERT_EX( buffer_length > 0, "Cannot write the path to the buffer with zero length" );
-
+    unsigned get_module_path(char* path_buffer, const unsigned buffer_length, const char* filename) {
+        __TBB_ASSERT_EX(buffer_length > 0, "Cannot write the path to the buffer with zero length");
         const DWORD actual_length = SearchPathA(/*lpPath*/NULL, filename, /*lpExtension*/NULL,
                                                 static_cast<DWORD>(buffer_length), path_buffer,
                                                 /*lpFilePart*/NULL);
@@ -684,7 +681,7 @@ namespace r1 {
         UINT prev_mode = SetErrorMode (SEM_FAILCRITICALERRORS);
 #if __TBB_VERIFY_DEPENDENCY_SIGNATURE
         if (!build_absolute_path) { // Get the path if it is not yet built
-            length = get_module_full_path(absolute_path, len, library);
+            length = get_module_path(absolute_path, len, library);
             if (length == 0) {
                 DYNAMIC_LINK_WARNING( dl_lib_not_found, path, dlerror() );
                 return library_handle;
