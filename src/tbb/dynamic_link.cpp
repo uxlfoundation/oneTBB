@@ -693,16 +693,12 @@ namespace r1 {
             path = absolute_path;
         }
 
-        if (has_valid_signature(path, length)) {
+        if (has_valid_signature(path, length))
 #endif /* __TBB_VERIFY_DEPENDENCY_SIGNATURE */
 #endif /* _WIN32 */
             // The argument of loading_flags is ignored on Windows
             library_handle = dlopen( path, loading_flags(flags & DYNAMIC_LINK_LOCAL) );
 #if _WIN32
-#if __TBB_VERIFY_DEPENDENCY_SIGNATURE
-        } else
-            return library_handle; // Warning (if any) has already been reported
-#endif /* __TBB_VERIFY_DEPENDENCY_SIGNATURE */
         SetErrorMode (prev_mode);
 #endif /* _WIN32 */
         if( library_handle ) {
