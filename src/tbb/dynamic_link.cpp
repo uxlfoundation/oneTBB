@@ -664,9 +664,10 @@ namespace r1 {
 #if __TBB_DYNAMIC_LOAD_ENABLED
         const char* path = library;
         std::size_t const len = PATH_MAX + 1;
-        char absolute_path[ len ];
+        char absolute_path[ len ] = {0};
         std::size_t length = 0;
-        if (flags & DYNAMIC_LINK_BUILD_ABSOLUTE_PATH) {
+        const bool build_absolute_path = flags & DYNAMIC_LINK_BUILD_ABSOLUTE_PATH;
+        if (build_absolute_path) {
             length = abs_path( library, absolute_path, len );
             if (length > len) {
                 DYNAMIC_LINK_WARNING( dl_buff_too_small );
@@ -682,18 +683,17 @@ namespace r1 {
         // (e.g. because of MS runtime problems - one of those crazy manifest related ones)
         UINT prev_mode = SetErrorMode (SEM_FAILCRITICALERRORS);
 #if __TBB_VERIFY_DEPENDENCY_SIGNATURE
-        char buff[PATH_MAX] = {0};
-        if ( !(flags & DYNAMIC_LINK_BUILD_ABSOLUTE_PATH) ) { // Get the path if it is not yet built
-            length = get_module_full_path(buff, /*buffer_length*/PATH_MAX, path);
+        if (!build_absolute_path) { // Get the path if it is not yet built
+            length = get_module_full_path(absolute_path, len, library);
             if (length == 0) {
                 DYNAMIC_LINK_WARNING( dl_lib_not_found, path, dlerror() );
                 return library_handle;
-            } else if (length >= PATH_MAX) { // The buffer length was insufficient
+            } else if (length >= len) { // The buffer length was insufficient
                 DYNAMIC_LINK_WARNING( dl_buff_too_small );
                 return library_handle;
             }
             length += 1;   // Count terminating NULL character as part of string length
-            path = buff;
+            path = absolute_path;
         }
 
         if (has_valid_signature(path, length)) {
