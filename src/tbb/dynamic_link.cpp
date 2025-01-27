@@ -666,7 +666,7 @@ namespace r1 {
         pWVTData.dwProvFlags         = WTD_CACHE_ONLY_URL_RETRIEVAL | WTD_REVOCATION_CHECK_CHAIN;
         pWVTData.dwUIContext         = WTD_UICONTEXT_EXECUTE;          // UI Context to run the file
 
-        const auto rc = WinVerifyTrust((HWND)INVALID_HANDLE_VALUE, &pgActionID, &pWVTData);
+        const LONG rc = WinVerifyTrust((HWND)INVALID_HANDLE_VALUE, &pgActionID, &pWVTData);
         report_signature_validation_status(rc, filepath);
 
         pWVTData.dwStateAction = WTD_STATEACTION_CLOSE;       // Release WVT state data
