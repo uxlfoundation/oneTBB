@@ -127,7 +127,7 @@ namespace r1 {
     #define DYNAMIC_LINK_WARNING dynamic_link_warning
 #if TBB_DYNAMIC_LINK_WARNING
     static void dynamic_link_warning( dynamic_link_error_t code, ... ) {
-        const char* prefix = "oneTBB dynamic link error:";
+        const char* prefix = "oneTBB dynamic link warning:";
         const char* str = nullptr;
         // Note: dlerr_t depends on OS: it is char const * on Linux* and macOS*, int on Windows*.
 #if _WIN32
