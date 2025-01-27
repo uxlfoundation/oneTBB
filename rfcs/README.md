@@ -17,15 +17,17 @@ The possible RFC states are:
 3. Supported
 4. Archived
 
-Most modifications or new features will naturally start as a part of a 
-GitHub issue or discussion. Small changes do not require a formal RFC. 
-However, if the issue or discussion results in an idea for a significant 
-change or new feature that affects the library's public API or architecture, 
+Most modifications or new features will naturally start as a part of a
+GitHub issue or discussion. Small changes do not require a formal RFC.
+However, if the issue or discussion results in an idea for a significant
+change or new feature that affects the library's public API or architecture,
 we recommend opening a PR to add a new RFC to the `rfcs/proposed` directory.
 
-The `rfcs/proposed` directory contains RFCs for approved proposals
-that need to be implemented. These documents describe the overall design
-and API for the proposed functionality.
+The `rfcs/proposed` directory contains RFCs for proposals that need to be
+implemented. These documents may be iteratively refined but eventually describe
+the overall design and API for the proposed functionality. A proposal may
+intially be merged into the proposed directory that contains only an extended
+motivation and an idea for a solution.
 
 The `rfcs/experimental` directory contains RFCs for experimental library features.
 In addition to the design, these documents describe the criteria for the described
@@ -53,7 +55,7 @@ To create a new RFC document, open a pull request (PR) to add it to the `rfcs/pr
 A template for new RFCs is available as [template.md](template.md).
 Use it to create the `README.md` file in a subdirectory of `rfcs/proposed` named
 `<library_feature>_<extension_description>`. For example,
-a proposal for a `new my_op flow graph node` should be put into the 
+a proposal for a `new my_op flow graph node` should be put into the
 `rfcs/proposed/flow_graph_my_op_node` directory. Put other files referenced by the 
 `README.md` file, such as figures, into the same directory. The "RFC" label can be 
 used to mark PRs containing RFC/design proposals.
