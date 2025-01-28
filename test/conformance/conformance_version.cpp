@@ -25,7 +25,7 @@
 //! Testing the match of compile-time oneTBB specification version
 //! \brief \ref requirement \ref interface
 TEST_CASE("Test specification version") {
-    const char* expected = "1.0";
+    const char* expected = "104";
     REQUIRE_MESSAGE(std::strcmp(expected, ONETBB_SPEC_VERSION) == 0,
         "Expected and actual specification versions do not match.");
 }

@@ -42,7 +42,7 @@
     __TBB_VERSION_SUFFIX
 
 // OneAPI oneTBB specification version
-#define ONETBB_SPEC_VERSION "1.0"
+#define ONETBB_SPEC_VERSION 104
 // Full interface version
 #define TBB_INTERFACE_VERSION 12150
 // Major interface version
