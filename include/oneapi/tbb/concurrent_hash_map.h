@@ -469,6 +469,8 @@ private:
     hash_map_iterator( const Container &map, std::size_t index, const bucket *b, node_base *n ) :
         my_map(&map), my_index(index), my_bucket(b), my_node(nullptr)
     {
+        // Cannot directly initialize to n, because it could be an invalid node pointer (e.g., when
+        // setting a midpoint for a 1-element range). If it is, try one from a subsequent bucket.
         if( map_base::is_valid(n) )
             my_node = static_cast<node*>(n);
         else if( b )
