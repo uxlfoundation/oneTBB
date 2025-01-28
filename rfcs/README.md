@@ -40,8 +40,8 @@ The `rfcs/archived` directory contains rejected proposals and documents for
 the former functionality that has been removed.
 
 A subdirectory for an RFC should have a name of the form `<library_feature>_<extension_description>`
-and should contain a `README.md` file that either is the RFC document
-or links to other files and Web resources that describe the functionality.
+and should contain a plain text file `README`, such as a `README.md` file, that either is 
+the RFC document or links to other files and Web resources that describe the functionality.
 The directory can contain other supporting files such as images or formulas,
 as well as sub-proposals / sub-RFCs.
 
