@@ -23,11 +23,11 @@ However, if the issue or discussion results in an idea for a significant
 change or new feature that affects the library's public API or architecture,
 we recommend opening a PR to add a new RFC to the `rfcs/proposed` directory.
 
-The `rfcs/proposed` directory contains RFCs for proposals that need to be
-implemented. These documents may be iteratively refined but eventually describe
-the overall design and API for the proposed functionality. A proposal may
-intially be merged into the proposed directory that contains only an extended
-motivation and an idea for a solution.
+The `rfcs/proposed` directory contains RFCs for proposals that are suggested for
+implementation. A proposal may initially be merged into the proposed directory
+that contains only an extended motivation and an idea for a solution. Later on, it 
+may be iteratively refined but eventually describe the overall design and API for
+the proposed functionality. 
 
 The `rfcs/experimental` directory contains RFCs for experimental library features.
 In addition to the design, these documents describe the criteria for the described
