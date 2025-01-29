@@ -90,6 +90,11 @@ flow::function_node<
 
 The `flow::limited_resource` class template heuristically looks like:
 
+> [!NOTE]
+> Would it be reasonable to make `limited_resource` a constrained template,
+> and to introduct a concept of `resource` that would be used to define the
+> constraint?
+
 ```c++
 template <typename Resource = /* implementation-defined */>
 class limited_resource {
