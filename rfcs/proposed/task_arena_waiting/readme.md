@@ -114,7 +114,7 @@ for(unsigned j = 0; j < numa_arenas.size(); j++) {
 
 Additionally, a task group parameter can also be added to `execute` as well as to `this_task_arena::isolate`,
 which is similar to `execute` but provides additional work isolation guarantees. That would make
-the experimental `isolated_task_arena` class fully obsolete.
+the experimental `isolated_task_group` class fully obsolete.
 
 ### 2. Reconsider waiting for all tasks
 
