@@ -1,7 +1,8 @@
 # Dining philosophers node
 
 Various flow-graph nodes accept a constructor argument that specifies the maximum concurrency the graph can assume for that particular node.
-For example, in high-energy physics, an algorithm might reconstruct physics tracks from tracks recorded by an experiment's detector.
+This allows one to use, in such a node, a function body that is not threadsafe, while ensuring that the graph into which the node is inserted is threadsafe.
+For example, in the field of particle physics, an algorithm might reconstruct particle trajectories ("tracks") from energy deposits ("hits") left behind by those particles, and recorded by an experiment's detector.
 If the algorithm is not threadsafe, a reasonable node construction could be:
 
 ``` c++
@@ -35,7 +36,7 @@ flow::function_node<Signals, Clusters> cluster_maker{
 In the above, the function `db_unsafe_access()` returns a handle, providing thread-unsafe access to the database.
 To avoid data races, the function bodies of `track_maker` and `cluster_maker` must not execute at the same time.
 Achieving with flow graph such serialization between function bodies is nontrivial.
-Options include:
+Some options include:
 
 1. placing an explicit lock around the use of the database, resulting in inefficiencies in the execution of the graph,
 2. creating explicit edges between `track_maker` and `cluster_maker` even though there is not obvious data dependency between them,
@@ -60,6 +61,8 @@ flow::function_node<Signals, Clusters> cluster_maker{
 ```
 
 where `db_resource` represents a limited resource to which both `track_maker` and `cluster_maker` require sole access.
+Note that if the only reason that the bodies of `track_maker` and `cluster_maker` were thread unsafe was their access to the limited resource indicated by `db_resource` it is no longer necessary to declare that the nodes have concurrency `flow::serial`.
+It may be possible to have the node `track_maker` active at the same time, if the nature of `db_resource` were to allow two tokens to be available, and as long as each activation was given a different token.
 
 ## Proposal
 
