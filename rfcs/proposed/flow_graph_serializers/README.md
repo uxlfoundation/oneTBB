@@ -1,10 +1,10 @@
 # Dining philosophers node
 
-Flow-graph provides a facility to serialize the execution of a node to allow some code that would not otherwise be thread safe to be executed in parallel graphs.
+Flow-graph provides a facility to serialize the execution of a node to allow some code that would not otherwise be thread-safe to be executed in parallel graphs.
 Various flow-graph nodes accept a constructor argument that specifies the maximum concurrency the graph can invoke for that particular node.
-This allows one to use, in such a node, a function body that is not threadsafe, while ensuring that the graph into which the node is inserted is threadsafe.
+This allows one to use, in such a node, a function body that is not thread-safe, while ensuring that the graph into which the node is inserted is thread-safe.
 For example, in the field of particle physics, an algorithm might reconstruct particle trajectories ("tracks") from energy deposits ("hits") left behind by those particles, and recorded by an experiment's detector.
-If the algorithm is not threadsafe, a reasonable node construction could be:
+If the algorithm is not thread-safe, a reasonable node construction could be:
 
 ``` c++
 using namespace tbb;
@@ -18,7 +18,7 @@ flow::function_node<Hits, Tracks> track_maker{
 
 where the `flow::serial` argument constrains the flow graph to execute the node body by no more than one thread at a time.
 
-There are cases, however, where specifying a concurrency limit of `flow::serial` is insufficient to guarantee thread-safety of the full graph.
+There are cases, however, where specifying a concurrency limit of `flow::serial` is insufficient to guarantee thread safety of the full graph.
 For example, suppose `track_maker` needs exclusive access to some database connection, and another node `cluster_maker` also needs access to the same database:
 
 ``` c++
@@ -62,7 +62,7 @@ flow::function_node<Signals, Clusters> cluster_maker{
 ```
 
 where `db_resource` represents a limited resource to which both `track_maker` and `cluster_maker` require sole access.
-Note that if the only reason that the bodies of `track_maker` and `cluster_maker` were thread unsafe was their access to the limited resource indicated by `db_resource` it is no longer necessary to declare that the nodes have concurrency `flow::serial`.
+Note that if the only reason that the bodies of `track_maker` and `cluster_maker` were thread-unsafe was their access to the limited resource indicated by `db_resource` it is no longer necessary to declare that the nodes have concurrency `flow::serial`.
 It may be possible to have the node `track_maker` active at the same time, if the nature of `db_resource` were to allow two tokens to be available, and as long as each activation was given a different token.
 
 ## Proposal
