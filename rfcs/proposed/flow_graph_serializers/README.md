@@ -1,6 +1,7 @@
 # Dining philosophers node
 
-Various flow-graph nodes accept a constructor argument that specifies the maximum concurrency the graph can assume for that particular node.
+Flow-graph provides a facility to serialize the execution of a node to allow some code that would not otherwise be thread safe to be executed in parallel graphs.
+Various flow-graph nodes accept a constructor argument that specifies the maximum concurrency the graph can invoke for that particular node.
 This allows one to use, in such a node, a function body that is not threadsafe, while ensuring that the graph into which the node is inserted is threadsafe.
 For example, in the field of particle physics, an algorithm might reconstruct particle trajectories ("tracks") from energy deposits ("hits") left behind by those particles, and recorded by an experiment's detector.
 If the algorithm is not threadsafe, a reasonable node construction could be:
@@ -42,7 +43,7 @@ Some options include:
 2. creating explicit edges between `track_maker` and `cluster_maker` even though there is not obvious data dependency between them,
 3. creating a token-based system that can limit access to a shared resource.
 
-We have implemented option 3 and describe it below in the "Implementation experience" section.
+This RFC proposes an interface that pursues option 3, which we describe in the "Implementation experience" section, below.
 Our proposal, however, does not mandate any implementation but suggests an API similar to:
 
 ``` c++
@@ -92,7 +93,7 @@ The `flow::limited_resource` class template heuristically looks like:
 
 > [!NOTE]
 > Would it be reasonable to make `limited_resource` a constrained template,
-> and to introduct a concept of `resource` that would be used to define the
+> and to introduce a concept of `resource` that would be used to define the
 > constraint?
 
 ```c++
