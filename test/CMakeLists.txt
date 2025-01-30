@@ -282,7 +282,7 @@ function(tbb_add_tbbbind_test)
     endif()
     ProcessorCount(SYSTEM_CONCURRENCY)
 
-    if (UNIX AND NOT TARGET stubhwloc)
+    if (UNIX AND NOT TARGET stubhwloc AND NOT TBB_TCM_TESTING)
         file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/stubhwloc.cpp "int main(){}")
         add_library(stubhwloc SHARED ${CMAKE_CURRENT_BINARY_DIR}/stubhwloc.cpp)
         set_target_properties(stubhwloc PROPERTIES OUTPUT_NAME "hwloc" SOVERSION 15)
@@ -293,7 +293,9 @@ function(tbb_add_tbbbind_test)
         FAIL_REGULAR_EXPRESSION "Status:.*FAILURE"
     )
 
-    target_link_libraries(${_tbbbind_test_NAME} PRIVATE stubhwloc)
+    if (TARGET stubhwloc)
+        target_link_libraries(${_tbbbind_test_NAME} PRIVATE stubhwloc)
+    endif()
 
     if (TARGET HWLOC::hwloc_2_5 AND NOT HWLOC_2_5_TESTS_STATUS_SHOWN)
         message(STATUS "HWLOC 2.5 dependent tests were enabled.")
