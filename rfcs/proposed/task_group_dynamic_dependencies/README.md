@@ -7,7 +7,7 @@ the lowest-level tasking interface changed significantly and was no longer
 promoted as a user-facing feature. Instead, we encouraged
 to use the `task_group` or the flow graph APIs to express patterns 
 previously handled by the lowest-level tasking API. While this approach has been
-cases, this has been sufficient. However, there is one use case which is not 
+sufficient for most cases, one scenario remains challenging: dynamic task graphs that are not trees.
 straightforward to express by the revised API: Dynamic task graphs which are 
 not trees. This proposal expands `tbb::task_group` to make additional use cases 
 easier to express.
