@@ -282,10 +282,14 @@ function(tbb_add_tbbbind_test)
     endif()
     ProcessorCount(SYSTEM_CONCURRENCY)
 
-    if (UNIX AND NOT TARGET stubhwloc)
-        file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/stubhwloc.cpp "int main(){}")
-        add_library(stubhwloc SHARED ${CMAKE_CURRENT_BINARY_DIR}/stubhwloc.cpp)
-        set_target_properties(stubhwloc PROPERTIES OUTPUT_NAME "hwloc" SOVERSION 15)
+    if (UNIX NOT TARGET HWLOC::hwloc_stub AND NOT TBB_TCM_TESTING)
+        file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/stubhwloc.cpp "void hwloc_stub(){}")
+        add_library(hwloc_stub SHARED ${CMAKE_CURRENT_BINARY_DIR}/stubhwloc.cpp)
+        add_library(HWLOC::hwloc_stub ALIAS hwloc_stub)
+
+        set_target_properties(hwloc_stub PROPERTIES
+            OUTPUT_NAME "hwloc" SOVERSION 15
+        )
     endif()
 
     set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
@@ -293,7 +297,15 @@ function(tbb_add_tbbbind_test)
         FAIL_REGULAR_EXPRESSION "Status:.*FAILURE"
     )
 
-    target_link_libraries(${_tbbbind_test_NAME} PRIVATE stubhwloc)
+    if (TARGET HWLOC::hwloc_stub)
+        _tbb_get_hwloc_runtime_vars(
+            ENV_EXTENSION_VARIABLE HWLOC_RUNTIME_VARS
+            HWLOC_VERSION_LIST "hwloc_stub"
+        )
+        target_link_libraries(${_tbbbind_test_NAME} PRIVATE HWLOC::hwloc_stub)
+
+        set_property(TEST ${_tbbbind_test_NAME} PROPERTY ENVIRONMENT "${HWLOC_RUNTIME_VARS}" APPEND)
+    endif()
 
     if (TARGET HWLOC::hwloc_2_5 AND NOT HWLOC_2_5_TESTS_STATUS_SHOWN)
         message(STATUS "HWLOC 2.5 dependent tests were enabled.")
