@@ -2,20 +2,20 @@
 
 ## Introduction
 
-In 2021, with the trasition from TBB 2020 to the first release of oneTBB, 
-the lowest-level tasking interface changed significantly and was no longer 
+In 2021, with the transition from TBB 2020 to the first release of oneTBB, 
+the lowest-level tasking interface changed significantly and was no longer
 promoted as a user-facing feature. Instead, we encouraged
-to use the `task_group` or the flow graph APIs to express patterns 
-previously handled by the lowest-level tasking API. While this approach has been
-cases, this has been sufficient. However, there is one use case which is not 
-straightforward to express by the revised API: Dynamic task graphs which are 
-not trees. This proposal expands `tbb::task_group` to make additional use cases 
-easier to express.
+using the `task_group` or the flow graph APIs to express patterns
+previously handled by the lowest-level tasking API. This approach has been
+sufficient for many cases. However, there is one use case which is not
+straightforward to express by the revised API: Dynamic task graphs which are
+not trees. This proposal expands `tbb::task_group` to support additional use cases.
 
-The class definition from section **[scheduler.task_group]** in the oneAPI 
-Threading Building Blocks (oneTBB) Specification 1.3-rev-1 for `tbb::task_group` 
-is shown below. Note the existing `defer` function because this function and 
-its return type, `task_handle`, are the foundation of our proposed extensions:
+The class definition from section
+[scheduler.task_group](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_group/task_group_cls)
+of the oneAPI Threading Building Blocks (oneTBB) Specification 1.3-rev-1 for
+`tbb::task_group` is shown below. Note the existing `defer` function, since this
+function and its return type, `task_handle`, are the foundation of the proposed extensions:
 
     class task_group {
     public:
@@ -43,32 +43,31 @@ its return type, `task_handle`, are the foundation of our proposed extensions:
 
 ## Proposal
 
-The following table summarizes the three primary extensions that are under 
-consideration. The remainder of this post provides background and further 
-clarification on these proposed extensions.
+The following list summarizes the three primary extensions that are under
+consideration. The sections that follow provide background and further
+clarification on the proposed extensions.
 
-1. Extend semantics and useful lifetime of `task_handle`. We propose `task_handle` 
-to represent tasks for the purpose of adding dependencies. The useful lifetime and 
-semantics of `task_handle` will need to be extended to include tasks that have been 
+1. **Extend semantics and useful lifetime of `task_handle`.** We propose `task_handle`
+to represent tasks for the purpose of adding dependencies. It requires extending its
+useful lifetime and semantics to include tasks that have been
 submitted, are currently executing, or have been completed.
-2. Add functions to set task dependencies. In the current `task_group`, tasks can 
-only be waited for as a group and there is no direct way to add any before-after 
-relationships between individual tasks. We will discuss options for spelling.
-3. Add a function to move successors from a currently executing task to a new task. 
-This functionality is necessary for recursively generated task graphs. This case 
-represents a situation where it is safe to modify dependencies for an already 
-submitted task. 
+2. **Add functions to set task dependencies.** In the current `task_group`, tasks can
+only be waited on as a group, with no direct way to define before-after
+relationships between individual tasks.
+3. **Add a function to move successors from an executing task to a new task.**
+This functionality is necessary for recursively generated task graphs. It enables
+safe modifification of dependencies for an already submitted task.
 
 ### Extend the semantics and useful lifetime of task_handle
 
-Dynamic tasks graphs order the execution of tasks via dependencies on the 
-completion of other tasks. They are dynamic because the creation of tasks, 
-specification of dependencies between, submission of tasks for scheduling, and
-execution of the tasks may happen concurrently and in various orders. Different
-concrete use cases have different requirements on when new tasks are created 
-and when dependencies between tasks are specified. 
+Dynamic tasks graphs order the execution of tasks via dependencies on the
+completion of other tasks. They are considered dynamic because task creation,
+specification of dependencies, submission for scheduling, and task execution
+may happen concurrently and in various orders. Different
+use cases have different requirements on when tasks are created
+and when dependencies are specified.
 
-For the sake of discussion, let’s label four points in a task’s lifetime: 
+For the sake of discussion, let’s label four points in a task’s lifetime:
 
 1. created
 2. submitted
