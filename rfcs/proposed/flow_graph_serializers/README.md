@@ -11,7 +11,7 @@ using namespace tbb;
 flow::graph g;
 flow::function_node<Hits, Tracks> track_maker{
   g,
-  flow::serial, 
+  flow::serial,
   [](Hits const&) -> Tracks { ... }
 };
 ```
@@ -29,7 +29,7 @@ flow::function_node<Hits, Tracks> track_maker{
 };
 flow::function_node<Signals, Clusters> cluster_maker{
   g,
-  flow::serial, 
+  flow::serial,
   [](Signals const&) -> Clusters { auto a = db_unsafe_access(); ... }
 };
 ```
@@ -47,7 +47,7 @@ This RFC proposes an interface that pursues option 3, which we describe in the "
 Our proposal, however, does not mandate any implementation but suggests an API similar to:
 
 ``` c++
-auto& db_resource = flow::limited_resource(g, 1); // Only 1 database "token" allowed in the entire graph 
+auto& db_resource = flow::limited_resource(g, 1); // Only 1 database "token" allowed in the entire graph
 
 flow::function_node<Hits, Tracks> track_maker{
   g,
@@ -56,7 +56,7 @@ flow::function_node<Hits, Tracks> track_maker{
 };
 flow::function_node<Signals, Clusters> cluster_maker{
   g,
-  db_resource, 
+  db_resource,
   [](Signals const&) -> Clusters { auto a = db_unsafe_access(); ... }
 };
 ```
@@ -70,7 +70,7 @@ It may be possible to have the node `track_maker` active at the same time, if th
 > [!NOTE]
 > Although we focus on the `flow::function_node` class template in this proposal, the concepts discussed here apply to nearly any flow-graph node that accepts a user-provided function body.
 
-Our proposal consists of: 
+Our proposal consists of:
 1. Introducing the equivalent of a `flow::limited_resource` class template that, when connected with another node, ensures limited access to the resource it represents.
 2. Adding `flow::function_node` constructors that allow the specification of limited resource nodes instead of a `concurrency` value.
 
@@ -112,7 +112,7 @@ where `Resource` represents a policy class.
 For serialized nodes that do not need to access details of the resource, a default policy can be provided:
 
 ```c++
-flow::limited_resource f{g, 2}; // Is there a use case for needing more than one token but not having access to the internals?
+flow::limited_resource f{g, 2}; // Is there a use case for needing more than one token but not having access to the resource?
 ```
 
 #### User-defined `Resource` policies
