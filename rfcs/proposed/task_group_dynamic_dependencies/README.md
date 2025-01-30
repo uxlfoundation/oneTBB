@@ -3,7 +3,7 @@
 ## Introduction
 
 In 2021, with the trasition from TBB 2020 to the first release of oneTBB, 
-the lowest level tasking interface changed significantly and was no longer 
+the lowest-level tasking interface changed significantly and was no longer 
 promoted as a user-facing feature. Instead, the guidance since then has been 
 to use the `task_group` or the flow graph APIs to express patterns that were 
 previously expressed using with the lowest level tasking API. And for most 
