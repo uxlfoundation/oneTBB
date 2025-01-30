@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2023 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -269,10 +269,6 @@ TEST_CASE("parallel_for_each constraints") {
     test_pfor_each_container_based_sequence_constraints();
     test_pfor_each_body_constraints();
 }
-
-#endif // __TBB_CPP20_CONCEPTS_PRESENT
-
-#if __TBB_CPP20_PRESENT
 
 struct no_copy_move {
     no_copy_move() = default;
