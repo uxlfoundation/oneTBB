@@ -27,7 +27,6 @@
 #include "common/spin_barrier.h"
 
 #include "tbb/task_arena.h"
-#include "tbb/parallel_for.h"
 
 void active_wait_for(std::chrono::microseconds duration) {
     for (auto t1 = std::chrono::steady_clock::now(), t2 = t1;
@@ -52,7 +51,7 @@ std::size_t measure_median_start_time(tbb::task_arena* ta, const F1& start = F1{
 
     std::vector<std::chrono::steady_clock::time_point> start_times(num_threads);
     utils::SpinBarrier barrier(num_threads);
-    auto measure_start_time = [&] (std::size_t) {
+    auto measure_start_time = [&] {
         start_times[tbb::this_task_arena::current_thread_index()] = std::chrono::steady_clock::now();
         barrier.wait();
     };
@@ -69,7 +68,11 @@ std::size_t measure_median_start_time(tbb::task_arena* ta, const F1& start = F1{
     auto work = [&] {
         auto start_time = std::chrono::steady_clock::now();
         start();
-        tbb::parallel_for(std::size_t(0), num_threads, measure_start_time, tbb::static_partitioner{});
+        for(std::size_t thr = 0; thr < num_threads-1; ++thr) {
+            tbb::this_task_arena::enqueue(measure_start_time);
+        }
+        start_times[tbb::this_task_arena::current_thread_index()] = std::chrono::steady_clock::now();
+        barrier.wait();
         end();
         longest_start_times.push_back(get_longest_start(start_time));
     };
@@ -158,7 +161,7 @@ class start_time_collection_sequenced_phases
     std::size_t measure_impl() {
         std::size_t median_start_time;
         utils::SpinBarrier barrier;
-        auto body = [&] (std::size_t) {
+        auto body = [&] {
             barrier.wait();
         };
         if (arena) {
@@ -168,7 +171,10 @@ class start_time_collection_sequenced_phases
                     std::size_t num_threads = arena->max_concurrency();
                     arena->start_parallel_phase();
                     arena->execute([&] {
-                        tbb::parallel_for(std::size_t(0), num_threads, body, tbb::static_partitioner{});
+                        for(std::size_t thr = 0; thr < num_threads-1; ++thr) {
+                            tbb::this_task_arena::enqueue(body);
+                        }
+                        barrier.wait();
                     });
                     arena->end_parallel_phase(with_fast_leave);
                 }
@@ -179,7 +185,10 @@ class start_time_collection_sequenced_phases
                 [&] {
                     std::size_t num_threads = tbb::this_task_arena::max_concurrency();
                     tbb::this_task_arena::start_parallel_phase();
-                    tbb::parallel_for(std::size_t(0), num_threads, body, tbb::static_partitioner{});
+                    for(std::size_t thr = 0; thr < num_threads-1; ++thr) {
+                        tbb::this_task_arena::enqueue(body);
+                    }
+                    barrier.wait();
                     tbb::this_task_arena::end_parallel_phase(with_fast_leave); 
                 }
             );
@@ -207,7 +216,7 @@ class start_time_collection_sequenced_scoped_phases
 
     std::size_t measure_impl() {
         utils::SpinBarrier barrier{static_cast<std::size_t>(arena->max_concurrency())};
-        auto body = [&] (std::size_t) {
+        auto body = [&] {
             barrier.wait();
         };
         auto median_start_time = measure_median_start_time(arena,
@@ -216,7 +225,10 @@ class start_time_collection_sequenced_scoped_phases
                 {
                     tbb::task_arena::scoped_parallel_phase phase{*arena, with_fast_leave};
                     arena->execute([&] {
-                        tbb::parallel_for(std::size_t(0), num_threads, body, tbb::static_partitioner{});
+                        for(std::size_t thr = 0; thr < num_threads-1; ++thr) {
+                            tbb::this_task_arena::enqueue(body);
+                        }
+                        barrier.wait();
                     });
                 }
             }
