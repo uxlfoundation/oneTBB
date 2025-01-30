@@ -6,7 +6,7 @@ In 2021, with the trasition from TBB 2020 to the first release of oneTBB,
 the lowest-level tasking interface changed significantly and was no longer 
 promoted as a user-facing feature. Instead, we encouraged
 to use the `task_group` or the flow graph APIs to express patterns 
-previously expressed using with the lowest level tasking API. And for most 
+previously handled by the lowest-level tasking API. While this approach has been
 cases, this has been sufficient. However, there is one use case which is not 
 straightforward to express by the revised API: Dynamic task graphs which are 
 not trees. This proposal expands `tbb::task_group` to make additional use cases 
