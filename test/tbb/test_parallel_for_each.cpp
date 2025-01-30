@@ -22,7 +22,7 @@
 //! \file test_parallel_for_each.cpp
 //! \brief Test for [algorithms.parallel_for_each]
 
-#if __TBB_CPP20_PRESENT
+#if __TBB_CPP20_CONCEPTS_PRESENT
 // Fancy iterator type that models the C++20 iterator type
 // that defines the real iterator category using iterator_concept type
 // and iterator_category is always std::input_iterator_type
@@ -119,7 +119,7 @@ struct cpp20_iterator {
 private:
     T* my_ptr = nullptr;
 }; // class cpp20_iterator
-#endif // __TBB_CPP20_PRESENT
+#endif // __TBB_CPP20_CONCEPTS_PRESENT
 
 //! Test forward access iterator support
 //! \brief \ref error_guessing \ref interface
@@ -328,4 +328,4 @@ TEST_CASE("parallel_for_each with cpp20 iterator") {
     test_with_cpp20_iterator<std::random_access_iterator_tag>();
 }
 
-#endif // __TBB_CPP20_PRESENT
+#endif // __TBB_CPP20_CONCEPTS_PRESENT
