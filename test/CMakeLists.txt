@@ -282,7 +282,7 @@ function(tbb_add_tbbbind_test)
     endif()
     ProcessorCount(SYSTEM_CONCURRENCY)
 
-    if (UNIX NOT TARGET HWLOC::hwloc_stub AND NOT TBB_TCM_TESTING)
+    if (UNIX AND NOT TARGET HWLOC::hwloc_stub AND NOT TBB_TCM_TESTING)
         file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/stubhwloc.cpp "void hwloc_stub(){}")
         add_library(hwloc_stub SHARED ${CMAKE_CURRENT_BINARY_DIR}/stubhwloc.cpp)
         add_library(HWLOC::hwloc_stub ALIAS hwloc_stub)
