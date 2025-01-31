@@ -349,7 +349,7 @@ behind the functions `users::do_serial_sort`, `users::create_left_range`,
         }
     }
 
-The task tree for this example matches the one shown earlier for merge-sort. 
+This task tree matches the one shown earlier for merge-sort. 
 
 ## Open Questions in Design
 
