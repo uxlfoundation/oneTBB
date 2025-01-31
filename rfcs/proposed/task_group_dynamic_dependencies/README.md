@@ -290,20 +290,20 @@ before the new work can start.
         tg.run(new_task);
     }
 
-Again, the graph, as shown below, is simple. However, now we do not 
-know the completion status of the predecessors. Therefore, 
-for ease-of-use, a `task_handle` should be usable as a dependency 
+While the graph, as shown below, is simple, 
+the completion status of the predecessors is unknown. Therefore, 
+for ease of use, `task_handle` should be usable as a dependency 
 regardless of state of the task it represents. Any predecessor 
 that is already completed when it is added as a predecessor will 
-not delay the start of the dependent task. Otherwise, end-users 
+not delay the start of the dependent task. Otherwise, the end users 
 will need to track these states explicitly.
 
 <img src="unknown_states.png" width=400>
 
-#### And example of recursive decomposition
+#### Recursive Decomposition
 
 This example is a version of merge-sort (with many of the details left out). 
-Assume that there is an initial task that executes the function shown 
+Assume an initial task executes the function shown
 below as its body, and the function implements that task, and also serves 
 as the body for the recursively decomposed pieces. The beginning and
 end of the sequence are represented by `b` and `e`, and much of the
