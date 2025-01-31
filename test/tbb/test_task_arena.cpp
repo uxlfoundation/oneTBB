@@ -1807,7 +1807,7 @@ void test_threads_sleep(int concurrency, int reserved_slots) {
 }
 
 //--------------------------------------------------//
-
+#if !EMSCRIPTEN
 // This test requires TBB in an uninitialized state
 //! \brief \ref requirement
 TEST_CASE("task_arena initialize soft limit ignoring affinity mask") {
@@ -2068,3 +2068,4 @@ TEST_CASE("worker threads occupy slots in correct range") {
 
     while (counter < 42) { utils::yield(); }
 }
+#endif

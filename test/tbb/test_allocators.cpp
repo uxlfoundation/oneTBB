@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2005-2024 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -49,6 +49,7 @@ TEST_CASE("Test cache_aligned_allocate throws") {
     }
     REQUIRE_MESSAGE(address1, "cache_aligned_allocate unable to obtain 1024*1024 bytes");
 
+#if !EMSCRIPTEN
     bool exception_caught = false;
     try {
         // Try allocating more memory than left in the address space; should cause std::bad_alloc
@@ -60,7 +61,7 @@ TEST_CASE("Test cache_aligned_allocate throws") {
         exception_caught = true;
     }
     REQUIRE_MESSAGE(exception_caught, "cache_aligned_allocate did not throw bad_alloc");
-
+#endif
     try {
         cache_aligned_deallocate(address1);
     } catch (...) {
