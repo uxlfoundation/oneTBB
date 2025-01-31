@@ -258,7 +258,6 @@ to complete.
 
     final_task.add_predecessor(first_task);
     final_task.add_predecessor(second_task);
-    // optionally: final_task.add_predecessors(first_task, second_task);
 
     // order of submission is not important
     tg.run(final_task);
@@ -273,12 +272,10 @@ The dependency graph for this example is:
 
 #### Predecessors in Unknown States
 
-The example below shows a graph where the dependencies are determined 
-dynamically. The state of the predecessors may be unknown – they may 
-be created, submitted, executing or completed. Although not shown,
-let's assume that the user's `users::find_predecessors` function 
-returns, based on application logic, the tasks that must complete 
-before the new work can start.
+The example below shows a graph where the dependencies are determined
+dynamically. The state of the predecessors is unknown. The
+`users::find_predecessors` function returns, based on application
+logic, the tasks that must complete before the new work can start.
 
     void add_another_task(tbb::task_group& tg, int work_id) {
         tbb::task_handle new_task = tg.defer([=] { do_work(work_id); });
@@ -290,26 +287,23 @@ before the new work can start.
         tg.run(new_task);
     }
 
-While the graph, as shown below, is simple, 
-the completion status of the predecessors is unknown. Therefore, 
-for ease of use, `task_handle` should be usable as a dependency 
-regardless of state of the task it represents. Any predecessor 
-that is already completed when it is added as a predecessor will 
-not delay the start of the dependent task. Otherwise, the end users 
-will need to track these states explicitly.
+While the graph, as shown below, is simple, the completion status of the predecessors
+is unknown. Therefore, for ease of use, `task_handle` should be usable as a dependency
+regardless of state of the task it represents. Any predecessor that is already
+completed when it is added as a predecessor will not delay the start of the dependent
+task.
 
 <img src="unknown_states.png" width=400>
 
 #### Recursive Decomposition
 
 This example is a version of merge-sort (with many of the details left out). 
-Assume an initial task executes the function shown
-below as its body, and the function implements that task, and also serves 
-as the body for the recursively decomposed pieces. The beginning and
-end of the sequence are represented by `b` and `e`, and much of the
-(unimportant) details of the implementation of merge-sort is hidden 
-behind the functions `users::do_serial_sort`, `users::create_left_range`,
-`users::create_right_range`, and `users::do_merge`.  
+Assume an initial task executes the function shown below as its body, and the
+function implements that task, and also serves as the body for the recursively
+decomposed pieces. The range of the sequence is defined by `b` (beginning) and
+end `e` (end). Most of the implementation details of merge sort are abstracted
+into the following helper functions: `users::do_serial_sort`, `users::create_left_range`,
+`users::create_right_range`, and `users::do_merge`.
 
     template<typename T>
     void merge_sort(tbb::task_group& tg, T b, T e) {
@@ -337,7 +331,8 @@ behind the functions `users::do_serial_sort`, `users::create_left_range`,
                 });
 
             // add predecessors for new merge task
-            merge.add_predecessors(sortleft, sortright);
+            merge.add_predecessor(sortleft);
+            merge.add_predecessor(sortright);
 
             // insert new subgraph between currently executing
             // task and its successors
