@@ -58,7 +58,7 @@ relationships between individual tasks.
 This functionality is necessary for recursively generated task graphs. It enables
 safe modifification of dependencies for an already submitted task.
 
-### Extend the semantics and useful lifetime of task_handle
+### Extend the Semantics and Useful Lifetime of task_handle
 
 Dynamic tasks graphs order the execution of tasks via dependencies on the
 completion of other tasks. They are considered dynamic because task creation,
@@ -67,92 +67,88 @@ may happen concurrently and in various orders. Different
 use cases have different requirements on when tasks are created
 and when dependencies are specified.
 
-For the sake of discussion, let’s label four points in a task’s lifetime:
+For the sake of discussion, let’s define four points in a task’s lifetime:
 
-1. created
-2. submitted
-3. executing
-4. completed
+1. **Created:** is allocated but is not yet known to the scheduling
+algorithm, and therefore cannot begin executing.
+2. **Submitted:** is known to the scheduling algorithm and may be
+scheduled for execution whenever its incoming dependencies (predecessor tasks)
+are complete.
+3. **Executing:** has started executing its body but is not yet complete.
+4. **Completed:** fully executed to completion.
 
-A created task has been allocated but is not yet known to the scheduling
-algorithm and so cannot begin executing. A submitted task is known to the 
-scheduling algorithm and whenever its incoming dependencies (predecessor tasks)
-are complete it may be scheduled for execution. An executing task has started 
-executing its body but is not yet complete. Finally, a completed task has
-executed fully to completion.
-
-In the current specification for `task_group`, the function `task_group::defer`
-already provides a mechanism to separate task creation from submission. 
-`task_group::defer` returns a `tbb::task_handle`, which represents a created 
-task. A created task is in the created state until it is submitted via
-the `task_group::run` or `task_group::run_and_wait` functions. In the current 
-specification of `task_group`, accessing a `task_handle` after it is submitted
-via one of the run functions is undefined behavior. Currently, therefore, a 
-`task_handle` can only represent a created task. And currently, any task
-that is run can immediately be scheduled for execution since there is no notion
-of task dependencies for task_group.
+In the current `task_group` specification, the `task_group::defer` function
+already allows separate task creation and submission.
+`task_group::defer` returns a `tbb::task_handle` that represents a created
+task. A created task remains created until it is submitted through
+`task_group::run` or `task_group::run_and_wait`. The current
+`task_group` specification treats accessing a `task_handle` after it is submitted
+via one of the run functions as undefined behavior. Therefore, a
+`task_handle` represents a created task only. Furthermore, since `task_group`
+does not support task dependencies, any task that is run can be immediately
+scheduled for execution without considering dependencies.
 
 The first extension is to expand the semantics and usable lifetime of
-`task_handle` so that remains valid after it is passed to run and it can 
-represent tasks in any state, including submitted, executing, and completed 
-tasks. Similarly, a `task_handle` in the submitted state may represent a task
-that has predecessors that must complete before it can execute, and so passing
-a `task_handle` to `task_group::run` or `task_group::run_and_wait` only makes
-it available for dependency tracking, and does not make it immediately legal to
-execute.
+`task_handle` so that it remains valid after it is passed to run. This allows
+it to represent tasks in any state, including submitted, executing, and completed
+tasks. Similarly, a submitted `task_handle` may represent a task
+with predecessors that must complete before it can execute. In that case,
+passing a `task_handle` to `task_group::run` or `task_group::run_and_wait` only makes
+it available for dependency tracking and does not make it immediately eligible for
+execution.
 
-### Add function(s) to set dependencies.
+### Add Functions to Set Dependencies.
 
-The obvious next extension is to add a mechanism for specifying dependencies
-between tasks. In the most conservative view, it should only be legal to add 
-additional predecessors / in-dependencies to tasks in the created state. 
-After a task starts is completed, it doesn’t make sense to add additional 
-predecessors, since it’s too late for them to delay the start of the task’s 
-execution. 
+The next logical extension is to add a mechanism for specifying dependencies
+between tasks. In the most conservative view, it should only be allowed to add
+additional predecessors (in-dependencies) to tasks in the created state.
+After a task starts is completed, adding more predecessors is irrelevant,
+since it’s too late to delay the start of the task’s execution.
 
-It can make sense to add additional predecessors to a task that is
-currently executing if the executing task is suspended until those 
-additional dependencies complete. However, in this proposal we do not intend 
-to support this suspension model. 
+It might be logical to add additional predecessors to a task that is
+currently executing if it is suspended until these additional dependencies complete.
+However, this proposal does not include support for the suspension model.
 
 For a task in the submitted state, there can be a race between
-adding a new predecessor and the scheduler deciding to execute the task when its 
-currently known predecessors have completed. We will revisit the discussion of 
-adding predecessors to submitted tasks in the next section when we discuss 
-recursively grown task graphs. 
+adding a new predecessor and the scheduler deciding to execute the task once its
+current predecessors are complete. We will revisit the discussion of
+adding predecessors to submitted tasks in the next section when discussing
+recursively grown task graphs.
 
-Having mostly settled the question about when a predecessors can be added,
-then next question is what can be added as a predecessor task? The most 
-user-friendly answer is to have no limitation; any valid `task_handle` can act as 
-a predecessor. In many cases, a developer may only know what work must be completed 
-before a task can start but does not know the state of that work.
+After resolving the question about when a predecessors, the next question is,
+what can be added as a predecessor task? The simplest answer is to have no limitations.
+It means, any valid `task_handle` can act as a predecessor. In many cases, you may
+only know what work must be completed before a task can start, but you may not know
+work's state.
 
 We therefore think predecessors may be in any state when they are added, 
 as shown below:
 
 <img src="add_dependency.png" width=400>
 
-There are a number of possible options for the spelling of a function for adding 
-a single predecessor. We may also want a function to allow adding multiple 
-predecessors in one call.
+There are a number of possible options to spell a function for adding
+a single predecessor. Additionally, we may also want a function to allow
+adding multiple predecessors in a single call.
 
-Given two `task_handle` objects `h1` and `h2`, some possible options 
-for adding `h1` as an in-dependence / predecessor of `h2` include:
+Given two `task_handle` objects, `h1` and `h2`, some possible options 
+for adding `h1` as a predecessor (ind-dependence) of `h2` include:
 
 - `h2.add_predecessor(h1)`
 - `h2 = defer([]() { … }, h1)`
 - `make_edge(h1, h2)`
 
-We propose including the first option. Similarly, there could be
-versions of these two functions the accepted multiple predecessors 
+The proposal is to include the first option. Similarly, there could be
+a version of this function that accepts multiple predecessors
 at once:
 
 - `h.add_predecessors(h1, ..., hn)`
 
-In the general case, it would be undefined behavior to add a new predecessor
-to a task in the submitted, executing or completed states.
+This initial proposal does not include this function, but it can be added later.
 
-### Add a function for recursively grown graphs
+In the general case, it is undefined behavior to add a new predecessor
+to a task in the submitted, executing, or completed states.
+
+### Add a Function for Recursively Grown Graphs
 
 A very common use case for oneTBB tasks is parallel recursive decomposition. 
 The implementation of tbb::parallel_for is an example of an algorithm that 
