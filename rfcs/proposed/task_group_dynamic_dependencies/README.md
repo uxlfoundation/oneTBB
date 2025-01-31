@@ -151,59 +151,59 @@ to a task in the submitted, executing, or completed states.
 ### Add a Function for Recursively Grown Graphs
 
 A very common use case for oneTBB tasks is parallel recursive decomposition. 
-The implementation of tbb::parallel_for is an example of an algorithm that 
-performs a parallel recursive decomposition of the Range.  We currently 
-implement the oneTBB algorithms, such as tbb::parallel_for, using the non-public,
-low-level tasking API, not tbb::task_group. The current low-level tasking API
-puts all the burden on developers for both dependence tracking and memory
-management of tasks. This lets the TBB development team build highly optimized
-algorithms, but we believe a simpler set of interfaces are possible for TBB 
+An example of this is the implementation of `tbb::parallel_for` that 
+performs a parallel recursive decomposition of a range. Currently,
+the oneTBB algorithms, such as tbb::parallel_for, are implemented using the non-public,
+low-level tasking API, rather than `tbb::task_group`. This low-level tasking API
+puts the responsibility for dependence tracking and memory
+management of tasks on developers. While it allows the oneTBB development team to build highly optimized
+algorithms, a simpler set of interfaces are can be provided for the 
 users. Recursive parallel algorithms are one of the primary cases that we want 
 our task_group extension to cover.
 
 The key capability required for recursive decomposition is the ability to 
 create work while executing a task and insert this newly created work before 
 the (perhaps already submitted) successors of the currently executing task. 
-As a simple example, consider a merge sort. As shown in the figure that 
-follows, the top-level algorithm breaks a collection into two pieces and 
+A simple example is a merge sort. As shown in the figure
+below, the top-level algorithm breaks a collection into two pieces and 
 creates three tasks:
 
-1. a task to sort the left half
-2. a task to sort the right half
-3. a task to merge the left and right sorted halves once they have been sorted. 
+1. A task to sort the left half.
+2. A task to sort the right half.
+3. A task to merge the halves once they are sorted. 
 
 In a recursive merge sort, each of the sort tasks recursively takes the same 
-approach to sort their portions of the collection. The top-level task (and 
+approach to sort its portions of the collection. The top-level task (and 
 subsequent recursively generated tasks) must be able to create new tasks 
-and then update the graph so that their outer merge task waits for the 
+and then update the graph for their outer merge task to wait for the 
 newly created subtasks to complete.
 
 <img src="merge_sort.png" width=800>
 
-A key point about this recursive parallel algorithm is that we must change 
-the predecessors of the merge tasks. But the merge tasks are already 
-submitted at the time their predecessors are modified! In the previous 
-section, we noted that updating the predecessors of a submitted task is 
-risky, because there is a potential race.  However, in the example shown 
-here, we know it’s safe to add additional predecessors to the merge task 
-because it simply cannot start executing until all its current predecessors 
-complete, and its predecessors are the tasks modifying the predecessors! 
+A key point of this recursive parallel algorithm is the requirement to change 
+the predecessors of the merge tasks. However, the merge tasks are already 
+submitted when their predecessors are modified. As mentioned in the previous 
+section, updating the predecessors of a submitted task can be
+risky due to the potential for a race condition. However, in this case,
+it is safe to add additional predecessors to the merge task. 
+This is because the merge task cannot start execution until all of its current predecessors 
+complete. Those predecessors are the tasks responsible for modifying the predecessors. 
 
-We therefore propose a very limited extension that allows the transfer of 
+Therefore, the proposal is a limited extension that allows transferring 
 all the successors of a currently executing task to become the successors 
 of a different created task. This function can only access the successors
 of the currently executing task, and those tasks are prevented from executing 
 by a dependence on the current task itself, so we can ensure that we can safely 
-update the incoming dependencies for those tasks without worrying about any 
-potential race.
+update the incoming dependencies for those tasks without worrying about
+potential race conditions. 
 
 One possible spelling for this function would be `transfer_successors_to(h)`, 
-where `h` is a `task_handle` to a created task and the 
+Where `h` is a `task_handle` to a created task, and the 
 `transfer_successors_to` function must be called from within a task. Calling
-this function from outside a task, or passing anything other than a `task_handle`
+this function from outside a task or passing anything other than a `task_handle`
 representing a task in the created state is undefined behavior.
 
-### Proposed changes to task_handle
+### Proposed Changes for ``task_handle``
 
     namespace oneapi {
     namespace tbb {
@@ -242,12 +242,12 @@ Adds `th` as a successor that cannot start executing until the task represented 
 Transfers all of the successors from the currently executing task to the task 
 represented by `th`.
 
-### Small examples
+### Examples
 
-##### A simple three task graph
+##### Simple Three-Nodes Task Graph
 
-The example below shows a very simple graph with three nodes. The 
-`final_task` must wait for both the `first_task` and `second_task` 
+The example below shows a simple graph with three nodes. 
+`final_task` must wait for  `first_task` and `second_task` 
 to complete.
 
     tbb::task_group tg;
@@ -271,7 +271,7 @@ The dependency graph for this example is:
 
 <img src="three_task_graph.png" width=400>
 
-#### Adding predecessors in unknown states
+#### Predecessors in Unknown States
 
 The example below shows a graph where the dependencies are determined 
 dynamically. The state of the predecessors may be unknown – they may 
