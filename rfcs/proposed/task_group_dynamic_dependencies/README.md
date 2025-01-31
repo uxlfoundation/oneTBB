@@ -203,7 +203,7 @@ Where `h` is a `task_handle` to a created task, and the
 this function from outside a task or passing anything other than a `task_handle`
 representing a task in the created state is undefined behavior.
 
-### Proposed Changes for ``task_handle``
+### Proposed Changes for `task_handle` and `task_group`
 
     namespace oneapi {
     namespace tbb {
@@ -217,12 +217,36 @@ representing a task in the created state is undefined behavior.
             task_handle& operator=(task_handle&& th);
             explicit operator bool() const noexcept;
 
-            // proposed additions
+            // proposed addition
             void add_predecessor(task_handle& th);
-            void add_successor(task_handle& th);
         };
 
-        void transfer_successors_to(task_handle& th);
+        class task_group {
+        public:
+            task_group();
+            task_group(task_group_context& context);
+
+            ~task_group();
+
+            template<typename Func>
+            void run(Func&& f);
+
+            template<typename Func>
+            task_handle defer(Func&& f);
+
+            void run(task_handle&& h);
+
+            template<typename Func>
+            task_group_status run_and_wait(const Func& f);
+
+            task_group_status run_and_wait(task_handle&& h);
+
+            task_group_status wait();
+            void cancel();
+
+            // proposed addition
+            static void transfer_successors_to(task_handle& th);
+        };
     }
     }
 
@@ -232,12 +256,7 @@ representing a task in the created state is undefined behavior.
 Adds `th` as a predecessor that must complete before the task represented by
 `*this` can start executing.
 
-#### void task_handle::add_successor(task_handle& th);
-
-Adds `th` as a successor that cannot start executing until the task represented by 
-`*this` is complete.
-
-#### void transfer_successors_to(task_handle& th);
+#### void task_group::transfer_successors_to(task_handle& th);
 
 Transfers all of the successors from the currently executing task to the task 
 represented by `th`.
@@ -336,7 +355,7 @@ into the following helper functions: `users::do_serial_sort`, `users::create_lef
 
             // insert new subgraph between currently executing
             // task and its successors
-            tbb::transfer_successors_to(merge);
+            tbb::task_group::transfer_successors_to(merge);
 
             tg.run(sortleft);
             tg.run(sortright);
@@ -351,5 +370,10 @@ This task tree matches the one shown earlier for merge-sort.
 Some open questions that remain:
 
 - Are the suggested APIs sufficient?
+- Should we add a function to adds more than one predecessor as single call, such as `add_predecessors`?
+- Should we add functions that merge creation and definition of predecessor tasks, such as
+`template <typename Func> add_predecessor(Func&& f);`.
 - Are there additional use cases that should be considered that we missed in our analysis?
 - Are there other parts of the pre-oneTBB tasking API that developers have struggled to find a good alternative for?
+- What are the performance targets for this feature?
+- Assuming this will be targeted initially as an experimental feature, what are the exit criteria?
