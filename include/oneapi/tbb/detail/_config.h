@@ -263,8 +263,8 @@
 #define __TBB_CPP17_ALLOCATOR_IS_ALWAYS_EQUAL_PRESENT   (__TBB_LANG >= 201703L)
 #define __TBB_CPP17_IS_SWAPPABLE_PRESENT                (__TBB_LANG >= 201703L)
 
-// TODO: fix concepts on Apple Clang or define the broken versions
-#if !(__clang__ && __APPLE__) && defined(__cpp_concepts) && defined(__cpp_lib_concepts)
+// TODO: fix concepts on Clang or define the broken versions
+#if !(__clang__) && defined(__cpp_concepts) && defined(__cpp_lib_concepts)
     #define __TBB_CPP20_CONCEPTS_PRESENT ((__cpp_concepts >= 201907L) && (__cpp_lib_concepts >= 202002L))
 #else
     #define __TBB_CPP20_CONCEPTS_PRESENT 0
