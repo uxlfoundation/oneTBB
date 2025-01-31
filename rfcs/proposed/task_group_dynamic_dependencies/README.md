@@ -89,13 +89,12 @@ does not support task dependencies, any task that is run can be immediately
 scheduled for execution without considering dependencies.
 
 The first extension is to expand the semantics and usable lifetime of
-`task_handle` so that it remains valid after it is passed to run. This allows
-it to represent tasks in any state, including submitted, executing, and completed
-tasks. Similarly, a submitted `task_handle` may represent a task
-with predecessors that must complete before it can execute. In that case,
-passing a `task_handle` to `task_group::run` or `task_group::run_and_wait` only makes
-it available for dependency tracking and does not make it immediately eligible for
-execution.
+`task_handle` so that it can used as a predecessor to other tasks even after it is
+passed to run. The handle will track the state of its associated task and may represent
+a task that is created, submitted, executing, or completed. Similarly, a submitted `task_handle`
+may represent a task that depends on predecessors that must complete before it can execute.
+In that case, passing a `task_handle` to `task_group::run` or `task_group::run_and_wait` only makes
+it available for dependency tracking but does not make it immediately eligible for execution.
 
 ### Add Functions to Set Dependencies.
 
