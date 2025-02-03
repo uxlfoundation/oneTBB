@@ -419,11 +419,11 @@ Clients request for a permit using:
 +-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Parameter             | Type     | Description                                                                                                                                                                                                                                                     |
 +=======================+==========+=================================================================================================================================================================================================================================================================+
-| :code:`client_id`     | In       | Client ID obtained by tcmConnect.                                                                                                                                                                                                                              |
+| :code:`client_id`     | In       | Client ID obtained by tcmConnect.                                                                                                                                                                                                                               |
 +-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | :code:`request`       | In       | Specification of resources requested.                                                                                                                                                                                                                           |
 +-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`callback_arg`  | In       | The argument to pass into the callback function (set previously using :code:`tcmConnect`) in case of a subsequent permit renegotiation.                                                                                                                        |
+| :code:`callback_arg`  | In       | The argument to pass into the callback function (set previously using :code:`tcmConnect`) in case of a subsequent permit renegotiation.                                                                                                                         |
 +-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | :code:`permit_handle` | In/Out   | Descriptor of resources permitted by the Thread Composability Manager for use by the client. Assign :code:`nullptr` before passing to this function to request a new permit. Pass a descriptor of an existing permit to request updates to permit parameters.   |
 +-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -686,11 +686,11 @@ may use.
 +---------------------------------+----------------------------------------------------------------+
 | Value                           | Description                                                    |
 +=================================+================================================================+
-| :code:`TCM_RESULT_SUCCESS`       | Indicates successful execution of the function.                |
+| :code:`TCM_RESULT_SUCCESS`      | Indicates successful execution of the function.                |
 +---------------------------------+----------------------------------------------------------------+
-| :code:`TCM_RESULT_ERROR_UNKNOWN` | Indicates erroneous situation during the function execution.   |
+| :code:`TCM_RESULT_ERROR_UNKNOWN`| Indicates erroneous situation during the function execution.   |
 +---------------------------------+----------------------------------------------------------------+
-| :code:`TCM_RESULT_UNSUPPORTED`   | Indicates that the feature is unsupported.                     |
+| :code:`TCM_RESULT_UNSUPPORTED`  | Indicates that the feature is unsupported.                     |
 +---------------------------------+----------------------------------------------------------------+
 
 Example of returning :code:`TCM_RESULT_ERROR_UNKNOWN` is passing non-existing
@@ -730,15 +730,15 @@ permit that the Thread Composability Manager can assign.
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Value                              | Description                                                                                                                                                     |
 +====================================+=================================================================================================================================================================+
-| :code:`TCM_PERMIT_STATE_VOID`     | No permit. Neither client owns any resources associted with the permit, nor does the Thread Composability Manager know about corresponding request existence.   |
+| :code:`TCM_PERMIT_STATE_VOID`      | No permit. Neither client owns any resources associted with the permit, nor does the Thread Composability Manager know about corresponding request existence.   |
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`TCM_PERMIT_STATE_INACTIVE` | Client does not own and therefore should not use resources related to this permit.                                                                              |
+| :code:`TCM_PERMIT_STATE_INACTIVE`  | Client does not own and therefore should not use resources related to this permit.                                                                              |
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`TCM_PERMIT_STATE_PENDING`  | Resources are not assigned to this permit, but will be assigned as soon as execution allows.                                                                    |
+| :code:`TCM_PERMIT_STATE_PENDING`   | Resources are not assigned to this permit, but will be assigned as soon as execution allows.                                                                    |
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`TCM_PERMIT_STATE_IDLE`     | Resources are owned by the client, but they do not perform useful work.                                                                                         |
+| :code:`TCM_PERMIT_STATE_IDLE`      | Resources are owned by the client, but they do not perform useful work.                                                                                         |
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`TCM_PERMIT_STATE_ACTIVE`   | Resources are owned by the client, and they are used to perform useful work.                                                                                    |
+| :code:`TCM_PERMIT_STATE_ACTIVE`    | Resources are owned by the client, and they are used to perform useful work.                                                                                    |
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 **[WIP\_DSGN]** Discuss necessity of :code:`TCM_PERMIT_STATE_VOID`.
@@ -798,7 +798,7 @@ latest permit data.
 +===============+====================================================================================+
 | :code:`p`     | The unique permit handle, whose data has been changed.                             |
 +---------------+------------------------------------------------------------------------------------+
-| :code:`arg`   | The callback argument a client passed to the :code:`tcmRequestPermit` function.   |
+| :code:`arg`   | The callback argument a client passed to the :code:`tcmRequestPermit` function.    |
 +---------------+------------------------------------------------------------------------------------+
 | :code:`flags` | The reasons of callback invocation.                                                |
 +---------------+------------------------------------------------------------------------------------+
@@ -909,9 +909,9 @@ assigned to special values. Special values are:
 +------------------------+----------------------------------------------------------------------------------------------------------------------------------+
 | Value                  | Description                                                                                                                      |
 +========================+==================================================================================================================================+
-| :code:`tcm_automatic` | The Thread Composability Manager chooses the value based on the internal heuristics and current load of the platform.            |
+| :code:`tcm_automatic` | The Thread Composability Manager chooses the value based on the internal heuristics and current load of the platform.             |
 +------------------------+----------------------------------------------------------------------------------------------------------------------------------+
-| :code:`tcm_any`       | The Thread Composability Manager chooses one specific value based on the internal heuristics and current load of the platform.   |
+| :code:`tcm_any`       | The Thread Composability Manager chooses one specific value based on the internal heuristics and current load of the platform.    |
 +------------------------+----------------------------------------------------------------------------------------------------------------------------------+
 
 .. code:: cpp
@@ -992,7 +992,7 @@ requested from the Thread Composability Manager.
 +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Field                    | Description                                                                                                                                                      |
 +==========================+==================================================================================================================================================================+
-| :code:`min_sw_threads`   | The minimum number of software threads to fulfil. If it cannot be satisfied, the Thread Composability Manager returns :code:`TCM_PERMIT_STATE_PENDING` state.   |
+| :code:`min_sw_threads`   | The minimum number of software threads to fulfil. If it cannot be satisfied, the Thread Composability Manager returns :code:`TCM_PERMIT_STATE_PENDING` state.    |
 +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | :code:`max_sw_threads`   | The maximum number of software threads desired.                                                                                                                  |
 +--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------+
