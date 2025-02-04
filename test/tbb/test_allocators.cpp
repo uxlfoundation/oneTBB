@@ -14,10 +14,13 @@
     limitations under the License.
 */
 
-#include <tbb/version.h>
-#define TEST_BROKEN __INTEL_LLVM_COMPILER == 20250000 && __TBB_GLIBCXX_VERSION == 110000 && __TBB_CPP20_PRESENT
+#include <tbb/version.h> // For __TBB_GLIBCXX_VERSION and __TBB_CPP20_PRESENT
 
-#if TEST_BROKEN
+// Intel LLVM compiler triggers a deprecation warning in the implementation of std::allocator_traits::destroy
+// inside Standard Library while using STL PMR containers since std::polymorphic_allocator::destroy is deprecated since C++20
+#define TEST_LLVM_COMPILER_PMR_DESTROY_DEPRECATED_BROKEN __INTEL_LLVM_COMPILER == 20250000 && __TBB_GLIBCXX_VERSION == 110000 && __TBB_CPP20_PRESENT
+
+#if TEST_LLVM_COMPILER_PMR_DESTROY_DEPRECATED_BROKEN
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #endif
@@ -108,7 +111,6 @@ TEST_CASE("polymorphic_allocator test") {
 }
 #endif
 
-#if TEST_BROKEN
+#if TEST_LLVM_COMPILER_PMR_DESTROY_DEPRECATED_BROKEN
 #pragma clang diagnostic pop // "-Wdeprecated-declarations"
 #endif
-
