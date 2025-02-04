@@ -14,6 +14,14 @@
     limitations under the License.
 */
 
+#include <tbb/version.h>
+#define TEST_BROKEN __INTEL_LLVM_COMPILER == 20250000 && __TBB_GLIBCXX_VERSION == 110000 && __TBB_CPP20_PRESENT
+
+#if TEST_BROKEN
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 #include "tbb/cache_aligned_allocator.h"
 #include "tbb/tbb_allocator.h"
 
@@ -98,5 +106,9 @@ TEST_CASE("polymorphic_allocator test") {
             "Cache aligned resource upstream shouldn't be equal to the standard resource.");
     TestAllocatorWithSTL(std::pmr::polymorphic_allocator<void>(&aligned_resource));
 }
+#endif
+
+#if TEST_BROKEN
+#pragma clang diagnostic pop // "-Wdeprecated-declarations"
 #endif
 
