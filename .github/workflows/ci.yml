@@ -198,7 +198,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-12
+          - os: macos-14
             c_compiler: clang
             cxx_compiler: clang++
             std: 14
@@ -314,7 +314,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-12
+          - os: macos-15
             c_compiler: clang
             cxx_compiler: clang++
             std: 14
