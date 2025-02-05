@@ -392,6 +392,7 @@ jobs:
           cmake --build . -v --target tbb --target tbbmalloc --target tbbmalloc_proxy
       - name: Test doc examples
         run: |
+          ls
           cd ../doc/main/examples_testing
           mkdir build && cd build
           cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
