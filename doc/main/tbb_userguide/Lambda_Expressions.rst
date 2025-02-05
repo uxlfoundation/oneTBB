@@ -14,8 +14,10 @@ expression. The lambda expression, replaces both the declaration and constructio
 example of the previous section.
 
 
-.. literalinclude:: ./examples/parallel_for_lambda_example_1.h
+.. literalinclude:: ./examples/parallel_for_lambda_example_1.cpp
     :language: c++
+    :start-after: /*begin_parallel_for_lambda_1*/
+    :end-before: /*end_parallel_for_lambda_1*/
 
 The [=] introduces the lambda expression. The expression creates a
 function object very similar to ``ApplyFoo``. When local variables like
@@ -62,8 +64,10 @@ each f(i) can be evaluated in parallel if resources permit. The ``step``
 parameter is optional. Here is the previous example rewritten in the
 compact form:
 
-.. literalinclude:: ./examples/parallel_for_lambda_example_2.h
+.. literalinclude:: ./examples/parallel_for_lambda_example_2.cpp
     :language: c++
+    :start-after: /*begin_parallel_for_lambda_2*/
+    :end-before: /*end_parallel_for_lambda_2*/
 
 The compact form supports only unidimensional iteration spaces of
 integers and the automatic chunking feature detailed on the following

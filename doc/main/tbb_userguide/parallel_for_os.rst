@@ -26,8 +26,10 @@ that operates on a chunk. The form is an STL-style function object,
 called the *body* object, in which ``operator()`` processes a chunk. The
 following code declares the body object.
 
-.. literalinclude:: ./examples/parallel_for_os_example_1.h
+.. literalinclude:: ./examples/parallel_for_os_example.cpp
     :language: c++
+    :start-after: /*begin_parallel_for_os_1*/
+    :end-before: /*end_parallel_for_os_1*/
 
 The ``using`` directive in the example enables you to use the library
 identifiers without having to write out the namespace prefix ``oneapi::tbb``
@@ -81,8 +83,10 @@ example:
 Once you have the loop body written as a body object, invoke the
 template function ``parallel_for``, as follows:
 
-.. literalinclude:: ./examples/parallel_for_os_example_2.h
+.. literalinclude:: ./examples/parallel_for_os_example.cpp
     :language: c++
+    :start-after: /*begin_parallel_for_os_2*/
+    :end-before: /*end_parallel_for_os_2*/
 
 The ``blocked_range`` constructed here represents the entire iteration
 space from 0 to n-1, which ``parallel_for`` divides into subspaces for

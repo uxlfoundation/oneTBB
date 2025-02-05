@@ -57,6 +57,8 @@ Example
 
 .. literalinclude:: ../examples/malloc_replacement_log_example.cpp
     :language: c++
+    :start-after: /*begin_malloc_replacement_log_example*/
+    :end-before: /*end_malloc_replacement_log_example*/
 
 Example output:
 

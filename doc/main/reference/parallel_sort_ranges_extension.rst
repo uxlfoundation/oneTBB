@@ -56,5 +56,7 @@ Example
 
 This interface may be used for sorting rvalue or constant views:
 
-.. literalinclude:: ./examples/parallel_sort_ranges_extension_example.h
+.. literalinclude:: ./examples/parallel_sort_ranges_extension_example.cpp
     :language: c++
+    :start-after: /*begin_parallel_sort_ranges_extension_example*/
+    :end-before: /*end_parallel_sort_ranges_extension_example*/

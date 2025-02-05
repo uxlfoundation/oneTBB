@@ -276,8 +276,10 @@ related to ``input`` are executed, and no related objects remain in any buffer w
 Example
 *******
 
-.. literalinclude:: ./examples/try_put_and_wait_example.h
+.. literalinclude:: ./examples/try_put_and_wait_example.cpp
     :language: c++
+    :start-after: /*begin_try_put_and_wait_example*/
+    :end-before: /*end_try_put_and_wait_example*/
 
 Each iteration of ``parallel_for`` submits an input into the Flow Graph. After returning from ``try_put_and_wait(input)``, it is
 guaranteed that all of the work related to the completion of ``input`` is done by all of the nodes in the graph. Tasks related to inputs

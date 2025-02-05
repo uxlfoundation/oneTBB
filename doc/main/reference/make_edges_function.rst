@@ -53,5 +53,7 @@ The example implements the graph structure in the picture below.
 .. figure:: ./Resources/make_edges_example.png
     :align: center
 
-.. literalinclude:: ./examples/make_edges_function_example.h
+.. literalinclude:: ./examples/make_edges_function_example.cpp
     :language: c++
+    :start-after: /*begin_make_edges_function_example*/
+    :end-before: /*end_make_edges_function_example*/

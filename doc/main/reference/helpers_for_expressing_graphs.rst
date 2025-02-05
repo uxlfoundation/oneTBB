@@ -44,10 +44,14 @@ to avoid template parameter specification where possible.
 
 **Regular API**
 
-.. literalinclude:: ./examples/helpers_for_expressing_graphs_regular_api_example.h
+.. literalinclude:: ./examples/helpers_for_expressing_graphs_regular_api_example.cpp
     :language: c++
+    :start-after: /*begin_helpers_for_expressing_graphs_regular_api_example*/
+    :end-before: /*end_helpers_for_expressing_graphs_regular_api_example*/
 
 **Preview API**
 
-.. literalinclude:: ./examples/helpers_for_expressing_graphs_preview_api_example.h
+.. literalinclude:: ./examples/helpers_for_expressing_graphs_preview_api_example.cpp
     :language: c++
+    :start-after: /*begin_helpers_for_expressing_graphs_preview_api_example*/
+    :end-before: /*end_helpers_for_expressing_graphs_preview_api_example*/

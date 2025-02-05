@@ -109,3 +109,5 @@ The code below provides a simple example of container construction with the use 
 
 .. literalinclude:: ../examples/memory_pool_allocator_example.cpp
     :language: c++
+    :start-after: /*begin_memory_pool_allocator_example*/
+    :end-before: /*end_memory_pool_allocator_example*/

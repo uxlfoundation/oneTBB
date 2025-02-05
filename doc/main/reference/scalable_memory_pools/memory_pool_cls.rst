@@ -72,3 +72,5 @@ The code below provides a simple example of allocation from an extensible memory
 
 .. literalinclude:: ../examples/memory_pool_example.cpp
     :language: c++
+    :start-after: /*begin_memory_pool_example*/
+    :end-before: /*end_memory_pool_example*/

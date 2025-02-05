@@ -67,5 +67,7 @@ and ``oneapi::tbb::rw_mutex`` meet the requirements above.
 The example below demonstrates how to wrap ``std::shared_mutex`` (C++17) to meet the requirements
 of `ReaderWriterMutex` and how to customize ``concurrent_hash_map`` to use this mutex.
 
-.. literalinclude:: ./examples/custom_mutex_chmap_example.h
+.. literalinclude:: ./examples/custom_mutex_chmap_example.cpp
     :language: c++
+    :start-after: /*begin_custom_mutex_chmap_example*/
+    :end-before: /*end_custom_mutex_chmap_example*/

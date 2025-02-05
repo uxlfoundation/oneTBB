@@ -66,3 +66,5 @@ The code below provides a simple example of allocation from a fixed pool.
 
 .. literalinclude:: ../examples/fixed_pool_example.cpp
     :language: c++
+    :start-after: /*begin_fixed_pool_example*/
+    :end-before: /*end_fixed_pool_example*/
