@@ -15,7 +15,7 @@
 cmake_minimum_required(VERSION 3.11)
 project(doc_examples_testing)
 
-set(_tbb_include_path "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
+set(_tbb_include_path "${CMAKE_CURRENT_SOURCE_DIR}/../../../include")
 set(_reference_examples_path "${CMAKE_CURRENT_SOURCE_DIR}/../reference/examples")
 set(_userguide_examples_path "${CMAKE_CURRENT_SOURCE_DIR}/../tbb_userguide/examples")
 
