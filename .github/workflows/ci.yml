@@ -378,7 +378,7 @@ jobs:
           - os: ubuntu-latest
             c_compiler: gcc
             cxx_compiler: g++
-            std: 11
+            std: 20
             build_type: relwithdebinfo
             job_name: linux_doc_examples_testing_ubuntu_latest
     steps:

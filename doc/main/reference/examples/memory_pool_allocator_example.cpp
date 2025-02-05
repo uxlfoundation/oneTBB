@@ -14,7 +14,6 @@
     limitations under the License.
 */
 
-
 /*begin_memory_pool_allocator_example*/
 #define TBB_PREVIEW_MEMORY_POOL 1
 #include "oneapi/tbb/memory_pool.h"
