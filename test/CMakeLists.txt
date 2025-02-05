@@ -535,6 +535,8 @@ if (TARGET TBB::tbb)
 
         set_target_properties(test_openmp PROPERTIES COMPILE_FLAGS ${TBB_OPENMP_FLAG})
 
+        # Intel LLVM compiler triggers a warning when using OpenMP in debug mode on Windows.
+        # The only way not to trigger it seems to be explicitly disabling it from the command line.
         if (WIN32 AND (CMAKE_CXX_COMPILER_ID STREQUAL IntelLLVM) AND (CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 2025.0))
             target_compile_options(test_openmp PRIVATE $<$<CONFIG:DEBUG>:-Wno-debug-option-simd>)
         endif()
