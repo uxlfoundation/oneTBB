@@ -535,6 +535,10 @@ if (TARGET TBB::tbb)
 
         set_target_properties(test_openmp PROPERTIES COMPILE_FLAGS ${TBB_OPENMP_FLAG})
 
+        if (WIN32 AND (CMAKE_CXX_COMPILER_ID STREQUAL IntelLLVM) AND (CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 2025.0))
+            target_compile_options(test_openmp PRIVATE $<$<CONFIG:DEBUG>:-Wno-debug-option-simd>)
+        endif()
+
         if (NOT TBB_OPENMP_NO_LINK_FLAG)
             set_target_properties(test_openmp PROPERTIES LINK_FLAGS ${TBB_OPENMP_FLAG})
         endif()
