@@ -12,8 +12,8 @@ straightforward to express by the revised API: Dynamic task graphs which are
 not trees. This proposal expands `tbb::task_group` to support additional use cases.
 
 The class definition from section
-[scheduler.task_group](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_group/task_group_cls)
-of the oneAPI Threading Building Blocks (oneTBB) Specification 1.3-rev-1 for
+[scheduler.task_group](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/v1.4-rev-1/elements/onetbb/source/task_scheduler/task_group/task_group_cls)
+of the oneAPI Threading Building Blocks (oneTBB) Specification 1.4 for
 `tbb::task_group` is shown below. Note the existing `defer` function, since this
 function and its return type, `task_handle`, are the foundation of the proposed extensions:
 
@@ -100,11 +100,11 @@ it available for dependency tracking but does not make it immediately eligible f
 
 The next logical extension is to add a mechanism for specifying dependencies
 between tasks. In the most conservative view, it should only be allowed to add
-additional predecessors (in-dependencies) to tasks in the created state.
-After a task starts is completed, adding more predecessors is irrelevant,
-since it’s too late to delay the start of the task’s execution.
+predecessors (in-dependencies) to tasks in the created state.
+After a task starts, adding more predecessors is irrelevant,
+since it’s too late to delay the task execution.
 
-It might be logical to add additional predecessors to a task that is
+It might be reasonable to add new predecessors to a task that is
 currently executing if it is suspended until these additional dependencies complete.
 However, this proposal does not include support for the suspension model.
 
@@ -114,7 +114,7 @@ current predecessors are complete. We will revisit the discussion of
 adding predecessors to submitted tasks in the next section when discussing
 recursively grown task graphs.
 
-After resolving the question about when a predecessors, the next question is,
+After resolving the question about when to add predecessors, the next question is,
 what can be added as a predecessor task? The simplest answer is to have no limitations.
 It means, any valid `task_handle` can act as a predecessor. In many cases, you may
 only know what work must be completed before a task can start, but you may not know
@@ -130,7 +130,7 @@ a single predecessor. Additionally, we may also want a function to allow
 adding multiple predecessors in a single call.
 
 Given two `task_handle` objects, `h1` and `h2`, some possible options 
-for adding `h1` as a predecessor (ind-dependence) of `h2` include:
+for adding `h1` as a predecessor (in-dependence) of `h2` include:
 
 - `h2.add_predecessor(h1)`
 - `h2 = defer([]() { … }, h1)`
@@ -156,7 +156,7 @@ the oneTBB algorithms, such as tbb::parallel_for, are implemented using the non-
 low-level tasking API, rather than `tbb::task_group`. This low-level tasking API
 puts the responsibility for dependence tracking and memory
 management of tasks on developers. While it allows the oneTBB development team to build highly optimized
-algorithms, a simpler set of interfaces are can be provided for the 
+algorithms, a simpler set of interfaces can be provided for the 
 users. Recursive parallel algorithms are one of the primary cases that we want 
 our task_group extension to cover.
 
@@ -184,12 +184,12 @@ the predecessors of the merge tasks. However, the merge tasks are already
 submitted when their predecessors are modified. As mentioned in the previous 
 section, updating the predecessors of a submitted task can be
 risky due to the potential for a race condition. However, in this case,
-it is safe to add additional predecessors to the merge task. 
+it is safe to add or change predecessors to the merge task. 
 This is because the merge task cannot start execution until all of its current predecessors 
-complete. Those predecessors are the tasks responsible for modifying the predecessors. 
+complete. Those predecessors are the tasks responsible for modifying the merge task dependencies. 
 
-Therefore, the proposal is a limited extension that allows transferring 
-all the successors of a currently executing task to become the successors 
+Therefore, we propose a limited extension that allows transferring 
+all the successors of the currently executing task to become the successors 
 of a different created task. This function can only access the successors
 of the currently executing task, and those tasks are prevented from executing 
 by a dependence on the current task itself, so we can ensure that we can safely 
@@ -278,9 +278,9 @@ to complete.
     final_task.add_predecessor(second_task);
 
     // order of submission is not important
-    tg.run(final_task);
-    tg.run(first_task);
-    tg.run(second_task);
+    tg.run(std::move(final_task));
+    tg.run(std::move(first_task));
+    tg.run(std::move(second_task));
 
     tg.wait();
 
@@ -302,7 +302,7 @@ logic, the tasks that must complete before the new work can start.
             new_task.add_predecessor(p);
         }
 
-        tg.run(new_task);
+        tg.run(std::move(new_task));
     }
 
 While the graph, as shown below, is simple, the completion status of the predecessors
@@ -319,7 +319,7 @@ This example is a version of merge-sort (with many of the details left out).
 Assume an initial task executes the function shown below as its body, and the
 function implements that task, and also serves as the body for the recursively
 decomposed pieces. The range of the sequence is defined by `b` (beginning) and
-end `e` (end). Most of the implementation details of merge sort are abstracted
+`e` (end). Most of the implementation details of merge sort are abstracted
 into the following helper functions: `users::do_serial_sort`, `users::create_left_range`,
 `users::create_right_range`, and `users::do_merge`.
 
@@ -344,7 +344,7 @@ into the following helper functions: `users::do_serial_sort`, `users::create_lef
                     merge_sort(tg, rb, re);
                 });
             tbb::task_handle merge =
-            tg.defer([rb, re, &tg] {
+            tg.defer([lb, le, rb, re, &tg] {
                     users::do_merge(tg, lb, le, rb, re);
                 });
 
@@ -356,9 +356,9 @@ into the following helper functions: `users::do_serial_sort`, `users::create_lef
             // task and its successors
             tbb::task_group::transfer_successors_to(merge);
 
-            tg.run(sortleft);
-            tg.run(sortright);
-            tg.run(merge);
+            tg.run(std::move(sortleft));
+            tg.run(std::move(sortright));
+            tg.run(std::move(merge));
         }
     }
 
