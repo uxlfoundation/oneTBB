@@ -26,8 +26,8 @@ macro(add_doc_example _doc_example_path)
     get_filename_component(_doc_example_name "${_doc_example_path}" NAME_WE)
     add_executable(${_doc_example_name} EXCLUDE_FROM_ALL "${_doc_example_path}")
 
-    add_dependencies(${_doc_example_name} TBB::tbb TBB::tbbmalloc)
-    target_link_libraries(${_doc_example_name} TBB::tbb TBB::tbbmalloc)
+    add_dependencies(${_doc_example_name} TBB::tbb TBB::tbbmalloc TBB::tbbmalloc_proxy)
+    target_link_libraries(${_doc_example_name} TBB::tbb TBB::tbbmalloc TBB::tbbmalloc_proxy)
 
     add_dependencies(build-doc-examples ${_doc_example_name})
     add_test(NAME ${_doc_example_name} COMMAND ${_doc_example_name})
