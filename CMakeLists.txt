@@ -112,6 +112,7 @@ endif()
 
 option(TBB_TEST "Enable testing" ON)
 option(TBB_EXAMPLES "Enable examples" OFF)
+option(_TBB_DOC_EXAMPLES "Enable documentation examples" OFF)
 option(TBB_STRICT "Treat compiler warnings as errors" ON)
 option(TBB_WINDOWS_DRIVER "Build as Universal Windows Driver (UWD)" OFF)
 option(TBB_NO_APPCONTAINER "Apply /APPCONTAINER:NO (for testing binaries for Windows Store)" OFF)
@@ -328,6 +329,16 @@ endif()
 
 if (TBB_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+set(TBB_DOC_EXAMPLES_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/doc/main/examples_testing")
+
+if (_TBB_DOC_EXAMPLES)
+    if (NOT EXISTS ${TBB_DOC_EXAMPLES_DIRECTORY})
+        message(FATAL_ERROR "Documentation examples are not found while testing was enabled")
+    else()
+        add_subdirectory(${TBB_DOC_EXAMPLES_DIRECTORY})
+    endif()
 endif()
 
 if (TBB_BENCH)

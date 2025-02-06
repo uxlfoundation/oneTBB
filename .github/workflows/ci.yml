@@ -367,7 +367,7 @@ jobs:
             -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_CPF=${{ matrix.preview }} -DTBB_TEST=OFF -DTBB_EXAMPLES=ON ..
           cmake --build . -v --target light_test_examples
 
-  linux-doc-examples-testing:
+  doc-examples-testing:
     name: doc_examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}
     runs-on: ['${{ matrix.os }}']
     timeout-minutes: 10
@@ -376,26 +376,24 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
+            generator: "Unix Makefiles"
             c_compiler: gcc
             cxx_compiler: g++
             std: 20
             build_type: relwithdebinfo
-            job_name: linux_doc_examples_testing_ubuntu_latest
+          - os: windows-2022
+            generator: "Visual Studio 17 2022"
+            c_compiler: cl
+            cxx_compiler: cl
+            std: 20
+            build_type: relwithdebinfo
     steps:
       - uses: actions/checkout@v4
-      - name: Build library
-        run: |
-          mkdir build && cd build
-          cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} \
-            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
-            -DTBB_TEST=OFF ..
-          cmake --build . -v --target tbb --target tbbmalloc --target tbbmalloc_proxy
       - name: Test doc examples
         run: |
-          source `find ./build -name vars.sh`
-          cd doc/main/examples_testing
           mkdir build && cd build
-          cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} ..
-          cmake --build . -v --target build-doc-examples
-          ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure
+          cmake -G ${{ matrix.generator }} -DCMAKE_CXX_STANDARD=${{ matrix.std }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} \
+            -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST=ON -D_TBB_DOC_EXAMPLES=ON ..
+          cmake --build . -v --parallel --target build-doc-examples
+          ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure -L doc-examples
