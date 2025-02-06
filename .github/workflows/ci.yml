@@ -376,7 +376,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            generator: "Unix Makefiles"
+            generator: Unix Makefiles
             c_compiler: gcc
             cxx_compiler: g++
             std: 20
@@ -392,7 +392,7 @@ jobs:
       - name: Test doc examples
         run: |
           mkdir build && cd build
-          cmake -G ${{ matrix.generator }} -DCMAKE_CXX_STANDARD=${{ matrix.std }} \
+          cmake -G "${{ matrix.generator }}" -DCMAKE_CXX_STANDARD=${{ matrix.std }} \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} \
             -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST=ON -D_TBB_DOC_EXAMPLES=ON ..
           cmake --build . -v --parallel --target build-doc-examples
