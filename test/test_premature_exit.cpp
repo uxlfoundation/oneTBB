@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2024 Intel Corporation
+    Copyright (C) 2023-2025 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -33,7 +33,6 @@
 #error Implementation of the test is not provided for this kind of OS.
 #endif
 
-
 typedef tcm_result_t (*tcm_connect_t)(tcm_callback_t, tcm_client_id_t*);
 typedef tcm_result_t (*tcm_request_permit_t)(tcm_client_id_t, tcm_permit_request_t,
                                              void* /*callback_arg*/, tcm_permit_handle_t*,
@@ -57,8 +56,17 @@ void load_tcm() {
     tcm_connect = (tcm_connect_t)dlsym(tcm_handler, "tcmConnect");
     tcm_request_permit = (tcm_request_permit_t)dlsym(tcm_handler, "tcmRequestPermit");
 #elif _WIN32
+    #if __INTEL_LLVM_COMPILER >= 20250000
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wcast-function-type-mismatch"
+    #endif
+
     tcm_connect = (tcm_connect_t)GetProcAddress(tcm_handler, "tcmConnect");
     tcm_request_permit = (tcm_request_permit_t)GetProcAddress(tcm_handler, "tcmRequestPermit");
+
+    #if __INTEL_LLVM_COMPILER >= 20250000
+    #pragma GCC diagnostic pop
+    #endif
 #endif
 }
 
