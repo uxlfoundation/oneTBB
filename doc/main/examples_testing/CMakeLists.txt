@@ -23,8 +23,6 @@ add_custom_target(build-doc-examples
 set(doc_examples_test_label "doc-examples")
 
 macro(add_doc_example _doc_example_path)
-    message(STATUS "Adding ${_doc_example_path}")
-
     get_filename_component(_doc_example_name "${_doc_example_path}" NAME_WE)
     add_executable(${_doc_example_name} EXCLUDE_FROM_ALL "${_doc_example_path}")
 
@@ -36,13 +34,8 @@ macro(add_doc_example _doc_example_path)
     set_tests_properties(${_doc_example_name} PROPERTIES LABELS "${doc_examples_test_label}")
 endmacro()
 
-file(GLOB_RECURSE REFERENCE_EXAMPLES_LIST "${_reference_examples_path}/*.cpp")
-file(GLOB_RECURSE USERGUIDE_EXAMPLES_LIST "${_userguide_examples_path}/*.cpp")
+file(GLOB_RECURSE DOC_EXAMPLES_LIST "${_reference_examples_path}/*.cpp" "${_userguide_examples_path}/*.cpp")
 
-foreach(_doc_example_path IN LISTS REFERENCE_EXAMPLES_LIST)
-    add_doc_example(${_doc_example_path})
-endforeach()
-
-foreach(_doc_example_path IN LISTS USERGUIDE_EXAMPLES_LIST)
+foreach(_doc_example_path IN LISTS DOC_EXAMPLES_LIST)
     add_doc_example(${_doc_example_path})
 endforeach()
