@@ -23,6 +23,7 @@
 #include "_small_object_pool.h"
 #include "_utils.h"
 #include <memory>
+#include <forward_list>
 
 namespace tbb {
 namespace detail {
@@ -31,12 +32,25 @@ namespace d1 { class task_group_context; class wait_context; struct execution_da
 namespace d2 {
 
 class task_handle;
+class task_handle_task;
+
+class task_state_handler {
+    task_state_handler(task_handle_task* task, d1::small_object_allocator& alloc)
+        : m_task(task), m_is_finished(false), m_num_references(0), m_allocator(alloc) {}
+
+    void release() {
+        if (--m_num_references == 0) {
+            m_allocator.delete_object(this);
+        }
+    }
+    
+    task_handle_task* m_task;
+    bool m_is_finished;
+    std::size_t m_num_references;
+    d1::small_object_allocator m_allocator;
+};
 
 class task_handle_task : public d1::task {
-    std::uint64_t m_version_and_traits{};
-    d1::wait_tree_vertex_interface* m_wait_tree_vertex;
-    d1::task_group_context& m_ctx;
-    d1::small_object_allocator m_allocator;
 public:
     void finalize(const d1::execution_data* ed = nullptr) {
         if (ed) {
@@ -48,6 +62,7 @@ public:
 
     task_handle_task(d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
         : m_wait_tree_vertex(vertex)
+        , m_state_handler(nullptr)
         , m_ctx(ctx)
         , m_allocator(alloc) {
         suppress_unused_warning(m_version_and_traits);
@@ -58,7 +73,20 @@ public:
         m_wait_tree_vertex->release();
     }
 
+    void create_state_handler() {
+        // TODO: should we use stack-created allocator
+        m_state_handler = m_allocator.new_object<task_state_handler>(this, m_allocator);
+    }
+
+    task_state_handler* 
+
     d1::task_group_context& ctx() const { return m_ctx; }
+private:
+    std::uint64_t m_version_and_traits{};
+    d1::wait_tree_vertex_interface* m_wait_tree_vertex;
+    task_state_handler* m_state_handler;
+    d1::task_group_context& m_ctx;
+    d1::small_object_allocator m_allocator;
 };
 
 
