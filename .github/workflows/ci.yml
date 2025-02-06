@@ -414,5 +414,5 @@ jobs:
           cmake -G "${{ matrix.generator }}" -A x64 -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} `
             -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON ..
-          cmake --config ${{ matrix.build_type }} --build . -v --parallel --target build-doc-examples
+          cmake --build . --config ${{ matrix.build_type }} -v --parallel --target build-doc-examples
           ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure -L doc-examples
