@@ -546,7 +546,7 @@ inline void spawn_in_graph_arena(graph& g, graph_task& arena_task) {
 
         __TBB_ASSERT(g.my_task_arena && g.my_task_arena->is_active(), nullptr);
         submit( *gt, *g.my_task_arena, *g.my_context
-#if __TBB_PREVIEW_CRITICAL_TASKS
+#if __TBB_CRITICAL_TASKS
                 , /*as_critical=*/false
 #endif
         );
