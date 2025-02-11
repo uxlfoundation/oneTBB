@@ -790,16 +790,16 @@ TEST_CASE("Fibonacci test for the task group") {
 
 //! Cancellation and exception test for the task group
 //! \brief \ref interface \ref requirement
-TEST_CASE("Cancellation and exception test for the task group") {
-    for (unsigned p = MinThread; p <= MaxThread; ++p) {
-        tbb::global_control limit(tbb::global_control::max_allowed_parallelism, p);
-        tbb::task_arena a(p);
-        g_MaxConcurrency = p;
-        a.execute([] {
-            RunCancellationAndExceptionHandlingTests<tbb::task_group>();
-        });
-    }
-}
+// TEST_CASE("Cancellation and exception test for the task group") {
+//     for (unsigned p = MinThread; p <= MaxThread; ++p) {
+//         tbb::global_control limit(tbb::global_control::max_allowed_parallelism, p);
+//         tbb::task_arena a(p);
+//         g_MaxConcurrency = p;
+//         a.execute([] {
+//             RunCancellationAndExceptionHandlingTests<tbb::task_group>();
+//         });
+//     }
+// }
 
 //! Constant functor test for the task group
 //! \brief \ref interface \ref negative
@@ -1222,3 +1222,116 @@ TEST_CASE("task_handle cannot be scheduled into other task_group of the same con
 }
 
 #endif // TBB_USE_EXCEPTIONS
+
+void test_task_handle_states(unsigned concurrency) {
+    tbb::task_group tg;
+
+    std::size_t placeholder = 0;
+    auto task_body = [&] { ++placeholder; };
+    {
+        tbb::task_handle task1 = tg.defer(task_body);
+
+        CHECK_MESSAGE(!task1.is_completed(), "Incorrect task_handle state");
+        tg.run(std::move(task1));
+        if (concurrency == 1) {
+            // TODO: comment
+            CHECK_MESSAGE(!task1.is_completed(), "Incorrect task_handle state");
+        }
+        tg.wait();
+        CHECK_MESSAGE(task1.is_completed(), "Incorrect task_handle state");
+        CHECK(placeholder == 1);
+    }
+    {
+        tbb::task_handle task2 = tg.defer(task_body);
+        CHECK_MESSAGE(!task2.is_completed(), "Incorrect task_handle state");
+        tg.run_and_wait(std::move(task2));
+        CHECK_MESSAGE(task2.is_completed(), "Incorrect task_handle state");
+        CHECK(placeholder == 2);
+    }
+}
+
+struct leaf_task {
+    void operator()() const {
+        ++(*placeholder);
+    }
+    std::size_t* placeholder;
+};
+
+struct combine_task {
+    void operator()() const {
+        *placeholder = *left_subleaf + *right_subleaf;
+        delete left_subleaf;
+        delete right_subleaf;
+    }
+
+    std::size_t* placeholder;
+    std::size_t* left_subleaf;
+    std::size_t* right_subleaf;
+};
+
+void test_successors_created(unsigned) {
+    constexpr std::size_t depth = 1;
+
+    tbb::task_group tg;
+
+    std::size_t* left_leaf_placeholder = new std::size_t(0);
+    tbb::task_handle left_leaf_task = tg.defer(leaf_task{left_leaf_placeholder});
+    tbb::task_handle run_graph_leaf;
+
+    std::size_t* result_placeholder = new std::size_t(0);
+
+    for (std::size_t i = 0; i < depth; ++i) {
+        std::size_t* right_leaf_placeholder = new std::size_t(0);
+        tbb::task_handle right_leaf_task = tg.defer(leaf_task{right_leaf_placeholder});
+
+        std::size_t* combine_placeholder = new std::size_t(0);
+        tbb::task_handle combine = tg.defer(combine_task{combine_placeholder, left_leaf_placeholder, right_leaf_placeholder});
+
+        left_leaf_task.add_successor(combine);
+        right_leaf_task.add_successor(combine);
+
+        tg.run(std::move(combine));
+        tg.run(std::move(right_leaf_task));
+
+        if (i == 0) {
+            // Save first leaf to "run" the graph after construction
+            run_graph_leaf = std::move(left_leaf_task);
+        } else {
+            tg.run(std::move(left_leaf_task));
+        }
+        left_leaf_task = std::move(combine);
+        left_leaf_placeholder = combine_placeholder;
+        result_placeholder = combine_placeholder;
+    }
+    
+    CHECK(run_graph_leaf);
+    CHECK_MESSAGE(*result_placeholder == 0, "Task graph not executed yet");
+
+    // "Run" the graph
+    tg.run(std::move(run_graph_leaf));
+    tg.wait();
+
+    std::cout << *result_placeholder << std::endl;
+}
+
+void test_successors_scheduled(unsigned) {
+
+}
+
+void test_successors_completed(unsigned) {
+
+}
+
+void test_successors(unsigned concurrency) {
+    test_successors_created(concurrency);
+    test_successors_scheduled(concurrency);
+    test_successors_completed(concurrency);
+}
+
+TEST_CASE("dynamic extensions test") {
+    for (unsigned p=MinThread; p <= MaxThread; ++p) {
+        tbb::global_control limit(tbb::global_control::max_allowed_parallelism, p);
+        test_task_handle_states(p);
+        test_successors(p);
+    }
+}

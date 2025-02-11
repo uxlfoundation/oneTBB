@@ -214,6 +214,7 @@ public:
     }
 private:
     wait_tree_vertex_interface* my_parent;
+protected:
     std::atomic<std::uint64_t> m_ref_count;
 };
 

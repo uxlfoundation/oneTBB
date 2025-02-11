@@ -87,8 +87,18 @@ private:
     d1::task* execute(d1::execution_data& ed) override {
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
         task* res = task_ptr_or_nullptr(m_func);
+        task_handle_task* successor_task = this->complete_task_bypass();
+
+        task* next_task = nullptr;
+        if (res && successor_task) {
+           d1::spawn(*successor_task, successor_task->ctx());
+           next_task = res; 
+        } else if (successor_task) {
+            next_task = successor_task;
+        }
+
         finalize(&ed);
-        return res;
+        return next_task;
     }
     d1::task* cancel(d1::execution_data& ed) override {
         finalize(&ed);
@@ -581,7 +591,12 @@ public:
         using acs = d2::task_handle_accessor;
         __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
 
-        d1::spawn(*acs::release(h), context());
+        if (acs::has_dependency(h)) {
+            acs::release_continuation(h);
+        } else {
+            d1::spawn(*acs::release(h), context());
+        }
+        
     }
 
     template<typename F>
