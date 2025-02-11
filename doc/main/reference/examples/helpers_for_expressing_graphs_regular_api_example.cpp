@@ -16,7 +16,7 @@
 
 #if __cplusplus >= 201703L
 
-/*begin_helpers_for_expressing_graphs_preview_api_example*/
+/*begin_helpers_for_expressing_graphs_regular_api_example*/
 #include <oneapi/tbb/flow_graph.h>
 
 int main() {
@@ -52,7 +52,7 @@ int main() {
     }
     g.wait_for_all();
 }
-/*end_helpers_for_expressing_graphs_preview_api_example*/
+/*end_helpers_for_expressing_graphs_regular_api_example*/
 
 #else
 // Skip

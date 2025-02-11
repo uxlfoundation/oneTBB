@@ -55,8 +55,10 @@ or
 Example
 *******
 
-.. literalinclude:: ./examples/rvalue_reduce.h
+.. literalinclude:: ./examples/rvalue_reduce.cpp
     :language: c++
+    :start-after: /*begin_rvalue_reduce_example*/
+    :end-before: /*end_rvalue_reduce_example*/
 
 .. rubric:: See also
 
