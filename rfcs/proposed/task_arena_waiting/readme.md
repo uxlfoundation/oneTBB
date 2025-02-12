@@ -1,4 +1,4 @@
-# Wait for work completion in a task_arena
+# Waiting in a task_arena
 
 ## Motivation
 
@@ -14,7 +14,8 @@ completes. `enqueue` is a “fire-and-forget” call: the calling thread submits
 object as a task and returns immediately, providing no way to synchronize with the completion
 of the task.
 
-In [the oneDPL case study of asynchronous algorithms](https://github.com/uxlfoundation/oneDPL/tree/main/rfcs/archived/asynchronous_api_general#use-case-study)
+In [the oneDPL case study of asynchronous algorithms
+](https://github.com/uxlfoundation/oneDPL/tree/main/rfcs/archived/asynchronous_api_general#use-case-study)
 three main usage patterns were observed, each assuming subsequent synchronization either with
 the asynchronous job or with all jobs previously submitted into a work queue or device.
 A task arena can be considered analogous to a device or a work queue in these patterns,
@@ -28,7 +29,7 @@ submitting a job and waiting for its completion later. The flow graph is more su
 and executing graphs of dependent computations, while the `task_group`, as of now, allows starting
 and waiting for independent tasks. Notably, both require calling `wait`/`wait_for_all` to ensure that
 the work will be done. The `task_arena::enqueue`, on the other hand, being "fire-and-forget", enforces
-eventual availability of another thread in the arena to execute the task.
+availability of another thread in the arena to execute the task (so-called *mandatory concurrency*).
 
 So, a reasonable solution for the described use cases seems to combine a `task_arena` with a `task_group`.
 However, it is notoriously non-trivial to do right. For example, the following "naive" attempt is subtly
@@ -77,9 +78,31 @@ as it would result in a deadlock if accidentally called from a thread that holds
 
 Still, supporting the "synchronize with the queue/device" pattern would in general be useful.
 
+### Participation of application threads
+
+A related feature considered before is *moonlighting*, that is, temporary participation of application threads
+in a task arena. The idea is that if some application threads have nothing else to do, they might help with tasks
+submitted by other threads.
+
+The major questions regarding moonlighting are:
+- When should a moonlighting thread return? Should that be after completion of a specific task (a task group,
+  a flow graph)? Or after execution of a certain number of any tasks? Or maybe per some external signal or
+  condition, such as timeout?
+- Tasks that a moonlighting thread takes might contain a nested blocking call, which can prevent the thread to return
+  for an unpredictable time. That is, in the presence of nested parallelism it is hard to guarantee that the thread
+  will not get trapped for long and can stop moonlighting (or check exit conditions) after processing each single task.
+
+An alternative approach could be for application threads to "yield" CPUs to TBB threads, which would execute tasks
+and make progress. Even if a TBB thread is blocked in a nested wait, the application thread is not blocked and can
+return. Temporary CPU oversubscription is possible, but it is likely acceptable as some other TBB thread can leave
+the arena and restore utilization balance.
+
+One more option is to use a mechanism similar to task suspension, switching the moonlighting thread to an execution
+context with a separate stack which it can abandon if necessary.
+
 ## Proposal
 
-The proposal consists of two ideas that are not mutually exclusive and can be implemented independently.
+The proposal consists of ideas that are not mutually exclusive and can be implemented independently.
 
 ### 1. Simplify the use of a task group
 
@@ -130,6 +153,15 @@ the corresponding task group contexts. The implementation can likely be backward
 as no layout or function changes in `task_arena` seems necessary. A new library entry point
 would be added for the waiting function.
 
+### 3. Consider API for progress delegation
+
+Of the three options outlined above for application thread participation, the second one - exchanging
+an application thread for a TBB thread in the arena, or *progress delegation* - seems the least risky.
+At minimum, it would enforce mandatory concurrency similarly to `enqueue`; it might also increment
+the total demand for TBB worker threads, rebalance threads between active arenas, and in the most sophisticated
+case could even ensure that a certain arena gets a temporary boost during rebalancing.
+
 ## Open Questions
 
 - API details need to be elaborated
+- Implementation feasibility for (2) and (3) need to be explored
