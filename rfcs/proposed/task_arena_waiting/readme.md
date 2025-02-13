@@ -145,6 +145,13 @@ With the redesign of the task scheduler in oneTBB, we might evaluate if there is
 to ensure completion of all jobs in an arena. The safety concern can potentially be mitigated
 by throwing an exception or returning `false`, similarly to the `tbb::finalize` function.
 
+The corresponding API could look like:
+```cpp
+ta.wait_for_all(); // throws tbb::unsafe_wait if called 
+bool success = ta.wait_for_all(std::nothrow{}); // in case exceptions are undesirable
+```
+Another option for the non-throwing variation is `bool try_wait_for_all()`.
+
 Implementation-wise, a waiting context (reference counter) could be added to the internal arena class.
 It would be incremented on each call to `execute`, `enqueue`, and `isolate`, and decremented after
 the corresponding task is complete. The more tricky part is to track parallel jobs started in an
@@ -153,15 +160,31 @@ the corresponding task group contexts. The implementation can likely be backward
 as no layout or function changes in `task_arena` seems necessary. A new library entry point
 would be added for the waiting function.
 
+The implementation should, if possible, assign the waiting thread to execute tasks; if not, the thread
+should *block with progress delegation*, as described below.
+
 ### 3. Consider API for progress delegation
 
 Of the three options outlined above for application thread participation, the second one - exchanging
 an application thread for a TBB thread in the arena, or *progress delegation* - seems the least risky.
 At minimum, it would enforce mandatory concurrency similarly to `enqueue`; it might also increment
-the total demand for TBB worker threads, rebalance threads between active arenas, and in the most sophisticated
+the total demand for TBB worker threads, rebalance threads between active arenas, and in a more sophisticated
 case could even ensure that a certain arena gets a temporary boost during rebalancing.
+
+Since the scenario of participation or delegation with no explicit exit condition is covered by `wait_for_all`
+in (2), any special API function should explicitly take an exit condition. If that condition is the completion
+of specific tasks, the `wait_for` function described in (1) is likely most appropriate; besides a `task_group`,
+it could also accept a `task_handle` and a `flow::graph`, with the implementation equivalent to
+`ta.execute([&]{ argument_specific_wait(); })`.
+
+So any actual progress delegation function would take an argument for an external exit condition.
+The most universal approach is seemingly to take a callable that blocks the executing thread,
+and run that callable after "summoning" a worker thread to the arena. The API sketch for that is:
+```cpp
+ta.block_with_progress_delegation([]{ std::this_thread::sleep_for(100ms); });
+```
 
 ## Open Questions
 
-- API details need to be elaborated
-- Implementation feasibility for (2) and (3) need to be explored
+- API names and semantic details need to be further elaborated
+- Implementation feasibility for (2) and (3) needs to be explored
