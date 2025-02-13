@@ -235,10 +235,10 @@ foreach(FILE_WITH_EXTRA_TARGETS ${FILES_WITH_EXTRA_TARGETS})
 endforeach()
 
 if (NOT TBB_VERIFY_DEPENDENCY_SIGNATURE)
-    message(WARNING
-        "Verification of a dependency signature during dynamic run-time linking is explicitly disabled."
-        "This may lead to security vulnerabilities. It is recommended to leave it enabled by default"
-        " or set TBB_VERIFY_DEPENDENCY_SIGNATURE ON to enable it explicitly.")
+    message(WARNING "Verification of a dependency signature during dynamic "
+        "run-time linking is explicitly disabled. This may lead to security "
+        "vulnerabilities. It is recommended to set "
+        "TBB_VERIFY_DEPENDENCY_SIGNATURE to ON (default value)")
 endif()
 
 # - Enabling LTO on Android causes the NDK bug.
