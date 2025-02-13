@@ -36,7 +36,7 @@
     // FreeLibrary return bool value that is not used.
     #define dlclose( handle )       (void)( ! FreeLibrary( handle ) )
     #define dlerror()               GetLastError()
-#if __TBB_VERIFY_DEPENDENCY_SIGNATURE
+#if !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION
     #include <Softpub.h>
     #include <wintrust.h>
     #pragma comment (lib, "wintrust")     // Link with the Wintrust.lib file.
@@ -554,7 +554,7 @@ namespace r1 {
 #endif
     }
 
-#if _WIN32 && __TBB_VERIFY_DEPENDENCY_SIGNATURE
+#if _WIN32 && !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION
     /**
      * Obtains full path to the specified filename and stores it inside passed buffer. Returns the
      * actual length of the buffer required to hold the full path to the specified file, not
@@ -660,7 +660,7 @@ namespace r1 {
 
         return ERROR_SUCCESS == rc;
     }
-#endif  // _WIN32 && __TBB_VERIFY_DEPENDENCY_SIGNATURE
+#endif  // _WIN32 && !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION
 
     dynamic_link_handle dynamic_load( const char* library, const dynamic_link_descriptor descriptors[],
                                       std::size_t required, int flags )
@@ -692,7 +692,7 @@ namespace r1 {
         // Prevent Windows from displaying silly message boxes if it fails to load library
         // (e.g. because of MS runtime problems - one of those crazy manifest related ones)
         UINT prev_mode = SetErrorMode (SEM_FAILCRITICALERRORS);
-#if __TBB_VERIFY_DEPENDENCY_SIGNATURE
+#if !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION
         if (!build_absolute_path) { // Get the path if it is not yet built
             length = get_module_path(absolute_path, len, library);
             if (length == 0) {
@@ -707,15 +707,15 @@ namespace r1 {
         }
 
         if (has_valid_signature(path, length)) {
-#endif /* __TBB_VERIFY_DEPENDENCY_SIGNATURE */
+#endif /* !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION */
 #endif /* _WIN32 */
             // The argument of loading_flags is ignored on Windows
             library_handle = dlopen( path, loading_flags(flags & DYNAMIC_LINK_LOCAL) );
 #if _WIN32
-#if __TBB_VERIFY_DEPENDENCY_SIGNATURE
+#if !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION
         } else
             return library_handle; // Warning (if any) has already been reported
-#endif /* __TBB_VERIFY_DEPENDENCY_SIGNATURE */
+#endif /* !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION */
         SetErrorMode (prev_mode);
 #endif /* _WIN32 */
         if( library_handle ) {
