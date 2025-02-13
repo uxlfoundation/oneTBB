@@ -541,6 +541,18 @@ namespace r1 {
     }
 #endif
 
+    /**
+     * Checks if the file exists and is a regular file.
+     */
+    bool file_exists(const char* path) {
+#if __linux__
+        struct stat st;
+        return stat(path, &st) == 0 && S_ISREG(st.st_mode);
+#elif _WIN32
+        const DWORD attributes = GetFileAttributesA(path);
+        return attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY);
+#endif
+    }
 
 #if _WIN32 && __TBB_VERIFY_DEPENDENCY_SIGNATURE
     /**
@@ -648,7 +660,7 @@ namespace r1 {
 
         return ERROR_SUCCESS == rc;
     }
-#endif  // __TBB_VERIFY_DEPENDENCY_SIGNATURE
+#endif  // _WIN32 && __TBB_VERIFY_DEPENDENCY_SIGNATURE
 
     dynamic_link_handle dynamic_load( const char* library, const dynamic_link_descriptor descriptors[],
                                       std::size_t required, int flags )
@@ -668,6 +680,10 @@ namespace r1 {
                 return nullptr;
             } else if (length == 0) {
                 // length == 0 means failing of init_ap_data so the warning has already been issued.
+                return nullptr;
+            } else if (!file_exists(absolute_path)) {
+                // Path to a file has been built manually. It is not proven to exist however.
+                DYNAMIC_LINK_WARNING( dl_lib_not_found, absolute_path, dlerror() );
                 return nullptr;
             }
             path = absolute_path;
