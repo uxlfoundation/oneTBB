@@ -31,8 +31,11 @@
 #include <mutex>
 
 #include <cstddef>
+
 #ifdef _WIN32
 #include <windows.h>
+#elif __linux__
+#include <sys/stat.h>
 #endif /* _WIN32 */
 
 namespace tbb {
