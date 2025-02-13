@@ -55,24 +55,23 @@ endif()
 
 # TODO: Add statistics.cpp
 
-target_compile_definitions(tbb
-                           PUBLIC
-                           $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>
-                           PRIVATE
-                           __TBB_BUILD
-                           ${TBB_RESUMABLE_TASKS_USE_THREADS}
-                           $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:__TBB_DYNAMIC_LOAD_ENABLED=0>
-                           $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:__TBB_SOURCE_DIRECTLY_INCLUDED=1>)
+target_compile_definitions(
+    tbb
+    PUBLIC
+    $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>
+    PRIVATE
+    __TBB_BUILD
+    ${TBB_RESUMABLE_TASKS_USE_THREADS}
+    $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:__TBB_DYNAMIC_LOAD_ENABLED=0>
+    $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:__TBB_SOURCE_DIRECTLY_INCLUDED=1>
+    $<$<NOT:$<BOOL:${TBB_VERIFY_DEPENDENCY_SIGNATURE}>>:__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION=1>
+)
 
 if (NOT ("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "(armv7-a|aarch64|mips|arm64|riscv)" OR
          "${CMAKE_OSX_ARCHITECTURES}" MATCHES "arm64" OR
          WINDOWS_STORE OR
          TBB_WINDOWS_DRIVER))
     target_compile_definitions(tbb PRIVATE __TBB_USE_ITT_NOTIFY)
-endif()
-
-if (TBB_VERIFY_DEPENDENCY_SIGNATURE)
-    target_compile_definitions(tbb PRIVATE __TBB_VERIFY_DEPENDENCY_SIGNATURE)
 endif()
 
 target_include_directories(tbb
