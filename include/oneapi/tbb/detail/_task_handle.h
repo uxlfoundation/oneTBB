@@ -25,6 +25,7 @@
 #include <memory>
 #include <forward_list>
 #include "../mutex.h"
+#include <iostream>
 
 namespace tbb {
 namespace detail {
@@ -37,8 +38,12 @@ class task_handle_task;
 
 class task_state_handle {
 public:
-    task_state_handle(d1::small_object_allocator& alloc)
-        : m_is_finished(false), m_num_references(0), m_allocator(alloc) {}
+    task_state_handle(task_handle_task* task, d1::small_object_allocator& alloc)
+        : m_task(task), m_is_finished(false), m_num_references(0), m_allocator(alloc) {}
+
+    task_handle_task* handling_task() {
+        return m_task;
+    }
 
     void reserve() {
         ++m_num_references;
@@ -59,6 +64,7 @@ public:
         return m_is_finished.load(std::memory_order_relaxed);
     }
 private:
+    task_handle_task* m_task;
     std::atomic<bool> m_is_finished;
     std::atomic<std::size_t> m_num_references;
     d1::small_object_allocator m_allocator;
@@ -71,27 +77,17 @@ public:
         : d1::reference_vertex(nullptr, 1), m_task(task), m_allocator(alloc) {}
 
     task_handle_task* release_bypass(std::uint32_t delta = 1);
-private:
-    task_handle_task* m_task;
-    d1::small_object_allocator m_allocator;
-};
 
-class task_successors_list {
-public:
-    task_successors_list() = default;
-
-    void add_successor(successor_vertex* successor) {
-        __TBB_ASSERT(successor, nullptr);
-        successor->reserve();
-
-        d1::mutex::scoped_lock lock(m_mutex);
-        m_successor_vertexes.push_front(successor);
+    void set_next(successor_vertex* next) {
+        m_next_successor = next;
     }
 
-    task_handle_task* release_successors();
+    successor_vertex* get_next() const {
+        return m_next_successor;
+    }
 private:
-    std::forward_list<successor_vertex*> m_successor_vertexes;
-    d1::mutex m_mutex;
+    task_handle_task* m_task;
+    successor_vertex* m_next_successor;
     d1::small_object_allocator m_allocator;
 };
 
@@ -112,7 +108,6 @@ public:
         , m_allocator(alloc)
     {
         suppress_unused_warning(m_version_and_traits);
-        m_successors_list = m_allocator.new_object<task_successors_list>(); // TODO: deallocate
         m_wait_tree_vertex->reserve();
     }
 
@@ -123,8 +118,18 @@ public:
             m_state_handle->mark_completed();
             m_state_handle->release();
 
-            if (m_successors_list) {
-                next_task = m_successors_list->release_successors();
+            successor_vertex* current_successor = m_successors_head.exchange(nullptr);
+
+            while (current_successor) {
+                successor_vertex* next_successor = current_successor->get_next();
+                task_handle_task* successor_task = current_successor->release_bypass();
+
+                if (next_task == nullptr) {
+                    next_task = successor_task;
+                } else {
+                    d1::spawn(*successor_task, successor_task->ctx());
+                }
+                current_successor = next_successor;
             }
         }
         return next_task;
@@ -136,7 +141,7 @@ public:
 
     task_state_handle* create_state_handle() {
         // m_allocator can be used since the same thread allocates task and task_handler
-        m_state_handle = m_allocator.new_object<task_state_handle>(m_allocator);
+        m_state_handle = m_allocator.new_object<task_state_handle>(this, m_allocator);
         m_state_handle->reserve();
         return m_state_handle;
     }
@@ -150,8 +155,15 @@ public:
     }
 
     void add_successor(successor_vertex* successor) {
-        __TBB_ASSERT(m_successors_list, nullptr);
-        m_successors_list->add_successor(successor);
+        __TBB_ASSERT(successor, nullptr);
+        successor->reserve();
+
+        successor_vertex* current_head = m_successors_head.load(std::memory_order_acquire);
+        successor->set_next(current_head);
+
+        while (!m_successors_head.compare_exchange_weak(current_head, successor)) {
+            successor->set_next(current_head);
+        }
     } 
 
     bool has_dependency() const { return m_continuation_vertex != nullptr; }
@@ -168,7 +180,7 @@ private:
     std::uint64_t m_version_and_traits{};
     d1::wait_tree_vertex_interface* m_wait_tree_vertex;
     task_state_handle* m_state_handle;
-    task_successors_list* m_successors_list;
+    std::atomic<successor_vertex*> m_successors_head;
     successor_vertex* m_continuation_vertex;
     d1::task_group_context& m_ctx;
     d1::small_object_allocator m_allocator;
@@ -182,21 +194,6 @@ inline task_handle_task* successor_vertex::release_bypass(std::uint32_t delta) {
         m_task->unset_continuation();
         next_task = m_task;
         m_allocator.delete_object(this);
-    }
-    return next_task;
-}
-inline task_handle_task* task_successors_list::release_successors() {
-    d1::mutex::scoped_lock lock(m_mutex);
-    task_handle_task* next_task = nullptr;
-
-    for (auto& vertex : m_successor_vertexes) {
-        task_handle_task* task = vertex->release_bypass();
-        
-        if (next_task == nullptr) {
-            next_task = task;
-        } else {
-            d1::spawn(*task, task->ctx());
-        }
     }
     return next_task;
 }
@@ -232,12 +229,17 @@ public:
     }
 
     void add_successor(task_handle& successor) {
-        // TODO: clear behavior in case of empty this and successor
-        if (m_handle && successor.m_handle) {
-            __TBB_ASSERT(m_state_handle, nullptr);
-            if (!m_state_handle->is_completed()) {
-                m_handle->add_successor(successor.m_handle->get_continuation_vertex());
-            }
+        task_handle_task* handling_task = nullptr;
+        __TBB_ASSERT(successor, "Adding empty task handle as successor");
+
+        if (m_handle) {
+            handling_task = m_handle.get();
+        } else if (m_state_handle) {
+            handling_task = m_state_handle->is_completed() ? nullptr : m_state_handle->handling_task();
+        }
+
+        if (handling_task) {
+            handling_task->add_successor(successor.m_handle->get_continuation_vertex());
         }
     }
 

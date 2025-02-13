@@ -593,6 +593,7 @@ public:
 
         if (acs::has_dependency(h)) {
             acs::release_continuation(h);
+            acs::release(h);
         } else {
             d1::spawn(*acs::release(h), context());
         }
