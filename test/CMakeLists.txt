@@ -305,7 +305,7 @@ function(tbb_add_tbbbind_test)
         # so in the environment without HWLOC, it should be found.
         set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
             PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*tbbbind"
-            FAIL_REGULAR_EXPRESSION "Status: FAILURE!"
+            FAIL_REGULAR_EXPRESSION "Status:.*FAILURE"
         )
         # Don't export symbols from HWLOC archive library
         target_link_options(${_tbbbind_test_NAME} PRIVATE $<$<BOOL:UNIX>:-Wl,--exclude-libs,ALL>)
