@@ -150,15 +150,19 @@ The corresponding API could look like:
 ta.wait_for_all(); // throws tbb::unsafe_wait if called 
 bool success = ta.wait_for_all(std::nothrow{}); // in case exceptions are undesirable
 ```
-Another option for the non-throwing variation is `bool try_wait_for_all()`.
+Another option for the non-throwing variation is `bool try_wait_for_all()`. With that name, it might also
+have a weaker semantics omitting the guarantee of all arena work being completed.
 
 Implementation-wise, a waiting context (reference counter) could be added to the internal arena class.
 It would be incremented on each call to `execute`, `enqueue`, and `isolate`, and decremented after
 the corresponding task is complete. The more tricky part is to track parallel jobs started in an
 implicit thread-associated arenas; perhaps it can be done when registering and deregistering
-the corresponding task group contexts. The implementation can likely be backward compatible,
-as no layout or function changes in `task_arena` seems necessary. A new library entry point
-would be added for the waiting function.
+the corresponding task group contexts. For the weaker "try" semantics, it would be OK to return
+when no task to execute is found, even if some tasks are yet running; that can be done by
+inspecting the arena, without adding more reference counting.
+
+The implementation can likely be backward compatible, as no layout or function changes in `task_arena`
+seems necessary. A new library entry point would be added for the waiting function.
 
 The implementation should, if possible, assign the waiting thread to execute tasks; if not, the thread
 should *block with progress delegation*, as described below.
