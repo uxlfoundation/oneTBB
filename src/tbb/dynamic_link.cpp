@@ -126,13 +126,17 @@ namespace r1 {
     // Report runtime errors and continue.
     #define DYNAMIC_LINK_WARNING dynamic_link_warning
 #if TBB_DYNAMIC_LINK_WARNING
-    static void dynamic_link_warning( dynamic_link_error_t code, ... ) {
+    // Accepting 'int' instead of 'dynamic_link_error_t' allows to avoid the warning about undefined
+    // behavior when an object passed to 'va_start' undergoes default argument promotion. Yet the
+    // implicit promotion from 'dynamic_link_error_t' to its underlying type done at the place of a
+    // call is supported.
+    static void dynamic_link_warning( int code, ... ) {
         const char* prefix = "oneTBB dynamic link warning:";
         const char* str = nullptr;
         // Note: dlerr_t depends on OS: it is char const * on Linux* and macOS*, int on Windows*.
 #if _WIN32
         #define DLERROR_SPECIFIER "%d"
-        typedef long dlerr_t;
+        typedef DWORD dlerr_t;
 #else
         #define DLERROR_SPECIFIER "%s"
         typedef const char* dlerr_t;
@@ -212,7 +216,7 @@ namespace r1 {
     } // library_warning
 #undef DLERROR_SPECIFIER
 #else
-    static void dynamic_link_warning( dynamic_link_error_t code, ... ) {
+    static void dynamic_link_warning( int code, ... ) {
         suppress_unused_warning(code);
     } // library_warning
 #endif  // TBB_DYNAMIC_LINK_WARNING

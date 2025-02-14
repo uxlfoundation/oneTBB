@@ -113,18 +113,18 @@ void dynamic_unlink_all();
 // print detailed information when the errors appear, DYNAMIC_LINK_WARNING macro
 // needs to be defined, accepting one of these enum values as its first
 // parameter and a variable parameter args. The parameters in this list are
-// described below per each error along with the situation when it arises.
+// described below per each error along with the situation when it arises. The
+// enumeration starts from '1' to distinguish the error values from no error
+// value, which is usually equals to zero.
 //
 // To use the default implementation for DYNAMIC_LINK_WARNING macro,
 // TBB_DYNAMIC_LINK_WARNING macro needs to be set during compilation.
 //
 // Note: dlerr_t depends on OS: it is char const * on Linux* and macOS*, int on
 // Windows*.
-enum dynamic_link_error_t {
-    dl_success = 0,
-
+enum dynamic_link_error_t : int {
     // Library is not found
-    dl_lib_not_found,           // char const * lib, dlerr_t err
+    dl_lib_not_found = 1,       // char const * lib, dlerr_t err
 
     // Symbol is not found
     dl_sym_not_found,           // char const * sym, dlerr_t err
