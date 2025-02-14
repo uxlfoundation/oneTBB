@@ -587,7 +587,7 @@ namespace r1 {
         case TRUST_E_NOSIGNATURE:
         {
             // The file is not signed or has an invalid signature.
-            auto lerr = dlerror();
+            LONG lerr = (LONG)dlerror();
             if (lerr == TRUST_E_NOSIGNATURE || lerr == TRUST_E_SUBJECT_FORM_UNKNOWN ||
                 lerr == TRUST_E_PROVIDER_UNKNOWN)
             {
