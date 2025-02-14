@@ -37,7 +37,7 @@ foreach(hwloc_version ${HWLOC_REQUIRED_VERSIONS})
 
         set_target_properties(${HWLOC_TARGET_NAME} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES
             "${CMAKE_HWLOC_${hwloc_version}_INCLUDE_PATH}")
-        if (WIN32)
+        if (WIN32 AND NOT hwloc_version MATCHES "STATIC")
             set_target_properties(${HWLOC_TARGET_NAME} PROPERTIES
                                   IMPORTED_LOCATION "${CMAKE_HWLOC_${hwloc_version}_DLL_PATH}"
                                   IMPORTED_IMPLIB   "${CMAKE_HWLOC_${hwloc_version}_LIBRARY_PATH}")
