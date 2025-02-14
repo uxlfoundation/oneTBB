@@ -19,7 +19,7 @@ foreach(hwloc_version ${HWLOC_REQUIRED_VERSIONS})
 
     string(TOUPPER ${hwloc_version} hwloc_version)
 
-    if (NOT WIN32)
+    if (NOT WIN32 OR hwloc_version MATCHES "STATIC")
         set(CMAKE_HWLOC_${hwloc_version}_DLL_PATH STUB)
     endif()
 
@@ -45,7 +45,6 @@ foreach(hwloc_version ${HWLOC_REQUIRED_VERSIONS})
             set_target_properties(${HWLOC_TARGET_NAME} PROPERTIES
                                   IMPORTED_LOCATION "${CMAKE_HWLOC_${hwloc_version}_LIBRARY_PATH}")
         endif()
-        unset(_hwloc_library_type)
     endif()
 
     if (TARGET ${HWLOC_TARGET_NAME})
@@ -54,6 +53,7 @@ foreach(hwloc_version ${HWLOC_REQUIRED_VERSIONS})
 endforeach()
 
 unset(HWLOC_TARGET_NAME)
+unset(_hwloc_library_type)
 
 if (NOT HWLOC_TARGET_EXPLICITLY_DEFINED AND
     NOT TBB_DISABLE_HWLOC_AUTOMATIC_SEARCH
