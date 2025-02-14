@@ -549,12 +549,12 @@ namespace r1 {
      * Checks if the file exists and is a regular file.
      */
     bool file_exists(const char* path) {
-#if __linux__
-        struct stat st;
-        return stat(path, &st) == 0 && S_ISREG(st.st_mode);
-#elif _WIN32
+#if _WIN32
         const DWORD attributes = GetFileAttributesA(path);
         return attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY);
+#else
+        struct stat st;
+        return stat(path, &st) == 0 && S_ISREG(st.st_mode);
 #endif
     }
 
