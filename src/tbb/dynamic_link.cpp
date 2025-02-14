@@ -126,6 +126,7 @@ namespace r1 {
     // Report runtime errors and continue.
     #define DYNAMIC_LINK_WARNING dynamic_link_warning
 #if TBB_DYNAMIC_LINK_WARNING
+#define __DYNAMIC_LINK_REPORT_SIGNATURE_ERRORS 1
     // Accepting 'int' instead of 'dynamic_link_error_t' allows to avoid the warning about undefined
     // behavior when an object passed to 'va_start' undergoes default argument promotion. Yet the
     // implicit promotion from 'dynamic_link_error_t' to its underlying type done at the place of a
@@ -220,6 +221,9 @@ namespace r1 {
         suppress_unused_warning(code);
     } // library_warning
 #endif  // TBB_DYNAMIC_LINK_WARNING
+
+#elif defined(DYNAMIC_LINK_WARNING)
+#define __DYNAMIC_LINK_REPORT_SIGNATURE_ERRORS 1
 #endif /* !defined(DYNAMIC_LINK_WARNING) && !__TBB_WIN8UI_SUPPORT && __TBB_DYNAMIC_LOAD_ENABLED */
 
     static bool resolve_symbols( dynamic_link_handle module, const dynamic_link_descriptor descriptors[], std::size_t required )
@@ -576,7 +580,8 @@ namespace r1 {
         return actual_length;
     }
 
-    void report_signature_validation_status(const LONG retval, const char* filepath) {
+#if __DYNAMIC_LINK_REPORT_SIGNATURE_ERRORS
+    void report_signature_verification_error(const LONG retval, const char* filepath) {
         switch (retval) {
         case ERROR_SUCCESS:
             // The file is signed:
@@ -615,6 +620,9 @@ namespace r1 {
             break;
         }
     }
+#else /* __DYNAMIC_LINK_REPORT_SIGNATURE_ERRORS */
+    void report_signature_verification_error(const LONG /*retval*/, const char* /*filepath*/) {}
+#endif /* __DYNAMIC_LINK_REPORT_SIGNATURE_ERRORS */
 
     /**
      * Validates signature of specified file.
@@ -657,7 +665,7 @@ namespace r1 {
         pWVTData.dwUIContext         = WTD_UICONTEXT_EXECUTE;          // UI Context to run the file
 
         const LONG rc = WinVerifyTrust((HWND)INVALID_HANDLE_VALUE, &pgActionID, &pWVTData);
-        report_signature_validation_status(rc, filepath);
+        report_signature_verification_error(rc, filepath);
 
         pWVTData.dwStateAction = WTD_STATEACTION_CLOSE;       // Release WVT state data
         (void)WinVerifyTrust(NULL, &pgActionID, &pWVTData);
