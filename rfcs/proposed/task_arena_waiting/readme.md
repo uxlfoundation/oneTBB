@@ -135,9 +135,15 @@ for(unsigned j = 0; j < numa_arenas.size(); j++) {
 }
 ```
 
-Additionally, a task group parameter can also be added to `execute` as well as to `this_task_arena::isolate`,
-which is similar to `execute` but provides additional work isolation guarantees. That would make
-the experimental `isolated_task_group` class fully obsolete.
+It makes sense to also consider work isolation for this API. While waiting for task group completion,
+the thread can take unrelated tasks for execution, and that can potentially result in a delayed return
+and in latency increase. To prevent that, the tasks in the group should carry a unique tag that is
+also specified for the waiting call. The `isolated_task_group` preview class provides this functionality,
+but not the regular `task_group`. We can consider the following options for supporting isolation
+in `task_arena::wait_for(task_group&)`:
+- keep the `isolated_task_group` class and support it in the proposed `task_arena` extensions;
+- somehow extend the `task_group` class to optionally support work isolation (might require incompatible changes);
+- add an isolation tag (automatically or on demand) only when a `task_group` is used with `task_arena`.
 
 ### 2. Reconsider waiting for all tasks
 
@@ -169,8 +175,8 @@ should *block with progress delegation*, as described below.
 
 ### 3. Consider API for progress delegation
 
-Of the three options outlined above for application thread participation, the second one - exchanging
-an application thread for a TBB thread in the arena, or *progress delegation* - seems the least risky.
+Of the outlined options for [application thread participation](#participation-of-application-threads),
+exchanging an application thread for a TBB thread in the arena, or *progress delegation*, seems the least risky.
 At minimum, it would enforce mandatory concurrency similarly to `enqueue`; it might also increment
 the total demand for TBB worker threads, rebalance threads between active arenas, and in a more sophisticated
 case could even ensure that a certain arena gets a temporary boost during rebalancing.
@@ -191,4 +197,5 @@ ta.block_with_progress_delegation([]{ std::this_thread::sleep_for(100ms); });
 ## Open Questions
 
 - API names and semantic details need to be further elaborated
+- Whether/how work isolation is supported needs to be decided
 - Implementation feasibility for (2) and (3) needs to be explored
