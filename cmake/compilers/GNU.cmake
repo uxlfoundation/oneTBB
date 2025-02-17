@@ -55,16 +55,18 @@ execute_process(
     ERROR_STRIP_TRAILING_WHITESPACE
 )
 set(ASSEMBLER_VERSION_LINE ${ASSEMBLER_VERSION_LINE_OUT}${ASSEMBLER_VERSION_LINE_ERR})
-string(REGEX REPLACE ".*GNU assembler version ([0-9]+)\\.([0-9]+).*" "\\1" _tbb_gnu_asm_major_version "${ASSEMBLER_VERSION_LINE}")
-string(REGEX REPLACE ".*GNU assembler version ([0-9]+)\\.([0-9]+).*" "\\2" _tbb_gnu_asm_minor_version "${ASSEMBLER_VERSION_LINE}")
-unset(ASSEMBLER_VERSION_LINE_OUT)
-unset(ASSEMBLER_VERSION_LINE_ERR)
-unset(ASSEMBLER_VERSION_LINE)
-message(TRACE "Extracted GNU assembler version: major=${_tbb_gnu_asm_major_version} minor=${_tbb_gnu_asm_minor_version}")
+if ("${ASSEMBLER_VERSION_LINE}" MATCHES "GNU assembler version")
+    string(REGEX REPLACE ".*GNU assembler version ([0-9]+)\\.([0-9]+).*" "\\1" _tbb_gnu_asm_major_version "${ASSEMBLER_VERSION_LINE}")
+    string(REGEX REPLACE ".*GNU assembler version ([0-9]+)\\.([0-9]+).*" "\\2" _tbb_gnu_asm_minor_version "${ASSEMBLER_VERSION_LINE}")
+    unset(ASSEMBLER_VERSION_LINE_OUT)
+    unset(ASSEMBLER_VERSION_LINE_ERR)
+    unset(ASSEMBLER_VERSION_LINE)
+    message(TRACE "Extracted GNU assembler version: major=${_tbb_gnu_asm_major_version} minor=${_tbb_gnu_asm_minor_version}")
 
-math(EXPR _tbb_gnu_asm_version_number  "${_tbb_gnu_asm_major_version} * 1000 + ${_tbb_gnu_asm_minor_version}")
-set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} "-D__TBB_GNU_ASM_VERSION=${_tbb_gnu_asm_version_number}")
-message(STATUS "GNU Assembler version: ${_tbb_gnu_asm_major_version}.${_tbb_gnu_asm_minor_version}  (${_tbb_gnu_asm_version_number})")
+    math(EXPR _tbb_gnu_asm_version_number  "${_tbb_gnu_asm_major_version} * 1000 + ${_tbb_gnu_asm_minor_version}")
+    set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} "-D__TBB_GNU_ASM_VERSION=${_tbb_gnu_asm_version_number}")
+    message(STATUS "GNU Assembler version: ${_tbb_gnu_asm_major_version}.${_tbb_gnu_asm_minor_version}  (${_tbb_gnu_asm_version_number})")
+endif()
 
 # Enable Intel(R) Transactional Synchronization Extensions (-mrtm) and WAITPKG instructions support (-mwaitpkg) on relevant processors
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "(AMD64|amd64|i.86|x86)" AND NOT EMSCRIPTEN)
