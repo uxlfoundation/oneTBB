@@ -41,6 +41,29 @@ function and its return type, `task_handle`, are the foundation of the proposed 
         void cancel();
     };
 
+The oneTBB specification requires the function objects `Func` provided as arguments into `run`, `defer` and `run_and_wait` functions to be instances of
+C++ [FunctionObject](https://en.cppreference.com/w/cpp/named_req/FunctionObject) and does not specify the return type. 
+
+Current oneTBB implementation provides a [preview feature](https://www.intel.com/content/www/us/en/docs/onetbb/developer-guide-api-reference/2021-9/task-group-extensions.html)
+extending these requirements to better support
+[Task Scheduler Bypass](https://www.intel.com/content/www/us/en/docs/onetbb/developer-guide-api-reference/2021-6/task-scheduler-bypass.html).
+It allows the `Func` to be an instance of C++ `FunctionObject` returning `tbb::task_handle` representing a hint for the next task that should be executed:
+
+    #define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
+    #include <tbb/task_group.h>
+
+    tbb::task_group tg;
+
+    auto split_task = [&tg] -> tbb::task_handle {
+        auto first_task_handle = tg.defer([] { ... });
+        auto second_task_handle = tg.defer([] { ... });
+
+        tg.run(std::move(second_task_handle));
+        return std::move(first_task_handle);
+    };
+
+    g.run_and_wait(split_task);
+
 ## Proposal
 
 The following list summarizes the three primary extensions that are under
@@ -56,7 +79,7 @@ only be waited on as a group, with no direct way to define before-after
 relationships between individual tasks.
 3. **Add a function to move successors from an executing task to a new task.**
 This functionality is necessary for recursively generated task graphs. It enables
-safe modifification of dependencies for an already submitted task.
+safe modification of dependencies for an already submitted task.
 
 ### Extend the Semantics and Useful Lifetime of task_handle
 
@@ -96,6 +119,17 @@ may represent a task that depends on predecessors that must complete before it c
 In that case, passing a `task_handle` to `task_group::run` or `task_group::run_and_wait` only makes
 it available for dependency tracking but does not make it immediately eligible for execution.
 
+Since `task_group::run` and `task_group::run_and_wait` currently accepting `task_handle` as rvalue that
+allows the `task_group` to move-construct or move-assign from the received handle and transit it into the
+empty state. Hence, some changes in `run` and `run_and_wait` semantics would also be required to handle the
+`task_handle` argument differently to support the extension of its useful lifetime. One of the possible options
+is to add overloads for `run` and `run_and_wait` accepting `const task_handle&` argument.
+
+An other aspect that should be addressed is co-existence of the proposed semantics for `task_handle` with the currently
+available preview feature that allows to return `task_handle` from the function object passed into `run` or `run_and_wait`. 
+The option is to allow also returning the `task_handle` representing a task with added dependencies from the function object
+to make it visible for tracking the dependencies.
+
 ### Add Functions to Set Dependencies.
 
 The next logical extension is to add a mechanism for specifying dependencies
@@ -134,15 +168,13 @@ for adding `h1` as a predecessor (in-dependence) of `h2` include:
 
 - `h2.add_predecessor(h1)`
 - `h2 = defer([]() { … }, h1)`
-- `make_edge(h1, h2)`
+- `task_group::make_edge(h1, h2)` or other spellings expressing left-to-right ordering semantics, such as
+`task_group::set_dependency(h1, h2)`, `task_group::connect(h1, h2)`, etc.
 
-The proposal is to include the first option. Similarly, there could be
-a version of this function that accepts multiple predecessors
+Similarly, there could be a version of this function that accepts multiple predecessors
 at once:
 
 - `h.add_predecessors(h1, ..., hn)`
-
-This initial proposal does not include this function, but it can be added later.
 
 In the general case, it is undefined behavior to add a new predecessor
 to a task in the submitted, executing, or completed states.
@@ -152,7 +184,7 @@ to a task in the submitted, executing, or completed states.
 A very common use case for oneTBB tasks is parallel recursive decomposition. 
 An example of this is the implementation of `tbb::parallel_for` that 
 performs a parallel recursive decomposition of a range. Currently,
-the oneTBB algorithms, such as tbb::parallel_for, are implemented using the non-public,
+the oneTBB algorithms, such as `tbb::parallel_for`, are implemented using the non-public,
 low-level tasking API, rather than `tbb::task_group`. This low-level tasking API
 puts the responsibility for dependence tracking and memory
 management of tasks on developers. While it allows the oneTBB development team to build highly optimized
@@ -196,69 +228,11 @@ by a dependence on the current task itself, so we can ensure that we can safely
 update the incoming dependencies for those tasks without worrying about
 potential race conditions. 
 
-One possible spelling for this function would be `transfer_successors_to(h)`, 
+One possible spelling for this function would be `tbb::transfer_successors_to(h)`, 
 Where `h` is a `task_handle` to a created task, and the 
 `transfer_successors_to` function must be called from within a task. Calling
 this function from outside a task or passing anything other than a `task_handle`
 representing a task in the created state is undefined behavior.
-
-### Proposed Changes for `task_handle` and `task_group`
-
-    namespace oneapi {
-    namespace tbb {
-        class task_handle {
-        public:
-
-            // existing functions
-            task_handle();
-            task_handle(task_handle&& src);
-            ~task_handle();
-            task_handle& operator=(task_handle&& th);
-            explicit operator bool() const noexcept;
-
-            // proposed addition
-            void add_predecessor(task_handle& th);
-        };
-
-        class task_group {
-        public:
-            task_group();
-            task_group(task_group_context& context);
-
-            ~task_group();
-
-            template<typename Func>
-            void run(Func&& f);
-
-            template<typename Func>
-            task_handle defer(Func&& f);
-
-            void run(task_handle&& h);
-
-            template<typename Func>
-            task_group_status run_and_wait(const Func& f);
-
-            task_group_status run_and_wait(task_handle&& h);
-
-            task_group_status wait();
-            void cancel();
-
-            // proposed addition
-            static void transfer_successors_to(task_handle& th);
-        };
-    }
-    }
-
-
-#### void task_handle::add_predecessor(task_handle& th);
-
-Adds `th` as a predecessor that must complete before the task represented by
-`*this` can start executing.
-
-#### void task_group::transfer_successors_to(task_handle& th);
-
-Transfers all of the successors from the currently executing task to the task 
-represented by `th`.
 
 ### Examples
 
@@ -366,13 +340,26 @@ This task tree matches the one shown earlier for merge-sort.
 
 ## Open Questions in Design
 
-Some open questions that remain:
-
+Questions that should be addressed before moving into `experimental` and providing a preview feature:
 - Are the suggested APIs sufficient?
+- Are there additional use cases that should be considered that we missed in our analysis?
+- Semantics for `task_arena::enqueue` method that takes a `task_handle` object should be defined for all possible states of the handle.
+- What are the performance targets for this feature?
+- What are the exit criteria for a feature to become fully supported?
+- The API applicability for other usage scenarios should be checked, e.g.:
+  * A wavefront example representing tasks with multiple successors and predecessors
+  * Fibonacci example
+  * A two-stage parallel scan
+  * Other non-trivial divide-and-conquer patterns
+
+Questions that should be addressed before the future movement into `supported` and having a fully supported feature:
 - Should we add a function to adds more than one predecessor as single call, such as `add_predecessors`?
 - Should we add functions that merge creation and definition of predecessor tasks, such as
-`template <typename Func> add_predecessor(Func&& f);`.
-- Are there additional use cases that should be considered that we missed in our analysis?
+`template <typename Func> add_predecessor(Func&& f);`?
+- Should we add a function that indicates that the task handled by `task_handle` object is completed, such as
+`bool task_handle::is_completed()`?
+- Should the API combining creating of the task and setting dependencies/transferring successors be added? Something like
+`task_handle::add_predecessor(Func)` where `Func` is the body of the predecessor.
+
+Questions that does not directly affects the API proposed but should be addressed in the future:
 - Are there other parts of the pre-oneTBB tasking API that developers have struggled to find a good alternative for?
-- What are the performance targets for this feature?
-- Assuming this will be targeted initially as an experimental feature, what are the exit criteria?
