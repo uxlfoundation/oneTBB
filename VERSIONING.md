@@ -73,7 +73,7 @@ release can be used during the development of the application.
 
 On Windows, the TBB binary library has only the major version number, tbb12.dll.
 
-### How Backwards Compatibility is Maintained in the oneTBB library
+## API versioning used to maintain backwards compatibility
 
 This section is targeted at oneTBB contributors and will likely not be of interest to users of the
 oneTBB library.
