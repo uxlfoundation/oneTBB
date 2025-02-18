@@ -300,22 +300,27 @@ function(tbb_add_tbbbind_test)
         )
     endif()
 
-    if (TARGET HWLOC::hwloc_static)
-        # TBBBind is statically linked with HWLOC is available,
+    if (TARGET TBB::tbbbind)
+        # TBBBind which is statically linked with HWLOC is available,
         # so in the environment without HWLOC, it should be found.
         set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
             PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*tbbbind"
             FAIL_REGULAR_EXPRESSION "Status:.*FAILURE"
         )
-        # Don't export symbols from HWLOC archive library
-        target_link_options(${_tbbbind_test_NAME} PRIVATE $<$<BOOL:UNIX>:-Wl,--exclude-libs,ALL>)
-        target_link_libraries(${_tbbbind_test_NAME} PRIVATE HWLOC::hwloc_static)
-        target_compile_definitions(${_tbbbind_test_NAME} PRIVATE __TBB_HWLOC_VALID_ENVIRONMENT)
+
+        target_compile_definitions(${_tbbbind_test_NAME} PRIVATE __TBB_PORTABLE_TBBBIND_AVAILABLE)
     else()
         set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
             PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*UNAVAILABLE"
             FAIL_REGULAR_EXPRESSION "Status:.*FAILURE"
         )
+    endif()
+
+    if (TARGET HWLOC::hwloc_static)
+        # Don't export symbols from HWLOC archive library
+        target_link_options(${_tbbbind_test_NAME} PRIVATE $<$<BOOL:UNIX>:-Wl,--exclude-libs,ALL>)
+        target_link_libraries(${_tbbbind_test_NAME} PRIVATE HWLOC::hwloc_static)
+        target_compile_definitions(${_tbbbind_test_NAME} PRIVATE __TBB_HWLOC_VALID_ENVIRONMENT)
     endif()
 
     if (TARGET HWLOC::hwloc_stub)
@@ -378,7 +383,7 @@ endfunction()
 # Copy libraries to test folder to make it visible during tests execution if external TBB is tested.
 # TODO: check and update for multi-config generators.
 if (TBB_FOUND)
-    list(APPEND _tbb_test_components tbb tbbmalloc tbbmalloc_proxy tbbbind tbbbind_2_0 tbbbind_2_5 tbbbind_standalone)
+    list(APPEND _tbb_test_components tbb tbbmalloc tbbmalloc_proxy tbbbind tbbbind_2_0 tbbbind_2_5)
     foreach(_component ${_tbb_test_components})
         if (TARGET TBB::${_component})
             get_property(${_component}_lib_file_location TARGET TBB::${_component} PROPERTY LOCATION)
