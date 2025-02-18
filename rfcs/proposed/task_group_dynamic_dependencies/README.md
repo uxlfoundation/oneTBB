@@ -228,7 +228,7 @@ by a dependence on the current task itself, so we can ensure that we can safely
 update the incoming dependencies for those tasks without worrying about
 potential race conditions. 
 
-One possible spelling for this function would be `tbb::transfer_successors_to(h)`, 
+One possible spelling for this function would be `transfer_successors_to(h)`, 
 Where `h` is a `task_handle` to a created task, and the 
 `transfer_successors_to` function must be called from within a task. Calling
 this function from outside a task or passing anything other than a `task_handle`
@@ -343,23 +343,24 @@ This task tree matches the one shown earlier for merge-sort.
 Questions that should be addressed before moving into `experimental` and providing a preview feature:
 - Are the suggested APIs sufficient?
 - Are there additional use cases that should be considered that we missed in our analysis?
-- Semantics for `task_arena::enqueue` method that takes a `task_handle` object should be defined for all possible states of the handle.
+- Semantics for `task_handle` objects usages by `task_group` and `task_arena` should be defined for all possible states of the handle:
+  * `task_group::run(task_handle&&)` and `task_group::run_and_wait(task_handle&&)`,
+  * `task_arena::enqueue(task_handle&&)` and `this_task_arena::enqueue(task_handle&&)`,
+  * Returning a `task_handle` from a `task_group` task body when the preview `task_group` extensions are enabled.
 - What are the performance targets for this feature?
 - What are the exit criteria for a feature to become fully supported?
-- The API applicability for other usage scenarios should be checked, e.g.:
-  * A wavefront example representing tasks with multiple successors and predecessors
-  * Fibonacci example
-  * A two-stage parallel scan
-  * Other non-trivial divide-and-conquer patterns
 
 Questions that should be addressed before the future movement into `supported` and having a fully supported feature:
 - Should we add a function to adds more than one predecessor as single call, such as `add_predecessors`?
 - Should we add functions that merge creation and definition of predecessor tasks, such as
 `template <typename Func> add_predecessor(Func&& f);`?
-- Should we add a function that indicates that the task handled by `task_handle` object is completed, such as
-`bool task_handle::is_completed()`?
-- Should the API combining creating of the task and setting dependencies/transferring successors be added? Something like
-`task_handle::add_predecessor(Func)` where `Func` is the body of the predecessor.
+- Should we add functions indicating the state changes by the task handled by `task_handle` object, such as
+`bool task_handle::is_completed()` and `bool task_handle::is_submitted()`?
+- The API applicability for other usage scenarios should be checked, e.g.:
+  * A wavefront example representing tasks with multiple successors and predecessors
+  * Fibonacci example
+  * A two-stage parallel scan
+  * Other non-trivial divide-and-conquer patterns
 
 Questions that does not directly affects the API proposed but should be addressed in the future:
 - Are there other parts of the pre-oneTBB tasking API that developers have struggled to find a good alternative for?
