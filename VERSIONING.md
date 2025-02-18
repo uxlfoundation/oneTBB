@@ -98,7 +98,7 @@ by the oneTBB runtime library:
     }
     }
 
-This function is in the runtime namespace 'r1' and takes `d1` versions of `task_group_context` and 
+This function is in the runtime namespace `r1` and takes `d1` versions of `task_group_context` and 
 `filter_node` classes as arguments. Backward incompatible changes added to the library can be added 
 to namespaces with incremented version numbers.
 
