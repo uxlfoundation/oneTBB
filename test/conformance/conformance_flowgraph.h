@@ -346,9 +346,10 @@ struct copy_counting_object {
         copy_count(0), copies_count(0), assign_count(0), is_copy(false) {}
 
     copy_counting_object( const copy_counting_object<OutputType, InputType>& other ):
-        copy_count(other.copy_count + 1), is_copy(true) {
-            ++other.copies_count;
-        }
+        copy_count(other.copy_count + 1), copies_count(0), assign_count(0), is_copy(true)
+    {
+        ++other.copies_count;
+    }
 
     copy_counting_object& operator=( const copy_counting_object<OutputType, InputType>& other ) {
         assign_count = other.assign_count + 1;
