@@ -49,7 +49,7 @@ and therefore can safely use the newer binary library.
 [As described in the specification](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/configuration/version_information),
 the macros `TBB_INTERFACE_VERSION_MAJOR`, `TBB_INTERFACE_VERSION_MINOR`, `TBB_INTERFACE_VERSION` in `oneapi/tbb/version.h`
 can be used to determine the interface version of the implementation that is being compiled against. The function
-`const char* TBB_runtime_interface_version();` can be used to query the interface version of the oneTBB binary library that is
+`int TBB_runtime_interface_version();` can be used to query the interface version of the oneTBB binary library that is
 loaded at runtime.
 
 ### Shared Library Practices for Linux
