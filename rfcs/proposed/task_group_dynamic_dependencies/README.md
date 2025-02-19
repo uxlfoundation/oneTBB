@@ -119,7 +119,7 @@ may represent a task that depends on predecessors that must complete before it c
 In that case, passing a `task_handle` to `task_group::run` or `task_group::run_and_wait` only makes
 it available for dependency tracking but does not make it immediately eligible for execution.
 
-Since `task_group::run` and `task_group::run_and_wait` currently accepting `task_handle` as rvalue that
+Since `task_group::run` and `task_group::run_and_wait` currently accept `task_handle` as an rvalue that
 allows the `task_group` to move-construct or move-assign from the received handle and transit it into the
 empty state. Hence, some changes in `run` and `run_and_wait` semantics would also be required to handle the
 `task_handle` argument differently to support the extension of its useful lifetime. One of the possible options
