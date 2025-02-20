@@ -155,7 +155,7 @@ public:
     }
 };
 
-class wait_tree_vertex_interface {
+class __TBB_lto_visibility_public wait_tree_vertex_interface {
 public:
     virtual void reserve(std::uint32_t delta = 1) = 0;
     virtual void release(std::uint32_t delta = 1) = 0;
