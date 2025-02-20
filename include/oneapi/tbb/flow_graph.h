@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -85,7 +85,7 @@ class continue_msg {};
 } // namespace d2
 
 #if __TBB_CPP20_CONCEPTS_PRESENT
-namespace d0 {
+inline namespace d0 {
 
 template <typename ReturnType, typename OutputType>
 concept node_body_return_type = std::same_as<OutputType, tbb::detail::d2::continue_msg> ||
@@ -127,7 +127,7 @@ template <typename Body, typename Input, typename GatewayType>
 concept async_node_body = std::copy_constructible<Body> &&
                           std::invocable<Body&, const Input&, GatewayType&>;
 
-} // namespace d0
+} // inline namespace d0
 #endif // __TBB_CPP20_CONCEPTS_PRESENT
 
 namespace d2 {

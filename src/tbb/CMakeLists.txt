@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2024 Intel Corporation
+# Copyright (c) 2020-2025 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -163,7 +163,7 @@ if (TBB_INSTALL)
         # to support previous user experience for linkage.
         install(FILES
                 $<TARGET_LINKER_FILE:tbb>
-                DESTINATION lib
+                DESTINATION ${CMAKE_INSTALL_LIBDIR}
                 CONFIGURATIONS RelWithDebInfo Release MinSizeRel
                 RENAME tbb.lib
                 COMPONENT devel
@@ -171,7 +171,7 @@ if (TBB_INSTALL)
 
         install(FILES
                 $<TARGET_LINKER_FILE:tbb>
-                DESTINATION lib
+                DESTINATION ${CMAKE_INSTALL_LIBDIR}
                 CONFIGURATIONS Debug
                 RENAME tbb_debug.lib
                 COMPONENT devel
@@ -180,7 +180,7 @@ if (TBB_INSTALL)
     if(TBB_LINUX_SEPARATE_DBG)
         install(FILES
                 $<TARGET_FILE:tbb>.dbg
-                DESTINATION lib
+                DESTINATION ${CMAKE_INSTALL_LIBDIR}
                 COMPONENT devel
         )
     endif()

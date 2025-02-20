@@ -107,5 +107,7 @@ the received 3D subrange in nested loops, using the method ``dim`` to get
 the loop boundaries for each dimension.
 
 
-.. literalinclude:: ./snippets/blocked_nd_range_example.h
+.. literalinclude:: ./examples/blocked_nd_range_example.cpp
    :language: c++
+   :start-after: /*begin_blocked_nd_range_example*/
+   :end-before: /*end_blocked_nd_range_example*/

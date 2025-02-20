@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2024 Intel Corporation
+# Copyright (c) 2020-2025 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ endif()
 # information is written to either stdout or stderr. To not make any
 # assumptions, both are captured.
 execute_process(
-    COMMAND ${CMAKE_COMMAND} -E env "LANG=C" ${CMAKE_CXX_COMPILER} -xc -c /dev/null -Wa,-v -o/dev/null
+    COMMAND ${CMAKE_COMMAND} -E env "LC_ALL=C" "LANG=C" ${CMAKE_CXX_COMPILER} -xc -c /dev/null -Wa,-v -o/dev/null
     OUTPUT_VARIABLE ASSEMBLER_VERSION_LINE_OUT
     ERROR_VARIABLE ASSEMBLER_VERSION_LINE_ERR
     OUTPUT_STRIP_TRAILING_WHITESPACE
@@ -83,8 +83,8 @@ if (NOT ${CMAKE_CXX_COMPILER_ID} STREQUAL Intel)
     set(TBB_DSE_FLAG $<$<NOT:$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},6.0>>:-flifetime-dse=1>)
     set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} $<$<NOT:$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},8.0>>:-fstack-clash-protection>)
 
-    # Suppress GCC 12.x-13.x warning here that to_wait_node(n)->my_is_in_list might have size 0
-    set(TBB_COMMON_LINK_FLAGS ${TBB_COMMON_LINK_FLAGS} $<$<AND:$<NOT:$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},12.0>>,$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},14.0>>:-Wno-stringop-overflow>)
+    # Suppress GCC 12.x-14.x warning here that to_wait_node(n)->my_is_in_list might have size 0
+    set(TBB_COMMON_LINK_FLAGS ${TBB_COMMON_LINK_FLAGS} $<$<AND:$<NOT:$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},12.0>>,$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},15.0>>:-Wno-stringop-overflow>)
 endif()
 
 # Workaround for heavy tests and too many symbols in debug (rellocation truncated to fit: R_MIPS_CALL16)
