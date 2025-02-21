@@ -131,11 +131,11 @@ Functions
 
 .. cpp:function:: void this_task_arena::start_parallel_phase()
 
-    Indicate the start of parallel phase in internal task arena representation.
+    Indicate the start of parallel phase in the current ``task_arena``.
 
 .. cpp:function:: void this_task_arena::end_parallel_phase(bool with_fast_leave = false)
 
-    Indicate the end of parallel phase in internal task arena representation.
+    Indicate the end of parallel phase in the current ``task_arena``.
     If ``with_fast_leave`` is true, worker threads' leave policy is temporarily overridden to ``fast``.
 
 Example
