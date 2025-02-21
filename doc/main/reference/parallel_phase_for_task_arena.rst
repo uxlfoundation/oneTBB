@@ -107,7 +107,7 @@ Member types and constants
 .. cpp:function:: scoped_parallel_phase::scoped_parallel_phatse(task_arena& ta, bool with_fast_leave = false)
 
     Constructs a scoped_parallel_phase object that starts a parallel phase in the specified ``task_arena``.
-    If ``with_fast_leave`` is true, worker threads are not retained in the ``task_arena`` after the parallel phase's end.
+    If ``with_fast_leave`` is true, worker threads' leave policy is temporarily overridden to ``fast``.
 
 Member Functions
 ----------------
@@ -151,4 +151,4 @@ it is expected that worker threads shouldn't be retained in ``task_arena`` when 
 
 However, there is a sequence of parallel work (initializing and sorting data) interceded by serial work (prefix sum).
 To hint the start and end of parallel work, ``scoped_parallel_phase`` is used. This allows to hint the scheduler
-that worker threads might need to wait for next parallel work to come.
+that worker threads might need to idle more in ``task_arena`` as next parallel work will come soon.
