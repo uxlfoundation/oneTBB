@@ -15,6 +15,7 @@ Description
 
 This feature extends the `tbb::task_arena specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_arena/task_arena_cls>`_
 with the following API:
+
 * Adds the ``leave_policy`` enumeration class to ``task_arena``.
 * Adds ``leave_policy`` as the last parameter in ``task_arena`` constructors and ``task_arena::initialize`` methods.
   This allows to choose retention policy for worker threads in case when no more parallel work in the arena. 
