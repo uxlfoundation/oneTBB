@@ -62,7 +62,7 @@ It allows the `Func` to be an instance of C++ `FunctionObject` returning `tbb::t
         return std::move(first_task_handle);
     };
 
-    g.run_and_wait(split_task);
+    tg.run_and_wait(split_task);
 
 ## Proposal
 
@@ -269,14 +269,19 @@ dynamically. The state of the predecessors is unknown. The
 `users::find_predecessors` function returns, based on application
 logic, the tasks that must complete before the new work can start.
 
-    void add_another_task(tbb::task_group& tg, int work_id) {
+    tbb::task_handle add_another_task(tbb::task_group& tg, int work_id) {
         tbb::task_handle new_task = tg.defer([=] { do_work(work_id); });
 
         for (tbb::task_handle& p : users::find_predecessors(work_id)) {
             new_task.add_predecessor(p);
         }
 
-        tg.run(std::move(new_task));
+        tg.run(new_task);
+
+        // Return the newly created task to the caller since it can be added
+        // to the user-defined predecessors list and be visible as a predecessor
+        // for other tasks
+        return new_task;
     }
 
 While the graph, as shown below, is simple, the completion status of the predecessors
@@ -341,8 +346,6 @@ This task tree matches the one shown earlier for merge-sort.
 ## Open Questions in Design
 
 Questions that should be addressed before moving into `experimental` and providing a preview feature:
-- Are the suggested APIs sufficient?
-- Are there additional use cases that should be considered that we missed in our analysis?
 - Semantics for `task_handle` objects usages by `task_group` and `task_arena` should be defined for all possible states of the handle:
   * `task_group::run(task_handle&&)` and `task_group::run_and_wait(task_handle&&)`,
   * `task_arena::enqueue(task_handle&&)` and `this_task_arena::enqueue(task_handle&&)`,
