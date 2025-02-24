@@ -149,9 +149,9 @@ the additional reference counter would be held and released when the item is rem
 
 From the implementation perspective, working with metainformation is exposed by adding the new internal virtual functions in the Flow Graph:
 
-| Base Template Class | Existing Function Signature   | New Function Signature                              | Information                                      |
+| Base Template Class | Existing Function Signature   | New Function Signatures                             | Information                                      |
 |---------------------|-------------------------------|-----------------------------------------------------|--------------------------------------------------|
-| receiver            | bool try_put_task(const T& t) | bool try_put_task(const T& t)                       | Performs an action required by the node logic.   |
+| receiver            | bool try_put_task(const T& t) | bool try_put_task(const T& t) \n                    | Performs an action required by the node logic.   |
 |                     |                               | bool try_put_task(const T& t,                       | May buffer both ``t`` and ``metainfo``.          |
 |                     |                               |                   const message_metainfo& metainfo) | May broadcast the result and ``metainfo`` to     |
 |                     |                               |                                                     | successors of the node.                          |
