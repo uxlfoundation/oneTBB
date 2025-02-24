@@ -332,6 +332,12 @@
     #define __TBB_nodiscard
 #endif
 
+#if __clang__
+    #define __TBB_lto_visibility_public [[clang::lto_visibility_public]]
+#else
+    #define __TBB_lto_visibility_public
+#endif
+
 #define __TBB_CPP17_UNCAUGHT_EXCEPTIONS_PRESENT             (_MSC_VER >= 1900 || __GLIBCXX__ && __cpp_lib_uncaught_exceptions \
                                                             || _LIBCPP_VERSION >= 3700 && (!__TBB_MACOS_TARGET_VERSION || __TBB_MACOS_TARGET_VERSION >= 101200))
 
