@@ -28,7 +28,7 @@ extern "C" {
     extern __declspec(dllexport) void callDll();
 #else
     extern __TBB_EXPORT void callDll();
-    extern TEST_EXPORT int main();
+    extern __TBB_EXPORT int main();
 #endif
 }
 
