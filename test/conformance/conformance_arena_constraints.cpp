@@ -81,7 +81,7 @@ TEST_CASE("Test validity of NUMA interfaces when HWLOC is not present on the sys
 
 #if __TBB_PORTABLE_TBBBIND_AVAILABLE
     REQUIRE_MESSAGE(numa_indexes[0] != -1,
-        "Index of NUMA node must NOT be pinned to -1, if TBBBind is loaded regardless of HWLOC's presence.");
+        "Index of NUMA node must NOT be pinned to -1, since self-contained TBBBind is loaded.");
 #else
     REQUIRE_MESSAGE(numa_indexes.size() == 1,
         "Number of NUMA nodes must be pinned to 1, if we have no HWLOC on the system.");
