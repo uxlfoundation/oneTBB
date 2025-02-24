@@ -44,6 +44,7 @@ extern "C" {
     extern TEST_EXPORT size_t scalable_msize(void *);
     extern TEST_EXPORT size_t safer_scalable_msize (void *, size_t (*)(void*));
     extern TEST_EXPORT int anchor();
+    extern TEST_EXPORT int main();
 }
 
 extern "C" int anchor() {
@@ -114,7 +115,9 @@ extern "C" size_t safer_scalable_msize (void *, size_t (*)(void*))
     return 0;
 }
 
-int main() {}
+extern "C" int main() {
+    return 0;
+}
 
 #else  // _USRDLL
 
