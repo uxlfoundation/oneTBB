@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -174,6 +174,9 @@ static void TestExceptionClassesExports () {
 static void TestPreviewNames() {
     TestTypeDefinitionPresence2( concurrent_lru_cache<int, int> );
     TestTypeDefinitionPresence( isolated_task_group );
+    TestTypeDefinitionPresence( memory_pool_allocator<int> );
+    TestTypeDefinitionPresence( memory_pool<std::allocator<int>> );
+    TestTypeDefinitionPresence( fixed_pool );
 }
 #endif
 
@@ -274,6 +277,7 @@ static void DefinitionPresence() {
     TestTypeDefinitionPresence( tbb_allocator<int> );
     TestTypeDefinitionPresence( tick_count );
     TestTypeDefinitionPresence( global_control );
+    TestTypeDefinitionPresence( scalable_allocator<int> );
 
 #if __TBB_CPF_BUILD
     TestPreviewNames();

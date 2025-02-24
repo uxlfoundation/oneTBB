@@ -39,6 +39,9 @@
 #ifndef TBB_PREVIEW_BLOCKED_ND_RANGE_DEDUCTION_GUIDES
 #define TBB_PREVIEW_BLOCKED_ND_RANGE_DEDUCTION_GUIDES 1
 #endif
+#ifndef TBB_PREVIEW_MEMORY_POOL
+#define TBB_PREVIEW_MEMORY_POOL 1
+#endif
 #endif
 
 #include "oneapi/tbb/detail/_config.h"
