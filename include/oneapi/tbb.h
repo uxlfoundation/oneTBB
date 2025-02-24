@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -47,7 +47,9 @@
 #include "oneapi/tbb/flow_graph.h"
 #include "oneapi/tbb/global_control.h"
 #include "oneapi/tbb/info.h"
+#if TBB_PREVIEW_MEMORY_POOL
 #include "oneapi/tbb/memory_pool.h"
+#endif
 #include "oneapi/tbb/null_mutex.h"
 #include "oneapi/tbb/null_rw_mutex.h"
 #include "oneapi/tbb/parallel_for.h"
