@@ -14,8 +14,8 @@ Description
 ***********
 
 The ``blocked_nd_range`` class represents a recursively divisible N-dimensional half-open interval for the oneTBB
-parallel algorithms. This feature extends ``blocked_nd_range`` to support the Class Template Argument
-Deduction feature (starting from C++17). With that, you do not need to specify template arguments explicitly
+parallel algorithms. This feature extends ``blocked_nd_range`` to support Class Template Argument
+Deduction (starting from C++17). With that, you do not need to specify template arguments explicitly
 while creating a ``blocked_nd_range`` object if they can be inferred from the constructor arguments:
 
 .. literalinclude:: ./examples/blocked_nd_range_ctad_example.cpp
@@ -82,7 +82,7 @@ Deduction Guides
 ----------------
 
 The copy and move constructors of ``blocked_nd_range`` provide implicitly generated deduction guides. 
-In addition, the following explicit are provided:
+In addition, the following explicit deduction guides are provided:
 
 .. code:: cpp
 
@@ -91,6 +91,7 @@ In addition, the following explicit are provided:
     -> blocked_nd_range<Value, 1 + sizeof...(Values)>;
 
 **Effects**: Enables deduction when a set of ``blocked_range`` objects is passed to the ``blocked_nd_range`` constructor ``[1]``.
+
 **Constraints**: Participates in overload resolution only if all of the types in `Values` are same as `Value`.
 
 .. code:: cpp
@@ -101,12 +102,13 @@ In addition, the following explicit are provided:
 
 **Effects**: Enables deduction when a set of ``blocked_range`` objects is provided as braced-init-lists 
 to the ``blocked_nd_range`` constructor ``[1]``.
+
 **Constraints**: Participates in overload resolution only if ``sizeof...(Ns) >= 2``, and each integer ``Ni`` in ``Ns``
-is either ``2`` or ``3``, corresponding to ``blocked_range`` constructors with 2 and 3 arguments, respectfully. 
+is either ``2`` or ``3``, corresponding to ``blocked_range`` constructors with 2 and 3 arguments, respectively.
 
 .. note:: 
     The guide allows a deduction only from braced-init-lists containing objects of the same type. 
-    For ranges with non-integral ``value_type`` setting an explicit grainsize argument, 
+    For ranges with non-integral ``value_type``, setting an explicit grainsize argument, 
     is not supported by the deduction guides and requires specifying explicit template arguments.
 
 .. code:: cpp
