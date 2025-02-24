@@ -28,6 +28,7 @@ extern "C" {
     extern __declspec(dllexport) void callDll();
 #else
     extern __TBB_EXPORT void callDll();
+    extern TEST_EXPORT int main();
 #endif
 }
 
@@ -44,7 +45,9 @@ extern "C" void callDll()
         scalable_free(ptrs[i]);
 }
 
-int main() {}
+extern "C" int main() {
+    return 0;
+}
 
 
 #else // _USRDLL
