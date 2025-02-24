@@ -1,6 +1,6 @@
 .. _parallel_phase_for_task_arena:
 
-parallel_phase interface to hint start and end of work in task arena
+``parallel_phase`` Interface for Task Arena
 ====================================================================
 
 .. note::
