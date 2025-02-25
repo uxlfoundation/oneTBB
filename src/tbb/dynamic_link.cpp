@@ -151,7 +151,7 @@ namespace r1 {
         case dl_lib_not_found:
             str = va_arg(args, const char*);
             error = va_arg(args, dlerr_t);
-            TBB_FPRINTF(stdout, "%s The module \"%s\" was not found. System error: "
+            TBB_FPRINTF(stderr, "%s The module \"%s\" was not found. System error: "
                         DLERROR_SPECIFIER "\n", prefix, str, error);
             break;
         case dl_sym_not_found:     // char const * sym, dlerr_t err:
@@ -160,55 +160,55 @@ namespace r1 {
         case dl_sys_fail:
             str = va_arg(args, const char*);
             error = va_arg(args, dlerr_t);
-            TBB_FPRINTF(stdout, "%s A call to \"%s\" failed with error " DLERROR_SPECIFIER "\n",
+            TBB_FPRINTF(stderr, "%s A call to \"%s\" failed with error " DLERROR_SPECIFIER "\n",
                         prefix, str, error);
             break;
         case dl_buff_too_small:
-            TBB_FPRINTF(stdout, "%s An internal buffer representing a path to dynamically loaded "
+            TBB_FPRINTF(stderr, "%s An internal buffer representing a path to dynamically loaded "
                         "module is small. Consider compiling with larger value for PATH_MAX macro.\n",
                         prefix);
             break;
         case dl_unload_fail:
             str = va_arg(args, const char*);
             error = va_arg(args, dlerr_t);
-            TBB_FPRINTF(stdout, "%s Error unloading the module \"%s\": " DLERROR_SPECIFIER "\n",
+            TBB_FPRINTF(stderr, "%s Error unloading the module \"%s\": " DLERROR_SPECIFIER "\n",
                         prefix, str, error);
             break;
         case dl_lib_unsigned:
             str = va_arg(args, const char*);
-            TBB_FPRINTF(stdout, "%s The module \"%s\" is unsigned or has invalid signature.\n",
+            TBB_FPRINTF(stderr, "%s The module \"%s\" is unsigned or has invalid signature.\n",
                         prefix, str);
             break;
         case dl_sig_err_unknown:
             str = va_arg(args, const char*);
             error = va_arg(args, dlerr_t);
-            TBB_FPRINTF(stdout, "%s The signature verification of the module \"%s\" results in "
+            TBB_FPRINTF(stderr, "%s The signature verification of the module \"%s\" results in "
                         "unknown error:" DLERROR_SPECIFIER "\n", prefix, str, error);
             break;
         case dl_sig_explicit_distrust:
             str = va_arg(args, const char*);
-            TBB_FPRINTF(stdout, "%s The certificate with which the module \"%s\" is signed is "
+            TBB_FPRINTF(stderr, "%s The certificate with which the module \"%s\" is signed is "
                         "explicitly distrusted by an admin or user.\n", prefix, str);
             break;
         case dl_sig_untrusted_root:
             str = va_arg(args, const char*);
-            TBB_FPRINTF(stdout, "%s The signature verification process for the module \"%s\" has "
+            TBB_FPRINTF(stderr, "%s The signature verification process for the module \"%s\" has "
                         "terminated in a root certificate which is not trusted.\n", prefix, str);
             break;
         case dl_sig_distrusted:
             str = va_arg(args, const char*);
-            TBB_FPRINTF(stdout, "%s The signature of the module \"%s\" is not trusted.\n", prefix,
+            TBB_FPRINTF(stderr, "%s The signature of the module \"%s\" is not trusted.\n", prefix,
                         str);
             break;
         case dl_sig_security_settings:
             str = va_arg(args, const char*);
-            TBB_FPRINTF(stdout, "%s The hash or publisher of the module \"%s\" was not explicitly "
+            TBB_FPRINTF(stderr, "%s The hash or publisher of the module \"%s\" was not explicitly "
                         "trusted and user trust was not allowed.\n", prefix, str);
             break;
         case dl_sig_other_error:
             str = va_arg(args, const char*);
             error = va_arg(args, dlerr_t);
-            TBB_FPRINTF(stdout, "%s Signature verification for the module \"%s\" failed. System "
+            TBB_FPRINTF(stderr, "%s Signature verification for the module \"%s\" failed. System "
                         "error code: " DLERROR_SPECIFIER "\n", prefix, str, error);
             break;
         }
