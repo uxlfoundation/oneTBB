@@ -701,9 +701,6 @@ namespace r1 {
             path = absolute_path;
         }
 #if _WIN32
-        // Prevent Windows from displaying silly message boxes if it fails to load library
-        // (e.g. because of MS runtime problems - one of those crazy manifest related ones)
-        UINT prev_mode = SetErrorMode (SEM_FAILCRITICALERRORS);
 #if !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION
         if (!build_absolute_path) { // Get the path if it is not yet built
             length = get_module_path(absolute_path, len, library);
@@ -718,16 +715,16 @@ namespace r1 {
             path = absolute_path;
         }
 
-        if (has_valid_signature(path, length)) {
-#endif /* !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION */
-#endif /* _WIN32 */
-            // The argument of loading_flags is ignored on Windows
-            library_handle = dlopen( path, loading_flags(flags & DYNAMIC_LINK_LOCAL) );
-#if _WIN32
-#if !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION
-        } else
+        if (!has_valid_signature(path, length))
             return library_handle; // Warning (if any) has already been reported
 #endif /* !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION */
+        // Prevent Windows from displaying silly message boxes if it fails to load library
+        // (e.g. because of MS runtime problems - one of those crazy manifest related ones)
+        UINT prev_mode = SetErrorMode (SEM_FAILCRITICALERRORS);
+#endif /* _WIN32 */
+        // The argument of loading_flags is ignored on Windows
+        library_handle = dlopen( path, loading_flags(flags & DYNAMIC_LINK_LOCAL) );
+#if _WIN32
         SetErrorMode (prev_mode);
 #endif /* _WIN32 */
         if( library_handle ) {
