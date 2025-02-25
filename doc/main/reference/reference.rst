@@ -51,3 +51,4 @@ The key properties of a preview feature are:
     task_group_extensions
     custom_mutex_chmap
     try_put_and_wait
+    blocked_nd_range_ctad
