@@ -73,6 +73,22 @@ endif()
 
 set(TBB_COMMON_LINK_LIBS ${CMAKE_DL_LIBS})
 
+# Check whether code with full atomics can be built without libatomic
+# see: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=81358
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles("#include <atomic>
+int main() {
+  std::atomic<uint8_t> w1;
+  std::atomic<uint16_t> w2;
+  std::atomic<uint32_t> w4;
+  std::atomic<uint64_t> w8;
+  return ++w1 + ++w2 + ++w4 + ++w8;
+}" TBB_BUILDS_WITHOUT_LIBATOMIC)
+
+if(NOT TBB_BUILDS_WITHOUT_LIBATOMIC)
+   set(TBB_COMMON_LINK_LIBS ${TBB_COMMON_LINK_LIBS} atomic)
+endif()
+
 # Ignore -Werror set through add_compile_options() or added to CMAKE_CXX_FLAGS if TBB_STRICT is disabled.
 if (NOT TBB_STRICT AND COMMAND tbb_remove_compile_flag)
     tbb_remove_compile_flag(-Werror)
