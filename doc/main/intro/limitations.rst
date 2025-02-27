@@ -17,8 +17,8 @@ Static Assert
 
 **Limitation:** A static assert causes the compilation failures in oneTBB headers if the following conditions are satisfied:
   
-  * Compilation is done with Clang 12.0.0 or a more recent version. 
-  * The LLVM standard library is employed, coupled with the use of the ``-ffreestanding`` flag and C++11/14 compiler options.
+* Compilation is done with Clang 12.0.0 or a more recent version. 
+* The LLVM standard library is employed, coupled with the use of the ``-ffreestanding`` flag and C++11/14 compiler options.
 
 **Risk:** The compilation failures. 
 
