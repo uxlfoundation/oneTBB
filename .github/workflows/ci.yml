@@ -67,7 +67,7 @@ jobs:
         run: |
           pip3 install -U Jinja2
           pip3 install git+https://github.com/executablebooks/sphinx-book-theme.git
-          pip3 install sphinx-tabs
+          pip3 install sphinx_design
           echo GITHUB_SHA_SHORT=${GITHUB_SHA::8} >> $GITHUB_ENV
           mkdir html
       - name: Build documentation
