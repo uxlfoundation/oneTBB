@@ -108,7 +108,7 @@ is either ``2`` or ``3``, corresponding to ``blocked_range`` constructors with 2
 
 .. note:: 
     The guide allows a deduction only from braced-init-lists containing objects of the same type. 
-    For ranges with non-integral ``value_type``, setting an explicit grainsize argument, 
+    For ranges with non-integral ``value_type``, setting an explicit grainsize argument
     is not supported by the deduction guides and requires specifying explicit template arguments.
 
 .. code:: cpp
