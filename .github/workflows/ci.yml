@@ -159,21 +159,21 @@ jobs:
             std: 14
             build_type: relwithdebinfo
             preview: 'OFF'
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             c_compiler: gcc
             cxx_compiler: g++
             std: 17
             build_type: release
             preview: 'ON'
-          - os: ubuntu-20.04
-            c_compiler: gcc-10
-            cxx_compiler: g++-10
+          - os: ubuntu-24.04-arm
+            c_compiler: gcc-14
+            cxx_compiler: g++-14
             std: 20
             build_type: debug
             preview: 'ON'
-          - os: ubuntu-22.04
-            c_compiler: gcc-11
-            cxx_compiler: g++-11
+          - os: ubuntu-22.04-arm
+            c_compiler: gcc-13
+            cxx_compiler: g++-13
             std: 20
             build_type: release
             preview: 'ON'
@@ -198,6 +198,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - os: macos-15
+            c_compiler: clang
+            cxx_compiler: clang++
+            std: 17
+            build_type: debug
+            preview: 'ON'
           - os: macos-14
             c_compiler: clang
             cxx_compiler: clang++
@@ -231,8 +237,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-2019
-            generator: Visual Studio 16 2019
+          - os: windows-2025
+            generator: Visual Studio 17 2022
             c_compiler: cl
             cxx_compiler: cl
             std: 14
