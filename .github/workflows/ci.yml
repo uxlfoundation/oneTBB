@@ -172,8 +172,8 @@ jobs:
             build_type: debug
             preview: 'ON'
           - os: ubuntu-22.04-arm
-            c_compiler: gcc-13
-            cxx_compiler: g++-13
+            c_compiler: gcc-12
+            cxx_compiler: g++-12
             std: 20
             build_type: release
             preview: 'ON'
@@ -244,7 +244,7 @@ jobs:
             std: 14
             build_type: relwithdebinfo
             preview: 'ON'
-            job_name: windows_cl2019_cxx14_relwithdebinfo_preview=ON
+            job_name: windows_cl2022_cxx14_relwithdebinfo_preview=ON
           - os: windows-2019
             generator: Visual Studio 16 2019
             c_compiler: cl
