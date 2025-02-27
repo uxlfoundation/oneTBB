@@ -172,8 +172,8 @@ jobs:
             build_type: debug
             preview: 'ON'
           - os: ubuntu-22.04-arm
-            c_compiler: gcc-12
-            cxx_compiler: g++-12
+            c_compiler: gcc
+            cxx_compiler: g++
             std: 20
             build_type: release
             preview: 'ON'
