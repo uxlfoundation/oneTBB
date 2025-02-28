@@ -52,7 +52,7 @@ Some useful options:
 > **_TIP:_** It is recommended to install the HWLOC* library. See [oneTBB documentation](https://uxlfoundation.github.io/oneTBB/GSG/next_steps.html#hybrid-cpu-and-numa-support) for details.
 
 The TBBbind library has three versions: `tbbbind`, `tbbbind_2_0`, and `tbbbind_2_5`. Each of these versions is linked with the corresponding HWLOC* library version: 
-- `tbbbind` links with `HWLOC 1.11.x`
+- `tbbbind` links with `HWLOC 2.x` which was built as an archive library on Linux* (.a file) or a static library on Windows* (.lib file) 
 - `tbbbind_2_0` links with `HWLOC 2.1–2.4`
 - `tbbbind_2_5` links with `HWLOC 2.5` and later
 
@@ -72,7 +72,7 @@ Windows* OS requires an additional variable for correct TBBBind library building
  - `CMAKE_HWLOC_<HWLOC_VER>_DLL_PATH` - path to the corresponding HWLOC version `.dll` file.
 
 The `HWLOC_VER` substring used earlier can be replaced with one of the three values:
-- `1_11` for the `tbbbind` library configuration
+- `STATIC` for the `tbbbind` library configuration
 - `2` for the `tbbbind_2_0` library configuration
 - `2_5` for the `tbbbind_2_5` library configuration
 
