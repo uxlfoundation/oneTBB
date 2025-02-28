@@ -89,8 +89,8 @@ Member Types
 
 .. cpp:enum:: leave_policy::automatic
 
-    When passed to a constructor or the ``initialize`` method, the initialized ``task_arena`` has
-    default policy for worker threads.
+When passed to a constructor or the ``initialize`` method, the initialized ``task_arena`` has
+default policy for worker threads.
 
 .. note:: Worker threads in ``task_arena`` might be retained based on internal heuristics.
 
@@ -136,7 +136,7 @@ Indicates the start of the parallel phase in the current ``task_arena``.
 
 .. cpp:function:: void this_task_arena::end_parallel_phase(bool with_fast_leave = false)
 
-Indicate the end of the parallel phase in the current ``task_arena``.
+Indicates the end of the parallel phase in the current ``task_arena``.
 If ``with_fast_leave`` is ``true``, worker threads leave policy is temporarily set to ``fast``.
 
 Example
