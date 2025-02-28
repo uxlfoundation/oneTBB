@@ -74,19 +74,19 @@ TEST_CASE("Test core types topology traversal correctness") {
 
 #else /*!__TBB_HWLOC_VALID_ENVIRONMENT*/
 
-//! Testing NUMA support interfaces validity when HWLOC is not presented on system
+//! Testing NUMA support interfaces validity when HWLOC is not present on system
 //! \brief \ref interface \ref requirement
 TEST_CASE("Test validity of NUMA interfaces when HWLOC is not present on the system") {
     std::vector<oneapi::tbb::numa_node_id> numa_indexes = oneapi::tbb::info::numa_nodes();
 
-#if __TBB_PORTABLE_TBBBIND_AVAILABLE
-    REQUIRE_MESSAGE(numa_indexes[0] != -1,
-        "Index of NUMA node must NOT be pinned to -1, since self-contained TBBBind is loaded.");
+#if __TBB_SELF_CONTAINED_TBBBIND
+    REQUIRE_MESSAGE(numa_indexes[0] != tbb::task_arena::automatic,
+        "Index of NUMA node must NOT be pinned to tbb::task_arena::automatic, since self-contained TBBBind is loaded.");
 #else
     REQUIRE_MESSAGE(numa_indexes.size() == 1,
         "Number of NUMA nodes must be pinned to 1, if we have no HWLOC on the system.");
-    REQUIRE_MESSAGE(numa_indexes[0] == -1,
-        "Index of NUMA node must be pinned to -1, if we have no HWLOC on the system.");
+    REQUIRE_MESSAGE(numa_indexes[0] == tbb::task_arena::automatic,
+        "Index of NUMA node must be pinned to tbb::task_arena::automatic, if we have no HWLOC on the system.");
     REQUIRE_MESSAGE(oneapi::tbb::info::default_concurrency(numa_indexes[0]) == utils::get_platform_max_threads(),
         "Concurrency for NUMA node must be equal to default_num_threads(), if we have no HWLOC on the system.");
 #endif

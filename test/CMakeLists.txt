@@ -308,7 +308,7 @@ function(tbb_add_tbbbind_test)
             FAIL_REGULAR_EXPRESSION "Status:.*FAILURE"
         )
 
-        target_compile_definitions(${_tbbbind_test_NAME} PRIVATE __TBB_PORTABLE_TBBBIND_AVAILABLE)
+        target_compile_definitions(${_tbbbind_test_NAME} PRIVATE __TBB_SELF_CONTAINED_TBBBIND)
     else()
         set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
             PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*UNAVAILABLE"
@@ -352,17 +352,11 @@ function(tbb_add_tbbbind_test)
         hwloc_2_5
         hwloc_2
         hwloc_2_5_hwloc_2
-        hwloc_2_5_hwloc_static
-        hwloc_2_hwloc_static
-        hwloc_2_5_hwloc_2_hwloc_static
     )
 
     list(APPEND HWLOC_TEST_CASE_0_VARS tbbbind_2_5 "hwloc_2_5")
     list(APPEND HWLOC_TEST_CASE_1_VARS tbbbind_2   "hwloc_2")
     list(APPEND HWLOC_TEST_CASE_2_VARS tbbbind_2_5 "hwloc_2_5,hwloc_2")
-    list(APPEND HWLOC_TEST_CASE_3_VARS tbbbind_2_5 "hwloc_2_5,hwloc_static")
-    list(APPEND HWLOC_TEST_CASE_4_VARS tbbbind_2   "hwloc_2,hwloc_static")
-    list(APPEND HWLOC_TEST_CASE_5_VARS tbbbind_2_5 "hwloc_2_5,hwloc_2,hwloc_static")
 
     foreach(TEST_CASE ${HWLOC_TEST_CASES})
         list(FIND HWLOC_TEST_CASES ${TEST_CASE} TEST_CASE_INDEX)
