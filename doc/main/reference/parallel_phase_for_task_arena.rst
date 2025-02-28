@@ -18,7 +18,8 @@ with the following API:
 
 * Adds the ``leave_policy`` enumeration class to ``task_arena``.
 * Adds ``leave_policy`` as the last parameter in ``task_arena`` constructors and ``task_arena::initialize`` methods.
-  This allows to choose retention policy for worker threads in case when no more parallel work in the arena. 
+  This allows you to inform the scheduler about the preferred policy for worker threads
+  when they are about to leave `task_arena` due to a lack of available work.
 * Adds new ``start_parallel_phase`` and ``end_parallel_phase`` interfaces to the ``task_arena`` class
   and the ``this_task_arena`` namespace. These interfaces work as hints to the scheduler to mark the start and end
   of parallel work in the arena, enabling different worker thread retention policies.
@@ -94,12 +95,10 @@ default policy for worker threads.
 
 .. note:: Worker threads in ``task_arena`` might be retained based on internal heuristics.
 
-      
-
 .. cpp:enum:: leave_policy::fast
 
-    When passed to a constructor or the ``initialize`` method, the initialized ``task_arena`` has
-    policy to not retain worker threads in ``task_arena``.
+When passed to a constructor or the ``initialize`` method, the initialized ``task_arena`` has
+policy to not retain worker threads in ``task_arena``.
 
 .. cpp:class:: scoped_parallel_phase
 
@@ -118,9 +117,6 @@ Member Functions
 Indicates a point from where the scheduler can use a hint to keep threads in the arena for longer.
 
 .. note:: This function can also be a warm-up hint for the scheduler. It allows the scheduler to wake up worker threads in advance.
-
-       
-        
 
 .. cpp:function:: void end_parallel_phase(bool with_fast_leave = false)
 
