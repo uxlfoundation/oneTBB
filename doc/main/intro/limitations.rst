@@ -8,7 +8,7 @@ This page outlines the known limitations of oneTBB to help you better understand
 Using Debug TBB in SYCL Program
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Limitation:** When using the Debug version of oneAPI Threading Building Blocks (TBB) in a SYCL program compiled using the Intel(R) oneAPI DPC++/C++ Compiler, the application may crash due to two conflicting ``tbb`` and ``tbb_debug`` libraries being loaded at the same time.
+**Limitation:** When using the Debug version of oneAPI Threading Building Blocks (oneTBB) in a SYCL program compiled using the Intel(R) oneAPI DPC++/C++ Compiler, the application may crash due to two conflicting ``tbb`` and ``tbb_debug`` libraries being loaded at the same time.
 
 **Solution:** Link the applictation with the Release version ``tbb`` or use ``qtbb`` flag provided by the Intel(R) oneAPI DPC++/C++ Compiler.
 
