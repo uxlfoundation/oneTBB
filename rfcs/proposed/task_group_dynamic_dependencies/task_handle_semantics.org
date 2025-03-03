@@ -123,7 +123,7 @@ is a pointer to the vertex instance of the successor task.
 
 The vertex instance is created once the first task is registered as a predecessor and is reused by any other predecessors. 
 
-Once the predecessor task is completed, it should go through the list of successor vertexes and decrement the reference counter. Once the reference
+Once the predecessor task is completed, it should go through the list of successor vertices and decrement the reference counter. Once the reference
 counter is equal to 0, the successor task can be scheduled for execution.
 
 API-wise, the function that decreases the reference counter may also return the pointer to the task. If the reference counter is not equal to 0, the
