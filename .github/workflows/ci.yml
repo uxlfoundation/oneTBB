@@ -34,7 +34,7 @@ env:
 
 jobs:
   codespell:
-    runs-on: [ubuntu-20.04]
+    runs-on: [ubuntu-latest]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -44,7 +44,7 @@ jobs:
           ${GITHUB_WORKSPACE}/.github/scripts/codespell.sh `pwd`
 
   examples_clang-format:
-    runs-on: [ubuntu-20.04]
+    runs-on: [ubuntu-latest]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -115,7 +115,7 @@ jobs:
 
   copyright_check:
     if: ${{ github.ref != 'refs/heads/master' }}
-    runs-on: [ubuntu-20.04]
+    runs-on: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -288,13 +288,13 @@ jobs:
             std: 14
             build_type: relwithdebinfo
             preview: 'OFF'
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             c_compiler: gcc
             cxx_compiler: g++
             std: 17
             build_type: release
             preview: 'ON'
-          - os: ubuntu-20.04
+          - os: ubuntu-24.04
             c_compiler: gcc-10
             cxx_compiler: g++-10
             std: 20
