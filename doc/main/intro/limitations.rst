@@ -44,3 +44,10 @@ Incorrect Installation Location
 **Limitation:** oneTBB does not support ``fork()``. 
 
 **Solution:** To work-around the issue, consider using ``task_scheduler_handle`` to join oneTBB worker threads before using ``fork()``.
+
+Custom Allocator and Topology API Incompatibilities
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Limitation:** On Linux* OS, using custom memory allocators together with ``tbb::info`` and ``tbb::task_arena::constraints`` APIs may result in undefined behavior.
+
+**Solution:** Set ``TBB_ENABLE_SANITIZERS=1`` in the environment to hint that custom allocators are used.
