@@ -147,7 +147,7 @@ TEST_CASE("multithreading support in concurrent_multiset with greater compare") 
 }
 
 //! \brief \ref resource_usage
-TEST_CASE("multithreding support in concurrent_set with elements ctor and dtor check") {
+TEST_CASE("multithreading support in concurrent_set with elements ctor and dtor check") {
     Checker<checked_set_type::value_type> checker;
     test_concurrent<checked_set_type>();
 }

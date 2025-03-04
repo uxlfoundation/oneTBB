@@ -255,7 +255,7 @@ void TestThreadSafety() {
     // Test and warm up allocator.
     tests();
 
-    // Ensure that cosumption is stabilized.
+    // Ensure that consumption is stabilized.
     std::size_t initial = utils::GetMemoryUsage();
     for (;;) {
         tests();
