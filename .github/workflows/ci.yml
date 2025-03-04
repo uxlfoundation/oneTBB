@@ -50,9 +50,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run scan
         run: |
-          command -v clang-format
+          command -v clang-format-18
           cp -r examples examples_formatted
-          find examples_formatted -regex '.*\.\(cpp\|hpp\)' -exec clang-format -style=file -i {} \;
+          find examples_formatted -regex '.*\.\(cpp\|hpp\)' -exec clang-format-18 -style=file -i {} \;
           diff -r examples examples_formatted
 
   documentation:
