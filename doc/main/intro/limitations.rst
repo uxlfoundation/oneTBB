@@ -45,9 +45,9 @@ Incorrect Installation Location
 
 **Solution:** To work-around the issue, consider using ``task_scheduler_handle`` to join oneTBB worker threads before using ``fork()``.
 
-Custom Allocator and Topology API Incompatibilities
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Dynamic Malloc Replacement and Topology API Incompatibilities
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Limitation:** On Linux* OS, using custom memory allocators with ``tbb::info`` and ``tbb::task_arena::constraints`` APIs may result in undefined behavior.
+**Limitation:** On Linux* OS, using dynamic malloc replacement with ``tbb::info`` and ``tbb::task_arena::constraints`` APIs may result in undefined behavior.
 
-**Solution:** Set ``TBB_ENABLE_SANITIZERS=1`` in the environment. This informs that custom allocators are used.
+**Solution:** Set ``TBB_ENABLE_SANITIZERS=1`` in the environment. This informs that dynamic malloc replacement is used.
