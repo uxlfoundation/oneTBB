@@ -48,6 +48,6 @@ Incorrect Installation Location
 Dynamic Malloc Replacement and Topology API Incompatibilities
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Limitation:** On Linux* OS, using dynamic malloc replacement with ``tbb::info`` and ``tbb::task_arena::constraints`` APIs may result in undefined behavior.
+**Limitation:** On Linux* OS, using dynamic malloc replacement with ``tbb::info`` and ``tbb::task_arena::constraints`` APIs may result in runtime failures.
 
 **Solution:** Set ``TBB_ENABLE_SANITIZERS=1`` in the environment. This informs that dynamic malloc replacement is used.
