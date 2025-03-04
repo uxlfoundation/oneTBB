@@ -73,8 +73,8 @@ Build and Run a Sample
                              "type": "cppbuild",
                              "group": {
                              "args": [ 
-                                 "/IC:\\Program Files (x86)\\Intel\\oneAPI\\tbb\\2021.14.0\\include",
-                                 "C:\\Program Files (x86)\\Intel\\oneAPI\\tbb\\2021.14.0\\lib\\tbb12.lib"
+                                 "/IC:\\Program Files (x86)\\Intel\\oneAPI\\tbb\\2022.0.0\\include",
+                                 "C:\\Program Files (x86)\\Intel\\oneAPI\\tbb\\2022.0.0\\lib\\tbb12.lib"
                            
 
         #. Build the project. 
