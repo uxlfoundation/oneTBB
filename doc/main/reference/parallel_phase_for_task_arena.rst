@@ -25,6 +25,9 @@ with the following API:
   of parallel work submission into the arena, enabling different worker thread retention policies.
 * Adds the Resource Acquisition is Initialization (RAII) class ``scoped_parallel_phase`` to ``task_arena``.
 
+More details about motivation, semantics and conditions for becoming fully supported functionality can be found in the corresponding
+`Request For Comments document for parallel_phase <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/experimental/parallel_phase_for_task_arena>`_.
+
 API
 ***
 
@@ -91,14 +94,16 @@ Member Types
 .. cpp:enum:: leave_policy::automatic
 
 When passed to a constructor or the ``initialize`` method, the initialized ``task_arena`` has
-default policy for worker threads.
+the default (possibly system specific) policy for how quickly worker threads leave the arena
+when there is no more work available in the arena and when the arena is not in a parallel phase.
 
 .. note:: Worker threads in ``task_arena`` might be retained based on internal heuristics.
 
 .. cpp:enum:: leave_policy::fast
 
-When passed to a constructor or the ``initialize`` method, the initialized ``task_arena`` has
-policy to not retain worker threads in ``task_arena``.
+When passed to a constructor or the ``initialize`` method, the initialized ``task_arena``
+has policy that allows worker threads to more quickly leave the arena when there is no more work
+available in the arena and when the arena is not in a parallel phase.
 
 .. cpp:class:: scoped_parallel_phase
 
@@ -109,8 +114,18 @@ The RAII class to map a parallel phase to a code scope.
 Constructs a ``scoped_parallel_phase`` object that starts a parallel phase in the specified ``task_arena``.
 If ``with_fast_leave`` is ``true``, the worker threads leave policy is temporarily set to ``fast``.
 
+.. note:: For ``task_arena`` initialized with ``leave_policy::fast``, ``with_fast_leave`` setting has no effect.
+
+.. note::
+   When worker threads enter the arena with no active parallel phases,
+   the leave policy is reset to the value set during the initialization of the arena.
+
 Member Functions
 ----------------
+
+.. cpp:function:: task_arena(const task_arena&)
+
+Copies settings from ``task_arena`` instance including the ``leave_policy``.
 
 .. cpp:function:: void start_parallel_phase()
 
@@ -122,6 +137,12 @@ Indicates a point from where the scheduler can use a hint to keep threads in the
 
 Indicates the point when the scheduler may drop a hint and no longer retain threads in the arena.
 If ``with_fast_leave`` is ``true``, worker threads leave policy is temporarily set to ``fast``.
+
+.. note:: For ``task_arena`` initialized with ``leave_policy::fast``, ``with_fast_leave`` setting has no effect.
+
+.. note::
+   When worker threads enter the arena with no active parallel phases,
+   the leave policy is reset to the value set during the initialization of the arena.
 
 Functions
 ---------
