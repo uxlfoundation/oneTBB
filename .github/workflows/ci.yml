@@ -34,7 +34,7 @@ env:
 
 jobs:
   codespell:
-    runs-on: [ubuntu-latest]
+    runs-on: [ubuntu-22.04]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -44,15 +44,15 @@ jobs:
           ${GITHUB_WORKSPACE}/.github/scripts/codespell.sh `pwd`
 
   examples_clang-format:
-    runs-on: [ubuntu-latest]
+    runs-on: [ubuntu-22.04]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Run scan
         run: |
-          command -v clang-format-18
+          command -v clang-format
           cp -r examples examples_formatted
-          find examples_formatted -regex '.*\.\(cpp\|hpp\)' -exec clang-format-18 -style=file -i {} \;
+          find examples_formatted -regex '.*\.\(cpp\|hpp\)' -exec clang-format -style=file -i {} \;
           diff -r examples examples_formatted
 
   documentation:
