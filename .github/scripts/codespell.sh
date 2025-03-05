@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (c) 2021 Intel Corporation
+# Copyright (c) 2021-2025 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -51,6 +51,8 @@ IGNORE_COMMAND="sed -e /.*\\sOd\\s*=.*/d \
 -e /.*polygon_overlay\/README.md.*ist\\s*=.*/d \
 -e /.*_pipeline_filters.h.*nd\\s*=.*/d \
 -e /.*sub_string_finder\/README.md.*ba\\s*=.*/d"
+-e /.*frontend.cpp.*SEH\\s*=.*/d"
+-e /.*assert_impl.h.*statics\\s*=.*/d"
 
 SCAN_RESULT=`codespell --quiet-level=2 --skip "${SKIP_PATTERN}" -L "${IGNORE_WORDS}" ${SCAN_TARGET}`
 SCAN_RESULT=`echo -e "${SCAN_RESULT}" | ${IGNORE_COMMAND}`
