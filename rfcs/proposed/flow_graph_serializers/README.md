@@ -91,11 +91,6 @@ flow::function_node<
 
 The `flow::limited_resource` class template heuristically looks like:
 
-> [!NOTE]
-> Would it be reasonable to make `limited_resource` a constrained template,
-> and to introduce a concept of `resource` that would be used to define the
-> constraint?
-
 ```c++
 template <typename Resource = /* implementation-defined */>
 class limited_resource {
@@ -106,6 +101,11 @@ public:
 ```
 
 where `Resource` represents a policy class.
+
+
+#### C++20 support
+
+When compiling with a C++ standard of at least C++20, the `limited_resource` `Resource` template parameter can be constrained to model a resource concept.
 
 #### Default `Resource` policy
 
