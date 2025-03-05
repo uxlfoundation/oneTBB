@@ -54,3 +54,10 @@ Incorrect Installation Location
 **Limitation:** oneTBB does not support ``fork()``. 
 
 **Solution:** To work-around the issue, consider using ``task_scheduler_handle`` to join oneTBB worker threads before using ``fork()``.
+
+Dynamic Malloc Replacement and Topology API Incompatibilities
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Limitation:** On Linux* OS, using dynamic malloc replacement with ``tbb::info`` and ``tbb::task_arena::constraints`` APIs may result in runtime failures.
+
+**Solution:** Set ``TBB_ENABLE_SANITIZERS=1`` in the environment. This informs that dynamic malloc replacement is used.
