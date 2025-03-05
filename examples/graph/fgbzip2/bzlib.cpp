@@ -309,14 +309,14 @@ static void flush_RL(EState* s) {
         }                                                             \
         else /*-- general, uncommon cases --*/                        \
             if (zchh != zs->state_in_ch || zs->state_in_len == 255) { \
-            if (zs->state_in_ch < 256)                                \
-                add_pair_to_block(zs);                                \
-            zs->state_in_ch = zchh;                                   \
-            zs->state_in_len = 1;                                     \
-        }                                                             \
-        else {                                                        \
-            zs->state_in_len++;                                       \
-        }                                                             \
+                if (zs->state_in_ch < 256)                            \
+                    add_pair_to_block(zs);                            \
+                zs->state_in_ch = zchh;                               \
+                zs->state_in_len = 1;                                 \
+            }                                                         \
+            else {                                                    \
+                zs->state_in_len++;                                   \
+            }                                                         \
     }
 
 /*---------------------------------------------------*/
