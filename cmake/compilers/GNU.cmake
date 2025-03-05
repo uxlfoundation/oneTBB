@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2024 Intel Corporation
+# Copyright (c) 2020-2025 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ endif()
 # information is written to either stdout or stderr. To not make any
 # assumptions, both are captured.
 execute_process(
-    COMMAND ${CMAKE_COMMAND} -E env "LANG=C" ${CMAKE_CXX_COMPILER} -xc -c /dev/null -Wa,-v -o/dev/null
+    COMMAND ${CMAKE_COMMAND} -E env "LC_ALL=C" "LANG=C" ${CMAKE_CXX_COMPILER} -xc -c /dev/null -Wa,-v -o/dev/null
     OUTPUT_VARIABLE ASSEMBLER_VERSION_LINE_OUT
     ERROR_VARIABLE ASSEMBLER_VERSION_LINE_ERR
     OUTPUT_STRIP_TRAILING_WHITESPACE
@@ -113,7 +113,7 @@ if (NOT CMAKE_CXX_FLAGS MATCHES "_FORTIFY_SOURCE")
   set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2> )
 endif ()
 
-if (TBB_FILE_TRIM AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 8)
+if (TBB_FILE_TRIM AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 8 AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Intel")
     set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} -ffile-prefix-map=${NATIVE_TBB_PROJECT_ROOT_DIR}/= -ffile-prefix-map=${NATIVE_TBB_RELATIVE_BIN_PATH}/=)
 endif ()
 

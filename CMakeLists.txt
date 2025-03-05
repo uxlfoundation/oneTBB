@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2024 Intel Corporation
+# Copyright (c) 2020-2025 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.5)
+# If the running version of CMake is older than 3.12, the extra ... dots will be seen as version component separators,
+# resulting in the ...<max> part being ignored and preserving the pre-3.12 behavior of basing policies on <min>.
+cmake_minimum_required(VERSION 3.5.0...3.31.3)
 
 # Enable CMake policies
 
@@ -33,6 +35,11 @@ if (POLICY CMP0091)
     cmake_policy(SET CMP0091 NEW)
 elseif (DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
     message(FATAL_ERROR "CMAKE_MSVC_RUNTIME_LIBRARY was defined while policy CMP0091 is not available. Use CMake 3.15 or newer.")
+endif()
+
+if (POLICY CMP0148)
+    # CMake 3.27: The FindPythonInterp and FindPythonLibs modules are removed
+    cmake_policy(SET CMP0148 OLD)
 endif()
 
 if (TBB_WINDOWS_DRIVER AND (NOT ("${CMAKE_MSVC_RUNTIME_LIBRARY}" STREQUAL MultiThreaded OR "${CMAKE_MSVC_RUNTIME_LIBRARY}" STREQUAL MultiThreadedDebug)))
@@ -321,6 +328,18 @@ endif()
 
 if (TBB_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+
+if (TBB_DOC_EXAMPLES)
+    set(TBB_DOC_EXAMPLES_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/doc/main/examples_testing")
+    if (NOT EXISTS ${TBB_DOC_EXAMPLES_DIRECTORY})
+        message(FATAL_ERROR "Documentation examples are not found while testing was enabled")
+    else()
+        message(STATUS "Enabling testing for examples from documentation")
+        enable_testing()
+        add_subdirectory(${TBB_DOC_EXAMPLES_DIRECTORY})
+    endif()
 endif()
 
 if (TBB_BENCH)

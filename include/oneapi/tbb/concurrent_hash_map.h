@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -467,9 +467,13 @@ private:
     friend class concurrent_hash_map;
 
     hash_map_iterator( const Container &map, std::size_t index, const bucket *b, node_base *n ) :
-        my_map(&map), my_index(index), my_bucket(b), my_node(static_cast<node*>(n))
+        my_map(&map), my_index(index), my_bucket(b), my_node(nullptr)
     {
-        if( b && !map_base::is_valid(n) )
+        // Cannot directly initialize to n, because it could be an invalid node pointer (e.g., when
+        // setting a midpoint for a 1-element range). If it is, try one from a subsequent bucket.
+        if( map_base::is_valid(n) )
+            my_node = static_cast<node*>(n);
+        else if( b )
             advance_to_next_bucket();
     }
 
@@ -1009,9 +1013,10 @@ public:
         hashcode_type m = this->my_mask.load(std::memory_order_relaxed);
         __TBB_ASSERT((m&(m+1))==0, "data structure is invalid");
         this->my_size.store(0, std::memory_order_relaxed);
-        segment_index_type s = this->segment_index_of( m );
-        __TBB_ASSERT( s+1 == this->pointers_per_table || !this->my_table[s+1].load(std::memory_order_relaxed), "wrong mask or concurrent grow" );
-        do {
+        segment_index_type s = this->segment_index_of( m ) + 1;
+        __TBB_ASSERT( s == this->pointers_per_table || !this->my_table[s].load(std::memory_order_relaxed), "wrong mask or concurrent grow" );
+        while(s != 0) {
+            s--;
             __TBB_ASSERT(this->is_valid(this->my_table[s].load(std::memory_order_relaxed)), "wrong mask or concurrent grow" );
             segment_ptr_type buckets_ptr = this->my_table[s].load(std::memory_order_relaxed);
             size_type sz = this->segment_size( s ? s : 1 );
@@ -1023,7 +1028,7 @@ public:
                     delete_node( n );
                 }
             this->delete_segment(s);
-        } while(s-- > 0);
+        }
         this->my_mask.store(this->embedded_buckets - 1, std::memory_order_relaxed);
     }
 

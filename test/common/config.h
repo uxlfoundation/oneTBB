@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -18,11 +18,8 @@
 #define __TBB_test_common_config_H
 
 #if __TBB_CPF_BUILD
-#ifndef  TBB_PREVIEW_FLOW_GRAPH_FEATURES
+#ifndef TBB_PREVIEW_FLOW_GRAPH_FEATURES
 #define TBB_PREVIEW_FLOW_GRAPH_FEATURES 1
-#endif
-#ifndef TBB_PREVIEW_ALGORITHM_TRACE
-#define TBB_PREVIEW_ALGORITHM_TRACE 1
 #endif
 #ifndef TBB_DEPRECATED_LIMITER_NODE_CONSTRUCTOR
 #define TBB_DEPRECATED_LIMITER_NODE_CONSTRUCTOR 1
@@ -33,11 +30,17 @@
 #ifndef TBB_PREVIEW_CONCURRENT_LRU_CACHE
 #define TBB_PREVIEW_CONCURRENT_LRU_CACHE 1
 #endif
-#ifndef TBB_PREVIEW_VARIADIC_PARALLEL_INVOKE
-#define TBB_PREVIEW_VARIADIC_PARALLEL_INVOKE 1
-#endif
 #ifndef TBB_PREVIEW_ISOLATED_TASK_GROUP
 #define TBB_PREVIEW_ISOLATED_TASK_GROUP 1
+#endif
+#ifndef TBB_PREVIEW_PARALLEL_PHASE
+#define TBB_PREVIEW_PARALLEL_PHASE 1
+#endif
+#ifndef TBB_PREVIEW_BLOCKED_ND_RANGE_DEDUCTION_GUIDES
+#define TBB_PREVIEW_BLOCKED_ND_RANGE_DEDUCTION_GUIDES 1
+#endif
+#ifndef TBB_PREVIEW_MEMORY_POOL
+#define TBB_PREVIEW_MEMORY_POOL 1
 #endif
 #endif
 

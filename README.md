@@ -37,6 +37,7 @@ See [Release Notes](RELEASE_NOTES.md) and [System Requirements](SYSTEM_REQUIREME
 * [oneTBB Developer Guide and Reference](https://uxlfoundation.github.io/oneTBB)
 * [Migrating from TBB to oneTBB](https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/Migration_Guide.html)
 * [README for the CMake build system](cmake/README.md)
+* [oneTBB Versioning Policies](VERSIONING.md)
 * [oneTBB Testing Approach](https://uxlfoundation.github.io/oneTBB/main/intro/testing_approach.html)
 * [Basic support for the Bazel build system](Bazel.md)
 * [oneTBB Discussions](https://github.com/uxlfoundation/oneTBB/discussions)

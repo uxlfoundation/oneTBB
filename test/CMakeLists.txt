@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2024 Intel Corporation
+# Copyright (c) 2020-2025 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -66,6 +66,7 @@ function(tbb_add_test)
     endif()
 
     set_property(TEST ${_tbb_test_TARGET_NAME} PROPERTY ENVIRONMENT ${TBB_TESTS_ENVIRONMENT} APPEND)
+    set_property(TEST ${_tbb_test_TARGET_NAME} PROPERTY RUN_SERIAL TRUE)
 
     # Prefer using target_link_options instead of target_link_libraries to specify link options because
     # target_link_libraries may incorrectly handle some options (on Windows, for example).
@@ -111,6 +112,7 @@ function(tbb_add_c_test)
     endif()
 
     set_property(TEST ${_tbb_test_NAME} PROPERTY ENVIRONMENT ${TBB_TESTS_ENVIRONMENT} APPEND)
+    set_property(TEST ${_tbb_test_NAME} PROPERTY RUN_SERIAL TRUE)
 
     target_compile_definitions(${_tbb_test_NAME} PRIVATE
         $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>
@@ -193,7 +195,11 @@ function(_tbb_get_hwloc_runtime_vars)
 
     foreach(HWLOC_VERSION ${_runtime_vars_HWLOC_VERSION_LIST})
         get_target_property(HWLOC_LOCATION HWLOC::${HWLOC_VERSION} IMPORTED_LOCATION)
-        get_filename_component(HWLOC_LOCATION_PATH ${HWLOC_LOCATION} DIRECTORY)
+        if (NOT HWLOC_LOCATION)
+            get_target_property(HWLOC_LOCATION_PATH HWLOC::${HWLOC_VERSION} LIBRARY_OUTPUT_DIRECTORY)
+        else()
+            get_filename_component(HWLOC_LOCATION_PATH ${HWLOC_LOCATION} DIRECTORY)
+        endif()
         list(APPEND LIBRARIES_PATH ${HWLOC_LOCATION_PATH})
     endforeach()
 
@@ -280,10 +286,52 @@ function(tbb_add_tbbbind_test)
     endif()
     ProcessorCount(SYSTEM_CONCURRENCY)
 
-    set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
-        PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*UNAVAILABLE"
-        FAIL_REGULAR_EXPRESSION "Status:.*FAILURE"
-    )
+    # Make sure fake HWLOC is found before system one
+    if (UNIX AND NOT TARGET HWLOC::hwloc_stub AND NOT TBB_TCM_TESTING)
+        # The idea is to produce fake HWLOC library and link it with the test
+        # to ensure that TBBBind won't be loaded in order to simulate the case
+        # when real HWLOC is not present in the system.
+        file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/stubhwloc.cpp "void hwloc_stub(){}")
+        add_library(hwloc_stub SHARED ${CMAKE_CURRENT_BINARY_DIR}/stubhwloc.cpp)
+        add_library(HWLOC::hwloc_stub ALIAS hwloc_stub)
+
+        set_target_properties(hwloc_stub PROPERTIES
+            OUTPUT_NAME "hwloc" SOVERSION 15
+        )
+    endif()
+
+    if (TARGET TBB::tbbbind)
+        # TBBBind which is statically linked with HWLOC is available,
+        # so in the environment without HWLOC, it should be found.
+        set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
+            PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*tbbbind"
+            FAIL_REGULAR_EXPRESSION "Status:.*FAILURE"
+        )
+
+        target_compile_definitions(${_tbbbind_test_NAME} PRIVATE __TBB_SELF_CONTAINED_TBBBIND)
+    else()
+        set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
+            PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*UNAVAILABLE"
+            FAIL_REGULAR_EXPRESSION "Status:.*FAILURE"
+        )
+    endif()
+
+    if (TARGET HWLOC::hwloc_static)
+        # Don't export symbols from HWLOC archive library
+        target_link_options(${_tbbbind_test_NAME} PRIVATE $<$<BOOL:UNIX>:-Wl,--exclude-libs,ALL>)
+        target_link_libraries(${_tbbbind_test_NAME} PRIVATE HWLOC::hwloc_static)
+        target_compile_definitions(${_tbbbind_test_NAME} PRIVATE __TBB_HWLOC_VALID_ENVIRONMENT)
+    endif()
+
+    if (TARGET HWLOC::hwloc_stub)
+        _tbb_get_hwloc_runtime_vars(
+            ENV_EXTENSION_VARIABLE HWLOC_RUNTIME_VARS
+            HWLOC_VERSION_LIST "hwloc_stub"
+        )
+        target_link_libraries(${_tbbbind_test_NAME} PRIVATE HWLOC::hwloc_stub)
+
+        set_property(TEST ${_tbbbind_test_NAME} PROPERTY ENVIRONMENT "${HWLOC_RUNTIME_VARS}" APPEND)
+    endif()
 
     if (TARGET HWLOC::hwloc_2_5 AND NOT HWLOC_2_5_TESTS_STATUS_SHOWN)
         message(STATUS "HWLOC 2.5 dependent tests were enabled.")
@@ -295,32 +343,20 @@ function(tbb_add_tbbbind_test)
         set(HWLOC_2_TESTS_STATUS_SHOWN TRUE PARENT_SCOPE)
     endif()
 
-    if (TARGET HWLOC::hwloc_1_11 AND NOT HWLOC_1_11_TESTS_STATUS_SHOWN)
-        message(STATUS "HWLOC 1.11 dependent tests were enabled.")
-        set(HWLOC_1_11_TESTS_STATUS_SHOWN TRUE PARENT_SCOPE)
+    if (TARGET HWLOC::hwloc_static AND NOT HWLOC_STATIC_TESTS_STATUS_SHOWN)
+        message(STATUS "Portable TBBBind tests were enabled.")
+        set(HWLOC_STATIC_TESTS_STATUS_SHOWN TRUE PARENT_SCOPE)
     endif()
 
     list(APPEND HWLOC_TEST_CASES
         hwloc_2_5
         hwloc_2
-        hwloc_1_11
         hwloc_2_5_hwloc_2
-        hwloc_2_5_hwloc_1_11
-        hwloc_2_hwloc_1_11
-        hwloc_2_5_hwloc_2_hwloc_1_11
-        incompatible_hwlocs_1_11_vs_2_5
-        incompatible_hwlocs_1_11_vs_2
     )
 
     list(APPEND HWLOC_TEST_CASE_0_VARS tbbbind_2_5 "hwloc_2_5")
     list(APPEND HWLOC_TEST_CASE_1_VARS tbbbind_2   "hwloc_2")
-    list(APPEND HWLOC_TEST_CASE_2_VARS tbbbind     "hwloc_1_11")
-    list(APPEND HWLOC_TEST_CASE_3_VARS tbbbind_2_5 "hwloc_2_5,hwloc_2")
-    list(APPEND HWLOC_TEST_CASE_4_VARS tbbbind_2_5 "hwloc_2_5,hwloc_1_11")
-    list(APPEND HWLOC_TEST_CASE_5_VARS tbbbind_2   "hwloc_2,hwloc_1_11")
-    list(APPEND HWLOC_TEST_CASE_6_VARS tbbbind_2_5 "hwloc_2_5,hwloc_2,hwloc_1_11")
-    list(APPEND HWLOC_TEST_CASE_7_VARS tbbbind_2_5 "hwloc_1_11,hwloc_2_5")
-    list(APPEND HWLOC_TEST_CASE_8_VARS tbbbind_2   "hwloc_1_11,hwloc_2")
+    list(APPEND HWLOC_TEST_CASE_2_VARS tbbbind_2_5 "hwloc_2_5,hwloc_2")
 
     foreach(TEST_CASE ${HWLOC_TEST_CASES})
         list(FIND HWLOC_TEST_CASES ${TEST_CASE} TEST_CASE_INDEX)
@@ -416,6 +452,7 @@ if (TARGET TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_task_group DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_concurrent_hash_map DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_task_arena DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR tbb NAME test_parallel_phase DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_enumerable_thread_specific DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_concurrent_queue DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_resumable_tasks DEPENDENCIES TBB::tbb)
@@ -507,6 +544,12 @@ if (TARGET TBB::tbb)
         tbb_add_test(SUBDIR tbb NAME test_openmp DEPENDENCIES TBB::tbb)
 
         set_target_properties(test_openmp PROPERTIES COMPILE_FLAGS ${TBB_OPENMP_FLAG})
+
+        # Intel LLVM compiler triggers a warning when using OpenMP in debug mode on Windows.
+        # The only way not to trigger it seems to be explicitly disabling it from the command line.
+        if (WIN32 AND (CMAKE_CXX_COMPILER_ID STREQUAL IntelLLVM) AND (CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 2025.0))
+            target_compile_options(test_openmp PRIVATE $<$<CONFIG:DEBUG>:-Wno-debug-option-simd>)
+        endif()
 
         if (NOT TBB_OPENMP_NO_LINK_FLAG)
             set_target_properties(test_openmp PROPERTIES LINK_FLAGS ${TBB_OPENMP_FLAG})
@@ -679,4 +722,4 @@ endif()
 
 unset(HWLOC_2_5_TESTS_STATUS_SHOWN)
 unset(HWLOC_2_TESTS_STATUS_SHOWN)
-unset(HWLOC_1_11_TESTS_STATUS_SHOWN)
+unset(HWLOC_STATIC_TESTS_STATUS_SHOWN)
