@@ -22,8 +22,8 @@ with the following API:
   when they are about to leave `task_arena` due to a lack of available work.
 * Adds new ``start_parallel_phase`` and ``end_parallel_phase`` interfaces to the ``task_arena`` class
   and the ``this_task_arena`` namespace. These interfaces work as hints to the scheduler to mark the start and end
-  of parallel work in the arena, enabling different worker thread retention policies.
-* Adds the RAII class ``scoped_parallel_phase`` to ``task_arena``.
+  of parallel work submission into the arena, enabling different worker thread retention policies.
+* Adds the Resource Acquisition is Initialization (RAII) class ``scoped_parallel_phase`` to ``task_arena``.
 
 API
 ***
@@ -104,7 +104,7 @@ policy to not retain worker threads in ``task_arena``.
 
 The RAII class to map a parallel phase to a code scope.
 
-.. cpp:function:: scoped_parallel_phase::scoped_parallel_phatse(task_arena& ta, bool with_fast_leave = false)
+.. cpp:function:: scoped_parallel_phase::scoped_parallel_phase(task_arena& ta, bool with_fast_leave = false)
 
 Constructs a ``scoped_parallel_phase`` object that starts a parallel phase in the specified ``task_arena``.
 If ``with_fast_leave`` is ``true``, the worker threads leave policy is temporarily set to ``fast``.
