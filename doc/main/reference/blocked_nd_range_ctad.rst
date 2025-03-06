@@ -23,6 +23,10 @@ while creating a ``blocked_nd_range`` object if they can be inferred from the co
     :start-after: /*begin_blocked_nd_range_ctad_example_1*/
     :end-before: /*end_blocked_nd_range_ctad_example_1*/
 
+.. note::
+    For more detailed description of the implementation of this feature or to leave comments or feedback on the API, please
+    refer to the [corresponding RFC](https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/experimental/blocked_nd_range_ctad).
+
 API
 ***
 
