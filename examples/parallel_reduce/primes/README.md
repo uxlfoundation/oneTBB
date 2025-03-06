@@ -21,5 +21,5 @@ primes [n-of-threads=value] [number=value] [grain-size=value] [n-of-repeats=valu
 * `n-of-threads` - the number of threads to use; a range of the form low\[:high\], where low and optional high are non-negative integers or `auto` for a platform-specific default number.
 * `number` - the upper bound of range to search primes in, must be a positive integer.
 * `grain-size` - the optional grain size, must be a positive integer.
-* `n-of-repeats` - the number of the calculation repeats, must be a positive integer.
-* `silent` - no output except elapsed time.
+* `n-of-repeats` - the number of the calculation repeats, must be a positive integer; when it is greater than 1 then relative error will be calculated for them.
+* `silent` - no output except elapsed time and relative errors.
