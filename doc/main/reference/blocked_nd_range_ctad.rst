@@ -117,7 +117,7 @@ is either ``2`` or ``3``, corresponding to ``blocked_range`` constructors with 2
     blocked_nd_range(const Value (&)[N], typename blocked_nd_range<Value, N>::size_type = 1)
     -> blocked_nd_range<Value, N>;
 
-**Effects**: Allows deduction from a single C array object indicating a set of dimension endings using the constructor 
+**Effects**: Allows deduction from a single C array object indicating a set of dimension sizes to constructor 
 ``2`` of ``blocked_nd_range``.
 
 .. code:: cpp
