@@ -34,7 +34,7 @@ env:
 
 jobs:
   codespell:
-    runs-on: [ubuntu-20.04]
+    runs-on: [ubuntu-22.04]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -44,15 +44,15 @@ jobs:
           ${GITHUB_WORKSPACE}/.github/scripts/codespell.sh `pwd`
 
   examples_clang-format:
-    runs-on: [ubuntu-20.04]
+    runs-on: [ubuntu-22.04]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Run scan
         run: |
-          command -v clang-format-10
+          command -v clang-format
           cp -r examples examples_formatted
-          find examples_formatted -regex '.*\.\(cpp\|hpp\)' -exec clang-format-10 -style=file -i {} \;
+          find examples_formatted -regex '.*\.\(cpp\|hpp\)' -exec clang-format -style=file -i {} \;
           diff -r examples examples_formatted
 
   documentation:
@@ -115,7 +115,7 @@ jobs:
 
   copyright_check:
     if: ${{ github.ref != 'refs/heads/master' }}
-    runs-on: [ubuntu-20.04]
+    runs-on: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -159,21 +159,21 @@ jobs:
             std: 14
             build_type: relwithdebinfo
             preview: 'OFF'
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             c_compiler: gcc
             cxx_compiler: g++
             std: 17
             build_type: release
             preview: 'ON'
-          - os: ubuntu-20.04
-            c_compiler: gcc-10
-            cxx_compiler: g++-10
+          - os: ubuntu-24.04-arm
+            c_compiler: gcc-14
+            cxx_compiler: g++-14
             std: 20
             build_type: debug
             preview: 'ON'
-          - os: ubuntu-22.04
-            c_compiler: gcc-11
-            cxx_compiler: g++-11
+          - os: ubuntu-22.04-arm
+            c_compiler: gcc
+            cxx_compiler: g++
             std: 20
             build_type: release
             preview: 'ON'
@@ -198,6 +198,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - os: macos-15
+            c_compiler: clang
+            cxx_compiler: clang++
+            std: 17
+            build_type: debug
+            preview: 'ON'
           - os: macos-14
             c_compiler: clang
             cxx_compiler: clang++
@@ -231,14 +237,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-2019
-            generator: Visual Studio 16 2019
+          - os: windows-2025
+            generator: Visual Studio 17 2022
             c_compiler: cl
             cxx_compiler: cl
             std: 14
             build_type: relwithdebinfo
             preview: 'ON'
-            job_name: windows_cl2019_cxx14_relwithdebinfo_preview=ON
+            job_name: windows_cl2022_cxx14_relwithdebinfo_preview=ON
           - os: windows-2019
             generator: Visual Studio 16 2019
             c_compiler: cl
@@ -282,15 +288,15 @@ jobs:
             std: 14
             build_type: relwithdebinfo
             preview: 'OFF'
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             c_compiler: gcc
             cxx_compiler: g++
             std: 17
             build_type: release
             preview: 'ON'
-          - os: ubuntu-20.04
-            c_compiler: gcc-10
-            cxx_compiler: g++-10
+          - os: ubuntu-24.04
+            c_compiler: gcc
+            cxx_compiler: g++
             std: 20
             build_type: debug
             preview: 'ON'

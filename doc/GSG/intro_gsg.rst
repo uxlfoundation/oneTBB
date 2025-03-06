@@ -12,7 +12,7 @@ to be executed simultaneously. Using threads can make your program work faster a
 
 Here you can see one of the possible executions of tasks by threads.
 
-.. figure:: Images/how-oneTBB-works.png
+.. figure:: /GSG/Images/how-oneTBB-works.png
    :scale: 70%
    :align: center
 

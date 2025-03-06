@@ -5,12 +5,22 @@ Known Limitations
 
 This page outlines the known limitations of oneTBB to help you better understand its capabilities. 
 
+Debug TBB In The SYCL Program
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Limitation:** The application may crash when using the Debug version of oneTBB in a SYCL program compiled with Intel(R) oneAPI DPC++/C++ Compiler. This happens because both ``tbb`` (Release version) and ``tbb_debug`` (Debug version) libraries load simultaneously, causing conflicts.
+
+**Solution:** Do one of the following:
+
+* Link the application with the Release version ``tbb`` instead of ``tbb_debug``.
+* Use the ``qtbb`` flag provided by the Intel(R) oneAPI DPC++/C++ Compiler.
+
 Freestanding Compilation Mode
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Limitation:** oneTBB does not support the freestanding compilation mode. 
 
-**Risk:** Compiling an application that utilizes oneTBB headers using the Intel(R) oneAPI DPC+/C+ Compiler may result in failure on Windows* OS if the ``/Qfreestanding`` compiler option is employed.
+**Risk:** Compiling an application that utilizes oneTBB headers using the Intel(R) oneAPI DPC++/C++ Compiler may result in failure on Windows* OS if the ``/Qfreestanding`` compiler option is employed.
 
 Static Assert
 ^^^^^^^^^^^^^
