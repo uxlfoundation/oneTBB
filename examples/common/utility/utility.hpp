@@ -549,9 +549,10 @@ inline void report_skipped() {
               << "\n";
 }
 
-inline void report_relative_error(double err) {
-    std::cout << "Relative_Err : " << err << " %"
-              << "\n";
+inline void report_relative_error(double err,
+                                  const std::string& prefix = "Relative_Err : ",
+                                  const std::string& suffix = " %") {
+    std::cout << prefix << err << suffix << std::endl;
 }
 
 inline void parse_cli_arguments(int argc, const char* argv[], utility::cli_argument_pack cli_pack) {

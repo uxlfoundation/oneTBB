@@ -31,17 +31,25 @@ public:
     measurements() = default;
 
     measurements(unsigned iterations) {
-        _time_intervals.reserve(iterations);
+        _iterations = iterations;
+        _time_intervals.reserve(_iterations);
+    }
+
+    inline unsigned iterations() {
+        return _iterations;
     }
 
     inline void start() {
         _startTime = std::chrono::steady_clock::now();
     }
-    inline void stop() {
+
+    inline std::chrono::microseconds stop() {
         auto _endTime = std::chrono::steady_clock::now();
         // store the end time and start time
         _time_intervals.push_back(std::make_pair(_startTime, _endTime));
+        return std::chrono::duration_cast<std::chrono::microseconds>(_endTime - _startTime);
     }
+
     double computeRelError() {
         // Accumulate the total duration in microseconds using std::accumulate with a lambda function
         assert(0 != _time_intervals.size());
@@ -76,6 +84,7 @@ private:
     using time_point = std::chrono::steady_clock::time_point;
     time_point _startTime;
     std::vector<std::pair<time_point, time_point>> _time_intervals;
+    unsigned _iterations;
 };
 
 } // namespace utility
