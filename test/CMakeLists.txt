@@ -195,7 +195,11 @@ function(_tbb_get_hwloc_runtime_vars)
 
     foreach(HWLOC_VERSION ${_runtime_vars_HWLOC_VERSION_LIST})
         get_target_property(HWLOC_LOCATION HWLOC::${HWLOC_VERSION} IMPORTED_LOCATION)
-        get_filename_component(HWLOC_LOCATION_PATH ${HWLOC_LOCATION} DIRECTORY)
+        if (NOT HWLOC_LOCATION)
+            get_target_property(HWLOC_LOCATION_PATH HWLOC::${HWLOC_VERSION} LIBRARY_OUTPUT_DIRECTORY)
+        else()
+            get_filename_component(HWLOC_LOCATION_PATH ${HWLOC_LOCATION} DIRECTORY)
+        endif()
         list(APPEND LIBRARIES_PATH ${HWLOC_LOCATION_PATH})
     endforeach()
 
@@ -296,10 +300,28 @@ function(tbb_add_tbbbind_test)
         )
     endif()
 
-    set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
-        PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*UNAVAILABLE"
-        FAIL_REGULAR_EXPRESSION "Status:.*FAILURE"
-    )
+    if (TARGET TBB::tbbbind)
+        # TBBBind which is statically linked with HWLOC is available,
+        # so in the environment without HWLOC, it should be found.
+        set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
+            PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*tbbbind"
+            FAIL_REGULAR_EXPRESSION "Status:.*FAILURE"
+        )
+
+        target_compile_definitions(${_tbbbind_test_NAME} PRIVATE __TBB_SELF_CONTAINED_TBBBIND)
+    else()
+        set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
+            PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*UNAVAILABLE"
+            FAIL_REGULAR_EXPRESSION "Status:.*FAILURE"
+        )
+    endif()
+
+    if (TARGET HWLOC::hwloc_static)
+        # Don't export symbols from HWLOC archive library
+        target_link_options(${_tbbbind_test_NAME} PRIVATE $<$<BOOL:UNIX>:-Wl,--exclude-libs,ALL>)
+        target_link_libraries(${_tbbbind_test_NAME} PRIVATE HWLOC::hwloc_static)
+        target_compile_definitions(${_tbbbind_test_NAME} PRIVATE __TBB_HWLOC_VALID_ENVIRONMENT)
+    endif()
 
     if (TARGET HWLOC::hwloc_stub)
         _tbb_get_hwloc_runtime_vars(
@@ -321,32 +343,20 @@ function(tbb_add_tbbbind_test)
         set(HWLOC_2_TESTS_STATUS_SHOWN TRUE PARENT_SCOPE)
     endif()
 
-    if (TARGET HWLOC::hwloc_1_11 AND NOT HWLOC_1_11_TESTS_STATUS_SHOWN)
-        message(STATUS "HWLOC 1.11 dependent tests were enabled.")
-        set(HWLOC_1_11_TESTS_STATUS_SHOWN TRUE PARENT_SCOPE)
+    if (TARGET HWLOC::hwloc_static AND NOT HWLOC_STATIC_TESTS_STATUS_SHOWN)
+        message(STATUS "Portable TBBBind tests were enabled.")
+        set(HWLOC_STATIC_TESTS_STATUS_SHOWN TRUE PARENT_SCOPE)
     endif()
 
     list(APPEND HWLOC_TEST_CASES
         hwloc_2_5
         hwloc_2
-        hwloc_1_11
         hwloc_2_5_hwloc_2
-        hwloc_2_5_hwloc_1_11
-        hwloc_2_hwloc_1_11
-        hwloc_2_5_hwloc_2_hwloc_1_11
-        incompatible_hwlocs_1_11_vs_2_5
-        incompatible_hwlocs_1_11_vs_2
     )
 
     list(APPEND HWLOC_TEST_CASE_0_VARS tbbbind_2_5 "hwloc_2_5")
     list(APPEND HWLOC_TEST_CASE_1_VARS tbbbind_2   "hwloc_2")
-    list(APPEND HWLOC_TEST_CASE_2_VARS tbbbind     "hwloc_1_11")
-    list(APPEND HWLOC_TEST_CASE_3_VARS tbbbind_2_5 "hwloc_2_5,hwloc_2")
-    list(APPEND HWLOC_TEST_CASE_4_VARS tbbbind_2_5 "hwloc_2_5,hwloc_1_11")
-    list(APPEND HWLOC_TEST_CASE_5_VARS tbbbind_2   "hwloc_2,hwloc_1_11")
-    list(APPEND HWLOC_TEST_CASE_6_VARS tbbbind_2_5 "hwloc_2_5,hwloc_2,hwloc_1_11")
-    list(APPEND HWLOC_TEST_CASE_7_VARS tbbbind_2_5 "hwloc_1_11,hwloc_2_5")
-    list(APPEND HWLOC_TEST_CASE_8_VARS tbbbind_2   "hwloc_1_11,hwloc_2")
+    list(APPEND HWLOC_TEST_CASE_2_VARS tbbbind_2_5 "hwloc_2_5,hwloc_2")
 
     foreach(TEST_CASE ${HWLOC_TEST_CASES})
         list(FIND HWLOC_TEST_CASES ${TEST_CASE} TEST_CASE_INDEX)
@@ -712,4 +722,4 @@ endif()
 
 unset(HWLOC_2_5_TESTS_STATUS_SHOWN)
 unset(HWLOC_2_TESTS_STATUS_SHOWN)
-unset(HWLOC_1_11_TESTS_STATUS_SHOWN)
+unset(HWLOC_STATIC_TESTS_STATUS_SHOWN)
