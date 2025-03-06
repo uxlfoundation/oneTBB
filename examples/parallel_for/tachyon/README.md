@@ -34,6 +34,7 @@ tachyon [dataset=value] [boundthresh=value] [no-display-updating] [no-bounding] 
 * `boundthresh` - bounding threshold value.
 * `no-display-updating` - disable run-time display updating.
 * `no-bounding` - disable bounding technique.
+* `n-of-repeats` - how many times to repeat rendering to collect its reliable performance statistics.
 
 ### Environment variables
 The `tbb` and `tbb1d` version of examples has the following settings that may be handled by environment variables:
