@@ -16,7 +16,7 @@
 
 #if __cplusplus >= 201703L
 
-#define TBB_PREVIEW_BLOCKED_ND_RANGE_CTAD 1
+#define TBB_PREVIEW_BLOCKED_ND_RANGE_DEDUCTION_GUIDES 1
 #include <oneapi/tbb/blocked_nd_range.h>
 
 int main() {
