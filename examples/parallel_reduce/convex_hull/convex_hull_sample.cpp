@@ -289,14 +289,12 @@ int main(int argc, char *argv[]) {
     points.reserve(cfg::numberOfPoints);
 
     if (!util::silent) {
-        std::cout << "Starting TBB-buffered version of QUICK HULL algorithm"
-                  << "\n";
+        std::cout << "Starting TBB-buffered version of QUICK HULL algorithm" << "\n";
     }
 
     if (util::numberOfIterations <= 0) {
         util::numberOfIterations = 10;
-        std::cout << "Setting the number of iterations = 10 default"
-                  << "\n";
+        std::cout << "Setting the number of iterations = 10 default" << "\n";
     }
     else {
         std::cout << "Input for the number of iterations = " << util::numberOfIterations << "\n";
