@@ -30,9 +30,6 @@
 #include "oneapi/tbb/concurrent_vector.h"
 
 #include "convex_hull.hpp"
-#include <thread>
-
-// extern int numberOfIterations;
 
 typedef util::point<double> point_t;
 typedef oneapi::tbb::concurrent_vector<point_t> pointVec_t;
