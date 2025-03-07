@@ -40,7 +40,6 @@
 namespace cfg {
 // convex hull problem user set parameters
 long numberOfPoints = 5000000; // problem size
-// long numberOfIterations = 100;
 
 // convex hull grain sizes for 3 subproblems. Be sure 16*GS < 512Kb
 const std::size_t generateGrainSize = 25000;

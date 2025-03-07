@@ -241,12 +241,6 @@ void divide_and_conquer(const pointVec_t &P, pointVec_t &H, point_t p1, point_t 
         divide_and_conquer(P_reduced, H1, p1, p_far);
         divide_and_conquer(P_reduced, H2, p_far, p2);
 
-        // std::thread t1(divide_and_conquer, std::ref(P_reduced), std::ref(H1), p1, p_far);
-        // std::thread t2(divide_and_conquer, std::ref(P_reduced), std::ref(H2), p_far, p2);
-
-        // t1.join();
-        // t2.join();
-
         appendVector(H1, H);
         appendVector(H2, H);
     }
@@ -263,14 +257,8 @@ void quickhull(const pointVec_t &points, pointVec_t &hull) {
 
     pointVec_t H;
 
-    // divide_and_conquer(points, hull, p_maxx, p_minx);
-    // divide_and_conquer(points, H, p_minx, p_maxx);
-
-    std::thread t1(divide_and_conquer, std::ref(points), std::ref(hull), p_maxx, p_minx);
-    std::thread t2(divide_and_conquer, std::ref(points), std::ref(H), p_minx, p_maxx);
-
-    t1.join();
-    t2.join();
+    divide_and_conquer(points, hull, p_maxx, p_minx);
+    divide_and_conquer(points, H, p_minx, p_maxx);
 
     appendVector(H, hull);
 }
