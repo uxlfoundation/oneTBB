@@ -40,6 +40,7 @@
 namespace cfg {
 // convex hull problem user set parameters
 long numberOfPoints = 5000000; // problem size
+// long numberOfIterations = 100;
 
 // convex hull grain sizes for 3 subproblems. Be sure 16*GS < 512Kb
 const std::size_t generateGrainSize = 25000;
@@ -51,6 +52,7 @@ namespace util {
 bool silent = false;
 bool verbose = false;
 std::vector<std::string> OUTPUT;
+int numberOfIterations = 0;
 
 // utility functionality
 void ParseInputArgs(int argc, char* argv[], utility::thread_number_range& threads) {
@@ -61,6 +63,9 @@ void ParseInputArgs(int argc, char* argv[], utility::thread_number_range& thread
             //"-h" option for displaying help is present implicitly
             .positional_arg(threads, "n-of-threads", utility::thread_number_range_desc)
             .positional_arg(cfg::numberOfPoints, "n-of-points", "number of points")
+            .positional_arg(numberOfIterations,
+                            "n-of-iterations",
+                            "number of iterations the example runs internally")
             .arg(silent, "silent", "no output except elapsed time")
             .arg(verbose, "verbose", "turns verbose ON"));
     //disabling verbose if silent is specified
@@ -131,7 +136,7 @@ template <typename Index>
 struct edge {
     Index start;
     Index end;
-    edge(Index _p1, Index _p2) : start(_p1), end(_p2){};
+    edge(Index _p1, Index _p2) : start(_p1), end(_p2) {};
 };
 
 template <typename T>

@@ -30,6 +30,9 @@
 #include "oneapi/tbb/concurrent_vector.h"
 
 #include "convex_hull.hpp"
+#include <thread>
+
+// extern int numberOfIterations;
 
 typedef util::point<double> point_t;
 typedef oneapi::tbb::concurrent_vector<point_t> pointVec_t;
@@ -238,6 +241,12 @@ void divide_and_conquer(const pointVec_t &P, pointVec_t &H, point_t p1, point_t 
         divide_and_conquer(P_reduced, H1, p1, p_far);
         divide_and_conquer(P_reduced, H2, p_far, p2);
 
+        // std::thread t1(divide_and_conquer, std::ref(P_reduced), std::ref(H1), p1, p_far);
+        // std::thread t2(divide_and_conquer, std::ref(P_reduced), std::ref(H2), p_far, p2);
+
+        // t1.join();
+        // t2.join();
+
         appendVector(H1, H);
         appendVector(H2, H);
     }
@@ -254,8 +263,14 @@ void quickhull(const pointVec_t &points, pointVec_t &hull) {
 
     pointVec_t H;
 
-    divide_and_conquer(points, hull, p_maxx, p_minx);
-    divide_and_conquer(points, H, p_minx, p_maxx);
+    // divide_and_conquer(points, hull, p_maxx, p_minx);
+    // divide_and_conquer(points, H, p_minx, p_maxx);
+
+    std::thread t1(divide_and_conquer, std::ref(points), std::ref(hull), p_maxx, p_minx);
+    std::thread t2(divide_and_conquer, std::ref(points), std::ref(H), p_minx, p_maxx);
+
+    t1.join();
+    t2.join();
 
     appendVector(H, hull);
 }
@@ -269,6 +284,7 @@ int main(int argc, char *argv[]) {
     pointVec_t points;
     pointVec_t hull;
     int nthreads;
+    double rel_error;
 
     points.reserve(cfg::numberOfPoints);
 
@@ -277,29 +293,52 @@ int main(int argc, char *argv[]) {
                   << "\n";
     }
 
+    if (util::numberOfIterations <= 0) {
+        util::numberOfIterations = 10;
+        std::cout << "Setting the number of iterations = 10 default"
+                  << "\n";
+    }
+    else {
+        std::cout << "Input for the number of iterations = " << util::numberOfIterations << "\n";
+    }
+
+    utility::measurements mu(util::numberOfIterations);
+
     for (nthreads = threads.first; nthreads <= threads.last; nthreads = threads.step(nthreads)) {
         oneapi::tbb::global_control c(oneapi::tbb::global_control::max_allowed_parallelism,
                                       nthreads);
 
         points.clear();
-        util::my_time_t tm_init = util::gettime();
-        initialize(points);
-        util::my_time_t tm_start = util::gettime();
-        if (!util::silent) {
-            std::cout << "Init time on " << nthreads
-                      << " threads: " << util::time_diff(tm_init, tm_start)
-                      << "  Points in input: " << points.size() << "\n";
-        }
 
-        tm_start = util::gettime();
-        quickhull(points, hull);
-        util::my_time_t tm_end = util::gettime();
-        if (!util::silent) {
-            std::cout << "Time on " << nthreads << " threads: " << util::time_diff(tm_start, tm_end)
-                      << "  Points in hull: " << hull.size() << "\n";
+        for (int iter = 0; iter < util::numberOfIterations; ++iter) {
+            util::my_time_t tm_init = util::gettime();
+            initialize(points);
+
+            util::my_time_t tm_start = util::gettime();
+            if (!util::silent) {
+                std::cout << "Init time on " << nthreads
+                          << " threads: " << util::time_diff(tm_init, tm_start)
+                          << "  Points in input: " << points.size() << "\n";
+            }
+
+            tm_start = util::gettime();
+            mu.start();
+
+            quickhull(points, hull);
+
+            mu.stop();
+            util::my_time_t tm_end = util::gettime();
+            if (!util::silent) {
+                std::cout << "Time on " << nthreads
+                          << " threads: " << util::time_diff(tm_start, tm_end)
+                          << "  Points in hull: " << hull.size() << "\n";
+            }
+            hull.clear();
         }
-        hull.clear();
+        rel_error = mu.computeRelError();
     }
+
     utility::report_elapsed_time(util::time_diff(tm_main_begin, util::gettime()));
+    utility::report_relative_error(rel_error);
     return 0;
 }
