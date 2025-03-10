@@ -67,47 +67,71 @@ It may be possible to have the node `track_maker` active at the same time, if th
 
 ## Proposal
 
-> [!NOTE]
-> Although we focus on the `flow::function_node` class template in this proposal, the concepts discussed here apply to nearly any flow-graph node that accepts a user-provided function body.
-
 Our proposal consists of:
-1. Introducing the equivalent of a `flow::limited_resource` class template that, when connected with another node, ensures limited access to the resource it represents.
-2. Adding `flow::function_node` constructors that allow the specification of limited resource nodes instead of a `concurrency` value.
+1. Introducing the equivalent of a `flow::resource_limiter_node` class template that, when connected with another node, ensures limited access to the resource it represents.
+2. Adding `flow::rl_function_node` constructors that allow the specification of limited resource nodes instead of (or in addition to) a `concurrency` value.
+
+> [!NOTE]
+> Although we pattern our proposal on the `flow::function_node` class template in this proposal, the concepts discussed here apply to nearly any flow-graph node that accepts a user-provided function body.
 
 ``` c++
-auto& gpu_resource = flow::limited_resource<GPU>(g, 2);
-auto& root_resource = flow::limited_resource<ROOT>(g, 1);
+flow::resource_limiter_node<GPU> gpu_resource{g, 2};
+flow::resource_limiter_node<ROOT> root_resource{g, 1};
 
-flow::function_node<
-  Hits,
-  Tracks,
-  tuple<GPU, ROOT>> fn{g,
-                       make_tuple(gpu_resource, root_resource),
-                       [](Hits const&, tuple<GPU, ROOT>) -> Tracks { ... }
-                      };
+flow::rl_function_node fn{g,
+                          std::tie(gpu_resource, root_resource),
+                          [](Hits const&, GPU const*, ROOT const*>) -> Tracks { ... }
+                         };
 
 ```
-### `flow::limited_resource` class template
+### `flow::resource_limiter_node` class template
 
-The `flow::limited_resource` class template heuristically looks like:
+The `flow::resource_limiter_node` class template heuristically looks like:
 
 ```c++
-template <typename Resource = /* implementation-defined */>
-class limited_resource {
+template <typename Handle = default_resource_handle>
+class resource_limiter_node : tbb::flow::buffer_node<Handle const*> {
 public:
-  template <typename... Ts>
-  limited_resource(flow::graph&, Ts... args_to_Resource_ctor);
+  using token_type = Handle const*;
+
+  /// \brief Constructs a resource_limiter with n_tokens tokens of type Handle.
+  resource_limiter_node(tbb::flow::graph& g, unsigned int n_handles = 1) :
+    tbb::flow::buffer_node<token_type>{g}, handles_(n_handles)
+  {}
+  resource_limiter_node(tbb::flow::graph& g, std::vector<Handle>&& handles) :
+    tbb::flow::buffer_node<token_type>{g}, handles_(std::move(handles))
+  {}
+
+  /// \brief Activate the resource_limiter by placing one token to each handle
+  /// it manages into its buffer.
+  ///
+  /// This function must be called before the flow graph is started.  It
+  /// is not automatically called by the constructor because the
+  /// resource_limiter may be placed into a container (e.g. a vector) that
+  /// can grow after the resource_limiter is constructed.  If the
+  /// resource_limiter is activated before it is placed into its final
+  /// location, then the locations of the tokens in the buffer can become
+  /// invalid, resulting in memory errors when the flow graph is executed.
+  void activate()
+  {
+    // Place tokens into the buffer.
+    for (auto const& handle : handles_) {
+      tbb::flow::buffer_node<token_type>::try_put(&handle);
+    }
+  }
+
+private:
+  std::vector<Handle> handles_;
 };
 ```
 
-where `Resource` represents a policy class.
-
+where `Handle` represents the type of a resource handle for which tokens can be passed throughout the graph.
 
 #### C++20 support
 
-When compiling with a C++ standard of at least C++20, the `limited_resource` `Resource` template parameter can be constrained to model a resource concept.
+When compiling with a C++ standard of at least C++20, the `resource_limiter` `Handle` template parameter can be constrained to model a resource concept.
 
-#### Default `Resource` policy
+#### Default `Handle` policy
 
 For serialized nodes that do not need to access details of the resource, a default policy can be provided:
 
