@@ -1,0 +1,22 @@
+@startuml
+
+participant caller 
+participant buffer as buffer
+participant join as j
+participant func_node as func
+participant user_func as uf
+participant root_rl as root
+
+
+activate caller
+caller -> buffer++ : try_put(3)
+buffer -> buffer : store(3)
+buffer -> j++ : try_put(3)
+j -> j : store(3)
+activate root
+root -> j++ : try_put(ROOT)
+j -> j : store(ROOT)
+j -> func : try_put(3, ROOT)
+func -> uf : call(3, ROOT)
+func -> root : try_put(ROOT)
+@enduml
