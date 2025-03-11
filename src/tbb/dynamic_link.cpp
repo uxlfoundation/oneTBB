@@ -432,12 +432,12 @@ namespace r1 {
         std::size_t name_len = std::strlen( name );
         std::size_t full_len = name_len+ap_data._len;
         if ( full_len < len ) {
-            __TBB_ASSERT( ap_data._path[ap_data._len] == 0, nullptr);
-            __TBB_ASSERT( std::strlen(ap_data._path) == ap_data._len, nullptr);
+            __TBB_ASSERT_EX( ap_data._path[ap_data._len] == 0, nullptr );
+            __TBB_ASSERT_EX( std::strlen(ap_data._path) == ap_data._len, nullptr );
             std::strncpy( path, ap_data._path, ap_data._len + 1 );
-            __TBB_ASSERT( path[ap_data._len] == 0, nullptr);
+            __TBB_ASSERT_EX( path[ap_data._len] == 0, nullptr );
             std::strncat( path, name, len - ap_data._len );
-            __TBB_ASSERT( std::strlen(path) == full_len, nullptr);
+            __TBB_ASSERT_EX( std::strlen(path) == full_len, nullptr );
         }
         return full_len+1; // +1 for null character
     }
