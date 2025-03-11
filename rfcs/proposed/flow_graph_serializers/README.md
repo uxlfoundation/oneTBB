@@ -1,4 +1,4 @@
-# Dining philosophers node
+# Resource-limited nodes (_or dining philosophers nodes_)
 
 Flow-graph provides a facility to serialize the execution of a node to allow some code that would not otherwise be thread-safe to be executed in parallel graphs.
 Various flow-graph nodes accept a constructor argument that specifies the maximum concurrency the graph can invoke for that particular node.
@@ -22,19 +22,21 @@ There are cases, however, where specifying a concurrency limit of `flow::serial`
 For example, suppose `track_maker` needs exclusive access to some database connection, and another node `cluster_maker` also needs access to the same database:
 
 ``` c++
+DB db = db_handle(...);
+
 flow::function_node<Hits, Tracks> track_maker{
   g,
   flow::serial,
-  [](Hits const&) -> Tracks { auto a = db_unsafe_access(); ... }
+  [&db](Hits const&) -> Tracks { auto a = db.access(/* unsafe */); ... }
 };
 flow::function_node<Signals, Clusters> cluster_maker{
   g,
   flow::serial,
-  [](Signals const&) -> Clusters { auto a = db_unsafe_access(); ... }
+  [&db](Signals const&) -> Clusters { auto a = db.access(/* unsafe */); ... }
 };
 ```
 
-In the above, the function `db_unsafe_access()` returns a handle, providing thread-unsafe access to the database.
+In the above, the invocation of `db.access()` is not thread-safe.
 To avoid data races, the function bodies of `track_maker` and `cluster_maker` must not execute at the same time.
 Achieving with flow graph such serialization between function bodies is nontrivial.
 Some options include:
@@ -47,21 +49,22 @@ This RFC proposes an interface that pursues option 3, which we describe in the "
 Our proposal, however, does not mandate any implementation but suggests an API similar to:
 
 ``` c++
-auto& db_resource = flow::limited_resource(g, 1); // Only 1 database "token" allowed in the entire graph
+flow::resource_limiter_node<DB> db_resource{g, {db_handle()}};
 
-flow::function_node<Hits, Tracks> track_maker{
+flow::rl_function_node<Hits, Tracks> track_maker{
   g,
-  db_resource,
-  [](Hits const&) -> Tracks { auto a = db_unsafe_access(); ... }
+  std::tie(db_resource),
+  [](Hits const&, DB const* db) -> Tracks { auto a = db->access(/* okay */); ... }
 };
-flow::function_node<Signals, Clusters> cluster_maker{
+flow::rl_function_node<Signals, Clusters> cluster_maker{
   g,
-  db_resource,
-  [](Signals const&) -> Clusters { auto a = db_unsafe_access(); ... }
+  std::tie(db_resource),
+  [](Signals const&, DB const* db) -> Clusters { auto a = db->access(/* okay */); ... }
 };
 ```
 
-where `db_resource` represents a limited resource to which both `track_maker` and `cluster_maker` require sole access.
+where `db_resource` ensures limited access to a resource that both `track_maker` and `cluster_maker` require sole access.
+The implementation of the `DB::access()`  function did not change, but by connecting the resource-limited function nodes to the `db_resource`, the function bodies of the nodes will not be invoked concurrently.
 Note that if the only reason that the bodies of `track_maker` and `cluster_maker` were thread-unsafe was their access to the limited resource indicated by `db_resource` it is no longer necessary to declare that the nodes have concurrency `flow::serial`.
 It may be possible to have the node `track_maker` active at the same time, if the nature of `db_resource` were to allow two tokens to be available, and as long as each activation was given a different token.
 
@@ -74,16 +77,29 @@ Our proposal consists of:
 > [!NOTE]
 > Although we pattern our proposal on the `flow::function_node` class template in this proposal, the concepts discussed here apply to nearly any flow-graph node that accepts a user-provided function body.
 
+With the proposal here, in addition to what is written above we imagine the following could be done:
+
 ``` c++
-flow::resource_limiter_node<GPU> gpu_resource{g, 2};
-flow::resource_limiter_node<ROOT> root_resource{g, 1};
+// Permit access to two GPUs
+flow::resource_limiter_node<GPU> gpus{g,
+                                      {GPU{ /*gpu 1*/ }, GPU{ /*gpu 2*/}};
+flow::resource_limiter_node<ROOT> root{g, ROOT{...}};  // Only 1 ROOT handle available
 
 flow::rl_function_node fn{g,
-                          std::tie(gpu_resource, root_resource),
-                          [](Hits const&, GPU const*, ROOT const*>) -> Tracks { ... }
+                          std::tie(gpus, root), // Edges implicitly created to the required resource nodes
+                          [](Hits const&, GPU const*, ROOT const*) -> Tracks {
+                             // User has access to resource handles as arguments to function body
+                             ...
+                          }                             
                          };
 
 ```
+
+The constructor signature for the node is similar to the regular `flow::function_node` constructor signatures, except that instead of a concurrency value, a `std::tuple` is supplied of resource limiters.
+The function body takes an argument for the input data (i.e. `Hits`) and (optionally) an argument corresponding to each limited resource.
+The function body is invoked only when the `rl_function_node` can obtain exclusive access to one of the resource handles provided by each resource-limiter node (and when a `Hits` message has been sent to it).
+Note that because two GPU handles can be accessed, it is possible to parallelize other work with a GPU as only each *invocation* of the user body requires sole access to a GPU handle.
+
 ### `flow::resource_limiter_node` class template
 
 The `flow::resource_limiter_node` class template heuristically looks like:
@@ -94,10 +110,11 @@ class resource_limiter_node : tbb::flow::buffer_node<Handle const*> {
 public:
   using token_type = Handle const*;
 
-  /// \brief Constructs a resource_limiter with n_tokens tokens of type Handle.
+  /// \brief Constructs a resource_limiter with n_handles of type Handle.
   resource_limiter_node(tbb::flow::graph& g, unsigned int n_handles = 1) :
     tbb::flow::buffer_node<token_type>{g}, handles_(n_handles)
   {}
+  /// \brief Constructs a resource_limiter with explicitly provided handles.
   resource_limiter_node(tbb::flow::graph& g, std::vector<Handle>&& handles) :
     tbb::flow::buffer_node<token_type>{g}, handles_(std::move(handles))
   {}
@@ -126,42 +143,62 @@ private:
 ```
 
 where `Handle` represents the type of a resource handle for which tokens can be passed throughout the graph.
+With this implementation, the token is simply a pointer to a handle owned by the resource limiter.
 
 #### C++20 support
 
-When compiling with a C++ standard of at least C++20, the `resource_limiter` `Handle` template parameter can be constrained to model a resource concept.
-
-#### Default `Handle` policy
-
-For serialized nodes that do not need to access details of the resource, a default policy can be provided:
-
-```c++
-flow::limited_resource f{g, 2}; // Is there a use case for needing more than one token but not having access to the resource?
-```
-
-#### User-defined `Resource` policies
+When compiling with a C++ standard of at least C++20, the `resource_limiter` `Handle` template parameter can be constrained to model a resource-handle concept.
 
 ### Resource handles
 
-Different token types that can carry state.
+#### User-defined resource handles
 
-> A full and detailed description of the proposal with highlighted consequences.
->
-> Depending on the kind of the proposal, the description should cover:
->
-> - New use cases supported by the extension.
-> - The expected performance benefit for a modification.
-> - The interface of extensions including class definitions or function
-> declarations.
->
+An example of a user-defined resource handle is the `DB` handle discussed above.
+A handle, in principle, can have an arbitrary structure with unlimited interface, so long as ownership of the handle ultimately reside with the `resource_limiter_node`.
+
+#### `default_resource_handle`
+
+For `rl_function_node` function bodies that do not need to access details of the resource, a default policy can be provided:
+
+```c++
+flow::resource_limiter_node r{g};
+```
+
+This can be useful if a third-party library supports substantial thread-unsafe interface and there is no obvious API that should be attached to the handle.
+
+### `rl_function_node` constructors
+
+We imagine the following constructors could exist
+
+```c++
+// 1. Already discussed above
+flow::rl_function_node fn1{g,
+                           std::tie(gpus, root),
+                           [](Hits const&, GPU const*, ROOT const*) -> Tracks { ... }};
+
+// 2. No access required to a limited resource (equivalent to flow::function_node)
+flow::rl_function_node fn2{g, tbb::flow::unlimited, [](Hits const&) -> Tracks { ... }};
+
+// 3. Access required to a limited resource, and the user body must be serialized
+flow::rl_function_node fn3{g,
+                           std::make_tuple(tbb::flow::serial, std::ref(db_limiter)),
+                           [](Hit const&, DB const*) -> Tracks{ ... }};
+```
+
+Constructor 1 has already been discussed.
+Constructor 2 would be equivalent (in signature and behavior) to what is already provided by `flow::function_node`.
+Constructor 3 would be the rarer situation where: 
+
+- the (e.g.) `db_resource` itself may have more than one resource handle, thus permitting some parallelism for that resource
+- the implementation of `fn3`'s user body may need to be serialized for reasons unrelated to the DB resource
+
 ## Implementation experience
 
-The image below depicts a system constructed implemented within the https://github.com/knoepfel/meld-serial repository.
+The image below depicts a system implemented within the https://github.com/knoepfel/meld-serial repository.
 
 ![Demonstration of token-based serialization system.](function-serialization.png)
 
-
-- We can never lose input data
+### Preformance results
 
 ## Future work
 
