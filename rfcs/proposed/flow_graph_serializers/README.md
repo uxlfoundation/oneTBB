@@ -1,7 +1,7 @@
 # Resource-limited nodes (_or dining philosophers nodes_)
 
 Flow-graph provides a facility to serialize the execution of a node to allow some code that would not otherwise be thread-safe to be executed in parallel graphs.
-Various flow-graph nodes accept a constructor argument that specifies the maximum concurrency the graph can invoke for that particular node.
+Various flow-graph nodes accept a constructor argument that specifies the maximum concurrency the graph can use for that particular node.
 This allows one to use, in such a node, a function body that is not thread-safe, while ensuring that the graph into which the node is inserted is thread-safe.
 For example, in the field of particle physics, an algorithm might reconstruct particle trajectories ("tracks") from energy deposits ("hits") left behind by those particles, and recorded by an experiment's detector.
 If the algorithm is not thread-safe, a reasonable node construction could be:
@@ -18,7 +18,7 @@ flow::function_node<Hits, Tracks> track_maker{
 
 where the `flow::serial` argument constrains the flow graph to execute the node body by no more than one thread at a time.
 
-There are cases, however, where specifying a concurrency limit of `flow::serial` is insufficient to guarantee thread safety of the full graph.
+There are cases, however, when specifying a concurrency limit of `flow::serial` is insufficient to guarantee thread safety of the full graph.
 For example, suppose `track_maker` needs exclusive access to some database connection, and another node `cluster_maker` also needs access to the same database:
 
 ``` c++
@@ -42,7 +42,7 @@ Achieving with flow graph such serialization between function bodies is nontrivi
 Some options include:
 
 1. placing an explicit lock around the use of the database, resulting in inefficiencies in the execution of the graph,
-2. creating explicit edges between `track_maker` and `cluster_maker` even though there is not obvious data dependency between them,
+2. creating explicit edges between `track_maker` and `cluster_maker` even though there is no obvious data dependency between them,
 3. creating a token-based system that can limit access to a shared resource.
 
 This RFC proposes an interface that pursues option 3, which we describe in the "Implementation experience" section, below.
@@ -63,7 +63,7 @@ flow::rl_function_node<Signals, Clusters> cluster_maker{
 };
 ```
 
-where `db_resource` ensures limited access to a resource that both `track_maker` and `cluster_maker` require sole access.
+where `db_resource` ensures limited access to a resource that both `track_maker` and `cluster_maker` require.
 The implementation of the `DB::access()`  function did not change, but by connecting the resource-limited function nodes to the `db_resource`, the function bodies of the nodes will not be invoked concurrently.
 Note that if the only reason that the bodies of `track_maker` and `cluster_maker` were thread-unsafe was their access to the limited resource indicated by `db_resource` it is no longer necessary to declare that the nodes have concurrency `flow::serial`.
 It may be possible to have the node `track_maker` active at the same time, if the nature of `db_resource` were to allow two tokens to be available, and as long as each activation was given a different token.
@@ -166,7 +166,7 @@ flow::resource_limiter_node r{g};
 
 This can be useful if a third-party library supports substantial thread-unsafe interface and there is no obvious API that should be attached to the handle.
 
-### `rl_function_node` constructors
+### `flow::rl_function_node` constructors
 
 We imagine the following constructors could exist
 
