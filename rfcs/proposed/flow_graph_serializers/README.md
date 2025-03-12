@@ -70,7 +70,7 @@ It may be possible to have the node `track_maker` active at the same time, if th
 
 ## Proposal
 
-Our proposal consists of:
+Our proposal is an addition to what already exists and does not break API backwards compatibility.  The proposal consists of:
 1. Introducing the equivalent of a `flow::resource_limiter_node` class template that, when connected with another node, ensures limited access to the resource it represents.
 2. Adding `flow::rl_function_node` constructors that allow the specification of limited resource nodes instead of (or in addition to) a `concurrency` value.
 
@@ -198,36 +198,12 @@ The image below depicts a system implemented within the https://github.com/knoep
 
 ![Demonstration of token-based serialization system.](function-serialization.png)
 
-### Preformance results
-
-## Future work
-
-> A proposal should clearly outline the alternatives that were considered,
-> along with their pros and cons. Each alternative should be clearly separated
-> to make discussions easier to follow.
->
-> Pay close attention to the following aspects of the library:
-> - API and ABI backward compatibility. The library follows semantic versioning
->   so if any of those interfaces are to be broken, the RFC needs to state that
->   explicitly.
-> - Performance implications, as performance is one of the main goals of the library.
-> - Changes to the build system. While the library's primary building system is
->   CMake, there are some frameworks that may build the library directly from the sources.
-> - Dependencies and support matrix: does the proposal bring any new
->   dependencies or affect the supported configurations?
->
-> Some other common subsections here are:
-> - Discussion: some people like to list all the options first (as separate
->   subsections), and then have a dedicated section with the discussion.
-> - List of the proposed API and examples of its usage.
-> - Testing aspects.
-> - Short explanation and links to the related sub-proposals, if any. Such
->   sub-proposals could be organized as separate standalone RFCs, but this is
->   not mandatory. If the change is insignificant or doesn't make any sense
->   without the original proposal, you can have it in the RFC.
-> - Execution plan (next steps), if approved.
+### Performance results
 
 ## Open Questions
 
-> For new proposals (i.e., those in the `rfcs/proposed` directory), list any
-> open questions.
+1. For function bodies that are serialized, the current implementation imposes serialization on the `flow::function_node` after the join of the tokens and the data.
+   This means that data may accumulate at the `flow::function_node`'s input-port buffer, thus reserving the resource token for longer than is desired.
+   It would be better for the tokens to be returned if the function body is already being executed by another thread.
+2. With the implementation presented here, a live-lock situation may occur for nodes that require access to several limited resources.
+   This is discussed in the performance results, where the "histo-generating" node does not execute until both the "histogramming" and "generating" nodes have completed their executions for all events.
