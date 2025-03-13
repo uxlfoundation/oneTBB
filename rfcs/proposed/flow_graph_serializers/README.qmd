@@ -149,7 +149,7 @@ rl_function_node fn{g,
                     [](Hits const&, GPU const*, ROOT const*) -> Tracks {
                       // User has access to resource handles as arguments to function body
                       ...
-                    }                             
+                    }
                    };
 
 ```
@@ -249,7 +249,7 @@ rl_function_node fn3{g,
 
 Constructor 1 has already been discussed.
 Constructor 2 would be equivalent (in signature and behavior) to what is already provided by `flow::function_node`.
-Constructor 3 would be the rarer situation where: 
+Constructor 3 would be the rarer situation where:
 
 - the (e.g.) `db_resource` itself may have more than one resource handle, thus permitting some parallelism for that resource
 - the implementation of `fn3`'s user body may need to be serialized for reasons unrelated to the DB resource
@@ -312,14 +312,14 @@ The first few rows of the `tasks` data frame are shown in @tbl-read-events below
 ```{r}
 #| label: tbl-read-events
 #| tbl-cap: "First few rows of the `tasks` data frame."
-#| 
+#|
 events <- read_times("serial_fanout.tsv")
 
 tasks <- events |>
   pivot_wider(id_cols=c(thread, node, message, data),
               names_from=event,
               values_from=time) |>
-  
+
   mutate(duration = Stop-Start)
 
 delays <- tasks |>
@@ -360,7 +360,7 @@ tasks |>
             color = "white",
             linewidth = 0.2) +
   labs(x = "Time (milliseconds)", y = "Thread") +
-  scale_fill_brewer(palette = "Accent") +  
+  scale_fill_brewer(palette = "Accent") +
   theme_minimal()
 ```
 
@@ -384,7 +384,7 @@ tasks |>
             linewidth = 0.2) +
   labs(x = "Time (milliseconds)", y = "Thread") +
   coord_cartesian(xlim = c(0, 5.0)) +  # zoom in but do not drop data
-  scale_fill_brewer(palette = "Accent") +  
+  scale_fill_brewer(palette = "Accent") +
   theme_minimal()
 ```
 
@@ -432,7 +432,7 @@ tasks |>
   labs(x = "Time (milliseconds)", y = "Thread") +
   coord_cartesian(xlim = c(1.0, 2.2)) +  # zoom in but do not drop data
   scale_color_identity() +  # use text_color as literal colors
-  scale_fill_brewer(palette = "Accent") +  
+  scale_fill_brewer(palette = "Accent") +
   theme_minimal()
 ```
 
@@ -457,7 +457,7 @@ tasks |>
             linewidth = 0.2) +
   labs(x = "Time (milliseconds)", y = "Thread") +
   coord_cartesian(xlim = c(700, 1100)) +  # zoom in but do not drop data
-  scale_fill_brewer(palette = "Accent") +  
+  scale_fill_brewer(palette = "Accent") +
   theme_minimal()
 ```
 
@@ -510,7 +510,7 @@ or as the starting time (@fig-source-time-structure-by-start).
 #| label: fig-source-time-structure-by-message
 #| fig-cap: "Duration of Source tasks a function of the message number.
 #|           The color of the point indicates the thread on which the task was run."
-tasks |> 
+tasks |>
   filter(node == "Source") |>
   ggplot(aes(x=message, y=duration, color=thread)) +
   geom_point() +
@@ -524,7 +524,7 @@ tasks |>
 #|           The color of the point indicates the thread on which the task was run.
 #|           Note the log $x$ axis.
 #|           Also note that the red point starts at time 0, but is plotted at the edge of the graph because the log scale cannot extend to time 0."
-tasks |> 
+tasks |>
   filter(node == "Source") |>
   ggplot(aes(x=Start, y=duration, color=thread)) +
   geom_point() +
@@ -548,7 +548,7 @@ There are a few delays that are much longer than others, as shown in @tbl-long-d
 #| tbl-cap: "Details of the delays longer than 1 millisecond."
 delays |>
   filter(delay > 1.0) |>
-  kableExtra::kable() 
+  kableExtra::kable()
 ```
 
 [Fig. @fig-delay-distribution] shows the distribution of the lengths of the delays.
@@ -574,9 +574,7 @@ delays |>
 ## Open Questions
 
 1. For function bodies that are serialized, the current implementation imposes serialization on the `flow::function_node` after the join of the tokens and the data.
-   This means that data may accumulate at the `flow::function_node`'s input-port buffer, thus reserving the resource token for longer than is desired.
+   This means that data may accumulate at the `flow::function_node`'s input-port buffer, thus reserving the resource for longer than is desired.
    It would be better for the tokens to be returned if the function body is already being executed by another thread.
 2. With the implementation presented here, a live-lock situation may occur for nodes that require access to several limited resources.
    This is discussed in the performance results, where the "histo-generating" node does not execute until both the "histogramming" and "generating" nodes have completed their executions for all events.
-
-

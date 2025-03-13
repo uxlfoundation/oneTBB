@@ -142,7 +142,7 @@ rl_function_node fn{g,
                     [](Hits const&, GPU const*, ROOT const*) -> Tracks {
                       // User has access to resource handles as arguments to function body
                       ...
-                    }                             
+                    }
                    };
 ```
 
