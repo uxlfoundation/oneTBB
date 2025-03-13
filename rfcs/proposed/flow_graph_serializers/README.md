@@ -4,14 +4,20 @@
 - [<span class="toc-section-number">1</span>
   Introduction](#introduction)
 - [<span class="toc-section-number">2</span> Proposal](#proposal)
+  - [<span class="toc-section-number">2.1</span> `resource_limiter_node`
+    class template](#resource_limiter_node-class-template)
+  - [<span class="toc-section-number">2.2</span> Resource
+    handles](#resource-handles)
+  - [<span class="toc-section-number">2.3</span> `rl_function_node`
+    constructors](#rl_function_node-constructors)
 - [<span class="toc-section-number">3</span> Implementation
   experience](#implementation-experience)
-- [<span class="toc-section-number">4</span> Performance
-  results](#performance-results)
-- [<span class="toc-section-number">5</span> Open
+  - [<span class="toc-section-number">3.1</span> Performance
+    results](#performance-results)
+- [<span class="toc-section-number">4</span> Open
   Questions](#open-questions)
 
-## Introduction
+# Introduction
 
 Flow-graph provides a facility to serialize the execution of a node to
 allow some code that would not otherwise be thread-safe to be executed
@@ -112,7 +118,7 @@ at the same time, if the nature of `db_resource` were to allow two
 tokens to be available, and as long as each activation was given a
 different token.
 
-## Proposal
+# Proposal
 
 Our proposal is an addition to what already exists and does not break
 API backwards compatibility. The proposal consists of: 1. Introducing
@@ -158,7 +164,7 @@ Note that because two GPU handles are available, it is possible to
 parallelize other work with a GPU as only each *invocation* of the node
 body requires sole access to a GPU handle.
 
-### `resource_limiter_node` class template
+## `resource_limiter_node` class template
 
 The `resource_limiter_node` class template heuristically looks like:
 
@@ -204,22 +210,22 @@ where `Handle` represents the type of a resource handle for which tokens
 can be passed throughout the graph. With this implementation, the token
 is simply a pointer to a handle owned by the resource limiter.
 
-#### C++20 support
+### C++20 support
 
 When compiling with a C++ standard of at least C++20, the
 `resource_limiter` `Handle` template parameter can be constrained to
 model a resource-handle concept.
 
-### Resource handles
+## Resource handles
 
-#### User-defined resource handles
+### User-defined resource handles
 
 An example of a user-defined resource handle is the `DB` handle
 discussed above. A handle, in principle, can have an arbitrary structure
 with unlimited interface, so long as ownership of the handle ultimately
 reside with the `resource_limiter_node`.
 
-#### `default_resource_handle`
+### `default_resource_handle`
 
 For `rl_function_node` function bodies that do not need to access
 details of the resource, a default policy can be provided:
@@ -232,7 +238,7 @@ This can be useful if a third-party library supports substantial
 thread-unsafe interface and there is no obvious API that should be
 attached to the handle.
 
-### `rl_function_node` constructors
+## `rl_function_node` constructors
 
 We imagine the following constructors could exist
 
@@ -263,7 +269,7 @@ equivalent (in signature and behavior) to what is already provided by
 - the implementation of `fn3`’s user body may need to be serialized for
   reasons unrelated to the DB resource
 
-## Implementation experience
+# Implementation experience
 
 The image below depicts a system implemented within the
 https://github.com/knoepfel/meld-serial repository.
@@ -438,7 +444,7 @@ source firing.
 
 </div>
 
-### Looking on at calibrations
+### Looking at calibrations
 
 Flowgraph seem to prefer keeping some tasks on a single thread. All of
 the *Histo-generating* tasks were run on the same thread. The same is
@@ -573,7 +579,7 @@ previous task on the same thread was run by a different node.
 
 </div>
 
-## Open Questions
+# Open Questions
 
 1.  For function bodies that are serialized, the current implementation
     imposes serialization on the `flow::function_node` after the join of
