@@ -13,6 +13,8 @@ cmake --build .
 ### Predefined make targets
 * `make run_sudoku` - executes the example with predefined parameters.
 * `make perf_run_sudoku` - executes the example with suggested parameters to measure the oneTBB performance.
+* `make benchmark_sudoku` - executes the example with suggested parameters to repeat performance measurements several times and report their relative error.
+* `make benchmark_sudoku_data` - same as `benchmark_sudoku` saving results into `benchmark_sudoku_data.csv` file.
 
 ### Application parameters
 Usage:
