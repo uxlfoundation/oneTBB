@@ -21,8 +21,10 @@ cmake --build .
 ## Running the sample
 ### Predefined make targets
 * `make run_tachyon` - executes the example with predefined parameters.
-* `make perf_run_tachyon` ` - executes the example with suggested parameters to measure the oneTBB performance.
+* `make perf_run_tachyon` - executes the example with suggested parameters to measure the oneTBB performance once.
 * `make light_test_tachyon` - executes the example with suggested parameters to reduce execution time.
+* `make benchmark_tachyon` - executes the example with suggested parameters to repeat performance measurements several times and report their relative error.
+* `make benchmark_tachyon_data` - same as `benchmark_tachyon` saving results into `benchmark_tachyon_data.csv` file.
 
 ### Application parameters
 Usage:
