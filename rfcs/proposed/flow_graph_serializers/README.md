@@ -4,12 +4,6 @@
 - [<span class="toc-section-number">1</span>
   Introduction](#introduction)
 - [<span class="toc-section-number">2</span> Proposal](#proposal)
-  - [<span class="toc-section-number">2.1</span> `resource_limiter_node`
-    class template](#resource_limiter_node-class-template)
-  - [<span class="toc-section-number">2.2</span> Resource
-    handles](#resource-handles)
-  - [<span class="toc-section-number">2.3</span> `rl_function_node`
-    constructors](#rl_function_node-constructors)
 - [<span class="toc-section-number">3</span> Implementation
   experience](#implementation-experience)
   - [<span class="toc-section-number">3.1</span> Performance
@@ -164,7 +158,7 @@ Note that because two GPU handles are available, it is possible to
 parallelize other work with a GPU as only each *invocation* of the node
 body requires sole access to a GPU handle.
 
-## `resource_limiter_node` class template
+### `resource_limiter_node` class template
 
 The `resource_limiter_node` class template heuristically looks like:
 
@@ -210,22 +204,22 @@ where `Handle` represents the type of a resource handle for which tokens
 can be passed throughout the graph. With this implementation, the token
 is simply a pointer to a handle owned by the resource limiter.
 
-### C++20 support
+#### C++20 support
 
 When compiling with a C++ standard of at least C++20, the
 `resource_limiter` `Handle` template parameter can be constrained to
 model a resource-handle concept.
 
-## Resource handles
+### Resource handles
 
-### User-defined resource handles
+#### User-defined resource handles
 
 An example of a user-defined resource handle is the `DB` handle
 discussed above. A handle, in principle, can have an arbitrary structure
 with unlimited interface, so long as ownership of the handle ultimately
 reside with the `resource_limiter_node`.
 
-### `default_resource_handle`
+#### `default_resource_handle`
 
 For `rl_function_node` function bodies that do not need to access
 details of the resource, a default policy can be provided:
@@ -238,7 +232,7 @@ This can be useful if a third-party library supports substantial
 thread-unsafe interface and there is no obvious API that should be
 attached to the handle.
 
-## `rl_function_node` constructors
+### `rl_function_node` constructors
 
 We imagine the following constructors could exist
 
