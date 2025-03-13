@@ -93,7 +93,7 @@ flow::function_node<Signals, Clusters> cluster_maker{
 
 In the above, the invocation of `db.access()` is not thread-safe.
 To avoid data races, the function bodies of `track_maker` and `cluster_maker` must not execute at the same time.
-Achieving with flow graph such serialization between node bodies is nontrivial.
+Achieving with Flow Graph such serialization between node bodies is nontrivial.
 Some options include:
 
 1. placing an explicit lock around the use of the database handle, resulting in inefficiencies in the execution of the graph,
@@ -124,7 +124,7 @@ rl_function_node<Signals, Clusters> cluster_maker{
 where `db_resource` ensures limited access to a resource that both `track_maker` and `cluster_maker` require.
 The implementation of the `DB::access()`  function did not change, but by connecting the resource-limited function nodes to the `db_resource`, the bodies of the nodes will not be invoked concurrently.
 Note that if the only reason that the bodies of `track_maker` and `cluster_maker` were thread-unsafe was their access to the limited resource indicated by `db_resource` it is no longer necessary to declare that the nodes have concurrency `flow::serial`.
-It may be possible to have the node `track_maker` active at the same time, if the nature of `db_resource` were to allow two tokens to be available, and as long as each activation was given a different token.
+It may be possible to have the node `track_maker` active at the same time, if the nature of `db_resource` were to allow two handles to be available, and as long as each activation was given a token to a different handle.
 
 # Proposal
 
@@ -262,8 +262,8 @@ The image below depicts a system implemented within the https://github.com/knoep
 
 ## Performance results
 
-This document provides some analysis of the timing performance of the `serial_node` node type.
-It analysis a simple data flow with 7 nodes.
+This document provides some analysis of the timing performance of the `rl_function_node` node type as provided in [meld-serial](https://github.com/knoepfel/meld-serial).
+It analyzes a simple data flow with 7 nodes[^1].
 
 * One *Source* (input node) that generates a series of messages.
   Each message is represented by a single integer.
@@ -271,16 +271,16 @@ It analysis a simple data flow with 7 nodes.
 * One *Propagating* node.
   This node has unlimited parallelism.
 * One *Histogramming* node.
-  This node requires sole access to the *ROOT* token, of which there is only one.
+  This node requires sole access to the *ROOT* resource, for which there is only one handle.
 * One *Generating* node.
-  This node require sole access to the *GENIE* token, of which there is only one.
+  This node require sole access to the *GENIE* resource, for which there is only one handle.
 * One *Histo-Generating* node.
-  This node requires simultaneous access to both the *ROOT* and *GENIE* tokens.
+  This node requires simultaneous access to both the *ROOT* and *GENIE* resources.
 * Three *Calibration* nodes.
   These nodes are labeled *Calibration[A]*, *Calibration[B]*, and *Calibration[C]*.
-  Each of these nodes requires sole access to a *DB* token.
-  There are two *DB* tokens available.
-  *DB* tokens have an associated integer ID; the values are 1 and 13.
+  Each of these nodes requires sole access to a *DB* handle.
+  There are two *DB* handles available.
+  *DB* handles have an associated integer ID; the values are 1 and 13.
   *Calibration[A]* and *Calibration[B]* have unlimited concurrency but *Calibration[C]* is serial.
   This means that, at the same time, we can have:
   * two *Calibration[A]* tasks running, or
@@ -288,11 +288,13 @@ It analysis a simple data flow with 7 nodes.
   * one *Calibration[A]* task running and one *Calibration[B]* task running, or
   * one *Calibration[A]* task running and one *Calibration[C]* task running, or
   * one *Calibration[B]* task running and one *Calibration[C]* task running.
-  
-  But we can not have two *Calibration[C]* tasks running at the same time.
 
-The *Source* node is directly connected to each of the other nodes.
-There are no other connections between nodes.
+  But we cannot have two *Calibration[C]* tasks running at the same time.
+
+[^1]: In this discussion, we do not refer to resource-limiter nodes as *nodes* but as *resource limiters*.
+
+The *Source* node is directly connected to each of the other nodes by explicitly calling `make_edge(...)`.
+All edges between the nodes and the resource limiters are created internally within the `rl_function_node` constructor.
 The tasks performed by the system is the generation of the messages and the processing of each message by all the other nodes in the system.
 
 Each time a node is fired, we record two events.
@@ -300,7 +302,7 @@ A *Start* event is recorded as the first thing done within the body of the node.
 The node then performs whatever work it is to do (for all but the *Source*, this is a busy loop for some fixed time).
 A *Stop* event is recorded as the last thing done within the body of the node.
 For each event, we record the *thread* on which the event occurred, the *node* that was executing, the *message* number, and the extra *data* associated with the event.
-The extra data is meaningful only for the *Calibration* nodes; this data is the *DB* token ID.
+The extra data is meaningful only for the *Calibration* nodes; this data is the *DB* handle ID.
 
 The event records are used to form the `events` data frame.
 Each task is associated with both a *Start* and a *Stop* event.
@@ -390,7 +392,7 @@ tasks |>
 
 We can see that the *Source* is firing many times, and with a wide spread of durations.
 We also see that the *Source* is serialized, as expected for an input node.
-There is some small idle time after the first firing of the *Source*, and a addtional delays after the next few firings.
+There is some small idle time after the first firing of the *Source*, and additional delays after the next few firings.
 After the first firing, all the activity for the *Source* moves to a different thread.
 We do not understand the cause of the delays between source firings, or the range of durations of the *Source* tasks.
 
@@ -463,7 +465,7 @@ tasks |>
 
 ### Looking at calibrations
 
-Flowgraph seem to prefer keeping some tasks on a single thread.
+Flow Graph seem to prefer keeping some tasks on a single thread.
 All of the *Histo-generating* tasks were run on the same thread.
 The same is true for *Generating* and *Histogramming* tasks.
 The calibrations are clustered onto a subset of threads, and are not distributed evenly across those threads.
@@ -534,7 +536,7 @@ tasks |>
 
 ### Idle time between tasks
 
-One of the concerns that some have with a system, like flowgraph, that automates the scheduling of tasks is the amount of time that the scheduling system takes (as opposed to the time spend doing the user's defined work).
+One of the concerns that some have with a system, like Flow Graph, that automates the scheduling of tasks is the amount of time that the scheduling system takes (as opposed to the time spent doing the user's defined work).
 We can estimate this by looking at the time between the end of one task and the start of the next task scheduled on the same thread.
 We call this time the *delay* and associate it with the second task.
 We also record, for each delay, whether the previous task on the thread was run by the same node.

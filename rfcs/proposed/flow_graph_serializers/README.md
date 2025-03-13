@@ -71,8 +71,8 @@ flow::function_node<Signals, Clusters> cluster_maker{
 
 In the above, the invocation of `db.access()` is not thread-safe. To
 avoid data races, the function bodies of `track_maker` and
-`cluster_maker` must not execute at the same time. Achieving with flow
-graph such serialization between node bodies is nontrivial. Some options
+`cluster_maker` must not execute at the same time. Achieving with Flow
+Graph such serialization between node bodies is nontrivial. Some options
 include:
 
 1.  placing an explicit lock around the use of the database handle,
@@ -115,8 +115,8 @@ was their access to the limited resource indicated by `db_resource` it
 is no longer necessary to declare that the nodes have concurrency
 `flow::serial`. It may be possible to have the node `track_maker` active
 at the same time, if the nature of `db_resource` were to allow two
-tokens to be available, and as long as each activation was given a
-different token.
+handles to be available, and as long as each activation was given a
+token to a different handle.
 
 # Proposal
 
@@ -280,23 +280,25 @@ system.](function-serialization.png)
 ## Performance results
 
 This document provides some analysis of the timing performance of the
-`serial_node` node type. It analysis a simple data flow with 7 nodes.
+`rl_function_node` node type as provided in
+[meld-serial](https://github.com/knoepfel/meld-serial). It analyzes a
+simple data flow with 7 nodes[^1].
 
 - One *Source* (input node) that generates a series of messages. Each
   message is represented by a single integer. As an input node, it is
   inherently serialized.
 - One *Propagating* node. This node has unlimited parallelism.
 - One *Histogramming* node. This node requires sole access to the *ROOT*
-  token, of which there is only one.
+  resource, for which there is only one handle.
 - One *Generating* node. This node require sole access to the *GENIE*
-  token, of which there is only one.
+  resource, for which there is only one handle.
 - One *Histo-Generating* node. This node requires simultaneous access to
-  both the *ROOT* and *GENIE* tokens.
+  both the *ROOT* and *GENIE* resources.
 - Three *Calibration* nodes. These nodes are labeled *Calibration\[A\]*,
   *Calibration\[B\]*, and *Calibration\[C\]*. Each of these nodes
-  requires sole access to a *DB* token. There are two *DB* tokens
-  available. *DB* tokens have an associated integer ID; the values are 1
-  and 13. *Calibration\[A\]* and *Calibration\[B\]* have unlimited
+  requires sole access to a *DB* handle. There are two *DB* handles
+  available. *DB* handles have an associated integer ID; the values are
+  1 and 13. *Calibration\[A\]* and *Calibration\[B\]* have unlimited
   concurrency but *Calibration\[C\]* is serial. This means that, at the
   same time, we can have:
   - two *Calibration\[A\]* tasks running, or
@@ -308,13 +310,15 @@ This document provides some analysis of the timing performance of the
   - one *Calibration\[B\]* task running and one *Calibration\[C\]* task
     running.
 
-  But we can not have two *Calibration\[C\]* tasks running at the same
+  But we cannot have two *Calibration\[C\]* tasks running at the same
   time.
 
-The *Source* node is directly connected to each of the other nodes.
-There are no other connections between nodes. The tasks performed by the
-system is the generation of the messages and the processing of each
-message by all the other nodes in the system.
+The *Source* node is directly connected to each of the other nodes by
+explicitly calling `make_edge(...)`. All edges between the nodes and the
+resource limiters are created internally within the `rl_function_node`
+constructor. The tasks performed by the system is the generation of the
+messages and the processing of each message by all the other nodes in
+the system.
 
 Each time a node is fired, we record two events. A *Start* event is
 recorded as the first thing done within the body of the node. The node
@@ -324,7 +328,7 @@ last thing done within the body of the node. For each event, we record
 the *thread* on which the event occurred, the *node* that was executing,
 the *message* number, and the extra *data* associated with the event.
 The extra data is meaningful only for the *Calibration* nodes; this data
-is the *DB* token ID.
+is the *DB* handle ID.
 
 The event records are used to form the `events` data frame. Each task is
 associated with both a *Start* and a *Stop* event. These times are
@@ -403,7 +407,7 @@ Figure 2: Task execution timeline, showing the startup of the program.
 We can see that the *Source* is firing many times, and with a wide
 spread of durations. We also see that the *Source* is serialized, as
 expected for an input node. There is some small idle time after the
-first firing of the *Source*, and a addtional delays after the next few
+first firing of the *Source*, and additional delays after the next few
 firings. After the first firing, all the activity for the *Source* moves
 to a different thread. We do not understand the cause of the delays
 between source firings, or the range of durations of the *Source* tasks.
@@ -446,7 +450,7 @@ source firing.
 
 ### Looking at calibrations
 
-Flowgraph seem to prefer keeping some tasks on a single thread. All of
+Flow Graph seem to prefer keeping some tasks on a single thread. All of
 the *Histo-generating* tasks were run on the same thread. The same is
 true for *Generating* and *Histogramming* tasks. The calibrations are
 clustered onto a subset of threads, and are not distributed evenly
@@ -532,9 +536,9 @@ time 0.
 
 ### Idle time between tasks
 
-One of the concerns that some have with a system, like flowgraph, that
+One of the concerns that some have with a system, like Flow Graph, that
 automates the scheduling of tasks is the amount of time that the
-scheduling system takes (as opposed to the time spend doing the user’s
+scheduling system takes (as opposed to the time spent doing the user’s
 defined work). We can estimate this by looking at the time between the
 end of one task and the start of the next task scheduled on the same
 thread. We call this time the *delay* and associate it with the second
@@ -585,12 +589,15 @@ previous task on the same thread was run by a different node.
     imposes serialization on the `flow::function_node` after the join of
     the tokens and the data. This means that data may accumulate at the
     `flow::function_node`’s input-port buffer, thus reserving the
-    resource token for longer than is desired. It would be better for
-    the tokens to be returned if the function body is already being
-    executed by another thread.
+    resource for longer than is desired. It would be better for the
+    tokens to be returned if the function body is already being executed
+    by another thread.
 2.  With the implementation presented here, a live-lock situation may
     occur for nodes that require access to several limited resources.
     This is discussed in the performance results, where the
     “histo-generating” node does not execute until both the
     “histogramming” and “generating” nodes have completed their
     executions for all events.
+
+[^1]: In this discussion, we do not refer to resource-limiter nodes as
+    *nodes* but as *resource limiters*.
