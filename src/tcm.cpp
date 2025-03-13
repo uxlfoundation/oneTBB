@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2024 Intel Corporation
+    Copyright (C) 2023-2025 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -2433,9 +2433,11 @@ protected:
            \/
           0xFF (higher memory address)
         */
-
+// Suppressing MSVC warning about possible buffer overrun: the writable size is 'permit_size' bytes,
+// but 'XX' bytes might be written
+__TCM_SUPPRESS_WARNING_WITH_PUSH(6386)
         tcm_permit_handle_t ph = new(permit_rep_as_byte_array) tcm_permit_rep_t;
-
+__TCM_SUPPRESS_WARNING_POP
         ph->epoch.store(0, std::memory_order_relaxed);
         tcm_permit_data_t& pd = ph->data;
 
