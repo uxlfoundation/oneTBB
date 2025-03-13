@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2024 Intel Corporation
+# Copyright (C) 2023-2025 Intel Corporation
 #
 # This software and the related documents are Intel copyrighted materials, and your use of them is
 # governed by the express license under which they were provided to you ("License"). Unless the
@@ -18,7 +18,7 @@ set(TCM_WARNING_LEVEL $<$<NOT:$<CXX_COMPILER_ID:Intel>>:/W4> $<$<BOOL:${TCM_STRI
 # suppress warning: Prefer 'enum class' over 'enum'
 set(TCM_WARNING_SUPPRESS /wd6011 /wd26812)
 
-set(TCM_LIB_COMPILE_FLAGS -D_CRT_SECURE_NO_WARNINGS /GS /Gy /GL /sdl)
+set(TCM_LIB_COMPILE_FLAGS -D_CRT_SECURE_NO_WARNINGS /GS /Gy /GL /sdl /analyze)
 set(TCM_COMMON_COMPILE_FLAGS /volatile:iso /FS /EHsc)
 set(TCM_COMMON_LINK_LIBS Kernel32.lib)
 
