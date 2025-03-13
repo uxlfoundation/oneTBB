@@ -6,8 +6,6 @@
 - [<span class="toc-section-number">2</span> Proposal](#proposal)
 - [<span class="toc-section-number">3</span> Implementation
   experience](#implementation-experience)
-  - [<span class="toc-section-number">3.1</span> Performance
-    results](#performance-results)
 - [<span class="toc-section-number">4</span> Open
   Questions](#open-questions)
 
@@ -271,9 +269,7 @@ https://github.com/knoepfel/meld-serial repository.
 ![Demonstration of token-based serialization
 system.](function-serialization.png)
 
-## Performance results
-
-This document provides some analysis of the timing performance of the
+This section provides some analysis of the timing performance of the
 `rl_function_node` node type as provided in
 [meld-serial](https://github.com/knoepfel/meld-serial). It analyzes a
 simple data flow with 7 nodes[^1].
@@ -324,20 +320,19 @@ the *message* number, and the extra *data* associated with the event.
 The extra data is meaningful only for the *Calibration* nodes; this data
 is the *DB* handle ID.
 
-The event records are used to form the `events` data frame. Each task is
+The event records are used to form the `events` table. Each task is
 associated with both a *Start* and a *Stop* event. These times are
 measured in milliseconds since the start of the first task. The `tasks`
-data frame is formed by pivoting the `events` data frame to have a
-single row for each task. The *duration* of each task is the difference
-between the *Stop* and *Start* times, and is also recorded in
-milliseconds.
+table is formed by pivoting the `events` table to have a single row for
+each task. The *duration* of each task is the difference between the
+*Stop* and *Start* times, and is also recorded in milliseconds.
 
-The first few rows of the `tasks` data frame are shown in
+The first few rows of the `tasks` table are shown in
 <a href="#tbl-read-events" class="quarto-xref">Table 1</a> below.
 
 <div id="tbl-read-events">
 
-Table 1: First few rows of the `tasks` data frame.
+Table 1: First few rows of the `tasks` table.
 
 <div class="cell-output-display">
 
@@ -405,6 +400,7 @@ first firing of the *Source*, and additional delays after the next few
 firings. After the first firing, all the activity for the *Source* moves
 to a different thread. We do not understand the cause of the delays
 between source firings, or the range of durations of the *Source* tasks.
+It is possible this is related to our use of *spdlog* to log messages.
 
 In <a href="#fig-program-start-after-first"
 class="quarto-xref">Figure 3</a>, we can zoom in further to see what is
@@ -444,7 +440,7 @@ source firing.
 
 ### Looking at calibrations
 
-Flow Graph seem to prefer keeping some tasks on a single thread. All of
+Flow Graph seems to prefer keeping some tasks on a single thread. All of
 the *Histo-generating* tasks were run on the same thread. The same is
 true for *Generating* and *Histogramming* tasks. The calibrations are
 clustered onto a subset of threads, and are not distributed evenly
@@ -541,7 +537,10 @@ thread was run by the same node. We find this is true for the large
 majority of tasks.
 
 There are a few delays that are much longer than others, as shown in
-<a href="#tbl-long-delays" class="quarto-xref">Table 3</a>.
+<a href="#tbl-long-delays" class="quarto-xref">Table 3</a>. Note that
+the largest of the delays appears because the *Calibration\[C\]* node’s
+tasks migrate from one thread to another; this is not a sign of an
+actual idle period for the sequence of *Calibration\[C\]* tasks.
 
 <div id="tbl-long-delays">
 
