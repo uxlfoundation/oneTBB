@@ -32,6 +32,10 @@ endif()
 set(EXECUTABLE "$<TARGET_FILE:sudoku>")
 set(ARGS 4 ${CMAKE_CURRENT_SOURCE_DIR}/input1 verbose)
 set(PERF_ARGS auto ${CMAKE_CURRENT_SOURCE_DIR}/input1 silent)
+set(BENCHMARK_ARGS filename=${CMAKE_CURRENT_SOURCE_DIR}/input4 n-of-repeats=3)
 
 add_execution_target(run_sudoku sudoku ${EXECUTABLE} "${ARGS}")
 add_execution_target(perf_run_sudoku sudoku ${EXECUTABLE} "${PERF_ARGS}")
+
+add_execution_target(benchmark_sudoku sudoku ${EXECUTABLE} "${BENCHMARK_ARGS}")
+add_benchmark_target(benchmark_sudoku_data sudoku ${EXECUTABLE} "${BENCHMARK_ARGS}")
