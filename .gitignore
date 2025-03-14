@@ -84,3 +84,5 @@ CMakeFiles/
 .svn
 crash*
 *.tmp
+.vscode
+*.d

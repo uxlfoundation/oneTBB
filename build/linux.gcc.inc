@@ -29,7 +29,7 @@ WARNING_AS_ERROR_KEY = -Werror
 WARNING_KEY = -Wall
 TEST_WARNING_KEY = -Wshadow -Wcast-qual -Woverloaded-virtual -Wnon-virtual-dtor
 
-WARNING_SUPPRESS = -Wno-parentheses
+WARNING_SUPPRESS = -Wno-parentheses -Wno-changes-meaning
 DYLIB_KEY = -shared
 EXPORT_KEY = -Wl,--version-script,
 LIBDL = -ldl

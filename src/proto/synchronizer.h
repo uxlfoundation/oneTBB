@@ -449,7 +449,7 @@ public:
     }
     //! Try acquire exclusive access
     access::result_t try_lock( concurrent_state & ) {
-        state_t s; s.word = as_atomic(state.word);// TODO: do we need fence here?
+        state_t s; s.word = as_atomic(state.word);
         if( !s.alive_bit ) return access::doomed;
         if( s.lock_bit ) return access::busy;
         // Note, alive_bit always set together with lock_bit
@@ -466,7 +466,7 @@ public:
 #endif
         { // success
             __TBB_ASSERT_RACEPOINT(());
-            s = state; // but is it doomed? //TODO: do we need fence here?
+            s = state; // but is it doomed?
             if( s.alive_bit ) return access::acquired;
             else { // revert to unlocked
                 s.lock_bit = 0;
@@ -510,7 +510,7 @@ public:
         }
         //reduce contention by working with lock_bit only
         do { // TODO: !!! use bit_test_and_set instead !!!
-            for( internal::AtomicBackoff trials; s.lock_bit; s.lock_version = as_atomic(state.lock_version) ) {
+            for( internal::atomic_backoff trials; s.lock_bit; s.lock_version = as_atomic(state.lock_version) ) {
                 trials.pause(); // wait until unlocked
                 __TBB_ASSERT_RACEPOINT(());
             }

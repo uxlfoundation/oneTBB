@@ -19,6 +19,7 @@
 */
 
 #define TBB_USE_ASSERT 1
+#define HARNESS_CUSTOM_MAIN 1
 
 struct debug_point {
     const char *file, *func;
@@ -37,15 +38,15 @@ struct debug_point {
 #include "tbb/aligned_space.h"
 #include "tbb/enumerable_thread_specific.h"
 #include "harness.h"
-#include "perf/harness_barrier.h"
+#include "harness_barrier.h"
 #include <cstdlib>
 #include <cstdio>
 #include <ctime>
 #include <vector>
 using namespace tbb;
-using namespace std;
+//using namespace std;
 
-static atomic<size_t> trace_counter;
+static tbb::atomic<size_t> trace_counter;
 static const size_t trace_buffer_size = 1<<16;
 struct trace_record {
     int thread;
@@ -104,6 +105,7 @@ struct race_scheduler {
         if(Verbose) puts("Warning: using poor random number generator");
     #endif
     }
+    
     template<typename Test>
     static void execute(int nthreads, const Test &test) {
         race_context &rc = tls.local(); // reset main thread
@@ -112,6 +114,13 @@ struct race_scheduler {
         is_active = true;
         NativeParallelFor(nthreads, test);
         is_active = false;
+    }
+    static void open_race_hole() {
+    #if __APPLE__ || __linux__
+        usleep(1);
+    #else
+        __TBB_Yield();
+    #endif
     }
     static bool next_iteration(int i, int t) {
         ASSERT(is_active, 0);
@@ -128,13 +137,6 @@ struct race_scheduler {
         if(!t) trace_counter = 0;
         barrier.wait();
         return true;
-    }
-    static void open_race_hole() {
-    #if __APPLE__ || __linux__
-        usleep(1);
-    #else
-        __TBB_Yield();
-    #endif
     }
     static void test_race(const debug_point &dp, const char *f = NULL, long arg0 = 0, long arg1 = 0) {
         if(!is_active) return;
@@ -289,8 +291,8 @@ struct test_synchronizer {
     struct TestActor: NoAssign {
         Synchronizer &sync;
         int &counter;
-        atomic<int> &frags;
-        TestActor( Synchronizer &sync_, int &c, atomic<int> &f)
+        tbb::atomic<int> &frags;
+        TestActor( Synchronizer &sync_, int &c, tbb::atomic<int> &f)
             : sync(sync_), counter(c), frags(f) {}
         /** Increments counter once for each iteration in the iteration space. */
         void operator()( int thread ) const {
@@ -350,8 +352,8 @@ struct test_synchronizer {
         memset(sync.begin(), 0, sizeof(sync)); // check for zerro-initialization
         ASSERT( sync.begin()->is_doomed(), 0);
         int counter = 0;
-        atomic<int> frags; frags = 0; // dead/live phases
-        race_scheduler::execute( 4, TestActor(*sync.begin(), counter, frags) );
+        tbb::atomic<int> frags; frags = 0; // dead/live phases
+        race_scheduler::execute( 4, TestActor  (*sync.begin(), counter, frags) );
         ASSERT( !counter, "Atomicity of accesses is broken");
         ASSERT( !frags, "Odd lifitime operation");
         ASSERT( sync.begin()->is_doomed(), 0);
@@ -360,10 +362,10 @@ struct test_synchronizer {
 
 #if _POSIX_VERSION
 #include <signal.h>
-int main(int argc, char* argv[]) {
+int main(int argc, char** argv) {
     signal(SIGTSTP, reinterpret_cast<void (*)(int)>(race_scheduler::print_context));
 #else
-int main(int argc, char* argv[]) {
+int main(int argc, char** argv) {
 #endif
     ParseCommandLine(argc, argv);
     SetHarnessErrorProcessing(race_scheduler::print_context);

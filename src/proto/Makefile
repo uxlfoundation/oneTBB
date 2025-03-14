@@ -15,7 +15,7 @@
 #
 #
 #
-
+.NOTPARALLEL:
 default:
 	@-echo Usage: gmake [test_{name}][debug_{name}][clean]
 
@@ -24,10 +24,12 @@ tbb_strict=0
 BUILDING_PHASE=0
 include $(tbb_root)/build/common.inc
 
-VPATH = $(tbb_root)/src/tbb/$(ASSEMBLY_SOURCE) $(tbb_root)/src/tbb $(tbb_root)/src/test $(work_dir)_$(cfg)
+VPATH = $(tbb_root)/src/tbb/$(ASSEMBLY_SOURCE) $(tbb_root)/src/tbb $(tbb_root)/src/test $(tbb_root)/include/tbb $(work_dir)_$(cfg)
 include $(tbb_root)/build/common_rules.inc
-CPLUS_FLAGS += $(INCLUDE_KEY) $(tbb_root)/src $(INCLUDE_KEY) $(tbb_root)/include/tbb $(INCLUDE_KEY) $(tbb_root)/src/test $(INCLUDE_KEY) $(tbb_root)/src/tbb
+CPLUS_FLAGS += $(INCLUDE_KEY) $(tbb_root)/src $(INCLUDE_KEY) $(tbb_root)/include/tbb $(INCLUDE_KEY) $(tbb_root)/src/test $(INCLUDE_KEY) $(tbb_root)/src/tbb -L $(work_dir)_$(cfg)
 DEBUG_SUFFIX=$(findstring _debug,_$(cfg))
+TEST_PREREQUISITE+=$(TBB.LIB)
+LINK_FILES+=-ltbb
 
 ifeq ($(tbb_os),windows)
     export PATH := $(work_dir)_$(cfg);$(PATH)
@@ -43,14 +45,9 @@ endif
 #TARGETS = $(subst .cpp,.exe,$(wildcard test_*.cpp time_*.cpp))
 #.PHONY: clean tbb tbb_release tbb_debug
 
-$(TBB.LIB): tbb_$(cfg)
 tbb: tbb_release tbb_debug
 tbb_%::
 	$(MAKE) -C $(tbb_root)/src $@
-
-# Rule for generating executable test
-%.exe: %.$(OBJ) $(TBB.LIB)
-	$(CPLUS) $(OUTPUT_KEY)$@ $(CPLUS_FLAGS) $^ $(LIBS) $(LINK_FLAGS)
 
 time_%: time_%.exe
 	./$^ $(args)
@@ -71,4 +68,4 @@ clean:
 #	-$(MAKE) -C $(@D)  -f $(EXAMPLE_MAKEFILE) $(subst .,,$(suffix $@)) CXX="$(CPLUS)"
 
 # Include automatically generated dependences
--include *.d
+#-include *.d
