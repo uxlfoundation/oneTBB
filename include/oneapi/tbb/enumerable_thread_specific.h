@@ -1035,9 +1035,17 @@ public:
         return my_result;
     }
 
-    // combine_func_t takes T by value or by [const] reference, and returns nothing
+    // combine_func_t takes T by value and returns nothing
     template <typename CombineFunc>
     void combine_each(CombineFunc f_combine) {
+        for(iterator ci = begin(); ci != end(); ++ci) {
+            f_combine( *ci );
+        }
+    }
+
+    // combine_func_t takes T by [const] reference and returns nothing
+    template <typename CombineFunc>
+    void combine_each(CombineFunc f_combine) const {
         for(iterator ci = begin(); ci != end(); ++ci) {
             f_combine( *ci );
         }
