@@ -879,7 +879,11 @@ public:
     ~enumerable_thread_specific() {
         if(my_construct_callback) my_construct_callback->destroy();
         // Deallocate the hash table before overridden free_array() becomes inaccessible
+#if defined( __clang__ ) && __clang_major__ >= 19
+        this->template ets_base<ETS_key_type>::table_clear();
+#else
         this->ets_base<ETS_key_type>::table_clear();
+#endif
     }
 
     //! returns reference to local, discarding exists
@@ -943,7 +947,11 @@ private:
         // concurrent_vector::swap() preserves storage space,
         // so addresses to the vector kept in ETS hash table remain valid.
         swap(my_locals, other.my_locals);
+#if defined( __clang__ ) && __clang_major__ >= 19
+        this->template ets_base<ETS_key_type>::table_swap(other);
+#else
         this->ets_base<ETS_key_type>::table_swap(other);
+#endif
     }
 
     template<typename A2, ets_key_usage_type C2>
