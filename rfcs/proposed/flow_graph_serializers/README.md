@@ -3,6 +3,8 @@
 
 - [<span class="toc-section-number">1</span>
   Introduction](#introduction)
+  - [<span class="toc-section-number">1.1</span>
+    Definitions](#definitions)
 - [<span class="toc-section-number">2</span> Proposal](#proposal)
 - [<span class="toc-section-number">3</span> Implementation
   experience](#implementation-experience)
@@ -83,17 +85,17 @@ to:
 using namespace tbb;
 flow::graph g;
 
-resource_limiter_node<DB> db_resource{g, {db_handle()}};
+resource_limiter<DB> db_resource{g, {db_handle()}};
 
 rl_function_node<Hits, Tracks> track_maker{
   g,
   std::tie(db_resource),
-  [](Hits const&, DB const* db) -> Tracks { auto a = db->access(/* okay */); ... }
+  [](Hits const&, token<DB> db) -> Tracks { auto a = db->access(/* okay */); ... }
 };
 rl_function_node<Signals, Clusters> cluster_maker{
   g,
   std::tie(db_resource),
-  [](Signals const&, DB const* db) -> Clusters { auto a = db->access(/* okay */); ... }
+  [](Signals const&, token<DB> db) -> Clusters { auto a = db->access(/* okay */); ... }
 };
 ```
 
@@ -110,15 +112,28 @@ at the same time, if the nature of `db_resource` were to allow two
 handles to be available, and as long as each activation was given a
 token to a different handle.
 
+## Definitions
+
+We use the following definitions in this proposal:
+
+- *resource*: an entity external to the program for which access may
+  need to be limited (e.g. a file on the file system, a database, a
+  thread-unsafe library)
+- *handle*: the program entity within the program that represents and
+  provides access to the resource (the handle is not copyable as the
+  resource itself cannot be copied)
+- *token*: a small, copyable object passed into a node to grant access
+  to the handle
+
 # Proposal
 
 Our proposal is an addition to what already exists and does not break
-API backwards compatibility. The proposal consists of: 1. Introducing
-the equivalent of a `resource_limiter_node` class template that, when
-connected with another node, ensures limited access to the resource it
-represents. 2. Adding a `rl_function_node` class template that allow the
-specification of limited resource nodes instead of (or in addition to) a
-`concurrency` value.
+API backwards compatibility. The proposal consists of: 1. Adding a
+`rl_function_node` class template that allows the specification of
+limited resources instead of (or in addition to) a `concurrency` value.
+2. Introducing the equivalent of a `resource_limiter` class template
+that, when connected with an `rl_function_node`, ensures limited access
+to the resource limiter’s handles.
 
 > \[!NOTE\] Although we pattern our proposal on the
 > `flow::function_node` class template in this proposal, the concepts
@@ -132,12 +147,12 @@ the following could be done:
 using namespace tbb;
 flow::graph g;
 
-resource_limiter_node<GPU> gpus{g, {GPU{ /*gpu 1*/ }, GPU{ /*gpu 2*/}}; // Permit access to two GPUs
-resource_limiter_node<ROOT> root{g, {ROOT{...}}};  // Only 1 ROOT handle available
+resource_limiter<GPU> gpus{g, {GPU{ /*gpu 1*/ }, GPU{ /*gpu 2*/}}; // Permit access to two GPUs
+resource_limiter<ROOT> root{g, {ROOT{...}}};  // Only 1 ROOT handle available
 
 rl_function_node fn{g,
                     std::tie(gpus, root), // Edges implicitly created to the required resource limiters
-                    [](Hits const&, GPU const*, ROOT const*) -> Tracks {
+                    [](Hits const&, token<GPU>, token<ROOT>) -> Tracks {
                       // User has access to resource handles as arguments to function body
                       ...
                     }
@@ -151,27 +166,30 @@ node body takes an argument for the input data (i.e. `Hits`) and
 (optionally) an argument corresponding to each limited resource. The
 node body is invoked only when the `rl_function_node` can obtain
 exclusive access to one of the resource handles provided by each
-resource-limiter node (and when a `Hits` message has been sent to it).
-Note that because two GPU handles are available, it is possible to
+resource limiter (and when a `Hits` message has been sent to it). Note
+that because two GPU handles are available, it is possible to
 parallelize other work with a GPU as only each *invocation* of the node
 body requires sole access to a GPU handle.
 
-### `resource_limiter_node` class template
+### `resource_limiter` class template
 
-The `resource_limiter_node` class template heuristically looks like:
+The `resource_limiter` class template heuristically looks like:
 
 ``` cpp
+template <typename Handle>
+using token = Handle*;
+
 template <typename Handle = default_resource_handle>
-class resource_limiter_node : tbb::flow::buffer_node<Handle const*> {
+class resource_limiter : tbb::flow::buffer_node<token<Handle>> {
 public:
-  using token_type = Handle const*;
+  using token_type = token<Handle>;
 
   /// \brief Constructs a resource_limiter with n_handles of type Handle.
-  resource_limiter_node(tbb::flow::graph& g, unsigned int n_handles = 1) :
+  resource_limiter(tbb::flow::graph& g, unsigned int n_handles = 1) :
     tbb::flow::buffer_node<token_type>{g}, handles_(n_handles)
   {}
   /// \brief Constructs a resource_limiter with explicitly provided handles.
-  resource_limiter_node(tbb::flow::graph& g, std::vector<Handle>&& handles) :
+  resource_limiter(tbb::flow::graph& g, std::vector<Handle>&& handles) :
     tbb::flow::buffer_node<token_type>{g}, handles_(std::move(handles))
   {}
 
@@ -188,7 +206,7 @@ public:
   void activate()
   {
     // Place tokens into the buffer.
-    for (auto const& handle : handles_) {
+    for (auto& handle : handles_) {
       tbb::flow::buffer_node<token_type>::try_put(&handle);
     }
   }
@@ -215,7 +233,7 @@ model a resource-handle concept.
 An example of a user-defined resource handle is the `DB` handle
 discussed above. A handle, in principle, can have an arbitrary structure
 with unlimited interface, so long as ownership of the handle ultimately
-reside with the `resource_limiter_node`.
+reside with the `resource_limiter`.
 
 #### `default_resource_handle`
 
@@ -223,7 +241,7 @@ For `rl_function_node` function bodies that do not need to access
 details of the resource, a default policy can be provided:
 
 ``` cpp
-resource_limiter_node r{g};
+resource_limiter r{g};
 ```
 
 This can be useful if a third-party library supports substantial
@@ -241,7 +259,7 @@ flow::graph g;
 // 1. Already discussed above
 rl_function_node fn1{g,
                      std::tie(gpus, root),
-                     [](Hits const&, GPU const*, ROOT const*) -> Tracks { ... }};
+                     [](Hits const&, token<GPU>, token<ROOT>) -> Tracks { ... }};
 
 // 2. No access required to a limited resource (equivalent to flow::function_node)
 rl_function_node fn2{g, flow::unlimited, [](Hits const&) -> Tracks { ... }};
@@ -249,7 +267,7 @@ rl_function_node fn2{g, flow::unlimited, [](Hits const&) -> Tracks { ... }};
 // 3. Access required to a limited resource, and the user body must be serialized
 rl_function_node fn3{g,
                      std::make_tuple(flow::serial, std::ref(db_limiter)),
-                     [](Hit const&, DB const*) -> Tracks{ ... }};
+                     [](Hit const&, token<DB>) -> Tracks{ ... }};
 ```
 
 Constructor 1 has already been discussed. Constructor 2 would be
@@ -272,7 +290,7 @@ system.](function-serialization.png)
 This section provides some analysis of the timing performance of the
 `rl_function_node` node type as provided in
 [meld-serial](https://github.com/knoepfel/meld-serial). It analyzes a
-simple data flow with 7 nodes[^1].
+simple data flow with 7 nodes.
 
 - One *Source* (input node) that generates a series of messages. Each
   message is represented by a single integer. As an input node, it is
@@ -578,7 +596,7 @@ previous task on the same thread was run by a different node.
 
 # Open Questions
 
-1.  For function bodies that are serialized, the current implementation
+1.  For node bodies that are serialized, the current implementation
     imposes serialization on the `flow::function_node` after the join of
     the tokens and the data. This means that data may accumulate at the
     `flow::function_node`’s input-port buffer, thus reserving the
@@ -591,6 +609,3 @@ previous task on the same thread was run by a different node.
     “histo-generating” node does not execute until both the
     “histogramming” and “generating” nodes have completed their
     executions for all events.
-
-[^1]: In this discussion, we do not refer to resource-limiter nodes as
-    *nodes* but as *resource limiters*.
