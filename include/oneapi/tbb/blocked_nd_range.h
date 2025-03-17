@@ -147,7 +147,8 @@ class blocked_nd_range : public blocked_nd_range_impl<Value, N> {
     using base::base;
 };
 
-#if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT && __TBB_PREVIEW_BLOCKED_ND_RANGE_DEDUCTION_GUIDES
+// #if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT && __TBB_PREVIEW_BLOCKED_ND_RANGE_DEDUCTION_GUIDES
+#if 1
 // blocked_nd_range(const dim_range_type& dim0, const dim_range_type& dim1, ...)
 // while the arguments are passed as braced-init-lists
 // Works only for 2 and more arguments since the deduction from

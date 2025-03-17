@@ -87,8 +87,21 @@ private:
     d1::task* execute(d1::execution_data& ed) override {
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
         task* res = task_ptr_or_nullptr(m_func);
+
+        task_handle_task* successor_task = this->complete_bypass();
+        task* next_task = nullptr;
+
+        if (successor_task != nullptr) {
+            if (res != nullptr) {
+                d1::spawn(*successor_task, successor_task->ctx());
+                next_task = res;
+            } else {
+                next_task = successor_task;
+            }
+        }
+
         finalize(&ed);
-        return res;
+        return next_task;
     }
     d1::task* cancel(d1::execution_data& ed) override {
         finalize(&ed);
@@ -584,6 +597,22 @@ public:
         d1::spawn(*acs::release(h), context());
     }
 
+    void run(d2::task_handle& h) {
+        __TBB_ASSERT(h != nullptr, "Attempt to schedule empty task_handle");
+
+        using acs = d2::task_handle_accessor;
+        __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
+
+        // TODO: better organize code in this place
+        acs::mark_task_submitted(h);
+        if (acs::has_dependency(h)) {
+            acs::release_successor_vertex(h);
+            acs::release_task_body(h);
+        } else {
+            d1::spawn(*acs::release_task_body(h), context());
+        }
+    }
+
     template<typename F>
     d2::task_handle defer(F&& f) {
         return prepare_task_handle(std::forward<F>(f));
@@ -598,6 +627,38 @@ public:
     task_group_status run_and_wait(d2::task_handle&& h) {
         return internal_run_and_wait(std::move(h));
     }
+
+    static void make_edge(d2::task_handle& pred, d2::task_handle& succ) {
+        task_handle_accessor::make_edge(pred, succ);
+    }
+
+    struct current_task {
+        static void add_successor(task_handle& sh) {
+            d1::task* t = d1::current_task();
+            __TBB_ASSERT_RELEASE(t, "add_successor was called out of executing task");
+            if (task_handle_task* handle_task = dynamic_cast<task_handle_task*>(t)) {
+                __TBB_ASSERT(&task_handle_accessor::ctx_of(sh) == &handle_task->ctx(), "Attempt to add different task_group task as successor");
+                task_handle_accessor::make_edge(handle_task, sh);
+            // } else if (function_stack_task* stack_task = dynamic_cast<function_stack_task*>(t)) {
+                // __TBB_ASSERT_RELEASE(false, "Unimplemented");
+            } else {
+                __TBB_ASSERT_RELEASE(false, "add_successor was called out of executing task_group task");
+            }
+        }
+
+        static void transfer_successors_to(task_handle& h) {
+            d1::task* t = d1::current_task();
+            __TBB_ASSERT_RELEASE(t, "transfer_successors_to was called out of executing task");
+            if (task_handle_task* handle_task = dynamic_cast<task_handle_task*>(t)) {
+                __TBB_ASSERT(&task_handle_accessor::ctx_of(h) == &handle_task->ctx(), "Attempt to add different task_group task as successor");
+                task_handle_accessor::transfer_successors(handle_task, h);
+            // } else if (function_stack_task* stack_task = dynamic_cast<function_stack_task*>(t)) {
+                // __TBB_ASSERT_RELEASE(false, "Unimplemented");
+            } else {
+                __TBB_ASSERT_RELEASE(false, "transfer_successors_to was called out of executing task_group task");
+            }
+        }
+    };
 }; // class task_group
 
 #if TBB_PREVIEW_ISOLATED_TASK_GROUP

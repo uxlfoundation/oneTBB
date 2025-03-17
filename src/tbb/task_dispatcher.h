@@ -249,11 +249,13 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
         task_dispatcher& task_disp;
         execution_data_ext old_execute_data_ext;
         properties old_properties;
+        d1::task* old_innermost_running_task;
         bool is_initially_registered;
 
         ~dispatch_loop_guard() {
             task_disp.m_execute_data_ext = old_execute_data_ext;
             task_disp.m_properties = old_properties;
+            task_disp.m_innermost_running_task = old_innermost_running_task;
 
             if (!is_initially_registered) {
                 task_disp.m_thread_data->my_arena->my_tc_client.get_pm_client()->unregister_thread();
@@ -263,7 +265,7 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
             __TBB_ASSERT(task_disp.m_thread_data && governor::is_thread_data_set(task_disp.m_thread_data), nullptr);
             __TBB_ASSERT(task_disp.m_thread_data->my_task_dispatcher == &task_disp, nullptr);
         }
-    } dl_guard{ *this, m_execute_data_ext, m_properties, m_thread_data->my_is_registered };
+    } dl_guard{ *this, m_execute_data_ext, m_properties, m_innermost_running_task, m_thread_data->my_is_registered };
 
     // The context guard to track fp setting and itt tasks.
     context_guard_helper</*report_tasks=*/ITTPossible> context_guard;
@@ -328,6 +330,7 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
 
                     ITT_CALLEE_ENTER(ITTPossible, t, itt_caller);
 
+                    m_innermost_running_task = t;
                     if (ed.context->is_group_execution_cancelled()) {
                         t = t->cancel(ed);
                     } else {
