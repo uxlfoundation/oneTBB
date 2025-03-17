@@ -128,14 +128,15 @@ We use the following definitions in this proposal:
 # Proposal
 
 Our proposal is an addition to what already exists and does not break
-API backwards compatibility. The proposal consists of: 1. Adding a
-`rl_function_node` class template that allows the specification of
+API backwards compatibility. The proposal consists of:
+
+1. Adding a `rl_function_node` class template that allows the specification of
 limited resources instead of (or in addition to) a `concurrency` value.
 2. Introducing the equivalent of a `resource_limiter` class template
 that, when connected with an `rl_function_node`, ensures limited access
 to the resource limiter’s handles.
 
-> \[!NOTE\] Although we pattern our proposal on the
+> [!NOTE] Although we pattern our proposal on the
 > `flow::function_node` class template in this proposal, the concepts
 > discussed here apply to nearly any flow-graph node that accepts a
 > user-provided node body.
