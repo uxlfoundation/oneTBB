@@ -4,18 +4,15 @@
 
 ## Introduction
 
-This document contains a concrete API and semantics proposal for ``task_group`` extensions defined in the parent RFC. 
-The following cases should be covered and be described:
-* ``task_handle`` semantic extension to allow handling the ``task_group`` tasks in various states: created, submitted, executing and completed. 
-  Existing API only allows having a non-empty ``task_handle`` to handle the created task and an empty one that does not handle any task.
-    * Semantics for ``task_group::run``, ``task_group::run_and_wait``, ``task_arena::enqueue`` and ``this_task_arena::enqueue`` should be defined
-      when the input ``task_handle`` is handling a task in various states.
-    * Semantics for returning a ``task_handle`` handling a task in various states from the body of the task should be described (while using the existing
-      preview extensions for ``task_group``). 
-* API for setting the dependencies between tasks in various states should be defined.
-* API for transferring the dependencies from the currently executing task to the task in one of the states above should be defined.
+This document contains a concrete API and semantics proposal for ``task_group`` extensions defined in the parent RFC.
+The following cases are covered:
+* ``task_group`` extensions allowing handling the tasks in various states: created, submitted, executing and completed.
+  Existing API only allows having a non-empty ``task_handle`` object handling the created task and an empty one that does not
+  handle any tasks.
+* API for setting the dependencies between tasks in various states.
+* API for transferring the dependencies from the executing task to the task in various states.
 
-## ``task_handle`` semantic extension
+## Semantic extension for handling tasks in various states
 
 The parent proposal for extending the task group with APIs for setting dynamic dependencies defines the following states of the task in the ``task_group``:
 * Created 
@@ -33,80 +30,58 @@ corresponding task body.
 
 Once the thread finishes executing the task body, the state of the task is changed to `completed`.
 
-The proposal is to
-* Extend possible task states that can be handled by non-empty ``task_handle`` to be any tasks in any state
-* Allow to use non-empty ``task_handle`` representing a task in any state for setting and transferring the dependencies between tasks
+The parent RFC proposes to extend possible tasks states that can be handled by ``task_handle`` object to be tasks in any states defined above. Such a change
+requires changing the semantics of the task submission methods (such as ``task_group::run`` and others) while working with various states handled by ``task_handle``. 
 
-Since current API allows submitting the ``task_handle`` for execution only as rvalues, having any usage of ``task_handle`` object after submitting for execution 
-(e.g. using ``task_group::run(std::move(task_handle))``) looks misleading even if some guarantees are provided for the referred handle object. It also creates an error-prone
-for TBB developers - any move-construct or move-assign from the accepted handle will break the guarantee. Code analyzers?
+Unlike this approach, this document proposes keeping the ``task_handle`` as a unique-owning handle that owns the task in created state or does not owns the task.
+For handling the task in other states, it is proposed to add a new weak-owning handle ``task_tracker`` that can handles the task in any state.
 
-To handle this, the proposal is to extend all functions that take the task handled by the ``task_handle`` with the new overload taking an non-const lvalue reference and provide the following guarantees:
-* Overloads accepting rvalue reference to ``task_handle`` take a non-empty handle and leave the handle in an empty state in the end (current behavior is preserved).
-* New overloads accepting lvalue references to ``task_handle`` also take a non-empty handle object but does not leave it in an empty state after submission. Hence, the ``task_handle`` can be
-  used after execution of the method to represent a task in submitted, executing or completed state and to set the dependencies on such tasks.
-  Using such a task handle once again as an argument to the submission function results in undefined behavior.
-
-The following APIs should be extended:
+``task_tracker`` object can be obtained by constructing from the ``task_handle`` object owning the created task. ``task_handle`` cannot be constructed using the
+``task_tracker`` argument.
 
 ```cpp
-class task_group {
-    void run(task_handle&& h); // existing overload
-    void run(task_handle& h);  // new overload
+tbb::task_group tg;
 
-    task_group_status run_and_wait(task_handle&& h); // existing overload
-    task_group_status run_and_wait(task_handle& h);  // new overload
-};
+tbb::task_handle handle = tg.defer([] {/*...*/}); // task is in created state, handle owns the task
+tbb::task_tracker tracker = handle; // create the tracker for the task owned by the handle
 
-class task_arena {
-    void enqueue(task_handle&& h); // existing overload
-    void enqueue(task_handle& h);  // new overload
-};
+tg.run(std::move(handle)); // task is in submitted state, handle is left in an empty state
 
-namespace this_task_arena {
-    void enqueue(task_handle&& h); // existing overload
-    void enqueue(task_handle& h);  // new overload
-};
+// tracker is non empty and can be used to track progress on the task and set dependencies
 ```
 
-Also, ``task_handle`` class API itself can be extended with the new methods, returning the status of the handled task. It may be useful to have the flags showing that it is safe to submit the
-``task_handle`` for execution using one of the submission methods above:
+In this case, no semantic changes are needed for the submission methods, because the ``task_handle`` semantics is not changed.
+
+Alternative approaches for handling tasks in different states are described in the [separate section](#alternative-approaches).
+
+``task_tracker`` class can also support special functions, returning the status of the tracked task:
 
 ```cpp
-class task_handle {
+class task_tracker {
+public:
     bool was_submitted() const;
     bool is_completed() const;
 };
 ```
 
-Having ``th.was_submitted()`` equal to ``true``, means the task state was changed from `created` to `submitted` in the past. The task can be either submitted, executing or completed.
-Extra care must be taken while working with this method anyway since even if it returns ``false``, it may be unsafe to submit the ``task_handle`` since the state 
-can be changed by the other thread.
+Having ``task_tracker.was_submitted()`` equal to ``true`` means the tracked task state was changed from created
+to submitted in the past. The task can be either in submitted, executing or completed state.
 
-``is_completed`` does not require any extra care since `completed` is the only state of the task that cannot be changed in the future by any thread.
-
-## Semantics for submitting tasks handled by ``task_handle``
-
-Tasks handled by ``task_handle`` can be submitter for execution using the following APIs:
-* ``task_group::run`` and ``task_group::run_and_wait``.
-* ``task_arena::enqueue`` and ``this_task_arena::enqueue``.
-* Returning non-empty ``task_handle`` from the body of the executing task (when the ``task_group`` preview extensions are enabled).
-
-The proposal is to allow only the tasks in `created` state to be acceptable by all of these methods since tasks in other states were already submitted in the past.
-Having a task in any other state in any function described above should be considered undefined behavior.
+``is_completed`` method returns ``true`` if the tracked task is completed. This state cannot be changed in the
+future.
 
 ## Semantics for setting dependencies between tasks
 
-Lets consider creating a predecessor-successor dependency between the task handled by ``predecessor_task_handle`` and the task handled by
- ``successor_task_handle`` - ``task_group::make_edge(predecessor_task_handle, successor_task_handle)``. 
+Lets consider creating a predecessor-successor dependency between the task tracked or owned by ``predecessor``
+and the task handled by ``successor_task_handle`` -
+``task_group::make_edge(predecessor_task_handle, successor_task_handle)``. 
 
-As it was already stated in the parent RFC document, we would like to allow adding predecessors in any state described above and to limit
-the ``successor_task_handle`` to handle a task in a `created` state since otherwise it can be too late to add predecessor dependencies to
-the task that is already running or completed.
+As it was stated in the parent RFC document, we would like to allow adding predecessors in any state described above and to limit the successor to be a task in created state since it can be too late to add predecessors to
+the task in executing or completed state.
 
-We can add this as a first formal limitation - if ``successor_task_handle`` does not represent a task in `created` state, the behavior is undefined.
+The second limitation is handled by limiting the successor argument to be only ``task_handle``.
 
-Lets consider the different states of the task handled by ``predecessor_task_handle``. 
+Lets consider the different states of the task tracked or handled by ``predecessor``. 
 
 If the predecessor task is in any state except the completed one (created/scheduled/running), the API registers the successor task
 in the list of successors on the predecessor side and increase the corresponding reference counter on the successor side to ensure it
@@ -143,22 +118,22 @@ itself and creates more tasks to process the cell below and the cell on the righ
 <img src="wavefront_grid.png" width=150>
 
 If there is a strong dependency between the computation of the current cell and the computations of the following cells, it is required to add
-currently executed task as a predecessor of the tasks representing the cells below and on the right. Since there is no ``task_handle`` representing the
+currently executed task as a predecessor of the tasks representing the cells below and on the right. Since there is no ``task_handle`` or ``task_tracker`` representing the
 currently executed task, the ``make_edge`` function described above cannot be used to set these dependencies. 
 
 It is proposed to add the special function to add successors to the currently executed task to handle this use-case. The API can be 
-``tbb::task_group::current_task::add_successor(task_handle& sh)`` and it has the same effect as ``make_edge`` between the ``task_handle`` that handles
+``tbb::task_group::current_task::add_successor(task_handle& sh)`` and it has the same effect as ``make_edge`` between the ``task_handle`` or ``task_tracker`` handling
 the current task and ``sh``. 
 
 ## Semantics for transferring successors from the currently executing task to the other task
 
-Lets consider the use-case where the successors of the task ``current`` are transferred to the task ``target`` handled by the ``target_task_handle``. 
-In this case, the API ``tbb::task_group::current_task::transfer_successors_to(target_task_handle)`` should be called from the body of ``current``.
+Lets consider the use-case where the successors of the task ``current`` are transferred to the task ``target`` owned or tracked by the ``target_handler``. 
+In this case, the API ``tbb::task_group::current_task::transfer_successors_to(target_handler)`` should be called from the body of ``current``.
 
 As it was mentioned in the parent RFC, if ``transfer_successors_to`` is called outside of task belonging to the same ``task_group``, the behavior is
 undefined.
 
-It is also useful for this API to be flexible in regard to ``target_task_handle`` and to allow different task states.
+It is also useful for this API to be flexible in regard to ``target_handler`` and to allow different task states.
 
 If ``target`` task is in `created`, `scheduled` or `executing` state, this API should merge together the successors list of ``current``
 and ``target`` and sets ``target`` to have the merged successors list. It should be thread-safe to add new successors to ``current`` and ``target``
@@ -178,7 +153,6 @@ Interesting aspect is what should be done with the successors list of ``current`
 The first option is to consider ``current`` and ``target`` a separate tasks even after the transferring the successors from one to another.
 
 In this case, after the transfer, the task ``current`` will have an empty successors list, and ``target`` will have a merged successors list:
-
 
 <img src="transferring_between_two_separate_tracking.png" width=800>
 
@@ -241,28 +215,50 @@ to track it's proxy ``A`` (and all other proxies) and update the pointed list on
 namespace oneapi {
 namespace tbb {
 
-class task_arena {
-    void enqueue(task_handle& h);
-};
+// Existing API
+class task_handle;
 
-namespace this_task_arena {
-    void enqueue(task_handle& h);
-} 
+// New APIs
+class task_tracker {
+public:
+    task_tracker();
 
-class task_handle {
+    task_tracker(const task_tracker& other);
+    task_tracker(task_tracker&& other);
+
+    task_tracker(const task_handle& handle);
+
+    ~task_tracker();
+
+    task_tracker& operator=(const task_tracker& other);
+    task_tracker& operator=(task_tracker&& other);
+
+    task_tracker& operator=(const task_handle& handle);
+
+    explicit operator bool() const noexcept;
+
     bool was_submitted() const;
     bool is_completed() const;
-};
+}; // class task_tracker
+
+bool operator==(const task_tracker& t, std::nullptr_t) noexcept;
+bool operator==(std::nullptr_t, const task_tracker& t) noexcept;
+
+bool operator!=(const task_tracker& t, std::nullptr_t) noexcept;
+bool operator!=(std::nullptr_t, const task_tracker& t) noexcept;
+
+bool operator==(const task_tracker& t, const task_tracker& rhs) noexcept;
+bool operator!=(const task_tracker& t, const task_tracker& rhs) noexcept;
 
 class task_group {
-    void run(task_handle& h);
-    task_group_status run_and_wait(task_handle& h);
-
-    static void make_edge(task_handle& ph, task_handle& sh);
+    static void make_edge(task_handle& pred, task_handle& succ);
+    static void make_edge(task_tracker& pred, task_handle& succ);
 
     struct current_task {
-        static void add_successor(task_handle& sh);
+        static void add_successor(task_handle& succ);
+
         static void transfer_successors_to(task_handle& h);
+        static void transfer_successors_to(task_tracker& h);
     };
 }; // class task_group
 
@@ -270,95 +266,183 @@ class task_group {
 } // namespace oneapi
 ```
 
-### Member functions of ``task_arena`` class
+### ``task_tracker`` class
 
-``void task_arena::enqueue(task_handle& h)``
+#### Construction, destruction and assignment
 
-Enqueues a task owned by ``h`` into the ``task_arena`` for processing.
+``task_tracker()``
 
-``h`` is left in a state that allows tracking the state of the task and setting the dependencies.
+Creates an empty ``task_tracker`` object that does not track any task.
 
-If ``h`` is an empty ``task_handle`` or it handles the task that has been submitted for processing, the behavior is undefined.
+``task_tracker(const task_tracker& other)``
 
-### Functions in ``this_task_arena`` namespace
+Copies ``other`` to ``*this``. After this, ``*this`` and ``other`` track the same task.
 
-``void this_task_arena::enqueue(task_handle&& h)``
+``task_tracker(task_tracker&& other)``
 
-Enqueues a task owned by ``h`` into the ``task_arena`` that is currently used by the calling thread.
+Moves ``other`` to ``*this``. After this, ``*this`` tracks the task previously tracked by ``other``.
+Other is left in empty state.
 
-``h`` is left in a state that allows tracking the state of the task and setting the dependencies.
+``task_tracker(const task_handle& handle)``
 
-If ``h`` is an empty ``task_handle`` or it handles the task that has been submitted for processing, the behavior is undefined.
+Creates ``task_tracker`` object that tracks the task owned by ``handle``. 
 
-### Member functions of ``task_handle`` class
+``~task_tracker()``
 
-``bool task_handle::was_submitted() const``
+Destroys the ``task_tracker`` object.
 
-Returns ``true`` if the task handled by ``*this`` was submitted for execution by ``task_arena::enqueue``, ``task_group::run`` or
-``task_group::run_and_wait``. 
-Returns ``false`` otherwise.
+``task_tracker& operator=(const task_tracker& other)``
 
-If ``*this`` is an empty task handle, the behavior is undefined.
+Replaces the task tracked by ``*this`` to be a task tracked by ``other``.
+After this, ``*this`` and ``other`` track the same task.
 
-``bool task_handle::is_completed() const``
+Returns a reference to ``*this``.
 
-Returns ``true`` if the task handled by ``*this`` is completed, ``false`` otherwise.
+``task_tracker& operator=(task_tracker&& other)``
 
-If ``*this`` is an empty task handle, the behavior is undefined.
+Replaces the task tracked by ``*this`` to be a task tracked by ``other``.
+After this, ``*this`` tracks the task previously tracked by ``other``.
+Other is left in empty state.
+
+Returns a reference to ``*this``.
+
+``task_tracker& operator=(const task_handle& handle)``
+
+Replaces the task tracked by ``*this`` to be a task owned by ``handle``.
+
+Returns a reference to ``*this``.
+
+#### Progress functions
+
+``explicit operator bool() const noexcept``
+
+Checks if `this`` tracks any task object.
+
+Returns ``true`` if ``*this`` is a non-empty tracker, ``false`` otherwise.
+
+``bool was_submitted() const``
+
+Returns ``true`` if the task tracked by ``*this`` was submitted for execution,
+``false`` otherwise.
+
+``bool is_completed() const``
+
+Returns ``true`` if the task tracked by ``*this`` is completed, ``false`` otherwise.
+
+#### Comparison operators
+
+``bool operator==(const task_tracker& t, std::nullptr_t) noexcept``
+
+Returns ``true`` if ``t`` is a non-empty tracker, ``false`` otherwise.
+
+``bool operator==(std::nullptr_t, const task_tracker& t) noexcept``
+
+Equivalent to ``t == nullptr``.
+
+``bool operator!=(const task_tracker& t, std::nullptr_t) noexcept``
+
+Equivalent to ``!(t == nullptr)``.
+
+``bool operator!=(std::nullptr_t, const task_tracker& t) noexcept``
+
+Equivalent to ``!(t == nullptr)``.
+
+``bool operator==(const task_tracker& lhs, const task_tracker& rhs) noexcept``
+
+Returns ``true`` if ``lhs`` tracks the same task as ``rhs``, ``false`` otherwise.
+
+``bool operator!=(const task_tracker& lhs, const task_tracker& rhs) noexcept``
+
+Equivalent to ``!(lhs == rhs)``.
 
 ### Member functions of ``task_group`` class
 
-``void task_group::run(task_handle& h)``
+``static void task_group::make_edge(task_handle& pred, task_handle& succ)``
 
-Submits the task object handled by ``h`` for the execution. 
+Registers the task owned by ``pred`` to be a predecessor that must complete before the task owned
+by ``succ`` can start executing.
 
-``h`` is left in a state that allows tracking the state of the task and setting the dependencies.
-
-If one of the following conditions is ``true``, the behavior is undefined:
-* ``h`` is an empty ``task_handle``.
-* ``h`` handles the task that has been already submitted for processing.
-* ``*this`` is the same ``task_group`` that ``h`` is created with.
-
-``task_group_status task_group::run_and_wait(task_handle& h)``
-
-Equivalent to ``{this->run(h); this->wait();}``. 
-
-``h`` is left in a state that allows tracking the state of the task and setting the dependencies.
-
-Returns the status of ``task_group``.
-
-If one of the following conditions is ``true``, the behavior is undefined:
-* ``h`` is an empty ``task_handle``.
-* ``h`` handles the task that has been already submitted for processing.
-* ``*this`` is the same ``task_group`` that ``h`` is created with.
-
-``static void task_group::make_edge(task_handle& ph, task_handle& sh)``
-
-Registers the task handled by ``ph`` to be a predecessor that must complete before the task handled by ``sh`` can start executing. 
-
-If ``sh`` handles the task that was already scheduled for execution, the behavior is undefined. 
+If ``pred`` or ``succ`` are empty, the behavior is undefined.
 
 It is safe to add multiple predecessors to the same successor and add the same predecessor for multiple successor tasks.
 
-It is safe to add predecessors to the ``task_handle`` handling the task that currently transfers it's successors to another task and
+It is safe to add successors to the task that currently transfers it's successors to another task and
 to the task to which the successors are transferred.
 
-``static task_group::current_task::add_successor(task_handle& sh)``
+``static void task_group::make_edge(task_tracker& pred, task_handle& succ)``
 
-Resisters currently executed task to be a predecessor that must complete before the task handled by ``sh`` can start executing.
+Registers the task tracked by ``pred`` to be a predecessor that must complete before the task owned
+by ``succ`` can start executing.
 
-If ``sh`` handles the task that was already scheduled for execution, the behavior is undefined. 
+If ``pred`` or ``succ`` are empty, the behavior is undefined.
 
-If is safe to use this function simultaneously with ``make_edge`` that adds more predecessors to ``sh`` and while transferring the successors
-from ``sh``.
+It is safe to add multiple predecessors to the same successor and add the same predecessor for multiple successor tasks.
 
-``static task_group::current_task::transfer_successors_to(task_handle& sh)``
+It is safe to add successors to the task that currently transfers it's successors to another task and
+to the task to which the successors are transferred.
+
+### Member functions of ``task_group::current_task``
+
+``static void add_successor(task_handle& succ)``
+
+Resisters currently executing task to be a predecessor that must complete before the task handled by ``succ`` can start executing.
+
+If this function is called outside of the body of the ``task_group`` task, the behavior is undefined.
+
+If is safe to use this function simultaneously with ``make_edge`` that adds more predecessors to ``succ``.
+
+``static void transfer_successors_to(task_handle& h)``
 
 The exact wording for the semantics of this method should be defined after making a decision about merged or separate tracking of tasks,
 that was described above.
 
+``static void transfer_successors_to(task_tracker& h)``
+
+The exact wording for the semantics of this method should be defined after making a decision about merged or separate tracking of tasks,
+that was described above.
+
+## Alternative approaches 
+
+The alternative approaches are to keep only the ``task_handle`` as the only was to track the task, set the
+dependencies and submit the task for execution.
+
+### ``task_handle`` as a unique owner
+
+The first option is to keep the ``task_handle`` to be a unique owner of the task in various states and to allow
+to use non-empty handle for setting or transferring the dependencies.
+
+Since the current API allows submitting the ``task_handle`` for execution only as rvalue, having any usage of ``task_handle`` object after submitting for execution 
+(e.g. using ``task_group::run(std::move(task_handle))``) looks misleading even if some guarantees are provided for the referred handle object.
+
+To handle this, it would be needed to extend all functions that take the task handled by the ``task_handle``
+with the new overload taking an non-const lvalue reference and provide the following guarantees:
+* Overloads accepting rvalue reference to ``task_handle`` take a non-empty handle and leave the handle in an empty state in the end (current behavior is preserved).
+* New overloads accepting lvalue references to ``task_handle`` also take a non-empty handle object but does not leave it in an empty state after submission. Hence, the ``task_handle`` can be
+  used after execution of the method to represent a task in submitted, executing or completed state and to set the dependencies on such tasks.
+  Using such a task handle once again as an argument to the submission function results in undefined behavior.
+
+Extension for all of the submission functions would be required:
+* ``task_group::run`` and ``task_group::run_and_wait``
+* ``task_arena::enqueue`` and ``this_task_arena::enqueue``
+
+Also, the submission functions would work only with the handles of the tasks in created states.
+Submitting the ``task_handle`` handling tasks in any other state results in undefined behavior.
+
+When the ``task_group`` preview extensions are enabled, returning a non-empty ``task_handle`` handling a task
+in the state other than created results in undefined behavior.
+
+### ``task_handle`` as a shared owner
+
+Another approach is to have ``task_handle`` to be a shared owner on the task allowing multiple instances of
+``task_handle`` to co-own the task. But since the task can only be submitted for execution once, using a
+``task_handle`` as an argument to one of the submission functions would invalidate all copies or set them
+in the "weak" state that allows only to set dependencies between tasks.
+
 Open questions:
 * Which approach for ``transfer_successors_to`` (merged or separate tracking) should be implemented?
 * Are concrete names of APIs good enough and reflects the purpose of the methods?
+* Should we allow the ``task_tracker`` in a non-submitted state as a successor argument to ``make_edge`` and
+  ``add_successor``?
+* Should comparison functions between ``task_tracker`` and ``task_handle`` be defined?
 * The performance targets for this feature were not defined by this RFC
 * Exit criteria for this feature was not defined by this RFC
