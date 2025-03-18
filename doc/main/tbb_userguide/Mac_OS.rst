@@ -44,5 +44,5 @@ where
 
 * ``<version>`` - binary version in a form of ``<ver_major>.<ver_minor>``
 
-See the :ref:`Integrate oneTBB <integrate>` to learn how to use CMake* and pkg-config tools.
-Learn how to setup environment in :ref:`Next Steps <next_steps>`.
+See :ref:`Integrate oneTBB <integrate>` to learn how to use CMake* and pkg-config tools.
+To set the environment, see :ref:`Next Steps <next_steps>`.

@@ -48,7 +48,7 @@ Where
 * ``<lib>`` - ``tbb``, ``tbbmalloc``, ``tbbmalloc_proxy`` or ``tbbbind``
 * ``<vcversion>`` 
 
-  - ``14`` - use for dynamic linkage  with the Microsoft C runtime (CRT)
+  - ``14`` - use for dynamic linkage with the Microsoft* C runtime (CRT)
 
   - ``14_uwp`` - use for Windows 10 Universal Windows applications
 
@@ -64,8 +64,8 @@ The last column shows, which environment variables are used by the
 Microsoft\* Visual C++\* or Intel® oneAPI DPC++/C++ Compiler, to find these
 subdirectories.
 
-See the :ref:`Integrate oneTBB <integrate>` to learn how to use CMake* and pkg-config tools.
-Learn how to setup environment in :ref:`Next Steps <next_steps>`.
+See :ref:`Integrate oneTBB <integrate>` to learn how to use CMake* and pkg-config tools.
+To set the environment, see :ref:`Next Steps <next_steps>`.
 
 .. CAUTION:: 
    Ensure that the relevant product directories are mentioned by the
