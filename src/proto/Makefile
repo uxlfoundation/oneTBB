@@ -49,8 +49,9 @@ tbb: tbb_release tbb_debug
 tbb_%::
 	$(MAKE) -C $(tbb_root)/src $@
 
-time_%: time_%.exe
-	./$^ $(args)
+bench_%:
+	g++ bench_accessing.cpp -I../../include -lbenchmark -fopenmp -o$@
+	./$@ $(args)
 
 test_%: test_%.exe
 	./$^ $(args)

@@ -18,21 +18,17 @@
 
 */
 
-#if INTEL_PRIVATE
 /* !!! WARNING: !!!
  * Interface of synchronizer has to be changed along with with interfaces of mutexes to comply C++0x concepts.
  * So, current implementation of interface is strictly for usage as template argument of tbb containers.
  */
-#endif
-#if INTEL_TRIAL==3
 #define __TBB_BTS 1
-#endif
 
 #ifndef __TBB_synchronizer_H
 #define __TBB_synchronizer_H
 
-#include "tbb_stddef.h"
-#include "atomic.h"
+#include "tbb/tbb_stddef.h"
+#include "tbb/atomic.h"
 #include <stdexcept>
 
 #ifndef __TBB_ASSERT_RACEPOINT
@@ -619,8 +615,10 @@ public:
         state.word = 0; state.alive_bit = alive;
     }
     //! Acquire the lock without contention while constructing
-    template<typename Memento>
-    versioned_synchronizer( Memento &m ) { state.word = 0; state.alive_bit = 1; state.init_lock( m ); }
+    //template<typename Memento>
+    //versioned_synchronizer( Memento &m ) { state.word = 0; state.alive_bit = 1; state.init_lock( m ); }
+    //! Acquire the lock without contention while constructing
+    versioned_synchronizer( const versioned_synchronizer &v ) { state = v.state; }
     ~versioned_synchronizer() {}
 
 protected:
