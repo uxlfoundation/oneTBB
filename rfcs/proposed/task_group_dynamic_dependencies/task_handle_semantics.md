@@ -161,9 +161,6 @@ affect the successors list of one task:
 
 <img src="transferring_between_two_separate_tracking_new_successors.png" width=800>
 
-Such an approach can be beneficial if ``current`` task is kind of generator task that collects the set of successors on each iteration of the loop
-and then transfers it to the newly created task.
-
 Alternative approach is to keep tracking ``current`` and ``target`` together after transferring. This requires introducing the new state of task - a `proxy` state.
 The task changes its state to `proxy` once the ``transfer_successors_to`` is executed from the body of the task.
 
