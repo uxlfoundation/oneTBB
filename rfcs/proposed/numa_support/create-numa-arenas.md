@@ -87,7 +87,19 @@ std::vector<tbb::task_arena> create_numa_task_arenas(
 }
 ```
 
+### Shortcomings and downsides
+
+The following critics was provided in the RFC discussion:
+
+- It might be confusing that a single `constraints` object is used to generate multiple arenas,
+  especially with part of it (`numa_id`) being ignored.
+- The proposed API addresses just one, albeit important, use case for creating a set of arenas.
+
+See the "universal function" alternative below for related considerations.
+
 ## Considered alternatives
+
+### Sub-classing `task_arena`
 
 The earlier proposal [PR #1559](https://github.com/uxlfoundation/oneTBB/pull/1559) suggested to add
 a new class derived from `task_arena` which would also provide a method to wait for work completion.
@@ -107,9 +119,43 @@ use of a task arena and a task group to submit and wait for work. Combined, thes
 provide only a slightly more verbose solution for the NUMA use case, while being more flexible
 and having greater potential for other useful extensions and applications.
 
+### Universal function to create an arena set
+
+In the discussion of this RFC, it was suggested to generalize the function for creating a set of arenas
+with various prescribed characteristics, beyond only NUMA-bound arenas. It would take a "constraint
+generator" type which would represent multiple arena constraint objects according to given options,
+and each of these constraints would be used to create an arena.
+
+Generally, such generalized API needs some way to describe which arena parameters should vary
+across the arena set and how, and which should remain uniform. Possible ways for that are
+to use some descriptive "language" and/or to generate parameter sets by a function.
+
+In the suggestion, construction arguments of a constraint generator (including value sets
+and named patterns) serve as the description language.
+Another way could be to add named patterns as possible data values for `task_arena::constraints`;
+for example, `tbb::task_arena::constraints c{ .numa_id = tbb::task_arena::iterate }`
+would serve as a pattern for generating a set of constraints bound to NUMA domains.
+
+Using a function to generate arena parameter sets seems even more flexible comparing to a description
+language, as that function would be not limited in which parameters to alter, and how.
+
+Compared to the proposal, this approach would necessarily be more verbose because of the need to
+describe or generate a set of constraints. That could however be mitigated for common use cases
+with presets provided by the library allowing for a reasonably concise code. For example:
+```c++
+  std::vector<tbb::task_arena> arenas = tbb::create_task_arenas(tbb::iterate_over_numa_ids);
+```
+where `iterate_over_numa_ids` is a predefined variable of a type accepted by the function.
+
+Yet it is questionable if such flexibility is useful at the moment, and so if it justifies
+extra complexity. As of now, we know just a few arena set patterns with potential practical usage:
+besides NUMA arenas, we can think of splitting CPU resources by core type and of creating a set of
+arenas with different priorities. We do not however recall any requests to simplify these use cases.
+
 ## Open questions
 - Instead of a free-standing function in namespace `tbb`, should we consider
   a static member function in class `task_arena`?
 - The proposal does not consider arena priority, simply keeping the default `priority::normal`.
   Are there use cases for pre-setting priorities? Similarly for the experimental thread leave policy.
+- Are there more practical use cases which could justify the universal function approach?
 - Are there any reasons for the API to first go out as an experimental feature?
