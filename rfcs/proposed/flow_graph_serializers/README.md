@@ -136,7 +136,8 @@ limited resources instead of (or in addition to) a `concurrency` value.
 that, when connected with an `rl_function_node`, ensures limited access
 to the resource limiter’s handles.
 
-> [!NOTE] Although we pattern our proposal on the
+> [!NOTE]
+> Although we pattern our proposal on the
 > `flow::function_node` class template in this proposal, the concepts
 > discussed here apply to nearly any flow-graph node that accepts a
 > user-provided node body.
