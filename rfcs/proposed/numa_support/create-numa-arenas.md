@@ -61,6 +61,11 @@ It optionally takes a `constraints` argument to change default arena settings su
 is ignored. The second optional argument allows to override the number of reserved slots, which by default
 is 0 (unlike the `task_arena` construction default of 1) for the reasons described in the introduction.
 
+These arena parameters were selected for pre-setting because there appear to be practical use cases to modify
+it uniformly for the whole arena set - e.g., to suppress the use of hyper-threading or to reserve a slot
+for a dedicated application thread. For other arena parameters, such as priorities and thread leave policy,
+no obvious use cases are seen for uniformly changing default values; it can be addressed on demand.
+
 The function returns a `std::vector` of created arenas. The arenas should not be initialized,
 in order to allow changing certain arena settings before the use.
 
@@ -106,5 +111,5 @@ and having greater potential for other useful extensions and applications.
 - Instead of a free-standing function in namespace `tbb`, should we consider
   a static member function in class `task_arena`?
 - The proposal does not consider arena priority, simply keeping the default `priority::normal`.
-  Should a possibility to change priorities be considered?
+  Are there use cases for pre-setting priorities? Similarly for the experimental thread leave policy.
 - Are there any reasons for the API to first go out as an experimental feature?
