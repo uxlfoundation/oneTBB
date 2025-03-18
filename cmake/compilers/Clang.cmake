@@ -64,7 +64,8 @@ endif()
 
 # Clang flags to prevent compiler from optimizing out security checks
 set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} -Wformat -Wformat-security -Werror=format-security -fPIC $<$<NOT:$<BOOL:${EMSCRIPTEN}>>:-fstack-protector-strong>)
-set(TBB_LIB_COMPILE_FLAGS ${TBB_LIB_COMPILE_FLAGS} -fstack-clash-protection -fcf-protection=full)
+set(TBB_LIB_COMPILE_FLAGS ${TBB_LIB_COMPILE_FLAGS} $<$<NOT:$<BOOL:${APPLE}>>:-fstack-clash-protection 
+    $<$<NOT:$<BOOL:${EMSCRIPTEN}>>:-fcf-protection=full)
 
 # -z switch is not supported on MacOS
 if (NOT APPLE)
