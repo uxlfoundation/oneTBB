@@ -1,7 +1,18 @@
 digraph {
   rankdir=LR
-  Source [label=<<b>Source</b>> style="filled" shape="cylinder" fillcolor="#666666" fontcolor="white" fontname="Arial"]
-  node [shape="box" style=filled fontname="Arial" width=2.7]
+  ranksep=2
+
+  node [fontname="Arial"]
+  Source [label=<<b>Source</b>> style="filled" shape="cylinder" fillcolor="#666666" fontcolor="white"]
+
+  node [shape="box" peripheries=2]
+  DB [label=<<b>DB</b><br/> 2 tokens>]
+  ROOT [label=<<b>ROOT</b><br/> 1 token>]
+  GENIE [label=<<b>GENIE</b><br/> 1 token>]
+
+  {rank=same; Source; DB; ROOT; GENIE}
+
+  node [shape="box" style=filled width=2.7 peripheries=1]
 
   propagating [
     label=<
@@ -83,5 +94,17 @@ digraph {
     fillcolor="#FDC086"
   ]
 
-  Source -> {propagating histogramming generating histo_generating calA calB calC}
+  Source -> {
+    calA
+    calB
+    calC
+    generating
+    histo_generating
+    histogramming
+    propagating
+  }
+
+  GENIE -> {generating histo_generating} -> GENIE [style="dotted" color="blue" arrowhead="empty"]
+  ROOT -> {histogramming histo_generating} -> ROOT [style="dotted" color="blue" arrowhead="empty"]
+  DB -> {calA calB calC} -> DB [style="dotted" color="blue" arrowhead="empty"]
 }

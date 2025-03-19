@@ -330,7 +330,7 @@ simple data flow with 7 nodes.
 
 The nodes are connected as shown in this diagram:
 
-![Fanout graph of analyzed workflow](analyzed-graph.png)
+![Fanout graph of analyzed workflow](analyzed-graph-with-limiters.png)
 
 
 The *Source* node is directly connected to each of the other nodes by
