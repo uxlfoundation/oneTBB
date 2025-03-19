@@ -328,6 +328,11 @@ simple data flow with 7 nodes.
   But we cannot have two *Calibration\[C\]* tasks running at the same
   time.
 
+The nodes are connected as shown in this diagram:
+
+![Fanout graph of analyzed workflow](analyzed-graph.pdf)
+
+
 The *Source* node is directly connected to each of the other nodes by
 explicitly calling `make_edge(...)`. All edges between the nodes and the
 resource limiters are created internally within the `rl_function_node`
