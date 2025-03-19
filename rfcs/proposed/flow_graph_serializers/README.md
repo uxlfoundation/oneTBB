@@ -130,10 +130,15 @@ We use the following definitions in this proposal:
 Our proposal is an addition to what already exists and does not break
 API backwards compatibility. The proposal consists of:
 
-1. Adding a `rl_function_node` class template that allows the specification of
-limited resources instead of (or in addition to) a `concurrency` value.
+1. Either:
+    1. Adding an `rl_function_node` class template that allows the specification of
+limited resources instead of (or in addition to) a `concurrency` value (implemented for this PR), or
+    2. Introducing new constructors to the relevant node types (e.g. `flow::function_node`)
+that allow the specification of resource limiters, similar to what is shown in
+[<span class="toc-section-number"></span>
+`rl_function_node` constructors](#rl_function_node-constructors) (preferred).
 2. Introducing the equivalent of a `resource_limiter` class template
-that, when connected with an `rl_function_node`, ensures limited access
+that, when connected with an `rl_function_node` (or its equivalent), ensures limited access
 to the resource limiter’s handles.
 
 > [!NOTE]
