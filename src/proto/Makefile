@@ -50,7 +50,7 @@ tbb_%::
 	$(MAKE) -C $(tbb_root)/src $@
 
 bench_%:
-	g++ bench_accessing.cpp -I../../include -lbenchmark -fopenmp -o$@
+	g++ bench_accessing.cpp -I../../include -lbenchmark -fopenmp -std=c++17 -o$@
 	./$@ $(args)
 
 test_%: test_%.exe
