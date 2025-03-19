@@ -87,6 +87,10 @@ private:
     d1::task* execute(d1::execution_data& ed) override {
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
         task* res = task_ptr_or_nullptr(m_func);
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        task_dynamic_state* state = this->get_dynamic_state_if_created();
+        if (state) state->complete_task();
+#endif
         finalize(&ed);
         return res;
     }
@@ -487,6 +491,9 @@ protected:
 
         using acs = d2::task_handle_accessor;
         __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        acs::mark_task_submitted(h);
+#endif
 
         bool cancellation_status = false;
         try_call([&] {
@@ -580,6 +587,9 @@ public:
 
         using acs = d2::task_handle_accessor;
         __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        acs::mark_task_submitted(h);
+#endif
 
         d1::spawn(*acs::release(h), context());
     }
@@ -701,6 +711,9 @@ using detail::d1::is_current_task_group_canceling;
 using detail::r1::missing_wait;
 
 using detail::d2::task_handle;
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+using detail::d2::task_tracker;
+#endif
 }
 
 } // namespace tbb

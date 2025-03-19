@@ -32,7 +32,81 @@ namespace d2 {
 
 class task_handle;
 
-class task_handle_task : public d1::task {
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+
+class task_with_dynamic_state;
+class task_dynamic_state {
+    enum class task_status {
+        no_status = 0,
+        submitted = 1,
+        completed = 2
+    };
+public:
+    task_dynamic_state(d1::small_object_allocator& alloc)
+        : m_task_status(task_status::no_status)
+        , m_num_references(0)
+        , m_allocator(alloc)
+    {}
+
+    void reserve() { ++m_num_references; }
+
+    void release() {
+        if (--m_num_references == 0) {
+            m_allocator.delete_object(this);
+        }
+    }
+
+    void mark_submitted() {
+        m_task_status.store(task_status::submitted, std::memory_order_release);
+    }
+
+    void complete_task() {
+        m_task_status.store(task_status::completed, std::memory_order_release);   
+    }
+
+    bool was_submitted() const {
+        return m_task_status.load(std::memory_order_acquire) >= task_status::submitted;
+    }
+
+    bool is_completed() const {
+        return m_task_status.load(std::memory_order_acquire) == task_status::completed;
+    }
+private:
+    std::atomic<task_status> m_task_status;
+    std::atomic<std::size_t> m_num_references;
+    d1::small_object_allocator m_allocator;
+};
+
+class task_with_dynamic_state : public d1::task {
+public:
+    task_with_dynamic_state(d1::small_object_allocator& alloc)
+        : m_state(nullptr)
+        , m_allocator(alloc)
+    {}
+
+    task_dynamic_state* get_dynamic_state() {
+        if (m_state == nullptr) {
+            m_state = m_allocator.new_object<task_dynamic_state>(m_allocator);
+        }
+        return m_state;
+    }
+
+    task_dynamic_state* get_dynamic_state_if_created() {
+        return m_state;
+    }
+private:
+    task_dynamic_state* m_state;
+    d1::small_object_allocator& m_allocator;
+};
+#endif // __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+
+class task_handle_task
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+: public task_with_dynamic_state
+#else
+: public d1::task
+#endif
+{
     std::uint64_t m_version_and_traits{};
     d1::wait_tree_vertex_interface* m_wait_tree_vertex;
     d1::task_group_context& m_ctx;
@@ -47,9 +121,14 @@ public:
     }
 
     task_handle_task(d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
-        : m_wait_tree_vertex(vertex)
+        : 
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+          task_with_dynamic_state(alloc),
+#endif
+          m_wait_tree_vertex(vertex)
         , m_ctx(ctx)
-        , m_allocator(alloc) {
+        , m_allocator(alloc)
+    {
         suppress_unused_warning(m_version_and_traits);
         m_wait_tree_vertex->reserve();
     }
@@ -64,7 +143,12 @@ public:
 
 class task_handle {
     struct task_handle_task_finalizer_t{
-        void operator()(task_handle_task* p){ p->finalize(); }
+        void operator()(task_handle_task* p){
+            p->finalize();
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+
+#endif
+        }
     };
     using handle_impl_t = std::unique_ptr<task_handle_task, task_handle_task_finalizer_t>;
 
@@ -84,8 +168,16 @@ public:
 
 private:
     friend struct task_handle_accessor;
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    friend class task_tracker;
+#endif
 
-    task_handle(task_handle_task* t) : m_handle {t}{};
+    task_handle(task_handle_task* t) : m_handle {t} {
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        task_dynamic_state* state = m_handle->get_dynamic_state();
+        state->reserve();
+#endif
+    }
 
     d1::task* release() {
        return m_handle.release();
@@ -93,12 +185,22 @@ private:
 };
 
 struct task_handle_accessor {
-static task_handle              construct(task_handle_task* t)  { return {t}; }
-static d1::task*                release(task_handle& th)        { return th.release(); }
-static d1::task_group_context&  ctx_of(task_handle& th)         {
-    __TBB_ASSERT(th.m_handle, "ctx_of does not expect empty task_handle.");
-    return th.m_handle->ctx();
-}
+    static task_handle construct(task_handle_task* t) { return {t}; }
+
+    static d1::task* release(task_handle& th) { return th.release(); }
+
+    static d1::task_group_context& ctx_of(task_handle& th) {
+        __TBB_ASSERT(th.m_handle, "ctx_of does not expect empty task_handle.");
+        return th.m_handle->ctx();
+    }
+
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    static void mark_task_submitted(task_handle& th) {
+        __TBB_ASSERT(th.m_handle, "mark_task_submitted does not expect empty task_handle");
+        task_dynamic_state* state = th.m_handle->get_dynamic_state_if_created();
+        if (state) state->mark_submitted();
+    }
+#endif
 };
 
 inline bool operator==(task_handle const& th, std::nullptr_t) noexcept {
@@ -115,6 +217,114 @@ inline bool operator!=(task_handle const& th, std::nullptr_t) noexcept {
 inline bool operator!=(std::nullptr_t, task_handle const& th) noexcept {
     return th.m_handle != nullptr;
 }
+
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+class task_tracker {
+public:
+    task_tracker() : m_task_state(nullptr) {}
+
+    task_tracker(const task_tracker& other) 
+        : m_task_state(other.m_task_state)
+    {
+        // Register one more co-owner of the dynamic state
+        if (m_task_state) m_task_state->reserve();
+    }
+    task_tracker(task_tracker&& other)
+        : m_task_state(other.m_task_state)
+    {
+        other.m_task_state = nullptr;
+    }
+
+    // TODO: explicit
+    task_tracker(const task_handle& th)
+        : m_task_state(th ? th.m_handle->get_dynamic_state() : nullptr)
+    {
+        // Register new co-owner of the dynamic state
+        if (m_task_state) m_task_state->reserve();
+    }
+
+    ~task_tracker() = default;
+
+    task_tracker& operator=(const task_tracker& other) {
+        if (this != &other) {
+            // Release co-ownership on the previously tracked dynamic state
+            if (m_task_state) m_task_state->release();
+
+            m_task_state = other.m_task_state;
+
+            // Register new co-owner of the new dynamic state
+            if (m_task_state) m_task_state->reserve();
+        }
+        return *this;
+    }
+
+    task_tracker& operator=(task_tracker&& other) {
+        if (this != &other) {
+            // Release co-ownership on the previously tracked dynamic state
+            if (m_task_state) m_task_state->release();
+
+            m_task_state = other.m_task_state;
+            other.m_task_state = nullptr;
+        }
+        return *this;
+    }
+
+    // TODO: explicit?
+    task_tracker& operator=(const task_handle& th) {
+        // Release co-ownership on the previously tracked dynamic state
+        if (m_task_state) m_task_state->release();
+
+        if (th) {
+            m_task_state = th.m_handle->get_dynamic_state();
+
+            // Reserve co-ownership on the new dynamic state
+            __TBB_ASSERT(m_task_state != nullptr, "No state in the non-empty task_handle");
+            m_task_state->reserve();
+        }
+        return *this;
+    }
+
+    explicit operator bool() const noexcept { return m_task_state != nullptr; }
+
+    bool was_submitted() const {
+        __TBB_ASSERT(m_task_state != nullptr, "Cannot get task status on the empty task_tracker");
+        return m_task_state->was_submitted();
+    }
+
+    bool is_completed() const {
+        __TBB_ASSERT(m_task_state != nullptr, "Cannot get task status on the empty task_tracker");
+        return m_task_state->is_completed();
+    }
+private:
+    friend bool operator==(const task_tracker& t, std::nullptr_t) noexcept {
+        return t.m_task_state == nullptr;
+    }
+
+    friend bool operator==(const task_tracker& lhs, const task_tracker& rhs) noexcept {
+        return lhs.m_task_state == rhs.m_task_state;
+    }
+
+#if !__TBB_CPP20_COMPARISONS_PRESENT
+    friend bool operator==(std::nullptr_t, const task_tracker& t) noexcept {
+        return t == nullptr;
+    }
+
+    friend bool operator!=(const task_tracker& t, std::nullptr_t) noexcept {
+        return !(t == nullptr);
+    }
+
+    friend bool operator!=(std::nullptr_t, const task_tracker& t) noexcept {
+        return !(t == nullptr);
+    }
+
+    friend bool operator!=(const task_tracker& lhs, const task_tracker& rhs) noexcept {
+        return !(lhs == rhs);
+    }
+#endif // !__TBB_CPP20_COMPARISONS_PRESENT
+
+    task_dynamic_state* m_task_state;
+};
+#endif
 
 } // namespace d2
 } // namespace detail
