@@ -86,13 +86,29 @@ class function_task : public task_handle_task  {
 private:
     d1::task* execute(d1::execution_data& ed) override {
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
-        task* res = task_ptr_or_nullptr(m_func);
+        task* next_task = task_ptr_or_nullptr(m_func);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
         task_dynamic_state* state = this->get_dynamic_state_if_created();
-        if (state) state->complete_task();
+        
+        if (state) {
+            task_with_dynamic_state* successor_task = state->complete_task();
+
+            // If one of the successors of the current task can be executed
+            if (successor_task != nullptr) {
+                if (next_task != nullptr) {
+                    // There was a task returned from the current task body - bypassing the returned task 
+                    // and spawning the successor task
+                    // successor task is guaranteed to be task_handle_task, safe to use static_cast
+                    d1::spawn(*successor_task, static_cast<task_handle_task*>(successor_task)->ctx());
+                } else {
+                    // No task was returned from the current task body - bypassing the successor task
+                    next_task = successor_task;
+                }
+            }
+        }
 #endif
         finalize(&ed);
-        return res;
+        return next_task;
     }
     d1::task* cancel(d1::execution_data& ed) override {
         finalize(&ed);
@@ -497,7 +513,16 @@ protected:
 
         bool cancellation_status = false;
         try_call([&] {
-            execute_and_wait(*acs::release(h), context(), m_wait_vertex.get_context(), context());
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+            if (acs::has_dependencies(h)) {
+                acs::release_continuation(h);
+                acs::release(h);
+                d1::wait(m_wait_vertex.get_context(), context());
+            } else
+#endif
+            {
+                execute_and_wait(*acs::release(h), context(), m_wait_vertex.get_context(), context());
+            }
         }).on_completion([&] {
             // TODO: the reset method is not thread-safe. Ensure the correct behavior.
             cancellation_status = context().is_group_execution_cancelled();
@@ -589,9 +614,15 @@ public:
         __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
         acs::mark_task_submitted(h);
-#endif
 
-        d1::spawn(*acs::release(h), context());
+        if (acs::has_dependencies(h)) {
+            acs::release_continuation(h);
+            acs::release(h);
+        } else
+#endif
+        {
+            d1::spawn(*acs::release(h), context());
+        }
     }
 
     template<typename F>
@@ -608,6 +639,22 @@ public:
     task_group_status run_and_wait(d2::task_handle&& h) {
         return internal_run_and_wait(std::move(h));
     }
+
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    static void make_edge(d2::task_handle& pred, d2::task_handle& succ) {
+        __TBB_ASSERT(pred != nullptr, "empty predecessor handle is not allowed for make_edge");
+        __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for make_edge");
+        internal_make_edge(task_handle_accessor::get_task_dynamic_state(pred),
+                           task_handle_accessor::get_task_dynamic_state(succ));
+    }
+
+    static void make_edge(d2::task_tracker& pred, d2::task_handle& succ) {
+        __TBB_ASSERT(pred != nullptr, "empty predecessor tracker is not allowed for make_edge");
+        __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for make_edge");
+        internal_make_edge(task_tracker_accessor::get_task_dynamic_state(pred),
+                           task_handle_accessor::get_task_dynamic_state(succ));
+    }
+#endif
 }; // class task_group
 
 #if TBB_PREVIEW_ISOLATED_TASK_GROUP

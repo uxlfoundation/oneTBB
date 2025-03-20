@@ -110,10 +110,16 @@ inline void enqueue_impl(task_handle&& th, d1::task_arena_base* ta) {
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
     task_handle_accessor::mark_task_submitted(th);
-#endif
 
-    // Do not access th after release
-    r1::enqueue(*task_handle_accessor::release(th), ctx, ta);
+    if (task_handle_accessor::has_dependencies(th)) {
+        task_handle_accessor::release_continuation(th);
+        task_handle_accessor::release(th);
+    } else 
+#endif
+    {
+        // Do not access th after release
+        r1::enqueue(*task_handle_accessor::release(th), ctx, ta);
+    }
 }
 } //namespace d2
 
