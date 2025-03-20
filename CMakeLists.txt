@@ -122,7 +122,6 @@ cmake_dependent_option(TBBMALLOC_PROXY_BUILD "Enable tbbmalloc_proxy build" ON "
 option(TBB_CPF "Enable preview features of the library" OFF)
 option(TBB_FIND_PACKAGE "Enable search for external oneTBB using find_package instead of build from sources" OFF)
 option(TBB_DISABLE_HWLOC_AUTOMATIC_SEARCH "Disable HWLOC automatic search by pkg-config tool" ${CMAKE_CROSSCOMPILING})
-option(TBB_VERIFY_DEPENDENCY_SIGNATURE "Verify signature of a dependency during its dynamic linking at run-time on Windows*" OFF)
 option(TBB_ENABLE_IPO "Enable Interprocedural Optimization (IPO) during the compilation" ON)
 option(TBB_CONTROL_FLOW_GUARD "Enable Control Flow Guard (CFG) during the compilation" OFF)
 option(TBB_FUZZ_TESTING "Enable fuzz testing" OFF)
@@ -133,6 +132,24 @@ option(TBB_LINUX_SEPARATE_DBG "Enable separation of the debug symbols during the
 endif()
 if(APPLE)
 option(TBB_BUILD_APPLE_FRAMEWORKS "Build as Apple Frameworks" OFF)
+endif()
+
+if (WIN32)
+    if (TBB_VERIFY_DEPENDENCY_SIGNATURE)
+        message(STATUS
+            "Dependency signature verification during dynamic linking in run-time is ENABLED.")
+    elseif (NOT DEFINED TBB_VERIFY_DEPENDENCY_SIGNATURE)
+        message(WARNING
+            "Dependency signature verification during dynamic linking in run-time is disabled by "
+            "default. This may lead to security vulnerabilities. See installation section in "
+            "oneTBB documentation for more details.")
+    else()
+        message(STATUS
+            "Dependency signature verification during dynamic linking in run-time is explicitly"
+            " DISABLED.")
+    endif()
+    option(TBB_VERIFY_DEPENDENCY_SIGNATURE
+        "Verify signature of a dependency during its dynamic linking at run-time on Windows*" OFF)
 endif()
 
 if (NOT DEFINED BUILD_SHARED_LIBS)
@@ -233,18 +250,6 @@ file(GLOB FILES_WITH_EXTRA_TARGETS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/*.cmake)
 foreach(FILE_WITH_EXTRA_TARGETS ${FILES_WITH_EXTRA_TARGETS})
     include(${FILE_WITH_EXTRA_TARGETS})
 endforeach()
-
-if (WIN32)
-    if (TBB_VERIFY_DEPENDENCY_SIGNATURE)
-        message(STATUS
-            "Dependency signature verification during dynamic linking in run-time is enabled.")
-    else()
-        message(WARNING
-            "\nDependency signature verification during dynamic linking in run-time is disabled. "
-            "This may lead to security vulnerabilities. It is recommended to set "
-            "TBB_VERIFY_DEPENDENCY_SIGNATURE to ON. See oneTBB documentation for more details.")
-    endif()
-endif()
 
 # - Enabling LTO on Android causes the NDK bug.
 #   NDK throws the warning: "argument unused during compilation: '-Wa,--noexecstack'"
