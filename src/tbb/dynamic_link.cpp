@@ -723,7 +723,7 @@ namespace r1 {
         UINT prev_mode = SetErrorMode (SEM_FAILCRITICALERRORS);
 #endif /* _WIN32 */
         // The argument of loading_flags is ignored on Windows
-        library_handle = dlopen( path, loading_flags(flags & DYNAMIC_LINK_LOCAL) );
+        library_handle = dlopen( path, loading_flags(flags) );
 #if _WIN32
         SetErrorMode (prev_mode);
 #endif /* _WIN32 */
