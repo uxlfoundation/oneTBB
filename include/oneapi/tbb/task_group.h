@@ -90,21 +90,9 @@ private:
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
         task_dynamic_state* state = this->get_dynamic_state_if_created();
         
-        if (state) {
+        if (state != nullptr) {
             task_with_dynamic_state* successor_task = state->complete_task();
-
-            // If one of the successors of the current task can be executed
-            if (successor_task != nullptr) {
-                if (next_task != nullptr) {
-                    // There was a task returned from the current task body - bypassing the returned task 
-                    // and spawning the successor task
-                    // successor task is guaranteed to be task_handle_task, safe to use static_cast
-                    d1::spawn(*successor_task, static_cast<task_handle_task*>(successor_task)->ctx());
-                } else {
-                    // No task was returned from the current task body - bypassing the successor task
-                    next_task = successor_task;
-                }
-            }
+            next_task = combine_tasks(next_task, successor_task);
         }
 #endif
         finalize(&ed);
@@ -460,7 +448,13 @@ class isolated_task_group;
 #endif
 
 template <typename F>
-class function_stack_task : public d1::task {
+class function_stack_task
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+: public task_with_dynamic_state
+#else
+: public d1::task
+#endif
+{
     const F& m_func;
     d1::wait_tree_vertex_interface* m_wait_tree_vertex;
 
@@ -468,16 +462,26 @@ class function_stack_task : public d1::task {
         m_wait_tree_vertex->release();
     }
     task* execute(d1::execution_data&) override {
-        task* res = d2::task_ptr_or_nullptr(m_func);
+        task* next_task = d2::task_ptr_or_nullptr(m_func);
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        task_dynamic_state* state = this->get_dynamic_state_if_created();
+
+        if (state != nullptr) {
+            task_with_dynamic_state* successor_task = state->complete_task();
+            next_task = combine_tasks(next_task, successor_task);
+        }
+#endif
         finalize();
-        return res;
+        return next_task;
     }
     task* cancel(d1::execution_data&) override {
         finalize();
         return nullptr;
     }
 public:
-    function_stack_task(const F& f, d1::wait_tree_vertex_interface* vertex) : m_func(f), m_wait_tree_vertex(vertex) {
+    function_stack_task(const F& f, d1::wait_tree_vertex_interface* vertex)
+    : m_func(f), m_wait_tree_vertex(vertex)
+    {
         m_wait_tree_vertex->reserve();
     }
 };
@@ -654,6 +658,14 @@ public:
         internal_make_edge(task_tracker_accessor::get_task_dynamic_state(pred),
                            task_handle_accessor::get_task_dynamic_state(succ));
     }
+
+    struct current_task {
+        static void add_successor(d2::task_handle& succ) {
+            __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for add_successor");
+            internal_make_edge(get_current_task_dynamic_state(),
+                               task_handle_accessor::get_task_dynamic_state(succ));
+        }
+    };
 #endif
 }; // class task_group
 

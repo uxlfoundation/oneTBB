@@ -139,6 +139,7 @@ public:
     void enter_task_dispatcher(task_dispatcher& task_disp, std::uintptr_t stealing_threshold);
     void leave_task_dispatcher();
     void propagate_task_group_state(std::atomic<uint32_t> d1::task_group_context::* mptr_state, d1::task_group_context& src, uint32_t new_state);
+    d1::task* get_current_task();
 
     //! Index of the arena slot the scheduler occupies now, or occupied last time
     unsigned short my_arena_index;
@@ -254,9 +255,12 @@ inline void thread_data::propagate_task_group_state(std::atomic<std::uint32_t> d
     my_context_list->epoch.store(the_context_state_propagation_epoch.load(std::memory_order_relaxed), std::memory_order_release);
 }
 
+inline d1::task* thread_data::get_current_task() {
+    return my_task_dispatcher->m_innermost_running_task;
+}
+
 } // namespace r1
 } // namespace detail
 } // namespace tbb
 
 #endif // __TBB_thread_data_H
-

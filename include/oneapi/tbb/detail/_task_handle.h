@@ -132,6 +132,10 @@ inline void internal_make_edge(task_dynamic_state* pred, task_dynamic_state* suc
 
 class task_with_dynamic_state : public d1::task {
 public:
+    task_with_dynamic_state()
+        : m_state(nullptr)
+    {}
+
     task_with_dynamic_state(d1::small_object_allocator& alloc)
         : m_state(nullptr)
         , m_allocator(alloc)
@@ -149,8 +153,19 @@ public:
     }
 private:
     task_dynamic_state* m_state;
-    d1::small_object_allocator& m_allocator;
+protected:
+    d1::small_object_allocator m_allocator;
 };
+
+inline task_dynamic_state* get_current_task_dynamic_state() {
+    d1::task* t = d1::current_task();
+    __TBB_ASSERT_RELEASE(t != nullptr, "the function was called outside of task body");
+    
+    task_with_dynamic_state* t_with_state = dynamic_cast<task_with_dynamic_state*>(t);
+    __TBB_ASSERT_RELEASE(t_with_state != nullptr, "the function was called outside of task_group task body");
+    
+    return t_with_state->get_dynamic_state();
+}
 
 class successor_vertex : public d1::reference_vertex {
 public:
@@ -201,7 +216,9 @@ class task_handle_task
     std::uint64_t m_version_and_traits{};
     d1::wait_tree_vertex_interface* m_wait_tree_vertex;
     d1::task_group_context& m_ctx;
+#if !__TBB_PREVIEW_TASK_GROUP_EXTENSIONS
     d1::small_object_allocator m_allocator;
+#endif
 public:
     void finalize(const d1::execution_data* ed = nullptr) {
         if (ed) {
@@ -218,7 +235,9 @@ public:
 #endif
           m_wait_tree_vertex(vertex)
         , m_ctx(ctx)
+#if !__TBB_PREVIEW_TASK_GROUP_EXTENSIONS
         , m_allocator(alloc)
+#endif
     {
         suppress_unused_warning(m_version_and_traits);
         m_wait_tree_vertex->reserve();
@@ -379,6 +398,17 @@ inline void task_dynamic_state::release_continuation() {
         // successor task is guaranteed to be task_handle_task, safe to use static_cast
         d1::spawn(*task, static_cast<task_handle_task*>(task)->ctx());
     }
+}
+
+inline d1::task* combine_tasks(d1::task* body_task, task_with_dynamic_state* successor_task) {
+    if (body_task == nullptr) return successor_task;
+    if (successor_task == nullptr) return body_task;
+
+    // There is a task returned from the body and the successor task - bypassing the body task
+    // and spawning the successor one
+    // successor task is guaranteed to be task_handle_task, it is safe to use static_cast
+    d1::spawn(*successor_task, static_cast<task_handle_task*>(successor_task)->ctx());
+    return body_task;
 }
 
 class task_tracker {
