@@ -136,17 +136,14 @@ endif()
 
 if (WIN32)
     if (TBB_VERIFY_DEPENDENCY_SIGNATURE)
-        message(STATUS
-            "Dependency signature verification during dynamic linking in run-time is ENABLED.")
+        message(STATUS "Dependency signature verification during dynamic linking in run-time is ENABLED.")
     elseif (NOT DEFINED TBB_VERIFY_DEPENDENCY_SIGNATURE)
         message(WARNING
             "Dependency signature verification during dynamic linking in run-time is disabled by "
             "default. This may lead to security vulnerabilities. See installation section in "
             "oneTBB documentation for more details.")
     else()
-        message(STATUS
-            "Dependency signature verification during dynamic linking in run-time is explicitly"
-            " DISABLED.")
+        message(STATUS "Dependency signature verification during dynamic linking in run-time is DISABLED")
     endif()
     option(TBB_VERIFY_DEPENDENCY_SIGNATURE
         "Verify signature of a dependency during its dynamic linking at run-time on Windows*" OFF)
