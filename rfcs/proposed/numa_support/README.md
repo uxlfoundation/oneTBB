@@ -126,9 +126,9 @@ in the two loops are from the same NUMA nodes? Or is this too much to expect wit
 See [sub-RFC for increased availability of NUMA API](tbbbind-link-static-hwloc.org)
 
 
-### Add NUMA-constrained arenas
+### Create NUMA-constrained arenas
 
-See [sub-RFC for creation and use of NUMA-constrained arenas](numa-arenas-creation-and-use.org)
+See [sub-RFC for creation of NUMA-constrained arenas](create-numa-arenas.md)
 
 ### NUMA-aware allocation
 
