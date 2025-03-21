@@ -1321,6 +1321,11 @@ TEST_CASE("test task_tracker") {
 
         tg.run_and_wait(std::move(task4_handle));
         CHECK_MESSAGE(task_placeholder == 4, "Task body was not executed");
+
+        tbb::task_handle empty_handle;
+        CHECK(task3_tracker2);
+        task3_tracker2 = empty_handle;
+        CHECK_MESSAGE(!task3_tracker2, "Non-empty task_tracker after move assignment from empty handle");
     }
     {
         // Test submission through enqueue
@@ -1337,7 +1342,6 @@ TEST_CASE("test task_tracker") {
             CHECK_MESSAGE(enqueue_task_tracker.is_completed(), "Unexpected result for is_completed for enqueue task");
             CHECK_MESSAGE(task_placeholder == 5, "Task body was not executed");
         }
-
         {
             tbb::task_tracker enqueue_task_tracker;
             arena.execute([&] {
