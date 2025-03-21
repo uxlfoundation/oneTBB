@@ -154,9 +154,7 @@ public:
 
 class task_handle {
     struct task_handle_task_finalizer_t{
-        void operator()(task_handle_task* p){
-            p->finalize();
-        }
+        void operator()(task_handle_task* p){ p->finalize(); }
     };
     using handle_impl_t = std::unique_ptr<task_handle_task, task_handle_task_finalizer_t>;
 
