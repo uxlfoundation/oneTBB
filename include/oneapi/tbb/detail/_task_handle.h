@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2020-2024 Intel Corporation
+    Copyright (c) 2020-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -132,24 +132,35 @@ inline void internal_make_edge(task_dynamic_state* pred, task_dynamic_state* suc
 
 class task_with_dynamic_state : public d1::task {
 public:
+    // TODO: should m_state be lazy-initialized while creating task_tracker or adding dependencies?
+    // Called while constructing the function_stack_task
+    task_with_dynamic_state()
+        : m_state(m_allocator.new_object<task_dynamic_state>(m_allocator))
+    {
+        __TBB_ASSERT(m_state != nullptr, "Failed to create task_dynamic_state");
+        m_state->reserve();
+    }
+
     task_with_dynamic_state(d1::small_object_allocator& alloc)
-        : m_state(nullptr)
-        , m_allocator(alloc)
-    {}
+        : m_allocator(alloc)
+        , m_state(m_allocator.new_object<task_dynamic_state>(m_allocator))
+    {
+        __TBB_ASSERT(m_state != nullptr, "Failed to create task_dynamic_state");
+        m_state->reserve();
+    }
+
+    virtual ~task_with_dynamic_state() {
+        __TBB_ASSERT(m_state != nullptr, nullptr);
+        m_state->release();
+    }
 
     task_dynamic_state* get_dynamic_state() {
-        if (m_state == nullptr) {
-            m_state = m_allocator.new_object<task_dynamic_state>(this, m_allocator);
-        }
         return m_state;
     }
-
-    task_dynamic_state* get_dynamic_state_if_created() {
-        return m_state;
-    }
+protected:
+    d1::small_object_allocator m_allocator;
 private:
     task_dynamic_state* m_state;
-    d1::small_object_allocator& m_allocator;
 };
 
 class successor_vertex : public d1::reference_vertex {
@@ -233,12 +244,7 @@ public:
 
 class task_handle {
     struct task_handle_task_finalizer_t{
-        void operator()(task_handle_task* p){
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-            p->get_dynamic_state()->release();
-#endif
-            p->finalize();
-        }
+        void operator()(task_handle_task* p){ p->finalize(); }
     };
     using handle_impl_t = std::unique_ptr<task_handle_task, task_handle_task_finalizer_t>;
 
@@ -262,11 +268,7 @@ private:
     friend class task_tracker;
 #endif
 
-    task_handle(task_handle_task* t) : m_handle {t} {
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        m_handle->get_dynamic_state()->reserve();
-#endif
-    }
+    task_handle(task_handle_task* t) : m_handle {t} {}
 
     d1::task* release() {
        return m_handle.release();
@@ -286,8 +288,7 @@ struct task_handle_accessor {
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
     static void mark_task_submitted(task_handle& th) {
         __TBB_ASSERT(th.m_handle, "mark_task_submitted does not expect empty task_handle");
-        task_dynamic_state* state = get_task_dynamic_state(th);
-        if (state != nullptr) state->mark_submitted();
+        th.m_handle->get_dynamic_state()->mark_submitted();
     }
 
     static task_dynamic_state* get_task_dynamic_state(task_handle& th) {
@@ -397,7 +398,6 @@ public:
         other.m_task_state = nullptr;
     }
 
-    // TODO: explicit
     task_tracker(const task_handle& th)
         : m_task_state(th ? th.m_handle->get_dynamic_state() : nullptr)
     {
@@ -405,7 +405,9 @@ public:
         if (m_task_state) m_task_state->reserve();
     }
 
-    ~task_tracker() = default;
+    ~task_tracker() {
+        if (m_task_state) m_task_state->release();
+    }
 
     task_tracker& operator=(const task_tracker& other) {
         if (this != &other) {
@@ -431,7 +433,6 @@ public:
         return *this;
     }
 
-    // TODO: explicit?
     task_tracker& operator=(const task_handle& th) {
         // Release co-ownership on the previously tracked dynamic state
         if (m_task_state) m_task_state->release();
@@ -442,6 +443,8 @@ public:
             // Reserve co-ownership on the new dynamic state
             __TBB_ASSERT(m_task_state != nullptr, "No state in the non-empty task_handle");
             m_task_state->reserve();
+        } else {
+            m_task_state = nullptr;
         }
         return *this;
     }
