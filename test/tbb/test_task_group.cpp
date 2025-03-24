@@ -1602,9 +1602,8 @@ TEST_CASE("test task_group dynamic dependencies") {
         test_predecessors<submit_function::run>();
         test_predecessors<submit_function::run_and_wait>();
 
-        // TODO: debug sporadic hangs
-        // test_predecessors<submit_function::arena_enqueue>();
-        // test_predecessors<submit_function::this_arena_enqueue>();
+        test_predecessors<submit_function::arena_enqueue>();
+        test_predecessors<submit_function::this_arena_enqueue>();
 
         test_current_task_successors<test_successors_first_task::task_handle_task>();
         test_current_task_successors<test_successors_first_task::run_task>();

@@ -416,17 +416,6 @@ inline void task_dynamic_state::release_continuation() {
     }
 }
 
-inline d1::task* combine_tasks(d1::task* body_task, task_with_dynamic_state* successor_task) {
-    if (body_task == nullptr) return successor_task;
-    if (successor_task == nullptr) return body_task;
-
-    // There is a task returned from the body and the successor task - bypassing the body task
-    // and spawning the successor one
-    // successor task is guaranteed to be task_handle_task, it is safe to use static_cast
-    d1::spawn(*successor_task, static_cast<task_handle_task*>(successor_task)->ctx());
-    return body_task;
-}
-
 class task_tracker {
 public:
     task_tracker() : m_task_state(nullptr) {}
