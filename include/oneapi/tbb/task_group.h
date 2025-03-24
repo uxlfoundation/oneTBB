@@ -484,9 +484,7 @@ class function_stack_task
         return nullptr;
     }
 public:
-    function_stack_task(const F& f, d1::wait_tree_vertex_interface* vertex)
-    : m_func(f), m_wait_tree_vertex(vertex)
-    {
+    function_stack_task(const F& f, d1::wait_tree_vertex_interface* vertex) : m_func(f), m_wait_tree_vertex(vertex) {
         m_wait_tree_vertex->reserve();
     }
 };
