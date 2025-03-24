@@ -78,6 +78,19 @@ template<typename F>
 d1::task* task_ptr_or_nullptr(F&& f);
 }
 
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+inline d1::task* combine_tasks(d1::task* body_task, task_with_dynamic_state* successor_task) {
+    if (body_task == nullptr) return successor_task;
+    if (successor_task == nullptr) return body_task;
+
+    // There is a task returned from the body and the successor task - bypassing the body task
+    // and spawning the successor one
+    // successor task is guaranteed to be task_handle_task, it is safe to use static_cast
+    d1::spawn(*successor_task, static_cast<task_handle_task*>(successor_task)->ctx());
+    return body_task;
+}
+#endif
+
 template<typename F>
 class function_task : public task_handle_task  {
     //TODO: apply empty base optimization here
@@ -88,24 +101,8 @@ private:
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
         task* next_task = task_ptr_or_nullptr(m_func);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        task_dynamic_state* state = this->get_dynamic_state_if_created();
-        
-        if (state) {
-            task_with_dynamic_state* successor_task = state->complete_task();
-
-            // If one of the successors of the current task can be executed
-            if (successor_task != nullptr) {
-                if (next_task != nullptr) {
-                    // There was a task returned from the current task body - bypassing the returned task 
-                    // and spawning the successor task
-                    // successor task is guaranteed to be task_handle_task, safe to use static_cast
-                    d1::spawn(*successor_task, static_cast<task_handle_task*>(successor_task)->ctx());
-                } else {
-                    // No task was returned from the current task body - bypassing the successor task
-                    next_task = successor_task;
-                }
-            }
-        }
+        task_with_dynamic_state* successor_task = this->get_dynamic_state()->complete_task();
+        next_task = combine_tasks(next_task, successor_task);
 #endif
         finalize(&ed);
         return next_task;
@@ -476,7 +473,8 @@ class function_stack_task
     task* execute(d1::execution_data&) override {
         task* res = d2::task_ptr_or_nullptr(m_func);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        this->get_dynamic_state()->complete_task();
+        task_with_dynamic_state* successor_task = this->get_dynamic_state()->complete_task();
+        __TBB_ASSERT(successor_task == nullptr, "function_stack_task cannot have successors yet");
 #endif
         finalize();
         return res;
