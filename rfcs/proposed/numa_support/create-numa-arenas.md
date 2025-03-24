@@ -41,6 +41,27 @@ The initialization code equivalent to the example above would be:
   std::vector<tbb::task_group> task_groups(arenas.size());
 ```
 
+The rest of the code in that example might be rewritten with the API proposed in
+[Waiting in a task arena](../task_arena_waiting/readme.md):
+
+```c++
+  // enqueue work to all but the first arena, using the task groups to track work
+  for (int i = 1; i < arenas.size(); i++)
+    arenas[i].enqueue(
+      [] { tbb::parallel_for(0, N, [](int j) { f(w); }); }, 
+      task_groups[i]
+    );
+
+  // directly execute the work to completion in the remaining arena
+  arenas[0].execute([] {
+    tbb::parallel_for(0, N, [](int j) { f(w); });
+  });
+
+  // join the other arenas to wait on their task groups
+  for (int i = 1; i < arenas.size(); i++)
+    arenas[i].wait_for(task_groups[i]);
+```
+
 ### Public API
 
 The function has the following signature:
@@ -101,16 +122,58 @@ See the "universal function" alternative below for related considerations.
 
 ### Sub-classing `task_arena`
 
-The earlier proposal [PR #1559](https://github.com/uxlfoundation/oneTBB/pull/1559) suggested to add
-a new class derived from `task_arena` which would also provide a method to wait for work completion.
-It aims to simplify the whole usage example as much as possible. That proposal also includes
-a factory function to create a set of such arenas constrained by NUMA domains.
+The earlier proposal [PR #1559](https://github.com/uxlfoundation/oneTBB/pull/1559) also aimed to simplify
+the typical usage pattern of NUMA arenas, with possibility to extend to other similar cases.
 
-While suggesting very concise and "bullet-proof" API for the problem at question, that approach has
+It suggested to add a new class derived from `task_arena` which would have "only necessary methods
+to allow submission and waiting of a parallel work", by selectively exposing methods of `task_arena`
+and also adding a method to wait for work completion. Instances of such class could only be created
+via a factory function that would instantiate a ready-to-use arena for each of the NUMA domains.
+
+```c++
+class constrained_task_arena : protected task_arena {
+public:
+    using task_arena::is_active;
+    using task_arena::terminate;
+    using task_arena::max_concurrency;
+
+    using task_arena::enqueue;
+    using task_arena::execute; // not in the original proposal
+
+    void wait();
+    friend std::vector<constrained_task_arena> initialize_numa_constrained_arenas();
+};
+```
+
+In the code example used in this document, that API (with the method `execute` also exposed)
+would fully eliminate explicit use of `task_group`:
+
+```c++
+  std::vector<tbb::constrained_task_arena> arenas =
+    tbb::initialize_numa_constrained_arenas();
+
+  // enqueue work to all but the first arena
+  for (int i = 1; i < arenas.size(); i++)
+    arenas[i].enqueue([] {
+      tbb::parallel_for(0, N, [](int j) { f(w); });
+    });
+
+  // directly execute the work to completion in the remaining arena
+  arenas[0].execute([] {
+    tbb::parallel_for(0, N, [](int j) { f(w); });
+  });
+
+  // join the other arenas to wait on their task groups
+  for (int i = 1; i < arenas.size(); i++)
+    arenas[i].wait();
+```
+
+While suggesting more concise and error-protected API for the problem at question, that approach has
 its downsides:
 - Adding a special "flavour" of `task_arena` potentially increases the library learning curve and
   might create confusion about which class to use in which conditions, and how these interoperate.
 - It seems very specialized, capable to only address specific and quite narrow set of use cases.
+- Arenas are pre-initialized and so could not be adjusted after creation.
 
 Our proposal, instead, aims at a single usability aspect with incremental improvements/extensions
 to the existing oneTBB classes and usage patterns, leaving other aspects to complementary proposals.
