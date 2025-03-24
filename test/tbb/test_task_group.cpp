@@ -1321,6 +1321,11 @@ TEST_CASE("test task_tracker") {
 
         tg.run_and_wait(std::move(task4_handle));
         CHECK_MESSAGE(task_placeholder == 4, "Task body was not executed");
+
+        tbb::task_handle empty_handle;
+        CHECK(task3_tracker2);
+        task3_tracker2 = empty_handle;
+        CHECK_MESSAGE(!task3_tracker2, "Non-empty task_tracker after move assignment from empty handle");
     }
     {
         // Test submission through enqueue
@@ -1337,7 +1342,6 @@ TEST_CASE("test task_tracker") {
             CHECK_MESSAGE(enqueue_task_tracker.is_completed(), "Unexpected result for is_completed for enqueue task");
             CHECK_MESSAGE(task_placeholder == 5, "Task body was not executed");
         }
-
         {
             tbb::task_tracker enqueue_task_tracker;
             arena.execute([&] {
@@ -1458,7 +1462,7 @@ void test_not_submitted_predecessors() {
 template <submit_function SubmitFunction, bool AlwaysCompleted>
 void test_submitted_predecessors() {
     tbb::task_arena arena;
-    const std::size_t num_predecessors = 100;
+    const std::size_t num_predecessors = 500;
     tbb::task_group tg;
     std::atomic<std::size_t> task_placeholder{0};
 
