@@ -471,13 +471,13 @@ class function_stack_task
         m_wait_tree_vertex->release();
     }
     task* execute(d1::execution_data&) override {
-        task* res = d2::task_ptr_or_nullptr(m_func);
+        task* next_task = d2::task_ptr_or_nullptr(m_func);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
         task_with_dynamic_state* successor_task = this->get_dynamic_state()->complete_task();
-        __TBB_ASSERT(successor_task == nullptr, "function_stack_task cannot have successors yet");
+        next_task = combine_tasks(next_task, successor_task);
 #endif
         finalize();
-        return res;
+        return next_task;
     }
     task* cancel(d1::execution_data&) override {
         finalize();
