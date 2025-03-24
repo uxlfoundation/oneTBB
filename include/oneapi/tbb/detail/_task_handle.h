@@ -68,6 +68,7 @@ private:
 };
 
 inline task_with_dynamic_state* release_successors_list(successors_list_node* list);
+
 class task_dynamic_state {
     enum class task_status {
         no_status = 0,
@@ -310,15 +311,12 @@ struct task_handle_accessor {
 
     static void release_continuation(task_handle& th) {
         __TBB_ASSERT(th.m_handle, "release_continuation does not expect empty task_handle");
-        task_dynamic_state* state = get_task_dynamic_state(th);
-        __TBB_ASSERT(state != nullptr, "dynamic state was not created for task with dependencies");
-        state->release_continuation();
+        th.m_handle->get_dynamic_state()->release_continuation();
     }
 
     static bool has_dependencies(task_handle& th) {
         __TBB_ASSERT(th.m_handle, "has_dependency does not expect empty task_handle");
-        task_dynamic_state* state = get_task_dynamic_state(th);
-        return state != nullptr ? state->has_dependencies() : false;
+        return th.m_handle->get_dynamic_state()->has_dependencies();
     }
 #endif
 };

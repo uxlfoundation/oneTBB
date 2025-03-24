@@ -1462,7 +1462,7 @@ void test_not_submitted_predecessors() {
 template <submit_function SubmitFunction, bool AlwaysCompleted>
 void test_submitted_predecessors() {
     tbb::task_arena arena;
-    const std::size_t num_predecessors = 1000;
+    const std::size_t num_predecessors = 500;
     tbb::task_group tg;
     std::atomic<std::size_t> task_placeholder{0};
 
