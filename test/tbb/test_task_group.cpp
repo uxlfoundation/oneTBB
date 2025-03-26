@@ -1457,10 +1457,10 @@ void test_not_submitted_predecessors() {
                   "Unexpected result for task graph execution");
 }
 
-// AlwaysCompleted flag means creating a set of predecessors that a guaranteed to be completed
+// all_predecessors_completed flag means creating a set of predecessors that a guaranteed to be completed
 // before setting dependencies
-template <submit_function SubmitFunction, bool AlwaysCompleted>
-void test_submitted_predecessors() {
+template <submit_function SubmitFunction>
+void test_submitted_predecessors(bool all_predecessors_completed) {
     tbb::task_arena arena;
     const std::size_t num_predecessors = 500;
     tbb::task_group tg;
@@ -1474,7 +1474,7 @@ void test_submitted_predecessors() {
         submit<SubmitFunction>(std::move(h), tg, arena);
     }
 
-    if (AlwaysCompleted) {
+    if (all_predecessors_completed) {
         tg.wait();
 
         for (tbb::task_tracker& tracker : predecessors) {
@@ -1493,7 +1493,7 @@ void test_submitted_predecessors() {
         tbb::task_group::make_edge(predecessors[i], successor_task);
     }
 
-    if (AlwaysCompleted) {
+    if (all_predecessors_completed) {
         CHECK_MESSAGE(task_placeholder == num_predecessors, "successor task completed before being submitted");
     }
     CHECK_MESSAGE(!successor_tracker.is_completed(), "successor task completed before being submitted");
@@ -1507,8 +1507,8 @@ void test_submitted_predecessors() {
 template <submit_function SubmitFunction>
 void test_predecessors() {
     test_not_submitted_predecessors<SubmitFunction>();
-    test_submitted_predecessors<SubmitFunction, /*AlwaysCompleted = */true>();
-    test_submitted_predecessors<SubmitFunction, /*AlwaysCompleted = */false>();
+    test_submitted_predecessors<SubmitFunction>(/*all_predecessors_completed = */true);
+    test_submitted_predecessors<SubmitFunction>(/*all_predecessors_completed = */false);
 }
 
 TEST_CASE("test task_group dynamic dependencies") {

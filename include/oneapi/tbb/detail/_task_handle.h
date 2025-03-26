@@ -99,7 +99,8 @@ public:
 
     task_with_dynamic_state* complete_task() {
         m_task_status.store(task_status::completed, std::memory_order_release);
-        return release_successors_list(m_successors_list_head.exchange(reinterpret_cast<successors_list_node*>(this)));
+        successors_list_node* list = fetch_successors_list();
+        return release_successors_list(list);
     }
 
     bool was_submitted() const {
@@ -141,7 +142,11 @@ public:
     }
 
     bool is_successors_list_alive() const {
-        return m_successors_list_head.load(std::memory_order_acquire) == reinterpret_cast<const successors_list_node*>(this);
+        return m_successors_list_head.load(std::memory_order_acquire) == reinterpret_cast<successors_list_node*>(~std::uintptr_t(0));
+    }
+
+    successors_list_node* fetch_successors_list() {
+        return m_successors_list_head.exchange(reinterpret_cast<successors_list_node*>(~std::uintptr_t(0)));
     }
 
 private:
