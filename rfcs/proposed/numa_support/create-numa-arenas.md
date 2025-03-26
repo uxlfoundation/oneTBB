@@ -221,4 +221,6 @@ arenas with different priorities. We do not however recall any requests to simpl
 - The proposal does not consider arena priority, simply keeping the default `priority::normal`.
   Are there use cases for pre-setting priorities? Similarly for the experimental thread leave policy.
 - Are there more practical use cases which could justify the universal function approach?
+- Need to consider alternatives to silently ignoring `numa_id` in constraints, such as an exception
+  or undefined behavior.
 - Are there any reasons for the API to first go out as an experimental feature?
