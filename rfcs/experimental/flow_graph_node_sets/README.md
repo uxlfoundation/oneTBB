@@ -200,7 +200,7 @@ to be created ``output_port<0>(n1) --> n2`` and ``output_port<1>(n1) --> n3``.
   }
 ```
 
-When run, the above code results in:
+When run, at the accuracy of the `n2` and `n3` execution order the above code results in:
 
 ```
   1:100
