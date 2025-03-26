@@ -8,7 +8,7 @@ node `input` has three successors.
 
 <img src="graph_with_many_edges.png" width=500>
 
-Without the proposed extensions, three separate calls to `make_edge` are require to connect the
+Without the proposed extensions, three separate calls to `make_edge` are required to connect the
 single `input` node to its three successors: 
 
 ```cpp
