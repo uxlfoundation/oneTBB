@@ -6,7 +6,7 @@ The flow graph API lacks a simple way to create multiple edges with a single cal
 limitation is verbose, less-readable code.  For example, the following picture shows a flow graph where the
 node `input` has three successors.
 
-<img src="graph_with_many_edges.png" width=500>
+<img src="graph_with_many_edges.png">
 
 Without the proposed extensions, three separate calls to `make_edge` are require to connect the
 single `input` node to its three successors: 
@@ -54,7 +54,8 @@ There are four main parts to the extension:
 In this proposal, `node_set` is an exposition-only name for the type returned from the
 `make_node_set` function. The `make_node_set` function template creates a set of nodes that
 can be passed as arguments to the `make_edges`, `follows` and `precedes` functions that are
-described in later sections.
+described in later sections. All nodes in a `node_set` should be from the same graph. Including
+nodes from more than one graph in a `node_set` results in undefined behavior.
 
 ```cpp
     // node_set is an exposition-only name for the type returned from make_node_set function
@@ -69,7 +70,7 @@ The make_edges function template creates edges between a single node and each no
 
 There are two ways to connect nodes in a set and a single node using make_edges:
 
-<img src="make_edges.png" width=600>
+<img src="make_edges.png">
 
 The order of the arguments determines the predecessor / successor relationship. The node or nodes represented
 by the left argument becomes the predecessor or predecessors of the node or nodes represented by the right
@@ -253,4 +254,9 @@ The following conditions need to be met to move the feature from experimental to
 * Collecting feedback on user experience confirming the choices made on the open questions and limitations:
   * Limitation that constructors can be used to set predecessors or successors but not both.
   * The multiport node rule that makes edges from each node in the set to the corresponding port.
+  * Should we enforce that all nodes in a `node_set` be from the same graph?
+  * Should support for `node_set` be added to composite node? It currently has no support.
+  * What deduction guides should be added to support CTAD?
 * The corresponding oneTBB specification update should be done backed by the user feedback provided.
+  * Should we keep `node_set` unspecified or define it.
+  * Should the ordering (preceding/following) become the property of a node set?
