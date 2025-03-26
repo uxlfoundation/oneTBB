@@ -44,10 +44,10 @@ This experimental feature is described in more detail in the
 
 There are four main parts to the extension:
 
-- make_node_set function template
-- make_edges function template
+- `make_node_set` function template
+- `make_edges` function template
 - two additional constructors for each flow graph node
-- follows and precedes function templates
+- `follows` and `precedes` function templates
 
 ### Node Sets
 
