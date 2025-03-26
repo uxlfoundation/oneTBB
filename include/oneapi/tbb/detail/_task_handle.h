@@ -99,7 +99,7 @@ public:
 
     task_with_dynamic_state* complete_task() {
         m_task_status.store(task_status::completed, std::memory_order_release);
-        return release_successors_list(m_successors_list_head.exchange(nullptr));
+        return release_successors_list(m_successors_list_head.exchange(reinterpret_cast<successors_list_node*>(this)));
     }
 
     bool was_submitted() const {
@@ -138,6 +138,10 @@ public:
         }
         __TBB_ASSERT(current_continuation_vertex != nullptr, "Failed to get continuation vertex");
         return current_continuation_vertex;
+    }
+
+    bool is_successors_list_alive() const {
+        return m_successors_list_head.load(std::memory_order_acquire) == reinterpret_cast<const successors_list_node*>(this);
     }
 
 private:
@@ -200,7 +204,7 @@ public:
     task_with_dynamic_state* release_bypass(std::uint32_t delta = 1) {
         task_with_dynamic_state* next_task = nullptr;
 
-        std::uint32_t ref = m_ref_count.fetch_sub(static_cast<std::uint64_t>(delta)) - static_cast<uint64_t>(delta);
+        std::uint64_t ref = m_ref_count.fetch_sub(static_cast<std::uint64_t>(delta)) - static_cast<uint64_t>(delta);
 
         if (ref == 0) {
             // TODO: can we skip this step since the task would be spawned anyway ?
@@ -362,7 +366,7 @@ inline task_with_dynamic_state* release_successors_list(successors_list_node* no
 inline void task_dynamic_state::add_successor(successor_vertex* successor) {
     __TBB_ASSERT(successor != nullptr, nullptr);
 
-    if (!is_completed()) {
+    if (!is_successors_list_alive()) {
         successor->reserve();
 
         d1::small_object_allocator alloc;
@@ -370,7 +374,8 @@ inline void task_dynamic_state::add_successor(successor_vertex* successor) {
         successors_list_node* current_successors_list_head = m_successors_list_head.load(std::memory_order_acquire);
         new_successor_node->set_next_node(current_successors_list_head);
 
-        if (is_completed()) {
+        // TODO: do we need is_completed check?
+        if (is_successors_list_alive()) {
             new_successor_node->finalize();
             successor->release();
             return;
@@ -378,7 +383,7 @@ inline void task_dynamic_state::add_successor(successor_vertex* successor) {
 
         while (!m_successors_list_head.compare_exchange_strong(current_successors_list_head, new_successor_node)) {
             // Other thread updated the head of the list
-            if (is_completed()) {
+            if (is_successors_list_alive()) {
                 // Current task has completed while we tried to insert the successor to the list
                 new_successor_node->finalize();
                 successor->release();
