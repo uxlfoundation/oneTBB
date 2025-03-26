@@ -8,7 +8,7 @@ node `input` has three successors.
 
 <img src="graph_with_many_edges.png">
 
-Without the proposed extensions, three separate calls to `make_edge` are require to connect the
+Without the proposed extensions, three separate calls to `make_edge` are required to connect the
 single `input` node to its three successors: 
 
 ```cpp
@@ -44,10 +44,10 @@ This experimental feature is described in more detail in the
 
 There are four main parts to the extension:
 
-- make_node_set function template
-- make_edges function template
+- `make_node_set` function template
+- `make_edges` function template
 - two additional constructors for each flow graph node
-- follows and precedes function templates
+- `follows` and `precedes` function templates
 
 ### Node Sets
 
@@ -201,7 +201,7 @@ to be created ``output_port<0>(n1) --> n2`` and ``output_port<1>(n1) --> n3``.
   }
 ```
 
-When run, the above code results in:
+When run, at the accuracy of the `n2` and `n3` execution order the above code results in:
 
 ```
   1:100
