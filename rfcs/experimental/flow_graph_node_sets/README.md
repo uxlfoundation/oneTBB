@@ -3,7 +3,7 @@
 ## Introduction
 
 The flow graph API lacks a simple way to create multiple edges with a single call. The result of this
-limitation is verbose, less-readable code.  For example, the follow pciture shows a flow graph where the
+limitation is verbose, less-readable code.  For example, the following picture shows a flow graph where the
 node `input` has three successors.
 
 <img src="graph_with_many_edges.png" width=500>
