@@ -1364,22 +1364,20 @@ enum class submit_function {
     this_arena_enqueue = 3
 };
 
-template <submit_function SubmitFunction>
-void submit(tbb::task_handle&& handle, tbb::task_group& group, tbb::task_arena& arena) {
-    if (SubmitFunction == submit_function::run || SubmitFunction == submit_function::run_and_wait) {
+void submit(submit_function func, tbb::task_handle&& handle, tbb::task_group& group, tbb::task_arena& arena) {
+    if (func == submit_function::run || func == submit_function::run_and_wait) {
         group.run(std::move(handle));
-    } else if (SubmitFunction == submit_function::arena_enqueue) {
+    } else if (func == submit_function::arena_enqueue) {
         arena.enqueue(std::move(handle));
     } else {
-        CHECK_MESSAGE(SubmitFunction == submit_function::this_arena_enqueue, "new submit function added but not handled");
+        CHECK_MESSAGE(func == submit_function::this_arena_enqueue, "new submit function added but not handled");
         tbb::this_task_arena::enqueue(std::move(handle));
     }
 }
 
-template <submit_function SubmitFunction>
-void submit_and_wait(tbb::task_handle&& handle, tbb::task_group& group, tbb::task_arena& arena) {
-    if (SubmitFunction != submit_function::run_and_wait) {
-        submit<SubmitFunction>(std::move(handle), group, arena);
+void submit_and_wait(submit_function func, tbb::task_handle&& handle, tbb::task_group& group, tbb::task_arena& arena) {
+    if (func != submit_function::run_and_wait) {
+        submit(func, std::move(handle), group, arena);
         group.wait();
     } else {
         group.run_and_wait(std::move(handle));
@@ -1404,8 +1402,7 @@ struct combine_task {
     std::shared_ptr<std::size_t> right_leaf;
 };
 
-template <submit_function SubmitFunction>
-void test_not_submitted_predecessors() {
+void test_not_submitted_predecessors(submit_function submit_function_tag) {
     tbb::task_arena arena;
     constexpr std::size_t depth = 100; 
 
@@ -1432,8 +1429,8 @@ void test_not_submitted_predecessors() {
         tbb::task_group::make_edge(left_leaf_tracker, combine);
         tbb::task_group::make_edge(right_leaf_task, combine);
 
-        submit<SubmitFunction>(std::move(combine), tg, arena);
-        submit<SubmitFunction>(std::move(right_leaf_task), tg, arena);
+        submit(submit_function_tag, std::move(combine), tg, arena);
+        submit(submit_function_tag, std::move(right_leaf_task), tg, arena);
 
         left_leaf_tracker = combine_tracker;
         left_leaf_placeholder = combine_placeholder;
@@ -1443,7 +1440,7 @@ void test_not_submitted_predecessors() {
     CHECK_MESSAGE(*left_leaf_placeholder == 0, "Receiving results from incomplete task graph");
 
     // "Run" the graph
-    submit_and_wait<SubmitFunction>(std::move(deepest_left_leaf_task), tg, arena);
+    submit_and_wait(submit_function_tag, std::move(deepest_left_leaf_task), tg, arena);
 
     std::size_t expected_result = 0;
     std::size_t counter = 0;
@@ -1459,8 +1456,7 @@ void test_not_submitted_predecessors() {
 
 // all_predecessors_completed flag means creating a set of predecessors that a guaranteed to be completed
 // before setting dependencies
-template <submit_function SubmitFunction>
-void test_submitted_predecessors(bool all_predecessors_completed) {
+void test_submitted_predecessors(submit_function submit_function_tag, bool all_predecessors_completed) {
     tbb::task_arena arena;
     const std::size_t num_predecessors = 500;
     tbb::task_group tg;
@@ -1471,7 +1467,7 @@ void test_submitted_predecessors(bool all_predecessors_completed) {
     for (std::size_t i = 0; i < num_predecessors; ++i) {
         tbb::task_handle h = tg.defer([&] { ++task_placeholder; });
         predecessors[i] = h;
-        submit<SubmitFunction>(std::move(h), tg, arena);
+        submit(submit_function_tag, std::move(h), tg, arena);
     }
 
     if (all_predecessors_completed) {
@@ -1498,27 +1494,26 @@ void test_submitted_predecessors(bool all_predecessors_completed) {
     }
     CHECK_MESSAGE(!successor_tracker.is_completed(), "successor task completed before being submitted");
 
-    submit_and_wait<SubmitFunction>(std::move(successor_task), tg, arena);
+    submit_and_wait(submit_function_tag, std::move(successor_task), tg, arena);
 
     CHECK_MESSAGE(task_placeholder == num_predecessors + 1, "successor task was not completed");
     CHECK_MESSAGE(successor_tracker.is_completed(), "successor task was not completed");
 }
 
-template <submit_function SubmitFunction>
-void test_predecessors() {
-    test_not_submitted_predecessors<SubmitFunction>();
-    test_submitted_predecessors<SubmitFunction>(/*all_predecessors_completed = */true);
-    test_submitted_predecessors<SubmitFunction>(/*all_predecessors_completed = */false);
+void test_predecessors(submit_function submit_function_tag) {
+    test_not_submitted_predecessors(submit_function_tag);
+    test_submitted_predecessors(submit_function_tag, /*all_predecessors_completed = */true);
+    test_submitted_predecessors(submit_function_tag, /*all_predecessors_completed = */false);
 }
 
 TEST_CASE("test task_group dynamic dependencies") {
     for (unsigned p = MinThread; p <= MaxThread; ++p) {
         tbb::global_control limit(tbb::global_control::max_allowed_parallelism, p);
 
-        test_predecessors<submit_function::run>();
-        test_predecessors<submit_function::run_and_wait>();
-        test_predecessors<submit_function::arena_enqueue>();
-        test_predecessors<submit_function::this_arena_enqueue>();
+        test_predecessors(submit_function::run);
+        test_predecessors(submit_function::run_and_wait);
+        test_predecessors(submit_function::arena_enqueue);
+        test_predecessors(submit_function::this_arena_enqueue);
     }
 }
 #endif
