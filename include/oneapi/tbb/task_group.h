@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -87,6 +87,9 @@ private:
     d1::task* execute(d1::execution_data& ed) override {
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
         task* res = task_ptr_or_nullptr(m_func);
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        this->get_dynamic_state()->complete_task();
+#endif
         finalize(&ed);
         return res;
     }
@@ -440,7 +443,13 @@ class isolated_task_group;
 #endif
 
 template <typename F>
-class function_stack_task : public d1::task {
+class function_stack_task
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    : public task_with_dynamic_state
+#else
+    : public d1::task
+#endif
+{
     const F& m_func;
     d1::wait_tree_vertex_interface* m_wait_tree_vertex;
 
@@ -449,6 +458,9 @@ class function_stack_task : public d1::task {
     }
     task* execute(d1::execution_data&) override {
         task* res = d2::task_ptr_or_nullptr(m_func);
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        this->get_dynamic_state()->complete_task();
+#endif
         finalize();
         return res;
     }
@@ -487,6 +499,9 @@ protected:
 
         using acs = d2::task_handle_accessor;
         __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        acs::mark_task_submitted(h);
+#endif
 
         bool cancellation_status = false;
         try_call([&] {
@@ -580,6 +595,9 @@ public:
 
         using acs = d2::task_handle_accessor;
         __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        acs::mark_task_submitted(h);
+#endif
 
         d1::spawn(*acs::release(h), context());
     }
@@ -701,6 +719,9 @@ using detail::d1::is_current_task_group_canceling;
 using detail::r1::missing_wait;
 
 using detail::d2::task_handle;
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+using detail::d2::task_tracker;
+#endif
 }
 
 } // namespace tbb
