@@ -42,7 +42,7 @@ This document provides details about hardware, operating system, and software pr
   - Microsoft* Windows* 11
   - Microsoft* Windows* Server 2019
   - Microsoft* Windows* Server 2022
-  - - Microsoft* Windows* Server 2025
+  - Microsoft* Windows* Server 2025
 - Systems with Linux* operating systems:
   - Amazon* Linux 2023
   - Debian* 11, 12
@@ -52,7 +52,9 @@ This document provides details about hardware, operating system, and software pr
   - SuSE* Linux* Enterprise Server 15
   - Ubuntu* 22.04, 24.04
 - Systems with macOS* operating systems:
-  - macOS* 13.x, 14.x, 15.x
+  - macOS* 12.x, 13.x, 14.x, 15.x
+- Systems with Android* operating systems:
+  - Android* 9
 
 ### Community-Supported Platforms
 - MinGW*
