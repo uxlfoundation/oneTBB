@@ -88,7 +88,7 @@ in the list of successors on the predecessor side and increase the corresponding
 would not be executed before the predecessor task. The successor task can only start executing once the associated reference counter is equal to 0.
 
 If the predecessor task is in `completed` state, the API has no effect in terms of modifying the list of successors and reference counters since no additional
-dependencies required and the successor task can be executed if all other dependent tasks are executed as well.
+dependencies are required and the successor task can be executed if all other dependent tasks are executed as well.
 
 If the predecessor task state has changed while registering the task as a predecessor for any task, the API should react accordingly to make sure
 adding dependencies and increasing the corresponding reference counters are not done for completed tasks.
