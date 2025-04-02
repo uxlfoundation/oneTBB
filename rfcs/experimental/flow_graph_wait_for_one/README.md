@@ -95,18 +95,18 @@ complete.
 Consider the following graph:
 
 ```cpp
-using namespace oneapi::tbb;
+namespace flow = oneapi::tbb::flow;
 
 flow::graph g;
 
 flow::broadcast_node<int> start(g);
 
-flow::function_node<int, int> f1(g, unlimited, f1_body);
-flow::function_node<int, int> f2(g, unlimited, f2_body);
+flow::function_node<int, int> f1(g, flow::unlimited, f1_body);
+flow::function_node<int, int> f2(g, flow::unlimited, f2_body);
 
 flow::join_node<std::tuple<int, int>> join(g);
 
-flow::function_node<int, int> pf(g, serial, pf_body);
+flow::function_node<int, int> pf(g, flow::serial, pf_body);
 
 flow::make_edge(start, f1);
 flow::make_edge(start, f2);
@@ -195,10 +195,10 @@ public:
 ```
 
 For each particular implementation of ``sender``, ``try_get`` gets the element and the metainfo from the buffer and assigns the message to ``t`` and
-the metainfo to ``info``. The reference counter/s, associated with the stored metainfo are released by ``1``.
+the metainfo to ``info``. The reference counter/s, associated with the stored metainfo are decremented.
 
 ``try_reserve`` implementation reserves the element and the corresponding metainfo inside of the buffer and feels the placeholders provided. Since the elements are not
-removed from the buffer, the reference counter/s remains unchanged and would be release by ``1`` if ``try_consume`` would be called. 
+removed from the buffer, the reference counter/s remains unchanged. They will be decremented when ``try_consume`` is called. 
 
 ## Nodes behavior
 
@@ -282,15 +282,15 @@ Since placing the buffers before rejecting nodes is not the only use-case, there
 The issue with broadcast-push ``overwrite_node`` and ``write_once_node`` is these nodes stores the received item and even if this item is accepted by one of the successors,
 it would be broadcasted to others and kept in the buffer.
 
-Since the metainformation is kept in the buffer together with the message itself, even if the computation is completed, the ``try_put_and_wait`` would stuck because of the reference
-held by the buffer.
+Since the metainformation is kept in the buffer together with the message itself, even if the message is consumed by a successor, 
+``try_put_and_wait`` will not complete because of the reference held by the buffer until the node is explicitly cleared.
 
 Even the ``wait_for_all()`` call would be able to finish in this case since it counting only the tasks in progress and ``try_put_and_wait`` would still be blocked.
 
 ``try_put_and_wait`` feature for the graph containing these nodes should be used carefully because of this issue:
 
-* The ``overwrite_node`` should be explicitly reset by calling ``node.reset()`` or the element with the stored metainfo should be overwritten with another element.
-* The ``write_once_node`` should be explicitly reset by calling ``node.reset()`` since the item cannot be overwritten.
+* The ``overwrite_node`` should be explicitly reset by calling ``node.clear()`` or the element with the stored metainfo should be overwritten with another element.
+* The ``write_once_node`` should be explicitly reset by calling ``node.clear()`` since the item cannot be overwritten.
 
 ### ``broadcast_node``
 
@@ -304,11 +304,11 @@ Metainformation on the decrement port is ignored since this signal should not be
 
 ### Queueing ``join_node``
 
-Each input port of the join_node should support the queue for both values and the associated metainformations. Once all of the input ports would contain the value, the values
+Each input port of the join_node should support the queue for both values and the associated metainformations. Once all of the input ports contain the value, the values
 should be combined into single tuple output and the metainformation objects should be combined into single metainfo using `metainfo1.merge(metainfo2)`, associated with the tuple
 and submitted to successors.
 
-If the item with the metainformation is stored in the internal queue of one of the input ports, but items never received by other ports, the item and the metainformation would be kept in the
+If an item with the metainformation is stored in the internal queue of one of the input ports, but items are never received by other ports, the item and the metainformation will be kept in the
 queue and block the corresponding ``try_put_and_wait`` call.
 
 ### Reserving ``join_node``
@@ -418,7 +418,7 @@ g.wait(desc);
 
 ```
 
-In that case it would be needed to extend the node with the new API returning some descriptor that can be used as a hit work waiting function `g.wait` that also should be added.
+In that case it would be needed to extend the node with the new API returning some descriptor that can be used as the argument to the work waiting function `g.wait` that also should be added.
 This descriptor can wrap the metainformation class for the current proposal, but the exact semantics and API should be defined since it makes the metainfo class public in some manner.
 
 ### Buffering the metainfo
