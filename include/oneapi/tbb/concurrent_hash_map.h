@@ -1013,9 +1013,10 @@ public:
         hashcode_type m = this->my_mask.load(std::memory_order_relaxed);
         __TBB_ASSERT((m&(m+1))==0, "data structure is invalid");
         this->my_size.store(0, std::memory_order_relaxed);
-        segment_index_type s = this->segment_index_of( m );
-        __TBB_ASSERT( s+1 == this->pointers_per_table || !this->my_table[s+1].load(std::memory_order_relaxed), "wrong mask or concurrent grow" );
-        do {
+        segment_index_type s = this->segment_index_of( m ) + 1;
+        __TBB_ASSERT( s == this->pointers_per_table || !this->my_table[s].load(std::memory_order_relaxed), "wrong mask or concurrent grow" );
+        while(s != 0) {
+            s--;
             __TBB_ASSERT(this->is_valid(this->my_table[s].load(std::memory_order_relaxed)), "wrong mask or concurrent grow" );
             segment_ptr_type buckets_ptr = this->my_table[s].load(std::memory_order_relaxed);
             size_type sz = this->segment_size( s ? s : 1 );
@@ -1027,7 +1028,7 @@ public:
                     delete_node( n );
                 }
             this->delete_segment(s);
-        } while(s-- > 0);
+        }
         this->my_mask.store(this->embedded_buckets - 1, std::memory_order_relaxed);
     }
 

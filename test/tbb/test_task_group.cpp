@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -255,7 +255,7 @@ void TestThreadSafety() {
     // Test and warm up allocator.
     tests();
 
-    // Ensure that cosumption is stabilized.
+    // Ensure that consumption is stabilized.
     std::size_t initial = utils::GetMemoryUsage();
     for (;;) {
         tests();
