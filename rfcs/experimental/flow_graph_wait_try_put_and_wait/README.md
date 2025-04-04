@@ -217,7 +217,10 @@ For each particular implementation of ``sender``, ``try_get`` gets the element a
 the metainfo to ``info``. The reference counter/s, associated with the stored metainfo are decremented.
 
 ``try_reserve`` implementation reserves the element and the corresponding metainfo inside of the buffer and feels the placeholders provided. Since the elements are not
-removed from the buffer, the reference counter/s remains unchanged. They will be decremented when ``try_consume`` is called. 
+removed from the buffer, the reference counter/s remains unchanged. They will be decremented when ``try_consume`` is called.
+
+To handle the backward compatibility issues caused by adding new virtual interfaces to ``receiver`` and ``sender``, the ``detail::d`` namespace version number should be increased
+while moving ``try_put_and_wait`` out of preview.
 
 ## Nodes behavior
 
@@ -453,18 +456,97 @@ also the metainformation associated with these values in the same buffer for fut
 until the rejecting receiver take the item from the buffer and process it. 
 
 Such a behavior may significantly affect the other common use-case for buffering nodes: when they are used to store the result of the computation at the end of the Flow Graph. 
-In such scenarios, the metainformation would be stored in the buffer and never taken from it since the buffering node is not used as part of push-pull protocol and hence there is
-no rejecting successor. The `try_put_and_wait` function associated with such a metainformation will hang forever since the reference counter on the stored metainformation would
-never be decreased.
+In such scenarios, the metainformation would be stored in the buffer and never taken from it by any Flow Graph node since the buffering node is not used as part of push-pull
+protocol and hence there is no rejecting successor.
+
+The `try_put_and_wait` function associated with such a metainformation will not return until any external consumer would drain the elements from the buffers and decrease the reference counter
+associated with the corresponding ``wait_context``. If no such external consumers exists, ``try_put_and_wait`` would never finish.
 
 It is impossible to rely on the number of successors while making a decision to store the metainformation in the buffer since if the node is used as part of the push-pull protocol,
 the number of successors is also equal to `0` since the edge is reversed.
 
-Current proposal considers this scenario is a `try_put_and_wait` feature limitation and does not add any support for that.
+Current design considers this scenario as a `try_put_and_wait` feature limitation and does not provide any support for that.
+
+### ``try_put_and_wait`` and token-based graphs
+
+The limitation described in the [buffering-related section](#buffering-the-metainfo) would also limit usage of ``try_put_and_wait`` with the graphs implementing
+the [token-based systems](https://www.intel.com/content/www/us/en/docs/onetbb/developer-guide-api-reference/2021-9/create-a-token-based-system.html) to limit access the number of messages:
+
+```cpp
+using flow = oneapi::tbb::flow;
+
+struct token {};
+struct graph_input;
+struct graph_output;
+
+flow::graph g;
+
+flow::queue_node<graph_input> inputs(g);
+flow::queue_node<token> tokens(g);
+
+using tuple_type = std::tuple<graph_input, token>;
+
+flow::join_node<tuple_type, flow::reserving> join(g);
+
+using compute_node_type = flow::multifunction_node<tuple_type, std::tuple<graph_output, token>>;
+compute_node_type compute(g, flow::unlimited,
+    [](const tuple_type& input, auto& output_ports) {
+        // Compute and send the output
+        graph_output output = compute_output(std::get<0>(input));
+        std::get<0>(output_ports).try_put(output);
+
+        // Return back the token
+        std::get<1>(output_ports).try_put(token{});
+    });
+
+flow::make_edge(inputs, flow::input_port<0>(join));
+flow::make_edge(tokens, flow::input_port<1>(join));
+flow::make_edge(join, compute);
+flow::make_edge(flow::output_port<0>(compute), following-graph-node-accepting-graph-output);
+flow::make_edge(flow::output_port<1>(compute), tokens);
+
+tokens.try_put(token{});
+
+inputs.try_put_and_wait(graph_input{});
+```
+
+<img src="token_based_system.png" width=400>
+
+Since ``multifunction_node`` is not currently supported by the ``try_put_and_wait`` implementation, we can consider the ``function_node``
+instead with two successors - ``input`` and ``tokens``. It would require ``token`` and ``graph_output`` to be the same type:
+
+The call to ``input.try_put_and_wait`` would create a ``message_metainfo`` object ``m`` associated with the waiting and store it in the node. Once the input can be combined
+with the token in ``join``, the tuple of message and the token would be passed to ``compute`` with the merged metainfo. Since the initial metainfo in ``tokens`` is empty, the merged
+metainfo would be equivalent to ``m``. After making the computations, the metainfo ``m`` would be passed by ``compute`` to the following graph nodes and also returned back to
+``tokens`` and stored there. 
+
+Since there is only one input in the graph above, the token would be kept in the ``tokens`` node even after completing of all other nodes in the graph.
+
+Similar to the previously described cases, the graph above would hang until all of the tokens would be drained from ``tokens`` by an external consumer, which is not required
+while using ``wait_for_all``.
+
+To improve this case, the following improvements can be considered:
+* Extending buffering nodes with the special policy tag that results in ignoring the metainfo even if it was received. In the example above, ``tokens`` node can be tagged with
+  such a policy.
+* ``multifunction_node`` support can be defined in a way that allows to explicitly mark the ports to which the metainfo would be passed.
+
+### Buffering as part of ``join_node``
+
+Consider a non-reserving ``join_node`` with 2 input ports. As it was described above, if the first port accepts a message with a non-empty metainfo, it would be stored
+in the internal queue (for ``queueing``) or hash map (for ``key_matching``). 
+
+If no inputs for the second port would be received during the executing of the Flow Graph, the element in the first port would be kept in the buffer and the corresponding
+reference counter would not be decreased. Since ``join_node`` does not provide any functionality to clear the internal buffers, the only way to drain elements from the internal
+buffers is to provide input into each input port.
+
+To improve this, the following improvements can be considered:
+* Add ``clear()`` method for non-reserving ``join_node``s that would remove all elements from the buffers on each input port.
+* Add ``get_partial()`` method for ``join_node`` returning a tuple of optional elements. If there is an item in the input port, the corresponding element of the tuple would be
+  non-empty optional.
 
 ### Multi-output nodes support
 
-Multi-output nodes (`multifunction_node` and `async_node`) creates an extra issue for the wait-for-one feature. Consider the following example (all of the examples shown
+Multi-output nodes (`multifunction_node` and `async_node`) creates an extra issue for the ``try_put_and_wait`` feature. Consider the following example (all of the examples shown
 in this section are for `multifunction_node` but also affects `async_node` in the same manner):
 
 ```cpp
@@ -493,18 +575,30 @@ Possible approaches for implementing such support:
 
 * Hiding metainfo inside of ``output_ports`` to preserve automatic metainfo propagation.
 * Merging the input and the ``message_metainfo`` together into some publicly available type ``tagged_input<T>`` and require the user to explicitly specify this type
-for multi-output nodes.
-* Introducing an extra unspecified type ``node_type::tag_type`` and require the user to accept it as a third argument of the body. 
+for multi-output nodes. We can also consider propagating metainfo as part of ``tagged_input`` for each node type, not only the multi-output nodes.
+* Introducing an extra unspecified type ``node_type::hint_type`` and require the user to accept it as a third argument of the body. This option implies significant changes since
+  it makes ``message_metainfo`` public in some manner by expressing the ``hint_type`` including describing the safety guarantees for each action. Also, it would be needed to extend
+  ``output_ports::try_put`` function with the ``hint_type`` argument and potentially to extend ``receiver::try_put`` with such an argument.
 
-## Open Questions
+## Possible improvements for design and implementation
+
+### ``message_metainfo`` semantic changes
+
+Increment and decrement of the reference counter/s stored in the ``message_metainfo`` can be done in the RAII manner - increase while creating and copying the object and decreased
+while destroying the object.
+
+Extending this approach would allow implementing move semantics for ``message_metainfo`` and optimize passing it to the last successor of the buffering node or a ``continue_node`` without
+modifying the reference counter.
+
+## Exit criteria
 
 The following questions should be addressed before moving this feature to ``supported``:
-
-* Multi-output nodes support should be described and implemented
-* Since the buffered item holds an additional reference counter on the associated metainfo, all elements should be retrieved from buffers to allow ``try_put_and_wait`` to exit.
-    * Should ``clear()`` member function be added to all of the buffering nodes in the graph (currently supported only in ``write_once_node`` and ``overwrite_node``).
-    * Should ``clear()`` member function be added to the non-rejecting ``join_node`` to handle the case when when we don't have the input present on each input port.
-    * Concurrent safety guarantees for ``clear()`` should be defined (e.g. is it safe to clear the buffer when other thread tries to insert the item).
+* Multi-output nodes support should be described and implemented.
+* Changes described in [metainfo semantic changes](#message_metainfo-semantic-changes) should be considered.
+* Reasonable solutions for buffering the metainfo issues should be described. See [buffering section](#buffering-the-metainfo), [join_node section](#buffering-as-part-of-join_node)
+  and [token-based graphs section](#try_put_and_wait-and-token-based-graphs) for more details.
+* Concurrent safety guarantees for ``clear()`` methods for ``overwrite_node`` and ``write_once_node`` should be defined (e.g. is it safe to clear the buffer when other thead
+  tries to insert the new item).
 * Feedback from the customers should be received
 * More multithreaded tests should be implemented for the existing functionality
 * The corresponding oneAPI specification update should be done
