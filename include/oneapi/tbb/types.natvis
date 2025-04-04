@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+	<!--
+    Copyright (c) 2021 Intel Corporation
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS-IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+	<Type Name="tbb::detail::d1::ets_element&lt;*&gt;">
+		<DisplayString>{ *($T1 *)(void *)my_space.aligned_array }</DisplayString>
+		<Expand>
+			<ExpandedItem>*($T1 *)(void *)my_space.aligned_array</ExpandedItem>
+		</Expand>
+	</Type>
+
+	<Type Name="tbb::detail::d1::enumerable_thread_specific&lt;*,*,*&gt;">
+		<DisplayString>{my_locals}</DisplayString>
+		<Expand>
+			<CustomListItems MaxItemsPerView="100">
+				<Variable Name="curNode" InitialValue="my_root._Storage._Value"/>
+				<Variable Name="nodeSize" InitialValue="0"/>
+				<Variable Name="offset" InitialValue="0"/>
+				<Variable Name="slotPtr" InitialValue="(slot *)0"/>
+
+				<Variable Name="appearsLater" InitialValue="false"/>
+				<Variable Name="checkNode" InitialValue="my_root._Storage._Value"/>
+				<Variable Name="checkNodeSize" InitialValue="0"/>
+				<Variable Name="checkOffset" InitialValue="0"/>
+				<Variable Name="checkSlotPtr" InitialValue="(slot *)0"/>
+
+				<Loop>
+					<!-- The structure is a linked list of nodes (node = array of slots),
+                         where each slot consists of `thread_id` and its local value. 
+                         Same `thread_id` can be displayed in multiple nodes (because of
+                         the reallocations), but they will all have the same local value.
+                    -->
+					<Break Condition="curNode == nullptr" />
+					<Exec>offset = 0</Exec>
+					<Exec>nodeSize = size_t(1) &lt;&lt; curNode->lg_size</Exec>
+
+					<Loop>
+						<Break Condition="offset == nodeSize" />
+						<Exec>slotPtr = ((slot*)(void*)(curNode + 1)) + offset</Exec>
+
+						<!-- Slot object visualization cannot be separated, as it doesn't know
+                             about the value type.
+                        -->
+
+						<!-- Check if thread_id appears later-->
+						<Exec>checkNode = curNode->next</Exec>
+						<Exec>appearsLater=false</Exec>
+						<Loop>
+							<Break Condition="checkNode == nullptr" />
+							<Exec>checkOffset = 0</Exec>
+							<Exec>checkNodeSize = size_t(1) &lt;&lt; checkNode->lg_size</Exec>
+							<Loop>
+								<Break Condition="checkOffset == checkNodeSize" />
+								<Exec>checkSlotPtr = ((slot*)(void*)(checkNode + 1)) + checkOffset</Exec>
+								<If Condition="slotPtr->key._Storage._Value._Id == checkSlotPtr->key._Storage._Value._Id">
+									<Exec>appearsLater = true</Exec>
+								</If>
+								<Exec>checkOffset += 1</Exec>
+							</Loop>
+
+							<Exec>checkNode = checkNode->next</Exec>
+						</Loop>
+
+						<Item Condition="slotPtr->key._Storage._Value._Id != 0 &amp;&amp; !appearsLater" Name="[thread_id={slotPtr->key._Storage._Value._Id}]">*($T1 *)(slotPtr->ptr)</Item>
+						<Exec>offset += 1</Exec>
+					</Loop>
+
+					<Exec>curNode = curNode->next</Exec>
+				</Loop>
+			</CustomListItems>
+		</Expand>
+	</Type>
+
+	<Type Name="tbb::detail::d1::concurrent_vector&lt;*,*&gt;">
+		<DisplayString>{{ size={my_size._Storage._Value} }}</DisplayString>
+		<Expand>
+			<Item Name="[size]">my_size._Storage._Value</Item>
+
+			<CustomListItems>
+				<Variable Name="idx" InitialValue="0"/>
+				<Variable Name="segmentIdx" InitialValue="-1"/>
+				<Variable Name="insideSegmentIdx" InitialValue="-1"/>
+
+				<Loop>
+					<Break Condition="idx == my_size._Storage._Value" />
+					<Exec> segmentIdx = segment_index_type(__log2(1 | idx))</Exec>
+					<Item>*(($T1 *)(my_segment_table._Storage._Value[segmentIdx]._Storage._Value)+idx)</Item>
+					<Exec> idx += 1</Exec>
+				</Loop>
+			</CustomListItems>
+		</Expand>
+	</Type>
+
+	<Type Name="tbb::detail::d1::combinable&lt;*&gt;">
+		<DisplayString>{ my_ets.my_locals }</DisplayString>
+		<Expand>
+			<ExpandedItem>my_ets</ExpandedItem>
+		</Expand>
+	</Type>
+
+	<Type Name="tbb::detail::d1::concurrent_unordered_set&lt;*,*,*,*&gt;">
+		<DisplayString>{{ size={my_size} }}</DisplayString>
+		<Expand>
+			<Item Name="[size]">my_size</Item>
+			<CustomListItems>
+				<Variable Name="node" InitialValue="&amp;my_head"/>
+				<Loop>
+					<Break Condition="node == nullptr" />
+					<Item Condition="(node-&gt;my_order_key &amp; 0x1) != 0">*($T1*)(&amp;((tbb::detail::d1::value_node&lt;$T1,unsigned int&gt;*)(node))-&gt;my_value)</Item>
+					<Exec>node = node-&gt;my_next._Storage._Value</Exec>
+				</Loop>
+			</CustomListItems>
+		</Expand>
+	</Type>
+
+
+	<!-- Visualization for std::vector -->
+	<Type Name="std::vector&lt;*&gt;">
+		<DisplayString>{{ size = {size()} }}</DisplayString>
+		<Expand>
+			<Item Name="[size]">size()</Item>
+			<ArrayItems>
+				<Size>size()</Size>
+				<ValuePointer>data()</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+
+</AutoVisualizer>
