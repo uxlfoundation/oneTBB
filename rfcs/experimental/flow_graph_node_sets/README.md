@@ -153,7 +153,7 @@ previous example:
   broadcast_node<int> n0(precedes(n1, n2, n3));
 ```
 
-One area for useful feedback is whether the semantics of `precedes` and `follows` is clear. The order type of a
+One area for useful feedback is whether the semantics of `precedes` and `follows` are clear. The order type of a
 node set,`order::following` or `order::preceding`, does not describe a property that is intrinsic to the node
 set itself, but instead describes the ordering of the yet-to-be-constructed node, **N**, relative to the nodes in the 
 `node_set`. An `order::following` node set becomes predecessors to **N**, since **N** is *following*
