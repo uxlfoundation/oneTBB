@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2005-2024 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -24,7 +24,12 @@
     #pragma weak dlopen
     #pragma weak dlsym
     #pragma weak dlerror
+    #include <limits.h>
+    #include <dlfcn.h>
+    #include <errno.h>
 #endif /* WIN */
+
+#include "itt_notify.h"
 
 #if __TBB_BUILD
 
@@ -39,8 +44,6 @@ extern "C" void MallocInitializeITT();
 #else
 #error This file is expected to be used for either TBB or TBB allocator build.
 #endif // __TBB_BUILD
-
-#include "tools_api/ittnotify_static.c"
 
 namespace tbb {
 namespace detail {
