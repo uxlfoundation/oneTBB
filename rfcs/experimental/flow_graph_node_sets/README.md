@@ -550,7 +550,7 @@ split_node(const node_set<order::preceding, Successors...>&)
 
 ### Open Questions
 
-* Is it acceptable that constructors can be used to set predecessors or successors but not both at the same time.
+* Is it acceptable that constructors can be used to set predecessors or successors but not both at the same time?
 * Are the special case rules for multiport nodes the expected ones?
 * Should `node_set` be defined or left as an exposition-only type?
   * If `node_set` is defined, are the semantics clear or is the naming of the order type potentially confusing?
