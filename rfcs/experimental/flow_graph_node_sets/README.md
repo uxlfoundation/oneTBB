@@ -222,7 +222,7 @@ set or an `order::preceding` set. These node sets are created using the `precede
 described [earlier](#follows-and-precedes-helper-functions).
 
 The object returned by `follows` or `precedes` is used in place of the constructor's graph argument. The graph argument
-for the node being constructed is then obtained by caling `node_set::graph_reference()`, which gets the graph associated
+for the node being constructed is then obtained by calling `node_set::graph_reference()`, which gets the graph associated
 with the first node in the set. As noted earlier, it is assumed that all nodes in a `node_set` belong to a single common graph.
 
 ### Single input, single output nodes
@@ -312,7 +312,7 @@ An `input_node` does *NOT* have an input port, so it can only receive a node set
 
 ### Single input, multiple output nodes
 
-Nodes with mutiple output ports are special case and include `multifunction_node` and `split_node`.
+Nodes with multiple output ports are special case and include `multifunction_node` and `split_node`.
 If the node's constructor receives an `order::following` node set, the rule is the same as
 for the simpler node types. All of the nodes in the `order::following` set become predecessors to the
 new node and are connected by an edge to its single input port. 
@@ -386,7 +386,7 @@ and sent `100*4` to the second node in the node set, `n3`.
 
 ### Single output, multiple input nodes
 
-Nodes with mutiple input ports are also a special case and include `join_node` and `indexer_node`.
+Nodes with multiple input ports are also a special case and include `join_node` and `indexer_node`.
 If the node's constructor receives an `order::preceding` node set, the rule is the sames as
 for the simpler node types. All of the nodes in the `order::preceding` set become successors to the
 new node and are connected by an edge to its single output port. 
@@ -429,7 +429,7 @@ are enabled by the additional information present in the `node_set` argument.
 
 For nodes that have user-provided callables, such as `function_node`, `continue_node`,
 `multifunction_node`, `async_node` or `sequencer_node`, explicit deduction guides are based on the
-callable and not related to `node_set` suppport, so those will not be discuss here in any detail.
+callable and not related to `node_set` support, so those will not be discuss here in any detail.
 
 ### For nodes with a single common input and output type
 
