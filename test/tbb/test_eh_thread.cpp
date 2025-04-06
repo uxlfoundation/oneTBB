@@ -48,7 +48,7 @@ void limitThreads(size_t limit)
     int ret = getrlimit(RLIMIT_NPROC, &rlim);
     CHECK_MESSAGE(0 == ret, "getrlimit has returned an error");
 
-    rlim.rlim_cur = (rlim.rlim_max == (rlim_t)RLIM_INFINITY) ? limit : utils::min(limit, rlim.rlim_max);
+    rlim.rlim_cur = (rlim.rlim_max == (rlim_t)RLIM_INFINITY) ? limit : utils::min((rlim_t)limit, rlim.rlim_max);
 
     ret = setrlimit(RLIMIT_NPROC, &rlim);
     CHECK_MESSAGE(0 == ret, "setrlimit has returned an error");
