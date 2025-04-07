@@ -46,7 +46,7 @@ jobs:
     
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@v2.11.0
+        uses: step-security/harden-runner@v2.11.1
         with:
           egress-policy: audit
           
