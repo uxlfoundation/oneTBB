@@ -437,8 +437,8 @@ For nodes that have a single, common input and output type, this common type may
 the `node_set` passed in place of the graph argument. The graph object itself does not provide
 sufficient information, but the input or output type of a node from the `node_set` can be used.
 The `node_set` support therefore introduces a new way to deduce the class template argument.
-Using this approach, additional support has been added for `broadcast_node`, `buffer_node`, 
-`queue_node`, `priority_queue_node` and `limiter_node`:
+Using this approach, additional support has been added for `overwrite_node`, `write_once_node`,
+`broadcast_node`, `buffer_node`, `queue_node`, `priority_queue_node` and `limiter_node`:
 
 ```cpp
 template <typename NodeSet>
