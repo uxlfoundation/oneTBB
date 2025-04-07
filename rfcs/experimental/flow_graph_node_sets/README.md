@@ -322,7 +322,7 @@ port to connect to which successor node(s). So, a simple special case rule is us
 `node_set` must be exactly equal to the number of output ports. Then during construction, a single edge is
 created between each output port to the node with the same index in the `node_set`.
 
-The constructors for the multi-output nodes are show below:
+The constructors for the multi-output nodes are shown below:
 
 ```cpp
     // multifunction_node
