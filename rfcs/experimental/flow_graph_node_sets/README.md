@@ -387,7 +387,7 @@ and sent `100*4` to the second node in the node set, `n3`.
 ### Single output, multiple input nodes
 
 Nodes with multiple input ports are also a special case and include `join_node` and `indexer_node`.
-If the node's constructor receives an `order::preceding` node set, the rule is the sames as
+If the node's constructor receives an `order::preceding` node set, the rule is the same as
 for the simpler node types. All of the nodes in the `order::preceding` set become successors to the
 new node and are connected by an edge to its single output port. 
 
