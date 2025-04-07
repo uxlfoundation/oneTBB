@@ -13,7 +13,7 @@ Without this feature, the oneTBB Flow Graph supports two basic actions after bui
 - Submitting messages in some nodes using the ``receiver::try_put`` or ``input_node::activate`` API.
 - Waiting for completion of **all** messages in the graph using the ``graph::wait_for_all``.
 
-Since the only API currently available for waiting until the work would be completed is ``wait_for_all`` and it waits for all
+Since the only API currently available for waiting for a work to complete is ``wait_for_all`` and it waits for all
 tasks in the graph to complete, there can be negative performance impact in use cases when the thread submitting the work 
 should be notified as soon as possible when the work is done. 
 
@@ -69,7 +69,7 @@ This function also can be executed concurrently from several threads as it shown
 
 While using the ``wait_for_all()``, each thread submitting the work to the graph is required to wait
 until **all** of the tasks to be done, even those that are unrelated to the input submitted. If some
-post-processing is required on each thread after receiving the computation result, it would be only safe to start it when the 
+post-processing is required on each thread after receiving the computation result, it would only be safe to start it when the 
 Flow Graph is completed. That is inefficient since the post-processing of lightweight graph tasks are blocked by processing of unrelated inputs.
 
 To remove this negative performance effect, the ``try_put_and_wait`` extension waits only for completion of one message by each node in the graph
@@ -140,7 +140,7 @@ The tasks are shown in the right-to-left order - the tasks on the right are subm
 
 Blue tasks relates to the parallel loop 0-100. Red tasks relates to the ``444`` message submitted as an input to ``try_put_and_wait``.
 
-Since ``pre_process`` is a serial ``function_node``, the items processing cannot be re-ordered and the red task would be in the leftmost position
+Since ``pre_process`` is a serial ``function_node``, the items processing cannot be re-ordered and the red task will be in the leftmost position
 since it was submitted after the blue tasks.
 
 ``f1`` and ``f2`` are ``unlimited`` ``function_node``s, so the tasks ordering is arbitrary since tasks for each computed item are spawned.
@@ -148,7 +148,7 @@ since it was submitted after the blue tasks.
 ``join`` is a queueing ``join_node`` and it should preserve the ordering of items as they are processed by ``f1`` and ``f2``. The tasks are shown
 as partially blue and partially red since the output of red task from ``f1`` can be combined with the output of blue task from ``f2`` and wise versa.
 
-Since ``post_process`` is a serial ``function_node``, the ordering of the tasks would be the same as in ``join``.
+Since ``post_process`` is a serial ``function_node``, the ordering of the tasks will be the same as in ``join``.
 
 The ``try_put_and_wait`` is expected to exit when all of the red (including partially red) tasks are completed. It may require some amount of blue tasks
 to be completed as well, e.g. to execute previously stored tasks in the ``function_node``'s queue. 
@@ -167,11 +167,11 @@ The reference counter in the ``wait_context`` inside of the ``message_metainfo``
 * The task associated with the computations of the ``try_put_and_wait`` input message is created (*).
 * The item associated with the computations of the desired input is stored in the buffering node or in the internal buffer of the other node type.
 * When the ``continue_msg`` with the non-empty associated waiter is received by ``continue_node``. In this case, the node buffers the ``message_metainfo``s received from each
-  predecessor and increases the underlying reference counter to prolonge the wait until signals from each predecessor would be received. 
+  predecessor and increases the underlying reference counter to prolonge the wait until signals from each predecessor is received. 
 
 The reference counter is decreased when:
 * The task associated with the computations of the ``try_put_and_wait`` input is finalized. If the output of the task should be propagated to the successors of the node, it is done
-  from the task body and hence the reference counter would be decreased only after creating the task for each successor and increasing the reference counter for them.
+  from the task body and hence the reference counter is decreased only after creating the task for each successor and increasing the reference counter for them.
 * The item associated with the computations is taken from the buffering node or from the internal buffer.
 * When the desired number of signals from the predecessors was received by the ``continue_node``. This case is equivalent to retrieving the set of buffered ``message_metainfo``s received previously
   from each predecessor. 
@@ -182,7 +182,8 @@ priorities for single messages - the corresponding priority tag can be assigned 
 Metainformation class supports containing multiple reference counters at the same time to support joining messages with different associated reference counters in the ``join_node``. 
 See [separate section](#details-about-metainformation-class) for more details.
 
-Implementation-wise, processing the metainformation is exposed by adding new internal virtual member functions to various Flow Graph instance:
+Currently processing the metainformation is exposed by adding new virtual member functions to various Flow Graph instances. 
+Note that the described functions are internal, may change over time and should not be used directly.
 
 ``` cpp
 template <typename T>
@@ -197,7 +198,7 @@ For each particular implementation of ``receiver``, the ``try_put_task`` perform
 
 It may buffer both ``t`` and ``metainfo`` or broadcast the result and the ``info`` to the successors of the node. 
 
-The existing API ``try_put_task(const T& t)`` can reuse the new one with the empty metainfo object.
+The existing API ``try_put_task(const T& t)`` can reuse the new one with the empty metainfo object if an empty metainfo is a preserved as a lightweight structure.
 
 ```cpp
 template <typename T>
@@ -219,8 +220,8 @@ the metainfo to ``info``. The reference counter/s, associated with the stored me
 ``try_reserve`` implementation reserves the element and the corresponding metainfo inside of the buffer and feels the placeholders provided. Since the elements are not
 removed from the buffer, the reference counter/s remains unchanged. They will be decremented when ``try_consume`` is called.
 
-To handle the backward compatibility issues caused by adding new virtual interfaces to ``receiver`` and ``sender``, the ``detail::d`` namespace version number should be increased
-while moving ``try_put_and_wait`` out of preview.
+To handle the backward compatibility issues caused by adding new virtual interfaces to ``receiver`` and ``sender``, the ``detail::d`` namespace version number for Flow Graph interfaces
+should be increased while moving ``try_put_and_wait`` out of preview.
 
 ## Nodes behavior
 
@@ -229,38 +230,38 @@ can be received from the predecessor node (explicit ``try_put_task`` call) or in
 
 ### Queueing ``function_node``
 
-If the concurrency of the ``function_node`` is set to ``unlimited``, the node creates a task for executing the body of the node. The created task holding the reference counter on each
-``wait_context``s stored in ``metainfo`` and also wraps the ``metainfo`` object itself since it would be broadcasted to the successors when the task is completed.
+If the concurrency of the ``function_node`` is set to ``unlimited``, the node creates a task for executing the body of the node. The created task holds the reference counter on each
+``wait_context`` stored in ``metainfo`` and also wraps the ``metainfo`` object itself to broadcast it to the successors when the task is completed.
 
 If the concurrency is not ``unlimited``, the call to ``try_put_task`` tries to occupy the concurrency of the node. If the thread limit is not yet reached - behaves the same as 
 in the ``unlimited`` case. Otherwise, both input message and the metainfo are stored in the internal queue of the node. When one of the node tasks is completed, it retrieves 
 the postponed message and the corresponding metainfo from the queue and spawns a task to process it.
 
-Since the ``function_node`` guarantees that all of the elements would be retrieved from the internal queue at some time, [buffering issues](#buffering-the-metainfo) cannot take place.
+Since the ``function_node`` guarantees that all of the elements will be retrieved from the internal queue at some time, [buffering issues](#buffering-the-metainfo) cannot take place.
 
 ### Rejecting ``function_node``
 
 If the concurrency of the node is set to ``unlimited``, behaves the same as in the ``queueing`` case described above.
 
-Otherwise, if the concurrency limit of the node is reached, both message and the associated metainformations would be rejected and the predecessor that called the ``try_put_task``
+Otherwise, if the concurrency limit of the node is reached, both message and the associated metainformations are rejected and the predecessor that called the ``try_put_task``
 is responsible on buffering both of them.
 
-If the predecessor is not a buffering node, both message and the metainfo would not be processed or stored somewhere. From the waiting perspective, it means that the computations
+If the predecessor is not a buffering node, both message and the metainfo are not processed or stored somewhere. From the waiting perspective, it means that the computations
 of the waited message are considered completed and if there are no other tasks/ buffered items corresponding to the same ``try_put_and_wait`` input in the graph, the ``try_put_and_wait``
-call would be exited.
+call is exited.
 
 When some ``function_node`` task is completed, it will try to get a buffered message and the metainfo from the predecessor by calling the ``try_get(msg, metainfo)`` method. 
 
-Since the ``function_node`` guarantees that all of the elements would be retrieved from the predecessor, [buffering issues](#buffering-the-metainfo) cannot take place
-for buffering nodes, preceding the ``function_node``.
+Since the ``function_node`` guarantees that all of the elements will be retrieved from the predecessor, [buffering issues](#buffering-the-metainfo) cannot take place
+for buffering nodes, preceding the rejecting ``function_node``.
 
 ### Lightweight ``function_node``
 
 Calls to ``try_put_task`` in the lightweight node will operate on the concurrency limit of the node in the same manner as is defined by the message buffering policy -
 ``queueing`` (default)  or ``rejecting``.
 
-The difference is that for lightweight nodes the tasks would not be spawned in most of the cases and the node body will be executed by the calling thread. 
-Since there are no tasks, the calling thread would broadcast the output and the metainformation to the successors after completing the function.
+The difference is that for lightweight nodes no tasks are created and spawned in most of the cases and the node body will be executed by the calling thread.
+Since there are no tasks, the calling thread broadcasts the output and the metainformation to the successors after completing the function.
 
 ### ``continue_node``
 
@@ -270,8 +271,8 @@ is the number of predecessors.
 It means that prior to executing the body, the node can receive several ``metainfo`` instances from different predecessors. To handle this, the node initially stores an
 empty metainfo instance inside itself and each call to ``try_put_task`` with non-empty metainfo, merges the received metainformation with the stored instance.
 
-Additional reference counter would be held on each input ``wait_context`` to make sure the corresponding ``try_put_and_wait`` will remain blocked until the item would leave the
-``continue_node``. 
+Additional reference counter is holding on each input ``wait_context`` to make sure the corresponding ``try_put_and_wait`` will remain blocked until the item leaves the
+``continue_node``.
 
 When the ``continue_node`` receives the last signal from the predecessors, it first saves a copy of the metainfo stored in the node and containing the merged metainfo from all of the
 predecessors and stores the empty metainformation in the node. Then, the node creates and spawns a task to complete the associated body. The copy of the previously stored metainfo objects
@@ -280,17 +281,18 @@ is associated with the new task.
 Implementation-wise, copying and resetting the metainfo is done under the ``continue_node`` mutex together with the internal predecessor counter update and check. The task is spawned after
 releasing the mutex, so other threads can operate with the stored counter and metainfo while body task is executing.
 
-The lightweight ``continue_node`` behaves the same as described above, but without creating any tasks. Everything would be performed by the calling thread.
+The lightweight ``continue_node`` behaves the same as described above, but without creating any tasks to perform a body.
 
 ### Multi-output functional nodes
 
 ``multifunction_node`` and ``async_node`` classes are not currently supported by this feature because of issues described in [the separate section](#multi-output-nodes-support).
 
-Passing the metainformation to such a node by the predecessor would have no effect and no metainfo would be broadcasted to further successors.
+Passing the metainformation to such a node by the predecessor have no effect and no metainfo is broadcasted to further successors. If there are no other tasks/ buffered items corresponding to the
+same ``try_put_and_wait`` input in the graph, the ``try_put_and_wait`` call is exited.
 
 ### Single-push buffering nodes
 
-This section describes the behavior for ``buffer_node``, ``queue_node``, ``priority_queue_node`` and ``sequencer_node`` classes. The only difference between them would be in
+This section describes the behavior for ``buffer_node``, ``queue_node``, ``priority_queue_node`` and ``sequencer_node`` classes. The only difference between them is
 ordering of retrieving the elements from the buffer.
 
 As it was described above, once the buffering node receives a message and the metainformation, both of them should be stored into the buffer.
@@ -308,12 +310,12 @@ Since placing the buffers before rejecting nodes is not the only use-case, there
 ### Broadcast-push buffering nodes
 
 The issue with broadcast-push ``overwrite_node`` and ``write_once_node`` is these nodes stores the received item and even if this item is accepted by one of the successors,
-it would be broadcasted to others and kept in the buffer.
+it is broadcasted to other successors and kept in the buffer.
 
 Since the metainformation is kept in the buffer together with the message itself, even if the message is consumed by a successor, 
 ``try_put_and_wait`` will not complete because of the reference held by the buffer until the node is explicitly cleared.
 
-Even the ``wait_for_all()`` call would be able to finish in this case since it counting only the tasks in progress and ``try_put_and_wait`` would still be blocked.
+Even the ``wait_for_all()`` call is able to finish in this case since it counting only the tasks in progress and ``try_put_and_wait`` will be blocked.
 
 ``try_put_and_wait`` feature for the graph containing these nodes should be used carefully because of this issue:
 
@@ -322,7 +324,7 @@ Even the ``wait_for_all()`` call would be able to finish in this case since it c
 
 ### ``broadcast_node``
 
-While ``broadcast_node::try_put_task`` is called with the metainfo argument - both item and the associated metainformation would be broadcasted to each successor of the node.
+While ``broadcast_node::try_put_task`` is called with the metainfo argument - both item and the associated metainformation are broadcasted to each successor of the node.
 
 ### ``limiter_node``
 
@@ -343,11 +345,11 @@ queue and block the corresponding ``try_put_and_wait`` call.
 
 Buffering node should be used before each input port for storing the values and the associated metainformations.
 
-Once all of the input ports would be triggered with the input value, the values and the metainformations would be reserved from the buffering nodes,
-values would be combined into single tuple output and the metainformation objects would be combined into single metainfo using `metainfo1.merge(metainfo2)`,
-associated with the tuple and submitted to successors.
+Once all of the input ports are triggered with the input value, the values and the metainformations are reserved in the buffering nodes,
+values are combined into a single tuple output and the metainformation objects are combined into a single metainfo using `metainfo1.merge(metainfo2)`. The merged metainfo is
+associated with the tuple and is submitted to the successors of the ``join_node``.
 
-Similar to the ``queueing`` case, if one of the input ports was triggered with the input value, but others never receive any values, the item and the metainformation would be kept in the
+Similar to the ``queueing`` case, if one of the input ports was triggered with the input value, but others never receive any values, the item and the metainformation are kept in the
 buffer and block the corresponding ``try_put_and_wait`` call.
 
 ### Key-matching ``join_node``
@@ -440,7 +442,7 @@ auto desc = node.try_put(work); // other API name can be selected
 
 // Other work
 // May submit more work into the Flow Graph
-// May create other descriptors that would be waited later
+// May create other descriptors that are waited later
 
 g.wait(desc);
 
@@ -456,11 +458,11 @@ also the metainformation associated with these values in the same buffer for fut
 until the rejecting receiver take the item from the buffer and process it. 
 
 Such a behavior may significantly affect the other common use-case for buffering nodes: when they are used to store the result of the computation at the end of the Flow Graph. 
-In such scenarios, the metainformation would be stored in the buffer and never taken from it by any Flow Graph node since the buffering node is not used as part of push-pull
+In such scenarios, the metainformation will be stored in the buffer and never taken from it by any Flow Graph node since the buffering node is not used as part of push-pull
 protocol and hence there is no rejecting successor.
 
-The `try_put_and_wait` function associated with such a metainformation will not return until any external consumer would drain the elements from the buffers and decrease the reference counter
-associated with the corresponding ``wait_context``. If no such external consumers exists, ``try_put_and_wait`` would never finish.
+The `try_put_and_wait` function associated with such a metainformation will not return until any external consumer drains the elements from the buffers and decrease the reference counter
+associated with the corresponding ``wait_context``. If no such external consumers exists, ``try_put_and_wait`` will never finish.
 
 It is impossible to rely on the number of successors while making a decision to store the metainformation in the buffer since if the node is used as part of the push-pull protocol,
 the number of successors is also equal to `0` since the edge is reversed.
@@ -469,8 +471,8 @@ Current design considers this scenario as a `try_put_and_wait` feature limitatio
 
 ### ``try_put_and_wait`` and token-based graphs
 
-The limitation described in the [buffering-related section](#buffering-the-metainfo) would also limit usage of ``try_put_and_wait`` with the graphs implementing
-the [token-based systems](https://www.intel.com/content/www/us/en/docs/onetbb/developer-guide-api-reference/2021-9/create-a-token-based-system.html) to limit access the number of messages:
+The limitation described in the [buffering-related section](#buffering-the-metainfo) also limits usage of ``try_put_and_wait`` with the graphs implementing
+the [token-based systems](https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/create_token_based_system.html) to limit access the number of messages:
 
 ```cpp
 using flow = oneapi::tbb::flow;
@@ -512,17 +514,17 @@ inputs.try_put_and_wait(graph_input{});
 
 <img src="token_based_system.png" width=400>
 
-Since ``multifunction_node`` is not currently supported by the ``try_put_and_wait`` implementation, we can consider the ``function_node``
-instead with two successors - ``input`` and ``tokens``. It would require ``token`` and ``graph_output`` to be the same type:
+Since ``multifunction_node`` is not currently supported by the ``try_put_and_wait`` implementation, we can instead consider the ``function_node``
+with two successors - ``input`` and ``tokens``. It requires ``token`` and ``graph_output`` to be the same type:
 
-The call to ``input.try_put_and_wait`` would create a ``message_metainfo`` object ``m`` associated with the waiting and store it in the node. Once the input can be combined
-with the token in ``join``, the tuple of message and the token would be passed to ``compute`` with the merged metainfo. Since the initial metainfo in ``tokens`` is empty, the merged
-metainfo would be equivalent to ``m``. After making the computations, the metainfo ``m`` would be passed by ``compute`` to the following graph nodes and also returned back to
+The call to ``input.try_put_and_wait`` creates a ``message_metainfo`` object ``m`` associated with the waiting and store it in the node. Once the input can be combined
+with the token in ``join``, the tuple of message and the token is be passed to ``compute`` with the merged metainfo. Since the initial metainfo in ``tokens`` is empty, the merged
+metainfo is equivalent to ``m``. After making the computations, the metainfo ``m`` is passed by ``compute`` to the following graph nodes and also returned back to
 ``tokens`` and stored there. 
 
-Since there is only one input in the graph above, the token would be kept in the ``tokens`` node even after completing of all other nodes in the graph.
+Since there is only one input in the graph above, the token is kept in the ``tokens`` node even after completing of all other nodes in the graph.
 
-Similar to the previously described cases, the graph above would hang until all of the tokens would be drained from ``tokens`` by an external consumer, which is not required
+Similar to the previously described cases, the graph above will hang until all of the tokens are drained from ``tokens`` by an external consumer, which is not required
 while using ``wait_for_all``.
 
 To improve this case, the following improvements can be considered:
@@ -532,11 +534,11 @@ To improve this case, the following improvements can be considered:
 
 ### Buffering as part of ``join_node``
 
-Consider a non-reserving ``join_node`` with 2 input ports. As it was described above, if the first port accepts a message with a non-empty metainfo, it would be stored
+Consider a non-reserving ``join_node`` with 2 input ports. As it was described above, if the first port accepts a message with a non-empty metainfo, it will be stored
 in the internal queue (for ``queueing``) or hash map (for ``key_matching``). 
 
-If no inputs for the second port would be received during the executing of the Flow Graph, the element in the first port would be kept in the buffer and the corresponding
-reference counter would not be decreased. Since ``join_node`` does not provide any functionality to clear the internal buffers, the only way to drain elements from the internal
+If no inputs for the second port are received during the executing of the Flow Graph, the element in the first port is kept in the buffer and the corresponding
+reference counter is not decreased. Since ``join_node`` does not provide any functionality to clear the internal buffers, the only way to drain elements from the internal
 buffers is to provide input into each input port.
 
 To improve this, the following improvements can be considered:
@@ -593,12 +595,14 @@ modifying the reference counter.
 ## Exit criteria
 
 The following questions should be addressed before moving this feature to ``supported``:
-* Multi-output nodes support should be described and implemented.
+* Multi-output nodes support should be described and implemented. See [separate section](#multi-output-nodes-support) section for more details.
 * Changes described in [metainfo semantic changes](#message_metainfo-semantic-changes) should be considered.
 * Reasonable solutions for buffering the metainfo issues should be described. See [buffering section](#buffering-the-metainfo), [join_node section](#buffering-as-part-of-join_node)
   and [token-based graphs section](#try_put_and_wait-and-token-based-graphs) for more details.
 * Concurrent safety guarantees for ``clear()`` methods for ``overwrite_node`` and ``write_once_node`` should be defined (e.g. is it safe to clear the buffer when other thead
   tries to insert the new item).
 * Feedback from the customers should be received
+* Necessity of separation of submitting the input to the graph and waiting for it's completion should be considered. See [separate section](#combined-or-separated-wait) for more details.
 * More multithreaded tests should be implemented for the existing functionality
+* More deep performance analysis should be done, including both proven performance boost when ``try_put_and_wait`` is used and absence of performance regression while it is not used.
 * The corresponding oneAPI specification update should be done
