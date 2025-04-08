@@ -24,19 +24,19 @@ structure for Linux\*, relative to *<tbb_install_dir>*
       - ``<tbb_install_dir>/lib/<arch>/gcc4.8/<lib><compat_version><variant>.so.<version>``
       - | ``LIBRARY_PATH``
 	| ``LD_LIBRARY_PATH``
-     * - Symbolic links
-       - | ``<tbb_install_dir>/lib/<arch>/gcc4.8/<lib><compat_version><variant>.so`` -> ``<tbb_install_dir>lib/<lib><compat_version><variant>.so.<ver_major>``
-         | ``<tbb_install_dir>/lib/<lib><compat_version><variant>.so.<ver_major>`` -> ``<tbb_install_dir>lib/<lib><compat_version><variant>.so.<ver_major>.<ver_minor>``
-       - \
-     * - CMake files
-       - ``<tbb_install_dir>/lib/cmake/tbb/*.cmake``
-       - \
-     * - pkg-config files
-       - ``<tbb_install_dir>/lib/pkgconfig/*.pc``
-       - \
-     * - vars script
-       - ``<tbb_install_dir>/env/vars.sh``
-       - \
+    * - Symbolic links
+      - | ``<tbb_install_dir>/lib/<arch>/gcc4.8/<lib><compat_version><variant>.so`` -> ``<tbb_install_dir>lib/<lib><compat_version><variant>.so.<ver_major>``
+        | ``<tbb_install_dir>/lib/<lib><compat_version><variant>.so.<ver_major>`` -> ``<tbb_install_dir>lib/<lib><compat_version><variant>.so.<ver_major>.<ver_minor>``
+      - 
+    * - CMake files
+      - ``<tbb_install_dir>/lib/cmake/tbb/*.cmake``
+      - 
+    * - pkg-config files
+      - ``<tbb_install_dir>/lib/pkgconfig/*.pc``
+      - 
+    * - vars script
+      - ``<tbb_install_dir>/env/vars.sh``
+      - 
 
 Where:
 
