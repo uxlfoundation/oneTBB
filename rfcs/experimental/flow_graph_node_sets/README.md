@@ -427,9 +427,13 @@ are enabled by the additional information present in the `node_set` argument.
 
 ### For nodes with callables
 
-For nodes that have user-provided callables, such as `function_node`, `continue_node`,
-`multifunction_node`, `async_node` or `sequencer_node`, explicit deduction guides are based on the
-callable and not related to `node_set` support, so those will not be discuss here in any detail.
+For some nodes that have user-provided callables, such as `function_node`, `continue_node`,
+or `sequencer_node`, explicit deduction guides are based on the callable and not related to
+`node_set` support, so those will not be discussed here in any detail.
+
+There are currently no explicit deduction guides for `multifunction_node` and `async_node`.
+Support for these nodes is not included in the current experimental support and whether support
+can be added needs further investigation.
 
 ### For nodes with a single common input and output type
 
@@ -557,6 +561,7 @@ split_node(const node_set<order::preceding, Successors...>&)
 * Should `node_set` support be added to:
   * `composite node`
   * the output of `indexer_node`
+* Can `node_set` support be used to add explicit deduction guides for `multifunction_node` and `async_node`?
 
 ### Exit Criteria
 
