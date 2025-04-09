@@ -198,7 +198,7 @@ For each particular implementation of ``receiver``, the ``try_put_task`` perform
 
 It may buffer both ``t`` and ``metainfo`` or broadcast the result and the ``info`` to the successors of the node. 
 
-The existing API ``try_put_task(const T& t)`` can reuse the new one with the empty metainfo object if an empty metainfo is a preserved as a lightweight structure.
+The existing API ``try_put_task(const T& t)`` can reuse the new one with the empty metainfo object if that does not incur a noticeable overhead for the regular use of flow graphs.
 
 ```cpp
 template <typename T>
@@ -546,6 +546,104 @@ To improve this, the following improvements can be considered:
 * Add ``get_partial()`` method for ``join_node`` returning a tuple of optional elements. If there is an item in the input port, the corresponding element of the tuple would be
   non-empty optional.
 
+### ``try_put_and_wait`` applicability for dependency graphs
+
+Consider a 2D wavefront on a 4x4 grid that is implemented using a dependency graph with separate ``continue_node`` for computations on each cell of the grid:
+
+<img src="wavefront_cells.png" width=400>
+
+```cpp
+struct cell_body; // computes cell [i, j]
+
+using flow = oneapi::tbb::flow;
+using cell_node_type = flow::continue_node<flow::continue_msg>;
+
+flow::graph g;
+
+const std::size_t x_size = 4;
+const std::size_t y_size = 4;
+
+std::vector<std::vector<cell_node_type>> cell_nodes;
+cell_nodes.reserve(x_size);
+
+for (std::size_t i = 0; i < x_size; ++i) {
+    cell_nodes[i].reserve(y_size);
+    for (std::size_t j = 0; j < x_size; ++j) {
+        cell_nodes[i][j].emplace_back(/*cell_node_type*/g, cell_body(i, j));
+
+        // make edge with the north node
+        if (i != 0) {
+            flow::make_edge(cell_nodes[i - 1][j], cell_nodes[i][j]);
+        }
+
+        // make edge with the west node
+        if (j != 0) {
+            flow::make-edge(cell_nodes[i][j - 1], cell_nodes[i][j]);
+        }
+    }
+}
+
+// run the dependency graph
+cell_nodes[0][0].try_put_and_wait(flow::continue_msg{});
+```
+
+<img src="wavefront_graph.png" width=400>
+
+As described [above](#continue_node), each ``continue_node`` in the graph merges the associated metainfo objects received from each predecessor and the merging is done (at least
+in the current implementation) without avoiding the duplications to make ``merge`` operation more lightweight.
+
+In the graph above, call to ``try_put_and_wait`` on the first light blue node will create ``wait_context`` and the associated metainfo. The blue node would increase the associated
+reference counter once, pass the signal to the successors and decrease the reference counter. The number of reference counter operations made by the light blue node is `2`, total number is `2`
+as well.
+
+Similarly, when the signal is passed from the first light blue node to it's successors (blue nodes), each of them would increase the associated reference counter once, pass the signal to orange
+nodes and decrease the reference counter. The number of reference counter operations made by the blue nodes is `4` (`2` for each node), the total number of operations is `6`.
+
+The situation changes starting from the orange nodes layer. As it was mentioned above, each ``continue_node`` merges the metainfo from it's successors. Hence, the middle node of the orange layer
+merges the metainfos from both blue nodes on the previous layer, each of them contains one pointer to the same ``wait_context``. The resulting metainfo contains two pointers to the same 
+``wait_context`` object and the reference counter is increased and then decreased on each ``wait_context`` in the list.
+
+As a result, a middle orange node makes `2` increases of the reference counter (`1` for each element in the merged metainfo), passes this merged metainfo to each of middle green nodes and
+decreases the reference counter twice as well. We have `4` reference counter operations made by the middle orange node only.
+
+The utmost orange nodes behaves the same as blue node and make `4` operations with a reference counter (`1` increase and `1` decrease each). The number of reference counter operations made by
+the orange layer is `8` and the total number of operations with a reference counter in ``wait_context`` is `14`.
+
+Similarly, the middle nodes in the green layer merges the reference metainfo from the predecessors. Each of these nodes receives a metainfo with `1` stored pointer from the utmost orange nodes
+and a metainfo with `2` stored pointers from the middle orange node. The merged metainfo contains `3` pointers to the same ``wait_context`` and each of the nodes makes `3` increases and `3` decreases
+of the same reference counter.
+
+The utmost green nodes makes `2` operations each, similarly to the utmost orange nodes. The number of operations on the reference counter made on the green layer is `16` (`6` operations for each
+of the middle nodes and `2` operations for each of the utmost nodes). The total number of operations is `30`.
+
+Each node on the purple layer also merges the metainfos from it's predecessors. Similarly to the logic shown above, the utmost nodes metainfo contains `4` elements and the middle node
+metainfo contains `6` elements. The number of operations made on the purple layer is `28` (`8` operations for each of the utmost nodes and `12` operations for the middle node).
+The total number of operations is `58`.
+
+On the yellow level, we will have a metainfo of `10` pointers on each node and `40` more operations with the reference counter(`98` in total).
+
+The last red node receives a merged metainfo of `20` pointers and adds `40` more operations as well. The total number of operations is `138` - `69` increases and `69` decreases.
+
+The table below summarizes the number of operations made on each layer.
+
+| Layer      | Number of operations made | Total |
+|------------|---------------------------|-------|
+| Light blue | 2                         | 2     |
+| Blue       | 4                         | 6     |
+| Orange     | 8                         | 14    |
+| Green      | 16                        | 30    |
+| Purple     | 28                        | 58    |
+| Yellow     | 40                        | 98    |
+| Red        | 40                        | 138   |
+
+The situation above shows that the usage of ``try_put_and_wait`` for dependency graphs exponentially increases the number of pointers in the metainfo and hence the number of operations
+made with the reference counters. For the wavefront example, all `138` operations are made with the same ``wait_context`` object since only one ``try_put_and_wait`` was called.
+
+We also expect only one data flow in the dependency graph at a time (otherwise, the ``continue_node``s would be triggered multiple times by the signals that belong to different streams and
+the node would start earlier than expected).
+
+We would need to reconsider the implementation of ``try_put_and_wait`` for such Flow Graphs or do not support it at all.
+
 ### Multi-output nodes support
 
 Multi-output nodes (`multifunction_node` and `async_node`) creates an extra issue for the ``try_put_and_wait`` feature. Consider the following example (all of the examples shown
@@ -601,8 +699,10 @@ The following questions should be addressed before moving this feature to ``supp
   and [token-based graphs section](#try_put_and_wait-and-token-based-graphs) for more details.
 * Concurrent safety guarantees for ``clear()`` methods for ``overwrite_node`` and ``write_once_node`` should be defined (e.g. is it safe to clear the buffer when other thead
   tries to insert the new item).
+* Applicability of ``try_put_and_wait`` for dependency graphs should be reconsidered or the implementation should be changed.
+  See [separate section](#try_put_and_wait-applicability-for-dependency-graphs) for more information.
 * Feedback from the customers should be received
 * Necessity of separation of submitting the input to the graph and waiting for it's completion should be considered. See [separate section](#combined-or-separated-wait) for more details.
 * More multithreaded tests should be implemented for the existing functionality
-* More deep performance analysis should be done, including both proven performance boost when ``try_put_and_wait`` is used and absence of performance regression while it is not used.
+* More deep performance analysis should be done, including both proven performance boost when ``try_put_and_wait`` is used and absence of performance regression for regular graph usages.
 * The corresponding oneAPI specification update should be done
