@@ -173,8 +173,8 @@ The reference counter is decreased when:
 * The task associated with the computations of the ``try_put_and_wait`` input is finalized. If the output of the task should be propagated to the successors of the node, it is done
   from the task body and hence the reference counter is decreased only after creating the task for each successor and increasing the reference counter for them.
 * The item associated with the computations is taken from the buffering node or from the internal buffer.
-* When the desired number of signals from the predecessors was received by the ``continue_node``. This case is equivalent to retrieving the set of buffered ``message_metainfo``s received previously
-  from each predecessor. 
+* When the desired number of signals from the predecessors was received by the ``continue_node`` (after spawning a task for executing the body).
+  This case is equivalent to retrieving the set of buffered ``message_metainfo``s received previously from each predecessor. 
 
 ``message_metainfo`` class may be reused in the future to support additional use-cases when it is required to push additional information about the input message through the graph. E.g. supporting
 priorities for single messages - the corresponding priority tag can be assigned as part of the metainfo.
