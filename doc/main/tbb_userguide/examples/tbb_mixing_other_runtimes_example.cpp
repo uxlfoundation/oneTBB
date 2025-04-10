@@ -1,7 +1,9 @@
 #include <cstdint>
 #include <vector>
 #include <omp.h>
+#ifndef _WIN32
 #include <pthread.h>
+#endif
 #include <oneapi/tbb/parallel_for.h>
 
 namespace nesting_tbb {
@@ -36,6 +38,7 @@ void test() {
 
 } // namespace nesting_tbb
 
+#ifndef _WIN32
 namespace pthreads_and_tbb {
 
 /*begin pthreads with tbb*/
@@ -76,6 +79,7 @@ void test() {
 }
 
 } // namespace pthreads_and_tbb
+#endif                          // _WIN32
 
 namespace nesting_omp {
 
@@ -106,6 +110,8 @@ void test() {
 
 int main() {
     nesting_tbb::test();
+#ifndef _WIN32
     pthreads_and_tbb::test();
+#endif
     nesting_omp::test();
 }
