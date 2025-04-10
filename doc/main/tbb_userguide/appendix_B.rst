@@ -15,27 +15,10 @@ packages.
 Here is an example that parallelizes an outer loop with OpenMP and an
 inner loop with |short_name|.
 
-
-::
-
-
-   int M, N;
-
-
-   struct InnerBody {
-       ...
-   };
-
-
-   void TBB_NestedInOpenMP() {
-   #pragma omp parallel
-       {
-   #pragma omp for
-           for( int i=0; i<M; ++i ) {
-               parallel_for( blocked_range<int>(0,N,10), InnerBody(i) );
-           }
-       }
-   }
+.. literalinclude:: ./examples/tbb_mixing_other_runtimes_example.cpp
+   :language: c++
+   :start-after: /*begin outer loop openmp with nested tbb*/
+   :end-before: /*end outer loop openmp with nested tbb*/
 
 
 The details of ``InnerBody`` are omitted for brevity. The ``#pragma omp
@@ -47,33 +30,10 @@ previously created thread team to execute the loop in parallel.
 
 Here is the same example written using POSIX\* Threads.
 
-
-::
-
-
-   int M, N;
-
-
-   struct InnerBody {
-       ...
-   };
-
-
-   void* OuterLoopIteration( void* args ) {
-       int i = (int)args;
-       parallel_for( blocked_range<int>(0,N,10), InnerBody(i) );
-   }
-
-
-   void TBB_NestedInPThreads() {
-       std::vector<pthread_t> id( M );
-       // Create thread for each outer loop iteration
-       for( int i=0; i<M; ++i )
-           pthread_create( &id[i], NULL, OuterLoopIteration, NULL );
-       // Wait for outer loop threads to finish
-       for( int i=0; i<M; ++i )
-           pthread_join( &id[i], NULL );
-   }
+.. literalinclude:: ./examples/tbb_mixing_other_runtimes_example.cpp
+   :language: c++
+   :start-after: /*begin pthreads with tbb*/
+   :end-before: /*end pthreads with tbb*/
 
 
 Avoid CPU Overutilization
@@ -89,22 +49,10 @@ execution performance.
 Consider the example with nested parallelism from above but now with the
 OpenMP parallel region executed from |short_name| parallel loop.
 
-.. code:: cpp
-
-    int M, N;
-
-    struct InnerBody {
-        ...
-    };
-
-    void OpenMP_NestedInTBB() {
-        parallel_for( 0, M, [&](int) {
-            #pragma omp parallel for
-            for( int j=0; j<N; ++j ) {
-                InnerBody(j);
-            }
-        });
-    }
+.. literalinclude:: ./examples/tbb_mixing_other_runtimes_example.cpp
+   :language: c++
+   :start-after: /*begin outer loop tbb with nested omp*/
+   :end-before: /*end outer loop tbb with nested omp*/
 
 
 Due to semantics of OpenMP parallel region, such composition of parallel
