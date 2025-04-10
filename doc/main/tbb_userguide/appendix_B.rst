@@ -36,6 +36,8 @@ Here is the same example written using POSIX\* Threads.
    :end-before: /*end pthreads with tbb*/
 
 
+.. _Avoid CPU Overutilization:
+
 Avoid CPU Overutilization
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
