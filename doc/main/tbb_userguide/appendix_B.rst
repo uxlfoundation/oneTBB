@@ -21,11 +21,10 @@ inner loop with |short_name|.
    :end-before: /*end outer loop openmp with nested tbb*/
 
 
-The details of ``InnerBody`` are omitted for brevity. The ``#pragma omp
-parallel`` causes the OpenMP to create a team of threads, and each
-thread executes the block statement associated with the pragma. The
-``#pragma omp for`` indicates that the compiler should use the
-previously created thread team to execute the loop in parallel.
+The ``#pragma omp parallel`` causes the OpenMP to create a team of
+threads, and each thread executes the block statement associated with
+the pragma. The ``#pragma omp for`` indicates that the compiler should
+use the previously created thread team to execute the loop in parallel.
 
 
 Here is the same example written using POSIX\* Threads.
