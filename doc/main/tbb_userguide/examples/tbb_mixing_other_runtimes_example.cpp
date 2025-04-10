@@ -64,8 +64,7 @@ void TBB_NestedInPThreads() {
     // Create thread for each outer loop iteration
     for(int i = 0; i < M; ++i) {
         std::intptr_t arg = i;
-        pthread_create(&id[i], NULL, OuterLoopIteration,
-                       reinterpret_cast<void*>(arg));
+        pthread_create(&id[i], NULL, OuterLoopIteration, (void*)arg);
     }
     // Wait for outer loop threads to finish
     for(int i = 0; i < M; ++i)
