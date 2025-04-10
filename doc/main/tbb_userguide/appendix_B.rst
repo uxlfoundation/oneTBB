@@ -69,34 +69,34 @@ Thread Composability Manager is an experimental feature in oneAPI, hence
 it is disabled by default. To enable it, set ``TCM_ENABLE`` environment
 variable to ``1``. To make sure it works as intended set ``TCM_VERSION``
 environment variable to ``1`` before running your application and search
-for the output of the form:
+for the output starting from ``TCM:`` lines, as in the example:
 
 ::
 
     TCM: VERSION            1.3.0
-    TCM: INTERFACE VERSION  1030
-    TCM: HWLOC API VERSION  2.11.0
-    TCM: HWLOC LIBRARY PATH /lib64/libhwloc.so.15
-    TCM: BUILD TIME         2025-01-08 10:05:00 UTC
-    TCM: COMMIT ID          cd1987ab
-    TCM: TCM_DEBUG          undefined
+    <...>
     TCM: TCM_ENABLE         1
 
 
 , where the ``TCM: TCM_ENABLE         1`` line indicates that Thread
-Composability Manager is enabled and works.
+Composability Manager is enabled and works. When used with the OpenMP
+implementation of Intel(R) DPC++/C++ Compiler, Thread Composability
+Manager prevents creation of excessive threads in the scenarios similar
+to the above.
 
-To provide feedback on this feature create an issue in the `Issues
-section of the oneTBB GitHub repository
-<https://github.com/uxlfoundation/oneTBB/issues>`_
+
+You may use |short_name| communication channels (`GitHub issues
+<https://github.com/uxlfoundation/oneTBB/issues>`_, `discussions
+<https://github.com/uxlfoundation/oneTBB/discussions>`_, etc.) to also
+ask questions and provide feedback on Thread Composability Manager.
 
 
 .. note::
-   Negotiating utilization of CPU resources requires support in
-   threading packages. To make coordination most efficient, the support
-   is required in all threading packages used within the application.
-   Consult documentation of other threading packages to see if such
-   resource coordination capability exists in them.
+   The use of Thread Composability Manager to negotiate utilization of
+   CPU resources requires support in threading packages. For most
+   efficient coordination, it should be supported by all thread pools
+   used within the application. Consult the documentation of other
+   threading packages to see if such support exists there.
 
 
 .. rubric:: See also
