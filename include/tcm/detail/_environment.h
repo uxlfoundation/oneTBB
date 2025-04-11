@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2024 Intel Corporation
+    Copyright (C) 2023-2025 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -17,12 +17,13 @@
 
 #include <cstdlib> // for std::atoi, std::atof
 #include <cstring> // for std::strncpy
+#include "tcm/types.h" // for tcm_automatic
 
 namespace tcm {
 namespace internal {
     struct environment {
         static constexpr int string_size = 16;
-        int tcm_enable = 0;
+        int tcm_enable = tcm_automatic;
         int tcm_version = 0;
         float tcm_oversubscription_factor = 1.0;
         char tcm_resource_distribution_strategy[string_size+1] = "FAIR";

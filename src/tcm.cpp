@@ -2631,10 +2631,19 @@ class theTCM {
   static std::size_t reference_count;
   static std::mutex tcm_mutex;
   static internal::environment tcm_env;
-
 public:
   static bool is_enabled() {
     return tcm_env.tcm_enable == 1;
+  }
+
+  static bool tcm_enable_variable_explicitly_set() {
+    return tcm_env.tcm_enable != tcm_automatic;
+  }
+
+  static bool tcm_in_dev_environment() {
+    static bool in_dev_env = std::getenv("TCMROOT") || std::getenv("ONEAPI_ROOT") ||
+                             std::getenv("TBBROOT") || std::getenv("CMPLR_ROOT");
+    return in_dev_env;
   }
 
   friend float internal::tcm_oversubscription_factor();
@@ -2664,6 +2673,22 @@ public:
         return;
       tcm_ptr = nullptr;
       delete rm_instance_to_delete;
+    }
+  }
+
+  static void consider_suggesting_usage() {
+    __TCM_ASSERT(!is_enabled(), nullptr);
+    static std::atomic<std::size_t> connection_attempts{0};
+    constexpr std::size_t max_failed_connection_attempts = 2;
+    std::size_t previous_attempts = connection_attempts.fetch_add(1, std::memory_order_relaxed);
+    if (previous_attempts == max_failed_connection_attempts - 1) {
+      std::fprintf(stderr,
+        "Note: Several threading libraries could use Thread Composability Manager.\n"
+        "Hint: If CPUs are overutilized, setting the TCM_ENABLE environment variable to 1\n"
+        "may improve performance. For more details, search for \"avoid cpu overutilization\"\n"
+        "at https://uxlfoundation.github.io/oneTBB/\n"
+        "To suppress this message, set TCM_ENABLE to either 0 or 1.\n"
+      );
     }
   }
 };
@@ -2700,9 +2725,12 @@ tcm_result_t tcmConnect(tcm_callback_t callback, tcm_client_id_t* client_id)
   using tcm::theTCM;
 
   if (!theTCM::is_enabled()) {
-      return TCM_RESULT_ERROR_UNKNOWN;
+    if (!theTCM::tcm_enable_variable_explicitly_set() && theTCM::tcm_in_dev_environment()) {
+      theTCM::consider_suggesting_usage();
+    }
+    return TCM_RESULT_ERROR_UNKNOWN;
   } else if (!client_id) {
-      return TCM_RESULT_ERROR_INVALID_ARGUMENT;
+    return TCM_RESULT_ERROR_INVALID_ARGUMENT;
   }
 
   theTCM::increase_ref_count();

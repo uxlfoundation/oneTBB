@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023 Intel Corporation
+    Copyright (C) 2023-2025 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -104,7 +104,7 @@ int environment::get_version_string(const environment& env_info, char* buffer, u
                 printed += print_extra_info(internal_info+printed, default_buffer_sz-printed, "%-18s %s", "COMMIT ID", __TCM_COMMIT_ID);
                 printed += print_extra_info(internal_info+printed, default_buffer_sz-printed, "%-18s %s", "TCM_DEBUG", __TCM_DEBUG_STRING);
                 print_extra_info(internal_info+printed, default_buffer_sz-printed, "%-18s %d", "TCM_ENABLE", env_info.tcm_enable);
-            } else if (env_info.tcm_enable == 0) {
+            } else if (env_info.tcm_enable < 1) {
                 print_extra_info(tcm_variables_info, default_buffer_sz, "%-18s %s", "TCM", "disabled");
             }
 

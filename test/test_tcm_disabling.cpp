@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2024 Intel Corporation
+    Copyright (C) 2023-2025 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -49,12 +49,32 @@ bool test_tcm_connection(const bool is_success_expected) {
   return test_stop(res, test_name);
 }
 
+bool test_tcm_suggesting(const bool is_success_expected) {
+  const char* test_name = __func__;
+  test_prolog(test_name);
+
+  if (is_success_expected) {
+    test_log("Test is skipped because TCM is ENABLED");
+    return test_epilog(test_name);
+  }
+  bool res = true;
+  bool connection_failed = true;
+  tcm_client_id_t clid1;
+  tcm_client_id_t clid2;
+  connection_failed &= !succeeded(tcmConnect(nullptr, &clid1));
+  connection_failed &= !succeeded(tcmConnect(nullptr, &clid2));
+  res &= check(connection_failed, "tcmConnect is supposed to fail when it wasn't enabled");
+
+  return test_stop(res, test_name);
+}
+
 int main() {
   bool res = true;
 
   const bool is_successful_connection_expected = is_tcm_enabled();
 
   res &= test_tcm_connection(is_successful_connection_expected);
+  res &= test_tcm_suggesting(is_successful_connection_expected);
 
   return int(!res);
 }

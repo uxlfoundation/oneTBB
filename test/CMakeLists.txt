@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2024 Intel Corporation
+# Copyright (C) 2023-2025 Intel Corporation
 #
 # This software and the related documents are Intel copyrighted materials, and your use of them is
 # governed by the express license under which they were provided to you ("License"). Unless the
@@ -68,6 +68,7 @@ add_tcm_test(NAME test_rb ENVIRONMENT "TCM_ENABLE=1" DEPENDENCIES HWLOC::hwloc)
 add_tcm_test(NAME test_constrained_requests ENVIRONMENT "TCM_ENABLE=1" DEPENDENCIES HWLOC::hwloc)
 add_tcm_test(NAME test_tcm_version)
 add_tcm_test(NAME test_tcm_environment)
+add_tcm_test(NAME test_tcm_disabling)
 
 set_tests_properties(test_tcm_environment PROPERTIES
   FAIL_REGULAR_EXPRESSION "TCM: VERSION.*TCM: VERSION"
@@ -98,20 +99,39 @@ set_tests_properties(test_tcm_environment_disable_version_set PROPERTIES
 
 # Group of tests that runs the same test in different environment checking TCM
 # reacts accordingly
-set(TCM_TEST_DISABLING test_tcm_disabling)
-add_executable(${TCM_TEST_DISABLING} test_tcm_disabling.cpp)
-target_compile_options(${TCM_TEST_DISABLING} PRIVATE ${TCM_WARNING_LEVEL})
-target_compile_definitions(${TCM_TEST_DISABLING} PRIVATE ${TCM_COMPILE_DEFINITIONS})
-target_link_libraries(${TCM_TEST_DISABLING} PUBLIC TCM::tcm HWLOC::hwloc)
+macro(add_tcm_disabling_test name environment expect_suggesting)
+    add_test(NAME test_tcm_disabling_${name}
+        COMMAND ${CMAKE_COMMAND} -E env
+        --unset=TCMROOT
+        --unset=TBBROOT
+        --unset=ONEAPI_ROOT
+        --unset=CMPLR_ROOT
+        ${environment}
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_tcm_disabling
+        WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+    )
+    set_tests_properties(test_tcm_disabling_${name} PROPERTIES
+        ENVIRONMENT "${environment}"
+    )
+    if (${expect_suggesting})
+        set_tests_properties(test_tcm_disabling_${name} PROPERTIES
+            PASS_REGULAR_EXPRESSION "Note: Several threading*"
+            FAIL_REGULAR_EXPRESSION "ERROR"
+        )
+    else()
+        set_tests_properties(test_tcm_disabling_${name} PROPERTIES
+            FAIL_REGULAR_EXPRESSION "Note: Several threading*;ERROR"
+        )
+    endif()
+endmacro()
+add_tcm_disabling_test(with_env_untouched "" FALSE)
+add_tcm_disabling_test(with_empty_value "TCM_ENABLE=" FALSE)
+add_tcm_disabling_test(with_null_value "TCM_ENABLE=0" FALSE)
+add_tcm_disabling_test(with_non_null_value "TCM_ENABLE=1" FALSE)
 
-add_test(NAME ${TCM_TEST_DISABLING}_with_empty_env COMMAND ${TCM_TEST_DISABLING} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-set_tests_properties(${TCM_TEST_DISABLING}_with_empty_env PROPERTIES ENVIRONMENT "TCM_ENABLE=")
-
-add_test(NAME ${TCM_TEST_DISABLING}_with_non_null_env COMMAND ${TCM_TEST_DISABLING} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-set_tests_properties(${TCM_TEST_DISABLING}_with_non_null_env PROPERTIES ENVIRONMENT "TCM_ENABLE=1")
-
-add_test(NAME ${TCM_TEST_DISABLING}_with_null_env COMMAND ${TCM_TEST_DISABLING} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-set_tests_properties(${TCM_TEST_DISABLING}_with_null_env PROPERTIES ENVIRONMENT "TCM_ENABLE=0")
+foreach(root_var "TCMROOT" "TBBROOT" "ONEAPI_ROOT" "CMPLR_ROOT")
+    add_tcm_disabling_test(with_dev_env_${root_var} "${root_var}=stub" TRUE)
+endforeach()
 
 
 # Test no crash occurs if the app exits while still using TCM
