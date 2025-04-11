@@ -22,7 +22,7 @@ After installing |short_name|, set the environment variables:
    oneTBB can coordinate with Intel(R) OpenMP on CPU resources usage to avoid
    excessive oversubscription when both runtimes are used within a process. To
    enable this feature set up ``TCM_ENABLE`` environment variable to ``1``. For
-   more details, see `Avoid CPU Overutilization`_.
+   more details, see `Avoid CPU Overutilization <avoid_cpu_overutilization>`_.
 
 
 Build and Run a Sample 
