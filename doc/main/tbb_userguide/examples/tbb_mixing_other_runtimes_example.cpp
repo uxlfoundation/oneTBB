@@ -4,6 +4,7 @@
 #ifndef _WIN32
 #include <pthread.h>
 #endif
+#include <oneapi/tbb/global_control.h>
 #include <oneapi/tbb/parallel_for.h>
 
 namespace nesting_tbb {
@@ -100,7 +101,7 @@ void OpenMP_NestedInTBB() {
 /*end outer loop tbb with nested omp*/
 
 void test() {
-    M = 1; N = 100;
+    M = 2; N = 100;
     OpenMP_NestedInTBB();
 }
 
@@ -108,6 +109,12 @@ void test() {
 
 
 int main() {
+    // Setting maximum number of threads for both runtimes to avoid
+    // oversubscription issues
+    constexpr int max_threads = 2;
+    omp_set_num_threads(max_threads);
+    tbb::global_control gl(tbb::global_control::max_allowed_parallelism, max_threads);
+
     nesting_tbb::test();
 #ifndef _WIN32
     pthreads_and_tbb::test();
