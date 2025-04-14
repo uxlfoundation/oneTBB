@@ -110,7 +110,7 @@ the `join_node`, and `K` is the key type of the node. In this default implementa
 defined in the message class will be called. Alternatively, the user can define their own `key_from_message`
 function in the same namespace with the message type. This function will be found via C++ argument-dependent
 lookup (ADL) and used in place of the default implementation. The `key_from_message` function is invoked
-from the body object constructed by the `join_node` using an explicit template argument and so the functon
+from the body object constructed by the `join_node` using an explicit template argument and so the function
 must be a template with at least the key type as a template parameter:
 
 
