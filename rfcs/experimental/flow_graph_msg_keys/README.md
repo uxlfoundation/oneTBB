@@ -7,7 +7,7 @@ input types. The extension simplifies the existing approach by removing the need
 each input port of `join_node`.
 
 Let's consider the following graph that has two `queue_nodes` named `q0` and `q1` that are connected to a
-key matching `join_node j` that is then connected to a final `queue_node` name `q2`:
+key matching `join_node j` that is then connected to a final `queue_node` name `q3`:
 
 <img src="JoinGraph.png">
 
