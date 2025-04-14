@@ -213,3 +213,4 @@ As an already released experimental feature, this extension is documented in the
 The following conditions need to be met to move the feature from experimental to fully supported:
 * Collecting feedback on user experience confirming the choices made on the open questions and limitations:
   * Is an optional `key()` member function and ADL the best options for simplification? We are open to other suggestions.
+* The feature must be added to the oneTBB specification and accepted.
