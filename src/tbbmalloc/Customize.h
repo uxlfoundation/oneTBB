@@ -94,7 +94,7 @@ namespace tbb {
 namespace detail {
 namespace d1 {
 
-    enum notify_type {prepare=0, cancel, acquired, releasing, destroy};
+    enum notify_type {prepare=0, cancel, acquired, releasing};
 
 #if TBB_USE_PROFILING_TOOLS
     inline void call_itt_notify(notify_type t, void *ptr) {
