@@ -70,7 +70,7 @@ private:
     friend class base_filter;
     friend void set_end_of_input(d1::base_filter& bf);
 
-    task_group_context& my_context;
+    d1::task_group_context& my_context;
 
     //! Pointer to first filter in the pipeline.
     d1::base_filter* first_filter;
