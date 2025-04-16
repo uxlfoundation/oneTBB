@@ -1,93 +1,110 @@
 # oneTBB Versioning Policies
 
-There are several types of "versioning" used by the oneTBB project.
+oneTBB follows a multi-level versioning approach. This document outlines the different types of versioning 
+used in the oneTBB project and how they relate to compatibility and usage.
 
-1. The *oneTBB specification version*
-2. The *official oneTBB library version*
-3. The *library interface version*
-4. *API versioning* used to maintain backwards compatibility
+## Version Types
 
-The oneTBB project uses semantic versioning (https://semver.org/) and as a oneAPI Library,
-the oneTBB project makes commitments around compatibility as described
-[here](https://www.intel.com/content/www/us/en/docs/oneapi/programming-guide/2024-1/oneapi-library-compatibility.html).
-With semantic versioning, a MAJOR version increment generally means an incompatible API change,
-while a MINOR version increment means added functionality that is implemented in a backwards compatible manner.
+oneTBB uses the following versioning types:
 
-## The oneTBB Specification Version
+| Version Type    | Purpose                          | Relevant Macros / Functions                               |
+|-----------------|----------------------------------|------------------------------------------------------------|
+| Specification   | Tracks [specification](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/nested-index) conformance          | `ONETBB_SPEC_VERSION`                                      |
+| Library         | Identifies the release version   | `TBB_VERSION_MAJOR`, `TBB_VERSION_MINOR`, `TBB_VERSION_STRING`, `TBB_runtime_version()` |
+| Interface       | Ensures binary compatibility     | `TBB_INTERFACE_VERSION_MAJOR`, `TBB_INTERFACE_VERSION_MINOR`, `TBB_INTERFACE_VERSION`, `TBB_runtime_interface_version()` |
+| API (Namespace) | Maintains backwards compatibility | Namespaces: `dN` (headers), `rN` (runtime symbols)         |
 
-The oneTBB project is governed by the [UXL foundation](https://uxlfoundation.org/) and has
+
+The oneTBB project uses [semantic versioning](https://semver.org/), where:
+ 
+* A **MAJOR** version change introduces breaking updates. 
+* A **MINOR** version adds backwards-compatible updates.
+
+As part of the [oneAPI Specification](https://oneapi.io/), oneTBB also follows 
+the [oneAPI Compatibility Guidelines](https://www.intel.com/content/www/us/en/docs/oneapi/programming-guide/2024-1/oneapi-library-compatibility.html).
+
+
+## Specification Version
+
+oneTBB is governed by the [UXL foundation](https://uxlfoundation.org/) and has
 [an open specification](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/nested-index).
-Each release of the specification has a version number.
 
-[As described in the specification](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/configuration/version_information),
-the value of the `ONETBB_SPEC_VERSION` macro in `oneapi/tbb/version.h` is  latest specification of oneTBB fully
-supported by the implementation.
+* The `ONETBB_SPEC_VERSION` macro, defined in `oneapi/tbb/version.h`, indicates the latest oneTBB specification version fully
+supported by the implementation. See [Version Information](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/configuration/version_information). 
+* Specification versions are independent of implementation or interface versions.
 
-## The oneTBB Library Version
 
-The oneTBB library version can be thought of as the name of the release. If you want to find a specific
-release in the repository (https://github.com/uxlfoundation/oneTBB), the tag you would look for corresponds
-to the oneTBB library version.
+## Library Version
 
-[As described in the specification](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/configuration/version_information),
-the macros `TBB_VERSION_MAJOR`, `TBB_VERSION_MINOR`, `TBB_VERSION_STRING` in `oneapi/tbb/version.h`
-provide the library version of the implementation that is being compiled against. The function
-`const char* TBB_runtime_version();` can be used to query the library version of the oneTBB binary library that is
-loaded at runtime.
+The oneTBB library version identifies an implementation release. We tag the [GitHub* Releases](https://github.com/uxlfoundation/oneTBB/releases) using the library version. 
 
-## The oneTBB Interface Version
+The following macros provide the library version that is being compiled against:
+* `TBB_VERSION_MAJOR`
+* `TBB_VERSION_MINOR`
+* `TBB_VERSION_STRING`
 
-The oneTBB interface version is the public contract about the interface to the library including the
-functions exported by the binary library and the types defined in the headers. The oneTBB library is designed
-for backwards compatibility. It works well in the scenarios where components compile/link against a TBB version
-X.Y. And then at runtime, the application loads a library version X.Z, where X.Z >= X.Y.
+See [Version Information](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/configuration/version_information) to learn more. 
 
-A minor version may add new functionality in the headers or in the binary library, including new entry points to the
-binary library. An application compiled against an older minor version could not have used this new functionality
-and therefore can safely use the newer binary library.
+To return the library version of the binary library at runtime, can use the `const char* TBB_runtime_version();` function. 
 
-[As described in the specification](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/configuration/version_information),
-the macros `TBB_INTERFACE_VERSION_MAJOR`, `TBB_INTERFACE_VERSION_MINOR`, `TBB_INTERFACE_VERSION` in `oneapi/tbb/version.h`
-can be used to determine the interface version of the implementation that is being compiled against. The function
-`int TBB_runtime_interface_version();` can be used to query the interface version of the oneTBB binary library that is
-loaded at runtime.
+## Interface Version
 
-### Shared Library Practices for Linux
+The interface version defines the public contract for the oneTBB library, including function signatures and types in headers and symbols in the binary.
 
-On Linux we use a symlink system for binary libraries in the oneTBB distribution, and also explicitly set a soname.
-The actual shared library is libtbb.so.X.Y but it is built with a –soname that uses only the major version number,
-libtbb.so.X.  In addition, there is a symlink from libtbb.so.X -> libtbb.so.X.Y and a symlink from
-libtbb.so -> libtbb.so.X.  Therefore, whether you build against libtbb.so, libtbb.so.X or libtbb.so.X.Y, your
-application will have a dependency on libtbb.so.X.
+It enables the runtime compatibility between different **MINOR** versions with the same **MAJOR** version. 
+Applications built with oneTBB version *X.Y* can safely run with binary version *X.Z* (where *Z* ≥ *Y*).
 
-A common development process is to compile and link against a library version X.Y. This creates
-a dependency on libtbb.so.X. The packaged project then redistributes a TBB shared library that 
-is X.Z, where X.Z >= X.Y.
+The following macros provide the interface version that is being compiled against:
 
-In the (unusual) case where the package does not redistribute a TBB library and instead depends on a version already 
-available on the install platform, it is safest to build against the oldest version you expect to encounter; in the
-extreme this would be X.1. Of course, building against X.1 means no additional functionalility added in any later minor 
-release can be used during the development of the application.
+* `TBB_INTERFACE_VERSION_MAJOR`
+* `TBB_INTERFACE_VERSION_MINOR`
+* `TBB_INTERFACE_VERSION` 
 
-### Shared Library Practices for Windows
+See [Version Information](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/configuration/version_information) to learn more. 
 
-On Windows, the TBB binary library has only the major version number, tbb12.dll.
+To return the interface version of the binary library at runtime, use the `int TBB_runtime_interface_version();` function. 
 
-## API versioning used to maintain backwards compatibility
+### Shared Library Conventions
 
-This section is targeted at oneTBB contributors and will likely not be of interest to users of the
-oneTBB library.
+#### Linux* OS
 
-As mentioned previously, minor release may add new functionality, including modified definitions of classes 
-in the headers or new entry points into the binary library.  To safely add this new functionality in a way 
-that avoids conflicts, oneTBB has namespaces for class definitions in the headers (that start with the 
-letter "d") and namespaces for symbols exported by the binary runtime library (that start with the 
-letter "r").
+oneTBB uses a symlink system for binary libraries and explicitly set a soname that uses only the major version number.
 
-Below is an example of
-[a function exported](https://github.com/uxlfoundation/oneTBB/blob/45c2298727d09556a523d6aeaec84ef23872eccf/src/tbb/parallel_pipeline.cpp#L446)
+ 
+* The shared library: ``libtbb.so.X.Y``
+* Soname: ``libtbb.so.X``
+* Symlinks:
+  
+  ```
+  libtbb.so.X -> libtbb.so.X.Y
+  libtbb.so -> libtbb.so.X
+  ```
+
+Therefore, whether you build against `libtbb.so`, `libtbb.so.X`, or `libtbb.so.X.Y`, your application has a dependency on `libtbb.so.X`.
+
+**Development Best Practice:** 
+
+* If you redistribute your version of the oneTBB binary, use the latest ``X.Z``. 
+* If you rely on system libraries, build against the oldest expected version (e.g., ``X.1``) for maximum compatibility.
+
+#### Windows* OS
+
+On Windows* OS, the TBB binary library has only the major version number, ``tbb12.dll``.
+
+## API Version to Maintain Backwards Compatibility
+
+This section is targeted at oneTBB contributors. 
+
+To preserve backwards compatibility across **MINOR** releases, oneTBB uses versioned namespaces:
+
+* Header-level types use the `dN` namespace (e.g., `d1`, `d2`).
+* Runtime library symbols use the `rN` namespace (e.g., `r1`, `r2`).
+
+### Example
+Below is an example of [a function exported](https://github.com/uxlfoundation/oneTBB/blob/45c2298727d09556a523d6aeaec84ef23872eccf/src/tbb/parallel_pipeline.cpp#L446)
 by the oneTBB runtime library:
 
+```
     namespace tbb {
     namespace detail {
     namespace r1 {
@@ -97,13 +114,13 @@ by the oneTBB runtime library:
     }
     }
     }
+```
 
-This function is in the runtime namespace `r1` and takes `d1` versions of `task_group_context` and 
-`filter_node` classes as arguments. Backward incompatible changes added to the library can be added 
-to namespaces with incremented version numbers.
+Here, ``parallel_pipeline`` is exported under the `r1` runtime namespace, taking `d1` versions of `task_group_context` and 
+`filter_node` classes as arguments. 
 
-Rules for the `d` namespace include:
 
-- If the layout of public class X is changed incompatibly, the “d” namespace number should be incremented.
-- If there are existing entry points using the current version of class X, the old version of X should 
-be kept in the previous “d” namespace.
+### Rules for Namespace Version
+
+- If the layout of public class X is changed incompatibly, increment the ``d`` namespace number.
+- Retain previous class versions in their original namespaces if existing entry points still use them.
