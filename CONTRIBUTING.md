@@ -36,7 +36,7 @@ You can find all [open oneTBB pull requests](https://github.com/uxlfoundation/on
 * Make sure you can build the product and run all the tests with your patch. 
 * For a larger feature, provide a relevant test. 
 * Document your code. The oneTBB project uses reStructuredText for documentation.  
-  * If your documentation has code samples or examples, place them into the corresonding example folder. 
+  * If your documentation has code samples or examples, place them into the corresponding example folder. 
 * Update the copyright year in the first line of the changing file(s). 
   For example, if you commit your changes in 2022:
   * the copyright year should be `2005-2025` for existing files
