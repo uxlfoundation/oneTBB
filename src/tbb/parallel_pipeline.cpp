@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -70,7 +70,7 @@ private:
     friend class base_filter;
     friend void set_end_of_input(d1::base_filter& bf);
 
-    task_group_context& my_context;
+    d1::task_group_context& my_context;
 
     //! Pointer to first filter in the pipeline.
     d1::base_filter* first_filter;

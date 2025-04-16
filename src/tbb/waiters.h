@@ -71,7 +71,10 @@ public:
                         return true;
                     }
 
-                    if (!my_arena.my_thread_leave.is_retention_allowed() ||
+                    if (
+#if __TBB_PREVIEW_PARALLEL_PHASE
+                        !my_arena.my_thread_leave.is_retention_allowed() ||
+#endif
                         my_arena.my_threading_control->is_any_other_client_active())
                     {
                         break;

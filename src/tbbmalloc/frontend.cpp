@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -2885,7 +2885,7 @@ void doThreadShutdownNotification(TLSData* tls, bool main_thread)
 }
 
 #if USE_PTHREAD
-void mallocThreadShutdownNotification(void* arg)
+extern "C" void mallocThreadShutdownNotification(void* arg)
 {
     // The routine is called for each pool (as TLS dtor) on each thread, except for the main thread
     if (!isMallocInitialized()) return;
