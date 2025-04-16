@@ -18,11 +18,11 @@
 This document contains changes of oneTBB compared to the last release.
 
 ## Table of Contents <!-- omit in toc -->
-- [New Features](new-features)
-- [Preview Features](#preview-features)
-- [Known Limitations](#known-limitations)
-- [Issues Fixed](#issues-fixed)
-- [Open-Source Contributions Integrated](#open-source-contributions-integrated)
+- [:tada: New Features](#tada-new-features)
+- [:rocket: Preview Features](#rocket-preview-features)
+- [:rotating\_light: Known Limitations](#rotating_light-known-limitations)
+- [:hammer: Issues Fixed](#hammer-issues-fixed)
+- [:octocat: Open-Source Contributions Integrated](#octocat-open-source-contributions-integrated)
 
 ## :tada: New Features
 - The oneTBB repository migrated to the new [UXL Foundation](https://github.com/uxlfoundation/oneTBB) organization.
