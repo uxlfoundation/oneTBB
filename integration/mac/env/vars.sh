@@ -142,7 +142,6 @@ if [ -e "$TBBROOT/lib/$LIBTBB_NAME" ]; then
     DYLD_LIBRARY_PATH=$(prepend_path "${TBBROOT}/lib" "${DYLD_LIBRARY_PATH:-}") ; export DYLD_LIBRARY_PATH
     C_INCLUDE_PATH=$(prepend_path "${TBBROOT}/include" "${C_INCLUDE_PATH:-}") ; export C_INCLUDE_PATH
     CPLUS_INCLUDE_PATH=$(prepend_path "${TBBROOT}/include" "${CPLUS_INCLUDE_PATH:-}") ; export CPLUS_INCLUDE_PATH
-
     CMAKE_PREFIX_PATH=$(prepend_path "${TBBROOT}" "${CMAKE_PREFIX_PATH:-}") ; export CMAKE_PREFIX_PATH
     PKG_CONFIG_PATH=$(prepend_path "${TBBROOT}/lib/pkgconfig" "${PKG_CONFIG_PATH:-}") ; export PKG_CONFIG_PATH
 else
