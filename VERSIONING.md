@@ -45,7 +45,7 @@ The following macros provide the library version that is being compiled against:
 
 See [Version Information](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/configuration/version_information) to learn more. 
 
-To return the library version of the binary library at runtime, can use the `const char* TBB_runtime_version();` function. 
+To return the library version of the binary library at runtime, use the `const char* TBB_runtime_version();` function. 
 
 ## Interface Version
 
