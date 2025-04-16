@@ -174,7 +174,8 @@ if [ -e "$TBBROOT/lib$TBB_ARCH_SUFFIX/$TBB_LIB_DIR/$TBB_LIB_NAME" ]; then
 
   LIBRARY_PATH=$(prepend_path "${TBBROOT}/lib$TBB_ARCH_SUFFIX/$TBB_LIB_DIR" "${LIBRARY_PATH:-}") ; export LIBRARY_PATH
   LD_LIBRARY_PATH=$(prepend_path "${TBBROOT}/lib$TBB_ARCH_SUFFIX/$TBB_LIB_DIR" "${LD_LIBRARY_PATH:-}") ; export LD_LIBRARY_PATH
-  CPATH=$(prepend_path "${TBBROOT}/include" "${CPATH:-}") ; export CPATH
+  C_INCLUDE_PATH=$(prepend_path "${TBBROOT}/include" "${C_INCLUDE_PATH:-}") ; export C_INCLUDE_PATH
+  CPLUS_INCLUDE_PATH=$(prepend_path "${TBBROOT}/include" "${CPLUS_INCLUDE_PATH:-}") ; export CPLUS_INCLUDE_PATH
   CMAKE_PREFIX_PATH=$(prepend_path "${TBBROOT}" "${CMAKE_PREFIX_PATH:-}") ; export CMAKE_PREFIX_PATH
   PKG_CONFIG_PATH=$(prepend_path "${TBBROOT}/lib$TBB_ARCH_SUFFIX/pkgconfig" "${PKG_CONFIG_PATH:-}") ; export PKG_CONFIG_PATH
 else

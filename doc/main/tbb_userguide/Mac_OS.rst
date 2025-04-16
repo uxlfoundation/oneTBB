@@ -17,7 +17,8 @@ The following table describes the subdirectory structure for macOS\*, relative t
       * - Header files     
         - | ``<tbb_install_dir>/include/oneapi/tbb.h``
  	  | ``<tbb_install_dir>/include/oneapi/tbb/*.h``     
-        - ``CPATH`` 
+        - |``C_INCLUDE_PATH``
+          |``CPLUS_INCLUDE_PATH``
       * - Shared libraries
         - ``<tbb_install_dir>/lib/<lib><variant>.<version>.dylib``
         - | ``LIBRARY_PATH``

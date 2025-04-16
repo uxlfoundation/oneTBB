@@ -19,7 +19,8 @@ structure for Linux\*, relative to *<tbb_install_dir>*
     * - Header files     
       - | ``<tbb_install_dir>/include/oneapi/tbb.h``
 	| ``<tbb_install_dir>/include/oneapi/tbb/*.h``     
-      - ``CPATH``     
+      - |``C_INCLUDE_PATH``
+        |``CPLUS_INCLUDE_PATH``
     * - Shared libraries     
       - ``<tbb_install_dir>/lib/<arch>/gcc4.8/<lib><compat_version><variant>.so.<version>``
       - | ``LIBRARY_PATH``
