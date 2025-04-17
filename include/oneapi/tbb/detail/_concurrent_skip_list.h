@@ -264,6 +264,7 @@ protected:
     using node_allocator_traits = tbb::detail::allocator_traits<node_allocator_type>;
 
     using list_node_type = skip_list_node<value_type, node_allocator_type>;
+    using atomic_node_ptr_type = std::atomic<list_node_type*>;
     using node_type = d1::node_handle<key_type, value_type, list_node_type, allocator_type>;
 
     using iterator = skip_list_iterator<list_node_type, value_type>;
