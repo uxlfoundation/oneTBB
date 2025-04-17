@@ -234,9 +234,9 @@
 					<Exec>page_ptr = my_queue_representation-&gt;array[micro_queue_index].head_page._Storage._Value</Exec> 
 
 					<!-- if the last element in the seg of pages is processing, increase the global index of the page -->
-					<If Condition="0 == (index % (my_queue_representation-&gt;n_queue * my_queue_representation-&gt;items_per_page))">
-						<Exec>processing_page_index += 1</Exec>
-					</If>
+					<If Condition="index != 0 &amp;&amp; 0 == (index % (my_queue_representation-&gt;n_queue * my_queue_representation-&gt;items_per_page))">
+				        <Exec>processing_page_index += 1</Exec>
+                    </If>
 					
 					<!-- finding the page number processing_page_index in the desired micro-queue starting from the head page -->
 					<Loop>
