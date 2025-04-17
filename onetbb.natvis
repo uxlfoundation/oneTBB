@@ -101,13 +101,13 @@
 					
 					the first node in the list is always a dummy node so the first real item is located in the second node
 				-->
-				<Variable Name="node_ptr" InitialValue="(*(atomic_node_ptr_type*)(my_head_ptr._Storage._Value + 1))._Storage._Value"/>
+				<Variable Name="node_ptr" InitialValue="(*(atomic_node_ptr*)(my_head_ptr._Storage._Value + 1))._Storage._Value"/>
 
 				<!-- traverse the skip list on the first level-->
 				<Loop>
 					<Break Condition="node_ptr == nullptr"/>
 					<Item>node_ptr-&gt;my_value</Item>
-					<Exec>node_ptr = (*(atomic_node_ptr_type*)(node_ptr + 1))._Storage._Value</Exec>
+					<Exec>node_ptr = (*(atomic_node_ptr*)(node_ptr + 1))._Storage._Value</Exec>
 				</Loop>
 			</CustomListItems>
 		</Expand>
