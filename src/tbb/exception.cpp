@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2005-2023 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@
 #include <stdexcept> // std::runtime_error
 #include <new>
 #include <stdexcept>
+#include <cstdarg>
 
 #define __TBB_STD_RETHROW_EXCEPTION_POSSIBLY_BROKEN                             \
     (__GLIBCXX__ && __TBB_GLIBCXX_VERSION>=40700 && __TBB_GLIBCXX_VERSION<60000 && TBB_USE_EXCEPTIONS)
@@ -40,55 +41,59 @@ const char* bad_last_alloc::what() const noexcept(true) { return "bad allocation
 const char* user_abort::what() const noexcept(true) { return "User-initiated abort has terminated this operation"; }
 const char* missing_wait::what() const noexcept(true) { return "wait() was not called on the structured_task_group"; }
 
+
+/*[[noreturn]]*/ void print_error_and_terminate(const char* format, ...)
+{
+    va_list vl;
+    va_start(vl,format);
+    std::vfprintf(stderr, format, vl);
+    va_end(vl);
+    std::fflush(stderr);
+    std::terminate();
+}
+
 #if TBB_USE_EXCEPTIONS
-    template <typename F>
-    /*[[noreturn]]*/ void do_throw_noexcept(F throw_func) noexcept {
-        throw_func();
-    }
-
-    /*[[noreturn]]*/ void do_throw_noexcept(void (*throw_func)()) noexcept {
-        throw_func();
-#if __GNUC__ == 7
-        // In release, GCC 7 loses noexcept attribute during tail call optimization.
-        // The following statement prevents tail call optimization.
-        volatile bool reach_this_point = true;
-        suppress_unused_warning(reach_this_point);
-#endif
-    }
-
     bool terminate_on_exception(); // defined in global_control.cpp and ipc_server.cpp
 
-    template <typename F>
-    /*[[noreturn]]*/ void do_throw(F throw_func) {
-        if (terminate_on_exception()) {
-            do_throw_noexcept(throw_func);
-        }
-        throw_func();
+    static void do_terminate_on_exception(const char* ex)
+    {
+        print_error_and_terminate("'terminate_on_exception' enabled when throwing %s. Aborting.\n", ex);
+    }
+    static void do_terminate_on_exception(const char* ex, const char* msg)
+    {
+        print_error_and_terminate("'terminate_on_exception' enabled when throwing %s(%s). Aborting.\n", ex, msg);
     }
 
-    #define DO_THROW(exc, init_args) do_throw( []{ throw exc init_args; } );
+#   define DO_THROW(ex, ...) \
+        if (terminate_on_exception()) { \
+            do_terminate_on_exception(#ex, ##__VA_ARGS__); \
+        } \
+        throw ex(__VA_ARGS__)
 #else /* !TBB_USE_EXCEPTIONS */
-    #define PRINT_ERROR_AND_ABORT(exc_name, msg) \
-        std::fprintf (stderr, "Exception %s with message %s would have been thrown, "  \
-            "if exception handling had not been disabled. Aborting.\n", exc_name, msg); \
-        std::fflush(stderr); \
-        std::abort();
-    #define DO_THROW(exc, init_args) PRINT_ERROR_AND_ABORT(#exc, #init_args)
+    static void do_exceptions_disabled_error(const char* ex)
+    {
+        print_error_and_terminate("Exception %s would have been thrown but exceptions are disabled.\n", ex);
+    }
+    static void do_exceptions_disabled_error(const char* ex, const char* msg)
+    {
+        print_error_and_terminate("Exception %s(%s) would have been thrown but exceptions are disabled.\n", ex, msg);
+    }
+#   define DO_THROW(ex, ...) do_exceptions_disabled_error(#ex, ##__VA_ARGS__)
 #endif /* !TBB_USE_EXCEPTIONS */
 
 void throw_exception ( exception_id eid ) {
     switch ( eid ) {
-    case exception_id::bad_alloc: DO_THROW(std::bad_alloc, ()); break;
-    case exception_id::bad_last_alloc: DO_THROW(bad_last_alloc, ()); break;
-    case exception_id::user_abort: DO_THROW( user_abort, () ); break;
-    case exception_id::nonpositive_step: DO_THROW(std::invalid_argument, ("Step must be positive") ); break;
-    case exception_id::out_of_range: DO_THROW(std::out_of_range, ("Index out of requested size range")); break;
-    case exception_id::reservation_length_error: DO_THROW(std::length_error, ("Attempt to exceed implementation defined length limits")); break;
-    case exception_id::missing_wait: DO_THROW(missing_wait, ()); break;
-    case exception_id::invalid_load_factor: DO_THROW(std::out_of_range, ("Invalid hash load factor")); break;
-    case exception_id::invalid_key: DO_THROW(std::out_of_range, ("invalid key")); break;
-    case exception_id::bad_tagged_msg_cast: DO_THROW(std::runtime_error, ("Illegal tagged_msg cast")); break;
-    case exception_id::unsafe_wait: DO_THROW(unsafe_wait, ("Unsafe to wait further")); break;
+    case exception_id::bad_alloc: DO_THROW(std::bad_alloc); break;
+    case exception_id::bad_last_alloc: DO_THROW(bad_last_alloc); break;
+    case exception_id::user_abort: DO_THROW(user_abort); break;
+    case exception_id::nonpositive_step: DO_THROW(std::invalid_argument, "Step must be positive"); break;
+    case exception_id::out_of_range: DO_THROW(std::out_of_range, "Index out of requested size range"); break;
+    case exception_id::reservation_length_error: DO_THROW(std::length_error, "Attempt to exceed implementation defined length limits"); break;
+    case exception_id::missing_wait: DO_THROW(missing_wait); break;
+    case exception_id::invalid_load_factor: DO_THROW(std::out_of_range, "Invalid hash load factor"); break;
+    case exception_id::invalid_key: DO_THROW(std::out_of_range, "invalid key"); break;
+    case exception_id::bad_tagged_msg_cast: DO_THROW(std::runtime_error, "Illegal tagged_msg cast"); break;
+    case exception_id::unsafe_wait: DO_THROW(unsafe_wait, "Unsafe to wait further"); break;
     default: __TBB_ASSERT ( false, "Unknown exception ID" );
     }
     __TBB_ASSERT(false, "Unreachable code");
@@ -113,11 +118,7 @@ void handle_perror( int error_code, const char* what ) {
         buf_len = std::strlen(buf);
     }
     __TBB_ASSERT(buf_len <= BUF_SIZE && buf[buf_len] == 0, nullptr);
-#if TBB_USE_EXCEPTIONS
-    do_throw([&buf] { throw std::runtime_error(buf); });
-#else
-    PRINT_ERROR_AND_ABORT( "runtime_error", buf);
-#endif /* !TBB_USE_EXCEPTIONS */
+    DO_THROW(std::runtime_error, buf);
 }
 
 #if __TBB_STD_RETHROW_EXCEPTION_POSSIBLY_BROKEN
