@@ -77,6 +77,14 @@
 #undef _DEBUG
 #endif /* !TBB_USE_DEBUG && defined(_DEBUG) */
 
+#if __TBB_TEST_SECONDARY && TBB_PREVIEW_MEMORY_POOL && defined(_CRTDBG_MAP_ALLOC)
+// when _CRTDBG_MAP_ALLOC is defined, the base versions of malloc, free and realloc are replaced with
+// their debug versions with different amount of arguments. It is implemented as #define malloc(x) _malloc_dbg(x, additional-args)
+// that breaks the definition of tbb::detail::d1::base_pool::malloc/free/realloc
+// excluding memory_pool.h from testing when this mode is enabled
+#undef TBB_PREVIEW_MEMORY_POOL
+#endif
+
 #include "tbb/tbb.h"
 
 #if !__TBB_TEST_SECONDARY
@@ -174,9 +182,11 @@ static void TestExceptionClassesExports () {
 static void TestPreviewNames() {
     TestTypeDefinitionPresence2( concurrent_lru_cache<int, int> );
     TestTypeDefinitionPresence( isolated_task_group );
+#if TBB_PREVIEW_MEMORY_POOL
     TestTypeDefinitionPresence( memory_pool_allocator<int> );
     TestTypeDefinitionPresence( memory_pool<std::allocator<int>> );
     TestTypeDefinitionPresence( fixed_pool );
+#endif
 }
 #endif
 
