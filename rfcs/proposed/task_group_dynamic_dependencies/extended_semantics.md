@@ -545,10 +545,10 @@ void calculate_forces(int n_bodies, Body* bodies) {
 
 ### Wavefront
 
-Wavefront is a scientific programming pattern in which data elements are distributed on multidimentional grids. Elements should be computed in order
+Wavefront is a scientific programming pattern in which data elements are distributed on multidimensional grids. Elements should be computed in order
 because of dependencies between them.
 
-Let's consider a 2 dimentional wavefront example where the computation starts on the upper left corner of the grid:
+Let's consider a 2 dimensional wavefront example where the computation starts on the upper left corner of the grid:
 
 <img src="assets/wavefront.png" width=300>
 
@@ -708,7 +708,7 @@ Outer task assigns child tasks (tasks that should be executed from the inner tas
 Currently executed task is replaced by `north_subtask` in the task graph by transferring the successors (becomes necessary starting from running the outer tasks
 on the second split).
 
-`north_subtask` is runned for execution because it does not have any additional dependencies.
+`north_subtask` is submitted for execution because it does not have any additional dependencies.
 
 The inner task also divides itself into 4 subtasks (outer tasks to re-run the algorithm) - `north_subtask`, `west_subtask`, `east_subtask` and `south_subtask`.
 
@@ -718,15 +718,15 @@ It creates predecessor-successor dependencies between them to create a diamond-s
 * While executing the outer `south_subtask` - additional dependencies are created with the outer `west_subtask`'s and `east_subtask`'s sub-tasks.
 
 The inner task saves trackers to the currently executing task sub-tasks and executes them. Subtasks can be executed directly if dependencies allows, e.g. when
-subtasks of the outer `north_subtask` are runned.
+subtasks of the outer `north_subtask` are ran.
 
 After running the sub-graph, inner task notifies it's child tasks about the subtasks created:
 * outer `west_subtask` and `east_subtask` are notified about inner sub-tasks of the outer `north_subtask`,
 * outer `south_subtask` is notified about inner sub-tasks of `west_subtask` and `east_subtask`.
 
-The last action done by the inner task - is decrementing the reference counter on childs and runnning them for execution:
-* outer `west_subtask` and `east_subtask` are runned by the outer `north_subtask`
-* outer `south_subtask` is runned by either the outer `west_subtask` or the outer `east_subtask`.
+The last action done by the inner task - is decrementing the reference counter on child tasks and is running them for execution:
+* outer `west_subtask` and `east_subtask` are ran by the outer `north_subtask`
+* outer `south_subtask` is ran by either the outer `west_subtask` or the outer `east_subtask`.
 
 The algorithm is repeated until the threshold is reached.
 
@@ -852,7 +852,7 @@ void eager_wavefront_inner_task::operator()() {
         tbb::task_group::make_edge(east_parent_south_subtask, east_subtask);
     }
 
-    // Save trackers to current subtasks for future assignment to childs
+    // Save trackers to current subtasks for future assignment to child tasks
     tbb::task_tracker west_subtask_tracker = west_subtask;
     tbb::task_tracker east_subtask_tracker = east_subtask;
     tbb::task_tracker south_subtask_tracker = south_subtask;
@@ -899,7 +899,7 @@ The task graph for the eager wavefront approach is shown below (outer tasks are 
 
 #### Combination of eager and classic approaches
 
-If we consider a combination of two approaches described above where the initial task is splitted in the following way:
+If we consider a combination of two approaches described above where the initial task is split in the following way:
 1. Outer split of the eager algorithm
 2. Inner split of each inner subtask created during the outer split stage
 3. Classic split of each subtask created during the inner split
