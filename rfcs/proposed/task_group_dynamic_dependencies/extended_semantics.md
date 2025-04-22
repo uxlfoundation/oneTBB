@@ -383,14 +383,14 @@ adjusts the velocity of each body according to the computed force.
 Given the fact that each *i*th body is acting on the *j*th body with force of the same magnitude as *j*th body acting on *i*th, but with the reversed direction, we can
 consider the initial problem as traversing the triangle shown below and calculating the force for each point in it.
 
-<img src="assets/n_body_triangle.png" width=200>
+<img src="assets/n_body_triangle.png" width=400>
 
 For effective parallel computations, we can follow the algorithm explained in
 [Parallel Programming with Cilk I](https://dspace.mit.edu/bitstream/handle/1721.1/122680/6-172-fall-2010/contents/projects/MIT6_172F10_proj4_1.pdf) paper.
 
 For parallelizing the computation on the triangle shown above, the algorithm splits it into two smaller triangles and one rectangle as it shown on the picture below:
 
-<img src="assets/n_body_triangle_split.png" width=400>
+<img src="assets/n_body_triangle_split.png" width=800>
 
 As it described in the paper, parallel computations can only be done on non-intersecting *i* and *j* indices. Hence, computations on two yellow triangles can
 be done in parallel and the computations of the blue rectangle can be only started after computations on them.
@@ -399,7 +399,7 @@ Each sub-triangle can be divided using the same splitting algorithm for triangle
 
 Computations on the rectangles can also be parallelized if we split each rectangle as it shown in the picture below:
 
-<img src="assets/n_body_rectangle_split.png" width=400>
+<img src="assets/n_body_rectangle_split.png" width=800>
 
 Computations on black sub-rectangles can be done in parallel as well as the gray ones. 
 
@@ -414,7 +414,7 @@ to execute the rectangle split only after doing computations on sub-triangles.
 Then each task that is doing the split should replace itself with the `rectangle_subtask` by transferring the successors
 to this subtask:
 
-<img src="assets/n_body_triangle_split_graph.png" width=400>
+<img src="assets/n_body_triangle_split_graph.png" width=800>
 
 Sub-tasks computing the triangle split are following the same logic. 
 
@@ -429,7 +429,7 @@ Similarly to the triangle split, the current task should also replace itself in 
 synchronize the work. Since current API only allows transferring the successors to the single task, an empty task should be
 created as a synchronization point and the successors of the current task should be transferred to this task:
 
-<img src="assets/n_body_rectangle_split_graph.png" width=400>
+<img src="assets/n_body_rectangle_split_graph.png" width=800>
 
 ```cpp
 class Body;
@@ -679,7 +679,7 @@ void classic_recursive_wavefront(int in, int jn) {
 
 The task graph for the classic approach is illustrated in the picture below:
 
-<img src="assets/wavefront_recursive_classic_dependencies.png" width=800>
+<img src="assets/wavefront_recursive_classic_dependencies.png" width=1000>
 
 #### Eager recursive approach
 
@@ -895,7 +895,7 @@ void eager_recursive_wavefront(int in, int jn) {
 
 The task graph for the eager wavefront approach is shown below (outer tasks are referred as `O task`s, the inner tasks are referred as `I task`s):
 
-<img src="assets/wavefront_recursive_eager_dependencies.png" width=800>
+<img src="assets/wavefront_recursive_eager_dependencies.png" width=1000>
 
 #### Combination of eager and classic approaches
 
@@ -906,7 +906,7 @@ If we consider a combination of two approaches described above where the initial
 
 The split algorithm is illustrated in the picture below:
 
-<img src="assets/wavefront_recursive_combined_dependencies.png" width=800>
+<img src="assets/wavefront_recursive_combined_dependencies.png" width=1000>
 
 As it is described in the eager wavefront algorithm section below, on the inner split stage, the dependencies between
 blue and red subtasks (C tasks) are created using the `task_tracker` to the blue C-tasks saved in the red C-tasks before running them for execution. 
