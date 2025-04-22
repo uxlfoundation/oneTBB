@@ -24,9 +24,11 @@ set(TCM_COMMON_LINK_LIBS Kernel32.lib)
 
 # The "/DEPENDENTLOADFLAG:0x2000" restricts the loader to look for dependencies in current working
 # directory only if it is in the so-called "Safe load list".
-set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} /DYNAMICBASE /NXCOMPAT /DEPENDENTLOADFLAG:0x2000 /LTCG /INCREMENTAL:NO)
+set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS}
+  LINKER:/DYNAMICBASE LINKER:/NXCOMPAT LINKER:/DEPENDENTLOADFLAG:0x2000 LINKER:/LTCG
+  LINKER:/INCREMENTAL:NO)
 if (TCM_ARCH EQUAL 32)
-    set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} /SAFESEH)
+    set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} LINKER:/SAFESEH)
 endif()
 
 # prevent Windows.h from adding unnecessary includes
