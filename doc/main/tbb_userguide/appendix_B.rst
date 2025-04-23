@@ -7,7 +7,7 @@ Appendix B Mixing With Other Threading Packages
 Correct Interoperability
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-You can use |short_name| with other threading packages. No additional 
+You can use |short_name| with other threading packages. No additional
 effort is required.
 
 
@@ -22,9 +22,11 @@ inner loop with |short_name|.
 
 The ``#pragma omp parallel`` instructs OpenMP to create a team of
 threads. Each thread executes the code block statement associated with
-the directive. 
-The ``#pragma omp for`` indicates that the compiler should
-distribute the iterations of the following loop among the threads in the existing thread team, enabling parallel execution of the loop body.
+the directive.
+
+The ``#pragma omp for`` indicates that the compiler should distribute
+the iterations of the following loop among the threads in the existing
+thread team, enabling parallel execution of the loop body.
 
 
 See the similar example with the POSIX\* Threads:
@@ -40,11 +42,11 @@ See the similar example with the POSIX\* Threads:
 Avoid CPU Overutilization
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-While you can safely use |short_name| with other threading packages without
-affecting the execution correctness, running a large
-number of threads from multiple thread pools concurrently can lead to oversubscription.
-This may significantly overutilize system resources, affecting the
-execution performance.
+While you can safely use |short_name| with other threading packages
+without affecting the execution correctness, running a large number of
+threads from multiple thread pools concurrently can lead to
+oversubscription. This may significantly overutilize system resources,
+affecting the execution performance.
 
 
 Consider the previous example with nested parallelism, but with an
@@ -56,21 +58,25 @@ OpenMP parallel region executed within |short_name| parallel loop:
    :end-before: /*end outer loop tbb with nested omp*/
 
 
-Due to the semantics of OpenMP parallel region, this composition of parallel
-runtimes may result in a quadratic number of simultaneously running
-threads. Such oversubscription can degrade the performance.
+Due to the semantics of OpenMP parallel region, this composition of
+parallel runtimes may result in a quadratic number of simultaneously
+running threads. Such oversubscription can degrade the performance.
 
 
-|full_name| is able to negotiate on the usage of CPU resources,
-cooperating with other threading runtimes through the Thread
-Composability Manager, a CPU resource coordination layer.
+|full_name| solves this issue with Thread Composability Manager (TCM).
+It is an experimental CPU resource coordination layer that enables
+better cooperation between different threading runtimes.
 
 
-Thread Composability Manager is an experimental feature in oneAPI, hence
-it is disabled by default. To enable it, set ``TCM_ENABLE`` environment
-variable to ``1``. To make sure it works as intended set ``TCM_VERSION``
-environment variable to ``1`` before running your application and search
-for the output starting from ``TCM:`` lines, as in the example:
+By default, TCM is disabled. To enable it, set ``TCM_ENABLE``
+environment variable to ``1``. To make sure it works as intended set
+``TCM_VERSION`` environment variable to ``1`` before running your
+application and check the output for lines starting with ``TCM:``. The
+``TCM: TCM_ENABLE 1`` line confirms that Thread Composability Manager is
+active.
+
+
+Example output:
 
 ::
 
@@ -79,26 +85,21 @@ for the output starting from ``TCM:`` lines, as in the example:
     TCM: TCM_ENABLE         1
 
 
-The ``TCM: TCM_ENABLE 1`` line confirms that Thread
-Composability Manager is active.
-
-When used with the OpenMP
-implementation of Intel(R) DPC++/C++ Compiler, TCM
-allows runtimes to avoid simultaneous scheduling excessive threads in the scenarios similar
-to the above.
+When used with the OpenMP implementation of Intel(R) DPC++/C++ Compiler,
+TCM allows to avoid simultaneous scheduling of excessive threads in the
+scenarios similar to the above.
 
 
-You can submit feedback or ask questions about Thread Composability Manager through |short_name| `GitHub Issues
+You can submit feedback or ask questions about Thread Composability
+Manager through |short_name| `GitHub Issues
 <https://github.com/uxlfoundation/oneTBB/issues>`_ or `Discussions
 <https://github.com/uxlfoundation/oneTBB/discussions>`_.
 
 
 .. note::
-   The use of Thread Composability Manager to negotiate utilization of
-   CPU resources requires support in threading packages. For most
-   efficient coordination, it should be supported by all thread pools
-   used within the application. Consult the documentation of other
-   threading packages to see if such support exists there.
+   Coordination on the use of CPU resources requires support for Thread
+   Composability Manager. For optimal coordination, make sure that each
+   threading package in your application integrates with TCM.
 
 
 .. rubric:: See also
