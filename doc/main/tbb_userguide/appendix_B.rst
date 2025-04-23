@@ -7,9 +7,8 @@ Appendix B Mixing With Other Threading Packages
 Correct Interoperability
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-|full_name| can be mixed with other threading packages. No special
-effort is required to use any part of |short_name| with other threading
-packages.
+You can use |short_name| with other threading packages. No additional 
+effort is required.
 
 
 Here is an example that parallelizes an outer loop with OpenMP and an
@@ -21,13 +20,14 @@ inner loop with |short_name|.
    :end-before: /*end outer loop openmp with nested tbb*/
 
 
-The ``#pragma omp parallel`` causes the OpenMP to create a team of
-threads, and each thread executes the block statement associated with
-the pragma. The ``#pragma omp for`` indicates that the compiler should
-use the previously created thread team to execute the loop in parallel.
+The ``#pragma omp parallel`` instructs OpenMP to create a team of
+threads. Each thread executes the code block statement associated with
+the directive. 
+The ``#pragma omp for`` indicates that the compiler should
+distribute the iterations of the following loop among the threads in the existing thread team, enabling parallel execution of the loop body.
 
 
-Here is the same example written using POSIX\* Threads.
+See the similar example with the POSIX\* Threads:
 
 .. literalinclude:: ./examples/tbb_mixing_other_runtimes_example.cpp
    :language: c++
@@ -40,15 +40,15 @@ Here is the same example written using POSIX\* Threads.
 Avoid CPU Overutilization
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Although |short_name| can be mixed with other threading packages without
+While you can safely use |short_name| with other threading packages without
 affecting the execution correctness, simultaneous running of large
-number of threads from multiple thread pools may end up oversubscribing
-and overutilizing system resources, significantly affecting the
+number of threads from multiple thread pools concurrently can lead to oversubscription.
+This may significantly overutilize system resources, affecting the
 execution performance.
 
 
-Consider the example with nested parallelism from above but now with the
-OpenMP parallel region executed from |short_name| parallel loop.
+Consider the previous example with nested parallelism, but with an
+OpenMP parallel region executed within |short_name| parallel loop:
 
 .. literalinclude:: ./examples/tbb_mixing_other_runtimes_example.cpp
    :language: c++
@@ -56,9 +56,9 @@ OpenMP parallel region executed from |short_name| parallel loop.
    :end-before: /*end outer loop tbb with nested omp*/
 
 
-Due to semantics of OpenMP parallel region, such composition of parallel
-runtimes will instantiate quadratic number of simultaneously running
-threads, which will lead to performance drops.
+Due to the semantics of OpenMP parallel region, this composition of parallel
+runtimes may result in a quadratic number of simultaneously running
+threads. Such oversubscription can degrade the performance.
 
 
 |full_name| is able to negotiate on the usage of CPU resources,
@@ -79,17 +79,18 @@ for the output starting from ``TCM:`` lines, as in the example:
     TCM: TCM_ENABLE         1
 
 
-, where the ``TCM: TCM_ENABLE         1`` line indicates that Thread
-Composability Manager is enabled and works. When used with the OpenMP
-implementation of Intel(R) DPC++/C++ Compiler, Thread Composability
-Manager prevents creation of excessive threads in the scenarios similar
+The ``TCM: TCM_ENABLE 1`` line confirms that Thread
+Composability Manager is active.
+
+When used with the OpenMP
+implementation of Intel(R) DPC++/C++ Compiler, TCM
+allows runtimes to avoid simultaneous scheduling excessive threads in the scenarios similar
 to the above.
 
 
-You may use |short_name| communication channels (`GitHub issues
-<https://github.com/uxlfoundation/oneTBB/issues>`_, `discussions
-<https://github.com/uxlfoundation/oneTBB/discussions>`_, etc.) to also
-ask questions and provide feedback on Thread Composability Manager.
+You can submit feedback or ask questions about Thread Composability Manager through |short_name| `GitHub Issues
+<https://github.com/uxlfoundation/oneTBB/issues>`_ or `Discussions
+<https://github.com/uxlfoundation/oneTBB/discussions>`_.
 
 
 .. note::
