@@ -41,7 +41,7 @@ Avoid CPU Overutilization
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 While you can safely use |short_name| with other threading packages without
-affecting the execution correctness, simultaneous running of large
+affecting the execution correctness, running a large
 number of threads from multiple thread pools concurrently can lead to oversubscription.
 This may significantly overutilize system resources, affecting the
 execution performance.
