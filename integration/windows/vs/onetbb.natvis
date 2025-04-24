@@ -114,57 +114,73 @@
 	</Type>
 
 	<Type Name="tbb::detail::d2::concurrent_hash_map&lt;*,*,*,*&gt;">
+		<!-- corresponds to tbb::detail::d2::hash_map_base::is_valid function -->
+		<Intrinsic Name="is_valid" Expression="(uintptr_t)(ptr) > (uintptr_t)(63)">
+			<Parameter Name="ptr" Type="void*"/>
+		</Intrinsic>
+		
 		<DisplayString>{{ size= {my_size} }}</DisplayString>
 		<Expand>
 			<Item Name="[hash_compare]">my_hash_compare</Item>
 			<Item Name="[allocator]">my_allocator</Item>
 
 			<CustomListItems MaxItemsPerView="50">
-				<Variable Name="bucket_index" InitialValue="0"/>
+				<Variable Name="k" InitialValue="1"/> <!-- corresponds to tbb::detail::d2::hash_map_iterator::advance_to_next_bucket variable named k -->
 				<Variable Name="segment_index" InitialValue="-1"/>
 				<Variable Name="segment_base" InitialValue="-1"/>
-				<Variable Name="index_in_segment" InitialValue="-1"/>
-				<Variable Name="bucket_ptr" InitialValue="&amp;my_embedded_segment[0]"/> <!-- would be restored in the loop -->
-				<Variable Name="node_ptr" InitialValue="bucket_ptr-&gt;node_list._Storage._Value"/> <!-- would be restored in the loop -->
-
+				<Variable Name="bucket_ptr" InitialValue="(base_type::bucket*)my_embedded_segment"/>
+				<Variable Name="node_ptr" InitialValue="my_embedded_segment-&gt;node_list._Storage._Value"/>
+				
 				<!--
-				    traverse the buckets in the concurrent_hash_map
-					the number of buckets is 1 + my_mask - corresponds to tbb::detail::d2::concurrent_hash_map::bucket_count function
+					The logic corresponds to tbb::detail::d2::hash_map_iterator::advance_to_next_bucket function implementation
+					The container is organized as a segment table of buckets, each bucket contains the list of nodes
 				-->
 				<Loop>
-					<Break Condition="bucket_index == 1 + my_mask._Storage._Value"/>
+					<Break Condition="this-&gt;is_valid(node_ptr) || k == my_mask._Storage._Value"/>
 					
-					<!--
-						calculate the index of the segment where the desired bucket is located
-						corresponds to tbb::detail::d1::segment_table::segment_index_of function
-					-->
-					<Exec>segment_index = segment_index_type(__log2(1 | bucket_index))</Exec>
+					<!-- beginning of the bucket check (same as in tbb::detail::d2::hash_map_iterator::advance_to_next_bucket) -->
+					<If Condition="k &amp; (k - 2)">
+						<Exec>++bucket_ptr</Exec>
+					</If>
+					<Else>
+						<!--
+							Corresponds to tbb::detail::d2::hash_map_base::get_bucket function
+						-->
+						<Exec>segment_index = (segment_index_type)(__log2(k | 1))</Exec> <!-- tbb::detail::d2::hash_map_base::segment_index_of(k) -->
+						
+						<!-- tbb::detail::d2::hash_map_base::segment_base(segment_index) -->
+						<Exec>segment_base = (segment_index_type(1) &lt;&lt; segment_index &amp; ~segment_index_type(1))</Exec>
+						<Exec>bucket_ptr = &amp;my_table[segment_index]._Storage._Value[k - segment_base]</Exec>
+					</Else>
 					
-					<!--
-						all segments are stored in the table with the offset
-						calculate the offset to access the real bucket
-						corresponds to tbb::detail::d1::segment_table::segment_base function
-					-->
-					<Exec>segment_base = segment_index_type(1) &lt;&lt; segment_index &amp; ~segment_index_type(1)</Exec>
-					
-					<!-- calculate inner index in the segment using the offset -->
-					<Exec>index_in_segment = bucket_index - segment_base</Exec>
-					
-					<!--
-						access the bucket in the segment
-						and traverse the node list stored in the bucket
-					-->
-					<Exec>bucket_ptr = &amp;(my_table[segment_index]._Storage._Value[index_in_segment])</Exec>
 					<Exec>node_ptr = bucket_ptr-&gt;node_list._Storage._Value</Exec>
-
-					<Loop>
-						<Break Condition="node_ptr == nullptr"/>
-						<Item>((node*)(node_ptr))-&gt;my_value</Item>
-						<Exec>node_ptr = node_ptr-&gt;next</Exec>
-					</Loop>
-					<Exec>bucket_index += 1</Exec>
+					<Exec>k += 1</Exec>
 				</Loop>
+				
+				<Loop>
+					<Break Condition="!this-&gt;is_valid(node_ptr)"/>
+					<Item>((node*)(node_ptr))-&gt;my_value</Item>
+					<Exec>node_ptr = node_ptr-&gt;next</Exec>
 					
+					<!--
+						Same logic as above, corresponds to tbb::detail::d2::hash_map_iterator::advance_to_next_bucket
+					-->
+					<Loop>
+						<Break Condition="this-&gt;is_valid(node_ptr) || k == my_mask._Storage._Value"/>
+
+						<If Condition="k &amp; (k - 2)">
+							<Exec>++bucket_ptr</Exec>
+						</If>
+						<Else>
+							<Exec>segment_index = (segment_index_type)(__log2(k | 1))</Exec>
+							<Exec>segment_base = (segment_index_type(1) &lt;&lt; segment_index &amp; ~segment_index_type(1))</Exec>
+							<Exec>bucket_ptr = &amp;my_table[segment_index]._Storage._Value[k - segment_base]</Exec>
+						</Else>
+						
+						<Exec>node_ptr = bucket_ptr-&gt;node_list._Storage._Value</Exec>
+						<Exec>k += 1</Exec>
+					</Loop>
+				</Loop>
 			</CustomListItems>
 		</Expand>
 	</Type>
