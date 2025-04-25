@@ -507,6 +507,7 @@ namespace r1 {
         // RTLD_GLOBAL - to guarantee that old TBB will find the loaded library
         // RTLD_NOLOAD - not to load the library without the full path
         library_handle = dlopen(library, RTLD_LAZY | RTLD_GLOBAL | RTLD_NOLOAD);
+        fprintf(stdout, "global_symbols_link: library_handle = %p, for '%s'\n", library_handle, library);
 #endif /* _WIN32 */
         if (library_handle) {
             if (!resolve_symbols(library_handle, descriptors, required)) {
