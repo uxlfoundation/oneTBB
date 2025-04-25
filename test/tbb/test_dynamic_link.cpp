@@ -81,6 +81,7 @@ void test_dynamic_link(const char* lib_name) {
         REQUIRE_MESSAGE((foo1_handler && foo2_handler), "The symbols are corrupted by dynamic_link");
         REQUIRE_MESSAGE((foo1_handler() == FOO_IMPLEMENTATION && foo2_handler() == FOO_IMPLEMENTATION),
                 "dynamic_link returned the successful code but symbol(s) are wrong");
+        std::cout << "True branch!\n";
     } else {
         REQUIRE_MESSAGE((foo1_handler == dummy_foo1 && foo2_handler == dummy_foo2), "The symbols are corrupted by dynamic_link");
     }
@@ -97,6 +98,20 @@ TEST_CASE("Test dynamic_link with non-existing library") {
 
 //! Testing dynamic_link
 //! \brief \ref error_guessing
-TEST_CASE("Test dynamic_link") {
+TEST_CASE("Test dynamic_link corner cases") {
+    std::cout << "Test dynamic_link ''\n";
+    auto library_handle = dlopen(NULL, RTLD_LAZY | RTLD_GLOBAL | RTLD_NOLOAD);
+    std::cout << "manual load library_handle = " << library_handle << "\n";
+    test_dynamic_link(nullptr);
     test_dynamic_link("");
 }
+
+
+// TODO:
+// 1. Check that the load happens even without DYNAMIC_LINK_BUILD_ABSOLUTE_PATH flag
+//    - Linux expected behavior: RUNPATH is used
+//    - Windows expected behavior: Application directory is looked into
+// 2. Check that stub unsigned binary is not loaded (Windows only) (if there is and there is no __TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION specified)
+//    - If TBB_DYNAMIC_LINK_WARNING is specified check corresponding regexp is printed.
+// 3. Check that signed library is loaded (Windows only)
+//    - Test needs to check itself that the library is signed
