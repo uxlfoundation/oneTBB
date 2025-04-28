@@ -47,23 +47,23 @@ The public interface of the NUMA-aware allocator:
 #+end_src
 
 *** Member Functions
-- src_c++{numa_allocator(numa_node_id numa_id, bool cache_align_allocations = true)}
+- =numa_allocator(numa_node_id numa_id, bool cache_align_allocations = true)=
 
   Constructs an allocator instance that will prefer allocating memory on specified NUMA node
   =numa_id=. If =cache_align_allocations= is =true=, each allocation is aligned to a cache line.
 
-- src_c++{T* allocate(size_type n)}
+- =T* allocate(size_type n)=
 
   Allocates =n * sizeof(T)= bytes on the specified NUMA node. Returns a pointer to the allocated
   memory.
 
-- src_c++{void deallocate(T* p, size_type n)}
+- =void deallocate(T* p, size_type n)=
 
   Deallocates memory pointed to by =p=. The behavior is undefined if the pointer =p= is not the
   result of the =allocate(n)= method. The behavior is undefined if the memory has been already
   deallocated.
 
-- src_c++{numa_node_id numa_id() const}
+- =numa_node_id numa_id() const=
 
   Returns the NUMA node ID that was specified during allocator construction.
 
@@ -84,16 +84,16 @@ may define the classes and functions in the same unspecified internal namespace 
 =oneapi::tbb::numa_allocator= as a type alias for which the non-member functions are reachable only
 via argument-dependent lookup.
 
-- src_c++{template<typename T, typename U> bool operator==(const numa_allocator<T>&, const
-  numa_allocator<U>&) noexcept;}
+- =template<typename T, typename U> bool operator==(const numa_allocator<T>&, const
+  numa_allocator<U>&) noexcept;=
 
   Returns =true= if two allocators are specified to prefer allocation of memory chunks on the same
   NUMA node. Otherwise, return =false=.
 
-- src_c++{template<typename T, typename U> bool operator!=(const numa_allocator<T>& lhs, const
-  numa_allocator<U>& rhs) noexcept;}
+- =template<typename T, typename U> bool operator!=(const numa_allocator<T>& lhs, const
+  numa_allocator<U>& rhs) noexcept;=
 
-  Returns src_c++{!(lhs == rhs)}.
+  Returns ~!(lhs == rhs)~.
 
 *** Usage Example
 The example demonstrates how =numa_allocator= can be used to allocate memory on specific NUMA node
@@ -131,26 +131,26 @@ interface used to specify allocation strategies for polymorphic allocators such 
 
 *** Member Functions
 
-- src_c++{numa_node_resource(numa_node_id numa_id)}
+- =numa_node_resource(numa_node_id numa_id)=
 
   Constructs a =numa_node_resource= that prefers allocation of memory from =numa_id= NUMA node.
 
-- src_c++{numa_node_id numa_id() const}
+- =numa_node_id numa_id() const=
 
   Returns the NUMA node ID that was specified during memory resource construction.
 
-- src_c++{void* do_allocate(size_t n, size_t alignment) override}
+- =void* do_allocate(size_t n, size_t alignment) override=
 
   Allocates =n= bytes of memory on specified at creation NUMA node, aligned to the specified
   =alignment=. Returns pointer to the allocated memory.
 
-- src_c++{void do_deallocate(void* p, size_t n, size_t alignment) override}
+- =void do_deallocate(void* p, size_t n, size_t alignment) override=
 
   Deallocates memory pointed to by =p=. The behavior is undefined if the pointer =p= is not the
   result of the earlier call to =allocate(n, alighment)= method or if the memory pointed by =p= has
   been already deallocated.
 
-- src_c++{bool do_is_equal(const std::pmr::memory_resource& other) const noexcept override}
+- =bool do_is_equal(const std::pmr::memory_resource& other) const noexcept override=
 
   Compares memory resources of =*this= and =other=. If =other= is not a =numa_node_resource= with
   the preference set to allocate on the same NUMA node, returns =false=. Othewise, returns =true=.
