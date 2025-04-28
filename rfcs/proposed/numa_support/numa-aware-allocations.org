@@ -1,0 +1,198 @@
+#+TITLE: NUMA-aware Allocations
+
+This is a sub-RFC of [[file:README.md][the general RFC about better NUMA support in oneTBB]].
+
+* Introduction
+oneTBB provides memory allocation facilities that allow users to apply certain behavior and/or
+exhibit certain characteristics of the allocated memory. These characteristics include only scalable
+and cache aligned allocation. These memory allocation facilities are NUMA-unaware. Meaning that they
+fully rely on the NUMA-related settings of the OS the application is running on or the user settings
+that were applied earlier using the means other than oneTBB provides.
+
+To simplify scenarios where memory allocation is guided by association to certain NUMA nodes,
+NUMA-aware allocation facilities need to be introduced into the library.
+
+* Proposal
+To be able to guide memory allocation preference to specific NUMA nodes, introduce the following
+entities:
+** NUMA-aware Allocator
+NUMA-aware allocator is meant to be specified in place of any other allocator used in oneTBB
+interfaces. Therefore, in addition to allow specifying the NUMA node, on which the memory allocation
+will be preferred, it should also satisfy the allocator requirements from [allocator.requirements]
+section of ISO C++ standard.
+
+The public interface of the NUMA-aware allocator:
+#+begin_src C++
+  // Defined in header <oneapi/tbb/numa_allocator.h>
+
+  namespace oneapi {
+  namespace tbb {
+
+  template<typename T> class numa_allocator {
+  public:
+      using value_type = T;
+      using propagate_on_container_move_assignment = std::true_type;
+
+      numa_allocator(numa_node_id numa_id, bool cache_align_allocations = true);
+      template<typename U> numa_allocator(const numa_allocator<U>&) noexcept;
+
+      T* allocate(size_type);
+      void deallocate(T*, size_type);
+
+      numa_node_id numa_id() const;
+  };
+
+  } // namespace tbb
+  } // namespace oneapi
+#+end_src
+
+*** Member Functions
+- src_c++{numa_allocator(numa_node_id numa_id, bool cache_align_allocations = true)}
+
+  Constructs an allocator instance that will prefer allocating memory on specified NUMA node
+  =numa_id=. If =cache_align_allocations= is =true=, each allocation is aligned to a cache line.
+
+- src_c++{T* allocate(size_type n)}
+
+  Allocates =n * sizeof(T)= bytes on the specified NUMA node. Returns a pointer to the allocated
+  memory.
+
+- src_c++{void deallocate(T* p, size_type n)}
+
+  Deallocates memory pointed to by =p=. The behavior is undefined if the pointer =p= is not the
+  result of the =allocate(n)= method. The behavior is undefined if the memory has been already
+  deallocated.
+
+- src_c++{numa_node_id numa_id() const}
+
+  Returns the NUMA node ID that was specified during allocator construction.
+
+*** Non-member Functions
+These functions provide comparison operations between two =numa_allocator= instances.
+
+#+begin_src C++
+  template<typename T, typename U>
+  bool operator==(const numa_allocator<T>&, const numa_allocator<U>&) noexcept;
+
+  template<typename T, typename U>
+  bool operator!=(const numa_allocator<T>&, const numa_allocator<U>&) noexcept;
+#+end_src
+
+The namespace where these functions are defined is unspecified, as long as they may be used in
+respective binary operation expressions on =numa_allocator= objects. For example, an implementation
+may define the classes and functions in the same unspecified internal namespace and define
+=oneapi::tbb::numa_allocator= as a type alias for which the non-member functions are reachable only
+via argument-dependent lookup.
+
+- src_c++{template<typename T, typename U> bool operator==(const numa_allocator<T>&, const
+  numa_allocator<U>&) noexcept;}
+
+  Returns =true= if two allocators are specified to prefer allocation of memory chunks on the same
+  NUMA node. Otherwise, return =false=.
+
+- src_c++{template<typename T, typename U> bool operator!=(const numa_allocator<T>& lhs, const
+  numa_allocator<U>& rhs) noexcept;}
+
+  Returns src_c++{!(lhs == rhs)}.
+
+*** Usage Example
+The example demonstrates how =numa_allocator= can be used to allocate memory on specific NUMA node
+for oneTBB containers.
+#+begin_src C++
+  std::vector<tbb::numa_node_id> nodes = tbb::info::numa_nodes();
+  tbb::numa_allocator<int> alloc(nodes[0]);          // Prefer allocation on specific NUMA node
+
+  tbb::concurrent_vector<int, tbb::numa_allocator<int>> v(alloc);
+  v.reserve(1000);                                   // Preallocate space on the specified NUMA node
+#+end_src
+
+** NUMA-aware Memory Resource
+NUMA-aware memory resource is an implementation of the abstract =std::pmr::memory_resource=
+interface used to specify allocation strategies for polymorphic allocators such as
+=std::pmr::polymorphic_allocator=, and preferring allocation on the specified NUMA node.
+
+#+begin_src C++
+  namespace oneapi {
+  namespace tbb {
+
+  class numa_node_resource : public std::pmr::memory_resource {
+  public:
+      numa_node_resource(numa_node_id numa_id);
+      numa_node_id numa_id() const;
+  private:
+      void* do_allocate(size_t n, size_t alignment) override;
+      void do_deallocate(void* p, size_t n, size_t alignment) override;
+      bool do_is_equal(const std::pmr::memory_resource& other) const noexcept override;
+  };
+
+  } // namespace tbb
+  } // namespace oneapi
+#+end_src
+
+*** Member Functions
+
+- src_c++{numa_node_resource(numa_node_id numa_id)}
+
+  Constructs a =numa_node_resource= that prefers allocation of memory from =numa_id= NUMA node.
+
+- src_c++{numa_node_id numa_id() const}
+
+  Returns the NUMA node ID that was specified during memory resource construction.
+
+- src_c++{void* do_allocate(size_t n, size_t alignment) override}
+
+  Allocates =n= bytes of memory on specified at creation NUMA node, aligned to the specified
+  =alignment=. Returns pointer to the allocated memory.
+
+- src_c++{void do_deallocate(void* p, size_t n, size_t alignment) override}
+
+  Deallocates memory pointed to by =p=. The behavior is undefined if the pointer =p= is not the
+  result of the earlier call to =allocate(n, alighment)= method or if the memory pointed by =p= has
+  been already deallocated.
+
+- src_c++{bool do_is_equal(const std::pmr::memory_resource& other) const noexcept override}
+
+  Compares memory resources of =*this= and =other=. If =other= is not a =numa_node_resource= with
+  the preference set to allocate on the same NUMA node, returns =false=. Othewise, returns =true=.
+
+*** Usage Examples
+
+The example demonstrates how a =numa_node_resource= memory resource can be used in conjunction with
+=oneapi::tbb::cache_aligned_resource= to prefer allocating cache-aligned memory on specified NUMA
+node:
+#+begin_src C++
+  std::vector<tbb::numa_node_id> nodes = tbb::info::numa_nodes();
+  tbb::numa_node_resource numa_resource(nodes[0]);
+  tbb::cache_aligned_resource numa_cache_aligned_resource(&numa_resource);
+
+  // Prefer allocations on specific NUMA node aligned to a cache-boundary
+  using K = int, V = int;
+  using allocator_type = std::pmr::polymorphic_allocator<std::pair<const K, V>>;
+  tbb::concurrent_map<K, V, std::less<K>, allocator_type> map(/*alloc*/{&numa_cache_aligned_resource});
+  map.insert(std::make_pair(1, 2));
+#+end_src
+
+Another examples shows usage of =numa_node_resource= together with
+=std::pmr::synchronized_pool_resource= to implement cached memory allocation strategy with
+allocation preference to specified NUMA node.
+#+begin_src C++
+  std::vector<tbb::numa_node_id> nodes = tbb::info::numa_nodes();
+  tbb::numa_node_resource numa_resource(nodes[0]);
+  std::pmr::synchronized_pool_resource numa_resource_pool(&numa_resource);
+
+  struct character_t { unsigned char data[128][128][3]; };
+  using char_allocator_t = std::pmr::polymorphic_allocator<character_t>;
+  char_allocator_t char_allocator(&numa_resource_pool);
+
+  using word_t = std::vector<character_t, char_allocator_t>;
+  word_t word(char_allocator);
+  using word_allocator_t = std::pmr::polymorphic_allocator<word_t>;
+  word_allocator_t word_allocator(&numa_resource_pool);
+
+  tbb::concurrent_vector<word_t, word_allocator_t> random_words(word_allocator);
+#+end_src
+
+* Open Questions
+1. Does NUMA-aware allocator give benefit comparing to the default, platform-specific settings of
+   memory allocation?
+2. Does NUMA-aware memory resource useful to introduce?
