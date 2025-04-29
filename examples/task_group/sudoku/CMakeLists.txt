@@ -24,9 +24,12 @@ add_executable(sudoku sudoku.cpp)
 
 target_link_libraries(sudoku TBB::tbb Threads::Threads)
 target_compile_options(sudoku PRIVATE ${TBB_CXX_STD_FLAG})
-
-if (MSVC AND CMAKE_CXX_COMPILER_ID STREQUAL IntelLLVM)
+if (MSVC)
+  if (CMAKE_CXX_COMPILER_ID STREQUAL IntelLLVM)
     target_compile_options(sudoku PRIVATE -D_CRT_SECURE_NO_WARNINGS)
+  else()
+    target_compile_options(sudoku PRIVATE /EHsc)
+  endif()
 endif()
 
 set(EXECUTABLE "$<TARGET_FILE:sudoku>")

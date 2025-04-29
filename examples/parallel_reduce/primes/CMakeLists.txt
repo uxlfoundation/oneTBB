@@ -24,6 +24,9 @@ add_executable(primes main.cpp primes.cpp)
 
 target_link_libraries(primes TBB::tbb Threads::Threads)
 target_compile_options(primes PRIVATE ${TBB_CXX_STD_FLAG})
+if (MSVC AND NOT CMAKE_CXX_COMPILER_ID STREQUAL IntelLLVM)
+  target_compile_options(primes PRIVATE /EHsc)
+endif()
 
 set(EXECUTABLE "$<TARGET_FILE:primes>")
 set(ARGS "")
