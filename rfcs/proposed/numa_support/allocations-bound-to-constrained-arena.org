@@ -19,7 +19,7 @@ allocations done by the threads should also be constrained to the constraints of
 Introduce an interface that will indicate that memory allocations by threads should preferably be
 bound to the constraint settings of the ~tbb::task_arena~ instance.
 
-Since the funtionality represents additional contraint, it is reasonable to extend the existing
+Since the functionality represents additional constraint, it is reasonable to extend the existing
 constraints struct with the new interface for this feature.
 
 Therefore, the interface is an extension to the ~tbb:task_arena::constraints~ struct:
