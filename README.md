@@ -33,7 +33,7 @@ oneTBB is a part of the [UXL Foundation](http://www.uxlfoundation.org) and is an
 See [Release Notes](RELEASE_NOTES.md) and [System Requirements](SYSTEM_REQUIREMENTS.md).
 
 ## Documentation
-* [oneTBB Specification](https://spec.oneapi.com/versions/latest/elements/oneTBB/source/nested-index.html)
+* [oneTBB Specification](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/nested-index)
 * [oneTBB Developer Guide and Reference](https://uxlfoundation.github.io/oneTBB)
 * [Migrating from TBB to oneTBB](https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/Migration_Guide.html)
 * [README for the CMake build system](cmake/README.md)
