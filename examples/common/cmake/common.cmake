@@ -50,7 +50,7 @@ endmacro()
 macro(add_benchmark_target TARGET_NAME TARGET_DEPENDENCIES EXECUTABLE ARGS)
     find_program(GAWK gawk NO_CACHE)
     if(NOT GAWK)
-      message(WARNING "AWK tool is not forund: no benchmark reports will be composed by ${TARGET_NAME}.")
+      message(WARNING "AWK tool is not found: no benchmark reports will be composed by ${TARGET_NAME}.")
     else()
       message("AWK tool to compose data reports by ${TARGET_NAME}: ${GAWK}")
       find_file(TARGET_NAME_FILTER
