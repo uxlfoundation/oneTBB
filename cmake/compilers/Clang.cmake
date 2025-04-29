@@ -71,7 +71,7 @@ endif()
 
 # -z switch is not supported on MacOS
 if (NOT APPLE)
-    set(TBB_LIB_LINK_FLAGS ${TBB_LIB_LINK_FLAGS} -Wl,-z,relro,-z,now)
+    set(TBB_LIB_LINK_FLAGS ${TBB_LIB_LINK_FLAGS} -Wl,-z,relro,-z,now,-z,noexecstack)
 endif()
 
 set(TBB_COMMON_LINK_LIBS ${CMAKE_DL_LIBS})
