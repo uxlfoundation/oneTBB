@@ -1,0 +1,101 @@
+#+TITLE: Bind Allocations for Constrained Threads
+
+This is a sub-RFC of [[file:README.md][the general RFC about better NUMA support in oneTBB]].
+
+* Introduction
+oneTBB allows binding threads that join a ~tbb::task_arena~ for task execution to a particular CPU
+mask that in most of the cases is related to a single NUMA node on the platform, but also can be
+associated with specific core types that do not necessarily correspond to a single NUMA node. The
+binding settings are specified using the [[https://github.com/uxlfoundation/oneTBB/blob/2df02d2ac710ff22a917d008dc04d7a21084e32e/include/oneapi/tbb/info.h#L36-L65][~tbb::task_arean::constraints~]] structure. These settings
+affect pinning of software threads onto hardware cores and has no explicit guidance about where
+memory is physically allocated by these pinned threads, effectively relying on the OS settings or
+preferences set up earlier by a user.
+
+The motivation is to introduce a handle that would allow users to explicitly specify that memory
+allocations done by the threads should also be constrained to the constraints of the
+~tbb::task_arena~ they join.
+
+* Proposal
+Introduce an interface that will indicate that memory allocations by threads should preferably be
+bound to the constraint settings of the ~tbb::task_arena~ instance.
+
+Since the funtionality represents additional contraint, it is reasonable to extend the existing
+constraints struct with the new interface for this feature.
+
+Therefore, the interface is an extension to the ~tbb:task_arena::constraints~ struct:
+#+begin_src C++
+  namespace tbb {
+  namespace detail {
+  namespace d1 {
+
+  using numa_node_id = int;
+  using core_type_id = int;
+
+  struct constraints {
+  #if !__TBB_CPP20_PRESENT
+      constraints(numa_node_id id = -1, int maximal_concurrency = -1,
+                  bool bind_memory_allocations = false) // <-- new parameter
+          : numa_id(id)
+          , max_concurrency(maximal_concurrency)
+          , core_type(-1)
+          , max_threads_per_core(-1)
+          , bind_memory_allocations(bind_memory_allocations) // <-- new member
+      {}
+  #endif /*!__TBB_CPP20_PRESENT*/
+
+      constraints& set_numa_id(numa_node_id id) {
+          numa_id = id;
+          return *this;
+      }
+      /* ... similar setters for other parameters ... */
+
+      // New method to set memory allocation binding
+      constraints& set_bind_memory_allocations(bool bind = true) {
+          bind_memory_allocations = bind;
+          return *this;
+      }
+
+      numa_node_id numa_id = -1;
+      /* ... other fields ... */
+      bool bind_memory_allocations = false; // <-- new member
+  };
+
+  } // namespace d1
+  } // namespace detail
+  } // namespace tbb
+#+end_src
+
+Implementation-wise the feature relies on HWLOC library. In particular, its [[https://hwloc.readthedocs.io/en/stable/group__hwlocality__membinding.html#ga020951efa0ce3862bd4faec295501a7f][~hwloc_set_membind~]] and
+[[https://hwloc.readthedocs.io/en/stable/group__hwlocality__membinding.html#gae21f0a1a884929c784bebf070252aa56][~hwloc_get_membind~]] functions.
+
+** Alternatives
+Since there is no guarantee that the allocations will be actually bound, the naming of the feature
+may imply the preference rather than strict enforcement. Although, it will be explained in the
+documentation, from the code readability standpoint it is better to have interfaces that accurately
+describe the actual behavior.
+
+*** Naming
+Naming alternatives for the parameter and struct field with variations in square brackets ~[]~:
+- ~prefer_local_allocations[_first]~
+- ~prefer_bound_allocations[_first]~
+- ~prefer_local_memory~.
+
+Alternatives for the word ~prefer~:
+- ~opt_for~
+- ~favor~
+- ~try~
+
+*** Setter Method
+Because the feature represents a toggle (i.e. can be code by a single boolean variable), it might
+make sense to have setter that only switches the feature ON. For example:
+~[prefer_]bind_memory_allocations()~
+
+*** Default Value
+Currently it is not proven that the feature makes any difference performance-wise. Depending on the
+performance results it can be switched ON or OFF by default. It might also left unimplemented (i.e.
+archived) if study results show that the feature does not help in improving the performance.
+
+* Open Questions
+1. Naming.
+2. Should the feature indicate (i.e. by means of error reporting) that the memory binding is not
+   possible?
