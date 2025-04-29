@@ -53,10 +53,10 @@ public:
     double computeRelError() {
         // Accumulate the total duration in microseconds using std::accumulate with a lambda function
         assert(0 != _time_intervals.size());
-        auto total_duration = std::accumulate(
+        unsigned long long total_duration = std::accumulate(
             _time_intervals.begin(),
             _time_intervals.end(),
-            0, // Start with 0 count
+            0ull, // Start with 0 count
             [](long long total, const std::pair<time_point, time_point>& interval) {
                 // Compute the difference and add it to the total
                 return total + std::chrono::duration_cast<std::chrono::microseconds>(
