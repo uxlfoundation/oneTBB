@@ -153,7 +153,7 @@ interface used to specify allocation strategies for polymorphic allocators such 
 - =bool do_is_equal(const std::pmr::memory_resource& other) const noexcept override=
 
   Compares memory resources of =*this= and =other=. If =other= is not a =numa_node_resource= with
-  the preference set to allocate on the same NUMA node, returns =false=. Othewise, returns =true=.
+  the preference set to allocate on the same NUMA node, returns =false=. Otherwise, returns =true=.
 
 *** Usage Examples
 
