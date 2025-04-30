@@ -1,0 +1,35 @@
+#+TITLE: Describing Data Placement to Guide Distribution of Tasks
+
+* Introduction
+By default, oneTBB does not make any assumption about the placement of the data which is processed
+by a parallel algorithm. There is potential side-effect based on the way memory prefetcher works
+implying that closer parallel iterations are executed faster by closer CPU cores. There is also an
+interface to guide the scheduler to run execution of whole parallel algorithms on certain CPU
+cores/NUMA nodes, which requires on the user side explicit management of separate task arenas
+including submission of work into them.
+
+This RFC tries to approach the problem from the other side by proposing, possibly, less intrusive
+and, at the same time, more intuitive interface for describing work distribution that minimizes
+latency effects when working with non-uniform memory.
+
+* Proposal
+The proposal is to add an interface that would allow to specify how parallel iteration space is
+associated with different banks of memory, i.e. allowing to describe what memory is accessed by each
+parallel iteration.
+
+Some brainstormed sketches about possible interface:
+- Extending ~tbb::blocked_range~
+  #+begin_src C++
+    tbb::blocked_range(begin, end, grainsize, /*association*/{numa_id : {begin, end [, grain_size?]}, ...})
+  #+end_src
+- Map of blocked ranges ~{numa_id : tbb::blocked_range}~ passed to parallel algorithm
+- Extending ~tbb::partitioner~
+  #+begin_src C++
+    partitioner(/*association*/{numa_id : tbb::blocked_range, ...})
+    partitioner(/*association*/{/*numa_id*/0 : {/*begin*/0, /*end*/4096 [, grain_size?]}, 1 : {4096, 8192}, ...})
+  #+end_src
+- Prefilled instance of ~tbb::affinity_partitioner~
+- Something close to the API provided by [[https://github.com/oneapi-src/distributed-ranges][Distributed Ranges]] to ensure better interoperability
+
+* Open Questions
+<TBD>
