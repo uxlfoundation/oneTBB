@@ -17,19 +17,56 @@ The proposal is to add an interface that would allow to specify how parallel ite
 associated with different banks of memory, i.e. allowing to describe what memory is accessed by each
 parallel iteration.
 
-Some brainstormed sketches about possible interface:
-- Extending ~tbb::blocked_range~
-  #+begin_src C++
-    tbb::blocked_range(begin, end, grainsize, /*association*/{numa_id : {begin, end [, grain_size?]}, ...})
-  #+end_src
-- Map of blocked ranges ~{numa_id : tbb::blocked_range}~ passed to parallel algorithm
-- Extending ~tbb::partitioner~
-  #+begin_src C++
-    partitioner(/*association*/{numa_id : tbb::blocked_range, ...})
-    partitioner(/*association*/{/*numa_id*/0 : {/*begin*/0, /*end*/4096 [, grain_size?]}, 1 : {4096, 8192}, ...})
-  #+end_src
-- Prefilled instance of ~tbb::affinity_partitioner~
-- Something close to the API provided by [[https://github.com/oneapi-src/distributed-ranges][Distributed Ranges]] to ensure better interoperability
+
+Sketches about possible interface for the mapping, i.e. iteration <=> memory boundary association:
+1. Passing iteration numbers denoting the split points.
+
+   Example:
+   #+begin_src C++
+     {4096, 8192, 16384, 32768}
+   #+end_src
+
+   Open question:
+   - How to indicate split points if the memory is distributed in a non-monotonic way. E.g. NUMA 0
+     contains memory for {4096, 8192} interval, NUMA 1 - {0, 4096}.
+
+2. Intervals associated with an id.
+
+   Examples:
+   #+begin_src C++
+     {numa_id : tbb::blocked_range, ...}
+     {/*numa_id*/0 : {/*begin*/0, /*end*/4096 [, grain_size?]}, /*numa_id*/1 : {4096, 8192}, ...}
+   #+end_src
+
+
+The overall idea is to give hints to the scheduler so that it can aim at:
+- Splitting the tasks in a way where each single task does not cover parallel iterations from
+  different memory banks
+- Assigning the tasks to closer threads taking into account existing thread placement.
+
+
+Some sketches where user could declare the association:
+1. Extending ~tbb::blocked_range~
+   #+begin_src C++
+     tbb::blocked_range(begin, end, grainsize, /*association*/{numa_id : {begin, end [, grain_size?]}, ...})
+   #+end_src
+2. Map of blocked ranges ~{numa_id : tbb::blocked_range}~ passed to parallel algorithm
+3. Extending ~tbb::partitioner~
+   #+begin_src C++
+     partitioner(/*association*/{numa_id : tbb::blocked_range, ...})
+     partitioner(/*association*/{/*numa_id*/0 : {/*begin*/0, /*end*/4096 [, grain_size?]}, 1 : {4096, 8192}, ...})
+   #+end_src
+4. Prefilled instance of ~tbb::affinity_partitioner~ or explicit setter
+   #+begin_src C++
+     // This code demonstrates the use of TBB's affinity partitioner to control data placement
+     tbb::affinity_partitioner ap1(
+         {0 : {0, 512}, 1 : {512, 1024}, 2 : {1024, 1536}, 3 : {1536, 2048}}
+     );
+
+     tbb::affinity_partitioner ap2;
+     ap2.hint({0 : {0, 512}, 1 : {512, 1024}, 2 : {1024, 1536}, 3 : {1536, 2048}});
+   #+end_src
+5. Something close to the API provided by [[https://github.com/oneapi-src/distributed-ranges][Distributed Ranges]] to ensure better interoperability
 
 * Open Questions
 <TBD>
