@@ -4,8 +4,11 @@ Controlling Chunking
 ====================
 
 
-Chunking is controlled by a *partitioner* and a *grainsize.*\  To gain
-the most control over chunking, you specify both.
+Chunking is the process of dividing up the overall work into individual jobs,
+controlled by a *partitioner* and a *grainsize*. The partitioner controls
+the kind of heuristic applied to the chunking process, and a grainsize
+controls how small the chunks of work are allowed to be. To gain the most control
+over chunking, you specify both.
 
 
 -  Specify ``simple_partitioner()`` as the third argument to
@@ -23,7 +26,7 @@ advantage.
 
 
 The following code is the last example from parallel_for, modified to
-use an explicit grainsize ``G``.
+use a grainsize ``G``.
 
 
 ::
@@ -33,7 +36,7 @@ use an explicit grainsize ``G``.
     
 
    void ParallelApplyFoo( float a[], size_t n ) {
-       parallel_for(blocked_range<size_t>(0,n,G), ApplyFoo(a), 
+       parallel_for(blocked_range<size_t>(0,n,G), ApplyFoo(a),
                     simple_partitioner());
    }
 
@@ -42,7 +45,8 @@ The grainsize sets a minimum threshold for parallelization. The
 ``parallel_for`` in the example invokes ``ApplyFoo::operator()`` on
 chunks, possibly of different sizes. Let *chunksize* be the number of
 iterations in a chunk. Using ``simple_partitioner`` guarantees that
-[G/2] <= *chunksize* <= G.
+[G/2] <= *chunksize* <= G (a chunk will be between half to all of the
+grain size).
 
 
 There is also an intermediate level of control where you specify the
@@ -67,13 +71,13 @@ and ``affinity_partitioner`` to choose the grainsize automatically.
 .. container:: tablenoborder
 
 
-   .. list-table:: 
+   .. list-table::
       :header-rows: 1
 
       * -     |image0|
         -     |image1|
-      * -     Case A     
-        -     Case B     
+      * -     Case A
+        -     Case B
 
 
 
@@ -120,7 +124,7 @@ parallel performance if there is other parallelism available higher up
 in the call tree.
 
 
-.. tip:: 
+.. tip::
    You do not have to set the grainsize too precisely.
 
 
@@ -150,7 +154,7 @@ threads. Notice that a grainsize over the wide range 100-100,000 works
 quite well.
 
 
-.. tip:: 
+.. tip::
    A general rule of thumb for parallelizing loop nests is to
    parallelize the outermost one possible. The reason is that each
    iteration of an outer loop is likely to provide a bigger grain of
