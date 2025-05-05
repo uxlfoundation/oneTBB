@@ -427,6 +427,7 @@ if (TARGET TBB::tbb)
         $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>)
     set_property(TARGET test_dynamic_link PROPERTY BUILD_RPATH_USE_ORIGIN TRUE)
     set_property(TARGET test_dynamic_link PROPERTY BUILD_RPATH "$ORIGIN")
+    target_compile_definitions(test_dynamic_link PRIVATE "TBBLIB_NAME=\"$<TARGET_FILE_NAME:TBB::tbb>\"")
     # set_property(TARGET test_dynamic_link PROPERTY BUILD_RPATH "$<TARGET_FILE_DIR:TBB::tbb>")
 
     if (LINKER_HAS_NO_AS_NEEDED)
