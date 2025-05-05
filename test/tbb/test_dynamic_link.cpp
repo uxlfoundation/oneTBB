@@ -51,10 +51,11 @@ FOO_TYPE dummy_foo2() { return FOO_DUMMY; }
 #ifdef __TBB_WEAK_SYMBOLS_PRESENT
 #undef __TBB_WEAK_SYMBOLS_PRESENT
 #endif
-// The direct include since we want to test internal functionality
-#ifndef TBB_DYNAMIC_LINK_WARNING
-#define TBB_DYNAMIC_LINK_WARNING
+
+#ifdef __TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION
+#warning "Signature verification must not be turned off to fully test dynamic link functionality"
 #endif
+// The direct include since we want to test internal functionality
 #include "src/tbb/dynamic_link.cpp"
 
 #if __TBB_DYNAMIC_LOAD_ENABLED
@@ -72,6 +73,9 @@ static const tbb::detail::r1::dynamic_link_descriptor LinkTable[] = {
 #include "common/utils.h"
 #include "common/utils_dynamic_libs.h"
 
+#include <cstdio>               // for std::snprintf
+#include <cstring>              // for std::strcmp
+
 void test_dynamic_link(const char* lib_name) {
 #if __TBB_DYNAMIC_LOAD_ENABLED
 #if !_WIN32
@@ -88,7 +92,6 @@ void test_dynamic_link(const char* lib_name) {
         REQUIRE_MESSAGE((foo1_handler && foo2_handler), "The symbols are corrupted by dynamic_link");
         REQUIRE_MESSAGE((foo1_handler() == FOO_IMPLEMENTATION && foo2_handler() == FOO_IMPLEMENTATION),
                         "dynamic_link returned the successful code but symbol(s) are wrong");
-        std::cout << "True branch!\n";
     } else {
         REQUIRE_MESSAGE((foo1_handler == dummy_foo1 && foo2_handler == dummy_foo2), "The symbols are corrupted by dynamic_link");
     }
@@ -106,7 +109,6 @@ TEST_CASE("Test dynamic_link with non-existing library") {
 //! Testing dynamic_link
 //! \brief \ref error_guessing
 TEST_CASE("Test dynamic_link corner cases") {
-    std::cout << "Test dynamic_link ''\n";
     test_dynamic_link(nullptr);
     test_dynamic_link("");
 }
@@ -116,12 +118,21 @@ TEST_CASE("Test dynamic_link corner cases") {
 //! Testing dynamic_link with existing library
 //! \brief \ref functionality
 TEST_CASE("Test dynamic_link with existing library") {
-    // Check that the library is loaded and the symbols are linked.
-    const char* lib_name = TBBLIB_NAME;
-    static const char* (*version_handler)() = nullptr;
-    // Table describing how to link the handlers.
+  // Check that not-yet-linked libary is found and loaded even without specifying absolute path to
+  // it. On Windows, signature validation is performed.
+#if _WIN32
+    // Well known signed Windows library that exist in every distribution
+    const char* lib_name = "user32.dll";
+    const char* symbol = "MessageBoxA";
+    int (*handler)(void * /*hWnd*/, const char * /*lpText*/, const char * /*lpCaption*/,
+                   unsigned int /*uType*/) = nullptr;
+#else
+    const char* lib_name = TBBLIB_NAME; // On Linux it is the name of the library itself
+    const char* symbol = "TBB_runtime_version";
+    static const char* (*handler)() = nullptr;
+#endif
     static const tbb::detail::r1::dynamic_link_descriptor table[] = {
-        { "TBB_runtime_version", (tbb::detail::r1::pointer_to_handler*)(void*)(&version_handler) },
+        { symbol, (tbb::detail::r1::pointer_to_handler*)(void*)(&handler) },
     };
 
     constexpr int load_flags =
@@ -129,11 +140,14 @@ TEST_CASE("Test dynamic_link with existing library") {
     const bool link_result = tbb::detail::r1::dynamic_link(lib_name, table,
                                                            sizeof(table) / sizeof(table[0]),
                                                            /*handle*/nullptr, load_flags);
-
-    REQUIRE_MESSAGE(link_result, "The TBB library must be loaded");
-    REQUIRE_MESSAGE(version_handler, "The TBB_runtime_version() symbol must be found");
-    REQUIRE_MESSAGE(0 == std::strcmp(version_handler(), TBB_VERSION_STRING),
-                    "dynamic_link returned the successful code but symbol(s) are wrong");
+    char msg[128] = {0};
+    std::snprintf(msg, sizeof(msg) / sizeof(msg[0]), "The library \"%s\" was not loaded", lib_name);
+    REQUIRE_MESSAGE(link_result, msg);
+    REQUIRE_MESSAGE(handler, "The symbol was not found.");
+#if !_WIN32
+    REQUIRE_MESSAGE(0 == std::strcmp(handler(), TBB_VERSION_STRING),
+                    "dynamic_link returned successful code but symbol returned incorrect result");
+#endif
 }
 #endif // __TBB_DYNAMIC_LOAD_ENABLED
 
