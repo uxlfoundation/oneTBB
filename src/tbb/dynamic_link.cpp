@@ -426,7 +426,7 @@ namespace r1 {
                     otherwise -- Ok, number of characters (incl. terminating null) written to buffer.
     */
     static std::size_t abs_path( char const * name, char * path, std::size_t len ) {
-        if ( ap_data._len == 0 )
+        if ( !name || ap_data._len == 0 )
             return 0;
 
         std::size_t name_len = std::strlen( name );
