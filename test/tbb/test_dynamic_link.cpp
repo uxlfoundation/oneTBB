@@ -21,7 +21,12 @@
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#define __TBB_NO_IMPLICIT_LINKAGE 1
+
 #include "common/test.h"
+
+// Out-of-line TBB assertion handling routines are instantiated here
+#include "../../src/tbb/assert_impl.h"
 
 enum FOO_TYPE {
     FOO_DUMMY,
@@ -100,8 +105,6 @@ TEST_CASE("Test dynamic_link with non-existing library") {
 //! \brief \ref error_guessing
 TEST_CASE("Test dynamic_link corner cases") {
     std::cout << "Test dynamic_link ''\n";
-    auto library_handle = dlopen(NULL, RTLD_LAZY | RTLD_GLOBAL | RTLD_NOLOAD);
-    std::cout << "manual load library_handle = " << library_handle << "\n";
     test_dynamic_link(nullptr);
     test_dynamic_link("");
 }
