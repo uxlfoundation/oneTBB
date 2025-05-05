@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -47,28 +47,23 @@ FOO_TYPE dummy_foo1() { return FOO_DUMMY; }
 FOO_TYPE dummy_foo2() { return FOO_DUMMY; }
 
 #include "oneapi/tbb/detail/_config.h"
+#include "oneapi/tbb/version.h"
+
 // Suppress the weak symbol mechanism to avoid surplus compiler warnings.
 #ifdef __TBB_WEAK_SYMBOLS_PRESENT
 #undef __TBB_WEAK_SYMBOLS_PRESENT
 #endif
 
+
+#ifndef TBB_DYNAMIC_LINK_WARNING
+#define TBB_DYNAMIC_LINK_WARNING 1
+#endif
 #ifdef __TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION
 #warning "Signature verification must not be turned off to fully test dynamic link functionality"
 #endif
 // The direct include since we want to test internal functionality
 #include "src/tbb/dynamic_link.cpp"
 
-#if __TBB_DYNAMIC_LOAD_ENABLED
-// Handlers.
-static FOO_TYPE (*foo1_handler)() = &dummy_foo1;
-static FOO_TYPE (*foo2_handler)() = &dummy_foo2;
-
-// Table describing how to link the handlers.
-static const tbb::detail::r1::dynamic_link_descriptor LinkTable[] = {
-    { "foo1", (tbb::detail::r1::pointer_to_handler*)(void*)(&foo1_handler) },
-    { "foo2", (tbb::detail::r1::pointer_to_handler*)(void*)(&foo2_handler) }
-};
-#endif
 
 #include "common/utils.h"
 #include "common/utils_dynamic_libs.h"
@@ -78,6 +73,17 @@ static const tbb::detail::r1::dynamic_link_descriptor LinkTable[] = {
 
 void test_dynamic_link(const char* lib_name) {
 #if __TBB_DYNAMIC_LOAD_ENABLED
+    // Handlers.
+    static FOO_TYPE (*foo1_handler)() = nullptr;
+    static FOO_TYPE (*foo2_handler)() = nullptr;
+    foo1_handler = &dummy_foo1;
+    foo2_handler = &dummy_foo2;
+
+    // Table describing how to link the handlers.
+    static const tbb::detail::r1::dynamic_link_descriptor LinkTable[] = {
+        { "foo1", (tbb::detail::r1::pointer_to_handler*)(void*)(&foo1_handler) },
+        { "foo2", (tbb::detail::r1::pointer_to_handler*)(void*)(&foo2_handler) }
+    };
 #if !_WIN32
     // Check if the executable exports its symbols.
     REQUIRE_MESSAGE((utils::GetAddress(utils::OpenLibrary(nullptr), "foo1") && utils::GetAddress(utils::OpenLibrary(nullptr), "foo2")),
@@ -93,7 +99,8 @@ void test_dynamic_link(const char* lib_name) {
         REQUIRE_MESSAGE((foo1_handler() == FOO_IMPLEMENTATION && foo2_handler() == FOO_IMPLEMENTATION),
                         "dynamic_link returned the successful code but symbol(s) are wrong");
     } else {
-        REQUIRE_MESSAGE((foo1_handler == dummy_foo1 && foo2_handler == dummy_foo2), "The symbols are corrupted by dynamic_link");
+        REQUIRE_MESSAGE((foo1_handler == &dummy_foo1 && foo2_handler == &dummy_foo2),
+                        "The symbols are corrupted by dynamic_link");
     }
 #else
     utils::suppress_unused_warning(lib_name);
@@ -116,10 +123,10 @@ TEST_CASE("Test dynamic_link corner cases") {
 
 #if __TBB_DYNAMIC_LOAD_ENABLED
 //! Testing dynamic_link with existing library
-//! \brief \ref functionality
+//! \brief \ref requirement
 TEST_CASE("Test dynamic_link with existing library") {
-  // Check that not-yet-linked libary is found and loaded even without specifying absolute path to
-  // it. On Windows, signature validation is performed.
+  // Check that not-yet-linked library is found and loaded even without specifying absolute path to
+  // it. On Windows, signature validation is performed in addition.
 #if _WIN32
     // Well known signed Windows library that exist in every distribution
     const char* lib_name = "user32.dll";
@@ -149,13 +156,39 @@ TEST_CASE("Test dynamic_link with existing library") {
                     "dynamic_link returned successful code but symbol returned incorrect result");
 #endif
 }
-#endif // __TBB_DYNAMIC_LOAD_ENABLED
 
-// TODO:
-// 1. Check that the load happens even without DYNAMIC_LINK_BUILD_ABSOLUTE_PATH flag
-//    - Linux expected behavior: RUNPATH is used
-//    - Windows expected behavior: Application directory is looked into
-// 2. Check that stub unsigned binary is not loaded (Windows only) (if there is and there is no __TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION specified)
-//    - If TBB_DYNAMIC_LINK_WARNING is specified check corresponding regexp is printed.
-// 3. Check that signed library is loaded (Windows only)
-//    - Test needs to check itself that the library is signed
+#if _WIN32 && !defined(__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION)
+//! Testing dynamic_link with stub library known to be unsigned
+//! \brief \ref requirement
+TEST_CASE("Test dynamic_link does not load unsigned library found in the directory with the test") {
+    const int size = PATH_MAX + 1;
+    char msg[size] = {0};
+    const char* lib_name = TEST_LIBRARY_NAME("stub_unsigned");
+    char path[size] = {0};
+    const std::size_t len = tbb::detail::r1::abs_path(lib_name, path, sizeof(path));
+    REQUIRE_MESSAGE((0 < len && len <= PATH_MAX), "The path to the library is not built");
+    std::snprintf(msg, size, "Test prerequisite is not held - the path \"%s\" must exist", path);
+    REQUIRE_MESSAGE(tbb::detail::r1::file_exists(path), msg);
+
+    // The library exists, check that it will not be loaded.
+    void (*handler)() = nullptr;
+    static const tbb::detail::r1::dynamic_link_descriptor table[] = {
+        { "foo", (tbb::detail::r1::pointer_to_handler*)(void*)(&handler) },
+    };
+
+    // Specify library name without absolute path to test that it still can be found because it
+    // resides in the application (i.e. test) directory
+    constexpr int load_flags =
+        tbb::detail::r1::DYNAMIC_LINK_DEFAULT & ~tbb::detail::r1::DYNAMIC_LINK_BUILD_ABSOLUTE_PATH;
+    const bool link_result = tbb::detail::r1::dynamic_link(lib_name, table,
+                                                           sizeof(table) / sizeof(table[0]),
+                                                           /*handle*/nullptr, load_flags);
+    std::snprintf(msg, size, "The library \"%s\" was loaded but should not have been.", path);
+    REQUIRE_MESSAGE(false == link_result, msg);
+    REQUIRE_MESSAGE(nullptr == handler, "The symbol should not be changed.");
+    // TODO: Verify the warning message contains "TBB dynamic link warning: The module
+    // \".*stub_unsigned.*.dll\" is unsigned or has invalid signature."
+}
+#endif // _WIN32 && !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION
+
+#endif // __TBB_DYNAMIC_LOAD_ENABLED
