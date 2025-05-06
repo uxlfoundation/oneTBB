@@ -88,7 +88,7 @@ private:
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
         task* res = task_ptr_or_nullptr(m_func);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        this->get_dynamic_state()->complete_task();
+        this->complete_task();
 #endif
         finalize(&ed);
         return res;
@@ -459,7 +459,7 @@ class function_stack_task
     task* execute(d1::execution_data&) override {
         task* res = d2::task_ptr_or_nullptr(m_func);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        this->get_dynamic_state()->complete_task();
+        this->complete_task();
 #endif
         finalize();
         return res;
