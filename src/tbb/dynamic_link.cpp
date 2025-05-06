@@ -136,12 +136,17 @@ namespace r1 {
         const char* str = nullptr;
         // Note: dlerr_t depends on OS: it is char const * on Linux* and macOS*, int on Windows*.
 #if _WIN32
-        #define DLERROR_SPECIFIER "%d"
+#if __INTEL_LLVM_COMPILER
+// Suppress the incorrect warning about the format specifier for the unsigned long long type.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat"
+#endif
+        #define DLERROR_SPECIFIER "%ul"
         typedef DWORD dlerr_t;
 #else
         #define DLERROR_SPECIFIER "%s"
         typedef const char* dlerr_t;
-#endif
+#endif                          // _WIN32
         dlerr_t error = 0;
 
         std::va_list args;
@@ -216,6 +221,9 @@ namespace r1 {
         va_end(args);
     } // library_warning
 #undef DLERROR_SPECIFIER
+#if _WIN32 && __INTEL_LLVM_COMPILER
+#pragma GCC diagnostic pop
+#endif
 #else
     static void dynamic_link_warning( int code, ... ) {
         suppress_unused_warning(code);
