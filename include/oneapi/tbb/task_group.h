@@ -101,7 +101,7 @@ private:
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
         task* next_task = task_ptr_or_nullptr(m_func);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        task_with_dynamic_state* successor_task = this->get_dynamic_state()->complete_task();
+        task_with_dynamic_state* successor_task = this->complete_task();
         next_task = combine_tasks(next_task, successor_task);
 #endif
         finalize(&ed);
@@ -473,7 +473,7 @@ class function_stack_task
     task* execute(d1::execution_data&) override {
         task* next_task = d2::task_ptr_or_nullptr(m_func);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        task_with_dynamic_state* successor_task = this->get_dynamic_state()->complete_task();
+        task_with_dynamic_state* successor_task = this->complete_task();
         next_task = combine_tasks(next_task, successor_task);
 #endif
         finalize();

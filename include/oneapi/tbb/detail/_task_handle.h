@@ -165,35 +165,56 @@ inline void internal_make_edge(task_dynamic_state* pred, task_dynamic_state* suc
 
 class task_with_dynamic_state : public d1::task {
 public:
-    // TODO: should m_state be lazy-initialized while creating task_tracker or adding dependencies?
-    // Called while constructing the function_stack_task
-    task_with_dynamic_state()
-        : m_state(m_allocator.new_object<task_dynamic_state>(this, m_allocator))
-    {
-        __TBB_ASSERT(m_state != nullptr, "Failed to create task_dynamic_state");
-        m_state->reserve();
-    }
-
-    task_with_dynamic_state(d1::small_object_allocator& alloc)
-        : m_allocator(alloc)
-        , m_state(m_allocator.new_object<task_dynamic_state>(this, m_allocator))
-    {
-        __TBB_ASSERT(m_state != nullptr, "Failed to create task_dynamic_state");
-        m_state->reserve();
-    }
+    task_with_dynamic_state() : m_state(nullptr) {}
 
     virtual ~task_with_dynamic_state() {
-        __TBB_ASSERT(m_state != nullptr, nullptr);
-        m_state->release();
+        task_dynamic_state* current_state = m_state.load(std::memory_order_relaxed);
+        if (current_state != nullptr) {
+            current_state->release();
+        }
     }
 
+    // Creates the dynamic state if the task_tracker is created or the first successor to task_handle
     task_dynamic_state* get_dynamic_state() {
-        return m_state;
+        task_dynamic_state* current_state = m_state.load(std::memory_order_acquire);
+
+        if (current_state == nullptr) {
+            d1::small_object_allocator alloc;
+
+            task_dynamic_state* new_state = alloc.new_object<task_dynamic_state>(this, alloc);
+
+            if (m_state.compare_exchange_strong(current_state, new_state)) {
+                // Reserve a task co-ownership for dynamic_state
+                new_state->reserve();
+                current_state = new_state;
+            } else {
+                // Other thread created the dynamic state
+                alloc.delete_object(new_state);
+            }
+        }
+
+        __TBB_ASSERT(current_state != nullptr, "Failed to create dynamic state");
+        return current_state;
     }
-protected:
-    d1::small_object_allocator m_allocator;
+
+    void mark_submitted() {
+        task_dynamic_state* current_state = m_state.load(std::memory_order_relaxed);
+        if (current_state != nullptr) {
+            current_state->mark_submitted();
+        }
+    }
+
+    task_with_dynamic_state* complete_task() {
+        task_with_dynamic_state* next_task = nullptr;
+
+        task_dynamic_state* current_state = m_state.load(std::memory_order_relaxed);
+        if (current_state != nullptr) {
+            next_task = current_state->complete_task();
+        }
+        return next_task;
+    }
 private:
-    task_dynamic_state* m_state;
+    std::atomic<task_dynamic_state*> m_state;
 };
 
 class successor_vertex : public d1::reference_vertex {
@@ -246,11 +267,7 @@ public:
     }
 
     task_handle_task(d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
-        : 
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-          task_with_dynamic_state(alloc),
-#endif
-          m_wait_tree_vertex(vertex)
+        : m_wait_tree_vertex(vertex)
         , m_ctx(ctx)
         , m_allocator(alloc)
     {
@@ -311,7 +328,11 @@ struct task_handle_accessor {
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
     static void mark_task_submitted(task_handle& th) {
         __TBB_ASSERT(th.m_handle, "mark_task_submitted does not expect empty task_handle");
-        th.m_handle->get_dynamic_state()->mark_submitted();
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+        th.m_handle->mark_submitted();
+#pragma GCC diagnostic pop
     }
 
     static task_dynamic_state* get_task_dynamic_state(task_handle& th) {
