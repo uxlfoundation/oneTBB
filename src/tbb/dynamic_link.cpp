@@ -136,12 +136,17 @@ namespace r1 {
         const char* str = nullptr;
         // Note: dlerr_t depends on OS: it is char const * on Linux* and macOS*, int on Windows*.
 #if _WIN32
-        #define DLERROR_SPECIFIER "%d"
+#if __INTEL_LLVM_COMPILER
+// Suppress the incorrect warning about the format specifier for the unsigned long long type.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat"
+#endif
+        #define DLERROR_SPECIFIER "%ul"
         typedef DWORD dlerr_t;
 #else
         #define DLERROR_SPECIFIER "%s"
         typedef const char* dlerr_t;
-#endif
+#endif                          // _WIN32
         dlerr_t error = 0;
 
         std::va_list args;
@@ -216,6 +221,9 @@ namespace r1 {
         va_end(args);
     } // library_warning
 #undef DLERROR_SPECIFIER
+#if _WIN32 && __INTEL_LLVM_COMPILER
+#pragma GCC diagnostic pop
+#endif
 #else
     static void dynamic_link_warning( int code, ... ) {
         suppress_unused_warning(code);
@@ -426,7 +434,7 @@ namespace r1 {
                     otherwise -- Ok, number of characters (incl. terminating null) written to buffer.
     */
     static std::size_t abs_path( char const * name, char * path, std::size_t len ) {
-        if ( ap_data._len == 0 )
+        if ( !name || ap_data._len == 0 )
             return 0;
 
         std::size_t name_len = std::strlen( name );
