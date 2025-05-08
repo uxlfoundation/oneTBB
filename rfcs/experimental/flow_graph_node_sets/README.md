@@ -145,7 +145,7 @@ the ordering added. For example, the code below creates a `node_set` that contai
 In the above code, the `node_set handlers` is constructed with `order::undefined` and
 the call to `precedes` creates a new set that is constructed with `order::preceding`.
 
-The template functions `[2]` and `[4]` take a sequence of nodes and creates a node set that has
+The template functions `[2]` and `[4]` take a sequence of nodes and create a node set that has
 an `order::following` or `order::preceding` order type. The following code is equivalent to the
 previous example:
 
