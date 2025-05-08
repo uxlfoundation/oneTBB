@@ -7,11 +7,11 @@ input types. The extension simplifies the existing approach by removing the need
 each input port of `join_node`.
 
 Let's consider the following graph that has two `queue_nodes` named `q0` and `q1` that are connected to a
-key matching `join_node j` that is then connected to a final `queue_node` name `q3`:
+key matching `join_node j` that is then connected to a final `queue_node` named `q3`:
 
 <img src="JoinGraph.png">
 
-The code to implement such as graph is shown below, with the message type `Message`.
+The code to implement such a graph is shown below, with the message type `Message`.
 
 ```cpp
 #include "oneapi/tbb/flow_graph.h"
@@ -80,6 +80,10 @@ key function with the message type instead of specifying it manually for each in
 
 ## Experimental Feature
 
+This experimental feature first appeared in 2015 and likely needs modernization before going into
+production. Here we describe the feature as-is, and intend to use this document as a reference
+for proposals for modifications.
+
 The extension adds a special constructor to the `join_node` interface when the
 `key_matching<typename K, class KHash=tbb_hash_compare>` policy is used. The constructor has the
 following signature:
@@ -133,8 +137,12 @@ must be a template with at least the key type as a template parameter:
 The initial example is rewritten below with both options for using the less verbose constructor.
 When compiled with the `USE_FUNCTION` macro defined, the code will add a member function `key()`
 to the `struct Message` which the default `key_from_message` will use. If instead, the
-the `USE_ADL` macro is defined, then the code defines its own `key_from_message` function in the
+`USE_ADL` macro is defined, then the code defines its own `key_from_message` function in the
 same namespace as `struct Message` and this function will be found by ADL.
+
+Simplifying key calculation from incoming messages remains desirable but the approach proposed
+in 2015 may no longer be the best approach. Before productization, alternatives should be
+considered as mentioned in the Exit Criteria.
 
 ```cpp
 #define TBB_PREVIEW_FLOW_GRAPH_FEATURES 1
@@ -211,6 +219,8 @@ As an already released experimental feature, this extension is documented in the
 ## Exit Criteria
 
 The following conditions need to be met to move the feature from experimental to fully supported:
-* Collecting feedback on user experience confirming the choices made on the open questions and limitations:
-  * Is an optional `key()` member function and ADL the best options for simplification? We are open to other suggestions.
+* Modernize the approach:
+  * Is an optional `key()` member function and ADL of `key_from_message_body` still the best
+  approach for simplification?
+  * Consider alternatives.
 * The feature must be added to the oneTBB specification and accepted.
