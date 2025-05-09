@@ -43,22 +43,22 @@
      -- uses n to determine size
      -- allocates and generates values in to A
 **********************************************/
-void matrix_init(double *&A, int &n, const char *fname);
+void matrix_init(double *&A, int &n, const std::string& fname);
 
 /**********************************************
  Writes a lower triangular matrix to a file
  -- first line of file is n
  -- subsequently 1 row per line
 **********************************************/
-void matrix_write(double *A, int n, const char *fname, bool is_triangular = false);
+void matrix_write(double *A, int n, const std::string& fname);
 
 /************************************************************
  GLOBAL VARIABLES
 ************************************************************/
 bool g_benchmark_run = false;
 int g_n = -1, g_b = -1, g_num_trials = 1;
-char *g_input_file_name = nullptr;
-char *g_output_prefix = nullptr;
+std::string g_input_file_name;
+std::string g_output_prefix;
 std::string g_alg_name;
 int g_num_tbb_threads;
 
@@ -184,10 +184,8 @@ public:
                 elapsed_time += (t1 - t0).seconds();
 
             if (!g_benchmark_run && !check_if_valid(A0, C, A, n)) {
-                if (g_output_prefix) {
-                    std::string s(g_output_prefix);
-                    s += "_" + name + ".txt";
-                    matrix_write(A0, g_n, s.c_str(), true);
+                if (!g_output_prefix.empty()) {
+                    matrix_write(A0, g_n, g_output_prefix + "_" + name);
                     free(A0);
                     free(C);
                     return 0.;
@@ -195,10 +193,8 @@ public:
             }
         }
 
-        if (g_output_prefix) {
-            std::string s(g_output_prefix);
-            s += "_" + name + ".txt";
-            matrix_write(A0, g_n, s.c_str(), true);
+        if (!g_output_prefix.empty()) {
+            matrix_write(A0, g_n, g_output_prefix + "_" + name);
         }
 
         printf("%s %d %d %d %d %lf %lf\n",
@@ -626,8 +622,8 @@ bool process_args(int argc, char *argv[]) {
                 g_output_prefix,
                 "output_prefix",
                 "if provided the prefix will be preappended to output files:\n"
-                "                     output_prefix_posdef.txt\n"
-                "                     output_prefix_X.txt; where X is the algorithm used\n"
+                "                     output_prefix_posdef\n"
+                "                     output_prefix_X; where X is the algorithm used\n"
                 "                 if output_prefix is not provided, no output will be written")
             .positional_arg(g_alg_name,
                             "algorithm",
@@ -658,7 +654,7 @@ bool process_args(int argc, char *argv[]) {
         return false;
     }
 
-    if (g_b == -1 || (g_n == -1 && g_input_file_name == nullptr)) {
+    if (g_b == -1 || (g_n == -1 && g_input_file_name.empty())) {
         return false;
     }
 
@@ -689,10 +685,8 @@ int main(int argc, char *argv[]) {
     matrix_init(A, g_n, g_input_file_name);
 
     // Write input matrix if output_prefix is set and we didn't read from a file
-    if (!g_input_file_name && g_output_prefix) {
-        std::string s(g_output_prefix);
-        s += "_posdef.txt";
-        matrix_write(A, g_n, s.c_str());
+    if (g_input_file_name.empty() && !g_output_prefix.empty()) {
+        matrix_write(A, g_n, g_output_prefix + "_posdef");
     }
 
     if (g_alg_name.empty()) {
@@ -702,15 +696,18 @@ int main(int argc, char *argv[]) {
         }
     }
     else {
-        algmap_t::iterator alg_iter = algmap.find(g_alg_name);
-
-        if (alg_iter != algmap.end()) {
-            algorithm *const alg = alg_iter->second;
-            (*alg)(A, g_n, g_b, g_num_trials);
-        }
-        else {
-            printf("ERROR: Invalid algorithm name: %s\n", g_alg_name.c_str());
-            return -1;
+        std::stringstream ss{g_alg_name};
+        std::string alg_name;
+        while (std::getline(ss, alg_name, ',')) {
+            algmap_t::iterator alg_iter = algmap.find(alg_name);
+            if (alg_iter != algmap.end()) {
+                algorithm *const alg = alg_iter->second;
+                (*alg)(A, g_n, g_b, g_num_trials);
+            }
+            else {
+                printf("ERROR: Invalid algorithm name: %s\n", alg_name.c_str());
+                return -1;
+            }
         }
     }
 

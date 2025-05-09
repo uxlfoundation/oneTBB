@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2024 Intel Corporation
+    Copyright (C) 2024-2025 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -14,6 +14,9 @@
 #include <cassert>
 #include <cstring>
 #include <cstdlib>
+#include <string>
+#include <fstream>
+#include <iostream>
 
 #include <mkl_cblas.h>
 
@@ -51,34 +54,29 @@ static void posdef_gen(double *A, int n) {
 }
 
 // Read the matrix from the input file
-void matrix_init(double *&A, int &n, const char *fname) {
-    if (fname) {
-        int i;
-        int j;
-        FILE *fp;
+void matrix_init(double *&A, int &n, const std::string& fname) {
+    if (!fname.empty()) {
+        std::ifstream fp{fname, std::ios::in | std::ios::binary};
 
-        fp = fopen(fname, "r");
-        if (fp == nullptr) {
-            fprintf(stderr, "\nFile does not exist\n");
+        if (!fp.is_open()) {
+            std::cerr << "\nFile does not exist\n";
             std::exit(0);
         }
-        if (fscanf(fp, "%d", &n) <= 0) {
-            fprintf(stderr, "\nCouldn't read n from %s\n", fname);
-            std::exit(-1);
+        if (!fp.read(reinterpret_cast<char*>(&n), sizeof(n))) {
+            throw std::runtime_error("Couldn't read n from " + fname);
         }
         A = (double *)calloc(sizeof(double), n * n);
-        for (i = 0; i < n; ++i) {
-            for (j = 0; j <= i; ++j) {
-                if (fscanf(fp, "%lf ", &A[i * n + j]) <= 0) {
-                    fprintf(stderr, "\nMatrix size incorrect %i %i\n", i, j);
-                    std::exit(-1);
+        // TODO: Investigate how beneficial reading of consecutive memory could be here
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j <= i; ++j) {
+                if (!fp.read(reinterpret_cast<char*>(&A[j * n + i]), sizeof(double))) {
+                    throw std::runtime_error("Couldn't read A from " + fname);
                 }
                 if (i != j) {
-                    A[j * n + i] = A[i * n + j];
+                    A[i * n + j] = A[j * n + i];
                 }
             }
         }
-        fclose(fp);
     }
     else {
         A = (double *)calloc(sizeof(double), n * n);
@@ -87,46 +85,19 @@ void matrix_init(double *&A, int &n, const char *fname) {
 }
 
 // write matrix to file
-void matrix_write(double *A, int n, const char *fname, bool is_triangular = false) {
-    if (fname) {
-        int i = 0;
-        int j = 0;
-        FILE *fp = nullptr;
-
-        fp = fopen(fname, "w");
-        if (fp == nullptr) {
-            fprintf(stderr, "\nCould not open file %s for writing.\n", fname);
+void matrix_write(double *A, int n, const std::string& fname) {
+    if (!fname.empty()) {
+        std::ofstream fp{fname, std::ios::out | std::ios::binary};
+        if (!fp.is_open()) {
+            std::cerr << "\nCould not open file " << fname << " for writing.\n";
             std::exit(0);
         }
-        fprintf(fp, "%d\n", n);
-        for (i = 0; i < n; ++i) {
-            for (j = 0; j <= i; ++j) {
-                fprintf(fp, "%lf ", A[j * n + i]);
-            }
-            if (!is_triangular) {
-                for (; j < n; ++j) {
-                    fprintf(fp, "%lf ", A[i * n + j]);
-                }
-            }
-            else {
-                for (; j < n; ++j) {
-                    fprintf(fp, "%lf ", 0.0);
-                }
-            }
-            fprintf(fp, "\n");
-        }
-        if (is_triangular) {
-            fprintf(fp, "\n");
-            for (i = 0; i < n; ++i) {
-                for (j = 0; j < i; ++j) {
-                    fprintf(fp, "%lf ", 0.0);
-                }
-                for (; j < n; ++j) {
-                    fprintf(fp, "%lf ", A[i * n + j]);
-                }
-                fprintf(fp, "\n");
+        fp.write(reinterpret_cast<char*>(&n), sizeof(n));
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j <= i; ++j) {
+                // TODO: Investigate how beneficial writing of consecutive memory could be here
+                fp.write(reinterpret_cast<char*>(&A[j * n + i]), sizeof(double));
             }
         }
-        fclose(fp);
     }
 }
