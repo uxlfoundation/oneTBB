@@ -101,7 +101,7 @@ private:
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
         task* next_task = task_ptr_or_nullptr(m_func);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        task_with_dynamic_state* successor_task = this->get_dynamic_state()->complete_task();
+        task_with_dynamic_state* successor_task = this->complete_task();
         next_task = combine_tasks(next_task, successor_task);
 #endif
         finalize(&ed);
@@ -473,7 +473,7 @@ class function_stack_task
     task* execute(d1::execution_data&) override {
         task* next_task = d2::task_ptr_or_nullptr(m_func);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        task_with_dynamic_state* successor_task = this->get_dynamic_state()->complete_task();
+        task_with_dynamic_state* successor_task = this->complete_task();
         next_task = combine_tasks(next_task, successor_task);
 #endif
         finalize();
@@ -661,6 +661,17 @@ public:
         internal_make_edge(task_tracker_accessor::get_task_dynamic_state(pred),
                            task_handle_accessor::get_task_dynamic_state(succ));
     }
+
+    struct current_task {
+        static void transfer_successors_to(d2::task_handle& new_task) {
+            d1::task* curr_task = d1::current_task();
+            __TBB_ASSERT(curr_task != nullptr, "transfer_successors_to was called outside of task body");
+            d2::task_with_dynamic_state* curr_task_with_state = dynamic_cast<d2::task_with_dynamic_state*>(curr_task);
+            __TBB_ASSERT(curr_task_with_state != nullptr, "transfer_successors_to was called outside of task_group task");
+
+            curr_task_with_state->transfer_successors_to(task_handle_accessor::get_task_dynamic_state(new_task));
+        }
+    };
 #endif
 }; // class task_group
 
