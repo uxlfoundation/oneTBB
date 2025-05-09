@@ -2,9 +2,11 @@
 
 ## Introduction
 
-This experimental extension allows a key matching `join_node` to obtain keys via functions associated with its
-input types. The extension simplifies the existing approach by removing the need to provide a function object for
-each input port of `join_node`.
+A key matching `join_node` requires developers to provide a function for each input port to map the
+input type to the key type. This experimental extension simplifies the existing approach by calling the
+`key` member function in the input type when available instead, removing the need to provide a function
+per port during construction. Users can alternatively overload a `key_from_message` function for their
+input type and it will be used if found by ADL.
 
 Let's consider the following graph that has two `queue_nodes` named `q0` and `q1` that are connected to a
 key matching `join_node j` that is then connected to a final `queue_node` named `q3`:
@@ -75,7 +77,7 @@ For each input port, a function object must be provided to get the key from the 
 For this example, there are two identical lambda expressions passed, `[](const msg_t& m) { return m.k; }`.
 If a `join_node` has 10 ports, there will need to be 10 function objects passed to the constructor.
 
-This proposal simplifies the use of key matching `join_node` by providing a way to associate a
+This experimental extension simplifies the use of key matching `join_node` by providing a way to associate a
 key function with the message type instead of specifying it manually for each input port.
 
 ## Experimental Feature
