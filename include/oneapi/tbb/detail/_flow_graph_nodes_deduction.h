@@ -23,83 +23,55 @@ namespace tbb {
 namespace detail {
 namespace d2 {
 
-template <typename Input, typename Output>
-struct declare_body_types {
+template <typename Input>
+struct declare_input_type {
     using input_type = Input;
-    using output_type = Output;
 };
 
-struct NoInputBody {};
+template <>
+struct declare_input_type<d1::flow_control> {};
 
-template <typename Output>
-struct declare_body_types<NoInputBody, Output> {
-    using output_type = Output;
+template <typename Input, typename Output>
+struct body_types : declare_input_type<std::decay_t<Input>> {
+    using output_type = std::decay_t<Output>;
 };
 
-template <typename T> struct body_types;
+template <typename P>
+struct extract_member_function_types;
 
-template <typename T, typename Input, typename Output>
-struct body_types<Output (T::*)(const Input&) const> : declare_body_types<Input, Output> {};
+template <typename Body, typename Input, typename Output>
+struct extract_member_function_types<Output (Body::*)(Input)> : body_types<Input, Output> {};
 
-template <typename T, typename Input, typename Output>
-struct body_types<Output (T::*)(const Input&)> : declare_body_types<Input, Output> {};
+template <typename Body, typename Input, typename Output>
+struct extract_member_function_types<Output (Body::*)(Input) const> : body_types<Input, Output> {};
 
-template <typename T, typename Input, typename Output>
-struct body_types<Output (T::*)(Input&) const> : declare_body_types<Input, Output> {};
+// Body is represented as a callable object - extract types from the pointer to operator()
+template <typename Body>
+struct extract_body_types : extract_member_function_types<decltype(&Body::operator())> {};
 
-template <typename T, typename Input, typename Output>
-struct body_types<Output (T::*)(Input&)> : declare_body_types<Input, Output> {};
-
-template <typename T, typename Output>
-struct body_types<Output (T::*)(d1::flow_control&) const> : declare_body_types<NoInputBody, Output> {};
-
-template <typename T, typename Output>
-struct body_types<Output (T::*)(d1::flow_control&)> : declare_body_types<NoInputBody, Output> {};
-
+// Body is represented as a pointer to function
 template <typename Input, typename Output>
-struct body_types<Output (*)(Input&)> : declare_body_types<Input, Output> {};
+struct extract_body_types<Output (*)(Input)> : body_types<Input, Output> {};
 
+// Body is represented as a pointer to member function
 template <typename Input, typename Output>
-struct body_types<Output (*)(const Input&)> : declare_body_types<Input, Output> {};
+struct extract_body_types<Output (Input::*)()> : body_types<Input, Output> {};
 
-template <typename Output>
-struct body_types<Output (*)(d1::flow_control&)> : declare_body_types<NoInputBody, Output> {};
+// Body is represented as a pointer to member object
+template <typename Input, typename Output>
+struct extract_body_types<Output Input::*> : body_types<Input, Output> {};
 
 template <typename Body>
-using input_t = typename body_types<Body>::input_type;
+using input_type = typename extract_body_types<Body>::input_type;
 
 template <typename Body>
-using output_t = typename body_types<Body>::output_type;
-
-template <typename T, typename Input, typename Output>
-auto decide_on_operator_overload(Output (T::*name)(const Input&) const)->decltype(name);
-
-template <typename T, typename Input, typename Output>
-auto decide_on_operator_overload(Output (T::*name)(const Input&))->decltype(name);
-
-template <typename T, typename Input, typename Output>
-auto decide_on_operator_overload(Output (T::*name)(Input&) const)->decltype(name);
-
-template <typename T, typename Input, typename Output>
-auto decide_on_operator_overload(Output (T::*name)(Input&))->decltype(name);
-
-template <typename Input, typename Output>
-auto decide_on_operator_overload(Output (*name)(const Input&))->decltype(name);
-
-template <typename Input, typename Output>
-auto decide_on_operator_overload(Output (*name)(Input&))->decltype(name);
-
-template <typename Body>
-decltype(decide_on_operator_overload(&Body::operator())) decide_on_callable_type(int);
-
-template <typename Body>
-decltype(decide_on_operator_overload(std::declval<Body>())) decide_on_callable_type(...);
+using output_type = typename extract_body_types<Body>::output_type;
 
 // Deduction guides for Flow Graph nodes
 
 template <typename GraphOrSet, typename Body>
 input_node(GraphOrSet&&, Body)
-->input_node<output_t<decltype(decide_on_callable_type<Body>(0))>>;
+->input_node<output_type<Body>>;
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 
@@ -134,7 +106,7 @@ queue_node(const NodeSet&)
 
 template <typename GraphOrProxy, typename Sequencer>
 sequencer_node(GraphOrProxy&&, Sequencer)
-->sequencer_node<input_t<decltype(decide_on_callable_type<Sequencer>(0))>>;
+->sequencer_node<input_type<Sequencer>>;
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 template <typename NodeSet, typename Compare>
@@ -181,17 +153,14 @@ join_node(const node_set<order::preceding, Successor, Successors...>)
 
 template <typename GraphOrProxy, typename Body, typename... Bodies>
 join_node(GraphOrProxy&&, Body, Bodies...)
-->join_node<std::tuple<input_t<decltype(decide_on_callable_type<Body>(0))>,
-                       input_t<decltype(decide_on_callable_type<Bodies>(0))>...>,
-            key_matching<join_key_t<output_t<decltype(decide_on_callable_type<Body>(0))>>>>;
+->join_node<std::tuple<input_type<Body>, input_type<Bodies>...>,
+            key_matching<join_key_t<output_type<Body>>>>;
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 template <typename... Predecessors>
 indexer_node(const node_set<order::following, Predecessors...>&)
 ->indexer_node<typename Predecessors::output_type...>;
-#endif
 
-#if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 template <typename NodeSet>
 limiter_node(const NodeSet&, size_t)
 ->limiter_node<decide_on_set_t<NodeSet>>;
@@ -210,16 +179,12 @@ template <typename GraphOrSet, typename Body, typename Policy>
 function_node(GraphOrSet&&,
               size_t, Body,
               Policy, node_priority_t = no_priority)
-->function_node<input_t<decltype(decide_on_callable_type<Body>(0))>,
-                output_t<decltype(decide_on_callable_type<Body>(0))>,
-                Policy>;
+->function_node<input_type<Body>, output_type<Body>, Policy>;
 
 template <typename GraphOrSet, typename Body>
 function_node(GraphOrSet&&, size_t,
               Body, node_priority_t = no_priority)
-->function_node<input_t<decltype(decide_on_callable_type<Body>(0))>,
-                output_t<decltype(decide_on_callable_type<Body>(0))>,
-                queueing>;
+->function_node<input_type<Body>, output_type<Body>, queueing>;
 
 template <typename Output>
 struct continue_output {
