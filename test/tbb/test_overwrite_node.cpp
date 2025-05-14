@@ -424,7 +424,7 @@ TEST_CASE("test overwrite_node try_put_and_wait") {
 }
 #endif
 
-//! Test for cancel register_predecessor_task
+//! Test for nested make_edge from predecessor of continue_node that adds edge to overwrite_node
 //! \brief \ref error_guessing
 TEST_CASE("Nested make_edge to continue_node") {
     tbb::flow::graph g;
