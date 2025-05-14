@@ -423,3 +423,39 @@ TEST_CASE("test overwrite_node try_put_and_wait") {
     test_overwrite_node_try_put_and_wait();
 }
 #endif
+
+//! Test for cancel register_predecessor_task
+//! \brief \ref error_guessing
+TEST_CASE("Nested make_edge to continue_node") {
+    tbb::flow::graph g;
+
+    using msg_t = tbb::flow::continue_msg;
+    using cnode_t = tbb::flow::continue_node<msg_t>;
+    using wnode_t = tbb::flow::write_once_node<msg_t>;
+
+    std::atomic<int> count = 0;
+
+    // make a write_once_node that and fill it
+    wnode_t w{g};
+    w.try_put(msg_t{});
+
+    cnode_t execute_one_time{g,
+        [&](const msg_t& m) {
+            ++count;
+            return m;
+        }};
+
+    cnode_t edge_adder{g, 
+        [&](const msg_t& m) {
+            // should increment count and then send message
+            tbb::flow::make_edge(w, execute_one_time);
+            return m;
+        }};
+
+    tbb::flow::make_edge(edge_adder, execute_one_time);
+    edge_adder.try_put(msg_t{});
+    g.wait_for_all();
+    execute_one_time.try_put(msg_t{}); // not enough with 2 predecessors
+    g.wait_for_all();
+    CHECK_MESSAGE ((count == 1), "node should only execute once");
+}
