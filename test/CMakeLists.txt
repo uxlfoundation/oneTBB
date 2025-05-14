@@ -428,9 +428,8 @@ if (TARGET TBB::tbb)
     set_property(TARGET test_dynamic_link PROPERTY BUILD_RPATH_USE_ORIGIN TRUE)
     set_property(TARGET test_dynamic_link PROPERTY BUILD_RPATH "$ORIGIN")
     target_compile_definitions(test_dynamic_link PRIVATE "TBBLIB_NAME=\"$<TARGET_FILE_NAME:TBB::tbb>\"")
-    # Making unsigned library so that the test fails to load it
-    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/stub_unsigned_lib.cpp "void foo(){}")
-    add_library(stub_unsigned SHARED ${CMAKE_CURRENT_BINARY_DIR}/stub_unsigned_lib.cpp)
+    # Making unsigned library which the test fails loading
+    add_library(stub_unsigned SHARED ${CMAKE_CURRENT_SOURCE_DIR}/tbb/stub_unsigned_lib.cpp)
     add_dependencies(test_dynamic_link stub_unsigned)
 
     if (LINKER_HAS_NO_AS_NEEDED)

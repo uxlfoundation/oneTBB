@@ -157,10 +157,10 @@ TEST_CASE("Test dynamic_link with existing library") {
 #endif
 }
 
-#if _WIN32 && !defined(__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION)
-//! Testing dynamic_link with stub library known to be unsigned
-//! \brief \ref requirement
-TEST_CASE("Test dynamic_link does not load unsigned library found in the directory with the test") {
+//! Testing dynamic_link with stub library known to be unsigned (on Windows) and having no exported
+//! symbols (on Linux)
+// \brief \ref requirement
+TEST_CASE("Test dynamic_link with bad library") {
     const int size = PATH_MAX + 1;
     char msg[size] = {0};
     const char* lib_name = TEST_LIBRARY_NAME("stub_unsigned");
@@ -184,11 +184,16 @@ TEST_CASE("Test dynamic_link does not load unsigned library found in the directo
                                                            sizeof(table) / sizeof(table[0]),
                                                            /*handle*/nullptr, load_flags);
     std::snprintf(msg, size, "The library \"%s\" was loaded but should not have been.", path);
-    REQUIRE_MESSAGE(false == link_result, msg);
+
+    // Expectation is that the library will not be loaded because:
+    // a) On Windows the library is unsigned
+    // b) On Linux the library does not have exported symbols
+    const bool expected_link_result = false;
+
+    REQUIRE_MESSAGE(expected_link_result == link_result, msg);
     REQUIRE_MESSAGE(nullptr == handler, "The symbol should not be changed.");
     // TODO: Verify the warning message contains "TBB dynamic link warning: The module
     // \".*stub_unsigned.*.dll\" is unsigned or has invalid signature."
 }
-#endif // _WIN32 && !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION
 
 #endif // __TBB_DYNAMIC_LOAD_ENABLED

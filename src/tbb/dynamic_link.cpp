@@ -160,7 +160,10 @@ namespace r1 {
                         DLERROR_SPECIFIER "\n", prefix, str, error);
             break;
         case dl_sym_not_found:     // char const * sym, dlerr_t err:
-            // TODO: Print not found symbol once it is used by the implementation
+            str = va_arg(args, const char*);
+            error = va_arg(args, dlerr_t);
+            TBB_FPRINTF(stderr, "%s The symbol \"%s\" was not resolved. System error: "
+                        DLERROR_SPECIFIER "\n", prefix, str, error);
             break;
         case dl_sys_fail:
             str = va_arg(args, const char*);
@@ -252,6 +255,7 @@ namespace r1 {
             dynamic_link_descriptor const & desc = descriptors[k];
             pointer_to_handler addr = (pointer_to_handler)dlsym( module, desc.name );
             if ( !addr ) {
+                DYNAMIC_LINK_WARNING( dl_sym_not_found, desc.name, dlerror() );
                 return false;
             }
             h[k] = addr;
