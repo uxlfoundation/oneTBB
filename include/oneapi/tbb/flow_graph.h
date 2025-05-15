@@ -329,7 +329,7 @@ protected:
     virtual graph& graph_reference() const = 0;
 
     template<typename TT, typename M> friend class successor_cache;
-    template< typename T > friend class overwrite_node;
+    template< typename TTT > friend class overwrite_node;
     virtual bool is_continue_receiver() { return false; }
 
     // TODO revamp: reconsider the inheritance and move node priority out of receiver
