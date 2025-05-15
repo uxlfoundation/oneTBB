@@ -235,6 +235,8 @@ namespace r1 {
 
 #elif defined(DYNAMIC_LINK_WARNING)
 #define __DYNAMIC_LINK_REPORT_SIGNATURE_ERRORS 1
+#else
+#define DYNAMIC_LINK_WARNING(...) (void)0
 #endif /* !defined(DYNAMIC_LINK_WARNING) && !__TBB_WIN8UI_SUPPORT && __TBB_DYNAMIC_LOAD_ENABLED */
 
     static bool resolve_symbols( dynamic_link_handle module, const dynamic_link_descriptor descriptors[], std::size_t required )
