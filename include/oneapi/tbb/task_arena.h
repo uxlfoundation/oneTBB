@@ -504,7 +504,7 @@ public:
         r1::exit_parallel_phase(this, static_cast<std::uintptr_t>(with_fast_leave));
     }
 
-    class scoped_parallel_phase {
+    class scoped_parallel_phase : no_copy {
         task_arena& arena;
         bool one_time_fast_leave;
     public:
