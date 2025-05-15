@@ -122,6 +122,8 @@ TEST_CASE("Test dynamic_link corner cases") {
 
 
 #if __TBB_DYNAMIC_LOAD_ENABLED
+
+#if !__TBB_WIN8UI_SUPPORT
 //! Testing dynamic_link with existing library
 //! \brief \ref requirement
 TEST_CASE("Test dynamic_link with existing library") {
@@ -156,6 +158,7 @@ TEST_CASE("Test dynamic_link with existing library") {
                     "dynamic_link returned successful code but symbol returned incorrect result");
 #endif
 }
+#endif                          // !__TBB_WIN8UI_SUPPORT
 
 //! Testing dynamic_link with stub library known to be unsigned (on Windows) and having no exported
 //! symbols (on Linux)
@@ -164,14 +167,15 @@ TEST_CASE("Test dynamic_link with bad library") {
     const int size = PATH_MAX + 1;
     const char* lib_name = TEST_LIBRARY_NAME("stub_unsigned");
     char path[size] = {0};
-
-    const std::size_t len = tbb::detail::r1::abs_path(lib_name, path, sizeof(path));
-    REQUIRE_MESSAGE((0 < len && len <= PATH_MAX), "The path to the library is not built");
-
     const int msg_size = size + 128; // Path to the file + message
     char msg[msg_size] = {0};
+
+#if !__TBB_WIN8UI_SUPPORT
+    const std::size_t len = tbb::detail::r1::abs_path(lib_name, path, sizeof(path));
+    REQUIRE_MESSAGE((0 < len && len <= PATH_MAX), "The path to the library is not built");
     std::snprintf(msg, msg_size, "Test prerequisite is not held - the path \"%s\" must exist", path);
     REQUIRE_MESSAGE(tbb::detail::r1::file_exists(path), msg);
+#endif
 
     // The library exists, check that it will not be loaded.
     void (*handler)() = nullptr;
