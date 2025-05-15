@@ -329,6 +329,7 @@ protected:
     virtual graph& graph_reference() const = 0;
 
     template<typename TT, typename M> friend class successor_cache;
+    template< typename T > friend class overwrite_node;
     virtual bool is_continue_receiver() { return false; }
 
     // TODO revamp: reconsider the inheritance and move node priority out of receiver
@@ -3319,6 +3320,7 @@ public:
         if (my_buffer_is_valid && is_graph_active( my_graph )) {
             // We have a valid value that must be forwarded immediately.
             if (s.is_continue_receiver()) {
+                // try_put can never fail, since continue_receivers always accept
                 my_successors.register_successor( s );
                 s.try_put( my_buffer );
                 return true;

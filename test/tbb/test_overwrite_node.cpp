@@ -431,11 +431,11 @@ TEST_CASE("Nested make_edge to continue_node") {
 
     using msg_t = tbb::flow::continue_msg;
     using cnode_t = tbb::flow::continue_node<msg_t>;
-    using wnode_t = tbb::flow::write_once_node<msg_t>;
+    using wnode_t = tbb::flow::overwrite_node<msg_t>;
 
     std::atomic<int> count(0);
 
-    // make a write_once_node that and fill it
+    // make a overwrite_node that and fill it
     wnode_t w{g};
     w.try_put(msg_t{});
 
