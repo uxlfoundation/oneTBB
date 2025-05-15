@@ -162,12 +162,15 @@ TEST_CASE("Test dynamic_link with existing library") {
 // \brief \ref requirement
 TEST_CASE("Test dynamic_link with bad library") {
     const int size = PATH_MAX + 1;
-    char msg[size] = {0};
     const char* lib_name = TEST_LIBRARY_NAME("stub_unsigned");
     char path[size] = {0};
+
     const std::size_t len = tbb::detail::r1::abs_path(lib_name, path, sizeof(path));
     REQUIRE_MESSAGE((0 < len && len <= PATH_MAX), "The path to the library is not built");
-    std::snprintf(msg, size, "Test prerequisite is not held - the path \"%s\" must exist", path);
+
+    const int msg_size = size + 128; // Path to the file + message
+    char msg[msg_size] = {0};
+    std::snprintf(msg, msg_size, "Test prerequisite is not held - the path \"%s\" must exist", path);
     REQUIRE_MESSAGE(tbb::detail::r1::file_exists(path), msg);
 
     // The library exists, check that it will not be loaded.
@@ -183,7 +186,7 @@ TEST_CASE("Test dynamic_link with bad library") {
     const bool link_result = tbb::detail::r1::dynamic_link(lib_name, table,
                                                            sizeof(table) / sizeof(table[0]),
                                                            /*handle*/nullptr, load_flags);
-    std::snprintf(msg, size, "The library \"%s\" was loaded but should not have been.", path);
+    std::snprintf(msg, msg_size, "The library \"%s\" was loaded but should not have been.", path);
 
     // Expectation is that the library will not be loaded because:
     // a) On Windows the library is unsigned
