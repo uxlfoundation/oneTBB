@@ -47,28 +47,12 @@ tbb::task_tracker tracker = handle; // create the tracker for the task owned by 
 
 tg.run(std::move(handle)); // task is in submitted state, handle is left in an empty state
 
-// tracker is non empty and can be used to track progress on the task and set dependencies
+// tracker is non empty and can be used to set dependencies
 ```
 
 In this case, no semantic changes are needed for the submission methods, because the ``task_handle`` semantics is not changed.
 
 Alternative approaches for handling tasks in different states are described in the [separate section](#alternative-approaches).
-
-``task_tracker`` class can also support special functions, returning the status of the tracked task:
-
-```cpp
-class task_tracker {
-public:
-    bool was_submitted() const;
-    bool is_completed() const;
-};
-```
-
-Having ``task_tracker.was_submitted()`` equal to ``true`` means the tracked task state was changed from created
-to submitted in the past. The task can be either in submitted, executing or completed state.
-
-``is_completed`` method returns ``true`` if the tracked task is completed. This state cannot be changed in the
-future.
 
 ## Semantics for setting dependencies between tasks
 
@@ -234,6 +218,33 @@ tg.run_and_wait([&tg] -> tbb::task_handle {
 })
 ```
 
+### Functions for tracking the task progress
+
+The earlier version of this proposal included special member functions for ``task_tracker`` class allowing to get the information about the current state
+of the tracked task:
+
+```cpp
+namespace oneapi {
+namespace tbb {
+class task_tracker {
+public:
+    bool was_submitted() const;
+    bool is_completed() const;
+};
+} // namespace tbb
+} // namespace oneapi
+```
+
+``was_submitted`` returns ``true`` if the tracked task was submitted for execution using one of the APIs in ``task_group`` or ``task_arena`` (e.g. ``task_group::run``).
+``is_completed`` returns ``true`` if the execution of the tracked task is completed by some TBB thread.
+
+These APIs were removed from the proposal because of the following reasons:
+* Lack of use-cases for these functions. All of the considered examples could be implemented without using these functions.
+* Unclear semantics for these function when the tracked task is executing ``task_group::current_task::transfer_successors_to``. Consider a task ``A`` that transfers
+  it's successors to the task ``B`` and exits the body. On the one hand, task ``A`` was already submitted and completed and both described functions should return ``true``.
+  On the other hand, the task ``A`` replaces itself in the task graph with the task ``B`` and it may be expected that the tracker would now track ``B`` (similarly to how
+  `make_edge` is done - new edges added to ``A`` after transferring are added to ``B``).
+
 ## Potential future enhancements
 
 ### ``empty_task`` API
@@ -302,6 +313,43 @@ public:
 
 Implementation-wise, it means that merged successors tracking should not only be applied to two tasks ("sender" of the successors and the recipient), but to
 the set of tasks, since one task can transfer it's successors to the running task that also performing `transfer_successors_to` and so on.
+
+### Using a ``task_tracker`` as a successor
+
+Current proposal only allows the tasks in created state as a successors. It is implemented by allowing only
+the ``task_handle`` as a second argument for ``make_edge``:
+
+```cpp
+namespace oneapi {
+namespace tbb {
+class task_group {
+    static void make_edge(task_handle& pred, task_handle& succ);
+    static void make_edge(task_tracker& pred, task_handle& succ);
+};
+} // namespace tbb
+} // namespace oneapi
+```
+
+Two enhancements for this API can be considered:
+* Allow ``task_tracker`` tracking the task in created state to be used as a successor.
+* Allow ``task_tracker`` tracking the task `T` in submitted state to be used as a successor if other non-submitted
+  predecessors of ``T`` prevent it from being scheduled for execution.
+
+These enhancements require the following APIs to be added:
+
+```cpp
+namespace oneapi {
+namespace tbb {
+class task_group {
+    static void make_edge(task_handle& pred, task_tracker& succ);
+    static void make_edge(task_tracker& pred, task_tracker& succ);
+};
+} // namespace tbb
+} // namespace oneapi
+```
+
+If the ``task_tracker`` tracking the task that is scheduled for execution, executing or completed, is used
+as a second argument, the behavior of APIs above is undefined.
 
 ## Advanced examples
 
@@ -693,233 +741,287 @@ The improved approach is described in the [Cache-Oblivious Wavefront](https://pe
 In such a recursion each dividing task knows that it's dependent tasks would split as well and notifies them about the sub-tasks required to make only the real
 dependencies between tasks.
 
-We can consider the algorithm as two types of tasks `eager_wavefront_outer_task` and `eager_wavefront_inner_task`. The computations starts from
-the outer task that computes the whole grid. 
+Let's consider a wavefront calculations on the square grid ``[0, n)`` on ``x`` and ``y`` dimensions.
 
-If threshold allows, outer task creates 4 inner subtasks (similarly to the classic algorithm) - `north_subtask`, `west_subtask`, `east_subtask` and `south_subtask`.
-Each subtask supports an atomic reference counter that would be used for future running the task.
+Similarly to the classic algorithm, the eager one splits the calculated area into 4 sub-areas by creating 4
+subtasks - ``north_subtask``, ``wast_subtask``, ``east_subtask`` and ``south_subtask``.
 
-The outer task does not make any predecessor-successor dependencies between inner subtasks, because different logic of running (based on reference counting) is used.
+The algorithm  also sets the same dependencies as a classic one:
+* ``west_subtask`` and ``east_subtask`` are successors of ``north_subtask``
+* ``south_subtask`` is a successor of ``west_subtask`` and ``east_subtask``.
 
-Outer task assigns child tasks (tasks that should be executed from the inner task body):
-* for `north_subtask` - `west_subtask` and `east_subtask`
-* for `west_subtask` and `east_subtask` - `south_subtask`
+During the first division, no extra actions needed since the task that splits calculation of the
+whole grid ``[0, n))`` can't have successors.
 
-Currently executed task is replaced by `north_subtask` in the task graph by transferring the successors (becomes necessary starting from running the outer tasks
-on the second split).
+But during the second division - when the north, west, east and south are executed, each task needs to notify it's
+successors about the subtasks to make dependencies.
 
-`north_subtask` is submitted for execution because it does not have any additional dependencies.
+Let's look into the second division in details. Initially, we have 4 subtasks created during the first division:
 
-The inner task also divides itself into 4 subtasks (outer tasks to re-run the algorithm) - `north_subtask`, `west_subtask`, `east_subtask` and `south_subtask`.
+<img src="assets/wavefront_recursive_eager_first_division.png" width=300>
 
-It creates predecessor-successor dependencies between them to create a diamond-shaped graph. Also, it adds dependencies with the subtasks from the parent tasks:
-* While executing the outer `north_subtask` - no additional dependencies added,
-* While executing the outer `west_subtask` and `east_subtask` - additional dependencies are created with the outer `north_subtask`'s sub-tasks,
-* While executing the outer `south_subtask` - additional dependencies are created with the outer `west_subtask`'s and `east_subtask`'s sub-tasks.
+The north subtask is executed first because dependencies prevents west, east and south tasks from executing.
+Similarly to the previous step, it creates the north, east, west and south subtasks:
 
-The inner task saves trackers to the currently executing task sub-tasks and executes them. Subtasks can be executed directly if dependencies allows, e.g. when
-subtasks of the outer `north_subtask` are ran.
+<img src="assets/wavefront_recursive_eager_second_division_north.png">
 
-After running the sub-graph, inner task notifies it's child tasks about the subtasks created:
-* outer `west_subtask` and `east_subtask` are notified about inner sub-tasks of the outer `north_subtask`,
-* outer `south_subtask` is notified about inner sub-tasks of `west_subtask` and `east_subtask`.
+The second step is to notify the successors about the subtasks:
+* ``W`` should be notified about west and south subtasks (``NW`` and ``NS``),
+* ``E`` should be notified about east and south subtasks (``NE`` and ``NS``).
 
-The last action done by the inner task - is decrementing the reference counter on child tasks and is running them for execution:
-* outer `west_subtask` and `east_subtask` are ran by the outer `north_subtask`
-* outer `south_subtask` is ran by either the outer `west_subtask` or the outer `east_subtask`.
+Notifying the successor is made by creating ``task_tracker`` objects tracking the corresponding tasks and storing them
+in the container visible for the successors.
 
-The algorithm is repeated until the threshold is reached.
+North subtask ``NN`` can start execution and division after completing the split of the previous level and notifying
+the successors.
 
-It is important to mention that outer sub-tasks are holding the `task_tracker`s to the inner subtasks of the parent task. And since the parent task have already
-been executed, the tracked tasks were already submitted for execution and can be in any of 4 states described above.
+Since ``N`` task is completed, ``W`` and ``E`` can start executing. ``W`` would also split itself into subtasks and
+notify ``S`` about the successors:
 
-This example shows the necessity of setting dependencies between the tasks in any state and a newly created task.
+<img src="assets/wavefront_recursive_eager_second_division_west.png">
+
+Additionally, ``W`` should add dependencies between it's subtasks ``WN`` and ``WE`` and the subtasks of ``N`` created
+on the previous step (``NW`` and ``NS``):
+
+<img src="assets/wavefront_recursive_eager_second_division_west_new_dependencies.png">
+
+It is important to mention that at the moment of making additional edges, ``NW`` and ``NS`` are at least
+in `submitted` state and even can be completed. 
+
+That highlights the importance of ability to make edges between tasks in any state and a task in created state.
+
+``E`` and ``S`` tasks are following the same logic as described above. That results in the following task graph:
+
+<img src="assets/wavefront_recursive_eager_second_division_west_new_dependencies.png">
+
+The splitting continues until the desired depth.
+
+The following code shows how it can be implemented using the API proposed:
 
 ```cpp
-void compute_cell(int i, int j);
+void compute_cell(std::size_t x, std::size_t y);
 
-void serial_wavefront(int i0, int in, int j0, int jn) {
-    for (int i = i0; i < in; ++i) {
-        for (int j = j0; j < jn; ++j) {
-            compute_cell(i, j);
+void serial_wavefront(std::size_t x0, std::size_t xn, std::size_t y0, std::size_t yn) {
+    for (std::size_t x = x0; x < xn; ++x) {
+        for (std::size_t y = y0; y < yn; ++y) {
+            compute_cell(x, y);
         }
     }
 }
 
-struct eager_wavefront_inner_task {
-    using ref_count_type = std::atomic<std::size_t>;
+class eager_wavefront_task {
+public:
+    static void prepare_predecessors_container(std::size_t num_divisions) {
+        // Reserve element in the vector for each level of division
+        predecessors_container.resize(num_divisions);
 
-    eager_wavefront_inner_task(int i_begin, int i_end, int j_begin, int j_end,
-                               std::size_t ref_count)
-        : i0(i_begin), in(i_end), j0(j_begin), jn(j_end)
-        , run_ref_count(ref_count)
+        int num_subtasks = 4; // number of subtasks on the first level
+
+        for (std::size_t i = 0; i < num_divisions; ++i) {
+            predecessors_container[i].reserve(num_subtasks);
+            num_subtasks *= 4;
+        }
+    }
+
+    static tbb::task_tracker find_predecessor(std::size_t n_division, std::size_t x_index, std::size_t y_index) {
+        // Number of elements in the grid on each level of division
+        // On the first level - 4 subtasks total (2 on each dimension)
+        // on the second level - 16 subtasks total (4 on each dimension), etc.
+        std::size_t n_grid = (2 << n_division);
+
+        auto it = predecessors[n_division].find(x_index * n_grid + y_index);
+        return it != predecessors[n_division].end() ? it->second : tbb::task_tracker{};
+    }
+
+    static void publish_predecessor(std::size_t n_division, std::size_t x_index, std::size_t y_index,
+                                    tbb::task_tracker&& pred)
+    {
+        std::size_t n_grid = (2 << n_division>>);
+
+        [[maybe_unused]] auto it = predecessors[n_division].emplace(x_index * n_grid + y_index, std::move(pred));
+        assert(it != predecessors[n_division].end());
+    }
+
+    eager_wavefront_task(tbb::task_group& tg, std::size_t x_index, std::size_t y_index,
+                         std::size_t x0, std::size_t xn, std::size_t y0, std::size_t yn,
+                         std::size_t n_div)
+        : m_tg(tg), m_x_index(x_index), m_y_index(y_index)
+        , m_x0(x0), m_xn(xn), m_y0(y0), m_yn(yn)
+        , m_n_division(n_div)
     {}
 
-    void operator()() const;
+    void operator()() const {
+        std::size_t x_size = m_xn - m_x0;
+        std::size_t y_size = m_yn - m_y0;
 
-    tbb::task_group& tg;
-    int i0;
-    int in;
-    int j0;
-    int jn;
-    std::atomic<std::size_t> run_ref_count;
+        // Do serial wavefront if the grainsize reached
+        if (i_size <= wavefront_grainsize) {
+            assert(j_size <= wavefront_grainsize);
+            serial_wavefront(m_i0, m_in, m_j0, m_jn);
+        } else {
+            std::size_t x_mid = m_x0 + x_size / 2;
+            std::size_t y_mid = m_y0 + y_size / 2;
 
-    tbb::task_tracker west_parent_east_subtask;
-    tbb::task_tracker west_parent_south_subtask;
-    tbb::task_tracker east_parent_west_subtask;
-    tbb::task_tracker east_parent_south_subtask;
+            // Calculate indices of subtasks in the next level grid
+            std::size_t north_x_index = m_x_index + m_x_index * 2;
+            std::size_t north_y_index = m_y_index + m_y_index * 2;
 
-    std::shared_ptr<eager_wavefront_inner_task> west_child;
-    std::shared_ptr<eager_wavefront_inner_task> east_child;
-};
+            std::size_t west_x_index = north_x_index;
+            std::size_t west_y_index = north_y_index + 1;
 
-void eager_wavefront_outer_task(tbb::task_group& tg, int i0, int in, int j0, int jn) {
-    int di = in - i0;
-    int dj = jn - j0;
+            std::size_t east_x_index = north_x_index + 1;
+            std::size_t east_y_index = north_y_index;
 
-    if (di <= threshold || dj <= threshold) {
-        serial_wavefront(i0, in, j0, jn);
-    } else {
-        int im = i0 + di / 2;
-        int jm = j0 + dj / 2;
+            std::size_t south_x_index = east_x_index;
+            std::size_t south_y_index = west_y_index;
 
-        using run_ref_count = typename eager_wavefront_inner_task::ref_count_type;
+            // Create subtasks
+            tbb::task_handle north_subtask = tg.defer(eager_wavefront_task(m_tg,
+                /*indices in the next level grid = */north_x_index, north_y_index,
+                /*area to process = */m_x0, x_mid, m_y0, y_mid,
+                /*n_division = */m_n_division + 1));
 
-        std::shared_ptr<eager_wavefront_inner_task> south_subtask
-            = std::make_shared<eager_wavefront_inner_task>(tg, im, in, jm, jn, /*ref_count = */2);
+            tbb::task_handle west_subtask = tg.defer(eager_wavefront_task(m_tg,
+                /*indices in the next level grid = */west_x_index, west_y_index,
+                /*area to process = */m_x0, x_mid, y_mid, m_yn,
+                /*n_division = */m_n_division + 1));
 
-        std::shared_ptr<eager_wavefront_inner_task> west_subtask
-             = std::make_shared<eager_wavefront_inner_task>(tg, i0, im, jm, jn, /*ref_count = */1);
+            tbb::task_handle east_subtask = tg.defer(eager_wavefront_task(m_tg,
+                /*indices in the next level grid = */east_x_index, east_y_index,
+                /*area to process = */x_mid, m_xn, m_y0, y_mid,
+                /*n_division = */m_n_division + 1));
 
-        west_subtask->east_child = south_subtask;
+            tbb::task_handle south_subtask = tg.defer(eager_wavefront_task(m_tg,
+                /*indices in the next level grid = */south_x_index, south_y_index,
+                /*area to process = */x_mid, m_xn, y_mid, m_yn,
+                /*n_division = */m_n_division + 1));
 
-        std::shared_ptr<eager_wavefront_inner_task> east_subtask
-             = std::make_shared<eager_wavefront_inner_task>(tg, im, in, j0, jm, /*ref_count = */1);
+            // Make dependencies between subtasks
+            tbb::task_group::make_edge(north_subtask, west_subtask);
+            tbb::task_group::make_edge(north_subtask, east_subtask);
+            tbb::task_group::make_edge(west_subtask, south_subtask);
+            tbb::task_group::make_edge(east_subtask, south_subtask);
 
-        east_subtask->west_child = south_subtask;
+            // Add extra dependencies with predecessor's subtasks
+            tbb::task_tracker west_predecessor_east_subtask;
+            tbb::task_tracker west_predecessor_south_subtask;
+            tbb::task_tracker north_predecessor_west_subtask;
+            tbb::task_tracker north_predecessor_south_subtask;
 
-        eager_wavefront_inner_task north_subtask
-             = std::make_shared<eager_wavefront_inner_task>(tg, i0, im, j0, jm, /*ref_count = */0);
-             
-        north_subtask.west_child = west_subtask;
-        north_subtask.east_child = east_subtask;
+            if (north_x_index != 0) {
+                west_predecessor_east_subtask = find_predecessor(m_n_division + 1, north_x_index - 1, north_y_index);
+            }
+            if (west_x_index != 0) {
+                west_predecessor_south_subtask = find_predecessor(m_n_division + 1, west_x_index - 1, west_y_index);
+            }
+            if (north_y_index != 0) {
+                north_predecessor_west_subtask = find_predecessor(m_n_division + 1, north_x_index, north_y_index - 1);
+            }
+            if (east_y_index != 0) {
+                north_predecessor_south_subtask = find_predecessor(m_n_division + 1, east_x_index, east_y_index - 1);
+            }
 
-        tbb::task_handle north_handle = tg.defer(north_subtask);
-        tbb::task_group::current_task::transfer_successors_to(north_handle);
-        tg.run(std::move(north_handle));
-    }
-}
+            if (west_predecessor_east_subtask) {
+                tbb::task_group::make_edge(west_predecessor_east_subtask, north_subtask);
+            }
+            if (west_predecessor_south_subtask) {
+                tbb::task_group::make_edge(west_predecessor_south_subtask, west_subtask);
+            }
+            if (north_predecessor_west_subtask) {
+                tbb::task_group::make_edge(north_predecessor_west_subtask, north_subtask);
+            }
+            if (north_predecessor_south_subtask) {
+                tbb::task_group::make_edge(north_predecessor_south_subtask, east_subtask);
+            }
 
-void eager_wavefront_inner_task::operator()() {
-    // Split the current task
-    int im = i0 + (in - i0) / 2;
-    int jm = j0 + (jn - j0) / 2;
+            // Save trackers to subtasks for future publishing
+            tbb::task_tracker north_subtask_tracker = north_subtask;
+            tbb::task_tracker west_subtask_tracker = west_subtask;
+            tbb::task_tracker east_subtask_tracker = east_subtask;
+            tbb::task_tracker south_subtask_tracker = south_subtask;
 
-    tbb::task_handle north_subtask = tg.defer([&tg, =] {
-        eager_wavefront_outer_task(tg, i0, im, j0, jm);
-    });
+            // Run subtasks
+            tg.run(std::move(north_subtask));
+            tg.run(std::move(west_subtask));
+            tg.run(std::move(east_subtask));
+            tg.run(std::move(south_subtask));
 
-    tbb::task_handle west_subtask = tg.defer([&tg, =] {
-        eager_wavefront_outer_task(tg, i0, im, jm, jn);
-    });
-
-    tbb::task_handle east_subtask = tg.defer([&tg, =] {
-        eager_wavefront_outer_task(tg, im, in, j0, jm);
-    });
-
-    tbb::task_handle south_subtask = tg.defer([&tg, =] {
-        eager_wavefront_outer_task(tg, im, in, jm, jn);
-    });
-
-    // Make dependencies between subtasks
-    tbb::task_group::make_edge(north_subtask, west_subtask);
-    tbb::task_group::make_edge(north_subtask, east_subtask);
-    tbb::task_group::make_edge(west_subtask, south_subtask);
-    tbb::task_group::make_edge(east_subtask, south_subtask);
-
-    // Add dependencies with parent subtasks
-    if (west_parent_east_subtask) {
-        assert(west_parent_south_subtask);
-
-        tbb::task_group::make_edge(west_parent_east_subtask, north_subtask);
-        tbb::task_group::make_edge(west_parent_south_subtask, west_subtask);
-    }
-
-    if (east_parent_west_subtask) {
-        assert(east_parent_south_subtask);
-
-        tbb::task_group::make_edge(east_parent_west_subtask, north_subtask);
-        tbb::task_group::make_edge(east_parent_south_subtask, east_subtask);
-    }
-
-    // Save trackers to current subtasks for future assignment to child tasks
-    tbb::task_tracker west_subtask_tracker = west_subtask;
-    tbb::task_tracker east_subtask_tracker = east_subtask;
-    tbb::task_tracker south_subtask_tracker = south_subtask;
-
-    // Run subtasks
-    tg.run(std::move(north_subtask));
-    tg.run(std::move(west_subtask));
-    tg.run(std::move(east_subtask));
-    tg.run(std;:move(south_subtask));
-
-    // Set current subtasks as parent subtasks in the child tasks
-    if (west_child) {
-        west_child->east_parent_west_subtask = std::move(west_subtask_tracker);
-        west_child->east_parent_south_subtask = south_subtask_tracker;
+            // Publish subtasks for successors
+            publish_predecessor(m_n_division + 1, north_x_index, north_y_index, std::move(north_subtask_tracker));
+            publish_predecessor(m_n_division + 1, west_x_index, west_y_index, std::move(west_subtask_tracker));
+            publish_predecessor(m_n_division + 1, east_x_index, east_y_index, std::move(east_subtask_tracker));
+            publish_predecessor(m_n_division + 1, south_x_index, south_y_index, std::move(south_subtask_tracker));
+        }
     }
 
-    if (east_child) {
-        east_child->west_parent_east_subtask = std::move(east_subtask_tracker);
-        east_child->west_parent_south_subtask = std::mvoe(south_subtask_tracker);
-    }
+private:
+    static constexpr std::size_t wavefront_grainsize = 5;
 
-    // Try to run dependent tasks
-    if (west_child->run_ref_count.fetch_sub(1) == 1) {
-        // we removed the task reference counter
-        tg.run(*west_child);
-    }
+    // Each element e[i] in the vector represents a map of additional predecessors on the i-th level of division
+    // Each element in the hash table maps linearized index in the grid (x_index * n + y_index) with the
+    // tracker to the corresponding task
+    using predecessors_container_type = std::vector<std::unordered_map<std::size_t, tbb::task_tracker>>;
 
-    if (east_child->run_ref_count.fetch_sub(1) == 1) {
-        tg.run(*east_child);
-    }
-}
+    static predecessors_container_type predecessors;
 
-void eager_recursive_wavefront(int in, int jn) {
+    tbb::task_group& m_tg;
+
+    // Indices in the grid of current level of division
+    // On the first division level indices are [0, 2) on x and y
+    // On the second division level indices are [0, 4) on x and y, etc.
+    std::size_t m_x_index;
+    std::size_t m_y_index;
+
+    // Begin and end indices of the globally computed area
+    std::size_t m_x0;
+    std::size_t m_xn;
+    std::size_t m_y0;
+    std::size_t m_yn;
+
+    // Division number
+    std::size_t m_n_division;
+}; // class eager_wavefront_task
+
+void eager_wavefront(std::size_t n) {
     tbb::task_group tg;
-    tg.run_and_wait([&tg, =] {
-        eager_wavefront_outer_task(tg, 0, in, 0, jn);
-    });
+
+    std::size_t num_divisions = log2(n / eager_wavefront_task::wavefront_grainsize) + 1;
+    eager_wavefront_task::prepare_predecessors_container(num_divisions);
+
+    tg.run_and_wait(eager_wavefront_task(tg,
+        /*x_index = */0, /*y_index = */0,
+        /*area to process = */0, n, 0, n,
+        /*n_division = */0));
 }
 ```
 
-The task graph for the eager wavefront approach is shown below (outer tasks are referred as `O task`s, the inner tasks are referred as `I task`s):
-
-<img src="assets/wavefront_recursive_eager_dependencies.png" width=1000>
-
 #### Combination of eager and classic approaches
 
-If we consider a combination of two approaches described above where the initial task is split in the following way:
-1. Outer split of the eager algorithm
-2. Inner split of each inner subtask created during the outer split stage
-3. Classic split of each subtask created during the inner split
+If we consider a combination of two approaches described above:
+1. First and second-level eager splits
+2. Classic split of each subtask created during the second-level split
 
 The split algorithm is illustrated in the picture below:
 
 <img src="assets/wavefront_recursive_combined_dependencies.png" width=1000>
 
-As it is described in the eager wavefront algorithm section below, on the inner split stage, the dependencies between
-blue and red subtasks (C tasks) are created using the `task_tracker` to the blue C-tasks saved in the red C-tasks before running them for execution. 
+As it is described in the eager wavefront algorithm section above, on the "Eager 2" stage, the dependencies between
+blue and red subtasks are created using the `task_tracker` to the blue subtasks. The blue subtasks can be executed
+during making this dependency (purple arrows on the picture).
 
-During the classic split, each blue C-task would be replaced in the task graph with the south classic sub-task using transferring the successors.
+During the classic split, each subtask of "Eager 2" replaces itself in the task graph with the south classic subtask
+using transferring the successors.
 
-Because the red tasks saving the tracker to the blue C-tasks before running and hence before transferring the successors from it, the dependency between
-the red C-task can be created after doing the transferring. And to maintain the structure of the graph, the newly added successor (red C-task) should be
-added to the blue C-task if doing it before replacing it with south blue classic subtasks, or should be added directly to south blue classic subtask if it
-is done after transferring. 
+Because the red subtasks on "Eager 2" knows only a tracker to the original blue subtasks (before transferring
+the successors) and because blue subtasks can be executed before the edge between blue and red subtasks are created,
+red subtask can use a ``task_tracker`` to the originally created blue task *after* this task replaces itself in the
+graph with the "Classic" subtask (by transferring it's successors).
 
-Hence, the example above perfectly illustrates the issue of combined or separate tracking of tasks after the transfer. And to maintain the task graph in the
-correct state, combined tracking should be implemented by `transfer_successors_to`.
+Hence, to create a correct edge on "Eager 2" level, all of the edges added to ``task_tracker`` that is associated
+with the task that transferred it's successors, should be added to the task that receives the successors.
+To maintain such a behavior, the "merged successors tracking" approach, described in the
+[section above](#semantics-for-transferring-successors-from-the-currently-executing-task-to-the-other-task)
+should be implemented.
 
 ## API proposal summary
 
@@ -948,9 +1050,6 @@ public:
     task_tracker& operator=(const task_handle& handle);
 
     explicit operator bool() const noexcept;
-
-    bool was_submitted() const;
-    bool is_completed() const;
 }; // class task_tracker
 
 bool operator==(const task_tracker& t, std::nullptr_t) noexcept;
@@ -1021,22 +1120,13 @@ Replaces the task tracked by ``*this`` to be a task owned by ``handle``.
 
 Returns a reference to ``*this``.
 
-#### Progress functions
+#### Observers
 
 ``explicit operator bool() const noexcept``
 
 Checks if `this`` tracks any task object.
 
 Returns ``true`` if ``*this`` is a non-empty tracker, ``false`` otherwise.
-
-``bool was_submitted() const``
-
-Returns ``true`` if the task tracked by ``*this`` was submitted for execution,
-``false`` otherwise.
-
-``bool is_completed() const``
-
-Returns ``true`` if the task tracked by ``*this`` is completed, ``false`` otherwise.
 
 #### Comparison operators
 
@@ -1148,13 +1238,12 @@ Another approach is to have ``task_handle`` to be a shared owner on the task all
 ``task_handle`` as an argument to one of the submission functions would invalidate all copies or set them
 in the "weak" state that allows only to set dependencies between tasks.
 
-Open questions:
+Exit criteria & open questions:
 * Are concrete names of APIs good enough and reflects the purpose of the methods?
-* Should we allow the ``task_tracker`` in a non-submitted state as a successor argument to ``make_edge`` and
-  ``add_successor``?
-* Should comparison functions between ``task_tracker`` and ``task_handle`` be defined?
-* Should ``empty_task`` helper API be provided to optimize creating and spawning the empty sync-only tasks (see [separate section](#empty_task-api)
-  for more details)
-* Should it be allowed to add predecessors to the task in ``submitted`` state if other dependencies of this task guarantees that it cannot not be executed.
-* The performance targets for this feature were not defined by this RFC
-* Exit criteria for this feature was not defined by this RFC
+* The performance targets for this feature should be defined
+* API improvements and enhancements should be considered (may be a criteria for moving the feature to `supported`):
+  * Should comparison functions between ``task_tracker`` and ``task_handle`` be defined?
+  * Should ``task_tracker`` tracking the task in created or submitted state (not always) be allowed as a
+    successor in ``make_edge``? See [separate section](#using-a-task_tracker-as-a-successor) for more details.
+  * Should ``empty_task`` helper API be provided to optimize creating and spawning the empty sync-only tasks. See
+    [separate section](#empty_task-api) for more details.
