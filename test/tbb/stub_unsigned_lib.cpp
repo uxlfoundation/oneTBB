@@ -28,6 +28,15 @@
 #include <cstdlib>
 
 extern "C" {
+
+static int dummy = []() {
+#if _WIN32
+    // Make sure the library is not loaded on Windows in test dynamic link
+    std::abort();
+#endif
+    return 1;
+}();
+
 STUB_EXPORT void foo() {
     std::abort();               // Test dynamic link should never call this function
 }
