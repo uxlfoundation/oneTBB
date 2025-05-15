@@ -3318,7 +3318,7 @@ public:
         spin_mutex::scoped_lock l( my_mutex );
         if (my_buffer_is_valid && is_graph_active( my_graph )) {
             // We have a valid value that must be forwarded immediately.
-            if (dynamic_cast<continue_receiver*>(&s)) {
+            if (s.is_continue_receiver()) {
                 my_successors.register_successor( s );
                 s.try_put( my_buffer );
                 return true;
