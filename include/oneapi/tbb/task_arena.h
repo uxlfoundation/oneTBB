@@ -109,8 +109,6 @@ inline void enqueue_impl(task_handle&& th, d1::task_arena_base* ta) {
     auto& ctx = task_handle_accessor::ctx_of(th);
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    task_handle_accessor::mark_task_submitted(th);
-
     if (task_handle_accessor::has_dependencies(th)) {
         task_handle_accessor::release_continuation(th);
         task_handle_accessor::release(th);
@@ -514,7 +512,7 @@ public:
         r1::exit_parallel_phase(this, static_cast<std::uintptr_t>(with_fast_leave));
     }
 
-    class scoped_parallel_phase {
+    class scoped_parallel_phase : no_copy {
         task_arena& arena;
         bool one_time_fast_leave;
     public:

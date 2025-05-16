@@ -106,18 +106,12 @@ The proposal consists of ideas that are not mutually exclusive and can be implem
 
 ### 1. Simplify the use of a task group
 
-To address the existing shortcomings of the `task_arena` and `task_group` combination, we could add
-a new overload of the `enqueue` method that takes task_group as an argument, and add a `task_arena::wait_for`
-method that also takes a task group.
-
-In the simplest possible implementation, it would be just header-based "syntax sugar" for the code
-described above:
+To address the existing shortcomings of the `task_arena` and `task_group` combination, the `enqueue` method
+could take `task_group` as the second argument, and a new method could wait for a task group:
 ```cpp
-ta.enqueue( []{ foo(); }, tg ); // => ta.enqueue(tg.defer([]{ foo(); }));
-ta.wait_for( tg );              // => ta.execute([&tg]{ tg.wait(); });
+ta.enqueue([]{ foo(); }, tg); // corresponds to: ta.enqueue(tg.defer([]{ foo(); }));
+ta.wait_for(tg);              // corresponds to: ta.execute([&tg]{ tg.wait(); });
 ```
-If justified performance-wise, a more elaborated implementation could perhaps shave off some overheads.
-It would likely require new library entry points, though.
 
 The example code to split work across NUMA-bound task arenas could then look like this (assuming also
 a special function that creates and initializes a vector of arenas):
@@ -135,15 +129,7 @@ for(unsigned j = 0; j < numa_arenas.size(); j++) {
 }
 ```
 
-It makes sense to also consider work isolation for this API. While waiting for task group completion,
-the thread can take unrelated tasks for execution, and that can potentially result in a delayed return
-and in latency increase. To prevent that, the tasks in the group should carry a unique tag that is
-also specified for the waiting call. The `isolated_task_group` preview class provides this functionality,
-but not the regular `task_group`. We can consider the following options for supporting isolation
-in `task_arena::wait_for(task_group&)`:
-- keep the `isolated_task_group` class and support it in the proposed `task_arena` extensions;
-- somehow extend the `task_group` class to optionally support work isolation (might require incompatible changes);
-- add an isolation tag (automatically or on demand) only when a `task_group` is used with `task_arena`.
+See [Improve interoperability with task groups](task_group_interop.md) for more details.
 
 ### 2. Reconsider waiting for all tasks
 
