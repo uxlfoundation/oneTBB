@@ -446,7 +446,6 @@ inline void task_dynamic_state::add_successor(successor_vertex* successor) {
 }
 
 inline void task_dynamic_state::add_successors_list(successors_list_node* successors_list) {
-    __TBB_ASSERT(m_task_status.load(std::memory_order_relaxed) == task_status::no_status, "It is not allowed to transfer successors to the submitted task");
     if (successors_list == nullptr) return;
 
     successors_list_node* last_node = successors_list;
