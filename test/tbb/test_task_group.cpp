@@ -1342,4 +1342,157 @@ TEST_CASE("test task_tracker") {
         }
     }
 }
+
+enum class submit_function {
+    run = 0,
+    run_and_wait = 1,
+    arena_enqueue = 2,
+    this_arena_enqueue = 3
+};
+
+void submit(submit_function func, tbb::task_handle&& handle, tbb::task_group& group, tbb::task_arena& arena) {
+    if (func == submit_function::run || func == submit_function::run_and_wait) {
+        group.run(std::move(handle));
+    } else if (func == submit_function::arena_enqueue) {
+        arena.enqueue(std::move(handle));
+    } else {
+        CHECK_MESSAGE(func == submit_function::this_arena_enqueue, "new submit function added but not handled");
+        tbb::this_task_arena::enqueue(std::move(handle));
+    }
+}
+
+void submit_and_wait(submit_function func, tbb::task_handle&& handle, tbb::task_group& group, tbb::task_arena& arena) {
+    if (func != submit_function::run_and_wait) {
+        submit(func, std::move(handle), group, arena);
+        group.wait();
+    } else {
+        group.run_and_wait(std::move(handle));
+    }
+}
+
+struct leaf_task {
+    void operator()() const {
+        *placeholder = value;
+    }
+    std::shared_ptr<std::size_t> placeholder;
+    std::size_t value;
+};
+
+struct combine_task {
+    void operator()() const {
+        *placeholder = *left_leaf + *right_leaf;
+    }
+
+    std::shared_ptr<std::size_t> placeholder;
+    std::shared_ptr<std::size_t> left_leaf;
+    std::shared_ptr<std::size_t> right_leaf;
+};
+
+void test_not_submitted_predecessors(submit_function submit_function_tag) {
+    tbb::task_arena arena;
+    constexpr std::size_t depth = 100; 
+
+    tbb::task_group tg;
+    std::size_t task_initializer = 0;
+
+    std::shared_ptr<std::size_t> left_leaf_placeholder = std::make_shared<std::size_t>(0);
+    tbb::task_tracker left_leaf_tracker;
+    tbb::task_handle deepest_left_leaf_task;
+
+    for (std::size_t i = 0; i < depth; ++i) {
+        if (i == 0) {
+            deepest_left_leaf_task = tg.defer(leaf_task{left_leaf_placeholder, task_initializer++});
+            left_leaf_tracker = deepest_left_leaf_task;
+        }
+
+        std::shared_ptr<std::size_t> right_leaf_placeholder = std::make_shared<std::size_t>(0);
+        tbb::task_handle right_leaf_task = tg.defer(leaf_task{right_leaf_placeholder, task_initializer++});
+
+        std::shared_ptr<std::size_t> combine_placeholder = std::make_shared<std::size_t>(0);
+        tbb::task_handle combine = tg.defer(combine_task{combine_placeholder, left_leaf_placeholder, right_leaf_placeholder});
+        tbb::task_tracker combine_tracker = combine;
+
+        tbb::task_group::make_edge(left_leaf_tracker, combine);
+        tbb::task_group::make_edge(right_leaf_task, combine);
+
+        submit(submit_function_tag, std::move(combine), tg, arena);
+        submit(submit_function_tag, std::move(right_leaf_task), tg, arena);
+
+        left_leaf_tracker = combine_tracker;
+        left_leaf_placeholder = combine_placeholder;
+    }
+    
+    CHECK(deepest_left_leaf_task);
+    CHECK_MESSAGE(*left_leaf_placeholder == 0, "Receiving results from incomplete task graph");
+
+    // "Run" the graph
+    submit_and_wait(submit_function_tag, std::move(deepest_left_leaf_task), tg, arena);
+
+    std::size_t expected_result = 0;
+    std::size_t counter = 0;
+
+    // 2 tasks on the first layer + one task for each next layer
+    for (std::size_t i = 0; i < depth + 1; ++i) {
+        expected_result += counter++;
+    }
+
+    CHECK_MESSAGE(expected_result == *left_leaf_placeholder,
+                  "Unexpected result for task graph execution");
+}
+
+// all_predecessors_completed flag means creating a set of predecessors that a guaranteed to be completed
+// before setting dependencies
+void test_submitted_predecessors(submit_function submit_function_tag, bool all_predecessors_completed) {
+    tbb::task_arena arena;
+    const std::size_t num_predecessors = 500;
+    tbb::task_group tg;
+    std::atomic<std::size_t> task_placeholder{0};
+
+    std::vector<tbb::task_tracker> predecessors(num_predecessors);
+
+    for (std::size_t i = 0; i < num_predecessors; ++i) {
+        tbb::task_handle h = tg.defer([&] { ++task_placeholder; });
+        predecessors[i] = h;
+        submit(submit_function_tag, std::move(h), tg, arena);
+    }
+
+    if (all_predecessors_completed) {
+        tg.wait();
+        CHECK_MESSAGE(task_placeholder == num_predecessors, "Not all tasks were executed");
+    }
+
+    tbb::task_handle successor_task = tg.defer([&] {
+        CHECK_MESSAGE(task_placeholder == num_predecessors, "Not all predecessors completed");
+        ++task_placeholder;
+    });
+    tbb::task_tracker successor_tracker = successor_task;
+
+    for (std::size_t i = 0; i < num_predecessors; ++i) {
+        tbb::task_group::make_edge(predecessors[i], successor_task);
+    }
+
+    if (all_predecessors_completed) {
+        CHECK_MESSAGE(task_placeholder == num_predecessors, "successor task completed before being submitted");
+    }
+    submit_and_wait(submit_function_tag, std::move(successor_task), tg, arena);
+
+    CHECK_MESSAGE(task_placeholder == num_predecessors + 1, "successor task was not completed");
+}
+
+void test_predecessors(submit_function submit_function_tag) {
+    test_not_submitted_predecessors(submit_function_tag);
+    test_submitted_predecessors(submit_function_tag, /*all_predecessors_completed = */true);
+    test_submitted_predecessors(submit_function_tag, /*all_predecessors_completed = */false);
+}
+
+TEST_CASE("test task_group dynamic dependencies") {
+    for (unsigned p = MinThread; p <= MaxThread; ++p) {
+        tbb::global_control limit(tbb::global_control::max_allowed_parallelism, p);
+
+        test_predecessors(submit_function::run);
+        test_predecessors(submit_function::run_and_wait);
+        test_predecessors(submit_function::arena_enqueue);
+        test_predecessors(submit_function::this_arena_enqueue);
+    }
+}
 #endif
