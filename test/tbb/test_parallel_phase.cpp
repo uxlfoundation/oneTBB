@@ -45,7 +45,9 @@ struct dummy_func {
 template <typename F1 = dummy_func, typename F2 = dummy_func>
 std::size_t measure_median_start_time(tbb::task_arena* ta, const F1& start = F1{}, const F2& end = F2{}) {
     std::size_t num_threads = ta ? ta->max_concurrency() : tbb::this_task_arena::max_concurrency();
-    std::size_t num_runs = 500;
+    // TODO: propagate worker threads blocking time to the test
+    std::size_t max_wait = 1000;
+    std::size_t num_runs = 100;
     std::vector<std::size_t> longest_start_times;
     longest_start_times.reserve(num_runs);
 
@@ -77,13 +79,14 @@ std::size_t measure_median_start_time(tbb::task_arena* ta, const F1& start = F1{
         longest_start_times.push_back(get_longest_start(start_time));
     };
 
-    for (std::size_t i = 1; i < num_runs; ++i) {
+    std::size_t step = max_wait / num_runs;
+    for (std::size_t i = 0; i <= max_wait; i += step) {
         if (ta) {
             ta->execute(work);
         } else {
             work();
         }
-        active_wait_for(std::chrono::microseconds(i*2));
+        active_wait_for(std::chrono::microseconds(i));
     }
     return utils::median(longest_start_times.begin(), longest_start_times.end());
 }

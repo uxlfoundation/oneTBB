@@ -1276,24 +1276,14 @@ TEST_CASE("test task_tracker") {
         CHECK_MESSAGE(task1_tracker != nullptr, "Unexpected result for comparison of non-empty tracker with nullptr");
         CHECK_MESSAGE(nullptr != task1_tracker, "Unexpected result for comparison of nullptr with non-empty tracker");
 
-        CHECK_MESSAGE(!task1_tracker.was_submitted(), "Unexpected result for was_submitted() for non-submitted task");
-        CHECK_MESSAGE(!task1_tracker.is_completed(), "Unexpected result for is_completed() for non-submitted task");
-        
         tg.run(std::move(task1_handle));
-
-        CHECK_MESSAGE(task1_tracker.was_submitted(), "Unexpected result for was_submitted() for submitted task");
-
         tg.wait();
-        CHECK_MESSAGE(task1_tracker.was_submitted(), "Unexpected result for was_submitted() for completed task");
-        CHECK_MESSAGE(task1_tracker.is_completed(), "Unexpected result for is_completed() for completed task");
         CHECK_MESSAGE(task_placeholder == 1, "Task body was not executed");
 
         tbb::task_handle task2_handle = tg.defer(task_body);
         tbb::task_tracker task2_tracker = task2_handle;
 
         tg.run_and_wait(std::move(task2_handle));
-        CHECK_MESSAGE(task2_tracker.was_submitted(), "Unexpected result for was_submitted() for completed task");
-        CHECK_MESSAGE(task2_tracker.is_completed(), "Unexpected result for is_completed() for completed task");
         CHECK_MESSAGE(task_placeholder == 2, "Task body was not executed");
 
         tbb::task_handle task3_handle = tg.defer(task_body);
@@ -1304,15 +1294,11 @@ TEST_CASE("test task_tracker") {
         CHECK_MESSAGE(!(task3_tracker1 != task3_tracker2), "Unexpected result for comparison of single task trackers");
 
         tg.run_and_wait(std::move(task3_handle));
-        CHECK((task3_tracker1.was_submitted() && task3_tracker2.was_submitted()));
-        CHECK((task3_tracker1.is_completed() && task3_tracker2.is_completed()));
         CHECK_MESSAGE(task_placeholder == 3, "Task body was not executed");
 
         tbb::task_handle task4_handle = tg.defer(task_body);
         
         task3_tracker1 = task4_handle;
-        CHECK_MESSAGE(!task3_tracker1.was_submitted(), "Unexpected result for was_submitted() after assigning from task_handle");
-        CHECK_MESSAGE(!task3_tracker1.is_completed(), "Unexpected result for is_completed() after assignment from task_handle");
 
         tbb::task_tracker task4_tracker;
         task3_tracker2 = std::move(task3_tracker1);
@@ -1336,11 +1322,10 @@ TEST_CASE("test task_tracker") {
             tbb::task_tracker enqueue_task_tracker = enqueue_task_handle;
 
             arena.enqueue(std::move(enqueue_task_handle));
-            CHECK_MESSAGE(enqueue_task_tracker.was_submitted(), "Unexpected result for was_submitted for enqueued task");
-            
+            CHECK_MESSAGE(enqueue_task_tracker, "task_tracker should not be empty after enqueue");
             tg.wait();
-            CHECK_MESSAGE(enqueue_task_tracker.is_completed(), "Unexpected result for is_completed for enqueue task");
             CHECK_MESSAGE(task_placeholder == 5, "Task body was not executed");
+            CHECK_MESSAGE(enqueue_task_tracker, "task_tracker should be empty after task completion");
         }
         {
             tbb::task_tracker enqueue_task_tracker;
@@ -1349,10 +1334,11 @@ TEST_CASE("test task_tracker") {
                 enqueue_task_tracker = enqueue_task_handle;
 
                 tbb::this_task_arena::enqueue(std::move(enqueue_task_handle));
-                CHECK_MESSAGE(enqueue_task_tracker.was_submitted(), "Unexpected result for was_submitted for enqueued task");
+                CHECK_MESSAGE(enqueue_task_tracker, "task_tracker should not be empty after enqueue");
             });
             tg.wait();
-            CHECK_MESSAGE(enqueue_task_tracker.is_completed(), "Unexpected result for is_completed for enqueued task");
+            CHECK_MESSAGE(task_placeholder == 6, "Task body was not executed");
+            CHECK_MESSAGE(enqueue_task_tracker, "task_tracker should be empty after task completion");
         }
     }
 }
@@ -1472,10 +1458,6 @@ void test_submitted_predecessors(submit_function submit_function_tag, bool all_p
 
     if (all_predecessors_completed) {
         tg.wait();
-
-        for (tbb::task_tracker& tracker : predecessors) {
-            CHECK_MESSAGE(tracker.is_completed(), "Task should be completed by does not");
-        }
         CHECK_MESSAGE(task_placeholder == num_predecessors, "Not all tasks were executed");
     }
 
@@ -1492,12 +1474,9 @@ void test_submitted_predecessors(submit_function submit_function_tag, bool all_p
     if (all_predecessors_completed) {
         CHECK_MESSAGE(task_placeholder == num_predecessors, "successor task completed before being submitted");
     }
-    CHECK_MESSAGE(!successor_tracker.is_completed(), "successor task completed before being submitted");
-
     submit_and_wait(submit_function_tag, std::move(successor_task), tg, arena);
 
     CHECK_MESSAGE(task_placeholder == num_predecessors + 1, "successor task was not completed");
-    CHECK_MESSAGE(successor_tracker.is_completed(), "successor task was not completed");
 }
 
 void test_predecessors(submit_function submit_function_tag) {

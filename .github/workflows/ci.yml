@@ -171,6 +171,12 @@ jobs:
             std: 20
             build_type: debug
             preview: 'ON'
+          - os: ubuntu-24.04-arm
+            c_compiler: clang
+            cxx_compiler: clang++
+            std: 20
+            build_type: release
+            preview: 'ON'
           - os: ubuntu-22.04-arm
             c_compiler: gcc
             cxx_compiler: g++

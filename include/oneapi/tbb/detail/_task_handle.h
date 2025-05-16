@@ -70,15 +70,9 @@ private:
 inline task_with_dynamic_state* release_successors_list(successors_list_node* list);
 
 class task_dynamic_state {
-    enum class task_status {
-        no_status = 0,
-        submitted = 1,
-        completed = 2
-    };
 public:
     task_dynamic_state(task_with_dynamic_state* task, d1::small_object_allocator& alloc)
         : m_task(task)
-        , m_task_status(task_status::no_status)
         , m_successors_list_head(nullptr)
         , m_continuation_vertex(nullptr)
         , m_new_dynamic_state(nullptr)
@@ -94,25 +88,12 @@ public:
         }
     }
 
-    void mark_submitted() {
-        m_task_status.store(task_status::submitted, std::memory_order_release);
-    }
-
     task_with_dynamic_state* complete_task() {
-        m_task_status.store(task_status::completed, std::memory_order_release);
         task_with_dynamic_state* next_task = nullptr;
         if (is_successors_list_alive()) {
             next_task = release_successors_list(fetch_successors_list());
         }
         return next_task;
-    }
-
-    bool was_submitted() const {
-        return m_task_status.load(std::memory_order_acquire) >= task_status::submitted;
-    }
-
-    bool is_completed() const {
-        return m_task_status.load(std::memory_order_acquire) == task_status::completed;
     }
 
     bool has_dependencies() const {
@@ -162,7 +143,6 @@ public:
 
 private:
     task_with_dynamic_state* m_task;
-    std::atomic<task_status> m_task_status;
     std::atomic<successors_list_node*> m_successors_list_head;
     std::atomic<successor_vertex*> m_continuation_vertex;
     std::atomic<task_dynamic_state*> m_new_dynamic_state;
@@ -186,7 +166,7 @@ public:
         }
     }
 
-    // Creates the dynamic state if the task_tracker is created or the first successor to task_handle
+    // Create dynamic state if task_tracker is created or a first successor is added to task_handle
     task_dynamic_state* get_dynamic_state() {
         task_dynamic_state* current_state = m_state.load(std::memory_order_acquire);
 
@@ -209,13 +189,6 @@ public:
         return current_state;
     }
 
-    void mark_submitted() {
-        task_dynamic_state* current_state = m_state.load(std::memory_order_relaxed);
-        if (current_state != nullptr) {
-            current_state->mark_submitted();
-        }
-    }
-
     task_with_dynamic_state* complete_task() {
         task_with_dynamic_state* next_task = nullptr;
 
@@ -235,6 +208,17 @@ public:
         if (current_state != nullptr) {
             current_state->transfer_successors_to(other_task_state);
         }
+    }
+    void release_continuation() {
+        task_dynamic_state* current_state = m_state.load(std::memory_order_relaxed);
+        if (current_state != nullptr && current_state->has_dependencies()) {
+            current_state->release_continuation();
+        }
+    }
+
+    bool has_dependencies() const {
+        task_dynamic_state* current_state = m_state.load(std::memory_order_relaxed);
+        return current_state ? current_state->has_dependencies() : false;
     }
 private:
     std::atomic<task_dynamic_state*> m_state;
@@ -302,8 +286,7 @@ public:
     task_handle_task(d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
         : m_wait_tree_vertex(vertex)
         , m_ctx(ctx)
-        , m_allocator(alloc)
-    {
+        , m_allocator(alloc) {
         suppress_unused_warning(m_version_and_traits);
         m_wait_tree_vertex->reserve();
     }
@@ -341,7 +324,7 @@ private:
     friend class task_tracker;
 #endif
 
-    task_handle(task_handle_task* t) : m_handle {t} {}
+    task_handle(task_handle_task* t) : m_handle {t}{}
 
     d1::task* release() {
        return m_handle.release();
@@ -351,7 +334,12 @@ private:
 struct task_handle_accessor {
     static task_handle construct(task_handle_task* t) { return {t}; }
 
-    static d1::task* release(task_handle& th) { return th.release(); }
+    static d1::task* release(task_handle& th) {
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        th.m_handle->release_continuation();
+#endif
+        return th.release();
+}
 
     static d1::task_group_context& ctx_of(task_handle& th) {
         __TBB_ASSERT(th.m_handle, "ctx_of does not expect empty task_handle.");
@@ -359,27 +347,13 @@ struct task_handle_accessor {
     }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    static void mark_task_submitted(task_handle& th) {
-        __TBB_ASSERT(th.m_handle, "mark_task_submitted does not expect empty task_handle");
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstringop-overflow"
-        th.m_handle->mark_submitted();
-#pragma GCC diagnostic pop
-    }
-
     static task_dynamic_state* get_task_dynamic_state(task_handle& th) {
         return th.m_handle->get_dynamic_state();
     }
 
-    static void release_continuation(task_handle& th) {
-        __TBB_ASSERT(th.m_handle, "release_continuation does not expect empty task_handle");
-        th.m_handle->get_dynamic_state()->release_continuation();
-    }
-
     static bool has_dependencies(task_handle& th) {
         __TBB_ASSERT(th.m_handle, "has_dependency does not expect empty task_handle");
-        return th.m_handle->get_dynamic_state()->has_dependencies();
+        return th.m_handle->has_dependencies();
     }
 #endif
 };
@@ -571,16 +545,6 @@ public:
     }
 
     explicit operator bool() const noexcept { return m_task_state != nullptr; }
-
-    bool was_submitted() const {
-        __TBB_ASSERT(m_task_state != nullptr, "Cannot get task status on the empty task_tracker");
-        return m_task_state->was_submitted();
-    }
-
-    bool is_completed() const {
-        __TBB_ASSERT(m_task_state != nullptr, "Cannot get task status on the empty task_tracker");
-        return m_task_state->is_completed();
-    }
 private:
     friend bool operator==(const task_tracker& t, std::nullptr_t) noexcept {
         return t.m_task_state == nullptr;
