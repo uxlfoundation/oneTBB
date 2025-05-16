@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2019-2022 Intel Corporation
+    Copyright (c) 2019-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -264,6 +264,7 @@ protected:
     using node_allocator_traits = tbb::detail::allocator_traits<node_allocator_type>;
 
     using list_node_type = skip_list_node<value_type, node_allocator_type>;
+    using atomic_node_ptr = std::atomic<list_node_type*>;
     using node_type = d1::node_handle<key_type, value_type, list_node_type, allocator_type>;
 
     using iterator = skip_list_iterator<list_node_type, value_type>;
@@ -1197,7 +1198,7 @@ private:
     node_allocator_type my_node_allocator;
     key_compare my_compare;
     random_level_generator_type my_rng;
-    std::atomic<list_node_type*> my_head_ptr;
+    atomic_node_ptr my_head_ptr;
     std::atomic<size_type> my_size;
     std::atomic<size_type> my_max_height;
 

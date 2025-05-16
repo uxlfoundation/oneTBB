@@ -1,5 +1,5 @@
 /*
-    Modifications Copyright (c) 2020-2023 Intel Corporation
+    Modifications Copyright (c) 2020-2025 Intel Corporation
     Modifications Licensed under the Apache License, Version 2.0;
     You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 */
@@ -509,7 +509,11 @@ DOCTEST_GCC_SUPPRESS_WARNING_POP
 // https://github.com/doctest/doctest/issues/126
 // https://github.com/doctest/doctest/issues/356
 #if DOCTEST_CLANG
+#if DOCTEST_CPLUSPLUS >= 201703L && __has_include(<version>)
+#include <version>
+#else
 #include <ciso646>
+#endif
 #endif // clang
 
 #ifdef _LIBCPP_VERSION

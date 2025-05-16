@@ -24,6 +24,7 @@ TBB_CONTROL_FLOW_GUARD:BOOL - Enable Control Flow Guard (CFG) during the compila
 TBB_BUILD_APPLE_FRAMEWORKS - Enable the Apple* frameworks instead of dylibs, only available on the Apple platform. (OFF by default)
 TBB_FILE_TRIM - Enable __FILE__ trim, replace a build-time full path with a relative path in the debug info and macro __FILE__; use it to make
            reproducible location-independent builds (ON by default)
+TBB_VERIFY_DEPENDENCY_SIGNATURE - On Windows* enable verification of signatures for dependencies linked at run-time. (ON by default)
 ```
 
 ## Configure, Build, and Test
