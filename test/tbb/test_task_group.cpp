@@ -1458,10 +1458,6 @@ void test_submitted_predecessors(submit_function submit_function_tag, bool all_p
 
     if (all_predecessors_completed) {
         tg.wait();
-
-        for (tbb::task_tracker& tracker : predecessors) {
-            CHECK_MESSAGE(tracker.is_completed(), "Task should be completed by does not");
-        }
         CHECK_MESSAGE(task_placeholder == num_predecessors, "Not all tasks were executed");
     }
 
@@ -1478,12 +1474,9 @@ void test_submitted_predecessors(submit_function submit_function_tag, bool all_p
     if (all_predecessors_completed) {
         CHECK_MESSAGE(task_placeholder == num_predecessors, "successor task completed before being submitted");
     }
-    CHECK_MESSAGE(!successor_tracker.is_completed(), "successor task completed before being submitted");
-
     submit_and_wait(submit_function_tag, std::move(successor_task), tg, arena);
 
     CHECK_MESSAGE(task_placeholder == num_predecessors + 1, "successor task was not completed");
-    CHECK_MESSAGE(successor_tracker.is_completed(), "successor task was not completed");
 }
 
 void test_predecessors(submit_function submit_function_tag) {

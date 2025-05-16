@@ -88,7 +88,6 @@ public:
     }
 
     task_with_dynamic_state* complete_task() {
-        m_task_status.store(task_status::completed, std::memory_order_release);
         successors_list_node* list = fetch_successors_list();
         return release_successors_list(list);
     }
@@ -186,6 +185,18 @@ public:
             next_task = current_state->complete_task();
         }
         return next_task;
+    }
+
+    void release_continuation() {
+        task_dynamic_state* current_state = m_state.load(std::memory_order_relaxed);
+        if (current_state != nullptr && current_state->has_dependencies()) {
+            current_state->release_continuation();
+        }
+    }
+
+    bool has_dependencies() const {
+        task_dynamic_state* current_state = m_state.load(std::memory_order_relaxed);
+        return current_state ? current_state->has_dependencies() : false;
     }
 private:
     std::atomic<task_dynamic_state*> m_state;
@@ -291,7 +302,12 @@ private:
 struct task_handle_accessor {
     static task_handle construct(task_handle_task* t) { return {t}; }
 
-    static d1::task* release(task_handle& th) { return th.release(); }
+    static d1::task* release(task_handle& th) {
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        th.m_handle->release_continuation();
+#endif
+        return th.release();
+}
 
     static d1::task_group_context& ctx_of(task_handle& th) {
         __TBB_ASSERT(th.m_handle, "ctx_of does not expect empty task_handle.");
@@ -303,14 +319,9 @@ struct task_handle_accessor {
         return th.m_handle->get_dynamic_state();
     }
 
-    static void release_continuation(task_handle& th) {
-        __TBB_ASSERT(th.m_handle, "release_continuation does not expect empty task_handle");
-        th.m_handle->get_dynamic_state()->release_continuation();
-    }
-
     static bool has_dependencies(task_handle& th) {
         __TBB_ASSERT(th.m_handle, "has_dependency does not expect empty task_handle");
-        return th.m_handle->get_dynamic_state()->has_dependencies();
+        return th.m_handle->has_dependencies();
     }
 #endif
 };

@@ -81,6 +81,7 @@ d1::task* task_ptr_or_nullptr(F&& f);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 inline d1::task* combine_tasks(d1::task* body_task, task_with_dynamic_state* successor_task) {
     if (body_task == nullptr) return successor_task;
+    // Successor task can't have dependencies
     if (successor_task == nullptr) return body_task;
 
     // There is a task returned from the body and the successor task - bypassing the body task
@@ -123,7 +124,10 @@ namespace {
     template<typename F>
     d1::task* task_ptr_or_nullptr_impl(std::false_type, F&& f){
         task_handle th = std::forward<F>(f)();
-        return task_handle_accessor::release(th);
+        bool has_dependencies = task_handle_accessor::has_dependencies(th);
+        d1::task* task_ptr = task_handle_accessor::release(th);
+        // If task has dependencies, it can't be bypassed
+        return has_dependencies ? nullptr : task_ptr;
     }
 
     template<typename F>
@@ -519,7 +523,6 @@ protected:
         try_call([&] {
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
             if (acs::has_dependencies(h)) {
-                acs::release_continuation(h);
                 acs::release(h);
                 d1::wait(m_wait_vertex.get_context(), context());
             } else
@@ -617,8 +620,8 @@ public:
         using acs = d2::task_handle_accessor;
         __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
 
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
         if (acs::has_dependencies(h)) {
-            acs::release_continuation(h);
             acs::release(h);
         } else
 #endif

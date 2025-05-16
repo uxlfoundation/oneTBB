@@ -110,7 +110,6 @@ inline void enqueue_impl(task_handle&& th, d1::task_arena_base* ta) {
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
     if (task_handle_accessor::has_dependencies(th)) {
-        task_handle_accessor::release_continuation(th);
         task_handle_accessor::release(th);
     } else 
 #endif
