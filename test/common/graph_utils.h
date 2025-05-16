@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -694,6 +694,47 @@ void test_reserving_nodes() {
     g.wait_for_all();
 
     CHECK(end_receiver.my_count == 2 * N);
+}
+
+template<typename BufferNode>
+void test_nested_make_edge_single_item_buffer_to_continue_receiver() {
+    tbb::flow::graph g;
+
+    using msg_t = tbb::flow::continue_msg;
+    using cnode_t = tbb::flow::continue_node<msg_t>;
+
+    std::atomic<int> count(0);
+
+    // make a single item buffer and fill it
+    BufferNode b{g};
+    b.try_put(msg_t{});
+
+    cnode_t execute_one_time{g,
+        [&](const msg_t& m) {
+            ++count;
+            return m;
+        }};
+
+    cnode_t edge_adder{g, 
+        [&](const msg_t& m) {
+            // should increment predecessor count on execute_one_time
+            // should NOT cause execute_one_time to immediately execute
+            // since it has 2 predecessors, edge_adder and b
+            tbb::flow::make_edge(b, execute_one_time);
+            return m;
+        }};
+
+    tbb::flow::make_edge(edge_adder, execute_one_time);
+
+    // execute_one should execute
+    edge_adder.try_put(msg_t{});
+    g.wait_for_all();
+
+    // execute_one should NOT execute, it has 2 predecessors and
+    // has seen a total of 3 messages
+    execute_one_time.try_put(msg_t{});
+    g.wait_for_all();
+    CHECK_MESSAGE ((count == 1), "node should only execute once");
 }
 
 namespace lightweight_testing {
