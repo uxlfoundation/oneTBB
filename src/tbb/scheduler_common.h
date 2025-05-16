@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -482,6 +482,8 @@ public:
                        tbb_allocator<std::pair<d1::wait_tree_vertex_interface* const, d1::reference_vertex*>>
                       >
         m_reference_vertex_map;
+
+    d1::task* m_innermost_running_task{ nullptr };
 
     //! Attempt to get a task from the mailbox.
     /** Gets a task only if it has not been executed by its sender or a thief
