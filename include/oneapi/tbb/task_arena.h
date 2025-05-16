@@ -108,10 +108,6 @@ inline void enqueue_impl(task_handle&& th, d1::task_arena_base* ta) {
 
     auto& ctx = task_handle_accessor::ctx_of(th);
 
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    task_handle_accessor::mark_task_submitted(th);
-#endif
-
     // Do not access th after release
     r1::enqueue(*task_handle_accessor::release(th), ctx, ta);
 }

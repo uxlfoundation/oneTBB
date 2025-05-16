@@ -499,9 +499,6 @@ protected:
 
         using acs = d2::task_handle_accessor;
         __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        acs::mark_task_submitted(h);
-#endif
 
         bool cancellation_status = false;
         try_call([&] {
@@ -595,9 +592,6 @@ public:
 
         using acs = d2::task_handle_accessor;
         __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        acs::mark_task_submitted(h);
-#endif
 
         d1::spawn(*acs::release(h), context());
     }

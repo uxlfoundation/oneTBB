@@ -35,15 +35,9 @@ class task_handle;
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
 class task_dynamic_state {
-    enum class task_status {
-        no_status = 0,
-        submitted = 1,
-        completed = 2
-    };
 public:
     task_dynamic_state(d1::small_object_allocator& alloc)
-        : m_task_status(task_status::no_status)
-        , m_num_references(0)
+        : m_num_references(0)
         , m_allocator(alloc)
     {}
 
@@ -55,23 +49,9 @@ public:
         }
     }
 
-    void mark_submitted() {
-        m_task_status.store(task_status::submitted, std::memory_order_release);
-    }
-
     void complete_task() {
-        m_task_status.store(task_status::completed, std::memory_order_release);   
-    }
-
-    bool was_submitted() const {
-        return m_task_status.load(std::memory_order_acquire) >= task_status::submitted;
-    }
-
-    bool is_completed() const {
-        return m_task_status.load(std::memory_order_acquire) == task_status::completed;
     }
 private:
-    std::atomic<task_status> m_task_status;
     std::atomic<std::size_t> m_num_references;
     d1::small_object_allocator m_allocator;
 };
@@ -108,13 +88,6 @@ public:
 
         __TBB_ASSERT(current_state != nullptr, "Failed to create dynamic state");
         return current_state;
-    }
-
-    void mark_submitted() {
-        task_dynamic_state* current_state = m_state.load(std::memory_order_relaxed);
-        if (current_state != nullptr) {
-            current_state->mark_submitted();
-        }
     }
 
     void complete_task() {
@@ -207,17 +180,6 @@ struct task_handle_accessor {
         __TBB_ASSERT(th.m_handle, "ctx_of does not expect empty task_handle.");
         return th.m_handle->ctx();
     }
-
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    static void mark_task_submitted(task_handle& th) {
-        __TBB_ASSERT(th.m_handle, "mark_task_submitted does not expect empty task_handle");
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstringop-overflow"
-        th.m_handle->mark_submitted();
-#pragma GCC diagnostic pop
-    }
-#endif
 };
 
 inline bool operator==(task_handle const& th, std::nullptr_t) noexcept {
@@ -304,16 +266,6 @@ public:
     }
 
     explicit operator bool() const noexcept { return m_task_state != nullptr; }
-
-    bool was_submitted() const {
-        __TBB_ASSERT(m_task_state != nullptr, "Cannot get task status on the empty task_tracker");
-        return m_task_state->was_submitted();
-    }
-
-    bool is_completed() const {
-        __TBB_ASSERT(m_task_state != nullptr, "Cannot get task status on the empty task_tracker");
-        return m_task_state->is_completed();
-    }
 private:
     friend bool operator==(const task_tracker& t, std::nullptr_t) noexcept {
         return t.m_task_state == nullptr;
