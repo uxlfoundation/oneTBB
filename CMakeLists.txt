@@ -134,6 +134,21 @@ if(APPLE)
 option(TBB_BUILD_APPLE_FRAMEWORKS "Build as Apple Frameworks" OFF)
 endif()
 
+if (WIN32)
+    if (TBB_VERIFY_DEPENDENCY_SIGNATURE)
+        message(STATUS "Dependency signature verification during dynamic linking in run-time is ENABLED.")
+    elseif (NOT DEFINED TBB_VERIFY_DEPENDENCY_SIGNATURE)
+        message(WARNING
+            "Dependency signature verification during dynamic linking in run-time is disabled by "
+            "default. This may lead to security vulnerabilities. See installation section in "
+            "oneTBB documentation for more details.")
+    else()
+        message(STATUS "Dependency signature verification during dynamic linking in run-time is DISABLED")
+    endif()
+    option(TBB_VERIFY_DEPENDENCY_SIGNATURE
+        "Verify signature of a dependency during its dynamic linking at run-time on Windows*" OFF)
+endif()
+
 if (NOT DEFINED BUILD_SHARED_LIBS)
     set(BUILD_SHARED_LIBS ON)
 endif()
@@ -252,7 +267,11 @@ endif()
 if (TBB_FILE_TRIM)
     file(RELATIVE_PATH TBB_RELATIVE_BIN_PATH ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_SOURCE_DIR})
     file(TO_NATIVE_PATH ${CMAKE_SOURCE_DIR} NATIVE_TBB_PROJECT_ROOT_DIR)
-    file(TO_NATIVE_PATH ${TBB_RELATIVE_BIN_PATH} NATIVE_TBB_RELATIVE_BIN_PATH)
+    if (TBB_RELATIVE_BIN_PATH)
+        file(TO_NATIVE_PATH ${TBB_RELATIVE_BIN_PATH} NATIVE_TBB_RELATIVE_BIN_PATH)
+    else()
+        file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} NATIVE_TBB_RELATIVE_BIN_PATH)
+    endif()
 endif ()
 
 if (TBB_CONTROL_FLOW_GUARD)
@@ -328,6 +347,18 @@ endif()
 
 if (TBB_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+
+if (TBB_DOC_EXAMPLES)
+    set(TBB_DOC_EXAMPLES_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/doc/main/examples_testing")
+    if (NOT EXISTS ${TBB_DOC_EXAMPLES_DIRECTORY})
+        message(FATAL_ERROR "Documentation examples are not found while testing was enabled")
+    else()
+        message(STATUS "Enabling testing for examples from documentation")
+        enable_testing()
+        add_subdirectory(${TBB_DOC_EXAMPLES_DIRECTORY})
+    endif()
 endif()
 
 if (TBB_BENCH)
