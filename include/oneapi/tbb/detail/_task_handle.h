@@ -67,7 +67,7 @@ public:
         }
     }
 
-    // Creates the dynamic state if the task_tracker is created or the first successor to task_handle
+    // Create dynamic state if task_tracker is created or a first successor is added to task_handle
     task_dynamic_state* get_dynamic_state() {
         task_dynamic_state* current_state = m_state.load(std::memory_order_acquire);
 
@@ -124,8 +124,7 @@ public:
     task_handle_task(d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
         : m_wait_tree_vertex(vertex)
         , m_ctx(ctx)
-        , m_allocator(alloc)
-    {
+        , m_allocator(alloc) {
         suppress_unused_warning(m_version_and_traits);
         m_wait_tree_vertex->reserve();
     }
@@ -164,7 +163,7 @@ private:
     friend class task_tracker;
 #endif
 
-    task_handle(task_handle_task* t) : m_handle {t} {}
+    task_handle(task_handle_task* t) : m_handle {t}{}
 
     d1::task* release() {
        return m_handle.release();
