@@ -25,29 +25,29 @@ namespace d2 {
 
 template <typename Input>
 struct declare_input_type {
-    using input_type = Input;
+    using input_type = std::decay_t<Input>;
 };
 
 template <>
 struct declare_input_type<d1::flow_control> {};
 
 template <typename Input, typename Output>
-struct body_types : declare_input_type<std::decay_t<Input>> {
+struct body_types : declare_input_type<Input> {
     using output_type = std::decay_t<Output>;
 };
 
 template <typename P>
-struct extract_member_function_types;
+struct extract_callable_object_types;
 
 template <typename Body, typename Input, typename Output>
-struct extract_member_function_types<Output (Body::*)(Input)> : body_types<Input, Output> {};
+struct extract_callable_object_types<Output (Body::*)(Input)> : body_types<Input, Output> {};
 
 template <typename Body, typename Input, typename Output>
-struct extract_member_function_types<Output (Body::*)(Input) const> : body_types<Input, Output> {};
+struct extract_callable_object_types<Output (Body::*)(Input) const> : body_types<Input, Output> {};
 
 // Body is represented as a callable object - extract types from the pointer to operator()
 template <typename Body>
-struct extract_body_types : extract_member_function_types<decltype(&Body::operator())> {};
+struct extract_body_types : extract_callable_object_types<decltype(&Body::operator())> {};
 
 // Body is represented as a pointer to function
 template <typename Input, typename Output>
@@ -55,7 +55,7 @@ struct extract_body_types<Output (*)(Input)> : body_types<Input, Output> {};
 
 // Body is represented as a pointer to member function
 template <typename Input, typename Output>
-struct extract_body_types<Output (Input::*)()> : body_types<Input, Output> {};
+struct extract_body_types<Output (Input::*)() const> : body_types<Input, Output> {};
 
 // Body is represented as a pointer to member object
 template <typename Input, typename Output>
