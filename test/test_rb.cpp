@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2024 Intel Corporation
+    Copyright (C) 2023-2025 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -175,7 +175,6 @@ bool test_nested_clients() {
             std::to_string(min_inner_thr) + ", " + std::to_string(inner_thr) + "]");
           eB_concurrency = inner_thr;
           if (!(check_permit(eB, phB) && check_permit(eA, phA))) {
-            std::cout << min_inner_thr << " " << inner_thr << std::endl;
             auto outer_permit = get_permit_data(phA);
             auto inner_permit = get_permit_data(phB);
             check(false, "Outer permit concurrency: " + std::to_string(outer_permit.concurrency()) +

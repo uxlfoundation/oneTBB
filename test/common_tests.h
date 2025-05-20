@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2024 Intel Corporation
+    Copyright (C) 2023-2025 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -25,11 +25,14 @@ std::set<tcm_permit_handle_t> renegotiating_permits;
 bool allow_null_in_callback_arg = false;
 bool is_client_renegotiate_callback_invoked = false;
 
-tcm_result_t
-client_renegotiate(tcm_permit_handle_t ph, void* arg, tcm_callback_flags_t invocation_reason) {
-  std::cout << "Start renegotiation callback \"" << __func__ << "\" for permit=" << ph << ", arg="
-            << arg << ", invocation reason={new_concurrency=" << invocation_reason.new_concurrency
-            << ", new_state=" << invocation_reason.new_state << "}\n";
+tcm_result_t client_renegotiate(tcm_permit_handle_t ph, void *arg,
+                                tcm_callback_flags_t invocation_reason)
+{
+  logger.log("Start renegotiation callback \"" + std::string(__func__) +
+             "\" for permit=" + to_string(ph) + ", arg=" + to_string(arg) +
+             ", invocation reason={new_concurrency=" +
+             std::to_string(invocation_reason.new_concurrency) + ", new_state=" +
+             std::to_string(invocation_reason.new_state) + "}\n");
 
   is_client_renegotiate_callback_invoked = true;
 
@@ -48,7 +51,7 @@ client_renegotiate(tcm_permit_handle_t ph, void* arg, tcm_callback_flags_t invoc
   // Remove permit from the expected set, to make sure renegotiation does not happen twice for it.
   renegotiating_permits.erase(ph);
 
-  std::cout << "End permit renegotiation callback \"" << __func__ << "\"" << std::endl;
+  logger.log("End permit renegotiation callback \"" + std::string(__func__) + "\"");
   return r ? TCM_RESULT_SUCCESS : TCM_RESULT_ERROR_UNKNOWN;
 }
 
@@ -120,7 +123,6 @@ bool test_alternating_clients() {
   if (!check_success(r, "tcmDisconnect B"))
     return test_fail(test_name);
 
-  std::cout << "test_alternating_clients done" << std::endl;
   return test_epilog(test_name);
 }
 

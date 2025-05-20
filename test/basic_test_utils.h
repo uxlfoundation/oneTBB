@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2024 Intel Corporation
+    Copyright (C) 2024-2025 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -110,6 +110,33 @@ tcm_permit_t make_pending_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_ma
 /***************************************************************************************************
  * Testing and reporting functions
  **************************************************************************************************/
+template <bool skip_out_stream = false, bool skip_err_stream = false>
+class tcm_test_logger_t {
+public:
+    tcm_test_logger_t() = default;
+
+    template <typename T> void log(T&& msg) const {
+        if constexpr (!skip_out_stream)
+            log_to(out_stream(), std::forward<T>(msg));
+    }
+
+    template <typename T> void log_error(T&& msg) const {
+        if constexpr (!skip_err_stream)
+            log_to(err_stream(), std::forward<T>(msg));
+    }
+
+    template <typename T> void log_to(std::ostream& os, T&& msg) const {
+        os << msg << std::endl;
+    }
+private:
+    static std::ostream& out_stream() { return std::cout; }
+    static std::ostream& err_stream() { return std::cerr; }
+
+    tcm_test_logger_t(const tcm_test_logger_t&) = delete;
+    tcm_test_logger_t& operator=(const tcm_test_logger_t&) = delete;
+};
+
+static tcm_test_logger_t</*skip_out_stream*/false, /*skip_err_stream*/false> logger;
 
 bool check(bool b, const std::string& msg, unsigned num_indents = 0,
            const std::string& report_msg = "")
@@ -117,18 +144,18 @@ bool check(bool b, const std::string& msg, unsigned num_indents = 0,
   const std::string indent(2 * num_indents, ' '); // Multiplied by two for clearer line distinction
 
   if (!b) {
-    std::cout << "***************** " << indent << msg << std::endl;
-    std::cout << "*     ERROR     * " << indent << msg << std::endl;
-    std::cout << "***************** " << indent << msg << std::endl;
-    std::cout << report_msg;
+    logger.log_error("***************** " + indent + msg + "\n" +
+                     "*     ERROR     * " + indent + msg + "\n" +
+                     "***************** " + indent + msg + "\n" +
+                     report_msg);
   } else if (!msg.empty()) {
-    std::cout << "SUCCESS: " << indent << msg << std::endl;
+    logger.log("SUCCESS: " + indent + msg);
   }
   return b;
 }
 
 inline void test_prolog(const std::string& msg) {
-  std::cout << "\n\nSUCCESS: begin " << msg << std::endl;
+  logger.log("\n\nSUCCESS: begin " + msg);
 }
 
 inline bool test_stop(bool b, const std::string& msg) {
@@ -144,7 +171,7 @@ inline bool test_epilog(const std::string& msg) {
 }
 
 inline void test_log(const std::string& msg) {
-  std::cout << msg << std::endl;
+  logger.log(msg);
 }
 
 inline bool succeeded(tcm_result_t res) {

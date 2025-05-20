@@ -135,8 +135,8 @@ int main() {
 
     while (!release_main_thread) { std::this_thread::yield(); }
 
-    std::cout << "\nReleasing main thread hence terminating the test\n  while having "
-        "TCM state initialized and resources distributed\n  to check if it results in error...\n";
+    logger.log("\nReleasing main thread hence terminating the test while having TCM state "
+               "initialized and resources distributed to check if it results in error...\n");
 
     return is_test_succeeded ? 0 : -1;
 }
