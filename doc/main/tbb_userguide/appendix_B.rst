@@ -20,11 +20,11 @@ inner loop with |short_name|.
    :end-before: /*end outer loop openmp with nested tbb*/
 
 
-The ``#pragma omp parallel`` instructs OpenMP to create a team of
+``#pragma omp parallel`` instructs OpenMP to create a team of
 threads. Each thread executes the code block statement associated with
 the directive.
 
-The ``#pragma omp for`` indicates that the compiler should distribute
+``#pragma omp for`` indicates that the compiler should distribute
 the iterations of the following loop among the threads in the existing
 thread team, enabling parallel execution of the loop body.
 
@@ -50,7 +50,7 @@ affecting the execution performance.
 
 
 Consider the previous example with nested parallelism, but with an
-OpenMP parallel region executed within |short_name| parallel loop:
+OpenMP parallel region executed within the parallel loop:
 
 .. literalinclude:: ./examples/tbb_mixing_other_runtimes_example.cpp
    :language: c++
@@ -58,12 +58,12 @@ OpenMP parallel region executed within |short_name| parallel loop:
    :end-before: /*end outer loop tbb with nested omp*/
 
 
-Due to the semantics of OpenMP parallel region, this composition of
+Due to the semantics of the OpenMP parallel region, this composition of
 parallel runtimes may result in a quadratic number of simultaneously
 running threads. Such oversubscription can degrade the performance.
 
 
-|full_name| solves this issue with Thread Composability Manager (TCM).
+|short_name| solves this issue with Thread Composability Manager (TCM).
 It is an experimental CPU resource coordination layer that enables
 better cooperation between different threading runtimes.
 
@@ -87,10 +87,10 @@ Example output:
 
 When used with the OpenMP implementation of Intel(R) DPC++/C++ Compiler,
 TCM allows to avoid simultaneous scheduling of excessive threads in the
-scenarios similar to the above.
+scenarios similar to the one above.
 
 
-You can submit feedback or ask questions about Thread Composability
+Submit feedback or ask questions about Thread Composability
 Manager through |short_name| `GitHub Issues
 <https://github.com/uxlfoundation/oneTBB/issues>`_ or `Discussions
 <https://github.com/uxlfoundation/oneTBB/discussions>`_.
