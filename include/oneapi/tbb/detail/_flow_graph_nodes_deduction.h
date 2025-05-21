@@ -45,9 +45,13 @@ struct extract_callable_object_types<Output (Body::*)(Input)> : body_types<Input
 template <typename Body, typename Input, typename Output>
 struct extract_callable_object_types<Output (Body::*)(Input) const> : body_types<Input, Output> {};
 
+template <typename Body, typename = void>
+struct extract_body_types;
+
 // Body is represented as a callable object - extract types from the pointer to operator()
 template <typename Body>
-struct extract_body_types : extract_callable_object_types<decltype(&Body::operator())> {};
+struct extract_body_types<Body, tbb::detail::void_t<decltype(&Body::operator())>>
+    : extract_callable_object_types<decltype(&Body::operator())> {};
 
 // Body is represented as a pointer to function
 template <typename Input, typename Output>
