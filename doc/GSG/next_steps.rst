@@ -126,8 +126,8 @@ Build and Run a Sample
 
 
 
-Hybrid CPU and NUMA Support
-****************************
+Enable Hybrid CPU and NUMA Support
+***********************************
 
 If you need NUMA/Hybrid CPU support in oneTBB, you need to make sure that HWLOC* is installed on your system.
 
