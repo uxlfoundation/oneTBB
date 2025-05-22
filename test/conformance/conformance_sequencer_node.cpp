@@ -59,6 +59,8 @@ void test_deduction_guides_common(Body body) {
 
     sequencer_node s4(s1);
     static_assert(std::is_same_v<decltype(s4), decltype(s1)>);
+
+    g.wait_for_all();
 }
 
 template <typename Input>

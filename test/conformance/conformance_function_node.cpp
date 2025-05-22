@@ -91,6 +91,7 @@ void test_deduction_guides_common(Body body) {
 
     function_node f13(f1);
     static_assert(std::is_same_v<decltype(f13), decltype(f1)>);
+    g.wait_for_all();
 }
 
 template <typename Input, typename Output>

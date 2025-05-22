@@ -54,6 +54,7 @@ void test_deduction_guides_common(Body port_body) {
 
     join_node j4(j1);
     static_assert(std::is_same_v<decltype(j4), decltype(j1)>);
+    g.wait_for_all();
 }
 
 template <typename Input, typename Key>
