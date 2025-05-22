@@ -430,32 +430,6 @@ TEST_CASE("Nested make_edge to continue_node") {
     tbb::flow::graph g;
 
     using msg_t = tbb::flow::continue_msg;
-    using cnode_t = tbb::flow::continue_node<msg_t>;
-    using wnode_t = tbb::flow::overwrite_node<msg_t>;
-
-    std::atomic<int> count(0);
-
-    // make a overwrite_node that and fill it
-    wnode_t w{g};
-    w.try_put(msg_t{});
-
-    cnode_t execute_one_time{g,
-        [&](const msg_t& m) {
-            ++count;
-            return m;
-        }};
-
-    cnode_t edge_adder{g, 
-        [&](const msg_t& m) {
-            // should increment count and then send message
-            tbb::flow::make_edge(w, execute_one_time);
-            return m;
-        }};
-
-    tbb::flow::make_edge(edge_adder, execute_one_time);
-    edge_adder.try_put(msg_t{});
-    g.wait_for_all();
-    execute_one_time.try_put(msg_t{}); // not enough with 2 predecessors
-    g.wait_for_all();
-    CHECK_MESSAGE ((count == 1), "node should only execute once");
+    using buffer_t = tbb::flow::overwrite_node<msg_t>;
+    test_nested_make_edge_single_item_buffer_to_continue_receiver<buffer_t>();
 }
