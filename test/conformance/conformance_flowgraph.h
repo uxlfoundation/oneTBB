@@ -811,4 +811,65 @@ void test_with_reserving_join_node_class() {
         if at least one successor accepts the tuple must consume messages");
 }
 }
+
+#if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
+namespace deduction_guides_testing {
+
+template <typename Input, typename Output>
+struct callable_object_body_base {
+    using input_type = std::decay_t<Input>;
+    using output_type = std::decay_t<Output>;
+};
+
+template <typename Input, typename Output, bool IsConst>
+struct callable_object_body : callable_object_body_base<Input, Output> {
+    Output operator()(Input) { return Output{}; }
+};
+
+template <typename Input, typename Output>
+struct callable_object_body<Input, Output, /*IsConst = */true> : callable_object_body_base<Input, Output> {
+    Output operator()(Input) const { return Output{}; }
+};
+
+template <typename Input, typename Output>
+Output function_body(Input) { return Output{}; }
+
+template <typename Output>
+struct Input {
+    Output member_object_body;
+    Output member_function_body() const { return Output{}; }
+};
+
+template <typename Body>
+struct read_types {
+    using input_type = typename Body::input_type;
+    using output_type = typename Body::output_type;
+};
+
+template <typename Input, typename Output>
+struct read_types<Output (Input::*)> {
+    using input_type = std::decay_t<Input>;
+    using output_type = std::decay_t<Output>;
+};
+
+template <typename Input, typename Output>
+struct read_types<Output (Input::*)() const> {
+    using input_type = std::decay_t<Input>;
+    using output_type = std::decay_t<Output>;
+};
+
+template <typename Input, typename Output>
+struct read_types<Output (*)(Input)> {
+    using input_type = std::decay_t<Input>;
+    using output_type = std::decay_t<Output>;
+};
+
+template <typename Body>
+using input_type = typename read_types<Body>::input_type;
+
+template <typename Body>
+using output_type = typename read_types<Body>::output_type;
+
+} // namespace deduction_guides_testing
+#endif
 #endif // __TBB_test_conformance_conformance_flowgraph_H
