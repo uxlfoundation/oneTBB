@@ -37,7 +37,7 @@ jobs:
     runs-on: [ubuntu-22.04]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Run scan
         run: |
           sudo apt update && sudo apt install -y codespell
@@ -47,7 +47,7 @@ jobs:
     runs-on: [ubuntu-22.04]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Run scan
         run: |
           command -v clang-format
@@ -62,7 +62,7 @@ jobs:
     runs-on: [ubuntu-latest]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Install prerequisites
         run: |
           pip3 install -U Jinja2
@@ -75,7 +75,7 @@ jobs:
           export BUILD_TYPE=${BUILD_TYPE} && sphinx-build doc html
           tar -czvf html.tar.gz html/
       - name: Save docs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: oneTBB-html-docs-${{ env.GITHUB_SHA_SHORT }}
           path: html.tar.gz
@@ -90,14 +90,14 @@ jobs:
     needs: [documentation]
     steps:
       - name: Checkout gh-pages
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: gh-pages
           path: gh-pages
       - name: Set env
         run: echo GITHUB_SHA_SHORT=${GITHUB_SHA::8} >> $GITHUB_ENV
       - name: Download documetation
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: oneTBB-html-docs-${{ env.GITHUB_SHA_SHORT }}
       - name: Publish to github pages
@@ -117,7 +117,7 @@ jobs:
     if: ${{ github.ref != 'refs/heads/master' }}
     runs-on: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
       - name: Run check
@@ -137,7 +137,7 @@ jobs:
     runs-on: [ubuntu-latest]
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Run testing
         run: |
           mkdir build && cd build
@@ -185,7 +185,7 @@ jobs:
             preview: 'ON'
             cmake_static: -DBUILD_SHARED_LIBS=OFF
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Run testing
         shell: bash
         run: |
@@ -224,7 +224,7 @@ jobs:
             preview: 'ON'
             cmake_static: -DBUILD_SHARED_LIBS=OFF
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Run testing
         shell: bash
         run: |
@@ -269,7 +269,7 @@ jobs:
             preview: 'OFF'
             job_name: windows_cl2022_cxx17_relwithdebinfo_preview=OFF
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Run testing
         run: |
           mkdir build
@@ -307,7 +307,7 @@ jobs:
             build_type: debug
             preview: 'ON'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Run testing
         shell: bash
         run: |
@@ -333,7 +333,7 @@ jobs:
             build_type: relwithdebinfo
             preview: 'ON'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Run testing
         shell: bash
         run: |
@@ -369,7 +369,7 @@ jobs:
             preview: 'OFF'
             job_name: examples_windows_cl2022_cxx17_relwithdebinfo_preview=OFF
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Run testing
         run: |
           mkdir build
@@ -393,7 +393,7 @@ jobs:
             std: 20
             build_type: relwithdebinfo
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Test doc examples
         run: |
           mkdir build && cd build
@@ -418,7 +418,7 @@ jobs:
             std: 20
             build_type: relwithdebinfo
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Test doc examples
         run: |
           mkdir build
