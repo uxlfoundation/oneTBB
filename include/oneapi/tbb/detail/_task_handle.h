@@ -446,8 +446,9 @@ inline void task_dynamic_state::add_successor_node(successors_list_node* new_suc
 
 inline void task_dynamic_state::add_successor(successor_vertex* successor) {
     __TBB_ASSERT(successor != nullptr, nullptr);
+    successors_list_node* current_successors_list_head = m_successors_list_head.load(std::memory_order_acquire);
 
-    if (is_alive(m_successors_list_head.load(std::memory_order_acquire))) {
+    if (is_alive(current_successors_list_head)) {
         successor->reserve();
         d1::small_object_allocator alloc;
         successors_list_node* new_successor_node = alloc.new_object<successors_list_node>(successor, alloc);
