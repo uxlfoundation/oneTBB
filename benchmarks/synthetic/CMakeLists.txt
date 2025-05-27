@@ -1,4 +1,4 @@
-# Copyright (C) 2023 Intel Corporation
+# Copyright (C) 2023-2025 Intel Corporation
 #
 # This software and the related documents are Intel copyrighted materials, and your use of them is
 # governed by the express license under which they were provided to you ("License"). Unless the
@@ -29,14 +29,14 @@ function(add_synthetic_bench)
         ${TCM_OPENMP_FLAG}
     )
 
-    if (NOT TCM_OPENMP_NO_LINK_FLAG)
+    if (NOT TCM_OPENMP_MISSING_LINK_FLAG)
         target_link_options(${_tcm_bench_NAME}
             PRIVATE
             ${TCM_OPENMP_FLAG}
         )
     endif()
 
-    if (TCM_CUSTOM_OPENMP_LIB_DIR)
+    if (TCM_CUSTOM_OPENMP_LIB_DIR AND NOT WIN32)
         target_link_options(${_tcm_bench_NAME}
             PRIVATE
             -Wl,--disable-new-dtags

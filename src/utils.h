@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2024 Intel Corporation
+    Copyright (C) 2024-2025 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -18,6 +18,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <map>
 
 #include "tcm/types.h"
 #include "tcm/detail/_tcm_assert.h"

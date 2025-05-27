@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2024 Intel Corporation
+# Copyright (C) 2023-2025 Intel Corporation
 #
 # This software and the related documents are Intel copyrighted materials, and your use of them is
 # governed by the express license under which they were provided to you ("License"). Unless the
@@ -15,7 +15,12 @@ if (NOT TBB_FOUND)
     message(FATAL_ERROR "oneTBB was not found in CMake using 'find_package(TBB)'")
 endif()
 
-set(TCM_OPENMP_FLAG -qopenmp)
+if (WIN32)
+  set(TCM_OPENMP_FLAG /Qopenmp)
+else()
+  set(TCM_OPENMP_FLAG -qopenmp)
+endif()
+
 if (NOT CMAKE_CXX_COMPILER_ID MATCHES "IntelLLVM")
   include(FindOpenMP)
   if (NOT OpenMP_FOUND)
@@ -31,7 +36,7 @@ add_subdirectory(synthetic)
 add_subdirectory(tbb_examples)
 
 add_custom_target(tcm_benchmarks)
-add_dependencies(tcm_benchmarks composable_scenarios seismic)
+add_dependencies(tcm_benchmarks composable_scenarios seismic fractal)
 if (TARGET cholesky)
     add_dependencies(tcm_benchmarks cholesky)
 endif()
