@@ -122,8 +122,8 @@ public:
         return current_continuation_vertex;
     }
 
-    bool is_successors_list_alive() const {
-        return m_successors_list_head.load(std::memory_order_acquire) != reinterpret_cast<successors_list_node*>(~std::uintptr_t(0));
+    static bool is_alive(successors_list_node* node) {
+        return node != reinterpret_cast<successors_list_node*>(~std::uintptr_t(0));
     }
 
     successors_list_node* fetch_successors_list() {
@@ -366,24 +366,18 @@ inline task_with_dynamic_state* release_successors_list(successors_list_node* no
 
 inline void task_dynamic_state::add_successor(successor_vertex* successor) {
     __TBB_ASSERT(successor != nullptr, nullptr);
+    successors_list_node* current_successors_list_head = m_successors_list_head.load(std::memory_order_acquire);
 
-    if (is_successors_list_alive()) {
+    if (is_alive(current_successors_list_head)) {
         successor->reserve();
 
         d1::small_object_allocator alloc;
         successors_list_node* new_successor_node = alloc.new_object<successors_list_node>(successor, alloc);
-        successors_list_node* current_successors_list_head = m_successors_list_head.load(std::memory_order_acquire);
         new_successor_node->set_next_node(current_successors_list_head);
-
-        if (!is_successors_list_alive()) {
-            new_successor_node->finalize();
-            successor->release();
-            return;
-        }
 
         while (!m_successors_list_head.compare_exchange_strong(current_successors_list_head, new_successor_node)) {
             // Other thread updated the head of the list
-            if (!is_successors_list_alive()) {
+            if (!is_alive(current_successors_list_head)) {
                 // Current task has completed while we tried to insert the successor to the list
                 new_successor_node->finalize();
                 successor->release();
