@@ -138,6 +138,7 @@ template< typename T > class receiver;
 class continue_receiver;
 
 template< typename T, typename U > class limiter_node;  // needed for resetting decrementer
+template< typename T > class overwrite_node; // needed for the forward friend declaration to work in GCC < 8
 
 template<typename T, typename M> class successor_cache;
 template<typename T, typename M> class broadcast_cache;
