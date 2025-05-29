@@ -69,23 +69,12 @@ To learn more about the extensions and how to configure the oneAPI environment, 
     * Clean the program
       make clean
 
-### On a Windows System
-
-#### Command line using MSBuild
-     * MSBuild tbb-task-sycl.sln /t:Rebuild /p:Configuration="debug"
-
-#### Visual Studio IDE
-     * Open Visual Studio 2017
-     * Select Menu "File > Open > Project/Solution", find "tbb-task-sycl" folder and select "tbb-task-sycl.sln"
-     * Select Menu "Project > Build" to build the selected configuration
-     * Select Menu "Debug > Start Without Debugging" to run the program
-
 ## Running the Sample
 
 ### Example of Output
     executing on CPU
     executing on GPU
-    Heterogenous triad correct.
+    Heterogeneous triad correct.
     TBB triad correct.
     input array a_array: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15
     input array b_array: 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15

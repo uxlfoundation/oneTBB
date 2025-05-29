@@ -1,8 +1,18 @@
-//==============================================================
-// Copyright � 2019 Intel Corporation
-//
-// SPDX-License-Identifier: MIT
-// =============================================================
+/*
+    Copyright (c) 2005-2025 Intel Corporation
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+*/
 
 #include <array>
 #include <iostream>
@@ -40,14 +50,14 @@ class ExecuteOnGpu {
     // all SYCL tasks must complete before exiting the block
     {  // starting SYCL code
 
-      const float coeff = alpha;  // coeff is a local varaible
+      const float coeff = alpha;  // coeff is a local variable
       sycl::range<1> n_items{array_size};
       sycl::buffer a_buffer(a_array);
       sycl::buffer b_buffer(b_array);
       sycl::buffer c_buffer(c_array);
 
       sycl::queue q(sycl::default_selector_v, dpc_common::exception_handler);
-      q.submit([&](sycl::handler& h) {            
+      q.submit([&](sycl::handler& h) {
             sycl::accessor a_accessor(a_buffer, h, sycl::read_only);
             sycl::accessor b_accessor(b_buffer, h, sycl::read_only);
             sycl::accessor c_accessor(c_buffer, h, sycl::write_only);
@@ -111,9 +121,9 @@ int main() {
 
   // Compare golden triad with heterogeneous triad
   if (!std::equal(std::begin(c_array), std::end(c_array), std::begin(c_gold)))
-    std::cout << "Heterogenous triad error.\n";
+    std::cout << "Heterogeneous triad error.\n";
   else
-    std::cout << "Heterogenous triad correct.\n";
+    std::cout << "Heterogeneous triad correct.\n";
 
   // Compare golden triad with TBB triad
   if (!std::equal(std::begin(c_array_tbb), end(c_array_tbb),
