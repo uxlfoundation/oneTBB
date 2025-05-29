@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024 Intel Corporation
+# Copyright (c) 2023-2025 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ jobs:
       issues: write
       contents: read
     steps:
-    - uses: github/issue-labeler@v3.4 #May not be the latest version
+    - uses: github/issue-labeler@c1b0f9f52a63158c4adc09425e858e87b32e9685 # v3.4
       with:
         repo-token: "${{ secrets.GITHUB_TOKEN }}"
         configuration-path: .github/issue_labeler.yml
