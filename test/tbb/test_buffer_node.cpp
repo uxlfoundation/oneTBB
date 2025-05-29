@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@
 #include "common/graph_utils.h"
 #include "common/test_follows_and_precedes_api.h"
 
-#include "test_buffering_try_put_and_wait.h"
+#include "test_try_put_and_wait.h"
 
 //! \file test_buffer_node.cpp
 //! \brief Test for [flow_graph.buffer_node] specification
