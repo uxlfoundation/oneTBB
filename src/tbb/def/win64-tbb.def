@@ -72,6 +72,7 @@ EXPORTS
 ?current_suspend_point@r1@detail@tbb@@YAPEAUsuspend_point_type@123@XZ
 ?notify_waiters@r1@detail@tbb@@YAX_K@Z
 ?get_thread_reference_vertex@r1@detail@tbb@@YAPEAVwait_tree_vertex_interface@d1@23@PEAV4523@@Z
+?current_task@r1@detail@tbb@@YAPEAVtask@d1@23@XZ
 
 ; Task dispatcher (task_dispatcher.cpp)
 ?spawn@r1@detail@tbb@@YAXAEAVtask@d1@23@AEAVtask_group_context@523@@Z
