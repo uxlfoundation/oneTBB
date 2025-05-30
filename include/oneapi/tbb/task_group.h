@@ -655,9 +655,9 @@ public:
             d1::task* curr_task = d1::current_task();
             __TBB_ASSERT(curr_task != nullptr, "transfer_successors_to was called outside of task body");
             d2::task_with_dynamic_state* curr_task_with_state = dynamic_cast<d2::task_with_dynamic_state*>(curr_task);
-            __TBB_ASSERT(curr_task_with_state != nullptr, "transfer_successors_to was called outside of task_group task");
-
-            curr_task_with_state->transfer_successors_to(task_handle_accessor::get_task_dynamic_state(new_task));
+            if (curr_task_with_state != nullptr) {
+                curr_task_with_state->transfer_successors_to(task_handle_accessor::get_task_dynamic_state(new_task));
+            }
         }
     };
 #endif
