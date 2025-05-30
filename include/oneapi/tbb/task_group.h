@@ -78,6 +78,20 @@ template<typename F>
 d1::task* task_ptr_or_nullptr(F&& f);
 }
 
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+inline d1::task* combine_tasks(d1::task* body_task, task_with_dynamic_state* successor_task) {
+    if (body_task == nullptr) return successor_task;
+    // Successor task can't have dependencies
+    if (successor_task == nullptr) return body_task;
+
+    // There is a task returned from the body and the successor task - bypassing the body task
+    // and spawning the successor one
+    // successor task is guaranteed to be task_handle_task, it is safe to use static_cast
+    d1::spawn(*successor_task, static_cast<task_handle_task*>(successor_task)->ctx());
+    return body_task;
+}
+#endif
+
 template<typename F>
 class function_task : public task_handle_task  {
     //TODO: apply empty base optimization here
@@ -86,12 +100,13 @@ class function_task : public task_handle_task  {
 private:
     d1::task* execute(d1::execution_data& ed) override {
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
-        task* res = task_ptr_or_nullptr(m_func);
+        task* next_task = task_ptr_or_nullptr(m_func);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        this->complete_task();
+        task_with_dynamic_state* successor_task = this->complete_task();
+        next_task = combine_tasks(next_task, successor_task);
 #endif
         finalize(&ed);
-        return res;
+        return next_task;
     }
     d1::task* cancel(d1::execution_data& ed) override {
         finalize(&ed);
@@ -109,7 +124,10 @@ namespace {
     template<typename F>
     d1::task* task_ptr_or_nullptr_impl(std::false_type, F&& f){
         task_handle th = std::forward<F>(f)();
-        return task_handle_accessor::release(th);
+        bool has_dependencies = task_handle_accessor::has_dependencies(th);
+        d1::task* task_ptr = task_handle_accessor::release(th);
+        // If task has dependencies, it can't be bypassed
+        return has_dependencies ? nullptr : task_ptr;
     }
 
     template<typename F>
@@ -493,7 +511,15 @@ protected:
 
         bool cancellation_status = false;
         try_call([&] {
-            execute_and_wait(*acs::release(h), context(), m_wait_vertex.get_context(), context());
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+            if (acs::has_dependencies(h)) {
+                acs::release(h);
+                d1::wait(m_wait_vertex.get_context(), context());
+            } else
+#endif
+            {
+                execute_and_wait(*acs::release(h), context(), m_wait_vertex.get_context(), context());
+            }
         }).on_completion([&] {
             // TODO: the reset method is not thread-safe. Ensure the correct behavior.
             cancellation_status = context().is_group_execution_cancelled();
@@ -584,7 +610,14 @@ public:
         using acs = d2::task_handle_accessor;
         __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
 
-        d1::spawn(*acs::release(h), context());
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        if (acs::has_dependencies(h)) {
+            acs::release(h);
+        } else
+#endif
+        {
+            d1::spawn(*acs::release(h), context());
+        }
     }
 
     template<typename F>
@@ -601,6 +634,22 @@ public:
     task_group_status run_and_wait(d2::task_handle&& h) {
         return internal_run_and_wait(std::move(h));
     }
+
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    static void make_edge(d2::task_handle& pred, d2::task_handle& succ) {
+        __TBB_ASSERT(pred != nullptr, "empty predecessor handle is not allowed for make_edge");
+        __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for make_edge");
+        internal_make_edge(task_handle_accessor::get_task_dynamic_state(pred),
+                           task_handle_accessor::get_task_dynamic_state(succ));
+    }
+
+    static void make_edge(d2::task_tracker& pred, d2::task_handle& succ) {
+        __TBB_ASSERT(pred != nullptr, "empty predecessor tracker is not allowed for make_edge");
+        __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for make_edge");
+        internal_make_edge(task_tracker_accessor::get_task_dynamic_state(pred),
+                           task_handle_accessor::get_task_dynamic_state(succ));
+    }
+#endif
 }; // class task_group
 
 #if TBB_PREVIEW_ISOLATED_TASK_GROUP
