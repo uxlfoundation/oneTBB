@@ -1485,6 +1485,33 @@ void test_predecessors(submit_function submit_function_tag) {
     test_submitted_predecessors(submit_function_tag, /*all_predecessors_completed = */false);
 }
 
+void test_return_task_with_dependencies(submit_function submit_function_tag) {
+    tbb::task_group tg;
+    tbb::task_arena arena;
+
+    std::atomic<std::size_t> predecessor_placeholder(0);
+    std::atomic<std::size_t> successor_placeholder(0);
+
+    tbb::task_handle predecessor = tg.defer([&] {
+        predecessor_placeholder = 1;
+    });
+    tbb::task_tracker predecessor_tracker = predecessor;
+
+    tbb::task_handle task = tg.defer([&] {
+        tbb::task_handle successor = tg.defer([&, predecessor_tracker] {
+            CHECK_MESSAGE(predecessor_placeholder == 1, "Predecessor task was not completed");
+            successor_placeholder = 1;
+        });
+
+        tbb::task_group::make_edge(predecessor_tracker, successor);
+        return successor;
+    });
+
+    submit(submit_function_tag, std::move(task), tg, arena);
+    submit_and_wait(submit_function_tag, std::move(predecessor), tg, arena);
+    CHECK_MESSAGE(successor_placeholder == 1, "Successor task was not completed");
+}
+
 TEST_CASE("test task_group dynamic dependencies") {
     for (unsigned p = MinThread; p <= MaxThread; ++p) {
         tbb::global_control limit(tbb::global_control::max_allowed_parallelism, p);
@@ -1493,6 +1520,11 @@ TEST_CASE("test task_group dynamic dependencies") {
         test_predecessors(submit_function::run_and_wait);
         test_predecessors(submit_function::arena_enqueue);
         test_predecessors(submit_function::this_arena_enqueue);
+
+        test_return_task_with_dependencies(submit_function::run);
+        test_return_task_with_dependencies(submit_function::run_and_wait);
+        test_return_task_with_dependencies(submit_function::arena_enqueue);
+        test_return_task_with_dependencies(submit_function::this_arena_enqueue);
     }
 }
 #endif

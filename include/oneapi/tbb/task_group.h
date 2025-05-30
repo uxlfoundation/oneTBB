@@ -471,7 +471,7 @@ class function_stack_task : public d1::task {
     task* execute(d1::execution_data&) override {
         task* res = d2::task_ptr_or_nullptr(m_func);
         finalize();
-        return next_task;
+        return res;
     }
     task* cancel(d1::execution_data&) override {
         finalize();
