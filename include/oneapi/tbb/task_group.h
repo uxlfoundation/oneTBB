@@ -443,13 +443,7 @@ class isolated_task_group;
 #endif
 
 template <typename F>
-class function_stack_task
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    : public task_with_dynamic_state
-#else
-    : public d1::task
-#endif
-{
+class function_stack_task : public d1::task {
     const F& m_func;
     d1::wait_tree_vertex_interface* m_wait_tree_vertex;
 
@@ -458,9 +452,6 @@ class function_stack_task
     }
     task* execute(d1::execution_data&) override {
         task* res = d2::task_ptr_or_nullptr(m_func);
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        this->complete_task();
-#endif
         finalize();
         return res;
     }
