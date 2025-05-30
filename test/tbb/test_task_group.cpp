@@ -1626,6 +1626,8 @@ void test_adding_successors_after_transfer(unsigned num_threads, submit_function
 void test_transferring_successors(unsigned num_threads, submit_function func) {
     test_recursive_reduction(func);
     test_adding_successors_after_transfer(num_threads, func);
+}
+
 void test_return_task_with_dependencies(submit_function submit_function_tag) {
     tbb::task_group tg;
     tbb::task_arena arena;
