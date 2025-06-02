@@ -49,7 +49,7 @@ if (NOT CMAKE_GENERATOR MATCHES "Ninja" AND NOT CMAKE_CXX_DEPENDS_USE_COMPILER)
     set(TBB_MMD_FLAG -MMD)
 endif()
 
-set(TBB_WARNING_LEVEL -Wall -Wextra $<$<BOOL:${TBB_STRICT}>:-Werror>)
+set(TBB_WARNING_LEVEL -Wall -Wextra $<$<BOOL:${TBB_STRICT}>:-Werror> -Wno-error=deprecated,unused-command-line-argument)
 set(TBB_TEST_WARNING_FLAGS -Wshadow -Wcast-qual -Woverloaded-virtual -Wnon-virtual-dtor)
 
 # Ignore -Werror set through add_compile_options() or added to CMAKE_CXX_FLAGS if TBB_STRICT is disabled.
@@ -63,10 +63,10 @@ if (CMAKE_SYSTEM_PROCESSOR MATCHES "(AMD64|amd64|i.86|x86)" AND NOT EMSCRIPTEN)
 endif()
 
 # Clang flags to prevent compiler from optimizing out security checks
-set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} -Wformat -Wformat-security -Werror=format-security -fPIC $<$<NOT:$<BOOL:${EMSCRIPTEN}>>:-fstack-protector-strong>)
+set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} -Wformat -Wformat-security -Werror=format-security $<$<NOT:$<OR:$<BOOL:${WIN32}>,$<BOOL:${EMSCRIPTEN}>>>:-fPIC> $<$<NOT:$<BOOL:${EMSCRIPTEN}>>:-fstack-protector-strong>)
 
 if (NOT APPLE AND NOT ANDROID_PLATFORM AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
-    set(TBB_LIB_COMPILE_FLAGS ${TBB_LIB_COMPILE_FLAGS} -fstack-clash-protection $<$<NOT:$<BOOL:${EMSCRIPTEN}>>:-fcf-protection=full>)
+    set(TBB_LIB_COMPILE_FLAGS ${TBB_LIB_COMPILE_FLAGS} $<$<NOT:$<BOOL:${EMSCRIPTEN}>>:-fcf-protection=full>)
 endif()
 
 # -z switch is not supported on MacOS
