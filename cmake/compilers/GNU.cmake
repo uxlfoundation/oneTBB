@@ -26,7 +26,7 @@ else()
     set(TBB_DEF_FILE_PREFIX lin${TBB_ARCH})
 endif()
 
-set(TBB_WARNING_LEVEL -Wall -Wextra $<$<BOOL:${TBB_STRICT}>:-Werror> -Wno-error=deprecated,unused-command-line-argument -Wfatal-errors)
+set(TBB_WARNING_LEVEL -Wall -Wextra $<$<BOOL:${TBB_STRICT}>:-Werror> -Wno-error=deprecated -Wno-error=unused-command-line-argument -Wfatal-errors)
 set(TBB_TEST_WARNING_FLAGS -Wshadow -Wcast-qual -Woverloaded-virtual -Wnon-virtual-dtor)
 
 # Depfile options (e.g. -MD) are inserted automatically in some cases.
