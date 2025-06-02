@@ -1023,6 +1023,209 @@ To maintain such a behavior, the "merged successors tracking" approach, describe
 [section above](#semantics-for-transferring-successors-from-the-currently-executing-task-to-the-other-task)
 should be implemented.
 
+#### File Parser
+
+File Parser is an example emulating the XML or C++ headers parser. Consider having a set of files *file1...fileN*
+each of them can include one or several files from the set. We assume that include paths cannot have loops.
+
+The parsing starts from one file *fileN*.
+
+Processing of each file is done in two stages:
+* *parsing* the file - includes opening and reading symbols from the file, determining the list of includes and their processing
+* *finalizing* the file - writing the result of processing in the resulting file and other finalize actions
+
+Consider the following example:
+
+<img src="assets/parser_diagram.png" width=400>
+
+The parsing here starts from *File 5*. Arrows indicates includes for each file.
+
+Serial implementation of example is shown below:
+
+```cpp
+struct FileInfo {
+    using map_type = std::unordered_map<std::string, FileInfo*>;
+    static map_type fileMap;
+    
+    FileInfo(std::string name) : m_name(name) {}
+
+    std::string m_name;
+    std::vector<std::string> m_includes;
+
+    void read();
+    void write();
+
+    FileInfo* try_process() {
+        auto [it, b] = fileMap.emplace(m_name, this);
+        if (b) process();
+        return it->second;
+    }
+
+    void process() {
+        parse();
+        finalize();
+    }
+
+    void parse() {
+        read(); // fills m_includes
+        for (auto& i : m_includes) {
+            FileInfo* maybe = new FileInfo(i);
+            FileInfo* actual = maybe->try_process();
+
+            // i was parsed previously
+            if (maybe != actual) delete maybe;
+        }
+    }
+
+    void finalize() { write(); }
+};
+
+int main() {
+    FileInfo* info = new FileInfo("File 5");
+    info->try_process();
+    delete info;
+}
+```
+
+The class `FileInfo` describes a processing of each file in the system. `fileMap` is a shared hash map that maps
+the name of the file to the `FileInfo` representing it.
+
+Fields `m_name` and `m_includes` indicate the name of the file and the list of includes respectfully. 
+
+The function `read()` opens the file, reads the content, determines the list of includes and fills the `m_includes` vector.
+
+Function `write()` opens the result file and writes the output into it (finalization stage).
+
+`try_process()` tries to add current `FileInfo` into a shared map. If the insertion succeeds, it runs processing the file.
+Otherwise, the file was already processed and the function returns the info from the shared map.
+
+Since the implementation is serial, the `process()` function is doing both `parse()` and `finalize()` stages.
+
+`parse()` stage reads the file, traverses the list of includes and runs processing of each include.
+
+The code below shows how the implementation can be modified to be parallel using the API described in this document:
+
+```cpp
+struct FileInfo {
+    using map_type = tbb::concurrent_unordered_map<std::string, FileInfo*>;
+    static map_type fileMap;
+
+    std::string              m_name;
+    std::vector<std::string> m_includes;
+
+    tbb::task_group&  m_tg;
+    tbb::task_handle  m_parse_task;
+    tbb::task_tracker m_tracker;
+
+    FileInfo(std::string n, tbb::task_group& tg)
+        : m_name(n), m_tg(tg)
+    {
+        m_tracker = m_parse_task = m_tg.defer([this] { parse(); });
+    }
+
+    void read();
+    void write();
+
+    FileInfo* try_process() {
+        auto [it, b] = fileMap.emplace(m_name, this);
+        if (b) process();
+        return it->second;
+    }
+
+    void process() {
+        m_tg.run(std::move(m_parse_task));
+    }
+
+    void parse() {
+        read();
+
+        tbb::task_handle finalize_task = m_tg.defer([this] { finalize(); });
+
+        for (auto& i : m_includes) {
+            FileInfo* maybe = new FileInfo(i);
+            FileInfo* actual = maybe->try_process(); // runs parse task for include
+
+            tbb::task_group::make_edge(actual->m_tracker, finalize_task);
+            
+            // i was parsed previously
+            if (maybe != actual) delete maybe;
+        }
+
+        tbb::task_group::current_task::transfer_successors_to(finalize_task);
+        m_tg.run(std::move(finalize_task));
+    }
+
+    void finalize() { write(); }
+};
+
+int main() {
+    tbb::task_group tg;
+    FileInfo* info = new FileInfo("File 5", tg);
+    info->try_process();
+    tg.wait();
+    delete info;
+}
+```
+
+The type of the `map_type` is modified to be `concurrent_unordered_map` to allow concurrent insertion and lookup of `FileInfo`s during
+processing. 
+
+Each `FileInfo` contains additional reference to `task_group`, a `task_handle` owning the parsing task and `task_tracker` initially set
+to track parsing task.
+
+`process()` function submits the task owned by `m_parse_task` for execution.
+
+`parse()` function reads the file, creates a task for finalization, transfers the list of dependencies and creates an edge between the
+corresponding `task_tracker` and the finalization task.
+
+After creating all of the edges, the parsing task replaces itself in the task graph with finalize_task by
+calling `transfer_successors_to(finalize_task)`.
+
+Since `maybe->try_process()` runs the parsing task for execution, at the moment of creating the edge, the task may be in one of the following
+states - `submitted`, `executing` or `completed`.
+
+The parser task may also transfer it's successors to the finalize task, so `make_edge` should add a successor to the finalize task that 
+illustrates the necessity of merged successors tracking after transferring since `m_tracker` was initially set to track the parsing task.
+
+Let's consider the task and edges while parsing the *File 5* from the picture above.
+
+Processing the *File 5* would create a finalize task `f5f`, two tasks parsing tasks for each include - `f4p` and `f3p`:
+
+<img src="assets/parser_tasks1.png" width=400>
+
+`f4p` and `f3p` are at least in `submitted` state when the edge with `f5f` is created.
+
+Let's assume that the task `f3p` is executed next. It creates the finalize task `f3f` and two tasks for includes - `f2p` and `f1p`:
+
+<img src="assets/parser_tasks2.png" width=400>
+
+After creating the edges between includes and `f3f` are added, `f3p` transfers it's successors to `f3f` and destroys:
+
+<img src="assets/parser_tasks3.png" width=400>
+
+Assume that `f4p` is taken for execution next. It creates finalize task `f4f` and should create edges for with *File 3* and *File 2*.
+
+Task for *File 2* was already created when parsing *File 3*, so the tracker to `f2p` would be found in the `fileMap`. 
+
+The tracker for *File 3* in the `fileMap` was initially set to track `f3p`, but it have already transferred it's successors to `f3f`, so
+new edges needed to be added to `f3f`, but using the tracker to `f3p`:
+
+<img src="assets/parser_tasks4.png" width=400>
+
+Similar to `f3p`, `f4p` transfers it's successor `f5f` to finalize task `f4f`:
+
+<img src="assets/parser_tasks5.png" width=400>
+
+When `f2p` is executed, it would create a finalize task `f2f`, connects it to `f1p` and transfers it's successors to `f2f`:
+
+<img src="assets/parser_tasks6.png" width=400>
+
+The last task to be executed is `f1p` that just replaces itself with the finalize task since there are no dependencies:
+
+<img src="assets/parser_tasks7.png" width=400>
+
+After all of the dependencies are made, *File 1* is finalized, than the *File 2*, *File 3*, *File 4* and *File 5*
+
 ## API proposal summary
 
 ```cpp
