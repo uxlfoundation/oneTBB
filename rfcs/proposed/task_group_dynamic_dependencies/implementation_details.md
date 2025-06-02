@@ -22,7 +22,7 @@ tbb::task_tracker tt = th;
 tg.run(std::move(th));
 // th is empty
 // tt is non-empty
-// the task is in on of the submitted->executing->completed states
+// the task is in one of the submitted->executing->completed states
 ```
 
 While creating a predecessor-successor dependency between tasks, the task in any state is allowed as
@@ -90,16 +90,16 @@ tbb::task_group::make_edge(prev_task_tracker, new_successor);
 ### Classes layout before implementing the proposal
 
 Currently, there are two types of tasks that are used in the `task_group` - `function_task` and `function_stack_task`.
-`function_task` is created then a non-waiting submission functions, such as `task_group::run` are used.
-`function_stack_task` is created only when `task_group::run_and_wait`.
+`function_task` is created when non-waiting submission functions, such as `task_group::run` are used.
+`function_stack_task` is created only when `task_group::run_and_wait` is used.
 
 The difference between these types of tasks is that `function_task` copies the body
 to itself and `function_stack_task` uses a reference to the use body instance since
 it can't be destroyed before the blocking API finishes.
 
-Due to API limitations, only the `function_stack_task` can be owned by the `task_handle`.
+Due to API limitations, only the `function_task` can be owned by the `task_handle`.
 
-`function_stack_task` is inherited from the `task_handle_task` object that manages the lifetime of the task.
+`function_task` is inherited from the `task_handle_task` object that manages the lifetime of the task.
 `task_handle_task` and `function_stack_task` are inherited from the basic `task` class.
 
 `task_handle` class is implemented as a `unique_ptr` owning the `task_handle_task` instance.
@@ -113,9 +113,9 @@ The class layout is shown on the picture below:
 The main part of the APIs described above are implemented as part of the new
 `task_dynamic_state` class. It is intended to manage the task status (in progress, completed, transferred),
 current list of successors and linkage with the new task after the transferring.
-It's layout would be described in details in the later sections. 
+Its layout would be described in details in the later sections. 
 
-Each task in the task group that can have predecessors or successors have the `task_dynamic_state` instance associated with it.
+Each task in the task group that can have predecessors or successors has the `task_dynamic_state` instance associated with it.
 
 Since `make_edge` API allows completed tasks as predecessors, it is required to prolong the lifetime of the `task_dynamic_state`
 instance associated with the task even after the task completion until the last `tbb::task_tracker` object associated with the
@@ -170,7 +170,7 @@ The instance is created once the `get_dynamic_state()` function is called the fi
 If there are several concurrent threads that are doing one of the actions above with the same task instance (e.g. concurrently adding
 successors to the same predecessor for which the dynamic state was not yet created), each of threads allocates the new dynamic state object
 and tries to update the atomic object in `task_with_dynamic_state` by doing the `compare_exchange_strong` operation. If it fails, meaning
-another thread have created and updated the dynamic state before the current thread, the state allocated by the current thread is destroyed:
+another thread has created and updated the dynamic state before the current thread, the state allocated by the current thread is destroyed:
 
 ```cpp
 class task_with_dynamic_state : public task {
@@ -263,7 +263,7 @@ private:
 
 `m_task` is a pointer to the task, with which the current dynamic state is associated.
 
-`m_successors_list_head` is an atomic pointing to the head of the successor's list of the currently served task. It is also used
+`m_successors_list_head` is an atomic pointer to the head of the successor's list of the currently served task. It is also used
 as a marker of the task completion. It would be described in details in the following sections.
 
 `m_continuation_vertex` is an atomic pointer to eh `continuation_vertex` object associated with the currently served task. The purpose of the
