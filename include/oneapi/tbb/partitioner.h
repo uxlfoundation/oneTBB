@@ -50,6 +50,9 @@
 #include <algorithm>
 #include <atomic>
 #include <type_traits>
+#include <tbb/blocked_range.h>
+#include <tbb/blocked_range2d.h>
+#include <tbb/blocked_range3d.h>
 
 #if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
     // Workaround for overzealous compiler warnings
@@ -67,7 +70,8 @@ class static_partitioner;
 class affinity_partitioner;
 class affinity_partition_type;
 class affinity_partitioner_base;
-
+template <typename T> class numa_partitioner;
+  
 inline std::size_t get_initial_auto_partitioner_divisor() {
     const std::size_t factor = 4;
     return factor * static_cast<std::size_t>(max_concurrency());
@@ -567,14 +571,15 @@ public:
     @ingroup algorithms */
 class simple_partitioner {
 public:
-    simple_partitioner() {}
+  simple_partitioner() {}
+  // new implementation just extends existing interface
+  typedef simple_partition_type task_partition_type;
+
 private:
     template<typename Range, typename Body, typename Partitioner> friend struct start_for;
     template<typename Range, typename Body, typename Partitioner> friend struct start_reduce;
     template<typename Range, typename Body, typename Partitioner> friend struct start_deterministic_reduce;
     template<typename Range, typename Body, typename Partitioner> friend struct start_scan;
-    // new implementation just extends existing interface
-    typedef simple_partition_type task_partition_type;
     // TODO: consider to make split_type public
     typedef simple_partition_type::split_type split_type;
 
@@ -594,14 +599,14 @@ private:
 class auto_partitioner {
 public:
     auto_partitioner() {}
+    // new implementation just extends existing interface
+    typedef auto_partition_type task_partition_type;
 
 private:
     template<typename Range, typename Body, typename Partitioner> friend struct start_for;
     template<typename Range, typename Body, typename Partitioner> friend struct start_reduce;
     template<typename Range, typename Body, typename Partitioner> friend struct start_deterministic_reduce;
     template<typename Range, typename Body, typename Partitioner> friend struct start_scan;
-    // new implementation just extends existing interface
-    typedef auto_partition_type task_partition_type;
     // TODO: consider to make split_type public
     typedef auto_partition_type::split_type split_type;
 
@@ -627,13 +632,15 @@ private:
 class static_partitioner {
 public:
     static_partitioner() {}
+    // new implementation just extends existing interface
+    typedef static_partition_type task_partition_type;
+
 private:
     template<typename Range, typename Body, typename Partitioner> friend struct start_for;
     template<typename Range, typename Body, typename Partitioner> friend struct start_reduce;
     template<typename Range, typename Body, typename Partitioner> friend struct start_deterministic_reduce;
     template<typename Range, typename Body, typename Partitioner> friend struct start_scan;
-    // new implementation just extends existing interface
-    typedef static_partition_type task_partition_type;
+
     // TODO: consider to make split_type public
     typedef static_partition_type::split_type split_type;
 };
@@ -642,18 +649,92 @@ private:
 class affinity_partitioner : affinity_partitioner_base {
 public:
     affinity_partitioner() {}
+    // new implementation just extends existing interface
+    typedef affinity_partition_type task_partition_type;
 
 private:
     template<typename Range, typename Body, typename Partitioner> friend struct start_for;
     template<typename Range, typename Body, typename Partitioner> friend struct start_reduce;
     template<typename Range, typename Body, typename Partitioner> friend struct start_deterministic_reduce;
     template<typename Range, typename Body, typename Partitioner> friend struct start_scan;
-    // new implementation just extends existing interface
-    typedef affinity_partition_type task_partition_type;
+
     // TODO: consider to make split_type public
     typedef affinity_partition_type::split_type split_type;
 };
 
+template<typename BasePartitioner>
+class numa_partitioner {
+    std::size_t num_numa_nodes;
+    BasePartitioner& base_partitioner;
+
+public:
+  numa_partitioner() : num_numa_nodes(get_number_of_numa_nodes()), base_partitioner() { initialize_arena();}
+  numa_partitioner(BasePartitioner& bp) : num_numa_nodes(get_number_of_numa_nodes()), base_partitioner(bp) { initialize_arena();}
+  
+  void initialize_arena() const {
+    for (std::size_t node = 0; node < num_numa_nodes; ++node) {
+      this->arenas.emplace_back(tbb::task_arena::constraints().set_numa_id(node));
+    }
+  }
+  typedef detail::proportional_split split_type;
+  typedef typename BasePartitioner::task_partition_type task_partition_type;
+
+  template<typename Range, typename Body>
+  void execute_for(const Range& range, const Body& body) const;
+
+  template<typename Range, typename Body>
+  void execute_reduce(const Range& range, Body& body) const;
+
+private:
+  mutable std::vector<oneapi::tbb::task_arena>  arenas;
+
+  // Function to get the number of NUMA nodes in the system
+  std::size_t get_number_of_numa_nodes() {
+    return oneapi::tbb::info::numa_nodes().size();
+  }
+  
+  // Helper function to split a range into multiple subranges
+  template<typename Range>
+  void split_range(const Range& range, std::vector<Range>& subranges, std::size_t num_parts) const {
+    subranges.push_back(range); // Start with the full range
+    for (std::size_t i = 1; i < num_parts; ++i) {
+            if (!subranges.back().is_divisible()) break; // If the range is no longer divisible, stop splitting
+            Range new_range = subranges.back(); // Copy the last range
+            subranges.back()= Range(new_range, detail::split());
+            subranges.push_back(new_range); // Add the new subrange
+    }
+  }
+};
+
+template<typename BasePartitioner>
+template<typename Range, typename Body>
+void numa_partitioner<BasePartitioner>::execute_for(const Range& range, const Body& body) const{
+    if (range.is_divisible() && num_numa_nodes > 1) {
+        std::vector<Range> subranges;
+        split_range(range, subranges, num_numa_nodes);
+        std::vector<oneapi::tbb::task_group> task_groups(num_numa_nodes);
+        //initialize_arena();
+
+        for (std::size_t i = 0; i < num_numa_nodes; ++i) {
+            arenas[i].execute([&]() {
+                task_groups[i].run([&, i] {
+                    parallel_for(subranges[i], body, base_partitioner);
+                });
+            });
+        }
+        for (std::size_t i = 0; i < num_numa_nodes; ++i) {
+            arenas[i].execute([&task_groups, i]() {
+                task_groups[i].wait();
+            });
+        }
+    }
+    else {
+        parallel_for(range,body,base_partitioner);
+    }
+}
+
+
+  
 } // namespace d1
 } // namespace detail
 
@@ -663,6 +744,7 @@ using detail::d1::auto_partitioner;
 using detail::d1::simple_partitioner;
 using detail::d1::static_partitioner;
 using detail::d1::affinity_partitioner;
+using detail::d1::numa_partitioner;
 // Split types
 using detail::split;
 using detail::proportional_split;
