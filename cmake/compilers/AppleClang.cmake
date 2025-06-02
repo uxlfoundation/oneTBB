@@ -14,7 +14,7 @@
 
 set(TBB_LINK_DEF_FILE_FLAG -Wl,-exported_symbols_list,)
 set(TBB_DEF_FILE_PREFIX mac${TBB_ARCH})
-set(TBB_WARNING_LEVEL -Wall -Wextra $<$<BOOL:${TBB_STRICT}>:-Werror> -Wno-error=deprecated,unused-command-line-argument)
+set(TBB_WARNING_LEVEL -Wall -Wextra $<$<BOOL:${TBB_STRICT}>:-Werror> -Wno-error=deprecated -Wno-error=unused-command-line-argument)
 set(TBB_TEST_WARNING_FLAGS -Wshadow -Wcast-qual -Woverloaded-virtual -Wnon-virtual-dtor)
 set(TBB_WARNING_SUPPRESS -Wno-parentheses -Wno-non-virtual-dtor -Wno-dangling-else)
 # For correct ucontext.h structures layout
