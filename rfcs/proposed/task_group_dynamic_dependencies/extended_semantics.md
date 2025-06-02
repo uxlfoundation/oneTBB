@@ -374,10 +374,11 @@ To preserve the predecessor-successor relations of the entire task graph, curren
 
 ```cpp
 int serial_fibonacci(int n) {
-    return n == 0 ? 0 : n + serial_fibonacci(n - 1);
+    if (n == 0 || n == 1) { return n; }
+    return serial_fibonacci(n - 1) + serial_fibonacci(n - 2);
 }
 
-constexpr int serial_fibonacci_cutoff = 100;
+constexpr int serial_fibonacci_cutoff = 25;
 
 void recursive_fibonacci_number(tbb::task_group& tg, int n, int* result_placeholder) {
     if (n <= serial_fibonacci_cutoff) {
@@ -792,7 +793,7 @@ That highlights the importance of ability to make edges between tasks in any sta
 
 ``E`` and ``S`` tasks are following the same logic as described above. That results in the following task graph:
 
-<img src="assets/wavefront_recursive_eager_second_division_west_new_dependencies.png">
+<img src="assets/wavefront_recursive_eager_second_division_complete.png">
 
 The splitting continues until the desired depth.
 
@@ -863,8 +864,8 @@ public:
             std::size_t y_mid = m_y0 + y_size / 2;
 
             // Calculate indices of subtasks in the next level grid
-            std::size_t north_x_index = m_x_index + m_x_index * 2;
-            std::size_t north_y_index = m_y_index + m_y_index * 2;
+            std::size_t north_x_index = m_x0 / (x_mid - m_x0);
+            std::size_t north_y_index = m_y0 / (y_mid - m_y0);
 
             std::size_t west_x_index = north_x_index;
             std::size_t west_y_index = north_y_index + 1;
@@ -1441,7 +1442,7 @@ Another approach is to have ``task_handle`` to be a shared owner on the task all
 ``task_handle`` as an argument to one of the submission functions would invalidate all copies or set them
 in the "weak" state that allows only to set dependencies between tasks.
 
-Exit criteria & open questions:
+## Exit criteria & open questions:
 * Are concrete names of APIs good enough and reflects the purpose of the methods?
 * The performance targets for this feature should be defined
 * API improvements and enhancements should be considered (may be a criteria for moving the feature to `supported`):
