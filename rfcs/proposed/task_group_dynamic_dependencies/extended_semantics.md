@@ -645,6 +645,11 @@ class task_group {
 } // namespace oneapi
 ```
 
+## Implementation details
+
+Implementation details for the API added by this RFC are described as part of the
+[separate sub-RFC](implementation_details.md).
+
 ## Exit criteria & open questions
 * Do the current API names clearly reflect the purpose of their corresponding methods?
   * In particular, a better name for `transfer_successors_to` could be considered to more accurately reflect its behavior and the successor tracking approach.
