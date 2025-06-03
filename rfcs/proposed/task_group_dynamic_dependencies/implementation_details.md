@@ -277,7 +277,7 @@ It is described in details in the section about transferring the successors.
 
 The stored reference counter is increased when:
 * `task_dynamic_state` associated with the task is created, the reference is reserved for the task object.
-* a `task_tracker` instance for the task is created.
+* a `task_tracker` instance for the task is created (both non-empty tracker created from `task_handle` and copy of the existing one).
 * `transfer_successors_to(new_task)` is called, the dynamic state of the currently executing task reserves a reference on the
   dynamic state of `new_task`. See [lifetime issue](#dynamic-state-lifetime-issue) section for more details.
 
