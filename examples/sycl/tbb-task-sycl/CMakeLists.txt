@@ -12,16 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required (VERSION 3.4)
-
 if (${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
-    set(CMAKE_CXX_COMPILER "icx-cl")
-    set(CMAKE_CXX_FLAGS "fsycl")
-
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /Qtbb")
 else()
-    set(CMAKE_CXX_COMPILER "icpx")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsycl")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -qtbb")
 endif()
 
-project (TBB-TASK-SYCL LANGUAGES CXX)
-add_subdirectory (src)
+# Set default build type to RelWithDebInfo if not specified
+if (NOT CMAKE_BUILD_TYPE)
+    message (STATUS "Default CMAKE_BUILD_TYPE not set. Using Release with Debug Info")
+    set (CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE
+        STRING "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel"
+        FORCE)
+endif()
+add_executable (tbb-task-sycl tbb-task-sycl.cpp)
+add_custom_target (run ./tbb-task-sycl)
