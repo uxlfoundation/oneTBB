@@ -1,6 +1,6 @@
 # Implementation details for task group dynamic dependencies feature
 
-*Note:* This document describes an implementation details for the [task group dynamic dependencies RFC](extended_semantics.md)
+*Note:* This document describes implementation details for the [task group dynamic dependencies RFC](extended_semantics.md)
 
 ## Introduction
 
@@ -8,8 +8,8 @@ The [task group dynamic dependencies RFC](extended_semantics.md) describes a des
 successor dependencies between tasks in various states (`make_edge` API) and replacing the currently executing
 task with another task in the task graph (`transfer_successors_to` API).
 
-The task in `created` state is expressed by `task_handle` object on the user side.
-The task in other states (`created`, `submitted`, `executing` or `completed`) - by `task_tracker` object.
+A task in the `created` state is expressed by a `task_handle` object on the user side.
+A task in other states (`created`, `submitted`, `executing` or `completed`) - by a `task_tracker` object.
 
 Similarly to `task_handle`, the `task_tracker` may be in two states - `empty`, meaning it does not
 track any tasks, and `non-empty`. The only way to get a `non-empty` `task_tracker` is to construct or
@@ -25,8 +25,8 @@ tg.run(std::move(th));
 // the task is in one of the submitted->executing->completed states
 ```
 
-While creating a predecessor-successor dependency between tasks, the task in any state is allowed as
-a predecessor and only a task in created state is allowed as successor. It is exposed by the following APIs:
+While creating a predecessor-successor dependency between tasks, a task in any state is allowed as
+a predecessor and only a task in the `created` state is allowed as successor. It is exposed by the following APIs:
 
 ```cpp
 namespace oneapi {
@@ -40,12 +40,12 @@ public:
 }
 ```
 
-The first overload is intended to create a predecessor-successor dependency between two tasks in `created` state.
+The first overload is intended to create a predecessor-successor dependency between two tasks in the `created` state.
 The second overload is to create a dependency between a predecessor in any of the states and a successor
-in `created` state.
+in the `created` state.
 
-Replacing the task in the task graph by the other task is exposed by transferring the successors of this
-task to another task:
+While executing a task, a new task can be added to the task graph and the successors of the
+currently executing task can be transferred to this new task:
 
 ```cpp
 namespace oneapi {
@@ -60,11 +60,11 @@ public:
 }
 ```
 
-Only the task in the `created` state is allowed to be a recipient of successors (only `task_handle` argument
+Only a task in the `created` state is allowed to be a recipient of successors (only `task_handle` argument
 is allowed).
 
 After doing the transferring from the task `prev_task` to the task `new_task`, the new successors that
-are added using the `task_tracker` to `prev_task` should be added to the `new_task`:
+are added using the `task_tracker` for `prev_task` should be added as successors of `new_task`:
 
 ```cpp
 
@@ -87,7 +87,7 @@ tbb::task_group::make_edge(prev_task_tracker, new_successor);
 
 ## Implementation details
 
-### Classes layout before implementing the proposal
+### Class layouts before implementing the proposal
 
 Currently, there are two types of tasks that are used in the `task_group` - `function_task` and `function_stack_task`.
 `function_task` is created when non-waiting submission functions, such as `task_group::run` are used.
@@ -97,14 +97,14 @@ The difference between these types of tasks is that `function_task` copies the b
 to itself and `function_stack_task` uses a reference to the use body instance since
 it can't be destroyed before the blocking API finishes.
 
-Due to API limitations, only the `function_task` can be owned by the `task_handle`.
+Due to API limitations, only a `function_task` can be owned by a `task_handle`.
 
-`function_task` is inherited from the `task_handle_task` object that manages the lifetime of the task.
-`task_handle_task` and `function_stack_task` are inherited from the basic `task` class.
+`function_task` inherits from `task_handle_task` that manages the lifetime of the task.
+`task_handle_task` and `function_stack_task` inherit from the basic `task` class.
 
 `task_handle` class is implemented as a `unique_ptr` owning the `task_handle_task` instance.
 
-The class layout is shown on the picture below:
+The class layout is shown in the picture below:
 
 <img src="assets/impl_prev_class_layout.png" width=600>
 
@@ -113,13 +113,13 @@ The class layout is shown on the picture below:
 The main part of the APIs described above are implemented as part of the new
 `task_dynamic_state` class. It is intended to manage the task status (in progress, completed, transferred),
 current list of successors and linkage with the new task after the transferring.
-Its layout would be described in details in the later sections. 
+Its layout is described in detail in the later sections. 
 
-Each task in the task group that can have predecessors or successors has the `task_dynamic_state` instance associated with it.
+Each task in the task group that can have predecessors or successors has a`task_dynamic_state` instance associated with it.
 
 Since `make_edge` API allows completed tasks as predecessors, it is required to prolong the lifetime of the `task_dynamic_state`
 instance associated with the task even after the task completion until the last `tbb::task_tracker` object associated with the
-task would be destroyed.
+task is destroyed.
 
 ### `task_with_dynamic_state` class
 
@@ -158,18 +158,18 @@ class function_task : public task_handle_task { /*...*/ };
 The main responsibility of the `task_with_dynamic_state` class is to lazily create the `task_dynamic_state` object associated
 with the task and provide access to the created object.
 
-Default constructor of the `task_with_dynamic_state` does not create a `task_dynamic_state` instance associated with the task
-not to introduce additional overhead on creating the instance if the dynamic task dependencies feature is not used.
+To avoid introducing possibly unnecessary overhead, the default constructor of the `task_with_dynamic_state`
+does not create a `task_dynamic_state` instance.
 
 The instance is created once the `get_dynamic_state()` function is called the first time. This function is called in the following cases:
 * `task_tracker` object is constructed or assigned from the `task_handle` object owning the task,
-* The `make_edge(pred, succ)` function was called to make a predecessor-successor dependency between `pred` and `succ`. associated
+* The `make_edge(pred, succ)` function is called to make a predecessor-successor dependency between `pred` and `succ`. Associated
   dynamic states are created for `pred` and `succ` tasks.
-* `transfer_successors_to(new_task)` function was called from the running task, the dynamic state is created for `new_task`.
+* `transfer_successors_to(new_task)` function is called from the running task. The dynamic state is created for `new_task`.
 
 If there are several concurrent threads that are doing one of the actions above with the same task instance (e.g. concurrently adding
-successors to the same predecessor for which the dynamic state was not yet created), each of threads allocates the new dynamic state object
-and tries to update the atomic object in `task_with_dynamic_state` by doing the `compare_exchange_strong` operation. If it fails, meaning
+successors to the same predecessor for which the dynamic state was not yet created), each threads allocates the new dynamic state object
+and tries to update the atomic object in `task_with_dynamic_state` by doing a `compare_exchange_strong` operation. If it fails, meaning
 another thread has created and updated the dynamic state before the current thread, the state allocated by the current thread is destroyed:
 
 ```cpp
@@ -202,7 +202,7 @@ private:
 ```
 
 The `new_state->reserve()` in case of successful CAS is needed to prolong the lifetime of `task_dynamic_state` until the task
-is in progress. Once the task destroys, the reference counter in `task_dynamic_state` is decreased.
+is in progress. When the task is destroyed, the reference counter in `task_dynamic_state` is decreased.
 
 ### `tbb::task_tracker` class implementation
 
@@ -266,25 +266,25 @@ private:
 `m_successors_list_head` is an atomic pointer to the head of the successor's list of the currently served task. It is also used
 as a marker of the task completion. It would be described in details in the following sections.
 
-`m_continuation_vertex` is an atomic pointer to eh `continuation_vertex` object associated with the currently served task. The purpose of the
-`continuation_vertex` would be described in the following sections.
+`m_continuation_vertex` is an atomic pointer to the  `continuation_vertex` object associated with the currently served task. The purpose of the
+`continuation_vertex` is described in the following sections.
 
 `m_new_dynamic_state` is an atomic pointer to the other dynamic state instance. It is used when the currently served task calls
 `transfer_successors_to(new_task)` while executing. `m_new_dynamic_state` will point to `new_task`s dynamic state after doing the transfer.
-It would be described in details in the section about transferring the successors.
+It is described in details in the section about transferring the successors.
 
-`m_num_references` and `m_allocator` are managing the lifetime of the dynamic state.
+`m_num_references` and `m_allocator` manage the lifetime of the dynamic state.
 
 The stored reference counter is increased when:
 * `task_dynamic_state` associated with the task is created, the reference is reserved for the task object.
-* `task_tracker` instance for the task is created.
+* a `task_tracker` instance for the task is created.
 * `transfer_successors_to(new_task)` is called, the dynamic state of the currently executing task reserves a reference on the
   dynamic state of `new_task`. See [lifetime issue](#dynamic-state-lifetime-issue) section for more details.
 
 The stored reference counter is decreased when:
 * The associated task is completed, before destroying the task instance
-* `task_tracker` instance associated with the task is destroyed
-* `task_dynamic_state` of the task that did `transfer_successors_to(new_task)` while executing is destroyed. In this case, the reference
+* a `task_tracker` instance associated with the task is destroyed
+* `task_dynamic_state` of a task that did `transfer_successors_to(new_task)` while executing is destroyed. In this case, the reference
   counter of dynamic state associated with `new_task` is decreased. See [lifetime issue](#dynamic-state-lifetime-issue) for more details.
 
 Once the reference counter is decreased the last time (is equivalent to `0`), the `task_dynamic_state` pointer by `this` is destroyed
