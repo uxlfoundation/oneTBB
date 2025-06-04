@@ -129,31 +129,20 @@ Build and Run a Sample
 Enable Hybrid CPU and NUMA Support
 ***********************************
 
-If you need NUMA/Hybrid CPU support in oneTBB, you need to make sure that HWLOC* is installed on your system.
+To enable NUMA and hybrid CPU optimizations in oneTBB, complete the following steps:
+1. **Locate the ``tbbbind`` Library**
+   
+   Find the ``tbbbind`` library included in your oneTBB installation. Starting with oneTBB 2022.2, this library is statically linked with HWLOC* 2.x. You do not need to install HWLOC separately.
 
-HWLOC* (Hardware Locality) is a library that provides a portable abstraction of the hierarchical topology of modern architectures (NUMA, hybrid CPU systems, etc). oneTBB relies on HWLOC* to identify the underlying topology of the system to optimize thread scheduling and memory allocation.
+2. **Ensure ``tbbbind`` Is Accessible**
+   
+   Place the ``tbbbind`` library in a location where oneTBB can find it during execution. Use one of the following options:
+   
+   * Put it in the same directory as the core tbb library (``libtbb.so``, ``tbb.dll``, etc.)
+   * Add its location to the system’s library search path (``LD_LIBRARY_PATH`` on Linux* OS, ``%PATH%`` on Windows* OS)
 
-Without HWLOC*, oneTBB may not take advantage of NUMA/Hybrid CPU support. Therefore, it's important to make sure that HWLOC* is installed before using oneTBB on such systems.
+3. **Run Your Application**
+   
+   You do not need to link your application explicitly with ``tbbbind``. oneTBB automatically loads it at runtime when your application calls an API that requires NUMA or hybrid CPU support
 
-Check HWLOC* on the System
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-To check if HWLOC* is already installed on your system, run ``hwloc-ls``:
-
-* For Linux* OS, in the command line.
-* For Windows* OS, in the command prompt.
-
-If HWLOC* is installed, the command displays information about the hardware topology of your system. If it is not installed, you receive an error message saying that the command ``hwloc-ls`` could not be found.
-
-.. note:: For Hybrid CPU support, make sure that HWLOC* is version 2.5 or higher. For NUMA support, install HWLOC* version 1.11 or higher.
-
-Install HWLOC*
-^^^^^^^^^^^^^^
-
-To install HWLOC*, visit the official Portable Hardware Locality website (https://www-lb.open-mpi.org/projects/hwloc/).
-
-* For Windows* OS, binaries are available for download.
-* For Linux* OS, only the source code is provided and binaries should be built.
-
-On Linux* OS, HWLOC* can be also installed with package managers, such as APT*, YUM*, etc. To do so, run: sudo apt install hwloc.
-
-.. note:: For Hybrid CPU support, make sure that HWLOC* is version 2.5 or higher. For NUMA support, install HWLOC* version 1.11 or higher.
+.. tip:: To confirm that ``tbbbind`` is loaded successfully, set the environment variable ``TBB_VERSION=1`` before running your application.
