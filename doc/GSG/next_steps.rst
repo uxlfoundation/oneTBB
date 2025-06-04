@@ -130,6 +130,7 @@ Enable Hybrid CPU and NUMA Support
 ***********************************
 
 To enable NUMA and hybrid CPU optimizations in oneTBB, complete the following steps:
+
 1. **Locate the ``tbbbind`` Library**
    
    Find the ``tbbbind`` library included in your oneTBB installation. Starting with oneTBB 2022.2, this library is statically linked with HWLOC* 2.x. You do not need to install HWLOC separately.
