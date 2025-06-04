@@ -115,7 +115,7 @@ The main part of the APIs described above are implemented as part of the new
 current list of successors and linkage with the new task after the transferring.
 Its layout is described in detail in the later sections. 
 
-Each task in the task group that can have predecessors or successors has a`task_dynamic_state` instance associated with it.
+Each task in the task group that can have predecessors or successors has a `task_dynamic_state` instance associated with it.
 
 Since `make_edge` API allows completed tasks as predecessors, it is required to prolong the lifetime of the `task_dynamic_state`
 instance associated with the task even after the task completion until the last `tbb::task_tracker` object associated with the
@@ -168,7 +168,7 @@ The instance is created once the `get_dynamic_state()` function is called the fi
 * `transfer_successors_to(new_task)` function is called from the running task. The dynamic state is created for `new_task`.
 
 If there are several concurrent threads that are doing one of the actions above with the same task instance (e.g. concurrently adding
-successors to the same predecessor for which the dynamic state was not yet created), each threads allocates the new dynamic state object
+successors to the same predecessor for which the dynamic state was not yet created), each thread allocates the new dynamic state object
 and tries to update the atomic object in `task_with_dynamic_state` by doing a `compare_exchange_strong` operation. If it fails, meaning
 another thread has created and updated the dynamic state before the current thread, the state allocated by the current thread is destroyed:
 
@@ -263,13 +263,13 @@ private:
 
 `m_task` is a pointer to the task, with which the current dynamic state is associated.
 
-`m_successors_list_head` is an atomic pointer to the head of the successor's list of the currently served task. It is also used
+`m_successors_list_head` is an atomic pointer to the head of the successor's list of the associated task. It is also used
 as a marker of the task completion. It would be described in details in the following sections.
 
-`m_continuation_vertex` is an atomic pointer to the  `continuation_vertex` object associated with the currently served task. The purpose of the
+`m_continuation_vertex` is an atomic pointer to the  `continuation_vertex` object for the associated task. The purpose of the
 `continuation_vertex` is described in the following sections.
 
-`m_new_dynamic_state` is an atomic pointer to the other dynamic state instance. It is used when the currently served task calls
+`m_new_dynamic_state` is an atomic pointer to the other dynamic state instance. It is used when the associated task calls
 `transfer_successors_to(new_task)` while executing. `m_new_dynamic_state` will point to `new_task`s dynamic state after doing the transfer.
 It is described in details in the section about transferring the successors.
 
@@ -287,28 +287,28 @@ The stored reference counter is decreased when:
 * `task_dynamic_state` of a task that did `transfer_successors_to(new_task)` while executing is destroyed. In this case, the reference
   counter of dynamic state associated with `new_task` is decreased. See [lifetime issue](#dynamic-state-lifetime-issue) for more details.
 
-Once the reference counter is decreased the last time (is equivalent to `0`), the `task_dynamic_state` pointer by `this` is destroyed
-and deallocated using `m_allocator`.
+Once the reference counter is decreased the last time (is equivalent to `0`), the `task_dynamic_state` is destroyed
+and then deallocated using `m_allocator`.
 
 ### Create dependencies between tasks
 
 #### `continuation_vertex` class
 
-`continuation_vertex` is a class that represents the currently served task as a successor of other tasks.
+`continuation_vertex` is a class that represents the associated task as a successor of other tasks.
 It implements the additional reference counter that is reserved:
-* For each predecessor added to the currently served task.
-* For currently served task itself to ensure the task would not be submitted for execution until the corresponding task is explicitly
+* For each predecessor added to the associated task.
+* For the associated task itself to ensure the task will not be submitted for execution until it is explicitly
   submitted for execution (e.g. by calling `tg.run(std::move(successor_handle))`).
 
 The reference counter is decreased when:
-* The predecessor task completes it's execution.
+* A predecessor task completes it's execution.
 * The submitting function is called with the `task_handle` owning the current task.
 
 Once the reference counter is decremented to `0`, the currently served task can be submitted for execution.
 
-The `continuation_vertex` instance is created lazily in the similar way as it was described for `task_dynamic_state` and `task_with_dynamic_state`.
+The `continuation_vertex` instance is created lazily in a similar way as  described for `task_dynamic_state` and `task_with_dynamic_state`.
 
-`task_dynamic_state` contains an atomic pointer to the `continuation_vertex`. Once the first predecessor is added to the currently served task,
+`task_dynamic_state` contains an atomic pointer to the `continuation_vertex`. Once the first predecessor is added to the associated task,
 the vertex is created. Multiple concurrent threads are synchronized with each other by doing the CAS operation on the atomic to publish the
 vertex created by the thread.
 
@@ -316,7 +316,7 @@ The relationship between successors and predecessor is shown in the picture belo
 
 <img src="assets/impl_continuation_vertex.png" width=600>
 
-It shown 4 tasks `pred1`, `pred2`, `succ1` and `succ2`, where `pred1` and `pred2` are predecessors for both `succ1` and `succ2`.
+It shows 4 tasks `pred1`, `pred2`, `succ1` and `succ2`, where `pred1` and `pred2` are predecessors for both `succ1` and `succ2`.
 
 Green rectangles represents the successors list of `pred1` and `pred2`. Each node in this list contains a pointer to the `continuation_vertex` of
 the successor. 
@@ -330,18 +330,18 @@ The same logic applies for `pred1`, `pred2` and `succ2`.
 Once the explicit submission function is called for `task_handle`s owning `succ1` and `succ2`, the corresponding reference counters in
 the `continuation_vertex` instances are decreased (each having the value `2` corresponding to predecessors only).
 
-When the task `pred1` completes execution, it traverses it's successors list and decreasing the reference counter stored in the vertex
+When the task `pred1` completes execution, it traverses it's successors list and decreases the reference counter stored in the vertex
 of `succ1` and `succ2`.
 
 When `pred2` traverse it's successors list, it decreases the reference counters in `succ1` and `succ2`. Both of them are equal to `0` now and hence
-`succ1` and `succ2` can be submitted for execution. One of them can be bypassed from `pred2` and one of them would be spawned. It would be described 
-in the separate section below.
+`succ1` and `succ2` can be submitted for execution. One of them can be bypassed from `pred2` and one of them spawned. This is further described 
+in a separate section below.
 
 Once the reference counter in `continuation_vertex` is decremented to be `0`, the `continuation_vertex` object is destroyed.
 
-Having the `continuation_vertex` assigned to the task (`m_continuation_vertex` not equal to `nullptr` in `task_dynamic_state`) also used as
-a marker that the currently served task have dependencies and cannot be unconditionally submitted for execution once the `task_handle` owning this task
-was received in one of the submit functions (e.g. `task_group::run`).
+Having a `continuation_vertex` assigned to the task (`m_continuation_vertex` not equal to `nullptr` in `task_dynamic_state`) is also used as
+a marker that the associated task has dependencies and cannot be unconditionally submitted for execution once the `task_handle` owning this task
+is received in one of the submit functions (e.g. `task_group::run`).
 
 #### The successors list
 
