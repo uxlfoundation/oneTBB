@@ -144,6 +144,6 @@ To enable NUMA and hybrid CPU optimizations in oneTBB, complete the following st
 
 3. **Run Your Application**
    
-   You do not need to link your application explicitly with ``tbbbind``. oneTBB automatically loads it at runtime when your application calls an API that requires NUMA or hybrid CPU support
+   You do not need to link your application explicitly with ``tbbbind``. oneTBB automatically loads and uses it when needed. 
 
 .. tip:: To confirm that ``tbbbind`` is loaded successfully, set the environment variable ``TBB_VERSION=1`` before running your application.
