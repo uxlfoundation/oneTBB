@@ -139,7 +139,7 @@ To enable NUMA and hybrid CPU optimizations in oneTBB, complete the following st
    
    Place the ``tbbbind`` library in a location where oneTBB can find it during execution. Use one of the following options:
    
-   * Put it in the same directory as the core tbb library (``libtbb.so``, ``tbb.dll``, etc.)
+   * Put it in the same directory as the core oneTBB library (``libtbb.so``, ``tbb.dll``, etc.)
    * Add its location to the system’s library search path (``LD_LIBRARY_PATH`` on Linux* OS, ``%PATH%`` on Windows* OS)
 
 3. **Run Your Application**
