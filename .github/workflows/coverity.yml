@@ -60,3 +60,37 @@ jobs:
             --form version="${GITHUB_SHA}" \
             --form description="" \
               "https://scan.coverity.com/builds?project=${{env.COVERITY_PROJECT}}"
+  coverity_windows:
+    name: Coverity Windows
+    if: github.repository == 'uxlfoundation/oneTBB'
+    runs-on: [windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Windows 64 Coverity Tool
+        run: |
+          curl https://scan.coverity.com/download/cxx/win64 --output ${GITHUB_WORKSPACE}/cov-win64-tool.zip \
+            --data "token=${{secrets.COVERITY_TOKEN}}&project=${{env.COVERITY_PROJECT}}"
+          mkdir cov-win64-tool
+          7z x cov-win64-tool.zip
+          move cov-win64-tool* cov-win64-tool
+      - name: Build with cov-build
+        run: |
+          set PATH="${PWD}/cov-win64-tool/bin:${PATH}"
+          mkdir build && cd build
+          cmake -DCMAKE_CXX_STANDARD=20 -DCMAKE_BUILD_TYPE=relwithdebinfo \
+            -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DTBB_CPF=ON ..
+          cov-build --dir cov-int make VERBOSE=1 -j${{env.BUILD_CONCURRENCY}}
+      - name: Archive Coverity build results
+        run: |
+          cd build
+          7z a -r cov-int.zip cov-int
+      - name: Submit Coverity results for analysis
+        run: |
+          cd build
+          curl \
+            --form token="${{ secrets.COVERITY_TOKEN }}" \
+            --form email="${{ secrets.COVERITY_EMAIL }}" \
+            --form file=@cov-int.zip \
+            --form version="${GITHUB_SHA}" \
+            --form description="" \
+              "https://scan.coverity.com/builds?project=${{env.COVERITY_PROJECT}}"
