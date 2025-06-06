@@ -78,6 +78,8 @@ jobs:
         shell: bash
         run: |
           export PATH="${PWD}/cov-win64-tool/bin:${PATH}"
+          ls -l
+          env
           mkdir build && cd build
           cmake -DCMAKE_CXX_STANDARD=20 -DCMAKE_BUILD_TYPE=relwithdebinfo \
             -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DTBB_CPF=ON ..
