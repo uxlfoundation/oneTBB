@@ -129,21 +129,17 @@ Build and Run a Sample
 Enable Hybrid CPU and NUMA Support
 ***********************************
 
-To enable NUMA and hybrid CPU optimizations in oneTBB, complete the following steps:
+To support Hybrid CPU and NUMA platforms, oneTBB relies on the HWLOC* library.
+ 
+The HWLOC functionality is accessed through a set of proxy libraries whose names begin with the ``tbbbind`` prefix. oneTBB automatically loads them at runtime when needed. To be found and loaded successfully, locate these libraries in the same directory as the oneTBB library itself (e.g., alongside ``libtbb.so`` or ``tbb.dll``).
+ 
+Starting with oneTBB 2022.2, the default ``tbbbind`` library is statically linked with HWLOC 2.x. This version is used if a system-provided HWLOC cannot be found.
+ 
+If you prefer to use a system-provided or custom-built version of HWLOC, make sure it is available in the search paths used by the dynamic loader. Consult your platform’s dynamic loader documentation for details about these paths (e.g., ``LD_LIBRARY_PATH`` on Linux* OS or ``PATH`` on Windows* OS).
+ 
+To use a specific HWLOC version, place one of the following tbbbind variants in the same directory as the oneTBB library:
 
-1. **Locate the ``tbbbind`` Library**
-   
-   Find the ``tbbbind`` library included in your oneTBB installation. Starting with oneTBB 2022.2, this library is statically linked with HWLOC* 2.x. You do not need to install HWLOC separately.
+* ``tbbbind_2_5`` — depends on HWLOC version 2.5 or higher. Use this version if hybrid CPU support is required.
+* ``tbbbind_2_0`` — depends on HWLOC versions 2.1 to 2.4.
 
-2. **Ensure ``tbbbind`` Is Accessible**
-   
-   Place the ``tbbbind`` library in a location where oneTBB can find it during execution. Use one of the following options:
-   
-   * Put it in the same directory as the core oneTBB library (``libtbb.so``, ``tbb.dll``, etc.)
-   * Add its location to the system’s library search path (``LD_LIBRARY_PATH`` on Linux* OS, ``%PATH%`` on Windows* OS)
-
-3. **Run Your Application**
-   
-   You do not need to link your application explicitly with ``tbbbind``. oneTBB automatically loads and uses it when needed. 
-
-.. tip:: To confirm that ``tbbbind`` is loaded successfully, set the environment variable ``TBB_VERSION=1`` before running your application.
+.. tip:: To confirm that tbbbind is loaded successfully at runtime, set the environment variable ``TBB_VERSION=1`` before launching your application.
