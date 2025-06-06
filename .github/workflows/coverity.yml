@@ -71,8 +71,8 @@ jobs:
       - name: Download Windows 64 Coverity Tool
         run: |
           curl https://scan.coverity.com/download/cxx/win64 -o cov-win64-tool.zip -d "token=${{secrets.COVERITY_TOKEN}}&project=${{env.COVERITY_PROJECT}}"
-          mkdir cov-win64-tool
           7z x cov-win64-tool.zip
+          del cov-win64-tool.zip
           move cov-win64-tool* cov-win64-tool
       - name: Build with cov-build
         run: |
