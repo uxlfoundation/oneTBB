@@ -131,7 +131,7 @@ Enable Hybrid CPU and NUMA Support
 
 To support Hybrid CPU and NUMA platforms, oneTBB relies on the HWLOC* library.
  
-The HWLOC functionality is accessed through a set of proxy libraries whose names begin with the ``tbbbind`` prefix. oneTBB automatically loads them at runtime when needed. To be found and loaded successfully, locate these libraries in the same directory as the oneTBB library itself (e.g., alongside ``libtbb.so`` or ``tbb.dll``).
+The HWLOC functionality is accessed through a set of proxy libraries whose names begin with the ``tbbbind`` prefix. oneTBB automatically loads them at runtime when needed. To find and load these libraries successfully, locate them in the same directory as the oneTBB library itself (e.g., alongside ``libtbb.so`` or ``tbb.dll``).
  
 Starting with oneTBB 2022.2, the default ``tbbbind`` library is statically linked with HWLOC 2.x. This version is used if a system-provided HWLOC cannot be found.
  
