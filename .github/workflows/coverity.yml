@@ -75,8 +75,9 @@ jobs:
           del cov-win64-tool.zip
           move cov-win64-tool* cov-win64-tool
       - name: Build with cov-build
+        shell: bash
         run: |
-          set PATH="${PWD}/cov-win64-tool/bin:${PATH}"
+          export PATH="${PWD}/cov-win64-tool/bin:${PATH}"
           mkdir build && cd build
           cmake -DCMAKE_CXX_STANDARD=20 -DCMAKE_BUILD_TYPE=relwithdebinfo \
             -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DTBB_CPF=ON ..
