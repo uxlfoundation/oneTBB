@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -87,6 +87,9 @@ private:
     d1::task* execute(d1::execution_data& ed) override {
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
         task* res = task_ptr_or_nullptr(m_func);
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        this->complete_task();
+#endif
         finalize(&ed);
         return res;
     }
@@ -701,6 +704,9 @@ using detail::d1::is_current_task_group_canceling;
 using detail::r1::missing_wait;
 
 using detail::d2::task_handle;
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+using detail::d2::task_tracker;
+#endif
 }
 
 } // namespace tbb
