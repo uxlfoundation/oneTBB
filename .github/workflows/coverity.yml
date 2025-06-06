@@ -19,6 +19,8 @@ on:
 # Only run on push to master branch
   push:
     branches: [master]
+  pull_request:
+    branches: [ "master" ]
 
 permissions: read-all
 
