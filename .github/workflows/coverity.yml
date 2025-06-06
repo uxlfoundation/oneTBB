@@ -79,6 +79,7 @@ jobs:
         run: |
           export PATH="${PWD}/cov-win64-tool/bin:${PATH}"
           ls -l
+          ls -l cov-analysis-win64-2024.6.1
           env
           mkdir build && cd build
           cmake -DCMAKE_CXX_STANDARD=20 -DCMAKE_BUILD_TYPE=relwithdebinfo \
