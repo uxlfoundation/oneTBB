@@ -78,10 +78,10 @@ jobs:
         shell: bash
         run: |
           export PATH="${PWD}/cov-win64-tool/bin:${PATH}"
-          cmake -DCMAKE_MAKE_PROGRAM=gmake -DCMAKE_CXX_STANDARD=14 -DCMAKE_BUILD_TYPE=relwithdebinfo \
+          cmake -DCMAKE_CXX_STANDARD=14 -DCMAKE_BUILD_TYPE=relwithdebinfo \
             -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DTBB_CPF=ON .
           cov-configure --msvc
-          cov-build --dir cov-int gmake VERBOSE=1 -j${{env.BUILD_CONCURRENCY}}
+          cov-build --dir cov-int msbuild ALL_BUILD.vcxproj -m:${{env.BUILD_CONCURRENCY}} -v:n
       - name: Archive Coverity build results
         run: |
           cd build
