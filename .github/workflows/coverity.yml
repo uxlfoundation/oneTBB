@@ -86,11 +86,9 @@ jobs:
           cov-build --dir cov-int msbuild.exe ALL_BUILD.vcxproj -m -v:n
       - name: Archive Coverity build results
         run: |
-          cd build
           7z a -r cov-int.zip cov-int
       - name: Submit Coverity results for analysis
         run: |
-          cd build
           curl \
             --form token="${{ secrets.COVERITY_TOKEN }}" \
             --form email="${{ secrets.COVERITY_EMAIL }}" \
