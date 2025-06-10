@@ -89,10 +89,4 @@ jobs:
           7z a -r cov-int.zip cov-int
       - name: Submit Coverity results for analysis
         run: |
-          curl \
-            --form token="${{ secrets.COVERITY_TOKEN }}" \
-            --form email="${{ secrets.COVERITY_EMAIL }}" \
-            --form file=@cov-int.zip \
-            --form version="${GITHUB_SHA}" \
-            --form description="" \
-              "https://scan.coverity.com/builds?project=${{env.COVERITY_PROJECT}}"
+          curl --form token="${{ secrets.COVERITY_TOKEN }}" --form email="${{ secrets.COVERITY_EMAIL }}" --form file=@cov-int.zip --form version="${GITHUB_SHA}" --form description="" "https://scan.coverity.com/builds?project=${{env.COVERITY_PROJECT}}"
