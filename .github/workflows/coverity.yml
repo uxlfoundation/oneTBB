@@ -83,7 +83,7 @@ jobs:
           cmake -DCMAKE_CXX_STANDARD=14 -DCMAKE_BUILD_TYPE=relwithdebinfo \
             -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DTBB_CPF=ON .
           cov-configure --msvc
-          cov-build --dir cov-int msbuild.exe ALL_BUILD.vcxproj -m:${{env.BUILD_CONCURRENCY}} -v:n
+          cov-build --dir cov-int msbuild.exe ALL_BUILD.vcxproj -m -v:n
       - name: Archive Coverity build results
         run: |
           cd build
