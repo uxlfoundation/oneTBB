@@ -78,9 +78,9 @@ jobs:
         shell: bash
         run: |
           export PATH="${PWD}/cov-win64-tool/bin:${PATH}"
-          mkdir build && cd build
+#          mkdir build && cd build
           cmake -DCMAKE_CXX_STANDARD=14 -DCMAKE_BUILD_TYPE=relwithdebinfo \
-            -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DTBB_CPF=ON ..
+            -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DTBB_CPF=ON .
           cov-configure --msvc
           cov-build --dir cov-int make VERBOSE=1 -j${{env.BUILD_CONCURRENCY}}
       - name: Archive Coverity build results
