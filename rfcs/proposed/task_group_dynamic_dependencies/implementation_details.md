@@ -751,7 +751,7 @@ Changes in the states on each step are highlighted with the red.
 
 As it was stated above, `task_handle` constructors do not create `task_dynamic_state`.
 
-An object for the predecessor task is created while constructing the `task_tracker` and the state for
+The state object for the predecessor task is created while constructing the `task_tracker` and the one for
 the successor task is created while calling `make_edge`.
 
 While creating the edge, the `continuation_vertex` associated with `successor` (`CV` on the diagram) is created and stored in
@@ -797,7 +797,7 @@ tbb::task_handle succ = tg.defer(...);
 
 tg.run(std::move(pred));
 tbb::task_group::make_edge(pred_tr, succ);
-tg.run(std::move(succ));
+tg.run_and_wait(std::move(succ));
 ```
 
 #### Linearization 1
@@ -853,3 +853,6 @@ When the `make_edge` is executed, the continuation vertex of `s_d_state` is adde
 While doing the transferring, this continuation vertex is transferred from `p_d_state` to `new_d_state`. Other changes are identical.
 
 When the `new_task` is completed, it fetches the successor list containing the `SCV` and releases the reference counter in the vertex.
+
+Since `succ` handle was not yet submitted, the successor task is not scheduled at this point and it is only done when `run_and_wait(std::move(succ))`
+releases the last reference counter in `SCV`.
