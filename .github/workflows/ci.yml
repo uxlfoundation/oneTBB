@@ -251,14 +251,14 @@ jobs:
             build_type: relwithdebinfo
             preview: 'ON'
             job_name: windows_cl2022_cxx14_relwithdebinfo_preview=ON
-          - os: windows-2019
-            generator: Visual Studio 16 2019
+          - os: windows-11-arm
+            generator: Visual Studio 17 2022
             c_compiler: cl
             cxx_compiler: cl
             std: 20
             build_type: release
             preview: 'ON'
-            job_name: windows_cl2019_cxx20_release_preview=ON-DBUILD_SHARED_LIBS=OFF
+            job_name: windows_11_arm_cl2022_cxx20_release_preview=ON-DBUILD_SHARED_LIBS=OFF
             cmake_static: -DBUILD_SHARED_LIBS=OFF
           - os: windows-2022
             generator: Visual Studio 17 2022
@@ -352,14 +352,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-2019
-            generator: Visual Studio 16 2019
+          - os: windows-11-arm
+            generator: Visual Studio 17 2022
             c_compiler: cl
             cxx_compiler: cl
             std: 14
             build_type: relwithdebinfo
             preview: 'ON'
-            job_name: examples_windows_cl2019_cxx14_relwithdebinfo_preview=ON
+            job_name: examples_windows_11_arm_cl2022_cxx14_relwithdebinfo_preview=ON
           - os: windows-2022
             generator: Visual Studio 17 2022
             c_compiler: cl
