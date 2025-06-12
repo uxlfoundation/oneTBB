@@ -764,7 +764,7 @@ Submission, scheduling and executing the `pred` does not affect dynamic states.
 
 Submission of `succ` releases the reference counter stored in `CV`.
 
-Once the `pred` task is completed, it fetches it's list of successor and exchanges `m_successors_list_head` to the `dead` state.
+Once the `pred` task is completed, it fetches it's list of successors and exchanges `m_successors_list_head` to the `dead` state.
 Also, it decrements the reference counter in each node stored in the successors list (`CV` only in our example).
 
 Since `pred` decrements the last reference counter in `CV`, the successor task is ready to be executed and is bypassed from `pred_task`.
@@ -774,7 +774,7 @@ releases the reference counter in `CV` before `succ` is submitted for execution.
 
 In this case, `succ` is not bypassed from `pred` and is only spawned while submitting `succ` handle for execution.
 
-Once the `succ_task` is completed, it fetches it's successor's list (empty) and decrements the reference counter in the `succ_task` dynamic state.
+Once the `succ_task` is completed, it fetches it's successors list (empty) and decrements the reference counter in the `succ_task` dynamic state.
 
 Since it is the last reference counter, the dynamic state is destroyed.
 
@@ -827,7 +827,7 @@ is alive.
 
 When the `pred_task` completes, it releases the reference counter in `p_d_state` since the task object itself is destroyed.
 
-When the `new_task` is completed, the reference counter in `new_d_state` is released and the successor's list state is changed to be `dead`.
+When the `new_task` is completed, the reference counter in `new_d_state` is released and the successor list's state is changed to be `dead`.
 
 Similarly to the example above, call to `make_edge` creates a dynamic state for a successor and a corresponding continuation vertex.
 
