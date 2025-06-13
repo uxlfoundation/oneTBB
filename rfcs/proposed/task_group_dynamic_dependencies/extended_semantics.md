@@ -1442,6 +1442,11 @@ Another approach is to have ``task_handle`` to be a shared owner on the task all
 ``task_handle`` as an argument to one of the submission functions would invalidate all copies or set them
 in the "weak" state that allows only to set dependencies between tasks.
 
+## Implementation details
+
+Implementation details for the API added by this RFC are described as part of the
+[separate sub-RFC](implementation_details.md).
+
 ## Exit criteria & open questions:
 * Are concrete names of APIs good enough and reflects the purpose of the methods?
 * The performance targets for this feature should be defined
