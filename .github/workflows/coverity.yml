@@ -32,6 +32,11 @@ jobs:
     if: github.repository == 'uxlfoundation/oneTBB'
     runs-on: [ubuntu-latest]
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        with:
+          egress-policy: audit
+
       - uses: actions/checkout@v4
       - name: Download Linux 64 Coverity Tool
         run: |
@@ -65,6 +70,11 @@ jobs:
     if: github.repository == 'uxlfoundation/oneTBB'
     runs-on: [windows-latest]
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        with:
+          egress-policy: audit
+
       - uses: actions/checkout@v4
       - name: Download Windows 64 Coverity Tool
         run: |
