@@ -29,6 +29,11 @@ jobs:
       issues: write
       contents: read
     steps:
+    - name: Harden the runner (Audit all outbound calls)
+      uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+      with:
+        egress-policy: audit
+
     - uses: github/issue-labeler@c1b0f9f52a63158c4adc09425e858e87b32e9685 # v3.4
       with:
         repo-token: "${{ secrets.GITHUB_TOKEN }}"
