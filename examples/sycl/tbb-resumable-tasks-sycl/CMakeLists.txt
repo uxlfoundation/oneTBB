@@ -53,6 +53,7 @@ target_compile_options(${sycl_sample_name} PRIVATE -fsycl)
 target_link_options(${sycl_sample_name} PRIVATE -fsycl)
 
 add_execution_target(run_${sycl_sample_name} ${sycl_sample_name} "$<TARGET_FILE:${sycl_sample_name}>" "")
+add_execution_target(light_test_${sycl_sample_name} ${sycl_sample_name} "$<TARGET_FILE:${sycl_sample_name}>" "")
 
 unset(sycl_sample_name)
 unset(should_issue_warning)
