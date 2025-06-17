@@ -12,23 +12,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if (${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /Qtbb")
+cmake_minimum_required(VERSION 3.5.0...3.31.3)
+
+set(sycl_sample_name tbb-async-sycl)
+project(${sycl_sample_name} CXX)
+
+include(../../common/cmake/common.cmake)
+
+set_common_project_settings(tbb)
+
+add_executable(${sycl_sample_name} ${sycl_sample_name}.cpp)
+set_target_properties(${sycl_sample_name} PROPERTIES CXX_STANDARD 17)
+
+get_target_property(is_tbb_imported TBB::tbb IMPORTED)
+if (is_tbb_imported)
+    get_target_property(tbb_imported_configurations TBB::tbb IMPORTED_CONFIGURATIONS)
+    if (NOT tbb_imported_configurations MATCHES "RELEASE")
+        set(should_issue_warning TRUE)
+        target_link_libraries(${sycl_sample_name} PRIVATE TBB::tbb)
+    else()
+        target_link_libraries(${sycl_sample_name} PRIVATE "$<TARGET_PROPERTY:TBB::tbb,IMPORTED_LOCATION_RELEASE>")
+    endif()
 else()
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -qtbb")
+    if (CMAKE_BUILD_TYPE MATCHES "debug")
+        set(should_issue_warning TRUE)
+    endif()
+    target_link_libraries(${sycl_sample_name} PRIVATE TBB::tbb)
 endif()
 
-# Set default build type to RelWithDebInfo if not specified
-if (NOT CMAKE_BUILD_TYPE)
-    message (STATUS "Default CMAKE_BUILD_TYPE not set. Using Release with Debug Info")
-    set (CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE
-        STRING "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel"
-        FORCE)
+
+if (should_issue_warning AND NOT TBB_SYCL_SAMPLES_WARNING_SHOWN)
+    message( WARNING 
+        "Using Debug version of TBB in SYCL application may cause crashes due to conflicts \
+        between Release and Debug version of TBB within the same application."
+    )
+    set(TBB_SYCL_SAMPLES_WARNING_SHOWN TRUE CACHE BOOL "")
 endif()
 
-add_executable (tbb-async-sycl tbb-async-sycl.cpp)
+target_compile_options(${sycl_sample_name} PRIVATE -fsycl)
+target_link_options(${sycl_sample_name} PRIVATE -fsycl)
 
-find_package(Threads REQUIRED)
-target_link_libraries(tbb-async-sycl Threads::Threads)
+add_execution_target(run_${sycl_sample_name} ${sycl_sample_name} "$<TARGET_FILE:${sycl_sample_name}>" "")
 
-add_custom_target (run ./tbb-async-sycl)
+unset(sycl_sample_name)
+unset(should_issue_warning)

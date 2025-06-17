@@ -77,6 +77,10 @@ tbb_add_example(test_all fibonacci)
 
 tbb_add_example(migration recursive_fibonacci)
 
-tbb_add_example(sycl tbb-task-sycl)
-tbb_add_example(sycl tbb-async-sycl)
-tbb_add_example(sycl tbb-resumable-tasks-sycl)
+if (${CMAKE_CXX_COMPILER_ID} MATCHES "IntelLLVM")
+    tbb_add_example(sycl tbb-task-sycl)
+    tbb_add_example(sycl tbb-async-sycl)
+    tbb_add_example(sycl tbb-resumable-tasks-sycl)
+else ()
+    message(WARNING "Intel(R) oneAPI DPC++/C++ Compiler is not used, sycl examples are excluded from the build.")
+endif()
