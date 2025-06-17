@@ -318,6 +318,34 @@ jobs:
             -DTBB_CPF=${{ matrix.preview }} -DTBB_TEST=OFF -DTBB_EXAMPLES=ON ..
           cmake --build . -v --target light_test_examples
 
+  linux-examples-testing-docker:
+    name: examples_${{ matrix.container_name }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_preview=${{ matrix.preview }}
+    runs-on: ['ubuntu-latest']
+    container:
+      image: ${{ matrix.container_name }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - container_name: intel/oneapi-basekit:latest
+            c_compiler: icx
+            cxx_compiler: icpx
+            std: 17
+            build_type: relwithdebinfo
+            preview: 'OFF'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run testing
+        shell: bash
+        run: |
+          set -x
+          mkdir build && cd build
+          cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
+            -DTBB_CPF=${{ matrix.preview }} -DTBB_TEST=OFF -DTBB_EXAMPLES=ON ..
+          cmake --build . -v --target light_test_examples
+
   macos-examples-testing:
     name: examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_preview=${{ matrix.preview }}
     runs-on: ['${{ matrix.os }}']
