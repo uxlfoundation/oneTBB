@@ -11,7 +11,7 @@ oneTBB uses the following versioning types:
 |-----------------|----------------------------------|------------------------------------------------------------|
 | Specification   | Tracks [specification](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/nested-index) conformance          | `ONETBB_SPEC_VERSION`                                      |
 | Library         | Identifies the release version   | `TBB_VERSION_MAJOR`, `TBB_VERSION_MINOR`, `TBB_VERSION_STRING`, `TBB_runtime_version()` |
-| Interface       | Ensures binary compatibility     | `TBB_INTERFACE_VERSION_MAJOR`, `TBB_INTERFACE_VERSION_MINOR`, `TBB_INTERFACE_VERSION`, `TBB_runtime_interface_version()` |
+| Interface       | Determines binary compatibility     | `TBB_INTERFACE_VERSION_MAJOR`, `TBB_INTERFACE_VERSION_MINOR`, `TBB_INTERFACE_VERSION`, `TBB_runtime_interface_version()` |
 | API (Namespace) | Maintains backwards compatibility | Namespaces: `dN` (headers), `rN` (runtime symbols)         |
 
 
