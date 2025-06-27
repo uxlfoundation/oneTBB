@@ -28,7 +28,7 @@ This document contains changes of oneTBB compared to the last release.
 ``-DTBB_VERIFY_DEPENDENCY_SIGNATURE=ON`` when invoking CMake.
 - Added support for printing warning messages about issues in dynamic dependency loading. To see these messages in the console, build the library with the ``TBB_DYNAMIC_LINK_WARNING`` macro defined.
 - Added a Natvis file for custom visualization of TBB containers when debugging with Microsoft* Visual Studio.
-- •	Refined Environment Setup: Replaced CPATH with ``C_INCLUDE_PATH and CPLUS_INCLUDE_PATH`` in environment setup to avoid unintended compiler warnings caused by globally applied include paths. 
+- Refined Environment Setup: Replaced CPATH with ``C_INCLUDE_PATH and CPLUS_INCLUDE_PATH`` in environment setup to avoid unintended compiler warnings caused by globally applied include paths. 
 
 
 ## :rotating_light: Known Limitations
