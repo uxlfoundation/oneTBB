@@ -19,20 +19,16 @@ This document contains changes of oneTBB compared to the last release.
 
 ## Table of Contents <!-- omit in toc -->
 - [:tada: New Features](#tada-new-features)
-- [:rocket: Preview Features](#rocket-preview-features)
 - [:rotating\_light: Known Limitations](#rotating_light-known-limitations)
-- [:hammer: Issues Fixed](#hammer-issues-fixed)
 - [:octocat: Open-Source Contributions Integrated](#octocat-open-source-contributions-integrated)
 
 ## :tada: New Features
-- The oneTBB repository migrated to the new [UXL Foundation](https://github.com/uxlfoundation/oneTBB) organization.
-- ``blocked_nd_range`` is now a fully supported feature.
-- Introduced the ``ONETBB_SPEC_VERSION`` macro to specify the version of oneAPI specification implemented by the current version of the library.
-
-
-## :rocket: Preview Features
-- Added the explicit deduction guides to ``blocked_nd_range`` to support C++17 Class Template Argument Deduction.
-- Extended ``task_arena`` API to select TBB workers leave policy and to hint the start and the end of parallel computations.
+- Improved Hybrid CPU and NUMA Platforms API Support: Enhanced API availability for better compatibility with Hybrid CPU and NUMA platforms.
+- Added support for verifying signatures of dynamic dependencies at runtime. To enable this feature, specify
+``-DTBB_VERIFY_DEPENDENCY_SIGNATURE=ON`` when invoking CMake.
+- Added support for printing warning messages about issues in dynamic dependency loading. To see these messages in the console, build the library with the ``TBB_DYNAMIC_LINK_WARNING`` macro defined.
+- Added a Natvis file for custom visualization of TBB containers when debugging with Microsoft* Visual Studio.
+- Refined Environment Setup: Replaced CPATH with ``C_INCLUDE_PATH and CPLUS_INCLUDE_PATH`` in environment setup to avoid unintended compiler warnings caused by globally applied include paths. 
 
 
 ## :rotating_light: Known Limitations
@@ -47,19 +43,10 @@ This document contains changes of oneTBB compared to the last release.
 > **_NOTE:_**  To see known limitations that impact all versions of oneTBB, refer to [oneTBB Documentation](https://uxlfoundation.github.io/oneTBB/main/intro/limitations.html).
 
 
-## :hammer: Issues Fixed
-- Fixed deadlock when using `tbb::concurrent_vector::grow_by()` (https://github.com/uxlfoundation/oneTBB/issues/1531).
-- Fixed assertion in the Debug version of oneTBB on systems with multiple processor groups.
-- Fixed issues with Flow Graph priorities when using limited concurrency nodes (https://github.com/uxlfoundation/oneTBB/issues/1595).
-- Improved support of ``tbb::task_arena::constraints`` functionality on Windows* systems with multiple processor groups.
-- Fixed ``concurrent_queue`` and ``concurrent_bounded_queue`` capacity preserving on copying, moving, and swapping (https://github.com/uxlfoundation/oneTBB/issues/1598).
-- Fixed ``parallel_for_each`` compilation issues on GCC 9 in C++20 mode (https://github.com/uxlfoundation/oneTBB/issues/1552).
-
-
 ## :octocat: Open-Source Contributions Integrated
-- Fixed linkage errors when the application is built with the hidden symbols visibility. Contributed by Vladislav Shchapov (https://github.com/uxlfoundation/oneTBB/pull/1114).
-- On Linux* OS, for external thread, determined stack size using POSIX* API instead of relying on the stack size of a worker thread. Contributed by bongkyu7-kim (https://github.com/uxlfoundation/oneTBB/pull/1485).
-- Added a CMake option to use relative paths instead of full paths in debug information. Contributed by Fang Xu (https://github.com/uxlfoundation/oneTBB/pull/1401).
-- Improved OpenBSD* support by removing the use of direct syscalls. Contributed by Brad Smith (https://github.com/uxlfoundation/oneTBB/pull/1499).
-- Fixed build issues on ARM64* when using Bazel. Contributed by snadampal (https://github.com/uxlfoundation/oneTBB/pull/1571).
-- Suppressed deprecation warnings for CMake versions earlier than 3.10 when using the latest CMake. Contributed by Vladislav Shchapov (https://github.com/uxlfoundation/oneTBB/pull/1585).
+- Fixed a CMake configuration error on systems with non-English locales. Contributed by moritz-h (https://github.com/uxlfoundation/oneTBB/pull/1606).
+- Made the install destination of import libraries on Windows* configurable. Contributed by Bora Yalçıner (https://github.com/uxlfoundation/oneTBB/pull/1613).
+- Resolved an in-source CMake build error. Contributed by Dmitrii Golovanov (https://github.com/uxlfoundation/oneTBB/pull/1670).
+- Migrated the build system to Bazel* version 8.1.1. Contributed by Julian Amann (https://github.com/uxlfoundation/oneTBB/pull/1694).
+- Fixed build errors on MinGW* and FreeBSD*. Contributed by John Ericson (https://github.com/uxlfoundation/oneTBB/pull/1696).
+- Addressed build errors on macOS* when using the GCC compiler. Contributed by Oleg Butakov (https://github.com/uxlfoundation/oneTBB/pull/1603).

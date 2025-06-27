@@ -46,7 +46,7 @@ This document provides details about hardware, operating system, and software pr
 - Systems with Linux* operating systems:
   - Amazon* Linux 2023
   - Debian* 11, 12
-  - Fedora* 40, 41
+  - Fedora* 41, 42
   - Rocky* Linux* 9
   - Red Hat* Enterprise Linux* 8, 9
   - SuSE* Linux* Enterprise Server 15
@@ -67,9 +67,9 @@ This document provides details about hardware, operating system, and software pr
 - Microsoft* Visual C++ 14.2 (Microsoft* Visual Studio* 2019, Windows* OS only)
 - Microsoft* Visual C++ 14.3 (Microsoft* Visual Studio* 2022, Windows* OS only)
 - For each supported Linux* operating system, the standard gcc version provided with that operating system is supported:
-  - GNU Compilers (gcc) 8.x – 14.x
-  - GNU C Library (glibc) version 2.28 – 2.40
-- Clang* 7.x - 19.x
+  - GNU Compilers (gcc) 8.x – 15.x
+  - GNU C Library (glibc) version 2.28 – 2.41
+- Clang* 7.x - 20.x
 
 ## Limitations
 There are some cases where we cannot provide support for your platforms. It includes: 
