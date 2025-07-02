@@ -10,7 +10,7 @@ The following cases are covered:
   Existing API only allows having a non-empty ``task_handle`` object handling the created task and an empty one that does not
   handle any tasks.
 * API for setting the dependencies between tasks in various states.
-* API for transferring the dependencies from the executing task to the task in various states.
+* API for transferring the dependent tasks (i.e. successors) from the executing task to the task in various states.
 
 ## Semantic extension for handling tasks in various states
 
@@ -87,8 +87,8 @@ Once the predecessor task is completed, it should go through the list of success
 reference counter is equal to 0, the successor task can be scheduled for execution.
 
 API-wise, the function that decreases the reference counter may also return the pointer to the task. If the reference counter is not equal to 0, the
-returned pointer is ``nullptr``. Otherwise, the successor task pointer is returned. It is required to allow bypassing one of the successor tasks
-if the body of the predecessor task did not return other task that should be bypassed.
+returned pointer is ``nullptr``. Otherwise, the successor task pointer is returned. If another task was not bypassed from the task's body, one of the returned
+successor tasks may be bypassed to reduce spawning overheads.
 
 This implementation approach is illustrated in the picture below:
 
@@ -125,13 +125,13 @@ In this case, after the transfer, the task ``current`` will have an empty succes
 After the transfer, the successors of ``current`` and ``target`` are tracked separately and adding new successors to one of them would only
 affect the successors list of one task:
 
-<img src="transferring_between_two_separate_tracking_new_successors.png" width=600>
+<img src="assets/transferring_between_two_separate_tracking_new_successors.png" width=600>
 
 Alternative approach is to keep tracking ``current`` and ``target`` together after transferring. This requires introducing a special state
-of ``task_tracker` - a kind of `proxy` state. If the executing task calls `transfer_successors_to` from the body, all trackers, initially created
-to track this task are changing the state to `proxy`.
+of ``task_tracker`` - a kind of ``proxy`` state. If the executing task calls ``transfer_successors_to`` from the body, all trackers, initially created
+to track this task are changing the state to ``proxy``.
 
-Tracker to the ``current`` and ``target`` are sharing the single merged list of successors if ``current`` tracker is in `proxy` state.
+Tracker to the ``current`` and ``target`` are sharing the single merged list of successors if ``current`` tracker is in ``proxy`` state.
 
 <img src="assets/transferring_between_two_merged_tracking.png" width=600>
 
@@ -156,8 +156,8 @@ If the successors of ``A`` and ``B`` are tracked together (the second option des
 successors list of ``B`` ("real" task) and ``A`` (task in `proxy` state).
 
 As it is stated in [one of the advanced examples topic](#combination-of-eager-and-classic-approaches), there are real-life scenarios where the combined tracking
-should be implemented. Generally, these are examples where one thread is setting a predecessor-successor dependency between a task that can be in the running state
-(using a `task_tracker` to such a task). Other thread can execute the tracked task and can replace it in the task graph with the subtree by calling `transfer_successors_to`. 
+should be implemented. Generally, these are the examples where one thread adds the successor to the task in running state (using it's ``task_tracker``)
+while the other thread is replacing this tracked task in the task graph with the subtree by calling ``transfer_successors_to``.
 
 Hence, the merged successors tracking approach is proposed by this document.
 
@@ -332,8 +332,8 @@ class task_group {
 
 Two enhancements for this API can be considered:
 * Allow ``task_tracker`` tracking the task in created state to be used as a successor.
-* Allow ``task_tracker`` tracking the task `T` in submitted state to be used as a successor if other non-submitted
-  predecessors of ``T`` prevent it from being scheduled for execution.
+* Allow ``task_tracker`` tracking the task `T` in submitted state to be used as a successor if other
+  predecessors of ``T`` (non-submitted or still being executed) prevent ``T`` from being scheduled for execution.
 
 These enhancements require the following APIs to be added:
 
@@ -350,6 +350,38 @@ class task_group {
 
 If the ``task_tracker`` tracking the task that is scheduled for execution, executing or completed, is used
 as a second argument, the behavior of APIs above is undefined.
+
+### Returning ``task_tracker`` from submitting functions
+
+It may be useful to allow adding successors not only for the tasks initially represented by ``task_handle``, but also for tasks that
+were created by submitting functions taking function object as an argument:
+
+```cpp
+tbb::task_group tg;
+tbb::task_tracker tr = tg.run([] { /*task body*/ });
+// ...
+
+tbb::task_handle successor = tg.defer([] { /*successor body*/ });
+tbb::task_group::make_edge(tr, successor);
+```
+
+It may be done by changing the return value of ``task_group::run`` or introducing the new submitting function:
+
+```cpp
+namespace oneapi {
+namespace tbb {
+class task_group {
+    // Option 1 - modify the return value
+    template <typename Body>
+    tbb::task_tracker run(const Body& body);
+
+    // Option 2 - introduce new function with different name
+    template <typename Body>
+    tbb::task_tracker run_tracked(const Body& body);
+};
+} // namespace tbb
+} // namespace oneapi
+```
 
 ## Advanced examples
 
@@ -597,16 +629,16 @@ void calculate_forces(int n_bodies, Body* bodies) {
 Wavefront is a scientific programming pattern in which data elements are distributed on multidimensional grids. Elements should be computed in order
 because of dependencies between them.
 
-Let's consider a 2 dimensional wavefront example where the computation starts on the upper left corner of the grid:
+Let's consider a 2 dimensional wavefront example where the computation starts at the top corner of the grid:
 
 <img src="assets/wavefront.png" width=300>
 
 Computations of each element *(i,j)* in the grid can start when two dependent sub-elements are completed:
-* North dependency - computation of the element *(i, j - 1)* if present
-* West dependency - computation of the element *(i - 1, j)* if present
+* Upper right dependency - computation of the element *(i, j - 1)* if present
+* Upper left dependency - computation of the element *(i - 1, j)* if present
 
 Hence all antidiagonal elements in the grid can be computed in parallel due to lack of dependencies between them (showed as cells with the
-same colour on the picture).
+same color on the picture).
 
 #### Non-recursive approach
 
@@ -631,10 +663,10 @@ void non_recursive_wavefront(int in, int jn) {
         for (int j = 0; j < jn; ++j) {
             cell_tasks[i].emplace_back(tg.defer([=] { compute_cell(i, j); }));
 
-            // north dependency
+            // upper right dependency
             if (j != 0) { tbb::task_group::make_edge(cell_tasks[i, j - 1], cell_tasks[i][j]); }
 
-            // west dependency
+            // upper left dependency
             if (i != 0) { tbb::task_group::make_edge(cell_tasks[i - 1][j], cell_tasks[i][j]); }
         }
     }
@@ -645,6 +677,7 @@ void non_recursive_wavefront(int in, int jn) {
             tg.run(std::move(cell_tasks[i][j]));
         }
     }
+    tg.wait();
 }
 ```
 
@@ -831,16 +864,17 @@ public:
         std::size_t n_grid = (2 << n_division);
 
         auto it = predecessors[n_division].find(x_index * n_grid + y_index);
-        return it != predecessors[n_division].end() ? it->second : tbb::task_tracker{};
+        assert(it != predecessors[d_division].end());
+        return it->second;
     }
 
     static void publish_predecessor(std::size_t n_division, std::size_t x_index, std::size_t y_index,
                                     tbb::task_tracker&& pred)
     {
-        std::size_t n_grid = (2 << n_division>>);
+        std::size_t n_grid = (2 << n_division);
 
-        [[maybe_unused]] auto it = predecessors[n_division].emplace(x_index * n_grid + y_index, std::move(pred));
-        assert(it != predecessors[n_division].end());
+        [[maybe_unused]] auto p = predecessors[n_division].emplace(x_index * n_grid + y_index, std::move(pred));
+        assert(p.second);
     }
 
     eager_wavefront_task(tbb::task_group& tg, std::size_t x_index, std::size_t y_index,
@@ -904,34 +938,20 @@ public:
             tbb::task_group::make_edge(east_subtask, south_subtask);
 
             // Add extra dependencies with predecessor's subtasks
-            tbb::task_tracker west_predecessor_east_subtask;
-            tbb::task_tracker west_predecessor_south_subtask;
-            tbb::task_tracker north_predecessor_west_subtask;
-            tbb::task_tracker north_predecessor_south_subtask;
-
             if (north_x_index != 0) {
-                west_predecessor_east_subtask = find_predecessor(m_n_division + 1, north_x_index - 1, north_y_index);
-            }
-            if (west_x_index != 0) {
-                west_predecessor_south_subtask = find_predecessor(m_n_division + 1, west_x_index - 1, west_y_index);
-            }
-            if (north_y_index != 0) {
-                north_predecessor_west_subtask = find_predecessor(m_n_division + 1, north_x_index, north_y_index - 1);
-            }
-            if (east_y_index != 0) {
-                north_predecessor_south_subtask = find_predecessor(m_n_division + 1, east_x_index, east_y_index - 1);
-            }
-
-            if (west_predecessor_east_subtask) {
+                auto west_predecessor_east_subtask = find_predecessor(m_n_division + 1, north_x_index - 1, north_y_index);
                 tbb::task_group::make_edge(west_predecessor_east_subtask, north_subtask);
             }
-            if (west_predecessor_south_subtask) {
-                tbb::task_group::make_edge(west_predecessor_south_subtask, west_subtask);
+            if (west_x_index != 0) {
+                auto west_predecessor_south_subtask = find_predecessor(m_n_division + 1, west_x_index - 1, west_y_index);
+                tbb::task_group::make_edge(north_west_predecessor_south_subtask, west_subtask);
             }
-            if (north_predecessor_west_subtask) {
+            if (north_y_index != 0) {
+                auto north_predecessor_west_subtask = find_predecessor(m_n_division + 1, north_x_index, north_y_index - 1);
                 tbb::task_group::make_edge(north_predecessor_west_subtask, north_subtask);
             }
-            if (north_predecessor_south_subtask) {
+            if (east_y_index != 0) {
+                auto north_predecessor_south_subtask = find_predecessor(m_n_division + 1, east_x_index, east_y_index - 1);
                 tbb::task_group::make_edge(north_predecessor_south_subtask, east_subtask);
             }
 
@@ -955,8 +975,8 @@ public:
         }
     }
 
-private:
     static constexpr std::size_t wavefront_grainsize = 5;
+private:
 
     // Each element e[i] in the vector represents a map of additional predecessors on the i-th level of division
     // Each element in the hash table maps linearized index in the grid (x_index * n + y_index) with the
@@ -1179,7 +1199,7 @@ to track parsing task.
 `parse()` function reads the file, creates a task for finalization, transfers the list of dependencies and creates an edge between the
 corresponding `task_tracker` and the finalization task.
 
-After creating all of the edges, the parsing task replaces itself in the task graph with finalize_task by
+After creating all of the edges, the parsing task replaces itself in the task graph with `finalize_task` by
 calling `transfer_successors_to(finalize_task)`.
 
 Since `maybe->try_process()` runs the parsing task for execution, at the moment of creating the edge, the task may be in one of the following
@@ -1328,7 +1348,7 @@ Returns a reference to ``*this``.
 
 ``explicit operator bool() const noexcept``
 
-Checks if `this`` tracks any task object.
+Checks if ``*this`` tracks any task object.
 
 Returns ``true`` if ``*this`` is a non-empty tracker, ``false`` otherwise.
 
@@ -1444,6 +1464,7 @@ in the "weak" state that allows only to set dependencies between tasks.
 
 ## Exit criteria & open questions:
 * Are concrete names of APIs good enough and reflects the purpose of the methods?
+  * In particular, better name for `transfer_successors_to` can be considered to better reflect the behavior and the successors tracking approach.
 * The performance targets for this feature should be defined
 * API improvements and enhancements should be considered (may be a criteria for moving the feature to `supported`):
   * Should comparison functions between ``task_tracker`` and ``task_handle`` be defined?
@@ -1451,3 +1472,5 @@ in the "weak" state that allows only to set dependencies between tasks.
     successor in ``make_edge``? See [separate section](#using-a-task_tracker-as-a-successor) for more details.
   * Should ``empty_task`` helper API be provided to optimize creating and spawning the empty sync-only tasks. See
     [separate section](#empty_task-api) for more details.
+  * Should submitting functions, accepting a body and returning the `task_tracker` be introduced? See
+    [separate section](#returning-task_tracker-from-submitting-functions) for further details.
