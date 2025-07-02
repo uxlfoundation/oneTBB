@@ -37,7 +37,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Download Linux 64 Coverity Tool
         run: |
           curl https://scan.coverity.com/download/cxx/linux64 --output ${GITHUB_WORKSPACE}/cov-linux64-tool.tar.gz \
@@ -75,7 +75,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Download Windows 64 Coverity Tool
         run: |
           curl https://scan.coverity.com/download/cxx/win64 -o cov-win64-tool.zip -d "token=${{secrets.COVERITY_TOKEN}}&project=${{env.COVERITY_PROJECT}}"
@@ -83,7 +83,7 @@ jobs:
           del cov-win64-tool.zip
           move cov-analysis-win64* cov-win64-tool
       - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2.0.0
       - name: Build with cov-build
         shell: bash
         run: |
