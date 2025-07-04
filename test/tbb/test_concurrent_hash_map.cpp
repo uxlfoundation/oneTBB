@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2023 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -899,3 +899,52 @@ TEST_CASE("container_range concept for tbb::concurrent_hash_map ranges") {
 }
 
 #endif // __TBB_CPP20_CONCEPTS_PRESENT
+
+template <typename ChmapType, typename UnorderedMapType>
+void check_for_duplicated_keys(const ChmapType& chmap, const UnorderedMapType& unique_key_value_pairs) {
+    CHECK_MESSAGE(chmap.size() == unique_key_value_pairs.size(), "Incorrect number of keys in the hash map");
+    for (auto& pair : unique_key_value_pairs) {
+        CHECK_MESSAGE(chmap.count(pair.first) == 1, "Key from the unique set is not presented in the hash map");
+    }
+}
+
+//! \brief \ref regression
+TEST_CASE("test key duplications in constructors accepting the half-open interval") {
+    using value_type = std::pair<const int, int>;
+    using hash_map_type = tbb::concurrent_hash_map<int, int>;
+
+    // init_list should contain duplicated keys
+    auto init_list = { value_type{0, 0}, value_type{1, 1}, value_type{2, 2},
+                       value_type{0, 100}, value_type{1, 100}, value_type{2, 200},
+                       value_type{3, 3},
+                       value_type{0, 200} };
+
+    using pair_type = std::pair<int, int>;
+    std::vector<pair_type> vec(init_list.begin(), init_list.end());
+    std::unordered_map<int, int> unique_keys_map(vec.begin(), vec.end());
+    CHECK_MESSAGE(unique_keys_map.size() != vec.size(), "Incorrect test setup");
+
+    {
+        hash_map_type chmap(vec.begin(), vec.end());
+        check_for_duplicated_keys(chmap, unique_keys_map);
+    }
+    {
+        hash_map_type::hash_compare_type hash_compare;
+        hash_map_type chmap(vec.begin(), vec.end(), hash_compare);
+        check_for_duplicated_keys(chmap, unique_keys_map);
+    }
+    {
+        hash_map_type chmap(init_list);
+        check_for_duplicated_keys(chmap, unique_keys_map);
+    }
+    {
+        hash_map_type::allocator_type alloc;
+        hash_map_type chmap(init_list, alloc);
+        check_for_duplicated_keys(chmap, unique_keys_map);
+    }
+    {
+        hash_map_type chmap{ {0, 0}, {1, 1}, {2, 2}, {3, 3}, {4, 4} };
+        chmap = init_list;
+        check_for_duplicated_keys(chmap, unique_keys_map);
+    }
+}
