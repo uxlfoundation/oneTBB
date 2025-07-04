@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -1520,9 +1520,12 @@ protected:
             hashcode_type h = my_hash_compare.hash( (*first).first );
             bucket *b = this->get_bucket( h & m );
             __TBB_ASSERT(!rehash_required(b->node_list.load(std::memory_order_relaxed)), "Invalid bucket in destination table");
-            node* node_ptr = create_node(base_type::get_allocator(), (*first).first, (*first).second);
-            this->add_to_bucket( b, node_ptr );
-            ++this->my_size; // TODO: replace by non-atomic op
+            const auto& key = (*first).first;
+            if (search_bucket(key, b) == nullptr) {
+                node* node_ptr = create_node(base_type::get_allocator(), *first);
+                this->add_to_bucket( b, node_ptr );
+                ++this->my_size; // TODO: replace by non-atomic op
+            }
         }
     }
 
