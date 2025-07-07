@@ -110,8 +110,12 @@ If the predecessor task is in any state except `completed` (i.e. `created`/`sche
 in the predecessor's list of successors and increments the corresponding reference counter on the successor side to ensure it
 is not executed before the predecessor completes. The successor task can only begin executing once its reference counter reaches zero.
 
-If the predecessor task is in the `completed` state, the API has no effect: no changes are made to the list of successors or reference counters,
-since no additional dependencies are needed. The successor task can proceed if all other dependencies are also satisfied.
+If the predecessor task is in the `completed` state, the behavior of the API depends on whether its successors were transferred to another task during the execution of the task body.
+
+If no transfer occurred, the API has no effect: the list of successors and reference counters remain unchanged, as no additional dependencies are introduced. The successor task can proceed once all other dependencies are satisfied.
+
+If a transfer did occur - meaning the original task was replaced in the task graph by another - the API redirects the new successor to the task that previously received the original list of successors.
+For the receiving task, the same state-based logic applies.
 
 If the predecessor's state changes during registration, the API must ensure that dependencies are not added and reference counters are not incremented for tasks that have already completed.
 
@@ -124,9 +128,8 @@ A vertex instance is created when the first predecessor is registered and is reu
 When a predecessor task completes, it iterates through its list of successor vertices and decrements each reference counter.
 When a successor's reference counter reaches zero, the task can be scheduled for execution.
 
-From the API perspective, the function that decrements the reference counter may return a pointer to the task. If the reference counter is not zero, the
-function returns ``nullptr``. Otherwise, it returns a pointer to the successor task. If no other task was bypassed from the task body, one of the returned
-successor tasks may be bypassed to reduce spawning overhead.
+To avoid unnecessary scheduling overhead, the predecessor task may bypass one of its successor tasks if the associated reference counter reaches zero and
+no other task has already been bypassed from the user-provided task body.
 
 This implementation approach is illustrated in the picture below:
 
@@ -534,9 +537,18 @@ auto empty_sync_task = tg.get_empty_task();
 
 tbb::task_group::make_edge(left_upper_rectangle_task, empty_sync_task);
 tbb::task_group::make_edge(right_upper_rectangle_task, empty_sync_task);
+tbb::task_group::current_task::transfer_successors_to(empty_sync_task);
 
 // empty_sync_task would not be spawned and only used for dependency tracking
 ```
+
+An alternative approach is to allow ``transfer_successors_to`` to accept multiple tasks as parameters. The example above would then look like:
+
+```cpp
+tbb::task_group::current_task::transfer_successors_to(left_upper_rectangle_task, right_upper_rectangle_task);
+```
+
+From an implementation perspective, the same empty synchronization task could still be created internally.
 
 ### Transferring successors to the task in any state
 
@@ -598,7 +610,7 @@ class task_group {
 } // namespace oneapi
 ```
 
-If a ``task_tracker`` that tracks a task in the `submitted`, `executing`, or `completed` state is used
+If a ``task_tracker`` that tracks a task in the `executing`, or `completed` state is used
 as the second argument, the behavior of the above APIs is undefined.
 
 ### Returning ``task_tracker`` from submission functions
