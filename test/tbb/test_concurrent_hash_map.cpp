@@ -1,4 +1,5 @@
 /*
+    Copyright (c) 2005-2025 Intel Corporation
     Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,6 +41,7 @@
 #include <functional>
 #include <scoped_allocator>
 #include <mutex>
+#include <unordered_map>
 
 //! \file test_concurrent_hash_map.cpp
 //! \brief Test for [containers.concurrent_hash_map containers.tbb_hash_compare] specification
@@ -900,11 +902,27 @@ TEST_CASE("container_range concept for tbb::concurrent_hash_map ranges") {
 
 #endif // __TBB_CPP20_CONCEPTS_PRESENT
 
-template <typename ChmapType, typename UnorderedMapType>
-void check_for_duplicated_keys(const ChmapType& chmap, const UnorderedMapType& unique_key_value_pairs) {
-    CHECK_MESSAGE(chmap.size() == unique_key_value_pairs.size(), "Incorrect number of keys in the hash map");
-    for (auto& pair : unique_key_value_pairs) {
-        CHECK_MESSAGE(chmap.count(pair.first) == 1, "Key from the unique set is not presented in the hash map");
+template <typename ChmapType, typename UnorderedMultimapType>
+void check_for_duplicated_keys(const ChmapType& chmap, const UnorderedMultimapType& init_multimap)
+{
+    using unordered_map_type = std::unordered_map<typename ChmapType::key_type, typename ChmapType::mapped_type>;
+    unordered_map_type unique_keys(init_multimap.begin(), init_multimap.end());
+
+    CHECK_MESSAGE(unique_keys.size() != init_multimap.size(), "Incorrect test setup");
+    CHECK_MESSAGE(chmap.size() == unique_keys.size(), "Incorrect number of keys in the hash map");
+    for (auto& pair : unique_keys) {
+        typename ChmapType::const_accessor acc;
+        bool res = chmap.find(acc, pair.first);
+        CHECK_MESSAGE(res, "Key from unique set is not found");
+        CHECK_MESSAGE(acc->first == pair.first, "Incorrect key found");
+        
+        auto possible_values_range = init_multimap.equal_range(pair.first);
+
+        auto equal_value_pred = [&acc](const typename UnorderedMultimapType::value_type& value) {
+            return acc->second == value.second;
+        };
+        CHECK_MESSAGE(1 == std::count_if(possible_values_range.first, possible_values_range.second, equal_value_pred),
+                      "Incorrect mapped value for unique key");
     }
 }
 
@@ -919,32 +937,29 @@ TEST_CASE("test key duplications in constructors accepting the half-open interva
                        value_type{3, 3},
                        value_type{0, 200} };
 
-    using pair_type = std::pair<int, int>;
-    std::vector<pair_type> vec(init_list.begin(), init_list.end());
-    std::unordered_map<int, int> unique_keys_map(vec.begin(), vec.end());
-    CHECK_MESSAGE(unique_keys_map.size() != vec.size(), "Incorrect test setup");
+    std::unordered_multimap<int, int> init_container(init_list);
 
     {
-        hash_map_type chmap(vec.begin(), vec.end());
-        check_for_duplicated_keys(chmap, unique_keys_map);
+        hash_map_type chmap(init_container.begin(), init_container.end());
+        check_for_duplicated_keys(chmap, init_container);
     }
     {
         hash_map_type::hash_compare_type hash_compare;
-        hash_map_type chmap(vec.begin(), vec.end(), hash_compare);
-        check_for_duplicated_keys(chmap, unique_keys_map);
+        hash_map_type chmap(init_container.begin(), init_container.end(), hash_compare);
+        check_for_duplicated_keys(chmap, init_container);
     }
     {
         hash_map_type chmap(init_list);
-        check_for_duplicated_keys(chmap, unique_keys_map);
+        check_for_duplicated_keys(chmap, init_container);
     }
     {
         hash_map_type::allocator_type alloc;
         hash_map_type chmap(init_list, alloc);
-        check_for_duplicated_keys(chmap, unique_keys_map);
+        check_for_duplicated_keys(chmap, init_container);
     }
     {
         hash_map_type chmap{ {0, 0}, {1, 1}, {2, 2}, {3, 3}, {4, 4} };
         chmap = init_list;
-        check_for_duplicated_keys(chmap, unique_keys_map);
+        check_for_duplicated_keys(chmap, init_container);
     }
 }

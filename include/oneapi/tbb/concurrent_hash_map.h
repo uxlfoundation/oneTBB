@@ -1,4 +1,5 @@
 /*
+    Copyright (c) 2005-2025 Intel Corporation
     Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
@@ -1517,10 +1518,11 @@ protected:
         this->reserve(reserve_size); // TODO: load_factor?
         hashcode_type m = this->my_mask.load(std::memory_order_relaxed);
         for(; first != last; ++first) {
-            hashcode_type h = my_hash_compare.hash( (*first).first );
+            const auto& key = (*first).first;
+            hashcode_type h = my_hash_compare.hash(key);
             bucket *b = this->get_bucket( h & m );
             __TBB_ASSERT(!rehash_required(b->node_list.load(std::memory_order_relaxed)), "Invalid bucket in destination table");
-            const auto& key = (*first).first;
+            
             if (search_bucket(key, b) == nullptr) {
                 node* node_ptr = create_node(base_type::get_allocator(), *first);
                 this->add_to_bucket( b, node_ptr );
