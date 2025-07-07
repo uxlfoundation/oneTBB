@@ -112,10 +112,9 @@ since no additional dependencies are needed. The successor task can proceed if a
 
 If the predecessor's state changes during registration, the API must ensure that dependencies are not added and reference counters are not incremented for tasks that have already completed.
 
-From an implementation perspective, this API requires each predecessor task to maintain a list of successors, with each successor represented by
-a vertex instance. Each vertex contains a reference counter and a pointer to the successor task.
-
-Each element in the successor list is a pointer to a vertex instance representing a successor task.
+From the implementation perspective, this API requires each predecessor task to maintain a list of successors.
+The list holds pointers to vertex instances, each representing a successor task.
+A vertex contains the reference counter for a successor task and the pointer to it.
 
 A vertex instance is created when the first predecessor is registered and is reused by subsequent predecessors. 
 
