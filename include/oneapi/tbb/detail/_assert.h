@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -32,11 +33,27 @@ namespace r1 {
   Otherwise call the assertion handler. */
 TBB_EXPORT void __TBB_EXPORTED_FUNC assertion_failure(const char *location, int line,
                                                       const char *expression, const char *comment);
+
+using assertion_handler_type = decltype(&assertion_failure);
+
+//! Set assertion handler and return its previous value.
+TBB_EXPORT assertion_handler_type __TBB_EXPORTED_FUNC set_assertion_handler(assertion_handler_type new_handler) noexcept;
+
+//! Return the current assertion handler.
+TBB_EXPORT assertion_handler_type __TBB_EXPORTED_FUNC get_assertion_handler() noexcept;
+
 #if __TBBMALLOC_BUILD
 }} // namespaces rml::internal
 #else
 } // namespace r1
 } // namespace detail
+
+inline namespace v1 {
+using detail::r1::assertion_handler_type;
+using detail::r1::set_assertion_handler;
+using detail::r1::get_assertion_handler;
+} // namespace v1
+
 } // namespace tbb
 #endif
 

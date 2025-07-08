@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -37,43 +38,55 @@ namespace tbb {
 namespace detail {
 namespace r1 {
 #endif
-// TODO: consider extension for formatted error description string
-static void assertion_failure_impl(const char* location, int line, const char* expression, const char* comment) {
 
-    std::fprintf(stderr, "Assertion %s failed (located in the %s function, line in file: %d)\n",
-        expression, location, line);
-
-    if (comment) {
-        std::fprintf(stderr, "Detailed description: %s\n", comment);
-    }
-#if _MSC_VER && _DEBUG
-    if (1 == _CrtDbgReport(_CRT_ASSERT, location, line, "tbb_debug.dll", "%s\r\n%s", expression, comment?comment:"")) {
-        _CrtDbgBreak();
-    } else
-#endif
-    {
-        std::fflush(stderr);
-        std::abort();
-    }
-}
-
-// Do not move the definition into the assertion_failure function because it will require "magic statics".
-// It will bring a dependency on C++ runtime on some platforms while assert_impl.h is reused in tbbmalloc 
+// Do not move the definition into the assertion_failure_impl function because it will require "magic statics".
+// It will bring a dependency on C++ runtime on some platforms while assert_impl.h is reused in tbbmalloc
 // that should not depend on C++ runtime
 static std::atomic<tbb::detail::do_once_state> assertion_state;
 
-void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line, const char* expression, const char* comment) {
+// TODO: consider extension for formatted error description string
+static void assertion_failure_impl(const char* location, int line, const char* expression, const char* comment) {
 #if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     // Workaround for erroneous "unreachable code" during assertion throwing using call_once
     #pragma warning (push)
     #pragma warning (disable: 4702)
 #endif
-    // We cannot use std::call_once because it brings a dependency on C++ runtime on some platforms 
+    // We cannot use std::call_once because it brings a dependency on C++ runtime on some platforms
     // while assert_impl.h is reused in tbbmalloc that should not depend on C++ runtime
-    atomic_do_once([&](){ assertion_failure_impl(location, line, expression, comment); }, assertion_state);
+    atomic_do_once([&](){
+        std::fprintf(stderr, "Assertion %s failed (located in the %s function, line in file: %d)\n",
+            expression, location, line);
+
+        if (comment) {
+            std::fprintf(stderr, "Detailed description: %s\n", comment);
+        }
+#if _MSC_VER && _DEBUG
+        if (1 == _CrtDbgReport(_CRT_ASSERT, location, line, "tbb_debug.dll", "%s\r\n%s", expression, comment?comment:"")) {
+            _CrtDbgBreak();
+        } else
+#endif
+        {
+            std::fflush(stderr);
+            std::abort();
+        }
+    }, assertion_state);
 #if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     #pragma warning (pop)
 #endif
+}
+
+static std::atomic<assertion_handler_type> assertion_handler{assertion_failure_impl};
+
+assertion_handler_type __TBB_EXPORTED_FUNC set_assertion_handler(assertion_handler_type new_handler) noexcept {
+    return assertion_handler.exchange(new_handler ? new_handler : assertion_failure_impl, std::memory_order_acq_rel);
+}
+
+assertion_handler_type __TBB_EXPORTED_FUNC get_assertion_handler() noexcept {
+    return assertion_handler.load(std::memory_order_acquire);
+}
+
+void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line, const char* expression, const char* comment) {
+    get_assertion_handler()(location, line, expression, comment);
 }
 
 //! Report a runtime warning.
