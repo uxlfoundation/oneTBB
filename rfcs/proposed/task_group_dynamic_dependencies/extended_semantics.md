@@ -1125,24 +1125,30 @@ void serial_wavefront(std::size_t x0, std::size_t xn, std::size_t y0, std::size_
 class eager_wavefront_task {
 public:
     static void prepare_predecessors_container(std::size_t num_divisions) {
-        // Reserve space in the container for each level of recursive division
-        predecessors.resize(num_divisions);
+        if (num_divisions > 1) {
+            // Reserve space in the container for each level of recursive division
+            predecessors.resize(num_divisions + 1);
+            int num_subtasks = 4; // number of subtasks on the first level
 
-        int num_subtasks = 4; // number of subtasks on the first level
-
-        for (std::size_t i = 0; i < num_divisions; ++i) {
-            predecessors[i].reserve(num_subtasks);
-            num_subtasks *= 4;
+            // First division cannot have predecessors, start filling the container from the second item
+            for (std::size_t i = 1; i < num_divisions; ++i) {
+                predecessors[i].reserve(num_subtasks);
+                num_subtasks *= 4;
+            }
         }
     }
 
-    static tbb::task_tracker find_predecessor(std::size_t n_division, std::size_t x_index, std::size_t y_index) {
-        // Number of elements in the grid on each level of division
-        // On the first level - 4 subtasks total (2 on each dimension)
-        // on the second level - 16 subtasks total (4 on each dimension), etc.
-        std::size_t n_grid = (2 << n_division);
+    static std::size_t grid_dimension_size(std::size_t n_division) {
+        // Number of elements in each dimension of the grid on the current level of division
+        // On the first level - 4 subtasks total (2 items on each dimension)
+        // on the second level - 16 subtasks total (4 items on each dimension), etc.
+        return (1 << n_division);
+    }
 
-        auto it = predecessors[n_division].find(x_index * n_grid + y_index);
+    static tbb::task_tracker find_predecessor(std::size_t n_division, std::size_t x_index, std::size_t y_index) {
+        assert(n_division != 0); // 0th level of division cannot have predecessors
+
+        auto it = predecessors[n_division].find(x_index * grid_dimension_size(n_division) + y_index);
         assert(it != predecessors[n_division].end());
         return it->second;
     }
@@ -1150,9 +1156,10 @@ public:
     static void publish_predecessor(std::size_t n_division, std::size_t x_index, std::size_t y_index,
                                     tbb::task_tracker&& pred)
     {
-        std::size_t n_grid = (2 << n_division);
+        assert(n_division != 0); // 0th division should not publish predecessors
 
-        [[maybe_unused]] auto p = predecessors[n_division].emplace(x_index * n_grid + y_index, std::move(pred));
+        [[maybe_unused]] auto p = predecessors[n_division].emplace(x_index * grid_dimension_size(n_division) + y_index,
+                                                                   std::move(pred));
         assert(p.second);
     }
 
@@ -1217,24 +1224,27 @@ public:
             tbb::task_group::make_edge(east_subtask, south_subtask);
 
             // Add extra dependencies with predecessor's subtasks
-            if (north_x_index != 0) {
-                auto west_predecessor_east_subtask = find_predecessor(m_n_division + 1, north_x_index - 1, north_y_index);
-                tbb::task_group::make_edge(west_predecessor_east_subtask, north_subtask);
-            }
-            if (west_x_index != 0) {
-                auto west_predecessor_south_subtask = find_predecessor(m_n_division + 1, west_x_index - 1, west_y_index);
-                tbb::task_group::make_edge(west_predecessor_south_subtask, west_subtask);
-            }
-            if (north_y_index != 0) {
-                auto north_predecessor_west_subtask = find_predecessor(m_n_division + 1, north_x_index, north_y_index - 1);
-                tbb::task_group::make_edge(north_predecessor_west_subtask, north_subtask);
-            }
-            if (east_y_index != 0) {
-                auto north_predecessor_south_subtask = find_predecessor(m_n_division + 1, east_x_index, east_y_index - 1);
-                tbb::task_group::make_edge(north_predecessor_south_subtask, east_subtask);
+            // Tasks on 0th division cannot have additional predecessors
+            if (m_n_division != 0) {
+                if (north_x_index != 0) {
+                    auto west_predecessor_east_subtask = find_predecessor(m_n_division + 1, north_x_index - 1, north_y_index);
+                    tbb::task_group::make_edge(west_predecessor_east_subtask, north_subtask);
+                }
+                if (west_x_index != 0) {
+                    auto west_predecessor_south_subtask = find_predecessor(m_n_division + 1, west_x_index - 1, west_y_index);
+                    tbb::task_group::make_edge(west_predecessor_south_subtask, west_subtask);
+                }
+                if (north_y_index != 0) {
+                    auto north_predecessor_west_subtask = find_predecessor(m_n_division + 1, north_x_index, north_y_index - 1);
+                    tbb::task_group::make_edge(north_predecessor_west_subtask, north_subtask);
+                }
+                if (east_y_index != 0) {
+                    auto north_predecessor_south_subtask = find_predecessor(m_n_division + 1, east_x_index, east_y_index - 1);
+                    tbb::task_group::make_edge(north_predecessor_south_subtask, east_subtask);
+                }
             }
 
-            // Save trackers to subtasks for future publishing
+            // Save trackers to subtasks for further publishing
             tbb::task_tracker north_subtask_tracker = north_subtask;
             tbb::task_tracker west_subtask_tracker = west_subtask;
             tbb::task_tracker east_subtask_tracker = east_subtask;
@@ -1281,6 +1291,8 @@ private:
     // Division number
     std::size_t m_n_division;
 }; // class eager_wavefront_task
+
+eager_wavefront_task::predecessors_container_type eager_wavefront_task::predecessors;
 
 void eager_wavefront(std::size_t n) {
     tbb::task_group tg;
