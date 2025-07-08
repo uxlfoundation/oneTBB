@@ -38,7 +38,7 @@ class task_handle;
 class task_dynamic_state {
 public:
     task_dynamic_state(d1::small_object_allocator& alloc)
-        : m_num_references(0)
+        : m_num_references(1) // reserves a task co-ownership for dynamic state
         , m_allocator(alloc)
     {}
 
@@ -78,8 +78,6 @@ public:
             task_dynamic_state* new_state = alloc.new_object<task_dynamic_state>(alloc);
 
             if (m_state.compare_exchange_strong(current_state, new_state)) {
-                // Reserve a task co-ownership for dynamic_state
-                new_state->reserve();
                 current_state = new_state;
             } else {
                 // Other thread created the dynamic state
