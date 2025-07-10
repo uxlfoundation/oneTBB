@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -33,6 +33,9 @@ public:
     virtual ~graph_proxy() {}
 };
 
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+class metainfo_tag_type;
+#endif
 template <typename Input>
 class receiver_gateway : public graph_proxy {
 public:
@@ -41,6 +44,10 @@ public:
 
     //! Submit signal from an asynchronous activity to FG.
     virtual bool try_put(const input_type&) = 0;
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+    virtual bool try_put(const input_type&, const metainfo_tag_type&) = 0;
+    virtual bool try_put(const input_type&, metainfo_tag_type&&) = 0;
+#endif
 };
 
 } // d2
