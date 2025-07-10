@@ -233,7 +233,7 @@ jobs:
           ctest --timeout ${TEST_TIMEOUT} --output-on-failure
 
   linux-testing-docker:
-    name: ${{ matrix.container_name }}_${{ container_options }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_preview=${{ matrix.preview }}${{ matrix.cmake_static }}
+    name: ${{ matrix.container_name }}_${{ matrix.container_options }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_preview=${{ matrix.preview }}${{ matrix.cmake_static }}
     runs-on: ['ubuntu-latest']
     container:
         image: ${{ matrix.container_name }}
