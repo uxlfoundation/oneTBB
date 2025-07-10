@@ -249,7 +249,7 @@ private:
     const unsigned m_num_cpus;
 };
 
-static unsigned get_cgroups_max_concurrency() {
+unsigned get_cgroups_max_concurrency() {
     static cgroup_info cgroup_info_instance;
     return cgroup_info_instance.num_cpus();
 }
@@ -276,7 +276,7 @@ static std::vector<int> get_cpuset_indices() {
 #endif
 }
 
-static int limit_number_of_threads( int max_threads ) {
+int limit_number_of_threads( int max_threads ) {
     ASSERT(max_threads >= 1,"The limited number of threads should be positive");
     maxProcs = get_max_procs();
     if (maxProcs < max_threads) {
