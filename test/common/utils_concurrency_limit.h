@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2020-2023 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Сontributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -101,21 +102,20 @@ static int get_max_procs() {
     return maxProcs;
 }
 
-int get_start_affinity_process() {
+static std::vector<int> get_cpuset_indices() {
 #if __linux__
     cpu_set_t mask;
     sched_getaffinity(0, sizeof(cpu_set_t), &mask);
 
-    int result = -1;
+    std::vector<int> result;
 
     int nproc = sysconf(_SC_NPROCESSORS_ONLN);
     for (int i = 0; i < nproc; ++i) {
         if (CPU_ISSET(i, &mask)) {
-            result = i;
-            break;
+            result.push_back(i);
         }
     }
-    ASSERT(result != -1, nullptr);
+    ASSERT(!result.empty(), nullptr);
     return result;
 #else
     // TODO: add affinity support for Windows and FreeBSD
@@ -123,7 +123,7 @@ int get_start_affinity_process() {
 #endif
 }
 
-int limit_number_of_threads( int max_threads ) {
+static int limit_number_of_threads( int max_threads ) {
     ASSERT(max_threads >= 1,"The limited number of threads should be positive");
     maxProcs = get_max_procs();
     if (maxProcs < max_threads) {
@@ -155,9 +155,10 @@ int limit_number_of_threads( int max_threads ) {
     }
 
     ASSERT(max_threads <= int(sizeof(mask_t) * CHAR_BIT), "The mask size is not enough to set the requested number of threads.");
-    int st = get_start_affinity_process();
-    for (int i = st; i < st + max_threads; ++i) {
-        CPU_SET(i, &new_mask);
+    std::vector<int> cpuset_indices = get_cpuset_indices();
+
+    for (int i = 0; i < max_threads; ++i) {
+        CPU_SET(cpuset_indices[i], &new_mask);
     }
     int err = setaffinity(new_mask);
 #endif
