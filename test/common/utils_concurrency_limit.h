@@ -102,6 +102,159 @@ static int get_max_procs() {
     return maxProcs;
 }
 
+#if __TBB_USE_CGROUPS
+
+// Linux control groups support
+class cgroup_info {
+public:
+    cgroup_info()
+        : default_num_cpus(std::thread::hardware_concurrency()), // Fallback value
+          m_num_cpus(parse_num_cpus()) {}
+
+    unsigned num_cpus() const { return m_num_cpus; }
+
+private:
+    unsigned parse_num_cpus() {
+        const std::string cgroup_line = find_cgroup_mount(mounts_path);
+        if (cgroup_line.empty())
+            return default_num_cpus; // Return default if no cgroup mount found
+
+        unsigned version = 0;
+        std::string mount_point;
+        if (!parse_version_and_mount_point(cgroup_line.c_str(), mount_point, version))
+            return default_num_cpus; // Return default if parsing fails
+
+        if (1 == version)
+            return determine_num_cpus_for_cgroup_v1(mount_point);
+        else
+            return determine_num_cpus_for_cgroup_v2(mount_point);
+    }
+
+    std::string find_cgroup_mount(const char* file_path) {
+        std::ifstream f(file_path);
+        if (!f)
+            return std::string();
+
+        std::string line;
+        while (std::getline(f, line)) {
+            if (line.length() < 6)
+                continue; // Skip empty or too short lines
+
+            if (std::strncmp(line.data(), "cgroup", 6) != 0)
+                continue; // Skip non-cgroup lines
+
+            return line;
+        }
+
+        return std::string();
+    }
+
+    bool read_line_from_file(const std::string& file_path, std::string& line) {
+        std::ifstream f(file_path);
+        if (!f || !std::getline(f, line))
+            return false; // Failed to read line
+        return true;
+    }
+
+    template <typename T>
+    bool convert_token_from_istream(std::istringstream& istream, T& value) {
+        if (!(istream >> value))
+            return false; // Failed to read period
+        return true;
+    }
+
+    bool parse_version_and_mount_point(const char* input, std::string& mount_point,
+                                       unsigned& version)
+    {
+        std::istringstream iss(input);
+        std::string device, version_str;
+        std::string* strs[] = {&device, &mount_point, &version_str};
+        for (auto& str : strs) {
+            if (!convert_token_from_istream(iss, *str))
+                return false; // Failed to read expected fields
+        }
+
+        version = 2;            // default
+        if (version_str == "cgroup")
+            version = 1;
+
+        return true;
+    }
+
+    bool parse_cpu_quota(std::istringstream& istream, unsigned long long& cpu_quota) {
+        std::string quota_str;
+        if (!convert_token_from_istream(istream, quota_str))
+            return false; // Failed to read quota
+
+        if (quota_str == "max") // CPU quota may be set to "max", which means no limit
+            return false;
+
+        std::istringstream cpu_quota_stream(quota_str);
+        return convert_token_from_istream(cpu_quota_stream, cpu_quota);
+    }
+
+    bool parse_cpu_period(std::istringstream& istream, unsigned long long& cpu_period) {
+        return convert_token_from_istream(istream, cpu_period);
+    }
+
+    unsigned determine_num_cpus_for_cgroup_v1(const std::string& mount_point) {
+        std::string line;
+        if (!read_line_from_file(mount_point + "/cpu/cpu.cfs_quota_us", line))
+            return default_num_cpus;
+
+        std::istringstream iss(line);
+        unsigned long long cpu_quota = 0;
+        if (!parse_cpu_quota(iss, cpu_quota))
+            return default_num_cpus;
+
+        if (!read_line_from_file(mount_point + "/cpu/cpu.cfs_period_us", line))
+            return default_num_cpus;
+
+        iss = std::istringstream(line);
+        unsigned long long cpu_period = 0;
+        if (!parse_cpu_period(iss, cpu_period))
+            return default_num_cpus;
+
+        return determine_num_cpus(cpu_quota, cpu_period);
+    }
+
+    unsigned determine_num_cpus_for_cgroup_v2(const std::string& mount_point) {
+        std::string line;
+        if (!read_line_from_file(mount_point + "/cpu.max", line))
+            return default_num_cpus;
+
+        std::istringstream iss(line);
+        unsigned long long cpu_quota = 0;
+        if (!parse_cpu_quota(iss, cpu_quota))
+            return default_num_cpus;
+
+        unsigned long long cpu_period = 0;
+        if (!parse_cpu_period(iss, cpu_period))
+            return default_num_cpus;
+
+        return determine_num_cpus(cpu_quota, cpu_period);
+    }
+
+    unsigned determine_num_cpus(unsigned long long cpu_quota, unsigned long long cpu_period) {
+        if (0 == cpu_period)
+            return default_num_cpus; // Avoid division by zero, use the default number of CPUs
+
+        const unsigned num_cpus = static_cast<unsigned>((cpu_quota + cpu_period / 2) / cpu_period);
+        return num_cpus > 0 ? num_cpus : 1;
+    }
+
+    static constexpr const char* mounts_path = "/proc/self/mounts";
+    const unsigned default_num_cpus; // Fallback value if parsing fails
+
+    const unsigned m_num_cpus;
+};
+
+static unsigned get_cgroups_max_concurrency() {
+    static cgroup_info cgroup_info_instance;
+    return cgroup_info_instance.num_cpus();
+}
+#endif
+
 static std::vector<int> get_cpuset_indices() {
 #if __linux__
     cpu_set_t mask;
