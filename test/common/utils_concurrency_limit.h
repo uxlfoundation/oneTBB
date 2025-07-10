@@ -255,13 +255,11 @@ unsigned get_cgroups_max_concurrency() {
 }
 #endif
 
-static std::vector<int> get_cpuset_indices() {
+std::vector<int> get_cpuset_indices() {
+    std::vector<int> result;
 #if __linux__
     cpu_set_t mask;
     sched_getaffinity(0, sizeof(cpu_set_t), &mask);
-
-    std::vector<int> result;
-
     int nproc = sysconf(_SC_NPROCESSORS_ONLN);
     for (int i = 0; i < nproc; ++i) {
         if (CPU_ISSET(i, &mask)) {
@@ -269,11 +267,10 @@ static std::vector<int> get_cpuset_indices() {
         }
     }
     ASSERT(!result.empty(), nullptr);
-    return result;
 #else
     // TODO: add affinity support for Windows and FreeBSD
-    return 0;
 #endif
+    return result;
 }
 
 int limit_number_of_threads( int max_threads ) {
