@@ -257,6 +257,12 @@ jobs:
           egress-policy: audit
 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install dependencies (apt)
+        if: ${{ contains(matrix.container_name, 'ubuntu') || contains(matrix.container_name, 'debian') }}
+        shell: bash
+        run: |
+          set -x
+          apt update && apt install -y build-essential cmake
       - name: Run testing
         shell: bash
         run: |
