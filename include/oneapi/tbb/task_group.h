@@ -80,15 +80,14 @@ d1::task* task_ptr_or_nullptr(F&& f);
 }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-inline d1::task* combine_tasks(d1::task* body_task, task_with_dynamic_state* successor_task) {
+inline d1::task* combine_tasks(d1::task* body_task, task_handle_task* successor_task) {
     if (body_task == nullptr) return successor_task;
     // Successor task can't have dependencies
     if (successor_task == nullptr) return body_task;
 
     // There is a task returned from the body and the successor task - bypassing the body task
     // and spawning the successor one
-    // successor task is guaranteed to be task_handle_task, it is safe to use static_cast
-    d1::spawn(*successor_task, static_cast<task_handle_task*>(successor_task)->ctx());
+    d1::spawn(*successor_task, successor_task->ctx());
     return body_task;
 }
 #endif
@@ -103,7 +102,7 @@ private:
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
         task* next_task = task_ptr_or_nullptr(m_func);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        task_with_dynamic_state* successor_task = this->complete_task();
+        task_handle_task* successor_task = this->complete_task();
         next_task = combine_tasks(next_task, successor_task);
 #endif
         finalize(&ed);

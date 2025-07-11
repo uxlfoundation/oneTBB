@@ -75,7 +75,7 @@ public:
         : m_task(task)
         , m_successors_list_head(nullptr)
         , m_continuation_vertex(nullptr)
-        : m_num_references(1) // reserves a task co-ownership for dynamic state
+        , m_num_references(1) // reserves a task co-ownership for dynamic state
         , m_allocator(alloc)
     {}
 
@@ -142,34 +142,6 @@ inline void internal_make_edge(task_dynamic_state* pred, task_dynamic_state* suc
     __TBB_ASSERT(pred != nullptr && succ != nullptr , nullptr);
     pred->add_successor(succ->get_continuation_vertex());
 }
-
-class successor_vertex : public d1::reference_vertex {
-public:
-    successor_vertex(task_handle_task* task, d1::small_object_allocator& alloc)
-        // Reserving 1 for task_handle that owns the task for which the predecessors are added
-        // reference counter would be released when this task_handle would be submitted for execution
-        : d1::reference_vertex(nullptr, 1)
-        , m_task(task)
-        , m_allocator(alloc)
-    {}
-
-    task_handle_task* release_bypass(std::uint32_t delta = 1) {
-        task_handle_task* next_task = nullptr;
-
-        std::uint64_t ref = m_ref_count.fetch_sub(static_cast<std::uint64_t>(delta)) - static_cast<uint64_t>(delta);
-
-        if (ref == 0) {
-            // TODO: can we skip this step since the task would be spawned anyway ?
-            m_task->get_dynamic_state()->unset_dependency();
-            next_task = m_task;
-            m_allocator.delete_object(this);
-        }
-        return next_task;
-    }
-private:
-    task_handle_task* m_task;
-    d1::small_object_allocator m_allocator;
-}; // class successor_vertex
 #endif // __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
 class task_handle_task : public d1::task {
@@ -224,7 +196,7 @@ public:
         if (current_state == nullptr) {
             d1::small_object_allocator alloc;
 
-            task_dynamic_state* new_state = alloc.new_object<task_dynamic_state>(alloc);
+            task_dynamic_state* new_state = alloc.new_object<task_dynamic_state>(this, alloc);
 
             if (m_dynamic_state.compare_exchange_strong(current_state, new_state)) {
                 current_state = new_state;
@@ -261,6 +233,36 @@ public:
     }
 #endif
 };
+
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+class successor_vertex : public d1::reference_vertex {
+public:
+    successor_vertex(task_handle_task* task, d1::small_object_allocator& alloc)
+        // Reserving 1 for task_handle that owns the task for which the predecessors are added
+        // reference counter would be released when this task_handle would be submitted for execution
+        : d1::reference_vertex(nullptr, 1)
+        , m_task(task)
+        , m_allocator(alloc)
+    {}
+
+    task_handle_task* release_bypass(std::uint32_t delta = 1) {
+        task_handle_task* next_task = nullptr;
+
+        std::uint64_t ref = m_ref_count.fetch_sub(static_cast<std::uint64_t>(delta)) - static_cast<uint64_t>(delta);
+
+        if (ref == 0) {
+            // TODO: can we skip this step since the task would be spawned anyway ?
+            m_task->get_dynamic_state()->unset_dependency();
+            next_task = m_task;
+            m_allocator.delete_object(this);
+        }
+        return next_task;
+    }
+private:
+    task_handle_task* m_task;
+    d1::small_object_allocator m_allocator;
+}; // class successor_vertex
+#endif
 
 class task_handle {
     struct task_handle_task_finalizer_t{

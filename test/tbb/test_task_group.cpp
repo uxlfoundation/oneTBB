@@ -1527,21 +1527,32 @@ TEST_CASE("test task_group dynamic dependencies") {
         test_return_task_with_dependencies(submit_function::arena_enqueue);
         test_return_task_with_dependencies(submit_function::this_arena_enqueue);
     }
+}
+
 TEST_CASE("test task_tracker in concurrent environment") {
     tbb::task_group tg;
     std::size_t task_placeholder = 0;
+    const int n = 100;
 
     tbb::task_handle task = tg.defer([&] {
         ++task_placeholder;
     });
 
-    tbb::parallel_for(0, 100, [&](int) {
+    std::atomic<std::size_t> succ_counter(0);
+
+    tbb::parallel_for(0, n, [&](int) {
         tbb::task_tracker tracker(task);
         CHECK_MESSAGE(tracker, "task_tracker should not be empty");
-        // TODO: extend this test with adding concurrent dependencies
+        tbb::task_handle succ = tg.defer([&] {
+            CHECK_MESSAGE(task_placeholder == 1, "Predecessor task was not executed");
+            ++succ_counter;
+        });
+        tbb::task_group::make_edge(tracker, succ);
+        tg.run(std::move(succ));
     });
 
     tg.run_and_wait(std::move(task));
     CHECK_MESSAGE(task_placeholder == 1, "task body was not executed");
+    CHECK_MESSAGE(succ_counter == n, "Not all of the successors were executed");
 }
 #endif
