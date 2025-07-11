@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -1325,7 +1326,7 @@ TEST_CASE("test task_tracker") {
             CHECK_MESSAGE(enqueue_task_tracker, "task_tracker should not be empty after enqueue");
             tg.wait();
             CHECK_MESSAGE(task_placeholder == 5, "Task body was not executed");
-            CHECK_MESSAGE(enqueue_task_tracker, "task_tracker should be empty after task completion");
+            CHECK_MESSAGE(enqueue_task_tracker, "task_tracker should not be empty after task completion");
         }
         {
             tbb::task_tracker enqueue_task_tracker;
@@ -1338,7 +1339,7 @@ TEST_CASE("test task_tracker") {
             });
             tg.wait();
             CHECK_MESSAGE(task_placeholder == 6, "Task body was not executed");
-            CHECK_MESSAGE(enqueue_task_tracker, "task_tracker should be empty after task completion");
+            CHECK_MESSAGE(enqueue_task_tracker, "task_tracker should not be empty after task completion");
         }
     }
 }
@@ -1674,5 +1675,32 @@ TEST_CASE("test task_group dynamic dependencies") {
         test_return_task_with_dependencies(submit_function::arena_enqueue);
         test_return_task_with_dependencies(submit_function::this_arena_enqueue);
     }
+}
+
+TEST_CASE("test task_tracker in concurrent environment") {
+    tbb::task_group tg;
+    std::size_t task_placeholder = 0;
+    const int n = 100;
+
+    tbb::task_handle task = tg.defer([&] {
+        ++task_placeholder;
+    });
+
+    std::atomic<std::size_t> succ_counter(0);
+
+    tbb::parallel_for(0, n, [&](int) {
+        tbb::task_tracker tracker(task);
+        CHECK_MESSAGE(tracker, "task_tracker should not be empty");
+        tbb::task_handle succ = tg.defer([&] {
+            CHECK_MESSAGE(task_placeholder == 1, "Predecessor task was not executed");
+            ++succ_counter;
+        });
+        tbb::task_group::make_edge(tracker, succ);
+        tg.run(std::move(succ));
+    });
+
+    tg.run_and_wait(std::move(task));
+    CHECK_MESSAGE(task_placeholder == 1, "task body was not executed");
+    CHECK_MESSAGE(succ_counter == n, "Not all of the successors were executed");
 }
 #endif
