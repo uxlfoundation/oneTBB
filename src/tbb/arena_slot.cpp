@@ -81,13 +81,13 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
                 __TBB_ASSERT( H0 == head.load(std::memory_order_relaxed)
                     && T == tail.load(std::memory_order_relaxed)
                     && H0 == T + 1, "victim/thief arbitration algorithm failure" );
-                reset_task_pool_and_leave();
+                (tasks_omitted) ? release_task_pool() : reset_task_pool_and_leave();
                 // No tasks in the task pool.
                 task_pool_empty = true;
                 break;
             } else if ( H0 == T ) {
                 // There is only one task in the task pool.
-                reset_task_pool_and_leave();
+                (tasks_omitted || isolation != no_isolation) ? release_task_pool() : reset_task_pool_and_leave();
                 task_pool_empty = true;
             } else {
                 // Release task pool if there are still some tasks.
@@ -109,31 +109,22 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
 
     if ( tasks_omitted ) {
         if ( task_pool_empty ) {
-            // All tasks have been checked. The task pool should be  in reset state.
-            // We just restore the bounds for the available tasks.
-            // TODO: Does it have sense to move them to the beginning of the task pool?
-            __TBB_ASSERT( is_quiescent_local_task_pool_reset(), nullptr );
+            // All tasks have been checked.
             if ( result ) {
                 // If we have a task, it should be at H0 position.
                 __TBB_ASSERT( H0 == T, nullptr );
                 ++H0;
+                head.store(H0, std::memory_order_relaxed);
             }
             __TBB_ASSERT( H0 <= T0, nullptr );
-            if ( H0 < T0 ) {
-                // Restore the task pool if there are some tasks.
-                head.store(H0, std::memory_order_relaxed);
-                tail.store(T0, std::memory_order_relaxed);
-                // The release fence is used in publish_task_pool.
-                publish_task_pool();
-                // Synchronize with snapshot as we published some tasks.
-                ed.task_disp->m_thread_data->my_arena->advertise_new_work<arena::wakeup>();
-            }
         } else {
             // A task has been obtained. We need to make a hole in position T.
             __TBB_ASSERT( is_task_pool_published(), nullptr );
             __TBB_ASSERT( result, nullptr );
             task_pool_ptr[T] = nullptr;
-            tail.store(T0, std::memory_order_release);
+        }
+        tail.store(T0, std::memory_order_release);
+        if ( H0 < T0 ) {
             // Synchronize with snapshot as we published some tasks.
             // TODO: consider some approach not to call wakeup for each time. E.g. check if the tail reached the head.
             ed.task_disp->m_thread_data->my_arena->advertise_new_work<arena::wakeup>();
