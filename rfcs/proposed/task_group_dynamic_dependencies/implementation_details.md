@@ -2,92 +2,7 @@
 
 *Note:* This document describes implementation details for the [task group dynamic dependencies RFC](extended_semantics.md)
 
-## Introduction
-
-The [task group dynamic dependencies RFC](extended_semantics.md) describes a design for setting predecessor-
-successor dependencies between tasks in various states (`make_edge` API) and replacing the currently executing
-task with another task in the task graph (`transfer_successors_to` API).
-
-A task in the `created` state is expressed by a `task_handle` object on the user side.
-A task in other states (`created`, `submitted`, `executing` or `completed`) is represented by a `task_tracker` object.
-
-Similar to `task_handle`, the `task_tracker` may be in two states - `empty`, meaning it does not
-track any tasks, and `non-empty`. The only way to get a `non-empty` `task_tracker` is to construct or
-assign it from a non-empty `task_handle`:
-
-```cpp
-tbb::task_group tg;
-tbb::task_handle th = tg.defer(...); // task is in created state
-tbb::task_tracker tt = th;
-tg.run(std::move(th));
-// th is empty
-// tt is non-empty
-// the task is in one of the submitted->executing->completed states
-```
-
-While creating a predecessor-successor dependency between tasks, any task state is allowed for
-a predecessor but only a task in the `created` state is allowed as successor. It is exposed by the following APIs:
-
-```cpp
-namespace oneapi {
-namespace tbb {
-class task_group {
-public:
-    static void make_edge(task_handle& pred, task_handle& succ);
-    static void make_edge(task_tracker& pred, task_handle& succ);
-};
-}
-}
-```
-
-The first overload is intended to create a predecessor-successor dependency between two tasks in the `created` state.
-The second overload is to create a dependency between a predecessor in any of the states and a successor
-in the `created` state.
-
-While executing a task, a new task can be added to the task graph and the successors of the
-currently executing task can be transferred to this new task:
-
-```cpp
-namespace oneapi {
-namespace tbb {
-class task_group {
-public:
-    struct current_task {
-        static void transfer_successors_to(tbb::task_handle& rec);
-    };
-};
-}
-}
-```
-
-Only a task in the `created` state is allowed to be a recipient of successors (only `task_handle` argument
-is allowed).
-
-After transferring from the task `prev_task` to `new_task`, the new successors added
-using the `task_tracker` for `prev_task` should be added as successors of `new_task`:
-
-```cpp
-
-tbb::task_group tg;
-tbb::task_handle prev_task = tg.defer([] {
-    tbb::task_handle new_task = tg.defer(...);
-    tbb::task_group::current_task::transfer_successors_to(new_task);
-    tg.run(std::move(new_task));
-});
-
-tbb::task_tracker prev_task_tracker = prev_task;
-tg.run(std::move(prev_task));
-
-// assume that prev task is completed at this moment
-tbb::task_handle new_successor = tg.defer(...);
-
-// new_successor is added to new_task
-tbb::task_group::make_edge(prev_task_tracker, new_successor);
-```
-
-## Implementation details
-
-### Class layouts before implementing the proposal
+## Class layouts before implementing the proposal
 
 Currently, there are two types of tasks used in the `task_group`: `function_task` and `function_stack_task`.
 A `function_task` is created when non-blocking submission functions, such as `task_group::run` are used.
@@ -108,7 +23,7 @@ The class layout is shown in the picture below:
 
 <img src="assets/impl_prev_class_layout.png" width=600>
 
-### `task_dynamic_state` class
+## `task_dynamic_state` class
 
 The main parts of the APIs described above are implemented as part of the new
 `task_dynamic_state` class. It is intended to manage the task status (in progress, completed, transferred),
@@ -121,7 +36,7 @@ Since the `make_edge` API allows completed tasks as predecessors, it is necessar
 instance associated with the task even after its completion, until the last `tbb::task_tracker` object associated with the
 task is destroyed.
 
-### `task_with_dynamic_state` class
+## `task_with_dynamic_state` class
 
 To associate an instance of `task_dynamic_state` with a task, the current implementation introduces a new class `task_with_dynamic_state`
 inserted between `task_handle_task` and `task` classes in the class hierarchy. This class contains an atomic pointer to the `task_dynamic_state`
@@ -204,7 +119,7 @@ private:
 The `new_state->reserve()` in case of successful CAS is needed to prolong the lifetime of `task_dynamic_state` until the task
 is in progress. When the task is destroyed, the reference counter in `task_dynamic_state` is decreased.
 
-### `tbb::task_tracker` class implementation
+## `tbb::task_tracker` class implementation
 
 The `tbb::task_tracker` class implements a shared pointer to the `task_dynamic_state` object. Each copy of a `task_tracker` object
 associated with a task increases the reference counter stored in the dynamic state to prolong its lifetime until all associated trackers are destroyed.
@@ -243,7 +158,7 @@ public:
 }
 ```
 
-### `task_dynamic_state` in details
+## `task_dynamic_state` in details
 
 As mentioned above, the `task_dynamic_state` class implements tracking of a task's state (completed or not completed),
 its list of successors, and the post-transfer actions. It has the following layout:
@@ -289,9 +204,9 @@ The stored reference counter is decreased when:
 Once the reference counter is decreased for the last time (i.e., reaches `0`), the `task_dynamic_state` is destroyed
 and then deallocated using `m_allocator`.
 
-### Create dependencies between tasks
+## Create dependencies between tasks
 
-#### `continuation_vertex` class
+### `continuation_vertex` class
 
 `continuation_vertex` is a class that represents the associated task as a successor of other tasks.
 It implements an additional reference counter that is reserved:
@@ -344,7 +259,7 @@ Having a `continuation_vertex` assigned to the task (`m_continuation_vertex` not
 a marker that the associated task has dependencies and cannot be unconditionally submitted for execution once the `task_handle` owning this task
 is received in one of the submit functions (e.g. `task_group::run`).
 
-#### The successors list
+### The successors list
 
 The successors of the task are organized in a forward list stored in the `task_dynamic_state`. Each element in the list is an object of
 `successors_list_node` class, representing a simple forward list node that contains a pointer to the `continuation_vertex` of the successor:
@@ -371,7 +286,7 @@ The successors list in `task_dynamic_state` can have two possible states:
       should be redirected to the dynamic state of the task, receiving the successors. In this case also `m_new_dynamic_state` should point to
       the receiving state.
 
-#### Adding successors to the list
+### Adding successors to the list
 
 This section describes the algorithm for adding a new successor to the successors list. The `make_edge` API allows both adding multiple successors
 concurrently to the same predecessor and adding multiple predecessors concurrently to the same successor.
@@ -498,7 +413,7 @@ void make_edge(tbb::task_tracker& pred, tbb::task_handle& succ) {
 }
 ```
 
-#### Notifying the successors
+### Notifying the successors
 
 Once the predecessor's task body is completed, it should notify all the successors.
 
@@ -597,7 +512,7 @@ task_with_dynamic_state* release_successors_list(successors_list_node* node) {
 If the body did not return a task, or a returned task have dependencies, the successor task is bypassed. Otherwise, the task returned by the
 body is bypassed.
 
-#### Submitting a task for execution
+### Submitting a task for execution
 
 The implementation of submit functions that accept a `task_handle` is also being updated to support task with dependencies. The following functions are
 modified:
@@ -625,7 +540,7 @@ has any dependencies (i.e., whether `m_continuation_vertex` for the current task
 If the reference counter is now equal to `0`, the owned task can be spawned. Otherwise, it will be spawned by that last predecessor releasing its list
 of successors.
 
-### Transferring successors to the other task
+## Transferring successors to the other task
 
 The API `tbb::task_group::current_task::transfer_successors_to(tbb::task_handle& new_task)` is implemented by setting the `m_new_dynamic_state` in
 the dynamic state of the currently executing task to the address of the dynamic state of `new_task`.
@@ -699,7 +614,7 @@ void task_dynamic_state::add_successors_list(successors_list_node* list) {
 }
 ```
 
-#### Dynamic state lifetime issue
+### Dynamic state lifetime issue
 
 During the implementation of the `transfer_successors_to`, an issue was found with the lifetime of `task_dynamic_state`.
 
@@ -724,11 +639,11 @@ However, since `B_state` was destroyed after finalizing task `B`, accessing it w
 The solution is to prolong the lifetime of `B_state` by increasing the reference counter for each state having `B_state` as `m_new_dynamic_state`.
 The reference counter is decreased when the `A_state` is destroyed.
 
-### Dynamic state transition examples
+## Dynamic state transition examples
 
 Consider several examples of how the associated dynamic state changes during different states of a task.
 
-#### Creating the edges
+### Creating the edges
 
 The first example illustrates the following code:
 
@@ -779,7 +694,7 @@ Since it is the last reference counter, the dynamic state is destroyed.
 
 `pred_task` dynamic state is destroyed when the `pred_tr` destructor releases the last reference counter.
 
-#### Transferring and creating edges
+### Transferring and creating edges
 
 This example describes both transferring and creating edges in the same application:
 
