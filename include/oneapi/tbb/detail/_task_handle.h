@@ -75,6 +75,7 @@ public:
         : m_task(task)
         , m_successor_list_head(nullptr)
         , m_continuation_vertex(nullptr)
+        , m_new_dynamic_state(nullptr)
         , m_num_references(1) // reserves a task co-ownership for dynamic state
         , m_allocator(alloc)
     {}
@@ -83,13 +84,20 @@ public:
 
     void release() {
         if (--m_num_references == 0) {
+            task_dynamic_state* new_state = m_new_dynamic_state.load(std::memory_order_relaxed);
+            // There was a new state assigned to the current one by transferring the successors
+            // Need to unregister the current dynamic state as a co-owner
+            if (new_state) new_state->release();
             m_allocator.delete_object(this);
         }
     }
-
+        
     task_handle_task* complete_task() {
-        successor_list_node* list = fetch_successor_list();
-        return release_successor_list(list);
+        task_handle_task* next_task = nullptr;
+        if (is_alive(m_successor_list_head.load(std::memory_order_acquire))) {
+            next_task = release_successor_list(fetch_successor_list());
+        }
+        return next_task;
     }
 
     bool has_dependencies() const {
@@ -100,7 +108,10 @@ public:
         m_continuation_vertex.store(nullptr, std::memory_order_release);
     }
 
+    bool check_transfer_or_completion(successor_list_node* current_list_head, successor_list_node* successor_node);
     void add_successor(continuation_vertex* successor);
+    void add_successor_node(successor_list_node* successor_node);
+    void add_successor_list(successor_list_node* successor_list);
     void release_continuation();
     
     continuation_vertex* get_continuation_vertex() {
@@ -130,10 +141,21 @@ public:
         return m_successor_list_head.exchange(reinterpret_cast<successor_list_node*>(~std::uintptr_t(0)));
     }
 
+    void transfer_successors_to(task_dynamic_state* new_dynamic_state) {
+        __TBB_ASSERT(new_dynamic_state != nullptr, nullptr);
+        // Register current dynamic state as a co-owner of the new dynamic state
+        // to prevent it's early destruction
+        new_dynamic_state->reserve();
+        m_new_dynamic_state.store(new_dynamic_state, std::memory_order_relaxed);
+        successor_list_node* successor_list = fetch_successor_list();
+        new_dynamic_state->add_successor_list(successor_list);
+    }
+
 private:
     task_handle_task* m_task;
     std::atomic<successor_list_node*> m_successor_list_head;
     std::atomic<continuation_vertex*> m_continuation_vertex;
+    std::atomic<task_dynamic_state*> m_new_dynamic_state;
     std::atomic<std::size_t> m_num_references;
     d1::small_object_allocator m_allocator;
 };
@@ -230,6 +252,16 @@ public:
     bool has_dependencies() const {
         task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_relaxed);
         return current_state ? current_state->has_dependencies() : false;
+    }
+
+    void transfer_successors_to(task_dynamic_state* other_task_state) {
+        __TBB_ASSERT(other_task_state != nullptr, nullptr);
+        task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_relaxed);
+
+        // If dynamic state was not created for currently executing task, it cannot have successors
+        if (current_state != nullptr) {
+            current_state->transfer_successors_to(other_task_state);
+        }
     }
 #endif
 };
@@ -360,27 +392,78 @@ inline task_handle_task* release_successor_list(successor_list_node* node) {
     return next_task;
 }
 
+// If the current task have transferred it's successors to another task - redirects the successor_node to the receiving task, returns true
+// If the current task was completed - removes the successor_node, returns true
+// Otherwise, does nothing and returns false
+inline bool task_dynamic_state::check_transfer_or_completion(successor_list_node* current_list_head,
+                                                             successor_list_node* new_successor_node)
+{
+    if (!is_alive(current_list_head)) {
+        task_dynamic_state* new_state = m_new_dynamic_state.load(std::memory_order_relaxed);
+        if (new_state != nullptr) {
+            // Originally tracker task transferred successors to other task, add new successor to the receiving task
+            new_state->add_successor_node(new_successor_node);
+        } else {
+            // Task completed while reading the successor list, no need to add extra dependencies
+            new_successor_node->get_continuation_vertex()->release();
+            new_successor_node->finalize();
+        }
+        return true;
+    }
+    return false;
+}
+
+inline void task_dynamic_state::add_successor_node(successor_list_node* new_successor_node) {{
+    __TBB_ASSERT(new_successor_node != nullptr, nullptr);
+
+    successor_list_node* current_successor_list_head = m_successor_list_head.load(std::memory_order_acquire);
+
+    if (!check_transfer_or_completion(current_successor_list_head, new_successor_node)) {
+        // Task is not completed and did not transfer the successors
+        new_successor_node->set_next_node(current_successor_list_head);
+
+        while (!m_successor_list_head.compare_exchange_strong(current_successor_list_head, new_successor_node) &&
+               !check_transfer_or_completion(current_successor_list_head, new_successor_node))
+        {
+            // Other thread inserted the successor before us, update the new node
+            new_successor_node->set_next_node(current_successor_list_head);
+        }
+    }
+}}
+
 inline void task_dynamic_state::add_successor(continuation_vertex* successor) {
     __TBB_ASSERT(successor != nullptr, nullptr);
     successor_list_node* current_successor_list_head = m_successor_list_head.load(std::memory_order_acquire);
 
     if (is_alive(current_successor_list_head)) {
         successor->reserve();
-
         d1::small_object_allocator alloc;
         successor_list_node* new_successor_node = alloc.new_object<successor_list_node>(successor, alloc);
-        new_successor_node->set_next_node(current_successor_list_head);
-
-        while (!m_successor_list_head.compare_exchange_strong(current_successor_list_head, new_successor_node)) {
-            // Other thread updated the head of the list
-            if (!is_alive(current_successor_list_head)) {
-                // Current task has completed while we tried to insert the successor to the list
-                new_successor_node->finalize();
-                successor->release();
-                break;
-            }
-            new_successor_node->set_next_node(current_successor_list_head);
+        add_successor_node(new_successor_node);
+    } else {
+        task_dynamic_state* new_state = m_new_dynamic_state.load(std::memory_order_relaxed);
+        if (new_state != nullptr) {
+            // Originally tracked task transferred successors to other task, add new successor to the receiving task
+            new_state->add_successor(successor);
         }
+    }
+}
+
+inline void task_dynamic_state::add_successor_list(successor_list_node* successor_list) {
+    if (successor_list == nullptr) return;
+
+    successor_list_node* last_node = successor_list;
+
+    while (last_node->get_next_node() != nullptr) {
+        last_node = last_node->get_next_node();
+    }
+
+    successor_list_node* current_successor_list_head = m_successor_list_head.load(std::memory_order_acquire);
+    last_node->set_next_node(current_successor_list_head);
+
+    while (!m_successor_list_head.compare_exchange_strong(current_successor_list_head, successor_list)) {
+        // Other thread updated the head of the list
+        last_node->set_next_node(current_successor_list_head);
     }
 }
 
