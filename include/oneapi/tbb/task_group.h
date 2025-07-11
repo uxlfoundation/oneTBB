@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -600,6 +601,19 @@ public:
     }
 }; // class task_group
 
+class wait_delegate : public d1::delegate_base {
+    bool operator()() const override {
+        status = tg.wait();
+        return true;
+    }
+protected:
+    task_group& tg;
+    task_group_status& status;
+public:
+    wait_delegate(task_group& a_group, task_group_status& tgs)
+        : tg(a_group), status(tgs) {}
+};
+
 #if TBB_PREVIEW_ISOLATED_TASK_GROUP
 class spawn_delegate : public d1::delegate_base {
     d1::task* task_to_spawn;
@@ -612,19 +626,6 @@ public:
     spawn_delegate(d1::task* a_task, d1::task_group_context& ctx)
         : task_to_spawn(a_task), context(ctx)
     {}
-};
-
-class wait_delegate : public d1::delegate_base {
-    bool operator()() const override {
-        status = tg.wait();
-        return true;
-    }
-protected:
-    task_group& tg;
-    task_group_status& status;
-public:
-    wait_delegate(task_group& a_group, task_group_status& tgs)
-        : tg(a_group), status(tgs) {}
 };
 
 template<typename F>
