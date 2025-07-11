@@ -98,7 +98,12 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
         }
         result = get_task_impl( T, ed, tasks_omitted, isolation );
         if ( result ) {
-            poison_pointer( task_pool_ptr[T] );
+            // If some tasks were omitted, we need to make a hole in position T.
+            if ( tasks_omitted ) {
+                task_pool_ptr[T] = nullptr;
+            } else {
+                poison_pointer( task_pool_ptr[T] );
+            }
             break;
         } else if ( !tasks_omitted ) {
             poison_pointer( task_pool_ptr[T] );
@@ -108,20 +113,15 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
     } while ( !result && !task_pool_empty );
 
     if ( tasks_omitted ) {
+        __TBB_ASSERT( is_task_pool_published(), nullptr );
         if ( task_pool_empty ) {
             // All tasks have been checked.
             if ( result ) {
                 // If we have a task, it should be at H0 position.
                 __TBB_ASSERT( H0 == T, nullptr );
                 ++H0;
-                head.store(H0, std::memory_order_relaxed);
             }
             __TBB_ASSERT( H0 <= T0, nullptr );
-        } else {
-            // A task has been obtained. We need to make a hole in position T.
-            __TBB_ASSERT( is_task_pool_published(), nullptr );
-            __TBB_ASSERT( result, nullptr );
-            task_pool_ptr[T] = nullptr;
         }
         tail.store(T0, std::memory_order_release);
         if ( H0 < T0 ) {
