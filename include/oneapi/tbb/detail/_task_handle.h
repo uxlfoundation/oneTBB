@@ -56,61 +56,16 @@ private:
     std::atomic<std::size_t> m_num_references;
     d1::small_object_allocator m_allocator;
 };
-
-class task_with_dynamic_state : public d1::task {
-public:
-    task_with_dynamic_state() : m_state(nullptr) {}
-
-    virtual ~task_with_dynamic_state() {
-        task_dynamic_state* current_state = m_state.load(std::memory_order_relaxed);
-        if (current_state != nullptr) {
-            current_state->release();
-        }
-    }
-
-    // Create dynamic state if task_tracker is created or a first successor is added to task_handle
-    task_dynamic_state* get_dynamic_state() {
-        task_dynamic_state* current_state = m_state.load(std::memory_order_acquire);
-
-        if (current_state == nullptr) {
-            d1::small_object_allocator alloc;
-
-            task_dynamic_state* new_state = alloc.new_object<task_dynamic_state>(alloc);
-
-            if (m_state.compare_exchange_strong(current_state, new_state)) {
-                current_state = new_state;
-            } else {
-                // Other thread created the dynamic state
-                alloc.delete_object(new_state);
-            }
-        }
-
-        __TBB_ASSERT(current_state != nullptr, "Failed to create dynamic state");
-        return current_state;
-    }
-
-    void complete_task() {
-        task_dynamic_state* current_state = m_state.load(std::memory_order_relaxed);
-        if (current_state != nullptr) {
-            current_state->complete_task();
-        }
-    }
-private:
-    std::atomic<task_dynamic_state*> m_state;
-};
 #endif // __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
-class task_handle_task
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-: public task_with_dynamic_state
-#else
-: public d1::task
-#endif
-{
+class task_handle_task : public d1::task {
     std::uint64_t m_version_and_traits{};
     d1::wait_tree_vertex_interface* m_wait_tree_vertex;
     d1::task_group_context& m_ctx;
     d1::small_object_allocator m_allocator;
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    std::atomic<task_dynamic_state*> m_dynamic_state;
+#endif
 public:
     void finalize(const d1::execution_data* ed = nullptr) {
         if (ed) {
@@ -123,16 +78,59 @@ public:
     task_handle_task(d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
         : m_wait_tree_vertex(vertex)
         , m_ctx(ctx)
-        , m_allocator(alloc) {
+        , m_allocator(alloc)
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        , m_dynamic_state(nullptr)
+#endif
+    {
         suppress_unused_warning(m_version_and_traits);
         m_wait_tree_vertex->reserve();
     }
 
     ~task_handle_task() override {
         m_wait_tree_vertex->release();
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_relaxed);
+        if (current_state != nullptr) {
+            current_state->release();
+        }
+#endif
     }
 
     d1::task_group_context& ctx() const { return m_ctx; }
+
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    // Initializes the dynamic state if:
+    // * the task_tracker object was created
+    // * first dependency was added to a task_handle
+    // * Successors were transferred to the current task
+    task_dynamic_state* get_dynamic_state() {
+        task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_acquire);
+
+        if (current_state == nullptr) {
+            d1::small_object_allocator alloc;
+
+            task_dynamic_state* new_state = alloc.new_object<task_dynamic_state>(alloc);
+
+            if (m_dynamic_state.compare_exchange_strong(current_state, new_state)) {
+                current_state = new_state;
+            } else {
+                // Other thread created the dynamic state
+                alloc.delete_object(new_state);
+            }
+        }
+
+        __TBB_ASSERT(current_state != nullptr, "Failed to create dynamic state");
+        return current_state;
+    }
+
+    void complete_task() {
+        task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_relaxed);
+        if (current_state != nullptr) {
+            current_state->complete_task();
+        }
+    }
+#endif
 };
 
 
