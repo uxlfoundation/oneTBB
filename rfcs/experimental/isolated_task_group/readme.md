@@ -3,7 +3,7 @@
 ## Introduction
 
 In-arena task isolation scopes were introduced into TBB to restrict task stealing within arena
-in scenarios where stealing arbitrary tasks lead to correctness or performance issues.
+in scenarios where stealing arbitrary tasks leads to correctness or performance issues.
 
 On the implementation level, an isolation scope is represented by a unique tag (usually an address)
 that is assigned to any task created within the dynamic extent of the scope and used by
@@ -11,10 +11,10 @@ task dispatchers called within that extent. Other task dispatchers, and specific
 oneTBB worker threads, are not restricted by isolation and can take any task, including those
 with an isolation tag.
 
-On the API level, the main way to create an isolation scope is to call `task_arena::isolate`.
-Typically, it wraps one or more parallel algorithm invocations, and the calling thread
+On the API level, the main way to create an isolation scope is to call `this_task_arena::isolate`.
+Typically, it is used to wrap one or more parallel algorithm invocations, and the calling thread
 is prohibited to take any task created outside of those algorithms. A typical usage pattern
-for this is to wrap nested parallel calls within an outer-level parallel algorithm which tasks
+for this is to wrap nested parallel calls within an outer-level parallel algorithm in which tasks
 depend on a thread-specific state (e.g., use TLS or acquire a lock).
 
 However, there are also patterns where the isolation scope needs to go beyond a single invocation
@@ -51,7 +51,7 @@ by threads that wait for that initialization to complete - so that it can be com
 and the threads can make progress on their outer level tasks.
 
 However, for that to happen each participating thread should use the same isolation tag, which is
-not possible with `task_arena::isolate`. And since a task group is used for collaborative waiting
+not possible with `this_task_arena::isolate`. And since a task group is used for collaborative waiting
 anyway, it is natural for it to also provide the isolation scope.
 
 ## Experimental feature: `isolated_task_group`
@@ -125,7 +125,7 @@ Over time, alternative ways to provide "shareable" in-arena isolation scopes wer
 One of early ideas for in-arena isolation was to add a special trait to the `task_group_context`
 class that would communicate to the task scheduler that arbitrary stealing is not allowed
 for a certain parallel construct. The benefits of this approach are: a) the possibility to use
-with all TBB parallel constructs (algorithms, task groups, flow graphs), and b) the dynamic tree
+it with all TBB parallel constructs (algorithms, task groups, flow graphs), and b) the dynamic tree
 of bound contexts would enable propagation of isolation to nested constructs.
 
 However, the main role of `task_group_context` and the dynamic tree is to support cancellation
@@ -151,7 +151,7 @@ After analysis we can conclude that:
   check/obtain an isolation tag, causing extra overhead and breaking the pay-as-you-go principle.
 
 Seemingly, making task isolation a property of `task_group_context` (or something similar) would
-require a significant rehaul of both the scheduler internals and likely the public oneTBB APIs.
+require a significant overhaul of both the scheduler internals and likely the public oneTBB APIs.
 
 #### User-specified isolation tags
 
@@ -187,7 +187,7 @@ any isolation tag; and so user errors are still possible.
 
 ## Exit criteria
 
-To decide on making `isolated_task_arena` a fully supported feature of the library, we need to
+To decide on making `isolated_task_group` a fully supported feature of the library, we need to
 answer at least the following questions:
 
 - Is there sufficient motivation to add support for isolation scopes shared across multiple calls?
