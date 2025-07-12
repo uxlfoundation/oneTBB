@@ -2,8 +2,9 @@
 
 ## Introduction
 
-In-arena task isolation scopes were introduced into TBB to restrict task stealing within arena
-in scenarios where stealing arbitrary tasks leads to correctness or performance issues.
+[In-arena task isolation scopes](https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/work_isolation.html)
+were introduced into TBB to restrict task stealing within an arena in scenarios where stealing
+arbitrary tasks leads to correctness or performance issues.
 
 On the implementation level, an isolation scope is represented by a unique tag (usually an address)
 that is assigned to any task created within the dynamic extent of the scope and used by
@@ -18,7 +19,7 @@ for this is to wrap nested parallel calls within an outer-level parallel algorit
 depend on a thread-specific state (e.g., use TLS or acquire a lock).
 
 However, there are also patterns where the isolation scope needs to go beyond a single invocation
-of `task_arena::isolate`. For example, the following pseudocode expresses a lazy initialization
+of `this_task_arena::isolate`. For example, the following pseudocode expresses a lazy initialization
 pattern within an outer TBB parallel construct, with the initialization function also utilizing
 some parallelism.
 
@@ -51,8 +52,8 @@ by threads that wait for that initialization to complete - so that it can be com
 and the threads can make progress on their outer level tasks.
 
 However, for that to happen each participating thread should use the same isolation tag, which is
-not possible with `this_task_arena::isolate`. And since a task group is used for collaborative waiting
-anyway, it is natural for it to also provide the isolation scope.
+not possible with `this_task_arena::isolate`. And since a task group is used for collaborative
+waiting anyway, it is natural for it to also provide the isolation scope.
 
 ## Experimental feature: `isolated_task_group`
 
@@ -157,7 +158,7 @@ require a significant overhaul of both the scheduler internals and likely the pu
 
 Another idea is to add an isolation tag parameter to the `task_arena` APIs for work submission,
 allowing users to explicitly manage isolation scopes as they need. At the time it was considered
-as a possible future extension for `task_arena::isolate`; but it might as well be added to
+as a possible future extension for `this_task_arena::isolate`; but it might as well be added to
 `enqueue` and `wait_for` calls.
 
 The main advantage of this approach is that it is a reasonably simple API extension on top of
