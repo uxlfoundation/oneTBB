@@ -202,10 +202,10 @@ private:
     //! Get a task from the local pool at specified location T.
     /** Returns the pointer to the task or nullptr if the task cannot be executed,
         e.g. proxy has been deallocated or isolation constraint is not met.
-        tasks_omitted tells if some tasks have been omitted.
+        tasks_skipped tells if some tasks have been skipped.
         Called only by the pool owner. The caller should guarantee that the
         position T is not available for a thief. **/
-    d1::task* get_task_impl(size_t T, execution_data_ext& ed, bool& tasks_omitted, isolation_type isolation);
+    d1::task* get_task_impl(size_t T, execution_data_ext& ed, bool& tasks_skipped, isolation_type isolation);
 
     //! Makes sure that the task pool can accommodate at least n more elements
     /** If necessary relocates existing task pointers or grows the ready task deque.
