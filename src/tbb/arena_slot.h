@@ -45,14 +45,18 @@ static d1::task** const EmptyTaskPool  = nullptr;
 static d1::task** const LockedTaskPool = reinterpret_cast<d1::task**>(~std::intptr_t(0));
 
 struct alignas(max_nfs_size) arena_slot_shared_state {
-    //! Scheduler of the thread attached to the slot
-    /** Marks the slot as busy, and is used to iterate through the schedulers belonging to this arena **/
+    //! The flag indicates whether the slot is used by a thread.
+    /** Marks the slot as idle or busy, and is used when threads join and leave the arena **/
     std::atomic<bool> my_is_occupied;
 
-    // Synchronization of access to Task pool
+    //! The flag indicates that the task pool might temporarily exclude some valid tasks.
+    /** Set by the owning thread in get_task(), tested during exhaustive task search in has_tasks(). **/
+    std::atomic<bool> has_skipped_tasks;
+
+    //! Synchronization of access to the task pool.
     /** Also is used to specify if the slot is empty or locked:
-         0 - empty
-        -1 - locked **/
+        EmptyTaskPool  === nullptr
+        LockedTaskPool === a "pointer" with all bits set to 1 **/
     std::atomic<d1::task**> task_pool;
 
     //! Index of the first ready task in the deque.

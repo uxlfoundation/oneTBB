@@ -39,6 +39,7 @@ d1::task* arena_slot::get_task_impl(size_t T, execution_data_ext& ed, bool& task
     if (!skip && !task_accessor::is_proxy_task(*result)) {
         return result;
     } else if (skip) {
+        has_skipped_tasks.store(true, std::memory_order_relaxed);
         tasks_skipped = true;
         return nullptr;
     }
@@ -87,6 +88,10 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
                 break;
             } else if ( H0 == T ) {
                 // There is only one task in the task pool.
+                if ( isolation != no_isolation ) {
+                    // There might be isolation mismatch, so let's pessimistically assume the task is skipped
+                    has_skipped_tasks.store(true, std::memory_order_relaxed);
+                }
                 (isolation != no_isolation || tasks_skipped) ? release_task_pool() : reset_task_pool_and_leave();
                 task_pool_empty = true;
             } else {
@@ -130,6 +135,8 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
             ed.task_disp->m_thread_data->my_arena->advertise_new_work<arena::wakeup>();
         }
     }
+    // At this point, skipped tasks - if any - are again within the pool bounds
+    has_skipped_tasks.store(false, std::memory_order_relaxed);
 
     __TBB_ASSERT( (std::intptr_t)tail.load(std::memory_order_relaxed) >= 0, nullptr );
     __TBB_ASSERT( result || tasks_skipped || is_quiescent_local_task_pool_reset(), nullptr );
