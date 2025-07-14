@@ -23,10 +23,21 @@
 #include <tbb/blocked_range.h>
 #include <tbb/global_control.h>
 #include <tbb/parallel_for.h>
-#include "tbb/task_group.h"
-// dpc_common.hpp can be found in the dev-utilities include folder.
-// e.g., $ONEAPI_ROOT/dev-utilities//include/dpc_common.hpp
-#include "dpc_common.hpp"
+#include <tbb/task_group.h>
+
+static auto exception_handler = [](sycl::exception_list eList) {
+    for (std::exception_ptr const& e : eList) {
+        try {
+            std::rethrow_exception(e);
+        }
+        catch (std::exception const& e) {
+#if _DEBUG
+            std::cout << "Failure" << std::endl;
+#endif
+            std::terminate();
+        }
+    }
+};
 
 #define VERBOSE
 
@@ -56,7 +67,7 @@ public:
             sycl::buffer b_buffer(b_array);
             sycl::buffer c_buffer(c_array);
 
-            sycl::queue q(sycl::default_selector_v, dpc_common::exception_handler);
+            sycl::queue q(sycl::default_selector_v, exception_handler);
             q.submit([&](sycl::handler& h) {
                  sycl::accessor a_accessor(a_buffer, h, sycl::read_only);
                  sycl::accessor b_accessor(b_buffer, h, sycl::read_only);
