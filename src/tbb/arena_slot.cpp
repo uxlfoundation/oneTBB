@@ -67,7 +67,7 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
     // The bounds of available tasks in the task pool. H0 is only used when the head bound is reached.
     std::size_t H0 = (std::size_t)-1, T = T0;
     d1::task* result = nullptr;
-    bool task_pool_empty = false;
+    bool all_tasks_checked = false;
     bool tasks_skipped = false;
     do {
         __TBB_ASSERT( !result, nullptr );
@@ -85,7 +85,7 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
                     && H0 == T + 1, "victim/thief arbitration algorithm failure" );
                 (tasks_skipped) ? release_task_pool() : reset_task_pool_and_leave();
                 // No tasks in the task pool.
-                task_pool_empty = true;
+                all_tasks_checked = true;
                 break;
             } else if ( H0 == T ) {
                 // There is only one task in the task pool.
@@ -94,7 +94,7 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
                     has_skipped_tasks.store(true, std::memory_order_relaxed);
                 }
                 (isolation != no_isolation || tasks_skipped) ? release_task_pool() : reset_task_pool_and_leave();
-                task_pool_empty = true;
+                all_tasks_checked = true;
             } else {
                 // Release task pool if there are still some tasks.
                 // After the release, the tail will be less than T, thus a thief
@@ -106,6 +106,8 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
         if ( result ) {
             // If some tasks were skipped, we need to make a hole in position T.
             if ( tasks_skipped ) {
+                // If all tasks have been checked, the taken task must be at the H0 position
+                __TBB_ASSERT( !all_tasks_checked || H0 == T, nullptr );
                 task_pool_ptr[T] = nullptr;
             } else {
                 poison_pointer( task_pool_ptr[T] );
@@ -116,19 +118,10 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
             __TBB_ASSERT( T0 == T+1, nullptr );
             T0 = T;
         }
-    } while ( !result && !task_pool_empty );
+    } while ( !result && !all_tasks_checked );
 
     if ( tasks_skipped ) {
-        __TBB_ASSERT( is_task_pool_published(), nullptr );
-        if ( task_pool_empty ) {
-            // All tasks have been checked.
-            if ( result ) {
-                // If we have a task, it should be at H0 position.
-                __TBB_ASSERT( H0 == T, nullptr );
-                ++H0;
-            }
-            __TBB_ASSERT( H0 <= T0, nullptr );
-        }
+        __TBB_ASSERT( is_task_pool_published(), nullptr ); // the pool was not reset
         tail.store(T0, std::memory_order_release);
     }
     // At this point, skipped tasks - if any - are back in the pool bounds
