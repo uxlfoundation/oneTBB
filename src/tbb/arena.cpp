@@ -372,7 +372,7 @@ bool arena::has_tasks() {
     std::size_t n = my_limit.load(std::memory_order_acquire);
     bool tasks_are_available = false;
     for (std::size_t k = 0; k < n && !tasks_are_available; ++k) {
-        tasks_are_available = !my_slots[k].is_empty();
+        tasks_are_available = my_slots[k].has_tasks();
     }
     tasks_are_available = tasks_are_available || has_enqueued_tasks() || !my_resume_task_stream.empty();
 #if __TBB_CRITICAL_TASKS

@@ -129,13 +129,8 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
             __TBB_ASSERT( H0 <= T0, nullptr );
         }
         tail.store(T0, std::memory_order_release);
-        if ( H0 < T0 ) {
-            // Synchronize with snapshot as we published some tasks.
-            // TODO: consider some approach not to call wakeup for each time. E.g. check if the tail reached the head.
-            ed.task_disp->m_thread_data->my_arena->advertise_new_work<arena::wakeup>();
-        }
     }
-    // At this point, skipped tasks - if any - are again within the pool bounds
+    // At this point, skipped tasks - if any - are back in the pool bounds
     has_skipped_tasks.store(false, std::memory_order_relaxed);
 
     __TBB_ASSERT( (std::intptr_t)tail.load(std::memory_order_relaxed) >= 0, nullptr );

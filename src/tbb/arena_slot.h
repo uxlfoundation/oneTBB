@@ -173,9 +173,28 @@ public:
         return task_pool.load(std::memory_order_relaxed) != EmptyTaskPool;
     }
 
-    bool is_empty() const {
-        return task_pool.load(std::memory_order_relaxed) == EmptyTaskPool ||
-               head.load(std::memory_order_relaxed) >= tail.load(std::memory_order_relaxed);
+    bool has_tasks() {
+        d1::task** the_task_pool = task_pool.load(std::memory_order_relaxed);
+        if ( the_task_pool == EmptyTaskPool ) {
+            return false;
+        }
+        std::size_t hd = head.load(std::memory_order_relaxed), tl = tail.load(std::memory_order_relaxed); 
+        if ( (std::intptr_t)hd >= (std::intptr_t)tl ) {
+            // Since some tasks might be temporary out of the visible pool bounds, lock the pool to examine closely
+            bool skipped_tasks = false;
+            the_task_pool = lock_task_pool();
+            if ( the_task_pool == EmptyTaskPool ) {
+                return false;
+            }
+            hd = head.load(std::memory_order_relaxed);
+            tl = tail.load(std::memory_order_relaxed);
+            skipped_tasks = has_skipped_tasks.load(std::memory_order_relaxed);
+            unlock_task_pool(the_task_pool);
+            if ( (std::intptr_t)hd >= (std::intptr_t)tl && !skipped_tasks ) {
+                return false;
+            }
+        }
+        return true;
     }
 
     bool is_occupied() const {
