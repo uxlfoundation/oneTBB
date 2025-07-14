@@ -87,6 +87,10 @@ This experimental feature was added in [TBB 2019 Update 9](https://github.com/ux
 For unknown reasons (most likely just by oversight) the documentation for the class is missed
 for oneTBB 2021 and beyond.
 
+`isolated_task_group` uses the ABI function `isolate_within_arena`, passing `this` (the task group
+ object address) as the isolation tag.  For comparison, `this_task_arena::isolate` uses the same
+ ABI function, but the isolation tag is the address of `isolate`'s function object argument.
+
 ## Does oneTBB still need `isolated_task_group`?
 
 ### Use cases
