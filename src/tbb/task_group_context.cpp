@@ -240,19 +240,28 @@ bool task_group_context_impl::is_group_execution_cancelled(const d1::task_group_
     return ctx.my_cancellation_requested.load(std::memory_order_relaxed) != 0;
 }
 
-// IMPORTANT: It is assumed that this method is not used concurrently!
+// Thread-safe reset implementation using compare_exchange
 void task_group_context_impl::reset(d1::task_group_context& ctx) {
     __TBB_ASSERT(!is_poisoned(ctx.my_context_list), nullptr);
     //! TODO: Add assertion that this context does not have children
-    // No fences are necessary since this context can be accessed from another thread
-    // only after stealing happened (which means necessary fences were used).
-
-    auto exception = ctx.my_exception.load(std::memory_order_relaxed);
-    if (exception) {
-        exception->destroy();
-        ctx.my_exception.store(nullptr, std::memory_order_relaxed);
+    
+    // Thread-safe exception cleanup using compare_exchange
+    tbb_exception_ptr* exception = ctx.my_exception.load(std::memory_order_acquire);
+    while (exception != nullptr) {
+        // Atomically clear the exception if it's still the same one
+        if (ctx.my_exception.compare_exchange_weak(exception, nullptr, 
+                                                   std::memory_order_acq_rel,
+                                                   std::memory_order_acquire)) {
+            // Successfully cleared - now safe to destroy
+            exception->destroy();
+            break;
+        }
+        // compare_exchange_weak failed and updated 'exception' with current value
+        // Retry if another exception was set, or exit if it was cleared by another thread
     }
-    ctx.my_cancellation_requested = 0;
+    
+    // Thread-safe cancellation reset using atomic store
+    ctx.my_cancellation_requested.store(0, std::memory_order_relaxed);
 }
 
 // IMPORTANT: It is assumed that this method is not used concurrently!
