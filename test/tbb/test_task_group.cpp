@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -1219,6 +1220,80 @@ TEST_CASE("task_handle cannot be scheduled into other task_group of the same con
 
     CHECK_NOTHROW(tg.run(tg.defer([]{})));
     CHECK_THROWS_WITH_AS(tg1.run(tg.defer([]{})), "Attempt to schedule task_handle into different task_group", std::runtime_error);
+}
+
+//! Test for thread-safe exception handling in concurrent wait scenarios
+//! \brief \ref error_guessing \ref interface
+TEST_CASE("Concurrent exception handling in task_group wait") {
+    if (tbb::this_task_arena::max_concurrency() < 3) {
+        // Test requires at least 3 threads: main + 2 waiters
+        return;
+    }
+
+    const int num_waiters = 4;
+    const int num_iterations = 5;
+    
+    for (int iter = 0; iter < num_iterations; ++iter) {
+        tbb::task_group tg;
+        utils::SpinBarrier barrier(num_waiters + 1); // +1 for main thread
+        std::atomic<int> exceptions_caught{0};
+        std::atomic<int> normal_completions{0};
+        std::atomic<bool> task_thrown{false};
+        
+        // Launch a task that will throw an exception
+        tg.run([&] {
+            barrier.wait(); // Wait for all waiters to be ready
+            utils::yield(); // Give waiters a chance to enter wait state
+            task_thrown = true;
+            throw test_exception("Concurrent wait exception test");
+        });
+        
+        // Launch multiple threads that will concurrently call wait()
+        std::vector<std::thread> waiters;
+        for (int i = 0; i < num_waiters; ++i) {
+            waiters.emplace_back([&, i] {
+                barrier.wait(); // Synchronize start
+                try {
+                    tbb::task_group_status status = tg.wait();
+                    if (status != tbb::not_complete)
+                        ++normal_completions;
+                } catch (const test_exception& e) {
+                    CHECK_MESSAGE(std::string(e.what()) == "Concurrent wait exception test", 
+                                "Unexpected exception message");
+                    ++exceptions_caught;
+                } catch (...) {
+                    CHECK_MESSAGE(false, "Unexpected exception type caught");
+                }
+            });
+        }
+                
+        try {
+            tbb::task_group_status status = tg.wait();
+            if (status != tbb::not_complete)
+                ++normal_completions;
+        } catch (const test_exception& e) {
+            CHECK_MESSAGE(std::string(e.what()) == "Concurrent wait exception test", 
+                        "Unexpected exception message");
+            ++exceptions_caught;
+        } catch (...) {
+            CHECK_MESSAGE(false, "Unexpected exception type caught");
+        }
+        
+        // Wait for all threads to complete
+        for (auto& waiter : waiters) {
+            waiter.join();
+        }
+        
+        MESSAGE("thrown == ", task_thrown.load(), " caught == ", exceptions_caught.load(), " completed == ", normal_completions.load() );
+        // Verify that the exception was properly handled
+        CHECK_MESSAGE(task_thrown.load(), "Task should have thrown an exception");
+        
+        // At least one thread should have caught the exception
+        CHECK_MESSAGE(exceptions_caught.load() > 0, 
+                     "At least one waiter should have caught the exception");
+        CHECK_MESSAGE(normal_completions.load() + exceptions_caught.load() == num_waiters + 1,
+                     "The total caught or completed is num_waiters + 1");
+    }
 }
 
 #endif // TBB_USE_EXCEPTIONS
