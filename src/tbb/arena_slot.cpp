@@ -31,7 +31,7 @@ d1::task* arena_slot::get_task_impl(size_t T, execution_data_ext& ed, bool& task
             "Is it safe to get a task at position T?");
 
     d1::task* result = task_pool_ptr[T];
-    __TBB_ASSERT(!is_poisoned( result ), "The poisoned task is going to be processed");
+    __TBB_ASSERT(!is_poisoned( result ), "A poisoned task is going to be processed");
 
     if (!result) {
         return nullptr;
@@ -193,10 +193,6 @@ unlock:
     __TBB_cl_evict(&victim_slot.head);
     __TBB_cl_evict(&victim_slot.tail);
 #endif
-    if (tasks_skipped) {
-        // Synchronize with snapshot as the head and tail can be bumped which can falsely trigger EMPTY state
-        a.advertise_new_work<arena::wakeup>();
-    }
     return result;
 }
 

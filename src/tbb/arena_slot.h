@@ -312,7 +312,6 @@ private:
         if (!is_task_pool_published()) {
             return; // we are not in arena - nothing to lock
         }
-        bool sync_prepare_done = false;
         for( atomic_backoff b;;b.pause() ) {
 #if TBB_USE_ASSERT
             // Local copy of the arena slot task pool pointer is necessary for the next
@@ -325,11 +324,8 @@ private:
                 task_pool.compare_exchange_strong(expected, LockedTaskPool ) ) {
                 // We acquired our own slot
                 break;
-            } else if( !sync_prepare_done ) {
-                // Start waiting
-                sync_prepare_done = true;
             }
-            // Someone else acquired a lock, so pause and do exponential backoff.
+            // Someone else acquired the lock, so pause and do exponential backoff.
         }
         __TBB_ASSERT( task_pool.load(std::memory_order_relaxed) == LockedTaskPool, "not really acquired task pool" );
     }
@@ -363,7 +359,7 @@ private:
                 // We've locked victim's task pool
                 break;
             } 
-            // Someone else acquired a lock, so pause and do exponential backoff.
+            // Someone else acquired the lock, so pause and do exponential backoff.
             backoff.pause();
         }
         __TBB_ASSERT(victim_task_pool == EmptyTaskPool ||
@@ -400,7 +396,6 @@ private:
     //! Leave the task pool
     /** Leaving task pool automatically releases the task pool if it is locked. **/
     void leave_task_pool() {
-        __TBB_ASSERT(is_task_pool_published(), "Not in arena");
         // Do not reset my_arena_index. It will be used to (attempt to) re-acquire the slot next time
         __TBB_ASSERT(task_pool.load(std::memory_order_relaxed) == LockedTaskPool, "Task pool must be locked when leaving arena");
         __TBB_ASSERT(is_quiescent_local_task_pool_empty(), "Cannot leave arena when the task pool is not empty");
