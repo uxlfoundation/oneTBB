@@ -284,7 +284,7 @@ where `cont_vertex` is the `continuation_vertex` of the successor.
 As a first step, the `add_successor` function checks the state of the successor list. If the list is not alive, there are two possible scenarios -
 either the task is completed, or it has transferred its successors to another task.
 
-If the `m_new_dynamic_state` atomic variable is set, than a transfer has occurred, and the function redirects the new successor
+If the `m_new_dynamic_state` atomic variable is set, then a transfer has occurred, and the function redirects the new successor
 to `new_state` by calling `new_state->add_successor(cont_vertex)`.
 
 If `m_new_dynamic_state` is not set, the task is considered completed, and adding a real dependency does not make any sense.
@@ -552,14 +552,14 @@ class task_group {
 `task_handle_task::transfer_successors_to` calls `task_dynamic_state::transfer_successors_to(new_task_state)` if the dynamic state of the
 current task is initialized. If the state is not initialized, there cannot be any successors associated with the current task.
 
-`task_dynamic_state::transfer_successors_to(task_dynamic_state* new_task_state)` sets the `m_new_dynamic_state` pointer to `new_task_state`,
-retrieves the successor list, and appends it to `new_task_state`:
+`task_dynamic_state::transfer_successors_to(task_dynamic_state* new_dynamic_state)` sets the `m_new_dynamic_state` pointer to `new_dynamic_state`,
+retrieves the successor list, and appends it to `new_dynamic_state`:
 
 ```cpp
 class task_dynamic_state {
 private:
     std::atomic<successor_list_node*> m_successor_list_head;
-    std::atomic<task_dynamic_state*>   m_new_task_state;
+    std::atomic<task_dynamic_state*>   m_new_dynamic_state;
 public:
     void transfer_successors_to(task_dynamic_state* new_dynamic_state) {
         // register current dynamic state as a co-owner of the new state
@@ -567,7 +567,7 @@ public:
         // see dynamic state lifetime issue section for more details
         new_dynamic_state->reserve();
 
-        m_new_task_state.store(new_dynamic_state);
+        m_new_dynamic_state.store(new_dynamic_state);
         successor_list_node* list = m_successor_list_head.exchange(~std::uintptr_t(0));
         new_dynamic_state->add_successor_list(list);
     }
@@ -623,7 +623,7 @@ The reference counter is decreased when the `A_state` is destroyed.
 
 ## Dynamic state transition examples
 
-This section presents several examples illustrating how the associated dynamic evolves during different stages of a task's lifecycle.
+This section presents several examples illustrating how the associated dynamic state evolves during different stages of a task's lifecycle.
 
 ### Creating the edges
 
