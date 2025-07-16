@@ -169,7 +169,7 @@ static void get_stack_attributes(std::uintptr_t& stack_base, std::size_t& stack_
 
     // Points to the lowest addressable byte of a stack.
     void* stack_limit = nullptr;
-#if __linux__ && !__bg__
+#if __linux__ && !__bg__ && !defined(__SANITIZE_ADDRESS__)
     size_t np_stack_size = 0;
     pthread_attr_t np_attr_stack;
     if (0 == pthread_getattr_np(pthread_self(), &np_attr_stack)) {
