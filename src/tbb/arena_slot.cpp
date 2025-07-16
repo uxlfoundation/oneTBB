@@ -88,12 +88,14 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
                 all_tasks_checked = true;
                 break;
             } else if ( H0 == T ) {
-                // There is only one task in the task pool.
-                if ( isolation != no_isolation ) {
-                    // There might be isolation mismatch, so let's pessimistically assume the task is skipped
+                // There is only one task in the task pool. If it can be taken, we want to reset the pool
+                if ( isolation != no_isolation && task_pool_ptr[T] &&
+                     isolation != task_accessor::isolation(*task_pool_ptr[T]) ) {
+                    // The task will be skipped due to isolation mismatch
                     has_skipped_tasks.store(true, std::memory_order_relaxed);
+                    tasks_skipped = true;
                 }
-                (isolation != no_isolation || tasks_skipped) ? release_task_pool() : reset_task_pool_and_leave();
+                (tasks_skipped) ? release_task_pool() : reset_task_pool_and_leave();
                 all_tasks_checked = true;
             } else {
                 // Release task pool if there are still some tasks.
