@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -514,8 +515,7 @@ public:
 
         for (auto& elem : m_reference_vertex_map) {
             d1::reference_vertex*& node = elem.second;
-            node->~reference_vertex();
-            cache_aligned_deallocate(node);
+            node->destroy();
             poison_pointer(node);
         }
 
