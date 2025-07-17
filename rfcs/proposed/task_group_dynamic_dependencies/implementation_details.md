@@ -147,7 +147,7 @@ public:
 ## `task_dynamic_state` in details
 
 As mentioned above, the `task_dynamic_state` class tracks a task's state (completed or not),
-its list of successors, and any post-transfer actions. It has the following layout:
+its list of successors, and transfers. It has the following layout:
 
 ```cpp
 class task_dynamic_state {
@@ -265,7 +265,7 @@ The successor list in `task_dynamic_state` can have two possible states:
 * `Alive` state (when `m_successor_list_head` is not equal to `~std::uintptr_t(0)`, including `nullptr`): indicates that the associated task
   is not completed and its successors have not been transferred. In this state, new successors can be added to the current `task_dynamic_state`.
 * `Dead` state (when `m_successor_list_head` equals `~std::uintptr_t(0)`): indicates one of two scenarios:
-    * The associated task is completed. Adding new successors does not add any real dependencies.
+    * The associated task is completed. Adding new successors does not add any real dependencies. Successors can proceed for execution if their other dependencies are satisfied.
     * The associated task has transferred its successors to another task. In this case, any new successor should be redirected to the dynamic state
       of the task that have received the successors during the transfer. `m_new_dynamic_state` should point to that receiving state.
 
