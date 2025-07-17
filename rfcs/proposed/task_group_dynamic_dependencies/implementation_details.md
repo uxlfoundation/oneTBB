@@ -99,48 +99,19 @@ class task_tracker {
 private:
     task_dynamic_state* m_state;
 public:
-    task_tracker() : m_state(nullptr) {}
+    task_tracker(); // creates empty task_tracker
+    task_tracker(const task_tracker& other);
+    
+    task_tracker& operator=(const task_tracker& other); 
 
-    task_tracker(const task_tracker& other) : m_state(other.m_state) {
-        if (m_state) m_state->reserve();
-    }
-    task_tracker& operator=(const task_tracker& other) {
-        if (this != &other) {
-            if (m_state) m_state->release();
-            m_state = other.m_state;
-            if (m_state) m_state->reserve();
-        }
-        return *this;
-    }
+    task_tracker(task_tracker&& other);
+    task_tracker& operator=(task_tracker&& other);
 
-    task_tracker(task_tracker&& other) : m_state(other.m_state) {
-        other.m_state = nullptr;
-    }
-    task_tracker& operator=(task_tracker&& other) {
-        if (this != &other) {
-            if (m_state) m_state->release();
-            m_state = other.m_state;
-            other.m_state = nullptr;
-        }
-        return *this;
-    }
-
-    task_tracker(const task_handle& th) : m_state(th ? th.get_dynamic_state() : nullptr) {
-        if (m_state) m_state->reserve();
-    }
-    task_tracker& operator=(const task_handle& th) {
-        if (m_state) m_state->release();
-
-        if (th) {
-            m_state = th.get_dynamic_state();
-            m_state->reserve();
-        } else {
-            m_state = nullptr;
-        }
-        return *this;
-    }
-
-    ~task_tracker() { if (m_state) m_state->release(); }
+    // creates a tracker referring to the dynamic state of task owned by th
+    task_tracker(const task_handle& th);
+    task_tracker& operator=(const task_handle& th);
+    
+    ~task_tracker();
 };
 ```
 
@@ -309,6 +280,10 @@ Each CAS failure (i.e., `m_successor_list_head` was updated) may indicate that:
 
 In the first case, the CAS operation should simply be retried, as the successor still needs to be added.
 In latter two cases, the same checks described above should be repeated.
+
+The sequence diagram of `make_edge` is shown in the picture below:
+
+<img src="assets/impl_sequence_diagram.png">
 
 The flow of `make_edge` is shown in the code snippet below:
 
