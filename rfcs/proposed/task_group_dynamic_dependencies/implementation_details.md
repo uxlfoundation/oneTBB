@@ -58,32 +58,32 @@ instance must be extended beyond task completion - until the last `tbb::task_tra
 
 ## Changes in `task_handle_task` class layout
 
-To associate an `task_dynamic_state` instance with a task, the current implementation adds a new atomic pointer field, `m_dynamic_state`,
+To associate an `task_dynamic_state` instance with a task, the current implementation adds a new atomic pointer field
 to the `task_handle_task` class. 
+
+To avoid unnecessary overhead for applications that do not use the dynamic dependencies feature,
+the initial value of the pointer is `nullptr`, meaning no dynamic state is associated with the task.
 
 The new class hierarchy is shown in the diagram below:
 
 <img src="assets/impl_new_class_layout.png" width=1000>
 
-To avoid introducing potentially unnecessary overhead for applications that do not use the dynamic dependencies feature,
-the initial value of `m_dynamic_state` is `nullptr`, meaning no dynamic state is associated with the task.
-
 The new `get_dynamic_state()` function is responsible for the lazy initialization of the associated state when it is called for the first time.
 This function is called in the following cases:
 * A `task_tracker` object is constructed or assigned from a `task_handle` that owns the task,
-* When `make_edge(pred, succ)` is called to create a predecessor-successor dependency between two `task_handle`s, dynamic states
-  are created for both tasks.
+* When `make_edge(pred, succ)` is called to create a predecessor-successor dependency, dynamic states
+  are created for its `task_handle` arguments.
 * When `transfer_successors_to(new_task)` is called from the running task, a dynamic state is created for `new_task`.
 
 If the associated dynamic state was already initialized, `get_dynamic_state` returns it.
 
 If multiple threads concurrently perform the actions above on the same task instance (e.g. concurrently adding
 successors to the same predecessor before its dynamic state is created), each thread allocates a new dynamic state object
-and attempts to update the atomic object in `task_handle_task` using a `compare_exchange_strong` operation. If the operation fails, meaning
+and uses atomic CAS to update the pointer in `task_handle_task` with the address of that object. If the CAS operation fails, meaning
 another thread has already stored the dynamic state, the state allocated by the current thread is destroyed:
 
-The created `task_dynamic_state` object initially holds a reference counter to prolong its lifetime
-while the task is in progress. When the task is destroyed, this reference counter is decreased.
+The `task_dynamic_state` object is constructed with the reference counter of 1 to prolong its lifetime
+while the task is in progress. When the task is destroyed, the reference counter is decremented.
 
 ## `tbb::task_tracker` class implementation
 
