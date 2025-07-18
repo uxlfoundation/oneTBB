@@ -1,0 +1,285 @@
+# Advanced Core Type Selection
+
+## Introduction
+
+### Motivation
+
+The current oneTBB API allows users to constrain task execution to a single core type using
+`task_arena::constraints::set_core_type(core_type_id)`. While this provides control, it creates limitations for
+real-world applications running on processors with more than two core types (e.g., on a system with performance (P),
+efficient (E), and low power efficient (LP E) cores):
+
+#### 1. **Flexibility and Resource Utilization**
+
+Many parallel workloads can execute efficiently on multiple core types. For example:
+- A parallel algorithm with good scalability works well on both P-cores and E-cores
+- Background processing can run on E-cores or LP E-cores depending on availability
+- Mixed workloads benefit from utilizing any available performance-class cores (P or E)
+
+Restricting to a single core type may leave available cores idle, reducing overall system throughput.
+
+#### 2. **Workload Classification Challenges**
+
+Applications often have workloads that don't fit neatly into a single core type category:
+- **Moderate priority tasks**: Not critical enough to demand P-cores exclusively, but shouldn't use LP E-cores
+- **Adaptive workloads**: Performance requirements that vary based on input size or system state
+- **Mixed computation phases**: Algorithms that alternate between compute-intensive and throughput-oriented phases
+
+#### 3. **Avoiding Inappropriate Core Selection**
+
+Without the ability to specify "P-cores OR E-cores (but not LP E-cores)", applications face a dilemma:
+- **No constraint**: Work might be scheduled on LP E-cores, causing significant performance degradation
+- **P-cores only**: Leaves E-cores idle, reducing parallelism
+- **E-cores only**: Misses opportunities to use faster P-cores when available
+
+### Current API Limitation
+
+The existing API only supports single core type constraints:
+
+```cpp
+auto core_types = tbb::info::core_types();
+// Assume: [0] = LP E-core, [1] = E-core, [2] = P-core
+
+tbb::task_arena arena(
+    tbb::task_arena::constraints{}.set_core_type(core_types[2])  // Only P-cores
+);
+```
+
+This forces applications to choose one of these suboptimal strategies:
+
+| Strategy | Pros | Cons |
+|----------|------|------|
+| **P-cores only** | Maximum single-threaded performance | Leaves E-cores idle; limited parallelism; higher power |
+| **E-cores only** | Good for parallel workloads | Doesn't utilize P-core performance; excludes LP E-cores |
+| **LP E-cores only** | Minimal power consumption | Severe performance impact for most workloads |
+| **No constraint** | Maximum flexibility | May schedule on inappropriate cores (e.g., LP E-cores for compute) |
+
+None of these options provide the desired behavior: **"Use P-cores or E-cores, but avoid LP E-cores"** or **"Use any
+efficiency cores (E-core or LP E-core)"**.
+
+## Proposal
+
+We propose extending the `task_arena::constraints` API to support specifying multiple acceptable core types, enabling
+applications to define flexible core type policies that adapt to workload requirements and available hardware
+resources.
+
+### New API
+
+Add the following methods to `tbb::task_arena::constraints`:
+
+#### Header
+
+```cpp
+#include <oneapi/tbb/task_arena.h>
+```
+
+#### Syntax
+
+```cpp
+namespace oneapi {
+namespace tbb {
+class task_arena {
+
+struct constraints {
+    // Existing API (unchanged)
+    constraints& set_core_type(core_type_id id);
+
+    // NEW: Set multiple acceptable core types
+    constraints& set_core_types(const std::vector<core_type_id>& ids);
+
+    // NEW: Retrieve configured core types
+    std::vector<core_type_id> get_core_types() const;
+};
+
+};
+}}
+```
+
+### Design Details
+
+#### Encoding Scheme
+
+We propose using bit-packing within the existing `core_type` field to maintain binary compatibility:
+
+- **Field type**: `core_type_id` (32-bit signed integer)
+- **Special value of -1**: still represents "any core type"
+- **Upper 4 bits**: Reserved for format marker, allowing up to 2<sup>4</sup>-1=15 format versions (`1111` is already
+  taken by the special value of -1)
+  - `0000` = Single core type (backward compatible)
+  - `0001` = Multiple core types (bitmap encoding)
+- **Bits 0-27**: Core type selection
+  - **Single mode**: Direct core type ID value (e.g., 0, 1, 2)
+  - **Multiple mode**: Bitmap with one bit per core type ID
+
+```mermaid
+graph TB
+    subgraph "core_type_id Layout"
+        Bits31_28["Bits 31-28<br/>Format Marker"]
+        Bits27_0["Bits 27-0<br/>Core Type(s)"]
+    end
+
+    subgraph "Single Core Type"
+        Single["Value stored directly<br/>Marker = 0000"]
+        SingleExample["Example: core_type = 3<br/>00000000 00000000 00000000 00000011"]
+    end
+
+    subgraph "Multiple Core Types"
+        Multiple["Marker set + bitflags<br/>Marker = 0001"]
+        MultipleExample["Example: types 0,2,3<br/>00010000 00000000 00000000 00001101"]
+    end
+
+    Bits31_28 -.->|Single| Single
+    Bits31_28 -.->|Multiple| Multiple
+    Bits27_0 -.-> |Direct value|SingleExample
+    Bits27_0 -.-> |Bitflags|MultipleExample
+
+    style Bits31_28 fill:pink,     stroke:red,   stroke-width:2px
+    style Bits27_0  fill:palegreen,stroke:green, stroke-width:2px
+    style Single    fill:lightblue,stroke:blue,  stroke-width:2px
+    style Multiple  fill:cornsilk, stroke:orange,stroke-width:2px
+```
+
+**Design Properties:**
+- **Backward compatible**: Single core type would use the same encoding as before
+- **Zero memory overhead**: No additional storage
+- **Efficient**: Simple bit operations for encoding/decoding
+- **Scalable**: Supports up to 28 distinct core types (sufficient for foreseeable hardware)
+- **Unambiguous**: Format marker prevents confusion between single and multiple types
+
+#### Implementation Strategy
+
+**1. Setting Multiple Core Types:**
+
+When provided with an empty vector, the `set_core_types()` method would set no constraint, allowing automatic core
+selection. A single core type would be encoded directly using the original format, preserving binary compatibility
+with existing code. For multiple core types, the method would switch to a bitmap-based encoding: it would set a format
+marker in the upper bits to signal the multi-type mode, then represent each requested core type as a set bit in
+the lower portion of the field. This approach would enable efficient representation of arbitrary core type
+combinations while maintaining the original data structure size.
+
+**2. Retrieving Core Types:**
+
+The `get_core_types()` method would examine the format marker to determine the encoding strategy. For automatic
+constraints or single core types, it would return a single-element vector containing the stored value. For multiple
+core types (identified by the format marker), it would scan the bitmap and extract each core type ID whose
+corresponding bit is set, returning them as a vector.
+
+**3. Affinity Mask Handling in TBBBind:**
+
+The system topology binding layer (TBBBind) would combine affinity masks for multiple core types by performing a
+logical OR operation across the hardware affinity masks of all specified core types. This combined mask would then be
+intersected with other constraint masks (NUMA node, threads-per-core) to produce the final thread affinity constraint,
+ensuring threads can be scheduled on any of the specified core types while respecting all other constraints.
+
+### Backward Compatibility
+
+The design ensures full backward compatibility:
+
+| Aspect | Guarantee |
+|--------|-----------|
+| **API** | Existing `set_core_type(int)` remains unchanged |
+| **Encoding** | Single core type would use identical bit pattern |
+| **Behavior** | All existing code paths would preserve exact semantics |
+| **ABI** | No changes to struct size or layout |
+
+### Usage Examples
+
+#### Example 1: Performance-Class Cores (P or E, not LP E)
+
+Most compute workloads should avoid LP E-cores but can use either P-cores or E-cores:
+
+```cpp
+auto core_types = tbb::info::core_types();
+// Assume: [0] = LP E-core, [1] = E-core, [2] = P-core
+
+tbb::task_arena arena(
+    tbb::task_arena::constraints{}
+        .set_core_types({core_types[1], core_types[2]})  // P or E cores
+);
+
+arena.execute([] {
+    // Compute-intensive work
+});
+```
+
+#### Example 2: Adaptive Core Selection
+
+Different arenas for different workload priorities:
+
+```cpp
+auto core_types = tbb::info::core_types();
+
+// High-priority
+tbb::task_arena high_priority(
+    tbb::task_arena::constraints{}.set_core_type(core_types[2])
+);
+
+// Medium-priority
+tbb::task_arena medium_priority(
+    tbb::task_arena::constraints{}.set_core_types({core_types[1], core_types[2]})
+);
+
+// Low-priority
+tbb::task_arena low_priority(
+    tbb::task_arena::constraints{}.set_core_types({core_types[0], core_types[1]})
+);
+```
+
+### Testing Strategy
+
+Tests should cover:
+
+* **Encoding/decoding correctness**: Verify that core type combinations are accurately stored and retrieved
+* **Backward compatibility**: Ensure existing single core type constraints work identically
+* **Comprehensive combination testing**: Test all possible core type combinations on the target hardware
+
+#### Core Type Combination Generation
+
+The test infrastructure could generate all possible core type combinations using a **power set approach**, producing
+2<sup>n</sup>-1 combinations for *n* core types:
+
+1. **Discover** available core types from the system
+2. **Enumerate** bit patterns from 1 to 2<sup>n</sup>-1
+3. **Map** each pattern to a core type combination
+4. **Generate** test cases for each combination
+
+### Performance Considerations
+
+| Aspect | Expected Impact |
+|--------|-----------------|
+| **Memory overhead** | None |
+| **Encoding cost** | O(k) where k = number of core types (typically ≤ 3) |
+| **Decoding cost** | O(28) worst case (scanning bitmap) |
+| **Runtime impact** | Negligible compared to task scheduling overhead |
+| **Affinity operations** | Linear in number of core types, performed once at arena creation |
+
+## Open Questions
+
+1. **API Naming**: Is `set_core_types` (plural) sufficiently distinct from `set_core_type` (singular)?
+   - Alternative: overload the existing `set_core_type` to accept `vector<core_type_id>`
+   - Alternative: `set_acceptable_core_types` or `allow_core_types`
+
+2. **Empty Vector Semantics**: Should `set_core_types({})` mean "automatic" or throw an exception?
+   - Current proposal: treat as automatic (-1)
+   - Alternative: require at least one core type
+
+3. **Query API**: Should we add convenience methods?
+
+```cpp
+bool has_core_type(core_type_id id) const;
+size_t num_core_types() const;
+```
+
+4. **Builder Pattern Extensions**: Should we support incremental building?
+
+```cpp
+constraints& add_core_type(core_type_id id);
+constraints& remove_core_type(core_type_id id);
+void clear_core_types();
+```
+
+5. **Core Types Data member**: Should we store core types in a new container data member instead of bit-packing?
+   - Pros: Simpler logic, easier to extend
+   - Cons: Increases struct size, breaks ABI compatibility
+
+6. **Info API**: Should `info::core_types()` be extended to return a count instead of/in addition to a vector?
