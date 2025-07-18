@@ -26,6 +26,7 @@
 
 #include <atomic>
 #include <stdexcept>
+#include <unordered_map>
 
 //! \file test_task_group.cpp
 //! \brief Test for [scheduler.task_group scheduler.task_group_status] specification
@@ -1702,5 +1703,43 @@ TEST_CASE("test task_tracker in concurrent environment") {
     tg.run_and_wait(std::move(task));
     CHECK_MESSAGE(task_placeholder == 1, "task body was not executed");
     CHECK_MESSAGE(succ_counter == n, "Not all of the successors were executed");
+}
+
+TEST_CASE("test dependencies and cancellation") {
+    tbb::task_group tg;
+
+    std::size_t execution_placeholder = 0;
+    auto body = [&] { ++execution_placeholder; };
+    std::size_t n_layer_tasks = 10;
+    std::size_t n_layers = 4;
+
+    std::unordered_map<std::size_t, std::vector<tbb::task_handle>> tasks;
+
+    for (std::size_t layer_index = 0; layer_index < n_layers; ++layer_index) {
+        auto& layer_tasks = tasks[layer_index];
+        layer_tasks.reserve(n_layer_tasks);
+
+        for (std::size_t task_index = 0; task_index < n_layer_tasks; ++task_index) {
+            layer_tasks.emplace_back(tg.defer(body));
+
+            if (layer_index != 0) {
+                auto& pred_layer = tasks.at(layer_index - 1);
+                for (std::size_t pred_task_index = 0; pred_task_index < n_layer_tasks; ++pred_task_index) {
+                    tbb::task_group::make_edge(pred_layer[pred_task_index], layer_tasks.back());
+                }
+            }
+        }
+    }
+
+    tg.cancel();
+
+    for (auto& layer_pair : tasks) {
+        for (auto& task : layer_pair.second) {
+            tg.run(std::move(task));
+        }
+    }
+    tbb::task_group_status status = tg.wait();
+    CHECK_MESSAGE(status == tbb::task_group_status::canceled, "Incorrect status of cancelled task_group");
+    CHECK_MESSAGE(execution_placeholder == 0, "Some tasks were executed in the cancelled task_group");
 }
 #endif

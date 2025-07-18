@@ -109,8 +109,13 @@ private:
         return next_task;
     }
     d1::task* cancel(d1::execution_data& ed) override {
+        task* t = nullptr;
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        // TODO: complete_task returns one ready successor task, others are spawned. Should cancel() be called instead?
+        t = this->complete_task();
+#endif
         finalize(&ed);
-        return nullptr;
+        return t;
     }
 public:
     template<typename FF>
