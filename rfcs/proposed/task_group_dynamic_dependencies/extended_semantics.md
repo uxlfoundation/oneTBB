@@ -16,51 +16,52 @@
   * 4.1 [Adding successors to the currently executing task](#adding-successors-to-the-currently-executing-task)
   * 4.2 [Functions for tracking the task progress](#functions-for-tracking-the-task-progress)
 * 5 [API proposal](#api-proposal)
-  * 5.1 [``task_tracker`` class](#task_tracker-class)
+  * 5.1 [``task_completion_handle`` class](#task_completion_handle-class)
     * 5.1.1 [Construction, destruction and assignment](#construction-destruction-and-assignment)
     * 5.1.2 [Observers](#observers)
     * 5.1.3 [Comparison operators](#comparison-operators)
   * 5.2 [Member functions of ``task_group`` class](#member-functions-of-task_group-class)
-  * 5.3 [Member functions of ``task_group::current_task``](#member-functions-of-task_groupcurrent_task)
 * 6 [Potential enhancements](#potential-enhancements)
-  * 6.1 [``empty_task`` API](#empty_task-api)
-  * 6.2 [Transferring successors to the task in any state](#transferring-successors-to-the-task-in-any-state)
-  * 6.3 [Using a ``task_tracker`` as a successor](#using-a-task_tracker-as-a-successor)
-  * 6.4 [Returning ``task_tracker`` from submission functions](#returning-task_tracker-from-submission-functions)
-* 7 [Exit criteria & open questions](#exit-criteria--open-questions)
-* 8 [Advanced examples](#advanced-examples)
-  * 8.1 [Recursive Fibonacci](#recursive-fibonacci)
-  * 8.2 [N-bodies problem](#n-bodies-problem)
-  * 8.3 [Wavefront](#wavefront)
-    * 8.3.1 [Non-recursive approach](#non-recursive-approach)
-    * 8.3.2 [Classic recursive approach](#classic-recursive-approach)
-    * 8.3.3 [Eager recursive approach](#eager-recursive-approach)
-    * 8.3.4 [Combination of eager and classic approaches](#combination-of-eager-and-classic-approaches)
-  * 8.4 [File Parser](#file-parser)
+  * 6.1 [Semantics for partial task tree destruction](#semantics-for-partial-task-tree-destruction)
+  * 6.2 [``empty_task`` API](#empty_task-api)
+  * 6.3 [Transferring successors to the task in any state](#transferring-successors-to-the-task-in-any-state)
+  * 6.4 [Using a ``task_completion_handle`` as a successor](#using-a-task_completion_handle-as-a-successor)
+  * 6.5 [Returning ``task_completion_handle`` from submission functions](#returning-task_completion_handle-from-submission-functions)
+* 7 [Naming considerations](#naming-considerations)
+* 8 [Exit criteria & open questions](#exit-criteria--open-questions)
+* 9 [Advanced examples](#advanced-examples)
+  * 9.1 [Recursive Fibonacci](#recursive-fibonacci)
+  * 9.2 [N-bodies problem](#n-bodies-problem)
+  * 9.3 [Wavefront](#wavefront)
+    * 9.3.1 [Non-recursive approach](#non-recursive-approach)
+    * 9.3.2 [Classic recursive approach](#classic-recursive-approach)
+    * 9.3.3 [Eager recursive approach](#eager-recursive-approach)
+    * 9.3.4 [Combination of eager and classic approaches](#combination-of-eager-and-classic-approaches)
+  * 9.4 [File Parser](#file-parser)
 
 ## Introduction
 
-This document presents a concrete proposal for the API and semantics of ``task_group`` extensions defined in the parent RFC.
+This document outlines a concrete proposal for the API and semantics of ``task_group`` extensions, as defined in the parent RFC.
 The following cases are covered:
 * ``task_group`` extensions that allow handling tasks in various states: `created`, `submitted`, `executing`, and `completed`.
   The existing API supports only a non-empty ``task_handle`` referring to a created task, or an empty one that refers to no task.
 * An API for setting dependencies between tasks in various states.
-* An API for transferring dependent tasks (i.e. successors) from an executing task to a task in any state.
+* An API for transferring dependent tasks (i.e., successors) from an executing task to a task in any state.
 
 ## Feature Design
 
 ### Semantic extension for handling tasks in various states
 
-The parent proposal for extending ``task_group`` with APIs for setting dynamic dependencies defines the following task states:
+The parent proposal for extending ``task_group`` with APIs for dynamic dependency management defines the following task states:
 * `Created` 
 * `Submitted`
 * `Executing`
 * `Completed`
 
-The task enters the `created` state after ``task_group::defer`` is called and the task is registered in the ``task_group``, but before any
-submission method (such as ``task_group::run``) is invoked. 
+A task enters the `created` state after ``task_group::defer`` is called and the task is registered in the ``task_group``, but before any
+submission method (e.g., ``task_group::run``) is invoked. 
 
-The task transitions to the `submitted` state when a submission method is called. At this point, the task may be scheduled for execution once all its
+The task transitions to the `submitted` state when a submission method is called. At this point, it may be scheduled for execution once all its
 dependencies are resolved.
 
 The task enters the `executing` state when all its dependencies are completed and a thread begins executing its body.
@@ -73,20 +74,19 @@ in various states.
 
 In contrast, this document proposes keeping ``task_handle`` as a unique-owning handle that either owns a task in the `created` state or owns no task.
 
-To handle tasks in other states, this proposal introduces a new weak-owning handle, ``task_tracker``. It can track a task in any state.
+To represent tasks in any state and to establish the dependencies for such tasks, this proposal introduces a new ``task_completion_handle`` class.
 
-A ``task_tracker`` object can be constructed from a ``task_handle`` that owns a created task. However, a ``task_handle`` cannot be constructed from a
-``task_tracker``.
+A ``task_completion_handle`` can be constructed from a ``task_handle`` that owns a created task. However, the reverse is not allowed.
 
 ```cpp
 tbb::task_group tg;
 
 tbb::task_handle handle = tg.defer([] {/*...*/}); // task is in created state, handle owns the task
-tbb::task_tracker tracker = handle; // create the tracker for the task owned by the handle
+tbb::task_completion_handle completion_handle = handle; // create the completion_handle for the task owned by the handle
 
 tg.run(std::move(handle)); // task is in submitted state, handle is left in an empty state
 
-// tracker is non-empty and can be used to set dependencies
+// completion_handle is non-empty and can be used to set dependencies
 ```
 
 In this approach, no semantic changes are needed for submission methods, since the semantics of ``task_handle`` remain unchanged.
@@ -95,18 +95,17 @@ Alternative approaches for handling tasks in different states are described in t
 
 ### Semantics for setting dependencies between tasks
 
-Consider creating a predecessor-successor dependency between the task tracked or owned by ``predecessor``
-and the task handled by ``successor_task_handle``—
-``task_group::make_edge(predecessor_task_handle, successor_task_handle)``. 
+Consider establishing a predecessor-successor dependency between the tasks ``predecessor`` and ``successor``—
+``task_group::set_task_order(predecessor, successor)``. 
 
-As stated in the parent RFC, predecessors may be in any of the defined states, but the successor must be in the `created` state, since it may be too late
-to add predecessors once a task is `executing` or `completed`.
+As stated in the parent RFC, a predecessor may be in any defined state, but the successor must be in the `created` state, as it may be too late
+to add predecessors once the task is `executing` or `completed`.
 
-The limitation is enforced by requiring the successor argument to be a ``task_handle``.
+This limitation is enforced by requiring the successor argument to be a ``task_handle``.
 
-Let's consider the different states of the task tracked or handled by ``predecessor``. 
+Let's consider the different states of the ``predecessor`` task.
 
-If the predecessor task is in any state except `completed` (i.e. `created`/`scheduled`/`executing`), the API registers the successor task
+If the predecessor task is in any state other than `completed` (i.e., `created`, `scheduled` or `executing`), the API registers the successor
 in the predecessor's list of successors and increments the corresponding reference counter on the successor side to ensure it
 is not executed before the predecessor completes. The successor task can only begin executing once its reference counter reaches zero.
 
@@ -120,7 +119,7 @@ For the receiving task, the same state-based logic applies.
 If the predecessor's state changes during registration, the API must ensure that dependencies are not added and reference counters are not incremented for tasks that have already completed.
 
 From the implementation perspective, this API requires each predecessor task to maintain a list of successors.
-The list holds pointers to vertex instances, each representing a successor task.
+The list contains pointers to vertex instances, each representing a successor task.
 A vertex contains the reference counter for a successor task and the pointer to it.
 
 A vertex instance is created when the first predecessor is registered and is reused by subsequent predecessors. 
@@ -135,28 +134,29 @@ This implementation approach is illustrated in the picture below:
 
 <img src="assets/predecessor_successor_implementation.png" width=600>
 
-### Semantics for transferring successors from the currently executing task to the other task
+### Semantics for transferring completion from the currently executing task to the other task
 
-Let's consider the use case where the successors of the task ``current`` are transferred to the task ``target``, which is owned or tracked by ``target_handler``. 
-In this case, the API ``tbb::task_group::current_task::transfer_successors_to(target_handler)`` should be called from within the body of ``current``.
+Consider the use case where the completion of the task ``current`` is transferred to the task ``target``, owned by ``target_handler``. 
+In this case, the API ``tbb::task_group::transfer_this_task_completion_to(target_handler)`` should be called from within the body of ``current``.
 
-As mentioned in the parent RFC, calling ``transfer_successors_to`` outside of a task belonging to same ``task_group`` results in undefined behavior.
+This function transfers the successors previously added to the currently executing task to ``target``.
+
+As noted in the parent RFC, transferring outside of a task belonging to same ``task_group`` results in undefined behavior.
 
 The current proposal limits this API to transfers from an executing task to a task in the `created` state.
 Transferring to tasks in `submitted`, `executing` or `completed` states are described in a [separate section](#transferring-successors-to-the-task-in-any-state)
 and may be supported in the future.
 
-Calling ``transfer_successors_to`` should merge the successor lists of ``current`` and ``target``,assigning the merged list to ``target``.
+Calling ``transfer_this_task_completion_to`` merges the successor lists of ``current`` and ``target``, assigning the merged list to ``target``.
 It should be thread-safe to add new successors to ``current`` using the ``make_edge`` API.
 
 <img src="assets/transferring_between_two_basic.png" width=600>
 
-During the transfer from ``current`` to ``target``, the successor list of ``target`` should include both original successors of ``target``
-and those of ``current``.
+During the transfer from ``current`` to ``target``, the successor list of ``target`` includes both its original successors and those of ``current``.
 
-An important consideration is how to handle the successor list of ``current``.
+An important consideration is how to manage the successor list of ``current``.
 
-One option is to treat ``current`` and ``target`` as separate tasks, even after transferring successors from one to the other.
+One approach is to treat ``current`` and ``target`` as separate tasks, even after transferring successors from one to the other.
 
 In this case, after the transfer, ``current`` will have an empty successor list, and ``target`` will hold the merged list:
 
@@ -167,16 +167,16 @@ affect that task's successor list:
 
 <img src="assets/transferring_between_two_separate_tracking_new_successors.png" width=600>
 
-An alternative approach is to track ``current`` and ``target`` together after the transfer. This requires introducing a special
-``task_tracker`` state— called a `proxy` state. If the executing task calls ``transfer_successors_to`` from within its body, all trackers originally
-created to track this task transition to the `proxy` state.
+An alternative approach is to track ``current`` and ``target`` jointly after the transfer. This requires introducing a special
+``task_completion_handle`` state— called a `proxy` state. If the executing task calls ``transfer_this_task_completion_to`` from within its body, all completion handles originally
+created for this task transition to the `proxy` state.
 
-Trackers for both ``current`` and ``target`` share a single merged successor list when the ``current`` tracker is in the `proxy` state.
+When the ``current`` handle is in the `proxy` state, both ``current`` and ``target`` share a single merged successor list.
 
 <img src="assets/transferring_between_two_merged_tracking.png" width=600>
 
 Any changes to the successor list made through either ``current`` or ``target`` will affect the same shared list —
-whether adding or transferring successors, the internal state of both "real" task and `proxy` tracker are updated.
+whether adding or transferring successors, the internal state of both "real" task and `proxy` handle are updated.
 
 <img src="assets/transferring_between_two_merged_tracking_new_successors.png" width=600>
 
@@ -192,55 +192,55 @@ included in the list transferred to ``B``.
 If the transfer occurs before the new successor is added, it will remain associated with ``A`` and will not appear in ``B``'s successor list.
 
 As a result, deterministic predecessor-successor relationships cannot be guaranteed due to the logical race between
-``make_edge`` and ``transfer_successors_to``.
+``make_edge`` and ``transfer_this_task_completion_to``.
 
 If ``A`` and ``B`` share a merged successor list (as in the second approach), then regardless of linearization, any newly added successor will appear in 
-both ``B``'s ("real" task) and ``A``'s (proxy tracker) successor lists.
+both ``B``'s ("real" task) and ``A``'s (proxy handle) successor lists.
 
-As noted in [one of the advanced examples](#combination-of-eager-and-classic-approaches), there are real-world scenarios where combined tracking
-is necessary. These scenarios typically involve one thread adding a successor to a task in the `executing` state (using its ``task_tracker``)
-while another thread replaces that task in the graph with a subtree via ``transfer_successors_to``.
+As illustrated in [one of the advanced examples](#combination-of-eager-and-classic-approaches), there are real-world scenarios where combined tracking
+is necessary. These scenarios typically involve one thread adding a successor to a task in the `executing` state (using its ``task_completion_handle``)
+while another thread replaces that task in the graph with a subtree via ``transfer_this_task_completion_to``.
 
 Therefore, this document proposes the merged successor tracking approach.
 
 ## Alternative approaches 
 
-The alternative approaches involve keeping ``task_handle`` as the sole mechanism to track tasks, set dependencies, and submit them for execution.
+Alternative approaches involve retaining ``task_handle`` as the sole mechanism to tracking task completion, setting dependencies, and submitting tasks for execution.
 
 ### ``task_handle`` as a unique owner
 
 The first option is to keep ``task_handle`` as a unique owner of the task in various states and to allow
 the use of a non-empty handle for setting or transferring dependencies.
 
-Since the current API allows submitting a ``task_handle`` for execution only as an rvalue, using the ``task_handle`` object after submission
-(e.g. via ``task_group::run(std::move(task_handle))``) may be misleading, even if some guarantees are provided for the referenced handle.
+Since the current API allows submitting a ``task_handle`` only as an rvalue, using the object after submission
+(e.g., via ``task_group::run(std::move(task_handle))``) may be misleading, even if some guarantees are provided for the referenced handle.
 
 To address this, all functions that accept a ``task_handle`` would need to be extended
 with an overload that takes a non-const lvalue reference and provides the following guarantees:
 * Overloads that accept an rvalue reference to ``task_handle`` require a non-empty handle and leave it in an empty state after execution (preserving current behavior).
 * New overloads that accept lvalue references to ``task_handle`` also require a non-empty handle, but do not leave it in an empty state after submission. Hence, the ``task_handle`` can be
   used after the method call to represent a task in the `submitted`, `executing`, or `completed` state, and to set dependencies on such tasks.
-  Reusing such a task handle as an argument to a submission function results in undefined behavior.
+  Reusing such a task handle in a submission function results in undefined behavior.
 
 All submission functions would need to be extended:
 * ``task_group::run`` and ``task_group::run_and_wait``
 * ``task_arena::enqueue`` and ``this_task_arena::enqueue``
 
-When the ``task_group`` preview extensions are enabled, returning a non-empty ``task_handle`` that refers to a task
+When ``task_group`` preview extensions are enabled, returning a non-empty ``task_handle`` referring to a task
 in any state other than `created` results in undefined behavior.
 
 ### ``task_handle`` as a shared owner
 
-An alternative approach is to make ``task_handle`` a shared owner of the task, allowing multiple instances of
-``task_handle`` to co-own it. However, since a task can only be submitted for execution once, using a
-``task_handle`` as an argument to a submission function would invalidate all copies or set them
+Another approach is to make ``task_handle`` a shared owner, allowing multiple instances to co-own the same task.
+However, since a task can be submitted for execution only once, using a
+``task_handle`` in a submission function would invalidate all copies or set them
 to a "weak" state, where they can only be used to set dependencies between tasks.
 
 ## Functionality removed from the proposal
 
 ### Adding successors to the currently executing task
 
-Initially, it was proposed to allow adding successor tasks to the currently executing task:
+An earlier proposal allowed adding successor tasks to the currently executing task:
 
 ```cpp
 namespace oneapi {
@@ -255,7 +255,7 @@ public:
 } // namespace oneapi
 ```
 
-The intended usage of this function is as follows:
+The intended usage of this function was as follows:
 
 ```cpp
 tbb::task_group tg;
@@ -275,8 +275,8 @@ tg.run_and_wait([&tg] {
 });
 ```
 
-The `add_successor` functionality was removed because its behavior can be replicated by reordering operations—
-running successors after the current task's computations (or bypassing one of them):
+The `add_successor` functionality was removed, as its behavior can be replicated by reordering operations—
+running successors after the current task's computations or bypassing one of them:
 
 ```cpp
 tbb::task_group tg;
@@ -295,12 +295,12 @@ tg.run_and_wait([&tg] -> tbb::task_handle {
 
 ### Functions for tracking the task progress
 
-An earlier version of this proposal included special member functions in the ``task_tracker`` class to retrieve the current state of the tracked task:
+An earlier version of the proposal included member functions in the ``task_completion_handle`` class to retrieve a task's current state:
 
 ```cpp
 namespace oneapi {
 namespace tbb {
-class task_tracker {
+class task_completion_handle {
 public:
     bool was_submitted() const;
     bool is_completed() const;
@@ -309,17 +309,17 @@ public:
 } // namespace oneapi
 ```
 
-``was_submitted`` returns ``true`` if the tracked task was submitted for execution using one of the APIs in ``task_group`` or
+``was_submitted`` returns ``true`` if the task was submitted for execution using one of the APIs in ``task_group`` or
 ``task_arena`` (e.g., ``task_group::run``).
-``is_completed`` returns ``true`` if the tracked task has completed execution by any TBB thread.
+``is_completed`` returns ``true`` if the task has completed execution by any TBB thread.
 
-These APIs were excluded from the proposal for the following reasons:
-* Lack of compelling use-cases. All considered examples could be implemented without these functions.
-* Unclear semantics for these functions when the tracked task is executing ``task_group::current_task::transfer_successors_to``.
-  Consider a task ``A`` that transfers its successors to task ``B`` and exits its body. On one hand, task ``A`` has already been submitted and 
+These APIs were excluded from the final proposal for the following reasons:
+* Lack of compelling use cases - existing examples could be implemented without these functions.
+* Unclear semantics for these functions when the task is executing ``task_group:transfer_this_task_completion_to``.
+  Consider a task ``A`` that transfers its completion to task ``B`` and exits its body. On one hand, task ``A`` has already been submitted and 
   completed, so both functions should return ``true``.
-  On the other hand, task ``A`` replaces itself in the task graph with task ``B`` and it may be expected that the tracker now
-  tracks ``B``— similarly to how `make_edge` works, where new edges added to ``A`` after the transfer are redirected to ``B``.
+  However, since task ``A`` replaces itself in the task graph with task ``B``, it may be expected that the completion handle now
+  refers to the completion of ``B``— similarly to how `make_edge` works, where new edges added to ``A`` after the transfer are redirected to ``B``.
 
 ## API proposal
 
@@ -331,90 +331,94 @@ namespace tbb {
 class task_handle;
 
 // New APIs
-class task_tracker {
+class task_completion_handle {
 public:
-    task_tracker();
+    task_completion_handle();
 
-    task_tracker(const task_tracker& other);
-    task_tracker(task_tracker&& other);
+    task_completion_handle(const task_completion_handle& other);
+    task_completion_handle(task_completion_handle&& other);
 
-    task_tracker(const task_handle& handle);
+    task_completion_handle(const task_handle& handle);
 
-    ~task_tracker();
+    ~task_completion_handle();
 
-    task_tracker& operator=(const task_tracker& other);
-    task_tracker& operator=(task_tracker&& other);
+    task_completion_handle& operator=(const task_completion_handle& other);
+    task_completion_handle& operator=(task_completion_handle&& other);
 
-    task_tracker& operator=(const task_handle& handle);
+    task_completion_handle& operator=(const task_handle& handle);
 
     explicit operator bool() const noexcept;
-}; // class task_tracker
+}; // class task_completion_handle
 
-bool operator==(const task_tracker& t, std::nullptr_t) noexcept;
-bool operator==(std::nullptr_t, const task_tracker& t) noexcept;
+bool operator==(const task_completion_handle& t, std::nullptr_t) noexcept;
+bool operator==(std::nullptr_t, const task_completion_handle& t) noexcept;
 
-bool operator!=(const task_tracker& t, std::nullptr_t) noexcept;
-bool operator!=(std::nullptr_t, const task_tracker& t) noexcept;
+bool operator!=(const task_completion_handle& t, std::nullptr_t) noexcept;
+bool operator!=(std::nullptr_t, const task_completion_handle& t) noexcept;
 
-bool operator==(const task_tracker& t, const task_tracker& rhs) noexcept;
-bool operator!=(const task_tracker& t, const task_tracker& rhs) noexcept;
+bool operator==(const task_completion_handle& t, const task_completion_handle& rhs) noexcept;
+bool operator!=(const task_completion_handle& t, const task_completion_handle& rhs) noexcept;
 
 class task_group {
-    static void make_edge(task_handle& pred, task_handle& succ);
-    static void make_edge(task_tracker& pred, task_handle& succ);
+    static void set_task_order(task_handle& pred, task_handle& succ);
+    static void set_task_order(task_completion_handle& pred, task_handle& succ);
 
-    struct current_task {
-        static void transfer_successors_to(task_handle& h);
-    };
+    static void transfer_this_task_completion_to(task_handle& h);
 }; // class task_group
 
 } // namespace tbb
 } // namespace oneapi
 ```
 
-### ``task_tracker`` class
+### ``task_completion_handle`` class
 
 #### Construction, destruction and assignment
 
-``task_tracker()``
+``task_completion_handle()``
 
-Creates an empty ``task_tracker`` object that does not track any task.
+Constructs an empty ``task_completion_handle`` that does not refer to any task.
 
-``task_tracker(const task_tracker& other)``
+``task_completion_handle(const task_completion_handle& other)``
 
-Copies ``other`` to ``*this``. After this, ``*this`` and ``other`` track the same task.
+Copies ``other`` to ``*this``. After this, ``*this`` and ``other`` refer to the same task.
 
-``task_tracker(task_tracker&& other)``
+``task_completion_handle(task_completion_handle&& other)``
 
-Moves ``other`` to ``*this``. After this, ``*this`` tracks the task previously tracked by ``other``.
+Moves ``other`` to ``*this``. After this, ``*this`` refers to the task that was referred by ``other``.
 ``other`` is left in an empty state.
 
-``task_tracker(const task_handle& handle)``
+``task_completion_handle(const task_handle& handle)``
 
-Creates a ``task_tracker`` object that tracks the task owned by ``handle``. 
+Constructs a ``task_completion_handle`` that refers to the task owned by ``handle``.
 
-``~task_tracker()``
+If ``handle`` is empty, the behavior is undefined.
 
-Destroys the ``task_tracker`` object.
+``~task_completion_handle()``
 
-``task_tracker& operator=(const task_tracker& other)``
+Destroys the ``task_completion_handle``.
 
-Replaces the task tracked by ``*this`` with the task tracked by ``other``.
-After this, ``*this`` and ``other`` track the same task.
+If the task is a predecessor or a successor, the behavior is undefined.
+
+``task_completion_handle& operator=(const task_completion_handle& other)``
+
+Copy-assigns ``other`` to ``*this``.
+After this, ``*this`` and ``other`` refer to the same task.
 
 Returns a reference to ``*this``.
 
-``task_tracker& operator=(task_tracker&& other)``
+``task_completion_handle& operator=(task_completion_handle&& other)``
 
-Replaces the task tracked by ``*this`` with the task tracked by ``other``.
-After this, ``*this`` tracks the task previously tracked by ``other``.
+Move-assigns ``other`` to ``*this``.
+After this, ``*this`` refers to the task that was referred by ``other``.
 ``other`` is left in an empty state.
 
 Returns a reference to ``*this``.
 
-``task_tracker& operator=(const task_handle& handle)``
+``task_completion_handle& operator=(const task_handle& handle)``
 
-Replaces the task tracked by ``*this`` with the task owned by ``handle``.
+Replaces task referred to by ``*this`` with the task owned by ``handle``.
+
+If ``handle`` is empty, the behavior is undefined.
 
 Returns a reference to ``*this``.
 
@@ -422,88 +426,120 @@ Returns a reference to ``*this``.
 
 ``explicit operator bool() const noexcept``
 
-Checks whether ``*this`` tracks any task.
-
-Returns ``true`` if ``*this`` tracks a task; otherwise, returns ``false``.
+Returns ``true`` if ``*this`` refers to any task; otherwise, returns ``false``.
 
 #### Comparison operators
 
-``bool operator==(const task_tracker& t, std::nullptr_t) noexcept``
+``bool operator==(const task_completion_handle& t, std::nullptr_t) noexcept``
 
-Returns ``true`` if ``t`` is an empty tracker; otherwise, returns ``false``.
+Returns ``true`` if ``t`` is empty; otherwise, returns ``false``.
 
-``bool operator==(std::nullptr_t, const task_tracker& t) noexcept``
+``bool operator==(std::nullptr_t, const task_completion_handle& t) noexcept``
 
 Equivalent to ``t == nullptr``.
 
-``bool operator!=(const task_tracker& t, std::nullptr_t) noexcept``
+``bool operator!=(const task_completion_handle& t, std::nullptr_t) noexcept``
 
 Equivalent to ``!(t == nullptr)``.
 
-``bool operator!=(std::nullptr_t, const task_tracker& t) noexcept``
+``bool operator!=(std::nullptr_t, const task_completion_handle& t) noexcept``
 
 Equivalent to ``!(t == nullptr)``.
 
-``bool operator==(const task_tracker& lhs, const task_tracker& rhs) noexcept``
+``bool operator==(const task_completion_handle& lhs, const task_completion_handle& rhs) noexcept``
 
-Returns ``true`` if ``lhs`` tracks the same task as ``rhs``, ``false`` otherwise.
+Returns ``true`` if ``lhs`` refers to the same task as ``rhs``, ``false`` otherwise.
 
-``bool operator!=(const task_tracker& lhs, const task_tracker& rhs) noexcept``
+``bool operator!=(const task_completion_handle& lhs, const task_completion_handle& rhs) noexcept``
 
 Equivalent to ``!(lhs == rhs)``.
 
 ### Member functions of ``task_group`` class
 
-``static void task_group::make_edge(task_handle& pred, task_handle& succ)``
+``static void task_group::set_task_order(task_handle& pred, task_handle& succ)``
 
 Registers the task owned by ``pred`` as a predecessor that must complete before the task owned
 by ``succ`` can begin execution.
 
+It is thread-safe to concurrently add multiple predecessors to a single successor, and to register the same predecessor for multiple successors.
+
+It is thread-safe to add successors to both the task currently transferring its successors and the task receiving them.
+
 The behavior is undefined in the following cases:
-* ``pred`` is an empty ``task_handle``, or ``succ`` is an empty ``task_handle``,
-* If the task handled by ``pred`` and the task handled by ``succ`` belong to different ``task_group``s.
+* ``pred`` or ``succ`` is empty.
+* If tasks handled by ``pred`` and ``succ`` belong to different ``task_group``s.
 
-It is safe to add multiple predecessors to the same successor, and to register the same predecessor for multiple successors.
+``static void task_group::set_task_order(task_completion_handle& pred, task_handle& succ)``
 
-It is safe to add successors to the task that is currently transferring its successors to another task, as well as
-to the task receiving those successors.
-
-``static void task_group::make_edge(task_tracker& pred, task_handle& succ)``
-
-Registers the task tracked by ``pred`` as a predecessor that must complete before the task owned
+Registers the task completion of which is handled by ``pred`` as a predecessor that must complete before the task owned
 by ``succ`` can begin execution.
 
+It is thread-safe to concurrently add multiple predecessors to a single successor, and to register the same predecessor for multiple successors.
+
+It is thread-safe to concurrently add successors to both the task currently transferring its successors and the task receiving them.
+
 The behavior is undefined in the following cases:
-* ``pred`` is an empty ``task_tracker``, or ``succ`` is an empty ``task_handle``,
-* If the task tracked by ``pred`` and the task handled by ``succ`` belong to different ``task_group``s.
+* ``pred`` or ``succ`` is empty.
+* If the task completion of which is handled by ``pred`` and the task handled by ``succ`` belong to different ``task_group``s.
 
-It is safe to add multiple predecessors to the same successor and to add the same predecessor for multiple successor tasks.
+``static void transfer_this_task_completion_to(task_handle& h)``
 
-It is safe to add successors to the task that is currently transferring its successors to another task, as well as
-to the task receiving those successors.
+Transfers the completion of the currently executing task to the task owned by ``h``.
+After the transfer, the successors of the current task will be executed after the completion the task owned by ``h``.
 
-### Member functions of ``task_group::current_task``
+Successors, added to the currently executing task after ``transfer_this_task_completion_to`` is executed, will also appear as successors of ``h``.
 
-``static void transfer_successors_to(task_handle& h)``
-
-Transfers all of the successors of the currently executing task to the task handled by ``h``.
+It is thread-safe to concurrently transfer successors to the task while adding successors to ``h``, or while other threads
+are adding successors to the currently executing task.
 
 The behavior is undefined in the following cases:
 * ``h`` is an empty ``task_handle``,
 * The function is called outside the body of a ``task_group`` task,
+* The function is called for the task, completion of which was already transferred.
 * The currently executing task and the task handled by ``h`` belong to different ``task_group``s.
-
-It is safe to transfer successors to the task while adding successors to ``h``, or while other threads
-are adding successors to the currently executing task.
-
-It is guaranteed that, in all cases, successors added to the current task will appear as successors of ``h``, even if
-they are added after calling ``transfer_successors_to``.
 
 ## Potential enhancements
 
+### Semantics for partial task tree destruction
+
+``tbb::task_group`` API allows not only running the deferred task, but also a destruction of the received ``task_handle``:
+
+```cpp
+tbb::task_group tg;
+{
+    // A reference is reserved in tg's wait_context for t
+    tbb::task_handle t = tg.defer(task_body);
+
+    // When the scope ends, t is destroyed
+    // The reference is release
+}
+tg.wait(); // returns immediately since no tasks are registered
+```
+
+An important consideration is how tasks should behave if one of the predecessors or successors is destroyed without being submitted.
+
+Consider two tasks, ``p`` and ``s`` where ``s`` is a successor of ``p``, and ``p`` is destroyed without being submitted:
+
+<img src="assets/task_destruction_two_tasks.png" width=300>
+
+There are two possible options how ``s`` should behave:
+* Proceed with execution, since the predecessor task is gone. This makes sense in use cases where the dependency restricts access to a shared resource.
+* Wait indefinitely, as it may strictly depend on the result of ``p``.
+
+Another use case to consider is three tasks ``L1``, ``L2`` and ``L3`` connected with each other, and ``L2`` is destroyed:
+
+<img src="assets/task_destruction_three_tasks.png" width=300>
+
+The question is, should ``L1`` completion be guaranteed before ``L3`` proceed for execution?
+
+Since concrete use cases for partial task tree destruction were not considered, and the required behavior
+is unknown, the current proposal treats it as undefined behavior.
+
+Moving this feature to `supported` requires defining the semantic for this case.
+
 ### ``empty_task`` API
 
-Since successors can only be transferred to a single task, some use-cases (see [N-body example](#n-bodies-problem)) 
+Since successors can only be transferred to a single task, some use cases (see [N-body example](#n-bodies-problem)) 
 require creating a synchronization-only empty task to combine multiple end-tasks in a subgraph and transfer successors to it:
 
 ```cpp
@@ -515,48 +551,48 @@ tbb::task_handle right_lower_rectangle_task = tg.defer(...);
 
 tbb::task_handle empty_sync_task = tg.defer([] {});
 
-tbb::task_group::make_edge(left_lower_rectangle_task, left_upper_rectangle_task);
-tbb::task_group::make_edge(left_lower_rectangle_task, right_lower_rectangle_task);
-tbb::task_group::make_edge(right_upper_rectangle_task, left_upper_rectangle_task);
-tbb::task_group::make_edge(right_upper_rectangle_task, right_lower_rectangle_task);
+tbb::task_group::set_task_order(left_lower_rectangle_task, left_upper_rectangle_task);
+tbb::task_group::set_task_order(left_lower_rectangle_task, right_lower_rectangle_task);
+tbb::task_group::set_task_order(right_upper_rectangle_task, left_upper_rectangle_task);
+tbb::task_group::set_task_order(right_upper_rectangle_task, right_lower_rectangle_task);
 
-tbb::task_group::make_edge(left_upper_rectangle_task, empty_sync_task);
-tbb::task_group::make_edge(right_lower_rectangle_task, empty_sync_task);
+tbb::task_group::set_task_order(left_upper_rectangle_task, empty_sync_task);
+tbb::task_group::set_task_order(right_lower_rectangle_task, empty_sync_task);
 
-tbb::task_group::current_task::transfer_successors_to(empty_sync_task);
+tbb::task_group::transfer_this_task_completion_to(empty_sync_task);
 ```
 
-In the current TBB implementation, ``empty_sync_task`` is still spawned or bypassed and executed, which may introduce unnecessary scheduling overhead.
+In the current TBB implementation, ``empty_sync_task`` is still spawned or bypassed and executed, potentially introducing unnecessary scheduling overhead.
 
-A possible extension is to add a special API to `task_group` that provides an `empty_task` — a task type that is never scheduled for execution and is skipped once its dependencies are resolved:
+A possible extension is to add a special API to `task_group` that provides an `empty_task` — a task type that is never scheduled and is skipped once its dependencies are resolved:
 
 ```cpp
 auto empty_sync_task = tg.get_empty_task();
 
 ...
 
-tbb::task_group::make_edge(left_upper_rectangle_task, empty_sync_task);
-tbb::task_group::make_edge(right_upper_rectangle_task, empty_sync_task);
-tbb::task_group::current_task::transfer_successors_to(empty_sync_task);
+tbb::task_group::set_task_order(left_upper_rectangle_task, empty_sync_task);
+tbb::task_group::set_task_order(right_upper_rectangle_task, empty_sync_task);
+tbb::task_group::transfer_this_task_completion_to(empty_sync_task);
 
 // empty_sync_task would not be spawned and only used for dependency tracking
 ```
 
-An alternative approach is to allow ``transfer_successors_to`` to accept multiple tasks as parameters. The example above would then look like:
+An alternative approach is to allow ``transfer_this_task_completion_to`` to accept multiple tasks as parameters. The example above would then look like:
 
 ```cpp
-tbb::task_group::current_task::transfer_successors_to(left_upper_rectangle_task, right_upper_rectangle_task);
+tbb::task_group::transfer_this_task_completion_to(left_upper_rectangle_task, right_upper_rectangle_task);
 ```
 
 From an implementation perspective, the same empty synchronization task could still be created internally.
 
 ### Transferring successors to the task in any state
 
-The current proposal limits ``transfer_successors_to`` to only accept a task in the `created` state as the recipient. It is enforced by allowing
+The current proposal limits ``transfer_this_task_completion_to`` to only accept a task in the `created` state as the recipient. It is enforced by allowing
 only `task_handle` as the argument.
 
-Current use cases do not require transferring successors to a task in any state. However, if such a need arises in the future,
-the semantics of `transfer_successors_to` could be extended with a new overload:
+Current use cases do not require transferring successors to tasks in arbitrary state. However, if such a need arises in the future,
+the semantics of `transfer_this_task_completion_to` could be extended with a new overload:
 
 ```cpp
 namespace oneapi {
@@ -564,9 +600,7 @@ namespace tbb {
 
 class task_group {
 public:
-    struct current_task {
-        static void transfer_successors_to(task_tracker& task);
-    };
+    static void transfer_this_task_completion_to(task_completion_handle& task);
 };
 
 } // namespace tbb
@@ -574,27 +608,27 @@ public:
 ```
 
 From an implementation perspective, this would require merged successor tracking to support not just two tasks (the sender and the recipient), but an entire set of
-tasks — since a task may transfer its successors to another task that is also performing `transfer_successors_to`, and so on.
+tasks — since a task may transfer its successors to another task that is also performing `transfer_this_task_completion_to`, and so on.
 
-### Using a ``task_tracker`` as a successor
+### Using a ``task_completion_handle`` as a successor
 
-The current proposal only allows tasks in the `created` state to be used as successors. This is enforced by allowing only
-a ``task_handle`` as the second argument to ``make_edge``:
+The current proposal restricts successors to tasks in the `created` state. This is enforced by allowing only
+a ``task_handle`` as the second argument to ``set_task_order``:
 
 ```cpp
 namespace oneapi {
 namespace tbb {
 class task_group {
-    static void make_edge(task_handle& pred, task_handle& succ);
-    static void make_edge(task_tracker& pred, task_handle& succ);
+    static void set_task_order(task_handle& pred, task_handle& succ);
+    static void set_task_order(task_completion_handle& pred, task_handle& succ);
 };
 } // namespace tbb
 } // namespace oneapi
 ```
 
 Two enhancements to this API can be considered:
-* Allow a ``task_tracker`` that tracks a task in the `created` state to be used as a successor.
-* Allow a ``task_tracker`` that tracks a task `T` in the `submitted` state to be used as a successor, provided that other
+* Allow a ``task_completion_handle`` that handles a completion of a task in the `created` state to be used as a successor.
+* Allow a ``task_completion_handle`` that handles a completion of a task `T` in the `submitted` state to be used as a successor, provided that other
   predecessors of ``T`` - which are not yet submitted or still executing - prevent ``T`` from being scheduled.
 
 These enhancements require the following APIs to be added:
@@ -603,31 +637,31 @@ These enhancements require the following APIs to be added:
 namespace oneapi {
 namespace tbb {
 class task_group {
-    static void make_edge(task_handle& pred, task_tracker& succ);
-    static void make_edge(task_tracker& pred, task_tracker& succ);
+    static void set_task_order(task_handle& pred, task_completion_handle& succ);
+    static void set_task_order(task_completion_handle& pred, task_completion_handle& succ);
 };
 } // namespace tbb
 } // namespace oneapi
 ```
 
-If a ``task_tracker`` that tracks a task in the `executing`, or `completed` state is used
-as the second argument, the behavior of the above APIs is undefined.
+If a ``task_completion_handle`` referring to a task in the `executing`, or `completed` state is used
+as the second argument, the behavior is undefined.
 
-### Returning ``task_tracker`` from submission functions
+### Returning ``task_completion_handle`` from submission functions
 
-It may be useful to allow adding successors not only to tasks represented by ``task_handle``, but also to tasks
-created via submission functions that accept function object as an argument:
+It may be useful to allow adding successors not only to tasks represented by ``task_handle``, but also to those
+created via submission functions that accept a function object as an argument:
 
 ```cpp
 tbb::task_group tg;
-tbb::task_tracker tr = tg.run([] { /*task body*/ });
+tbb::task_completion_handle ch = tg.run([] { /*task body*/ });
 // ...
 
 tbb::task_handle successor = tg.defer([] { /*successor body*/ });
-tbb::task_group::make_edge(tr, successor);
+tbb::task_group::set_task_order(ch, successor);
 ```
 
-This could be achieved either by changing the return type of ``task_group::run`` or by introducing a new submission function:
+This could be achieved by either changing the return type of ``task_group::run`` or introducing a new submission function:
 
 ```cpp
 namespace oneapi {
@@ -635,28 +669,50 @@ namespace tbb {
 class task_group {
     // Option 1 - modify the return value
     template <typename Body>
-    tbb::task_tracker run(const Body& body);
+    tbb::task_completion_handle run(const Body& body);
 
     // Option 2 - introduce new function with different name
     template <typename Body>
-    tbb::task_tracker run_tracked(const Body& body);
+    tbb::task_completion_handle run_get_completion_handle(const Body& body);
 };
 } // namespace tbb
 } // namespace oneapi
 ```
 
+## Naming considerations
+
+The original APIs introduced by this proposal included:
+* The ``task_tracker`` class, representing a task in any of the defined states (`created`, `submitted`, `executing`, or `completed`).
+* The ``tbb::task_group::make_edge`` function to establish a predecessor-successor relationship between tasks.
+* The ``tbb::task_group::current_task::transfer_successors_to`` function, which moves successors from the currently executing task to another task.
+
+The main concern with the name ``task_tracker`` was that the class does not actually track task progress- it only represents a task for the purpose of adding successors.
+
+``task_completion_handle`` was considered a better alternative, as it reflects its correlation with ``set_task_order`` and
+``transfer_this_task_completion_to``, both of which depend on task completion.
+
+To emphasize the semantical difference between ``tbb::task_group::make_edge`` and ``flow::make_edge``, which establishes a permanent edge between graph nodes,
+the API was renamed to ``tbb::task_group::set_task_order``.
+
+``tbb::task_group::current_task::transfer_successors_to`` did not clearly describe the extended
+[effect of transferring](#semantics-for-transferring-successors-from-the-currently-executing-task-to-the-other-task).
+
+``transfer_this_task_completion_to(t)`` was adopted to emphasize that the successors of the currently executing task will proceed only after
+`t` completes. The combination of ``transfer_this_task_completion_to`` and ``task_completion_handle`` indicates that successors
+added after the transfer will be associated with the task that receives the completion, and the ``task_completion_handle`` follows the transferred completion of the task.
+
 ## Exit criteria & open questions
-* Do the current API names clearly reflect the purpose of their corresponding methods?
-  * In particular, a better name for `transfer_successors_to` could be considered to more accurately reflect its behavior and the successor tracking approach.
 * Performance targets for this feature should be defined.
 * API improvements and enhancements should be considered (these may be criteria for promoting the feature to `supported`):
-  * Should comparison functions between ``task_tracker`` and ``task_handle`` be defined?
-  * Should a ``task_tracker`` that tracks a task in the `created` or `submitted` state (but not always) be allowed as a
-    successor in ``make_edge``? See [separate section](#using-a-task_tracker-as-a-successor) for more details.
+  * Do the current API names clearly reflect the purpose of their corresponding methods?
+  * The semantic for partial destruction of the task tree should be defined. See [separate section](#semantics-for-partial-task-tree-destruction) for more details.
+  * Should comparison functions between ``task_completion_handle`` and ``task_handle`` be defined?
+  * Should a ``task_completion_handle`` referring to a task in the `created` or `submitted` state (but not always) be allowed as a
+    successor in ``make_edge``? See [separate section](#using-a-task_completion_handle-as-a-successor) for more details.
   * Should an ``empty_task`` helper API be provided to optimize the creation and spawning of empty sync-only tasks. See
     [separate section](#empty_task-api) for more details.
-  * Should submitting functions that accept a body and return a `task_tracker` be introduced? See
-    [separate section](#returning-task_tracker-from-submitting-functions) for further details.
+  * Should submitting functions that accept a body and return a `task_completion_handle` be introduced? See
+    [separate section](#returning-task_completion_handle-from-submission-functions) for further details.
 
 ## Advanced examples
 
@@ -664,7 +720,7 @@ This section describes the applicability of the proposal to the advanced scenari
 
 ### Recursive Fibonacci
 
-Recursive Fibonacci illustrates parallel computation of the N-th Fibonacci number. Each *N*-th Fibonacci number is computed by calculating the *N-1*-th and 
+The Recursive Fibonacci example illustrates parallel computation of the N-th Fibonacci number. Each *N*-th Fibonacci number is computed by calculating the *N-1*-th and 
 *N-2*-th numbers in parallel, then summing their results after both computations
 complete.
 
@@ -709,10 +765,10 @@ void recursive_fibonacci_number(tbb::task_group& tg, int n, int* result_placehol
             delete subtask2_placeholder;
         });
 
-        tbb::task_group::make_edge(subtask1, merge_sum);
-        tbb::task_group::make_edge(subtask2, merge_sum);
+        tbb::task_group::set_task_order(subtask1, merge_sum);
+        tbb::task_group::set_task_order(subtask2, merge_sum);
 
-        tbb::task_group::current_task::transfer_successors_to(merge_sum);
+        tbb::task_group::transfer_this_task_completion_to(merge_sum);
 
         tg.run(std::move(subtask1));
         tg.run(std::move(subtask2));
@@ -846,15 +902,15 @@ void n_body_rectangle(tbb::task_group& tg,
 
         tbb::task_handle sync = tg.defer([] {});
 
-        tbb::task_group::make_edge(left_lower_subtask, left_upper_subtask);
-        tbb::task_group::make_edge(left_lower_subtask, right_lower_subtask);
-        tbb::task_group::make_edge(right_upper_subtask, left_upper_subtask);
-        tbb::task_group::make_edge(right_upper_subtask, right_lower_subtask);
+        tbb::task_group::set_task_order(left_lower_subtask, left_upper_subtask);
+        tbb::task_group::set_task_order(left_lower_subtask, right_lower_subtask);
+        tbb::task_group::set_task_order(right_upper_subtask, left_upper_subtask);
+        tbb::task_group::set_task_order(right_upper_subtask, right_lower_subtask);
         
-        tbb::task_group::make_edge(left_upper_subtask, sync);
-        tbb::task_group::make_edge(right_lower_subtask, sync);
+        tbb::task_group::set_task_order(left_upper_subtask, sync);
+        tbb::task_group::set_task_order(right_lower_subtask, sync);
 
-        tbb::task_group::current_task::transfer_successors_to(sync);
+        tbb::task_group::transfer_this_task_completion_to(sync);
 
         tg.run(std::move(left_lower_subtask));
         tg.run(std::move(right_upper_subtask));
@@ -883,10 +939,10 @@ void n_body_triangle(tbb::task_group& tg, int n0, int n1, Body* bodies) {
             n_body_rectangle(tg, n0, nm, nm, n1, bodies);
         });
 
-        tbb::task_group::make_edge(triangle_subtask1, rectangle_subtask);
-        tbb::task_group::make_edge(triangle_subtask2, rectangle_subtask);
+        tbb::task_group::set_task_order(triangle_subtask1, rectangle_subtask);
+        tbb::task_group::set_task_order(triangle_subtask2, rectangle_subtask);
 
-        tbb::task_group::current_task::transfer_successors_to(rectangle_subtask);
+        tbb::task_group::transfer_this_task_completion_to(rectangle_subtask);
 
         tg.run(std::move(triangle_subtask1));
         tg.run(std::move(triangle_subtask2));
@@ -941,10 +997,10 @@ void non_recursive_wavefront(int in, int jn) {
             cell_tasks[i].emplace_back(tg.defer([=] { compute_cell(i, j); }));
 
             // upper right dependency
-            if (j != 0) { tbb::task_group::make_edge(cell_tasks[i][j - 1], cell_tasks[i][j]); }
+            if (j != 0) { tbb::task_group::set_task_order(cell_tasks[i][j - 1], cell_tasks[i][j]); }
 
             // upper left dependency
-            if (i != 0) { tbb::task_group::make_edge(cell_tasks[i - 1][j], cell_tasks[i][j]); }
+            if (i != 0) { tbb::task_group::set_task_order(cell_tasks[i - 1][j], cell_tasks[i][j]); }
         }
     }
 
@@ -1014,12 +1070,12 @@ void classic_recursive_wavefront_task(tbb::task_group& tg, int i0, int in, int j
             classic_recursive_wavefront_task(tg, im, in, jm, jn);
         });
 
-        tbb::task_group::make_edge(north_subtask, west_subtask);
-        tbb::task_group::make_edge(north_subtask, east_subtask);
-        tbb::task_group::make_edge(west_subtask, south_subtask);
-        tbb::task_group::make_edge(east_subtask, south_subtask);
+        tbb::task_group::set_task_order(north_subtask, west_subtask);
+        tbb::task_group::set_task_order(north_subtask, east_subtask);
+        tbb::task_group::set_task_order(west_subtask, south_subtask);
+        tbb::task_group::set_task_order(east_subtask, south_subtask);
 
-        tbb::task_group::current_task::transfer_successors_to(south_subtask);
+        tbb::task_group::transfer_this_task_completion_to(south_subtask);
 
         tg.run(std::move(north_subtask));
         tg.run(std::move(west_subtask));
@@ -1082,7 +1138,7 @@ The next step is to notify each successor about its relevant subtasks:
 * ``W`` should be notified about the ``NW`` and ``NS`` subtasks,
 * ``E`` should be notified about the ``NE`` and ``NS`` subtasks.
 
-Successors are notified by creating ``task_tracker`` objects that track the corresponding subtasks and storing them
+Successors are notified by creating ``task_completion_handle`` objects that handles the completion of the corresponding subtasks and storing them
 in a shared container accessible to the successors.
 
 The ``NN`` subtask can begin execution and further subdivision once the previous
@@ -1145,7 +1201,7 @@ public:
         return (1 << n_division);
     }
 
-    static tbb::task_tracker find_predecessor(std::size_t n_division, std::size_t x_index, std::size_t y_index) {
+    static tbb::task_completion_handle find_predecessor(std::size_t n_division, std::size_t x_index, std::size_t y_index) {
         assert(n_division != 0); // 0th level of division cannot have predecessors
 
         auto it = predecessors[n_division].find(x_index * grid_dimension_size(n_division) + y_index);
@@ -1154,7 +1210,7 @@ public:
     }
 
     static void publish_predecessor(std::size_t n_division, std::size_t x_index, std::size_t y_index,
-                                    tbb::task_tracker&& pred)
+                                    tbb::task_completion_handle&& pred)
     {
         assert(n_division != 0); // 0th division should not publish predecessors
 
@@ -1218,37 +1274,37 @@ public:
                 /*n_division = */m_n_division + 1));
 
             // Make dependencies between subtasks
-            tbb::task_group::make_edge(north_subtask, west_subtask);
-            tbb::task_group::make_edge(north_subtask, east_subtask);
-            tbb::task_group::make_edge(west_subtask, south_subtask);
-            tbb::task_group::make_edge(east_subtask, south_subtask);
+            tbb::task_group::set_task_order(north_subtask, west_subtask);
+            tbb::task_group::set_task_order(north_subtask, east_subtask);
+            tbb::task_group::set_task_order(west_subtask, south_subtask);
+            tbb::task_group::set_task_order(east_subtask, south_subtask);
 
             // Add extra dependencies with predecessor's subtasks
             // Tasks on 0th division cannot have additional predecessors
             if (m_n_division != 0) {
                 if (north_x_index != 0) {
                     auto west_predecessor_east_subtask = find_predecessor(m_n_division + 1, north_x_index - 1, north_y_index);
-                    tbb::task_group::make_edge(west_predecessor_east_subtask, north_subtask);
+                    tbb::task_group::set_task_order(west_predecessor_east_subtask, north_subtask);
                 }
                 if (west_x_index != 0) {
                     auto west_predecessor_south_subtask = find_predecessor(m_n_division + 1, west_x_index - 1, west_y_index);
-                    tbb::task_group::make_edge(west_predecessor_south_subtask, west_subtask);
+                    tbb::task_group::set_task_order(west_predecessor_south_subtask, west_subtask);
                 }
                 if (north_y_index != 0) {
                     auto north_predecessor_west_subtask = find_predecessor(m_n_division + 1, north_x_index, north_y_index - 1);
-                    tbb::task_group::make_edge(north_predecessor_west_subtask, north_subtask);
+                    tbb::task_group::set_task_order(north_predecessor_west_subtask, north_subtask);
                 }
                 if (east_y_index != 0) {
                     auto north_predecessor_south_subtask = find_predecessor(m_n_division + 1, east_x_index, east_y_index - 1);
-                    tbb::task_group::make_edge(north_predecessor_south_subtask, east_subtask);
+                    tbb::task_group::set_task_order(north_predecessor_south_subtask, east_subtask);
                 }
             }
 
-            // Save trackers to subtasks for further publishing
-            tbb::task_tracker north_subtask_tracker = north_subtask;
-            tbb::task_tracker west_subtask_tracker = west_subtask;
-            tbb::task_tracker east_subtask_tracker = east_subtask;
-            tbb::task_tracker south_subtask_tracker = south_subtask;
+            // Save completion handles to subtasks for further publishing
+            tbb::task_completion_handle north_subtask_ch = north_subtask;
+            tbb::task_completion_handle west_subtask_ch = west_subtask;
+            tbb::task_completion_handle east_subtask_ch = east_subtask;
+            tbb::task_completion_handle south_subtask_ch = south_subtask;
 
             // Run subtasks
             m_tg.run(std::move(north_subtask));
@@ -1257,10 +1313,10 @@ public:
             m_tg.run(std::move(south_subtask));
 
             // Publish subtasks for successors
-            publish_predecessor(m_n_division + 1, north_x_index, north_y_index, std::move(north_subtask_tracker));
-            publish_predecessor(m_n_division + 1, west_x_index, west_y_index, std::move(west_subtask_tracker));
-            publish_predecessor(m_n_division + 1, east_x_index, east_y_index, std::move(east_subtask_tracker));
-            publish_predecessor(m_n_division + 1, south_x_index, south_y_index, std::move(south_subtask_tracker));
+            publish_predecessor(m_n_division + 1, north_x_index, north_y_index, std::move(north_subtask_ch));
+            publish_predecessor(m_n_division + 1, west_x_index, west_y_index, std::move(west_subtask_ch));
+            publish_predecessor(m_n_division + 1, east_x_index, east_y_index, std::move(east_subtask_ch));
+            publish_predecessor(m_n_division + 1, south_x_index, south_y_index, std::move(south_subtask_ch));
         }
     }
 
@@ -1269,8 +1325,8 @@ private:
 
     // Each element e[i] in the vector represents a map of additional predecessors on the i-th level of division
     // Each element in the hash table maps linearized index in the grid (x_index * n + y_index) with the
-    // tracker to the corresponding task
-    using predecessors_container_type = std::vector<std::unordered_map<std::size_t, tbb::task_tracker>>;
+    // completion_handle to the corresponding task
+    using predecessors_container_type = std::vector<std::unordered_map<std::size_t, tbb::task_completion_handle>>;
 
     static predecessors_container_type predecessors;
 
@@ -1318,21 +1374,21 @@ The resulting split strategy is illustrated in the diagram below:
 <img src="assets/wavefront_recursive_combined_dependencies.png" width=1000>
 
 As described in the eager wavefront section above, during the "Eager 2" stage, dependencies between
-the blue and red subtasks are created using `task_tracker` objects that reference the blue subtasks. The blue subtasks may already be executing 
+the blue and red subtasks are created using `task_completion_handle` objects that reference the blue subtasks. The blue subtasks may already be executing 
 when these dependencies are established (as shown by purple arrows in the diagram).
 
 During the classic split, each "Eager 2" subtask replaces itself in the task graph with the corresponding south subtask by
 transferring its successors.
 
-Because the red subtasks in "Eager 2" only have access to a ``task_tracker``
+Because the red subtasks in "Eager 2" only have access to a ``task_completion_handle``
 referencing the original blue subtasks (before the transfer), and because
 the blue subtasks may already be executing before the edge between them and
-the red subtasks is created, a red subtask may still use a ``task_tracker``
+the red subtasks is created, a red subtask may still use a ``task_completion_handle``
 referencing the original blue task even after it has replaced itself in
-the graph with the "Classic" subtask by transferring its successors.
+the graph with the "Classic" subtask by transferring its completion.
 
-Therefore, to correctly create an edge at the "Eager 2" level, all edges added to a ``task_tracker`` associated
-with a task that has transferred its successors must be applied to the task that received those successors.
+Therefore, to correctly create an edge at the "Eager 2" level, all edges added to a ``task_completion_handle`` associated
+with a task that has transferred its completion must be applied to the task that received those successors.
 To support this behavior, the "merged successors tracking" approach - described in the
 [section above](#semantics-for-transferring-successors-from-the-currently-executing-task-to-the-other-task) -
 must be implemented.
@@ -1429,12 +1485,12 @@ struct FileInfo {
 
     tbb::task_group&  m_tg;
     tbb::task_handle  m_parse_task;
-    tbb::task_tracker m_tracker;
+    tbb::task_completion_handle m_task_completion_handle;
 
     FileInfo(std::string n, tbb::task_group& tg)
         : m_name(n), m_tg(tg)
     {
-        m_tracker = m_parse_task = m_tg.defer([this] { parse(); });
+        m_task_completion_handle = m_parse_task = m_tg.defer([this] { parse(); });
     }
 
     void read();
@@ -1459,13 +1515,13 @@ struct FileInfo {
             FileInfo* maybe = new FileInfo(i);
             FileInfo* actual = maybe->try_process(); // runs parse task for include
 
-            tbb::task_group::make_edge(actual->m_tracker, finalize_task);
+            tbb::task_group::set_task_order(actual->m_task_completion_handle, finalize_task);
             
             // i was parsed previously
             if (maybe != actual) delete maybe;
         }
 
-        tbb::task_group::current_task::transfer_successors_to(finalize_task);
+        tbb::task_group::transfer_this_task_completion_to(finalize_task);
         m_tg.run(std::move(finalize_task));
     }
 
@@ -1484,22 +1540,22 @@ int main() {
 The `map_type` is changed to a `concurrent_unordered_map` to support thread-safe insertion and lookup of `FileInfo` instances during
 parallel processing. 
 
-Each `FileInfo` holds a reference to the `task_group`, a `task_handle` that owns the parsing task, and a `task_tracker` initially set
-to track that task.
+Each `FileInfo` holds a reference to the `task_group`, a `task_handle` that owns the parsing task, and a `task_completion_handle` initially set
+to handle the completion of that task.
 
 The `process()` function submits the task held by `m_parse_task` for execution.
 
 The `parse()` function reads the file, creates a finalization task, transfers the list of dependencies, and creates an edge from the
-corresponding `task_tracker` to the finalization task.
+corresponding `task_completion_handle` to the finalization task.
 
 After establishing all dependencies, the parsing task replaces itself in the task graph with `finalize_task` by
-calling `transfer_successors_to(finalize_task)`.
+calling `transfer_this_task_completion_to(finalize_task)`.
 
 Since `maybe->try_process()` triggers execution of the parsing task, the task may be in one of the following states - `submitted`, `executing`, or
 `completed` - at the time the edge is created.
 
 The parsing task may also transfer its successors to the finalization task. Therefore, `make_edge` must add the successor to the finalize task, 
-demonstrating the need for merged successors tracking - since `m_tracker` was originally set to track the parsing task.
+demonstrating the need for merged successors tracking - since `m_tracker` was originally set to handle the completion of the parsing task.
 
 Let's examine the tasks and edges involved in parsing *File 5*, as illustrated in the diagram above.
 
@@ -1519,10 +1575,11 @@ After the edges between the included files and `f3f` are added, `f3p` transfers 
 
 Assume that `f4p` is the next task to be executed. It creates the finalize task `f4f` and edges to *File 3* and *File 2*.
 
-The task for *File 2* was already created during the parsing of *File 3*, so the tracker for `f2p` would be found in the `fileMap`. 
+The task for *File 2* was already created during the parsing of *File 3*, so the completion handle for `f2p` would be found in the `fileMap`. 
 
-The tracker for *File 3* in the `fileMap` was initially set to track `f3p`, but it has already transferred its successors to `f3f`, making `f3f` the effective target for new dependencies.
-Therefore, new edges need to be added to `f3f` using the tracker to `f3p`:
+The completion handle for *File 3* in the `fileMap` was initially set to handle the completion of `f3p`, but it has already transferred its successors to `f3f`,
+making `f3f` the effective target for new dependencies.
+Therefore, new edges need to be added to `f3f` using the completion handle to `f3p`:
 
 <img src="assets/parser_tasks4.png" width=400>
 
