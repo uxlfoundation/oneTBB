@@ -1181,6 +1181,11 @@ TEST_CASE("Task handle for scheduler bypass via run_and_wait"){
 #endif //__TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
 #if TBB_USE_EXCEPTIONS
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS && __TBB_GCC_VERSION && !__clang__ && !__INTEL_COMPILER
+// GCC issues a warning in task_handle_task::has_dependencies for empty task_handle
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
 //As these tests are against behavior marked by spec as undefined, they can not be put into conformance tests
 
 //! The test for error in scheduling empty task_handle
@@ -1222,6 +1227,9 @@ TEST_CASE("task_handle cannot be scheduled into other task_group of the same con
     CHECK_THROWS_WITH_AS(tg1.run(tg.defer([]{})), "Attempt to schedule task_handle into different task_group", std::runtime_error);
 }
 
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS && __TBB_GCC_VERSION && !__clang__ && !__INTEL_COMPILER
+#pragma GCC diagnostic pop
+#endif
 #endif // TBB_USE_EXCEPTIONS
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
@@ -1380,13 +1388,13 @@ void test_not_submitted_predecessors(submit_function submit_function_tag) {
     std::size_t task_initializer = 0;
 
     std::shared_ptr<std::size_t> left_leaf_placeholder = std::make_shared<std::size_t>(0);
-    tbb::task_tracker left_leaf_tracker;
+    tbb::task_completion_handle left_leaf_completion_handle;
     tbb::task_handle deepest_left_leaf_task;
 
     for (std::size_t i = 0; i < depth; ++i) {
         if (i == 0) {
             deepest_left_leaf_task = tg.defer(leaf_task{left_leaf_placeholder, task_initializer++});
-            left_leaf_tracker = deepest_left_leaf_task;
+            left_leaf_completion_handle = deepest_left_leaf_task;
         }
 
         std::shared_ptr<std::size_t> right_leaf_placeholder = std::make_shared<std::size_t>(0);
@@ -1394,15 +1402,15 @@ void test_not_submitted_predecessors(submit_function submit_function_tag) {
 
         std::shared_ptr<std::size_t> combine_placeholder = std::make_shared<std::size_t>(0);
         tbb::task_handle combine = tg.defer(combine_task{combine_placeholder, left_leaf_placeholder, right_leaf_placeholder});
-        tbb::task_tracker combine_tracker = combine;
+        tbb::task_completion_handle combine_completion_handle = combine;
 
-        tbb::task_group::make_edge(left_leaf_tracker, combine);
-        tbb::task_group::make_edge(right_leaf_task, combine);
+        tbb::task_group::set_task_order(left_leaf_completion_handle, combine);
+        tbb::task_group::set_task_order(right_leaf_task, combine);
 
         submit(submit_function_tag, std::move(combine), tg, arena);
         submit(submit_function_tag, std::move(right_leaf_task), tg, arena);
 
-        left_leaf_tracker = combine_tracker;
+        left_leaf_completion_handle = combine_completion_handle;
         left_leaf_placeholder = combine_placeholder;
     }
     
@@ -1432,7 +1440,7 @@ void test_submitted_predecessors(submit_function submit_function_tag, bool all_p
     tbb::task_group tg;
     std::atomic<std::size_t> task_placeholder{0};
 
-    std::vector<tbb::task_tracker> predecessors(num_predecessors);
+    std::vector<tbb::task_completion_handle> predecessors(num_predecessors);
 
     for (std::size_t i = 0; i < num_predecessors; ++i) {
         tbb::task_handle h = tg.defer([&] { ++task_placeholder; });
@@ -1449,10 +1457,9 @@ void test_submitted_predecessors(submit_function submit_function_tag, bool all_p
         CHECK_MESSAGE(task_placeholder == num_predecessors, "Not all predecessors completed");
         ++task_placeholder;
     });
-    tbb::task_tracker successor_tracker = successor_task;
 
     for (std::size_t i = 0; i < num_predecessors; ++i) {
-        tbb::task_group::make_edge(predecessors[i], successor_task);
+        tbb::task_group::set_task_order(predecessors[i], successor_task);
     }
 
     if (all_predecessors_completed) {
@@ -1479,15 +1486,15 @@ void test_return_task_with_dependencies(submit_function submit_function_tag) {
     tbb::task_handle predecessor = tg.defer([&] {
         predecessor_placeholder = 1;
     });
-    tbb::task_tracker predecessor_tracker = predecessor;
+    tbb::task_completion_handle predecessor_completion_handle = predecessor;
 
     tbb::task_handle task = tg.defer([&] {
-        tbb::task_handle successor = tg.defer([&, predecessor_tracker] {
+        tbb::task_handle successor = tg.defer([&, predecessor_completion_handle] {
             CHECK_MESSAGE(predecessor_placeholder == 1, "Predecessor task was not completed");
             successor_placeholder = 1;
         });
 
-        tbb::task_group::make_edge(predecessor_tracker, successor);
+        tbb::task_group::set_task_order(predecessor_completion_handle, successor);
         return successor;
     });
 
@@ -1525,12 +1532,12 @@ TEST_CASE("test task_completion_handle in concurrent environment") {
 
     tbb::parallel_for(0, n, [&](int) {
         tbb::task_completion_handle completion_handle(task);
-        CHECK_MESSAGE(completion_handle, "task_tracker should not be empty");
+        CHECK_MESSAGE(completion_handle, "task_completion_handle should not be empty");
         tbb::task_handle succ = tg.defer([&] {
             CHECK_MESSAGE(task_placeholder == 1, "Predecessor task was not executed");
             ++succ_counter;
         });
-        tbb::task_group::make_edge(completion_handle, succ);
+        tbb::task_group::set_task_order(completion_handle, succ);
         tg.run(std::move(succ));
     });
 

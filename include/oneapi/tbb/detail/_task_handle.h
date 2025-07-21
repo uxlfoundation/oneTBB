@@ -138,7 +138,7 @@ private:
     d1::small_object_allocator m_allocator;
 };
 
-inline void internal_make_edge(task_dynamic_state* pred, task_dynamic_state* succ) {
+inline void internal_set_task_order(task_dynamic_state* pred, task_dynamic_state* succ) {
     __TBB_ASSERT(pred != nullptr && succ != nullptr , nullptr);
     pred->add_successor(succ->get_continuation_vertex());
 }
@@ -489,13 +489,13 @@ private:
     }
 #endif // !__TBB_CPP20_COMPARISONS_PRESENT
 
-    friend struct task_tracker_accessor;
+    friend struct task_completion_handle_accessor;
 
     task_dynamic_state* m_task_state;
 };
 
-struct task_tracker_accessor {
-    static task_dynamic_state* get_task_dynamic_state(task_tracker& tracker) {
+struct task_completion_handle_accessor {
+    static task_dynamic_state* get_task_dynamic_state(task_completion_handle& tracker) {
         return tracker.m_task_state;
     }
 };
