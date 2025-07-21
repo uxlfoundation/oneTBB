@@ -16,6 +16,7 @@
   * 4.1 [Adding successors to the currently executing task](#adding-successors-to-the-currently-executing-task)
   * 4.2 [Functions for tracking the task progress](#functions-for-tracking-the-task-progress)
 * 5 [API proposal](#api-proposal)
+  * 5.1 [Changes in ``task_handle`` class specification](#changes-in-task_handle-class-specification)
   * 5.1 [``task_completion_handle`` class](#task_completion_handle-class)
     * 5.1.1 [Construction, destruction and assignment](#construction-destruction-and-assignment)
     * 5.1.2 [Observers](#observers)
@@ -148,7 +149,7 @@ Transferring to tasks in `submitted`, `executing` or `completed` states are desc
 and may be supported in the future.
 
 Calling ``transfer_this_task_completion_to`` merges the successor lists of ``current`` and ``target``, assigning the merged list to ``target``.
-It should be thread-safe to add new successors to ``current`` using the ``make_edge`` API.
+It should be thread-safe to add new successors to ``current`` using the ``set_task_order`` API.
 
 <img src="assets/transferring_between_two_basic.png" width=600>
 
@@ -192,7 +193,7 @@ included in the list transferred to ``B``.
 If the transfer occurs before the new successor is added, it will remain associated with ``A`` and will not appear in ``B``'s successor list.
 
 As a result, deterministic predecessor-successor relationships cannot be guaranteed due to the logical race between
-``make_edge`` and ``transfer_this_task_completion_to``.
+``set_task_order`` and ``transfer_this_task_completion_to``.
 
 If ``A`` and ``B`` share a merged successor list (as in the second approach), then regardless of linearization, any newly added successor will appear in 
 both ``B``'s ("real" task) and ``A``'s (proxy handle) successor lists.
@@ -319,7 +320,7 @@ These APIs were excluded from the final proposal for the following reasons:
   Consider a task ``A`` that transfers its completion to task ``B`` and exits its body. On one hand, task ``A`` has already been submitted and 
   completed, so both functions should return ``true``.
   However, since task ``A`` replaces itself in the task graph with task ``B``, it may be expected that the completion handle now
-  refers to the completion of ``B``— similarly to how `make_edge` works, where new edges added to ``A`` after the transfer are redirected to ``B``.
+  refers to the completion of ``B``— similarly to how `set_task_order` works, where new successors added to ``A`` after the transfer are redirected to ``B``.
 
 ## API proposal
 
@@ -370,6 +371,14 @@ class task_group {
 } // namespace oneapi
 ```
 
+### Changes in ``task_handle`` class specification
+
+``~task_handle()``
+
+Destroys the ``task_handle`` object and associated task if it exists.
+
+If the associated task is a predecessor or a successor, the behavior is undefined.
+
 ### ``task_completion_handle`` class
 
 #### Construction, destruction and assignment
@@ -396,8 +405,6 @@ If ``handle`` is empty, the behavior is undefined.
 ``~task_completion_handle()``
 
 Destroys the ``task_completion_handle``.
-
-If the task is a predecessor or a successor, the behavior is undefined.
 
 ``task_completion_handle& operator=(const task_completion_handle& other)``
 
@@ -648,6 +655,9 @@ class task_group {
 If a ``task_completion_handle`` referring to a task in the `executing`, or `completed` state is used
 as the second argument, the behavior is undefined.
 
+Alternative approach is to define a function that attempts to convert a ``task_completion_handle`` to a valid ``task_handle``, if the task
+has not been started yet. The returned ``task_handle`` can be used for adding new predecessors and have to be resubmitted for execution.
+
 ### Returning ``task_completion_handle`` from submission functions
 
 It may be useful to allow adding successors not only to tasks represented by ``task_handle``, but also to those
@@ -662,19 +672,20 @@ tbb::task_handle successor = tg.defer([] { /*successor body*/ });
 tbb::task_group::set_task_order(ch, successor);
 ```
 
-This could be achieved by either changing the return type of ``task_group::run`` or introducing a new submission function:
+Since changing the return type of ``task_group::run`` to be ``task_completion_handle`` will introduce extra overhead for cases where returned value
+is not needed or ignored, this should be achieved by either introducing a new submission function or adding an extra argument to ``task_group::run``:
 
 ```cpp
 namespace oneapi {
 namespace tbb {
 class task_group {
+    // Option 1 - introduce a new submission function
+    template <typename Body>
+    tbb::task_completion_handle run_and_get_completion_handle(const Body& body);
+
     // Option 1 - modify the return value
     template <typename Body>
-    tbb::task_completion_handle run(const Body& body);
-
-    // Option 2 - introduce new function with different name
-    template <typename Body>
-    tbb::task_completion_handle run_get_completion_handle(const Body& body);
+    tbb::task_completion_handle run(const Body& body, additional-flag-argument);
 };
 } // namespace tbb
 } // namespace oneapi
@@ -709,7 +720,7 @@ added after the transfer will be associated with the task that receives the comp
   * The semantic for partial destruction of the task tree should be defined. See [separate section](#semantics-for-partial-task-tree-destruction) for more details.
   * Should comparison functions between ``task_completion_handle`` and ``task_handle`` be defined?
   * Should a ``task_completion_handle`` referring to a task in the `created` or `submitted` state (but not always) be allowed as a
-    successor in ``make_edge``? See [separate section](#using-a-task_completion_handle-as-a-successor) for more details.
+    successor in ``set_task_order``? See [separate section](#using-a-task_completion_handle-as-a-successor) for more details.
   * Should an ``empty_task`` helper API be provided to optimize the creation and spawning of empty sync-only tasks. See
     [separate section](#empty_task-api) for more details.
   * Should submitting functions that accept a body and return a `task_completion_handle` be introduced? See
@@ -1155,10 +1166,10 @@ in the previous step (``NW`` and ``NS``):
 
 <img src="assets/wavefront_recursive_eager_second_division_west_new_dependencies.png">
 
-It is important to note that when these additional edges are created, ``NW`` and ``NS`` are already in the
+It is important to note that when these additional dependencies are established, ``NW`` and ``NS`` are already in the
 `submitted` state, and may even have completed.
 
-This highlights the importance of being able to create edges from tasks in any state to a task in the `created` state.
+This highlights the importance of being able to use tasks in any state as predecessors in ``set_task_order``.
 
 The ``E`` and ``S`` subtasks follow the same logic as described above. This results in the following task graph structure:
 
@@ -1383,12 +1394,12 @@ transferring its successors.
 
 Because the red subtasks in "Eager 2" only have access to a ``task_completion_handle``
 referencing the original blue subtasks (before the transfer), and because
-the blue subtasks may already be executing before the edge between them and
-the red subtasks is created, a red subtask may still use a ``task_completion_handle``
+the blue subtasks may already be executing before the dependency between them and
+the red subtasks is established, a red subtask may still use a ``task_completion_handle``
 referencing the original blue task even after it has replaced itself in
 the graph with the "Classic" subtask by transferring its completion.
 
-Therefore, to correctly create an edge at the "Eager 2" level, all edges added to a ``task_completion_handle`` associated
+Therefore, to correctly establish a dependency at the "Eager 2" level, all successors added to a ``task_completion_handle`` associated
 with a task that has transferred its completion must be applied to the task that received those successors.
 To support this behavior, the "merged successors tracking" approach - described in the
 [section above](#semantics-for-transferring-successors-from-the-currently-executing-task-to-the-other-task) -
@@ -1546,41 +1557,41 @@ to handle the completion of that task.
 
 The `process()` function submits the task held by `m_parse_task` for execution.
 
-The `parse()` function reads the file, creates a finalization task, transfers the list of dependencies, and creates an edge from the
-corresponding `task_completion_handle` to the finalization task.
+The `parse()` function reads the file, creates a finalization task, transfers the list of dependencies, and establishes a dependency between the
+corresponding `task_completion_handle` and the finalization task.
 
 After establishing all dependencies, the parsing task replaces itself in the task graph with `finalize_task` by
 calling `transfer_this_task_completion_to(finalize_task)`.
 
 Since `maybe->try_process()` triggers execution of the parsing task, the task may be in one of the following states - `submitted`, `executing`, or
-`completed` - at the time the edge is created.
+`completed` - at the time the dependency is established.
 
-The parsing task may also transfer its successors to the finalization task. Therefore, `make_edge` must add the successor to the finalize task, 
+The parsing task may also transfer its successors to the finalization task. Therefore, `set_task_order` must add the successor to the finalize task, 
 demonstrating the need for merged successors tracking - since `m_tracker` was originally set to handle the completion of the parsing task.
 
-Let's examine the tasks and edges involved in parsing *File 5*, as illustrated in the diagram above.
+Let's examine the tasks and dependencies involved in parsing *File 5*, as illustrated in the diagram above.
 
 Processing *File 5* creates a finalize task `f5f` and two parsing tasks - `f4p` and `f3p` - for each included file.
 
 <img src="assets/parser_tasks1.png" width=400>
 
-`f4p` and `f3p` are in at least the `submitted` state when the edge to `f5f` is created.
+`f4p` and `f3p` are in at least the `submitted` state when the dependency to `f5f` is established.
 
 Let's assume that the task `f3p` is executed next. It creates the finalize task `f3f` and two tasks for the included files - `f2p` and `f1p`:
 
 <img src="assets/parser_tasks2.png" width=400>
 
-After the edges between the included files and `f3f` are added, `f3p` transfers its successors to `f3f` and is destroyed:
+After the dependencies between the included files and `f3f` are established, `f3p` transfers its successors to `f3f` and is destroyed:
 
 <img src="assets/parser_tasks3.png" width=400>
 
-Assume that `f4p` is the next task to be executed. It creates the finalize task `f4f` and edges to *File 3* and *File 2*.
+Assume that `f4p` is the next task to be executed. It creates the finalize task `f4f` and dependencies to *File 3* and *File 2*.
 
 The task for *File 2* was already created during the parsing of *File 3*, so the completion handle for `f2p` would be found in the `fileMap`. 
 
 The completion handle for *File 3* in the `fileMap` was initially set to handle the completion of `f3p`, but it has already transferred its successors to `f3f`,
 making `f3f` the effective target for new dependencies.
-Therefore, new edges need to be added to `f3f` using the completion handle to `f3p`:
+Therefore, new dependencies need to be added to `f3f` using the completion handle to `f3p`:
 
 <img src="assets/parser_tasks4.png" width=400>
 
