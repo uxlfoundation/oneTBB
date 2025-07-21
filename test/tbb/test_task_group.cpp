@@ -1715,7 +1715,7 @@ TEST_CASE("test dependencies and cancellation") {
             if (layer_index != 0) {
                 auto& pred_layer = tasks.at(layer_index - 1);
                 for (std::size_t pred_task_index = 0; pred_task_index < n_layer_tasks; ++pred_task_index) {
-                    tbb::task_group::make_edge(pred_layer[pred_task_index], layer_tasks.back());
+                    tbb::task_group::set_task_order(pred_layer[pred_task_index], layer_tasks.back());
                 }
             }
         }
