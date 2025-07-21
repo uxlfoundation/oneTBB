@@ -138,7 +138,7 @@ static int theNumProcs;
 class cgroup_info {
 public:
     static bool is_cpu_constrained(int& constrained_num_cpus) {
-        const int num = parse_cgroup_cpu_constraints();
+        static const int num = parse_cgroup_cpu_constraints();
         if (num == error_value || num == unlimited_num_cpus)
             return false;
 
@@ -325,7 +325,6 @@ private:
 
     static int parse_cgroup_cpu_constraints() {
         using unique_mounts_file_t = std::unique_ptr<FILE, decltype(&close_mounts_file)>;
-        using unique_file_t = std::unique_ptr<FILE, decltype(&close_file)>;
 
         // Reading /proc/self/mounts and /proc/self/cgroup anyway, so open them right away
         unique_mounts_file_t mounts_file_ptr(setmntent("/proc/self/mounts", "r"), &close_mounts_file);

@@ -99,7 +99,9 @@ TEST_CASE("Check absence of scheduler initialization") {
             utils::limit_number_of_threads(availableProcs) == availableProcs,
                         "limit_number_of_threads has not set the requested limitation");
 #if __TBB_USE_CGROUPS
-        availableProcs = utils::min(availableProcs, int(utils::get_cgroups_max_concurrency()));
+        int cgroup_num_cpus = 0;
+        if (utils::cgroup_info::is_cpu_constrained(cgroup_num_cpus))
+            availableProcs = std::min(availableProcs, cgroup_num_cpus);
 #endif
         REQUIRE(tbb::this_task_arena::max_concurrency() == availableProcs);
     }
