@@ -420,10 +420,15 @@ void test_constraints_affinity_and_concurrency(tbb::task_arena::constraints cons
     system_info::affinity_mask reference_affinity = prepare_reference_affinity_mask(constraints);
     int max_threads_per_core = static_cast<int>(system_info::get_maximal_threads_per_core());
 
+    int constrained_num_cpus = INT_MAX;
+    (void)utils::cgroup_info::is_cpu_constrained(constrained_num_cpus);
+
     if (constraints.max_threads_per_core == tbb::task_arena::automatic || constraints.max_threads_per_core == max_threads_per_core) {
         REQUIRE_MESSAGE(hwloc_bitmap_isequal(reference_affinity, arena_affinity),
-            "Wrong affinity mask was applied for the constraints instance.");
-        REQUIRE_MESSAGE(hwloc_bitmap_weight(reference_affinity) == default_concurrency,
+                        "Wrong affinity mask was applied for the constraints instance.");
+        const int reference_concurrency =
+            std::min(hwloc_bitmap_weight(reference_affinity), constrained_num_cpus);
+        REQUIRE_MESSAGE(reference_concurrency == default_concurrency,
             "Wrong default_concurrency was returned for the constraints instance.");
     } else {
         REQUIRE_MESSAGE(constraints.max_threads_per_core < max_threads_per_core,
@@ -445,10 +450,11 @@ void test_constraints_affinity_and_concurrency(tbb::task_arena::constraints cons
                     "Wrong number of threads may be scheduled to some core.");
             }
         }
-        REQUIRE_MESSAGE(valid_concurrency == default_concurrency,
-            "Wrong default_concurrency was returned for the constraints instance.");
         REQUIRE_MESSAGE(valid_concurrency == hwloc_bitmap_weight(arena_affinity),
             "Wrong number of bits inside the affinity mask.");
+        valid_concurrency = std::min(valid_concurrency, constrained_num_cpus);
+        REQUIRE_MESSAGE(valid_concurrency == default_concurrency,
+            "Wrong default_concurrency was returned for the constraints instance.");
     }
 }
 
