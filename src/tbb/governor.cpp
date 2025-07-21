@@ -587,11 +587,16 @@ void constraints_assertion(d1::constraints c) {
 int __TBB_EXPORTED_FUNC constraints_default_concurrency(const d1::constraints& c, intptr_t /*reserved*/) {
     constraints_assertion(c);
 
+    const int default_num_threads = int(governor::default_num_threads());
+
     if (c.numa_id >= 0 || c.core_type >= 0 || c.max_threads_per_core > 0) {
         system_topology::initialize();
-        return get_default_concurrency_ptr(c.numa_id, c.core_type, c.max_threads_per_core);
+        const int constrained_default_concurrency =
+            get_default_concurrency_ptr(c.numa_id, c.core_type, c.max_threads_per_core);
+        __TBB_ASSERT(constrained_default_concurrency >= 0, "Infinitely set HWLOC mask?");
+        return std::min(constrained_default_concurrency, default_num_threads);
     }
-    return governor::default_num_threads();
+    return default_num_threads;
 }
 
 int __TBB_EXPORTED_FUNC constraints_threads_per_core(const d1::constraints&, intptr_t /*reserved*/) {
