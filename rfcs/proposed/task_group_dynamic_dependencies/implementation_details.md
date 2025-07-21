@@ -7,7 +7,7 @@
 * 1 [Class hierarchy before implementing the proposal](#class-hierarchy-before-implementing-the-proposal)
 * 2 [`task_dynamic_state` class](#task_dynamic_state-class)
 * 3 [Changes in `task_handle_task` class layout](#changes-in-task_handle_task-layout)
-* 4 [`tbb::task_tracker` class implementation](#tbbtask_tracker-class-implementation)
+* 4 [``tbb::task_completion_handle`` class implementation](#tbbtask_completion_handle-class-implementation)
 * 5 [`task_dynamic_state` in details](#task_dynamic_state-in-details)
 * 6 [Create dependencies between tasks](#create-dependencies-between-tasks)
   * 6.1 [`continuation_vertex` class](#continuation_vertex-class)
@@ -15,11 +15,11 @@
   * 6.3 [Adding successors to the list](#adding-successors-to-the-list)
   * 6.4 [Notifying the successors](#notifying-the-successors)
   * 6.5 [Submitting a task for execution](#submitting-a-task-for-execution)
-* 7 [Transferring successors to the other task](#transferring-successors-to-the-other-task)
+* 7 [Transferring completion to the other task](#transferring-completion-to-the-other-task)
   * 7.1 [Dynamic state lifetime issue](#dynamic-state-lifetime-issue)
 * 8 [Dynamic state transition examples](#dynamic-state-transition-examples)
-  * 8.1 [Creating the edges](#creating-the-edges)
-  * 8.2 [Transferring and creating edges](#transferring-and-creating-edges)
+  * 8.1 [Ordering the tasks](#ordering-the-tasks)
+  * 8.2 [Transferring and ordering](#transferring-and-ordering)
     * 8.2.1 [Linearization 1](#linearization-1)
     * 8.2.2 [Linearization 2](#linearization-2)
 
@@ -53,8 +53,8 @@ Its layout is described in detail in later sections.
 
 Each task in the task group that have predecessors or successors has an associated `task_dynamic_state` instance.
 
-Since the `make_edge` API allows completed tasks to act as predecessors, the lifetime of the associated `task_dynamic_state`
-instance must be extended beyond task completion - until the last `tbb::task_tracker` referencing the task is destroyed.
+Since the `set_task_order` API allows completed tasks to act as predecessors, the lifetime of the associated `task_dynamic_state`
+instance must be extended beyond task completion - until the last `tbb::task_completion_handle` referencing the task is destroyed.
 
 ## Changes in `task_handle_task` class layout
 
@@ -70,10 +70,10 @@ The new class hierarchy is shown in the diagram below:
 
 The new `get_dynamic_state()` function is responsible for the lazy initialization of the associated state when it is called for the first time.
 This function is called in the following cases:
-* A `task_tracker` object is constructed or assigned from a `task_handle` that owns the task,
-* When `make_edge(pred, succ)` is called to create a predecessor-successor dependency, dynamic states
+* A `task_completion_handle` object is constructed or assigned from a `task_handle` that owns the task,
+* When `set_task_order(pred, succ)` is called to establish a predecessor-successor dependency, dynamic states
   are created for its `task_handle` arguments.
-* When `transfer_successors_to(new_task)` is called from the running task, a dynamic state is created for `new_task`.
+* When `transfer_this_task_completion_to(new_task)` is called from the running task, a dynamic state is created for `new_task`.
 
 If the associated dynamic state was already initialized, `get_dynamic_state` returns it.
 
@@ -85,33 +85,33 @@ another thread has already stored the dynamic state, the state allocated by the 
 The `task_dynamic_state` object is constructed with the reference counter of 1 to prolong its lifetime
 while the task is in progress. When the task is destroyed, the reference counter is decremented.
 
-## `tbb::task_tracker` class implementation
+## `tbb::task_completion_handle` class implementation
 
-The `tbb::task_tracker` class represents a task for the purpose of creating task dependencies. It can be constructed or assigned from a
+The `tbb::task_completion_handle` class represents a task for the purpose of creating task dependencies. It can be constructed or assigned from a
 `task_handle`. It is copyable and movable, with copies referring to the same `task_dynamic_state` object.
 
-The dynamic state of a task remains valid until both the task and all associated `task_tracker` objects are destroyed.
+The dynamic state of a task remains valid until both the task and all associated `task_completion_handle` objects are destroyed.
 
-A default-constructed `tbb::task_tracker` does not represent any task.
+A default-constructed `tbb::task_completion_handle` does not represent any task.
 
 ```cpp
-class task_tracker {
+class task_completion_handle {
 private:
     task_dynamic_state* m_state;
 public:
-    task_tracker(); // creates empty task_tracker
-    task_tracker(const task_tracker& other);
+    task_completion_handle(); // creates empty task_completion_handle
+    task_completion_handle(const task_completion_handle& other);
     
-    task_tracker& operator=(const task_tracker& other); 
+    task_completion_handle& operator=(const task_completion_handle& other); 
 
-    task_tracker(task_tracker&& other);
-    task_tracker& operator=(task_tracker&& other);
+    task_completion_handle(task_completion_handle&& other);
+    task_completion_handle& operator=(task_completion_handle&& other);
 
-    // creates a tracker referring to the dynamic state of task owned by th
-    task_tracker(const task_handle& th);
-    task_tracker& operator=(const task_handle& th);
+    // creates a handle referring to the dynamic state of task owned by th
+    task_completion_handle(const task_handle& th);
+    task_completion_handle& operator=(const task_handle& th);
     
-    ~task_tracker();
+    ~task_completion_handle();
 };
 ```
 
@@ -141,21 +141,21 @@ will be described in more detail in later sections.
 The `continuation_vertex` class is described in the following sections.
 
 `m_new_dynamic_state` points to the another dynamic state instance. It is used when the associated task calls
-`transfer_successors_to(new_task)` during execution. After the transfer, it points to the dynamic state of `new_task`.
-It is described in more detail in the section about transferring successors.
+`transfer_this_task_completion_to(new_task)` during execution. After the transfer, it points to the dynamic state of `new_task`.
+It is described in more detail in the section about transferring the completion.
 
 `m_num_references` and `m_allocator` manage the lifetime of the dynamic state.
 
 The stored reference counter is increased:
 * When the `task_dynamic_state` associated with a task is created, a reference is reserved for the task object.
-* When a `task_tracker` instance is created (either from a non-empty `task_handle` or by copying an existing tracker).
-* When `transfer_successors_to(new_task)` is called, the dynamic state of the currently executing task reserves a reference to the
+* When a `task_completion_handle` instance is created (either from a non-empty `task_handle` or by copying an existing completion handle).
+* When `transfer_this_task_completion_to(new_task)` is called, the dynamic state of the currently executing task reserves a reference to the
   dynamic state of `new_task`. See the [lifetime issue](#dynamic-state-lifetime-issue) section for more details.
 
 The stored reference counter is decreased:
 * When the associated task is completed, before the task instance is destroyed.
-* When a `task_tracker` instance associated with the task is destroyed.
-* When the `task_dynamic_state` of a task that called `transfer_successors_to(new_task)` is destroyed. In this case, the reference
+* When a `task_completion_handle` instance associated with the task is destroyed.
+* When the `task_dynamic_state` of a task that called `transfer_this_task_completion_to(new_task)` is destroyed. In this case, the reference
   counter of the dynamic state associated with `new_task` is decreased. See the [lifetime issue](#dynamic-state-lifetime-issue) section for more details.
 
 Once the reference counter reaches zero, the `task_dynamic_state` is destroyed and deallocated using `m_allocator`.
@@ -191,8 +191,8 @@ It shows 4 tasks, `pred1`, `pred2`, `succ1` and `succ2`, where `pred1` and `pred
 Green rectangles represent the successor list of `pred1` and `pred2`. Each node in this list contains a pointer to the `continuation_vertex` of
 the successor. 
 
-When the edge between `pred1` and `succ1` is created, the `continuation_vertex` for `succ1` is initialized with a reference count of `2` - one
-for `pred1` and one for the `task_handle` that owns `succ1`. When the edge between `pred2` and `succ1` is created, the same
+When the dependency between `pred1` and `succ1` is created, the `continuation_vertex` for `succ1` is initialized with a reference count of `2` - one
+for `pred1` and one for the `task_handle` that owns `succ1`. When the dependency between `pred2` and `succ1` is created, the same
 `continuation_vertex` is reused, and the reference count is incremented to `3`.
 
 The same logic applies for `pred1`, `pred2`, and `succ2`.
@@ -234,44 +234,42 @@ at the head.
 
 The successor list in `task_dynamic_state` can have two possible states:
 * `Alive` state (when `m_successor_list_head` is not equal to `~std::uintptr_t(0)`, including `nullptr`): indicates that the associated task
-  is not completed and its successors have not been transferred. In this state, new successors can be added to the current `task_dynamic_state`.
+  is not completed and its completion have not been transferred. In this state, new successors can be added to the current `task_dynamic_state`.
 * `Dead` state (when `m_successor_list_head` equals `~std::uintptr_t(0)`): indicates one of two scenarios:
     * The associated task is completed. Adding new successors does not add any real dependencies. Successors can proceed for execution if their other dependencies are satisfied.
-    * The associated task has transferred its successors to another task. In this case, any new successor should be redirected to the dynamic state
+    * The associated task has transferred its completion to another task. In this case, any new successor should be redirected to the dynamic state
       of the task that have received the successors during the transfer. `m_new_dynamic_state` should point to that receiving state.
 
 ### Adding successors to the list
 
-The `make_edge` API supports both concurrent addition of multiple successors to the same predecessor and multiple predecessors to the same successor.
+The `set_task_order` API supports both concurrent addition of multiple successors to the same predecessor and multiple predecessors to the same successor.
 
-The `make_edge` API first retrieves the dynamic states of the predecessor and successor by calling `get_dynamic_state()`.
-If the dynamic states do not yet exist, they are created. The function `internal_make_edge(pred_state, succ_state)`
-takes two dynamic states: one for the predecessor and one for the successor.
+The `set_task_order` API first retrieves the dynamic states of the predecessor and successor by calling `get_dynamic_state()`.
+If the dynamic states do not yet exist, they are created.
 
-The next step is to obtain the `continuation_vertex` associated with `succ_state`. As described earlier, if it
-has not yet been initialized, it is initialized at this point. `internal_make_edge` then calls the `pred_state->add_successor(cont_vertex)`,
-where `cont_vertex` is the `continuation_vertex` of the successor.
+The next step is to obtain the `continuation_vertex` associated with successor's dynamic state. As described earlier, if it
+has not yet been initialized, it is initialized at this point.
 
-As a first step, the `add_successor` function checks the state of the successor list. If the list is not alive, there are two possible scenarios -
-either the task is completed, or it has transferred its successors to another task.
+While registering the successor in the predecessor's dynamic state, the state of the successor list is checked. If the list is not alive, there are two possible scenarios -
+either the task is completed, or it has transferred its completion (i.e., successors) to another task.
 
-If the `m_new_dynamic_state` atomic variable is set, then a transfer has occurred, and the function redirects the new successor
-to `new_state` by calling `new_state->add_successor(cont_vertex)`.
+If the `m_new_dynamic_state` atomic variable is set, then a transfer has occurred, and the function redirects the new successor the state that received the completion
+during the transfer.
 
 If `m_new_dynamic_state` is not set, the task is considered completed, and adding a real dependency does not make any sense.
 
-If the successor list is alive, the `add_successor` function reserves a reference in `cont_vertex` for the predecessor, allocates a
-`successor_list_node` pointing to it, and calls `add_successor_node`, which operates on the node rather than the continuation vertex directly.
+If the successor list is alive, reference for the predecessor is reserved in the successors `continuation_vertex`. Then, a `successor_list_node` pointing to the created
+state is allocated.
 
-`add_successor_node` re-checks the state of the successor list. If it is not alive (meaning the task has completed or transferred its successors during
-the allocation of the forward-list node), the function checks `m_new_dynamic_state`, as described above.
+After this, the state of the successor list is re-checked. If it is not alive (meaning the task has completed or transferred its successors during
+the allocation of the forward-list node), the `m_new_dynamic_state` is checked, as described above.
 
-If the new state is assigned, `add_successor_node` redirects the successor to the new state by calling `new_state->add_successor_node(node)`.
+If the new state is assigned, the successor is redirected to the new state.
 
-Otherwise, the task is considered completed and the successor should not be added to the list. The function releases the previously reserved reference
-in `cont_vertex` and deallocates the node.
+Otherwise, the task is considered completed and the successor should not be added to the list. The previously reserved reference in successor's `continuation_vertex` is released and
+the `successor_list_node` is deallocated.
 
-If the list is alive, the function attempts to insert the successor node at the head of the list using a CAS operation on `m_successor_list_head`.
+If the list is alive, the algorithm attempts to insert the successor node at the head of the list using a CAS operation on `m_successor_list_head`.
 
 Each CAS failure (i.e., `m_successor_list_head` was updated) may indicate that:
 * Another thread added a different predecessor and updated the list head.
@@ -281,11 +279,11 @@ Each CAS failure (i.e., `m_successor_list_head` was updated) may indicate that:
 In the first case, the CAS operation should simply be retried, as the successor still needs to be added.
 In latter two cases, the same checks described above should be repeated.
 
-The sequence diagram of `make_edge` is shown in the picture below:
+The sequence diagram of `set_task_order` is shown in the picture below:
 
 <img src="assets/impl_sequence_diagram.png">
 
-The flow of `make_edge` is shown in the code snippet below:
+The flow of `set_task_order` is shown in the code snippet below:
 
 ```cpp
 
@@ -357,16 +355,16 @@ public:
     }
 };
 
-void internal_make_edge(task_dynamic_state* pred_state, task_dynamic_state* succ_state) {
+void internal_set_task_order(task_dynamic_state* pred_state, task_dynamic_state* succ_state) {
     pred_state->add_successor(succ_state->get_continuation_vertex());
 }
 
-void make_edge(tbb::task_handle& pred, tbb::task_handle& succ) {
-    internal_make_edge(pred->get_dynamic_state(), succ->get_dynamic_state());
+void set_task_order(tbb::task_handle& pred, tbb::task_handle& succ) {
+    internal_set_task_order(pred->get_dynamic_state(), succ->get_dynamic_state());
 }
 
-void make_edge(tbb::task_tracker& pred, tbb::task_handle& succ) {
-    internal_make_edge(pred->get_dynamic_state(), succ->get_dynamic_state());
+void set_task_order(tbb::task_completion_handle& pred, tbb::task_handle& succ) {
+    internal_set_task_order(pred->get_dynamic_state(), succ->get_dynamic_state());
 }
 ```
 
@@ -405,64 +403,15 @@ The `complete_task` function is implemented in the `task_handle_task` class. If 
 `task_dynamic_state::complete_task()`.
 
 The `task_dynamic_state::complete_task()` function atomically retrieves the successor list and sets its value to `~uintptr_t(0)`,
-signaling to other calls to `add_successor` that the list is no longer alive and the task has completed.
+signaling to other calls to `set_task_order` that the list is no longer alive and the task has completed.
 
-The next step is to notify all successors in the list of the task's completion, which is done by calling `release_successor_list(list)`
-function.
-
-The implementation of `complete_task` is shown below:
-
-```cpp
-class task_dynamic_state {
-private:
-    std::atomic<successor_list_node*> m_successor_list_head;
-    std::atomic<task_dynamic_state*>   m_new_dynamic_state;
-public:
-    task_handle_task* complete_task() {
-        task_handle_task* next_task = nullptr;
-
-        if (is_alive(m_successor_list_head.load())) {
-            successor_list_node* list = m_successor_list_head.exchange(~std::uintptr_t(0));
-            release_successor_list(list);
-        }
-        return next_task;
-    }
-};
-```
-
-The `release_successor_list` function traverses the list of successors, decrements the reference counter in each stored `continuation_vertex` and
-destroys the node.
+The next step is to notify all successors in the list of the task's completion by traversing the list and decrementing the reference counter
+in each stored `continuation_vertex` and destroying the node.
 
 If the reference counter in a `continuation_vertex` reaches zero, the associated task is returned, allowing the
 predecessor to bypass it by returning it from `execute`. 
 
 If multiple successors are ready to be scheduled, the first ready task is bypassed, and the others are spawned:
-
-```cpp
-task_handle_task* release_successor_list(successor_list_node* node) {
-    task_handle_task* next_task = nullptr;
-
-    while (node != nullptr) {
-        successor_list_node* next_node = node->get_next();
-
-        // Decrement continuation vertex ref counter, if 0, returns the successor task
-        task_handle_task* successor_task = node->get_continuation_vertex()->release_bypass();
-
-        // Remove the node from the list
-        node->finalize();
-        node = next_node;
-
-        if (successor_task) {
-            if (next_task == nullptr) next_task = successor_task; // First task will be bypassed
-            else {
-                // All other tasks are spawned
-                spawn(*successor_task);
-            }
-        }
-    }
-    return next_task;
-}
-```
 
 `function_task::execute` receives the last-added successor task and combines it with the task returned from the body.
 
@@ -498,58 +447,34 @@ If the dynamic state is not initialized for the task, it cannot have any depende
 If the reference counter reaches zero, the task is ready to be spawned. Otherwise, it will be spawned by that last predecessor that releases its list
 of successors.
 
-## Transferring successors to the other task
+## Transferring completion to the other task
 
-The API `tbb::task_group::current_task::transfer_successors_to(tbb::task_handle& new_task)` works by setting `m_new_dynamic_state` in
+The API `tbb::task_group::transfer_this_task_completion_to(tbb::task_handle& new_task)` works by setting `m_new_dynamic_state` in
 the dynamic state of the currently executing task to point to the dynamic state of `new_task`.
 
 To determine the dynamic state associated with the currently executing task, a pointer to the task must be obtained from the task scheduler.
-To achieve this, the new entry point `tbb::task* r1::current_task()` is added. 
+To achieve this, the new entry point `tbb::task* r1::get_current_task()` is added. 
 
-The implementation of `transfer_successors_to` is shown below:
+`transfer_this_task_completion_to` transfers the successors from the currently executing task to `new_task`.
+If the dynamic state of the currently executing task is not initialized, there cannot be any successors associated with the task.
 
-```cpp
-class task_group {
-    struct current_task {
-        static void transfer_successors_to(tbb::task_handle& new_task) {
-            tbb::task* curr_task = r1::current_task();
-            __TBB_ASSERT(curr_task != nullptr); // transfer called outside of the task
-            task_handle_task* curr_th_task = dynamic_cast<task_handle_task*>(curr_task);
-                // no assert(curr_th_task != nullptr) to allow no-op transfer_successors_to from function_stack_task
-            if (curr_th_task != nullptr) {
-                curr_th_task->transfer_successors_to(new_task->get_dynamic_state());
-            }
-        }
-    };
-};
-```
-
-`task_handle_task::transfer_successors_to` calls `task_dynamic_state::transfer_successors_to(new_task_state)` if the dynamic state of the
-current task is initialized. If the state is not initialized, there cannot be any successors associated with the current task.
-
-`task_dynamic_state::transfer_successors_to(task_dynamic_state* new_dynamic_state)` sets the `m_new_dynamic_state` pointer to `new_dynamic_state`,
-retrieves the successor list, and appends it to `new_dynamic_state`:
+While transferring the successors, the `m_new_dynamic_state` pointer in the dynamic state is set to `new_task`'s dynamic state. The successors
+are retrieved from the successor list and are appended to the `new_dynamic_state`'s successor list:
 
 ```cpp
-class task_dynamic_state {
-private:
-    std::atomic<successor_list_node*> m_successor_list_head;
-    std::atomic<task_dynamic_state*>   m_new_dynamic_state;
-public:
-    void transfer_successors_to(task_dynamic_state* new_dynamic_state) {
-        // register current dynamic state as a co-owner of the new state
-        // to prolong its lifetime if the recipient task completes
-        // see dynamic state lifetime issue section for more details
-        new_dynamic_state->reserve();
+void transfer_successors_to(task_dynamic_state* new_dynamic_state) {
+    // register current dynamic state as a co-owner of the new state
+    // to prolong its lifetime if the recipient task completes
+    // see dynamic state lifetime issue section for more details
+    new_dynamic_state->reserve();
 
-        m_new_dynamic_state.store(new_dynamic_state);
-        successor_list_node* list = m_successor_list_head.exchange(~std::uintptr_t(0));
-        new_dynamic_state->add_successor_list(list);
-    }
-};
+    m_new_dynamic_state.store(new_dynamic_state);
+    successor_list_node* list = m_successor_list_head.exchange(~std::uintptr_t(0));
+    new_dynamic_state->add_successor_list(list);
+}
 ```
 
-`add_successor_list` is implemented similarly to `add_successor`, but without additional checks, since the recipient task
+`add_successor_list` is implemented similarly to `set_task_order`, but without additional checks, since the recipient task
 can only be in the `created` state and cannot change.
 
 ```cpp
@@ -573,14 +498,14 @@ void task_dynamic_state::add_successor_list(successor_list_node* list) {
 
 ### Dynamic state lifetime issue
 
-During the implementation of `transfer_successors_to`, an issue was discovered regarding the lifetime management of `task_dynamic_state`.
+During the implementation of `transfer_this_task_completion_to`, an issue was discovered regarding the lifetime management of `task_dynamic_state`.
 
-Initially, the reference counter in `task_dynamic_state` was incremented only when the task or the `task_tracker` was created.
+Initially, the reference counter in `task_dynamic_state` was incremented only when the task or the `task_completion_handle` was created.
 
-Consider the following example: a task `A` and a `task_tracker` named `A_tracker`, which is initially assigned to track `A`. 
+Consider the following example: a task `A` and a `task_completion_handle` named `A_comp_handle`, which is initially assigned to handle the completion of `A`. 
 The dynamic state `A_state` is associated with `A`. 
 
-While task `A` is executing, it transfers its successors to task `B` (as shown by the red arrow in the diagram below).
+While task `A` is executing, it transfers its completion to task `B` (as shown by the red arrow in the diagram below).
 The dynamic state `B_state` is associated with task `B`.
 
 As described earlier, `A_state::m_new_dynamic_state` is set point to `B_state` (as shown by the green arrow in the diagram).
@@ -589,7 +514,7 @@ As described earlier, `A_state::m_new_dynamic_state` is set point to `B_state` (
 
 After task `A` completes, task `B` is executed and then destroyed, along with the associated `B_state`.
 
-If a new successor is added to `A_tracker` after this point, the request will be redirected to `B_state`.
+If a new successor is added using `A_comp_handle` after this point, the request will be redirected to `B_state`.
 
 However, since `B_state` was destroyed after task `B` completed, accessing it would result in use of deallocated memory.
 
@@ -600,7 +525,7 @@ The reference counter is decreased when the `A_state` is destroyed.
 
 This section presents several examples illustrating how the associated dynamic state evolves during different stages of a task's lifecycle.
 
-### Creating the edges
+### Ordering the tasks
 
 The first example illustrates the following code:
 
@@ -608,24 +533,24 @@ The first example illustrates the following code:
 tbb::task_handle pred = tg.defer(...);
 tbb::task_handle succ = tg.defer(...);
 
-tbb::task_tracker pred_tr = pred;
+tbb::task_completion_handle pred_comp_handle = pred;
 
-tbb::task_group::make_edge(pred, succ);
+tbb::task_group::set_task_order(pred, succ);
 
 tg.run(std::move(pred));
 tg.run_and_wait(std::move(succ));
 ```
 
-<img src="assets/state_diagram_make_edge.png">
+<img src="assets/state_diagram_ordering.png">
 
 Changes in the states at each step are highlighted in red in the diagram.
 
 As stated above, `task_handle` constructors do not create a `task_dynamic_state`.
 
-The dynamic state for the predecessor task is created when the `task_tracker` is constructed, and the state for
-the successor task is created during the `make_edge` call.
+The dynamic state for the predecessor task is created when the `task_completion_handle` is constructed, and the state for
+the successor task is created during the `set_task_order` call.
 
-When the edge is created, the `continuation_vertex` associated with `successor` (`CV` in the diagram) is initialized and stored in
+When the dependency is established, the `continuation_vertex` associated with `successor` (`CV` in the diagram) is initialized and stored in
 both the successor's `m_continuation_vertex` and the predecessor's successor list.
 
 A reference is reserved in `CV` for the `pred` task and also for `succ_handle` to prevent `succ` from executing if another thread
@@ -649,37 +574,37 @@ Once the `succ_task` is completed, it fetches the successor list (empty) and dec
 
 Since it is the last reference counter, the dynamic state is destroyed.
 
-The dynamic state of `pred_task` is destroyed when the `pred_tr` destructor releases the final reference.
+The dynamic state of `pred_task` is destroyed when the `pred_comp_handle` destructor releases the final reference.
 
-### Transferring and creating edges
+### Transferring and ordering
 
-This example demonstrates a scenario where both transferring and creating edges occur within the same application:
+This example demonstrates a scenario where both transferring and establishing the predecessor-successor dependencies
+occur within the same application:
 
 ```cpp
 auto pred_body = [] {
     tbb::task_handle new_task = tg.defer(...);
-    tbb::task_group::current_task::transfer_successors_to(new_task);
+    tbb::task_group::transfer_this_task_completion_to(new_task);
     tg.run(std::move(new_task));
 };
 
 tbb::task_handle pred = tg.defer(pred_body);
-tbb::task_tracker pred_tr = pred;
+tbb::task_completion_handle pred_comp_handle = pred;
 tbb::task_handle succ = tg.defer(...);
 
 tg.run(std::move(pred));
-tbb::task_group::make_edge(pred_tr, succ);
+tbb::task_group::set_task_order(pred_tr, succ);
 tg.run_and_wait(std::move(succ));
 ```
 
 #### Linearization 1
 
-In the first linearization scenario, the predecessor task is scheduled, executed, and completed before the edge to the
-successor is created:
+In the first linearization scenario, the predecessor task is scheduled, executed, and completed before the dependency is created:
 
 <img src="assets/state_diagram_transfer1.png">
 
 As in the previous example, the `task_handle` constructor for `pred` does not create a `task_dynamic_state`; it is created
-when the `pred_tr` object is instantiated. Two references are reserved: one for `pred_task` and one for `pred_tr`.
+when the `pred_comp_handle` object is instantiated. Two references are reserved: one for `pred_task` and one for `pred_comp_handle`.
 
 Similarly, creating the `succ` `task_handle` does not initialize a `task_dynamic_state`.
 
@@ -687,7 +612,7 @@ Submitting, scheduling, and executing `pred_task` does not modify any `task_dyna
 
 When `pred_task` is executed, it creates a `new_task` `task_handle`, which does not immediately create a dynamic state object.
 
-The dynamic state for `new_task` is created only when `transfer_successors_to` is called. Initially, a single reference is reserved - 
+The dynamic state for `new_task` is created only when `transfer_this_task_completion_to` is called. Initially, a single reference is reserved - 
 for the `new_task` itself. 
 
 As the next step in transferring, the `m_new_dynamic_state` in the predecessor's dynamic state is set to `new_d_state`. Then, the successor list
@@ -700,7 +625,7 @@ When the `pred_task` completes, it releases the reference counter in `p_d_state`
 
 When `new_task` completes, the reference counter in `new_d_state` is released, and its successor list is marked as `dead`.
 
-As in the previous example, calling `make_edge` creates a dynamic state for the successor and a corresponding continuation vertex.
+As in the previous example, calling `set_task_order` creates a dynamic state for the successor and a corresponding continuation vertex.
 
 Since the successor list in `p_d_state` is in the `dead` state and `m_new_dynamic_state` is set to `new_d_state`, the addition of the successor to
 `p_d_state` is redirected to `new_d_state`. Since its successor list is also in the `dead` state, no changes are made.
@@ -708,17 +633,17 @@ Since the successor list in `p_d_state` is in the `dead` state and `m_new_dynami
 Since no dependencies were added, `succ_task` is scheduled. After `succ_task` completes, its successor list is marked as `dead`, and
 its reference counter is decremented. Since it is the last reference counter, `s_d_state` is destroyed.
 
-When `pred_tr` is destroyed, the final references in both `p_d_state` and `new_d_state` are released, resulting in their destruction.
+When `pred_comp_handle` is destroyed, the final references in both `p_d_state` and `new_d_state` are released, resulting in their destruction.
 
 #### Linearization 2
 
-In the second linearization scenario, the edge is created before the predecessor task is executed and before transfer is performed.
+In the second linearization scenario, the dependency is established before the predecessor task is executed and before transfer is performed.
 
 <img src="assets/state_diagram_transfer2.png">
 
-State transitions when the `pred` handle and tracker are created are identical to the previous case.
+State transitions when the `pred` handle and completion handle are created are identical to the previous case.
 
-When `make_edge` is executed, the continuation vertex of `s_d_state` is added to the successor list of `p_d_state`.
+When `set_task_order` is executed, the continuation vertex of `s_d_state` is added to the successor list of `p_d_state`.
 
 During the transfer, the continuation vertex is moved from `p_d_state` to `new_d_state`.
 All other state transitions remain the same as in the previous linearization scenario.
