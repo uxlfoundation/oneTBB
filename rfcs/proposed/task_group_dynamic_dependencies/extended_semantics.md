@@ -683,7 +683,7 @@ class task_group {
     template <typename Body>
     tbb::task_completion_handle run_and_get_completion_handle(const Body& body);
 
-    // Option 1 - modify the return value
+    // Option 2 - add overload with an extra argument
     template <typename Body>
     tbb::task_completion_handle run(const Body& body, additional-flag-argument);
 };
