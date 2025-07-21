@@ -1512,9 +1512,9 @@ void recursive_reduction(submit_function fn, tbb::task_group& tg, tbb::task_aren
             delete right_placeholder;
         });
 
-        tbb::task_group::make_edge(left_subtask, reduction);
-        tbb::task_group::make_edge(right_subtask, reduction);
-        tbb::task_group::current_task::transfer_successors_to(reduction);
+        tbb::task_group::set_task_order(left_subtask, reduction);
+        tbb::task_group::set_task_order(right_subtask, reduction);
+        tbb::task_group::transfer_this_task_completion_to(reduction);
 
         submit(fn, std::move(left_subtask), tg, arena);
         submit(fn, std::move(right_subtask), tg, arena);
@@ -1578,7 +1578,7 @@ void test_adding_successors_after_transfer(unsigned num_threads, submit_function
         transferring_task_placeholder = finished_task;
 
         tbb::task_handle receiver_task = tg.defer(receiver_task_body);
-        tbb::task_group::current_task::transfer_successors_to(receiver_task);
+        tbb::task_group::transfer_this_task_completion_to(receiver_task);
         submit(func, std::move(receiver_task), tg, arena);
     });
 
@@ -1590,9 +1590,9 @@ void test_adding_successors_after_transfer(unsigned num_threads, submit_function
         new_successor_task_placeholder = finished_task;
     });
 
-    tbb::task_tracker transferring_task_tracker = transferring_task;
+    tbb::task_completion_handle transferring_task_completion_handle = transferring_task;
     
-    tbb::task_group::make_edge(transferring_task, successor_task);
+    tbb::task_group::set_task_order(transferring_task, successor_task);
 
     submit(func, std::move(successor_task), tg, arena);
     submit(func, std::move(transferring_task), tg, arena);
@@ -1605,7 +1605,7 @@ void test_adding_successors_after_transfer(unsigned num_threads, submit_function
 
     CHECK_MESSAGE(successor_task_placeholder == not_finished_task, "successor task ran before the receiving task");
 
-    tbb::task_group::make_edge(transferring_task_tracker, new_successor_task);
+    tbb::task_group::set_task_order(transferring_task_completion_handle, new_successor_task);
     submit_and_wait(func, std::move(new_successor_task), tg, arena);
 
     CHECK_MESSAGE(receiver_task_placeholder == finished_task, "receiver task was not finished");

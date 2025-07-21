@@ -650,16 +650,15 @@ public:
                                 task_handle_accessor::get_task_dynamic_state(succ));
     }
 
-    struct current_task {
-        static void transfer_successors_to(d2::task_handle& new_task) {
-            d1::task* curr_task = d1::current_task();
-            __TBB_ASSERT(curr_task != nullptr, "transfer_successors_to was called outside of task body");
-            task_handle_task* curr_th_task = dynamic_cast<task_handle_task*>(curr_task);
-            if (curr_th_task != nullptr) {
-                curr_th_task->transfer_successors_to(task_handle_accessor::get_task_dynamic_state(new_task));
-            }
+    static void transfer_this_task_completion_to(d2::task_handle& new_task) {
+        d1::task* curr_task = d1::get_current_task();
+        __TBB_ASSERT(curr_task != nullptr, "this_task_completion_to was called outside of task body");
+        task_handle_task* curr_th_task = dynamic_cast<task_handle_task*>(curr_task);
+        // Not using __TBB_ASSERT(curr_th_task) to allow function_stack_task body to use this method
+        if (curr_th_task != nullptr) {
+            curr_th_task->transfer_successors_to(task_handle_accessor::get_task_dynamic_state(new_task));
         }
-    };
+    }
 #endif
 }; // class task_group
 
