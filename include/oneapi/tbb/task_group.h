@@ -754,7 +754,7 @@ using detail::r1::missing_wait;
 
 using detail::d2::task_handle;
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-using detail::d2::task_tracker;
+using detail::d2::task_completion_handle;
 #endif
 }
 

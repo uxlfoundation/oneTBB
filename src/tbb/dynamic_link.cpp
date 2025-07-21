@@ -136,12 +136,17 @@ namespace r1 {
         const char* str = nullptr;
         // Note: dlerr_t depends on OS: it is char const * on Linux* and macOS*, int on Windows*.
 #if _WIN32
-        #define DLERROR_SPECIFIER "%d"
+#if __INTEL_LLVM_COMPILER
+// Suppress the incorrect warning about the format specifier for the unsigned long long type.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat"
+#endif
+        #define DLERROR_SPECIFIER "%ul"
         typedef DWORD dlerr_t;
 #else
         #define DLERROR_SPECIFIER "%s"
         typedef const char* dlerr_t;
-#endif
+#endif                          // _WIN32
         dlerr_t error = 0;
 
         std::va_list args;
@@ -155,7 +160,10 @@ namespace r1 {
                         DLERROR_SPECIFIER "\n", prefix, str, error);
             break;
         case dl_sym_not_found:     // char const * sym, dlerr_t err:
-            // TODO: Print not found symbol once it is used by the implementation
+            str = va_arg(args, const char*);
+            error = va_arg(args, dlerr_t);
+            TBB_FPRINTF(stderr, "%s The symbol \"%s\" was not resolved. System error: "
+                        DLERROR_SPECIFIER "\n", prefix, str, error);
             break;
         case dl_sys_fail:
             str = va_arg(args, const char*);
@@ -216,6 +224,9 @@ namespace r1 {
         va_end(args);
     } // library_warning
 #undef DLERROR_SPECIFIER
+#if _WIN32 && __INTEL_LLVM_COMPILER
+#pragma GCC diagnostic pop
+#endif
 #else
     static void dynamic_link_warning( int code, ... ) {
         suppress_unused_warning(code);
@@ -224,6 +235,8 @@ namespace r1 {
 
 #elif defined(DYNAMIC_LINK_WARNING)
 #define __DYNAMIC_LINK_REPORT_SIGNATURE_ERRORS 1
+#else
+#define DYNAMIC_LINK_WARNING(...) (void)0
 #endif /* !defined(DYNAMIC_LINK_WARNING) && !__TBB_WIN8UI_SUPPORT && __TBB_DYNAMIC_LOAD_ENABLED */
 
     static bool resolve_symbols( dynamic_link_handle module, const dynamic_link_descriptor descriptors[], std::size_t required )
@@ -244,6 +257,7 @@ namespace r1 {
             dynamic_link_descriptor const & desc = descriptors[k];
             pointer_to_handler addr = (pointer_to_handler)dlsym( module, desc.name );
             if ( !addr ) {
+                DYNAMIC_LINK_WARNING( dl_sym_not_found, desc.name, dlerror() );
                 return false;
             }
             h[k] = addr;
@@ -426,7 +440,7 @@ namespace r1 {
                     otherwise -- Ok, number of characters (incl. terminating null) written to buffer.
     */
     static std::size_t abs_path( char const * name, char * path, std::size_t len ) {
-        if ( ap_data._len == 0 )
+        if ( !name || ap_data._len == 0 )
             return 0;
 
         std::size_t name_len = std::strlen( name );
