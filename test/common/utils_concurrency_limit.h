@@ -110,11 +110,11 @@ static int get_max_procs() {
 class cgroup_info {
 public:
     static bool is_cpu_constrained(int& constrained_num_cpus) {
-        const int num = parse_cgroup_cpu_constraints();
-        if (num == error_value || num == unlimited_num_cpus)
+        static const int num_cpus = parse_cgroup_cpu_constraints();
+        if (num_cpus == error_value || num_cpus == unlimited_num_cpus)
             return false;
 
-        constrained_num_cpus = num;
+        constrained_num_cpus = num_cpus;
         return true;
     }
 
@@ -126,14 +126,6 @@ private:
 
     static constexpr int unlimited_num_cpus = INT_MAX;
     static constexpr int error_value = 0; // Some impossible value for the number of CPUs
-
-    //     Seems like the following algorithm makes sense (do until found):
-    // - Read the /proc/self/mounts to determine the mount point and version of the cgroup
-    // - Read the /proc/self/cgroup to determine the relative path, depending on the cgroup version.
-    // - Append the relative path with the mount point.
-    // - Depending on the cgroup version read:
-    // 	- cgroup v1: mount_point/relative-path/cpu.cfs_{quota|period}_us
-    // 	- cgroup v2: mount_point/relative-path/cpu.max
 
     static int determine_num_cpus(long long cpu_quota, long long cpu_period) {
         if (0 == cpu_period)
