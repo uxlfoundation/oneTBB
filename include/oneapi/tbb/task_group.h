@@ -641,30 +641,29 @@ public:
     }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    static void make_edge(d2::task_handle& pred, d2::task_handle& succ) {
-        __TBB_ASSERT(pred != nullptr, "empty predecessor handle is not allowed for make_edge");
-        __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for make_edge");
-        internal_make_edge(task_handle_accessor::get_task_dynamic_state(pred),
-                           task_handle_accessor::get_task_dynamic_state(succ));
+    static void set_task_order(d2::task_handle& pred, d2::task_handle& succ) {
+        __TBB_ASSERT(pred != nullptr, "empty predecessor handle is not allowed for set_task_order");
+        __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for set_task_order");
+        internal_set_task_order(task_handle_accessor::get_task_dynamic_state(pred),
+                                task_handle_accessor::get_task_dynamic_state(succ));
     }
 
-    static void make_edge(d2::task_tracker& pred, d2::task_handle& succ) {
-        __TBB_ASSERT(pred != nullptr, "empty predecessor tracker is not allowed for make_edge");
-        __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for make_edge");
-        internal_make_edge(task_tracker_accessor::get_task_dynamic_state(pred),
-                           task_handle_accessor::get_task_dynamic_state(succ));
+    static void set_task_order(d2::task_completion_handle& pred, d2::task_handle& succ) {
+        __TBB_ASSERT(pred != nullptr, "empty predecessor completion_handle is not allowed for set_task_order");
+        __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for set_task_order");
+        internal_set_task_order(task_completion_handle_accessor::get_task_dynamic_state(pred),
+                                task_handle_accessor::get_task_dynamic_state(succ));
     }
 
-    struct current_task {
-        static void transfer_successors_to(d2::task_handle& new_task) {
-            d1::task* curr_task = d1::current_task();
-            __TBB_ASSERT(curr_task != nullptr, "transfer_successors_to was called outside of task body");
-            task_handle_task* curr_th_task = dynamic_cast<task_handle_task*>(curr_task);
-            if (curr_th_task != nullptr) {
-                curr_th_task->transfer_successors_to(task_handle_accessor::get_task_dynamic_state(new_task));
-            }
+    static void transfer_this_task_completion_to(d2::task_handle& new_task) {
+        d1::task* curr_task = d1::get_current_task();
+        __TBB_ASSERT(curr_task != nullptr, "this_task_completion_to was called outside of task body");
+        task_handle_task* curr_th_task = dynamic_cast<task_handle_task*>(curr_task);
+        // Not using __TBB_ASSERT(curr_th_task) to allow function_stack_task body to use this method
+        if (curr_th_task != nullptr) {
+            curr_th_task->transfer_successors_to(task_handle_accessor::get_task_dynamic_state(new_task));
         }
-    };
+    }
 #endif
 }; // class task_group
 
@@ -770,7 +769,7 @@ using detail::r1::missing_wait;
 
 using detail::d2::task_handle;
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-using detail::d2::task_tracker;
+using detail::d2::task_completion_handle;
 #endif
 }
 
