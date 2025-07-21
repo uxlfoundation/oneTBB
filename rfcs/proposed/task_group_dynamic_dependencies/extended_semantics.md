@@ -481,6 +481,7 @@ It is thread-safe to concurrently add successors to both the task currently tran
 The behavior is undefined in the following cases:
 * ``pred`` or ``succ`` is empty.
 * If the task completion of which is handled by ``pred`` and the task handled by ``succ`` belong to different ``task_group``s.
+* If the task referred by ``pred`` was destroyed without being submitted for execution.
 
 ``static void transfer_this_task_completion_to(task_handle& h)``
 
