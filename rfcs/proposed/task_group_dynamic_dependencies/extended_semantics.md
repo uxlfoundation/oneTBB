@@ -692,12 +692,6 @@ class task_group {
 } // namespace oneapi
 ```
 
-<<<<<<< HEAD
-## Implementation details
-
-Implementation details for the API added by this RFC are described as part of the
-[separate sub-RFC](implementation_details.md).
-=======
 ## Naming considerations
 
 The original APIs introduced by this proposal included:
@@ -719,7 +713,11 @@ the API was renamed to ``tbb::task_group::set_task_order``.
 ``transfer_this_task_completion_to(t)`` was adopted to emphasize that the successors of the currently executing task will proceed only after
 `t` completes. The combination of ``transfer_this_task_completion_to`` and ``task_completion_handle`` indicates that successors
 added after the transfer will be associated with the task that receives the completion, and the ``task_completion_handle`` follows the transferred completion of the task.
->>>>>>> origin/dev/kboyarinov/tg-rfc-dynamic-dependencies-r2
+
+## Implementation details
+
+Implementation details for the API added by this RFC are described as part of the
+[separate sub-RFC](implementation_details.md).
 
 ## Exit criteria & open questions
 * Performance targets for this feature should be defined.
