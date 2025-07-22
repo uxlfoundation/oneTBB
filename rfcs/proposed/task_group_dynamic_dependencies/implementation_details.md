@@ -211,9 +211,8 @@ in more detail in a later section.
 
 Once the reference counter in `continuation_vertex` reaches zero, the `continuation_vertex` object is destroyed.
 
-If a `continuation_vertex` is assigned to a task (`m_continuation_vertex` not `nullptr` in `task_dynamic_state`), it also serves as
-a marker that the task has dependencies and cannot be unconditionally scheduled when the `task_handle` is passed to a submission
-function (e.g. `task_group::run`).
+Once a `continuation_vertex` is assigned to `task_dynamic_state::m_continuation_vertex`, it also serves as a marker that the task
+has dependencies and cannot be immediately scheduled when the `task_handle` is submitted via e.g. `task_group::run`.
 
 ### The successor list
 
