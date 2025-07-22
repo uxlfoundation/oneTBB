@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -226,7 +227,7 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
     __TBB_ASSERT(top_wait_context, nullptr);
     auto& dispatcher = *governor::get_thread_data()->my_task_dispatcher;
 
-    d1::reference_vertex* ref_counter{nullptr};
+    thread_reference_vertex* ref_counter{nullptr};
     auto& reference_map = dispatcher.m_reference_vertex_map;
     auto pos = reference_map.find(top_wait_context);
     if (pos != reference_map.end()) {
@@ -247,7 +248,7 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
         }
 
         reference_map[top_wait_context] = ref_counter =
-            new (cache_aligned_allocate(sizeof(d1::reference_vertex))) d1::reference_vertex(top_wait_context, 0);
+            new (cache_aligned_allocate(sizeof(thread_reference_vertex))) thread_reference_vertex(top_wait_context, 0);
     }
 
     return ref_counter;

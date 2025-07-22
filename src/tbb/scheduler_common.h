@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
     Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
@@ -440,6 +440,33 @@ struct suspend_point_type {
 #pragma warning( disable: 4324 )
 #endif
 
+class thread_reference_vertex: public d1::reference_vertex {
+public:
+    using d1::reference_vertex::reference_vertex;
+
+    void reserve(std::uint32_t delta = 1) override {
+        if (reserve_impl(delta) == 0) {
+            m_lifetime_ref_counter.fetch_add(1);
+        }
+    }
+
+    void release(std::uint32_t delta = 1) override {
+        if (release_impl(delta) == 0) {
+            destroy();
+        }
+    }
+
+    void destroy() {
+        auto ref = m_lifetime_ref_counter.fetch_sub(1);
+        if (ref == 1) {
+            this->~thread_reference_vertex();
+            cache_aligned_deallocate(this);
+        }
+    }
+private:
+    std::atomic<uint32_t> m_lifetime_ref_counter{1};
+};
+
 class alignas (max_nfs_size) task_dispatcher {
 public:
     // TODO: reconsider low level design to better organize dependencies and files.
@@ -478,9 +505,9 @@ public:
     suspend_point_type* m_suspend_point{ nullptr };
 
     //! Used to improve scalability of d1::wait_context by using per thread reference_counter
-    std::unordered_map<d1::wait_tree_vertex_interface*, d1::reference_vertex*,
+    std::unordered_map<d1::wait_tree_vertex_interface*, r1::thread_reference_vertex*,
                        std::hash<d1::wait_tree_vertex_interface*>, std::equal_to<d1::wait_tree_vertex_interface*>,
-                       tbb_allocator<std::pair<d1::wait_tree_vertex_interface* const, d1::reference_vertex*>>
+                       tbb_allocator<std::pair<d1::wait_tree_vertex_interface* const, r1::thread_reference_vertex*>>
                       >
         m_reference_vertex_map;
 
@@ -514,7 +541,7 @@ public:
         }
 
         for (auto& elem : m_reference_vertex_map) {
-            d1::reference_vertex*& node = elem.second;
+            thread_reference_vertex*& node = elem.second;
             node->destroy();
             poison_pointer(node);
         }

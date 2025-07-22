@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2020-2024 Intel Corporation
+    Copyright (c) 2020-2025 Intel Corporation
     Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
@@ -198,38 +198,36 @@ public:
     {}
 
     void reserve(std::uint32_t delta = 1) override {
-        if (m_ref_count.fetch_add(static_cast<std::uint64_t>(delta)) == 0) {
-            my_parent->reserve();
-            m_lifetime_ref_count.fetch_add(1);
-        }
+        reserve_impl(delta);
     }
 
     void release(std::uint32_t delta = 1) override {
-        auto parent = my_parent;
-        std::uint64_t ref = m_ref_count.fetch_sub(static_cast<std::uint64_t>(delta)) - static_cast<std::uint64_t>(delta);
-        if (ref == 0) {
-            parent->release();
-            destroy();
-        }
+        release_impl(delta);
     }
 
     std::uint32_t get_num_child() {
         return static_cast<std::uint32_t>(m_ref_count.load(std::memory_order_acquire));
     }
-
-    void destroy() {
-        auto ref = m_lifetime_ref_count.fetch_sub(1);
-        if (ref == 1) {
-            this->~reference_vertex();
-            r1::cache_aligned_deallocate(this);
+protected:
+    std::uint64_t reserve_impl(std::uint32_t delta) {
+        auto ref = m_ref_count.fetch_add(static_cast<std::uint64_t>(delta));
+        if (ref == 0) {
+            my_parent->reserve();
         }
+        return ref;
     }
 
+    std::uint64_t release_impl(std::uint32_t delta) {
+        auto parent = my_parent;
+        std::uint64_t ref = m_ref_count.fetch_sub(static_cast<std::uint64_t>(delta)) - static_cast<std::uint64_t>(delta);
+        if (ref == 0) {
+            parent->release();
+        }
+        return ref;
+    }
 private:
     wait_tree_vertex_interface* my_parent;
     std::atomic<std::uint64_t> m_ref_count;
-    // Reserve for TLS in advance
-    std::atomic<std::uint64_t> m_lifetime_ref_count{1};
 };
 
 struct execution_data {
