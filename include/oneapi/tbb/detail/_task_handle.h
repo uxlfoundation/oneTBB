@@ -409,17 +409,17 @@ inline bool task_dynamic_state::check_transfer_or_completion(successor_list_node
                                                              successor_list_node* new_successor_node)
 {
     bool result = false;
-    if (is_transferred(current_list_head)) {
-        // Originally tracker task transferred successors to other task, add new successor to the receiving task
-        task_dynamic_state* new_state = m_new_dynamic_state.load(std::memory_order_relaxed);
-        __TBB_ASSERT(new_state, "successor list is marked as transferred, but new dynamic state is not set");
-        new_state->add_successor_node(new_successor_node);
+    if (is_completed(current_list_head)) {
+        // Task completed while reading the successor list, no need to add extra dependencies
+        new_successor_node->get_continuation_vertex()->release();
+        new_successor_node->finalize();
         result = true;
     } else {
-        if (is_completed(current_list_head)) {
-            // Task completed while reading the successor list, no need to add extra dependencies
-            new_successor_node->get_continuation_vertex()->release();
-            new_successor_node->finalize();
+        if (is_transferred(current_list_head)) {
+            // Originally tracker task transferred successors to other task, add new successor to the receiving task
+            task_dynamic_state* new_state = m_new_dynamic_state.load(std::memory_order_relaxed);
+            __TBB_ASSERT(new_state, "successor list is marked as transferred, but new dynamic state is not set");
+            new_state->add_successor_node(new_successor_node);
             result = true;
         }
     }
@@ -448,13 +448,13 @@ inline void task_dynamic_state::add_successor(continuation_vertex* successor) {
     __TBB_ASSERT(successor != nullptr, nullptr);
     successor_list_node* current_successor_list_head = m_successor_list_head.load(std::memory_order_acquire);
 
-    if (is_transferred(current_successor_list_head)) {
-        // Originally tracked task transferred successors to other task, add new successor to the receiving task
-        task_dynamic_state* new_state = m_new_dynamic_state.load(std::memory_order_relaxed);
-        __TBB_ASSERT(new_state, "successor list is marked as transferred, but new dynamic state is not set");
-        new_state->add_successor(successor);
-    } else {
-        if (!is_completed(current_successor_list_head)) {
+    if (!is_completed(current_successor_list_head)) {
+        if (is_transferred(current_successor_list_head)) {
+            // Originally tracked task transferred successors to other task, add new successor to the receiving task
+            task_dynamic_state* new_state = m_new_dynamic_state.load(std::memory_order_relaxed);
+            __TBB_ASSERT(new_state, "successor list is marked as transferred, but new dynamic state is not set");
+            new_state->add_successor(successor);    
+        } else {
             successor->reserve();
             d1::small_object_allocator alloc;
             successor_list_node* new_successor_node = alloc.new_object<successor_list_node>(successor, alloc);
