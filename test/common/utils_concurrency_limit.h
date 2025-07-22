@@ -199,7 +199,8 @@ private:
 
     static bool try_read_cgroup_v1_num_cpus_from(const char* dir, int& num_cpus) {
         char path[PATH_MAX] = {0};
-        std::snprintf(path, PATH_MAX, "%s/cpu.cfs_quota_us", dir);
+        if (std::snprintf(path, PATH_MAX, "%s/cpu.cfs_quota_us", dir) < 0)
+            return false; // Failed to create path
 
         unique_file_t fd(std::fopen(path, "r"), &close_file);
         if (!fd)
@@ -214,7 +215,9 @@ private:
             return true;
         }
 
-        std::snprintf(path, PATH_MAX, "%s/cpu.cfs_period_us", dir);
+        if (std::snprintf(path, PATH_MAX, "%s/cpu.cfs_period_us", dir) < 0)
+            return false; // Failed to create path
+
         fd.reset(std::fopen(path, "r"));
         if (!fd)
             return false;
@@ -229,7 +232,8 @@ private:
 
     static bool try_read_cgroup_v2_num_cpus_from(const char* dir, int& num_cpus) {
         char path[PATH_MAX] = {0};
-        std::snprintf(path, PATH_MAX, "%s/cpu.max", dir);
+        if (std::snprintf(path, PATH_MAX, "%s/cpu.max", dir) < 0)
+            return false;
 
         unique_file_t fd(fopen(path, "r"), &close_file);
         if (!fd)
@@ -269,8 +273,8 @@ private:
                 cache_relative_path_for(cgroup_fd, paths_cache);
 
             // Now try reading including relative path
-            std::snprintf(dir, PATH_MAX, "%s/%s", mnt_dir, paths_cache.v2_relative_path);
-            try_read_cgroup_v2_num_cpus_from(dir, num_cpus);
+            if (std::snprintf(dir, PATH_MAX, "%s/%s", mnt_dir, paths_cache.v2_relative_path) >= 0)
+                try_read_cgroup_v2_num_cpus_from(dir, num_cpus);
             return num_cpus;
         }
 
@@ -282,8 +286,8 @@ private:
         if (!*paths_cache.v1_relative_path)
             cache_relative_path_for(cgroup_fd, paths_cache);
 
-        std::snprintf(dir, PATH_MAX, "%s/%s", mnt_dir, paths_cache.v1_relative_path);
-        try_read_cgroup_v1_num_cpus_from(dir, num_cpus);
+        if (std::snprintf(dir, PATH_MAX, "%s/%s", mnt_dir, paths_cache.v1_relative_path) >= 0)
+            try_read_cgroup_v1_num_cpus_from(dir, num_cpus);
         return num_cpus;
     }
 
