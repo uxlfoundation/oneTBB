@@ -88,7 +88,7 @@ public:
     }
 
     task_handle_task* complete_task() {
-        successor_list_node* list = fetch_successor_list();
+        successor_list_node* list = fetch_successor_list(COMPLETED_FLAG);
         return release_successor_list(list);
     }
 
@@ -122,12 +122,15 @@ public:
         return current_continuation_vertex;
     }
 
-    static bool is_alive(successor_list_node* node) {
-        return node != reinterpret_cast<successor_list_node*>(~std::uintptr_t(0));
+    using successor_list_state_flag = std::uintptr_t;
+    static constexpr successor_list_state_flag COMPLETED_FLAG = ~std::uintptr_t(0);
+
+    static bool is_completed(successor_list_node* node) {
+        return node == reinterpret_cast<successor_list_node*>(COMPLETED_FLAG);
     }
 
-    successor_list_node* fetch_successor_list() {
-        return m_successor_list_head.exchange(reinterpret_cast<successor_list_node*>(~std::uintptr_t(0)));
+    successor_list_node* fetch_successor_list(successor_list_state_flag new_list_state_flag) {
+        return m_successor_list_head.exchange(reinterpret_cast<successor_list_node*>(new_list_state_flag));
     }
 
 private:
@@ -364,7 +367,7 @@ inline void task_dynamic_state::add_successor(continuation_vertex* successor) {
     __TBB_ASSERT(successor != nullptr, nullptr);
     successor_list_node* current_successor_list_head = m_successor_list_head.load(std::memory_order_acquire);
 
-    if (is_alive(current_successor_list_head)) {
+    if (!is_completed(current_successor_list_head)) {
         successor->reserve();
 
         d1::small_object_allocator alloc;
@@ -373,7 +376,8 @@ inline void task_dynamic_state::add_successor(continuation_vertex* successor) {
 
         while (!m_successor_list_head.compare_exchange_strong(current_successor_list_head, new_successor_node)) {
             // Other thread updated the head of the list
-            if (!is_alive(current_successor_list_head)) {
+
+            if (is_completed(current_successor_list_head)) {
                 // Current task has completed while we tried to insert the successor to the list
                 new_successor_node->finalize();
                 successor->release();
