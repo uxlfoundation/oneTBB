@@ -402,9 +402,6 @@ inline task_handle_task* release_successor_list(successor_list_node* node) {
     return next_task;
 }
 
-// If the current task have transferred it's successors to another task - redirects the successor_node to the receiving task, returns true
-// If the current task was completed - removes the successor_node, returns true
-// Otherwise, does nothing and returns false
 inline bool task_dynamic_state::check_transfer_or_completion(successor_list_node* current_list_head,
                                                              successor_list_node* new_successor_node)
 {
