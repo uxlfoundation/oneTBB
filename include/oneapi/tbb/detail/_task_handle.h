@@ -93,8 +93,13 @@ public:
     }
         
     task_handle_task* complete_task() {
+        task_handle_task* next_task = nullptr;
+
         successor_list_node* list = fetch_successor_list(COMPLETED_FLAG);
-        return release_successor_list(list);
+        if (!is_transferred(list)) {
+            next_task = release_successor_list(list);
+        }
+        return next_task;
     }
 
     bool has_dependencies() const {
@@ -132,9 +137,14 @@ public:
 
     using successor_list_state_flag = std::uintptr_t;
     static constexpr successor_list_state_flag COMPLETED_FLAG = ~std::uintptr_t(0);
+    static constexpr successor_list_state_flag TRANSFERRED_FLAG = ~std::uintptr_t(0) - 1;
 
-    static bool is_completed(successor_list_node* node) {
-        return node == reinterpret_cast<successor_list_node*>(COMPLETED_FLAG);
+    static bool is_completed(successor_list_node* list) {
+        return list == reinterpret_cast<successor_list_node*>(COMPLETED_FLAG);
+    }
+
+    static bool is_transferred(successor_list_node* list) {
+        return list == reinterpret_cast<successor_list_node*>(TRANSFERRED_FLAG);
     }
 
     successor_list_node* fetch_successor_list(successor_list_state_flag new_list_state_flag) {
@@ -147,7 +157,7 @@ public:
         // to prevent it's early destruction
         new_dynamic_state->reserve();
         m_new_dynamic_state.store(new_dynamic_state, std::memory_order_relaxed);
-        successor_list_node* successor_list = fetch_successor_list();
+        successor_list_node* successor_list = fetch_successor_list(TRANSFERRED_FLAG);
         new_dynamic_state->add_successor_list(successor_list);
     }
 
@@ -398,19 +408,22 @@ inline task_handle_task* release_successor_list(successor_list_node* node) {
 inline bool task_dynamic_state::check_transfer_or_completion(successor_list_node* current_list_head,
                                                              successor_list_node* new_successor_node)
 {
-    if (!is_alive(current_list_head)) {
+    bool result = false;
+    if (is_transferred(current_list_head)) {
+        // Originally tracker task transferred successors to other task, add new successor to the receiving task
         task_dynamic_state* new_state = m_new_dynamic_state.load(std::memory_order_relaxed);
-        if (new_state != nullptr) {
-            // Originally tracker task transferred successors to other task, add new successor to the receiving task
-            new_state->add_successor_node(new_successor_node);
-        } else {
+        __TBB_ASSERT(new_state, "successor list is marked as transferred, but new dynamic state is not set");
+        new_state->add_successor_node(new_successor_node);
+        result = true;
+    } else {
+        if (is_completed(current_list_head)) {
             // Task completed while reading the successor list, no need to add extra dependencies
             new_successor_node->get_continuation_vertex()->release();
             new_successor_node->finalize();
+            result = true;
         }
-        return true;
     }
-    return false;
+    return result;
 }
 
 inline void task_dynamic_state::add_successor_node(successor_list_node* new_successor_node) {{
@@ -435,16 +448,17 @@ inline void task_dynamic_state::add_successor(continuation_vertex* successor) {
     __TBB_ASSERT(successor != nullptr, nullptr);
     successor_list_node* current_successor_list_head = m_successor_list_head.load(std::memory_order_acquire);
 
-    if (!is_completed(current_successor_list_head)) {
-        successor->reserve();
-        d1::small_object_allocator alloc;
-        successor_list_node* new_successor_node = alloc.new_object<successor_list_node>(successor, alloc);
-        add_successor_node(new_successor_node);
-    } else {
+    if (is_transferred(current_successor_list_head)) {
+        // Originally tracked task transferred successors to other task, add new successor to the receiving task
         task_dynamic_state* new_state = m_new_dynamic_state.load(std::memory_order_relaxed);
-        if (new_state != nullptr) {
-            // Originally tracked task transferred successors to other task, add new successor to the receiving task
-            new_state->add_successor(successor);
+        __TBB_ASSERT(new_state, "successor list is marked as transferred, but new dynamic state is not set");
+        new_state->add_successor(successor);
+    } else {
+        if (!is_completed(current_successor_list_head)) {
+            successor->reserve();
+            d1::small_object_allocator alloc;
+            successor_list_node* new_successor_node = alloc.new_object<successor_list_node>(successor, alloc);
+            add_successor_node(new_successor_node);
         }
     }
 }
