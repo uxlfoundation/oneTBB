@@ -17,11 +17,12 @@
   * 6.5 [Submitting a task for execution](#submitting-a-task-for-execution)
 * 7 [Transferring completion to the other task](#transferring-completion-to-the-other-task)
   * 7.1 [Dynamic state lifetime issue](#dynamic-state-lifetime-issue)
-* 8 [Dynamic state transition examples](#dynamic-state-transition-examples)
-  * 8.1 [Ordering the tasks](#ordering-the-tasks)
-  * 8.2 [Transferring and ordering](#transferring-and-ordering)
-    * 8.2.1 [Linearization 1](#linearization-1)
-    * 8.2.2 [Linearization 2](#linearization-2)
+* 8 [Library ABI changes](#library-abi-changes)
+* 9 [Dynamic state transition examples](#dynamic-state-transition-examples)
+  * 9.1 [Ordering the tasks](#ordering-the-tasks)
+  * 9.2 [Transferring and ordering](#transferring-and-ordering)
+    * 9.2.1 [Linearization 1](#linearization-1)
+    * 9.2.2 [Linearization 2](#linearization-2)
 
 ## Class hierarchy before implementing the proposal
 
@@ -94,26 +95,11 @@ The dynamic state of a task remains valid until both the task and all associated
 
 A default-constructed `tbb::task_completion_handle` does not represent any task.
 
-```cpp
-class task_completion_handle {
-private:
-    task_dynamic_state* m_state;
-public:
-    task_completion_handle(); // creates empty task_completion_handle
-    task_completion_handle(const task_completion_handle& other);
-    
-    task_completion_handle& operator=(const task_completion_handle& other); 
+From the implementation perspective, `task_completion_handle` represents a shared pointer to `task_dynamic_state` where copies holding the reference
+in the reference counter of dynamic state. 
 
-    task_completion_handle(task_completion_handle&& other);
-    task_completion_handle& operator=(task_completion_handle&& other);
-
-    // creates a handle referring to the dynamic state of task owned by th
-    task_completion_handle(const task_handle& th);
-    task_completion_handle& operator=(const task_handle& th);
-    
-    ~task_completion_handle();
-};
-```
+It is not currently implemented as a wrapper of `std::shared_ptr<task_dynamic_state>`, because `task_handle_task` and `task_dynamic_state` contain
+an atomic pointer to `task_dynamic_state` and `std::atomic<std::shared_ptr>` is a C++20 extension.
 
 ## `task_dynamic_state` in details
 
@@ -233,12 +219,13 @@ private:
 at the head.
 
 The successor list in `task_dynamic_state` can have two possible states:
-* `Alive` state (when `m_successor_list_head` is not equal to `~std::uintptr_t(0)`, including `nullptr`): indicates that the associated task
-  is not completed and its completion have not been transferred. In this state, new successors can be added to the current `task_dynamic_state`.
-* `Dead` state (when `m_successor_list_head` equals `~std::uintptr_t(0)`): indicates one of two scenarios:
-    * The associated task is completed. Adding new successors does not add any real dependencies. Successors can proceed for execution if their other dependencies are satisfied.
-    * The associated task has transferred its completion to another task. In this case, any new successor should be redirected to the dynamic state
-      of the task that have received the successors during the transfer. `m_new_dynamic_state` should point to that receiving state.
+* `alive` state (when `m_successor_list_head` is not equal to values below, including `nullptr`): indicates that the associated task
+  is not completed and its completion have not been transferred. In this case, new successors can be added to the current `task_dynamic_state`.
+* `completed` state (`m_successor_list_head` equals `~std::uintptr_t(0)`): indicates that the associated task is completed.
+  Adding new successors does not add any real dependencies. Successors can proceed for execution if their other dependencies are satisfied.
+* `transferred` state (`m_successor_list_head` equals `std::uintptr_t(0) - 1`): indicates that the completion of the associated task was transferred
+  to another task. In this case, any new successor should be redirected to the dynamic state of the task that have received the successors during the transfer.
+  `m_new_dynamic_state` should point to that receiving state.
 
 ### Adding successors to the list
 
@@ -250,31 +237,27 @@ If the dynamic states do not yet exist, they are created.
 The next step is to obtain the `continuation_vertex` associated with successor's dynamic state. As described earlier, if it
 has not yet been initialized, it is initialized at this point.
 
-While registering the successor in the predecessor's dynamic state, the state of the successor list is checked. If the list is not alive, there are two possible scenarios -
-either the task is completed, or it has transferred its completion (i.e., successors) to another task.
+While registering the successor in the predecessor's dynamic state, the state of the successor list is checked. If the successor list is in the `transferred` state,
+the new successor is redirected to the `m_new_dynamic_state` that received the completion during the transfer.
 
-If the `m_new_dynamic_state` atomic variable is set, then a transfer has occurred, and the function redirects the new successor the state that received the completion
-during the transfer.
-
-If `m_new_dynamic_state` is not set, the task is considered completed, and adding a real dependency does not make any sense.
+If the list is in the `completed` state, adding a real dependency does not make any sense.
 
 If the successor list is alive, reference for the predecessor is reserved in the successors `continuation_vertex`. Then, a `successor_list_node` pointing to the created
 state is allocated.
 
-After this, the state of the successor list is re-checked. If it is not alive (meaning the task has completed or transferred its successors during
-the allocation of the forward-list node), the `m_new_dynamic_state` is checked, as described above.
+After this, the state of the successor list is re-checked.
 
-If the new state is assigned, the successor is redirected to the new state.
+If the completion was transferred, the previously allocated successor is redirected to the `m_new_dynamic_state`.
 
-Otherwise, the task is considered completed and the successor should not be added to the list. The previously reserved reference in successor's `continuation_vertex` is released and
+If the task is completed, the successor should not be added to the list. The previously reserved reference in successor's `continuation_vertex` is released and
 the `successor_list_node` is deallocated.
 
-If the list is alive, the algorithm attempts to insert the successor node at the head of the list using a CAS operation on `m_successor_list_head`.
+If the list is `alive`, the algorithm attempts to insert the successor node at the head of the list using a CAS operation on `m_successor_list_head`.
 
 Each CAS failure (i.e., `m_successor_list_head` was updated) may indicate that:
 * Another thread added a different predecessor and updated the list head.
 * Another thread completed the task.
-* Another thread transferred the task's successors.
+* Another thread transferred the task's completion.
 
 In the first case, the CAS operation should simply be retried, as the successor still needs to be added.
 In latter two cases, the same checks described above should be repeated.
@@ -520,6 +503,26 @@ However, since `B_state` was destroyed after task `B` completed, accessing it wo
 
 The solution is to extend the lifetime of `B_state` by incrementing its reference counter in every state that stores it as `m_new_dynamic_state`.
 The reference counter is decreased when the `A_state` is destroyed.
+
+## Library ABI changes
+
+As previously mentioned, the implementation of `transfer_this_task_completion_to` requires introducing a new entry point into the TBB binary:
+
+```cpp
+namespace tbb::detail::d1 {
+    d1::task* get_current_task();
+}
+```
+
+The function returns a pointer to the innermost task that is currently executing.
+
+When the scheduler retrieves a task for execution from any source, it stores a pointer to that task in the corresponding
+`task_dispatcher` object. This occurs before invoking either `task::execute` or `task::cancel`.
+
+Upon calling `r1::get_current_task()`, the pointer to the current task is retrieved from the task dispatcher.
+
+If a different task is retrieved during the execution of a task, for example, when a blocking TBB call is made from within the task body,
+the stored pointer is temporarily replaced by the new task and restored once the blocking call completes.
 
 ## Dynamic state transition examples
 
