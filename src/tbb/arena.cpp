@@ -275,6 +275,7 @@ arena::arena(threading_control* control, unsigned num_slots, unsigned num_reserv
         my_slots[i].init_task_streams(i);
         my_slots[i].my_default_task_dispatcher = new(base_td_pointer + i) task_dispatcher(this);
         my_slots[i].my_is_occupied.store(false, std::memory_order_relaxed);
+        my_slots[i].has_skipped_tasks.store(false, std::memory_order_relaxed);
     }
     my_fifo_task_stream.initialize(my_num_slots);
     my_resume_task_stream.initialize(my_num_slots);
