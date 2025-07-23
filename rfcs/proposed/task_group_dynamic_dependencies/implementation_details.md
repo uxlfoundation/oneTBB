@@ -218,8 +218,8 @@ private:
 at the head.
 
 The successor list in `task_dynamic_state` can be in one of the three possible states:
-* `alive` state (when `m_successor_list_head` is not equal to values below, including `nullptr`): indicates that the associated task
-  is not completed and its completion has not been transferred. In this case, new successors can be added to the current `task_dynamic_state`.
+* `alive` state (when `m_successor_list_head` is not equal to the values below; `nullptr` is `alive`): indicates that the associated task
+  is not completed and its completion has not been transferred. In this case, new successors can be added to the list.
 * `completed` state (`m_successor_list_head` equals `~std::uintptr_t(0)`): indicates that the associated task is completed.
   Adding new successors does not add any real dependencies. Successors can proceed for execution if their other dependencies are satisfied.
 * `transferred` state (`m_successor_list_head` equals `std::uintptr_t(0) - 1`): indicates that the completion of the associated task was transferred
