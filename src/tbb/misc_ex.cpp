@@ -36,7 +36,6 @@
 #if __unix__
 #include <mntent.h>
 #include <memory>
-#include <climits>
 #if __linux__
 #include <sys/sysinfo.h>
 #endif
@@ -147,9 +146,9 @@ public:
     }
 
 private:
-    static void close_mounts_file(std::FILE *file) { endmntent(file); };
+    static void close_mounts_file(FILE *file) { endmntent(file); };
 
-    static void close_file(std::FILE *file) { std::fclose(file); };
+    static void close_file(FILE *file) { std::fclose(file); };
     using unique_file_t = std::unique_ptr<FILE, decltype(&close_file)>;
 
     static constexpr int unlimited_num_cpus = INT_MAX;
