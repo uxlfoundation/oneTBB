@@ -222,7 +222,7 @@ The successor list in `task_dynamic_state` can be in one of the three possible s
   is not completed and its completion has not been transferred. In this case, new successors can be added to the list.
 * `completed` state (`m_successor_list_head` equals `~std::uintptr_t(0)`): indicates that the associated task is completed.
   Adding new successors does not add any real dependencies. Successors can proceed for execution if their other dependencies are satisfied.
-* `transferred` state (`m_successor_list_head` equals `std::uintptr_t(0) - 1`): indicates that the completion of the associated task was transferred
+* `transferred` state (`m_successor_list_head` equals `~std::uintptr_t(0) - 1`): indicates that the completion of the associated task was transferred
   to another task. In this case, any new successor should be redirected to the dynamic state of the task that has received the successors during the transfer.
   `m_new_dynamic_state` should point to that receiving state.
 
@@ -269,22 +269,7 @@ The sequence diagram of `set_task_order` is shown in the picture below:
 
 Once the body of the predecessor task is completed, it must notify all its successors.
 
-Prior to this feature, the `function_task` in the `task_group` executed the task body and bypassed the returned task, if any:
-
-```cpp
-template <typename F>
-class function_task : public task_handle_task {
-public:
-    tbb::task* execute(d1::execution_data& ed) override {
-        task* returned_task = m_func();
-        finalize(ed);
-        return next_task;
-    }
-private:
-    const F m_func;
-};
-```
-
+Prior to this feature, the `function_task` in the `task_group` executed the task body and bypassed the returned task, if any.
 With this feature, a notification step is added between executing the body and finalization:
 
 ```cpp
@@ -347,42 +332,16 @@ To achieve this, the new entry point `tbb::task* r1::get_current_task()` is adde
 If the dynamic state of the currently executing task is not initialized, there cannot be any successors associated with the task.
 
 While transferring the successors, the `m_new_dynamic_state` pointer in the dynamic state is set to `new_task`'s dynamic state. The successors
-are retrieved from the successor list and are appended to the `new_dynamic_state`'s successor list:
+are retrieved from the successor list and are appended to the `new_dynamic_state`'s successor list.
 
-```cpp
-void transfer_successors_to(task_dynamic_state* new_dynamic_state) {
-    // register current dynamic state as a co-owner of the new state
-    // to prolong its lifetime if the recipient task completes
-    // see dynamic state lifetime issue section for more details
-    new_dynamic_state->reserve();
+The value of successor list head pointer is exchanged to expose the `transferred` state.
 
-    m_new_dynamic_state.store(new_dynamic_state);
-    successor_list_node* list = m_successor_list_head.exchange(~std::uintptr_t(0));
-    new_dynamic_state->add_successor_list(list);
-}
-```
-
-`add_successor_list` is implemented similarly to `set_task_order`, but without additional checks, since the recipient task
+Insertion of the successor list to the `new_task`'s dynamic state is implemented similarly to `set_task_order`, but without additional checks, since the recipient task
 can only be in the `created` state and cannot change.
 
-```cpp
-void task_dynamic_state::add_successor_list(successor_list_node* list) {
-    if (list != nullptr) {
-        // Finding the last node in the list
-        successor_list_node* last_node = list;
+The sequence diagram for `transfer_this_task_completion_to` is shown below:
 
-        while (last_node->get_next() != nullptr) last_node = last_node->get_next();
-
-        successor_list_node* current_list_head = m_successor_list_head.load();
-        last_node->set_next(current_list_head);
-
-        while (!m_successor_list_head.compare_exchange_strong(current_list_head, list)) {
-            // Other thread updated the list
-            last_node->set_next(current_list_head);
-        }
-    }
-}
-```
+<img src="assets/impl_sequence_diagram_transfer.png">
 
 ### Dynamic state lifetime issue
 
@@ -414,7 +373,7 @@ The reference counter is decreased when the `A_state` is destroyed.
 As previously mentioned, the implementation of `transfer_this_task_completion_to` requires introducing a new entry point into the TBB binary:
 
 ```cpp
-namespace tbb::detail::d1 {
+namespace tbb::detail::rN {
     d1::task* get_current_task();
 }
 ```
