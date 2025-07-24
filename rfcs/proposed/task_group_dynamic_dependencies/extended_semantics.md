@@ -616,7 +616,7 @@ public:
 ```
 
 From an implementation perspective, this would require merged successor tracking to support not just two tasks (the sender and the recipient), but an entire set of
-tasks — since a task may transfer its successors to another task that is also performing `transfer_this_task_completion_to`, and so on.
+tasks — since a task may transfer its completion to another task that is also performing `transfer_this_task_completion_to`, and so on.
 
 ### Using a ``task_completion_handle`` as a successor
 
@@ -1581,7 +1581,7 @@ Let's assume that the task `f3p` is executed next. It creates the finalize task 
 
 <img src="assets/parser_tasks2.png" width=400>
 
-After the dependencies between the included files and `f3f` are established, `f3p` transfers its successors to `f3f` and is destroyed:
+After the dependencies between the included files and `f3f` are established, `f3p` transfers its completion to `f3f` and is destroyed:
 
 <img src="assets/parser_tasks3.png" width=400>
 
