@@ -483,7 +483,7 @@ by ``succ`` can begin execution.
 
 It is thread-safe to concurrently add multiple predecessors to a single successor, and to register the same predecessor for multiple successors.
 
-It is thread-safe to concurrently add successors to both the task currently transferring its successors and the task receiving them.
+It is thread-safe to concurrently add successors to both the task currently transferring its completion and the task receiving it.
 
 The behavior is undefined in the following cases:
 * ``pred`` or ``succ`` is empty.
