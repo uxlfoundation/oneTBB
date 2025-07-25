@@ -1284,7 +1284,8 @@ TEST_CASE("Concurrent exception handling in task_group wait") {
             waiter.join();
         }
         
-        MESSAGE("thrown == ", task_thrown.load(), " caught == ", exceptions_caught.load(), " completed == ", normal_completions.load() );
+        MESSAGE("thrown == ", task_thrown.load(), " caught == ", exceptions_caught.load(),
+                " completed == ", normal_completions.load() );
         // Verify that the exception was properly handled
         CHECK_MESSAGE(task_thrown.load(), "Task should have thrown an exception");
         
