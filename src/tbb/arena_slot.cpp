@@ -26,51 +26,49 @@ namespace r1 {
 //------------------------------------------------------------------------
 // Arena Slot
 //------------------------------------------------------------------------
-d1::task* arena_slot::get_task_impl(size_t T, execution_data_ext& ed, bool& tasks_skipped, isolation_type isolation) {
-    __TBB_ASSERT(tail.load(std::memory_order_relaxed) <= T || is_local_task_pool_quiescent(),
-            "Is it safe to get a task at position T?");
 
-    d1::task* result = task_pool_ptr[T];
-    __TBB_ASSERT(!is_poisoned( result ), "A poisoned task is going to be processed");
+d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation) {
+    bool all_tasks_checked = false;
+    bool tasks_skipped = false;
 
-    if (!result) {
-        return nullptr;
-    }
-    bool skip = isolation != no_isolation && isolation != task_accessor::isolation(*result);
-    if (!skip && !task_accessor::is_proxy_task(*result)) {
-        return result;
-    } else if (skip) {
+    // A helper function to check the task isolation constraint. If not met, sets flags that indicate
+    // skipped tasks. Returns the pointer to the task, or nullptr if the task cannot be executed.
+    auto check_task_isolation = [&](d1::task* task_candidate) -> d1::task* {
+        __TBB_ASSERT(task_candidate, nullptr);
+        __TBB_ASSERT(!is_poisoned( task_candidate ), "A poisoned task cannot be processed");
+        if (isolation == no_isolation || isolation == task_accessor::isolation(*task_candidate)) {
+            return task_candidate;
+        }
+        // The task must be skipped due to isolation mismatch
         has_skipped_tasks.store(true, std::memory_order_relaxed);
         tasks_skipped = true;
         return nullptr;
-    }
+    };
+    // A helper function to detect and handle proxy tasks.
+    // Returns the pointer to the real task, or nullptr if there is no task to execute.
+    auto check_task_proxy = [&](d1::task* task_candidate) -> d1::task* {
+        __TBB_ASSERT(task_candidate, nullptr);
+        __TBB_ASSERT(!is_poisoned( task_candidate ), "A poisoned task cannot be processed");
+        if (!task_accessor::is_proxy_task(*task_candidate)){
+            return task_candidate;
+        }
+        task_proxy& tp = static_cast<task_proxy&>(*task_candidate);
+        if ( d1::task *t = tp.extract_task<task_proxy::pool_bit>() ) {
+            ed.affinity_slot = tp.slot;
+            return t;
+        }
+        // Proxy was empty, so it's our responsibility to free it
+        tp.allocator.delete_object(&tp, ed);
+        return nullptr;
+    };
 
-    task_proxy& tp = static_cast<task_proxy&>(*result);
-    d1::slot_id aff_id = tp.slot;
-    if ( d1::task *t = tp.extract_task<task_proxy::pool_bit>() ) {
-        ed.affinity_slot = aff_id;
-        return t;
-    }
-    // Proxy was empty, so it's our responsibility to free it
-    tp.allocator.delete_object(&tp, ed);
-
-    if ( tasks_skipped ) {
-        task_pool_ptr[T] = nullptr;
-    }
-    return nullptr;
-}
-
-d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation) {
     __TBB_ASSERT(is_task_pool_published(), nullptr);
     // The current task position in the task pool.
     std::size_t T0 = tail.load(std::memory_order_relaxed);
     // The bounds of available tasks in the task pool. H0 is only used when the head bound is reached.
     std::size_t H0 = (std::size_t)-1, T = T0;
     d1::task* result = nullptr;
-    bool all_tasks_checked = false;
-    bool tasks_skipped = false;
     do {
-        __TBB_ASSERT( !result, nullptr );
         // The full fence is required to sync the store of `tail` with the load of `head` (write-read barrier)
         T = --tail;
         // The acquire load of head is required to guarantee consistency of our task pool
@@ -88,38 +86,46 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
                 break;
             } else if ( H0 == T ) {
                 // There is only one task in the task pool. If it can be taken, we want to reset the pool
-                if ( isolation != no_isolation && task_pool_ptr[T] &&
-                     isolation != task_accessor::isolation(*task_pool_ptr[T]) ) {
-                    // The task will be skipped due to isolation mismatch
-                    has_skipped_tasks.store(true, std::memory_order_relaxed);
-                    tasks_skipped = true;
+                if ( task_pool_ptr[T] ) {
+                    result = check_task_isolation( task_pool_ptr[T] ); // may update tasks_skipped
                 }
                 (tasks_skipped) ? release_task_pool() : reset_task_pool_and_leave();
                 all_tasks_checked = true;
             } else {
                 // Release task pool if there are still some tasks.
                 // After the release, the tail will be less than T, thus a thief
-                // will not attempt to get a task at position T.
+                // will not attempt to get a task at the position T.
                 release_task_pool();
             }
         }
-        result = get_task_impl( T, ed, tasks_skipped, isolation );
-        if ( result ) {
-            // If some tasks were skipped, we need to make a hole in position T.
-            if ( tasks_skipped ) {
-                // If all tasks have been checked, the taken task must be at the H0 position
-                __TBB_ASSERT( !all_tasks_checked || H0 == T, nullptr );
-                task_pool_ptr[T] = nullptr;
-            } else {
-                poison_pointer( task_pool_ptr[T] );
+        // Get a task from the pool at the position T.
+        __TBB_ASSERT(tail.load(std::memory_order_relaxed) <= T || is_local_task_pool_quiescent(),
+                "Is it safe to get a task at position T?");
+        __TBB_ASSERT( !all_tasks_checked || H0 == T, nullptr );
+        if ( task_pool_ptr[T] ) {
+            if (!all_tasks_checked) {
+                result = check_task_isolation( task_pool_ptr[T] ); // may update tasks_skipped
             }
-            break;
-        } else if ( !tasks_skipped ) {
+            if ( result ) {
+                // Isolation matches; check if there is a real task
+                result = check_task_proxy( result );
+                // If some tasks were skipped, mark the position as a hole, otherwise poison it.
+                if ( tasks_skipped ) {
+                    task_pool_ptr[T] = nullptr;
+                } else {
+                    poison_pointer( task_pool_ptr[T] );
+                }
+
+                if ( result ) break /*do-while*/;
+            }
+        }
+        __TBB_ASSERT( !result, nullptr );
+        if ( !tasks_skipped ) {
             poison_pointer( task_pool_ptr[T] );
             __TBB_ASSERT( T0 == T+1, nullptr );
             T0 = T;
         }
-    } while ( !result && !all_tasks_checked );
+    } while ( /*!result &&*/ !all_tasks_checked );
 
     if ( tasks_skipped ) {
         __TBB_ASSERT( is_task_pool_published(), nullptr ); // the pool was not reset
