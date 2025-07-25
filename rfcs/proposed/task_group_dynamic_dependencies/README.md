@@ -345,7 +345,7 @@ This task tree matches the one shown earlier for merge-sort.
 
 ## Extended semantics proposal
 
-The detailed proposal for the API and semantics of `task_group` extensions is outlined in the [separate RFC](extended_semantics.md).
+The detailed proposal for the API and semantics of `task_group` extensions is presented in the [API and Semantics Details sub-RFC](extended_semantics.md).
 
 ## Open Questions in Design
 
