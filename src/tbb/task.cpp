@@ -237,8 +237,8 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
         if (reference_map.size() > max_reference_vertex_map_size) {
             // TODO: Research the possibility of using better approach for a clean-up
             for (auto it = reference_map.begin(); it != reference_map.end();) {
-                if (it->second->get_num_child() == 0) {
-                    it->second->destroy();
+                if (it->second->get_num_children() == 0) {
+                    it->second->release_ownership();
                     it = reference_map.erase(it);
                 } else {
                     ++it;

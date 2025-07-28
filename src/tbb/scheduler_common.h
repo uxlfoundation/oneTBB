@@ -445,18 +445,18 @@ public:
     using d1::reference_vertex::reference_vertex;
 
     void reserve(std::uint32_t delta = 1) override {
-        if (reserve_impl(delta) == 0) {
+        if (reserve_post_increment(delta) == 0) {
             m_lifetime_ref_counter.fetch_add(1);
         }
     }
 
     void release(std::uint32_t delta = 1) override {
-        if (release_impl(delta) == 0) {
-            destroy();
+        if (release_pre_decrement(delta) == 0) {
+            release_ownership();
         }
     }
 
-    void destroy() {
+    void release_ownership() {
         auto ref = m_lifetime_ref_counter.fetch_sub(1);
         if (ref == 1) {
             this->~thread_reference_vertex();
@@ -464,6 +464,7 @@ public:
         }
     }
 private:
+    // Reserve in advance for task_dispatcher that owns the vertex map
     std::atomic<uint32_t> m_lifetime_ref_counter{1};
 };
 
@@ -542,7 +543,7 @@ public:
 
         for (auto& elem : m_reference_vertex_map) {
             thread_reference_vertex*& node = elem.second;
-            node->destroy();
+            node->release_ownership();
             poison_pointer(node);
         }
 

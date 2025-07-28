@@ -159,9 +159,6 @@ public:
         auto last_iterator = my_msg_reference_vertices.cbefore_begin();
 
         for (auto& msg_waiter : my_msg_wait_context_vertices) {
-            // If the task is created by the thread outside the graph arena, the lifetime of the thread reference vertex
-            // may be shorter that the lifetime of the task, so thread reference vertex approach cannot be used
-            // and the task should be associated with the msg wait context itself
             d1::wait_tree_vertex_interface* ref_vertex = r1::get_thread_reference_vertex(msg_waiter);
             last_iterator = my_msg_reference_vertices.emplace_after(last_iterator,
                                                                     ref_vertex);
@@ -449,10 +446,6 @@ inline graph_task::graph_task(graph& g, d1::small_object_allocator& allocator,
     , priority(node_priority)
     , my_allocator(allocator)
 {
-    // If the task is created by the thread outside the graph arena, the lifetime of the thread reference vertex
-    // may be shorter that the lifetime of the task, so thread reference vertex approach cannot be used
-    // and the task should be associated with the graph wait context itself
-    // TODO: consider how reference counting can be improved for such a use case. Most common example is the async_node
     d1::wait_context_vertex* graph_wait_context_vertex = &my_graph.get_wait_context_vertex();
     my_reference_vertex = r1::get_thread_reference_vertex(graph_wait_context_vertex);
     __TBB_ASSERT(my_reference_vertex, nullptr);
