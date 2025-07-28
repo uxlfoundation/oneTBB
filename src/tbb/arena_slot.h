@@ -52,7 +52,7 @@ struct alignas(max_nfs_size) arena_slot_shared_state {
 
     //! The flag indicates that the task pool might temporarily exclude some valid tasks.
     /** Set by the owning thread in get_task(), tested during exhaustive task search in has_tasks(). **/
-    std::atomic<bool> has_skipped_tasks;
+    std::atomic<bool> accessed_by_owner;
 
     //! Synchronization of access to the task pool.
     /** Also is used to specify if the slot is empty or locked:
@@ -182,16 +182,20 @@ public:
         std::size_t hd = head.load(std::memory_order_relaxed), tl = tail.load(std::memory_order_relaxed); 
         if ( (std::intptr_t)hd >= (std::intptr_t)tl ) {
             // Since some tasks might be temporary out of the visible pool bounds, lock the pool to examine closely
-            bool skipped_tasks = false;
+            bool tail_unstable = false;
             the_task_pool = lock_task_pool();
             if ( the_task_pool == EmptyTaskPool ) {
                 return false;
             }
+            tail_unstable = accessed_by_owner.load(std::memory_order_acquire);
             hd = head.load(std::memory_order_relaxed);
             tl = tail.load(std::memory_order_relaxed);
-            skipped_tasks = has_skipped_tasks.load(std::memory_order_relaxed);
             unlock_task_pool(the_task_pool);
-            if ( (std::intptr_t)hd >= (std::intptr_t)tl && !skipped_tasks ) {
+            if ( (std::intptr_t)hd > (std::intptr_t)tl ) {
+                // The owning thread decremented the tail behind the head; the pool is empty but not yet reset
+                __TBB_ASSERT(tail_unstable, nullptr);
+                return false;
+            } else if ( hd == tl && !tail_unstable ) {
                 return false;
             }
         }

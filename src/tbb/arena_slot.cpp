@@ -40,7 +40,6 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
             return task_candidate;
         }
         // The task must be skipped due to isolation mismatch
-        has_skipped_tasks.store(true, std::memory_order_relaxed);
         tasks_skipped = true;
         return nullptr;
     };
@@ -63,6 +62,7 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
     };
 
     __TBB_ASSERT(is_task_pool_published(), nullptr);
+    accessed_by_owner.store(true, std::memory_order_relaxed);
     // The current task position in the task pool.
     std::size_t T0 = tail.load(std::memory_order_relaxed);
     // The bounds of available tasks in the task pool. H0 is only used when the head bound is reached.
@@ -132,7 +132,7 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
         tail.store(T0, std::memory_order_release);
     }
     // At this point, skipped tasks - if any - are back in the pool bounds
-    has_skipped_tasks.store(false, std::memory_order_relaxed);
+    accessed_by_owner.store(false, std::memory_order_release);
 
     __TBB_ASSERT( (std::intptr_t)tail.load(std::memory_order_relaxed) >= 0, nullptr );
     __TBB_ASSERT( result || tasks_skipped || is_quiescent_local_task_pool_reset(), nullptr );
