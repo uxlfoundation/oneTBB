@@ -124,18 +124,11 @@ Based on the described considerations, the pseudo-code of the algorithm could be
 
 * References:
 
-[1] https://docs.docker.com/engine/containers/resource_constraints/#cpu
-
-[2] https://github.com/uxlfoundation/oneTBB/issues/190
-
-[3] https://github.com/uxlfoundation/oneTBB/issues/1760
-
-[4] https://man7.org/linux/man-pages/man7/cgroups.7.html
-
-[5] https://www.kernel.org/doc/html/v6.15/scheduler/sched-bwc.html
-
-[6] https://www.man7.org/linux/man-pages/man5/proc_mounts.5.html
-
-[7] https://www.man7.org/linux/man-pages/man5/fstab.5.html
-
-[8] https://www.man7.org/linux/man-pages/man3/getmntent.3.html
+1. https://docs.docker.com/engine/containers/resource_constraints/#cpu
+2. https://github.com/uxlfoundation/oneTBB/issues/190
+3. https://github.com/uxlfoundation/oneTBB/issues/1760
+4. https://man7.org/linux/man-pages/man7/cgroups.7.html
+5. https://www.kernel.org/doc/html/v6.15/scheduler/sched-bwc.html
+6. https://www.man7.org/linux/man-pages/man5/proc_mounts.5.html
+7. https://www.man7.org/linux/man-pages/man5/fstab.5.html
+8. https://www.man7.org/linux/man-pages/man3/getmntent.3.html
