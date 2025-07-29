@@ -18,7 +18,7 @@
 
 // Intel LLVM compiler triggers a deprecation warning in the implementation of std::allocator_traits::destroy
 // inside Standard Library while using STL PMR containers since std::polymorphic_allocator::destroy is deprecated since C++20
-#define TEST_LLVM_COMPILER_PMR_DESTROY_DEPRECATED_BROKEN __INTEL_LLVM_COMPILER == 20250000 && __TBB_GLIBCXX_VERSION == 110000 && __TBB_CPP20_PRESENT
+#define TEST_LLVM_COMPILER_PMR_DESTROY_DEPRECATED_BROKEN __INTEL_LLVM_COMPILER >= 20250000 && __INTEL_LLVM_COMPILER <= 20250100 && __TBB_GLIBCXX_VERSION == 110000 && __TBB_CPP20_PRESENT
 
 #if TEST_LLVM_COMPILER_PMR_DESTROY_DEPRECATED_BROKEN
 #pragma clang diagnostic push

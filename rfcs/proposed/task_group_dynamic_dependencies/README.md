@@ -343,6 +343,10 @@ into the following helper functions: `users::do_serial_sort`, `users::create_lef
 
 This task tree matches the one shown earlier for merge-sort. 
 
+## Extended semantics proposal
+
+The detailed proposal for the API and semantics of `task_group` extensions is presented in the [API and Semantics Details sub-RFC](extended_semantics.md).
+
 ## Open Questions in Design
 
 Questions that should be addressed before moving into `experimental` and providing a preview feature:

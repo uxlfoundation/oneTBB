@@ -24,6 +24,7 @@ TBB_CONTROL_FLOW_GUARD:BOOL - Enable Control Flow Guard (CFG) during the compila
 TBB_BUILD_APPLE_FRAMEWORKS - Enable the Apple* frameworks instead of dylibs, only available on the Apple platform. (OFF by default)
 TBB_FILE_TRIM - Enable __FILE__ trim, replace a build-time full path with a relative path in the debug info and macro __FILE__; use it to make
            reproducible location-independent builds (ON by default)
+TBB_VERIFY_DEPENDENCY_SIGNATURE - On Windows* enable verification of signatures for dependencies linked at run-time. (ON by default)
 ```
 
 ## Configure, Build, and Test
@@ -188,15 +189,6 @@ ctest
 Or by using the ``test`` target:
 ```bash
 cmake --build . --target test # currently does not work on Windows* OS
-```
-
-## Installation
-See [Installation from Sources](../INSTALL.md) to learn how to install oneTBB.
-
-To install oneTBB from the release packages, use the following commands: 
-```bash
-tar -xvf oneapi-tbb-xxx.xx.x-*.tgz
-source env/vars.sh
 ```
 
 

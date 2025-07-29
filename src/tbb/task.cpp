@@ -172,6 +172,7 @@ void task_dispatcher::do_post_resume_action() {
         task_dispatcher* to_cleanup = static_cast<task_dispatcher*>(td->my_post_resume_arg);
         // Release coroutine's reference to my_arena
         td->my_arena->on_thread_leaving(arena::ref_external);
+        __TBB_ASSERT(is_alive(td->my_arena->my_guard), "The arena should not have been destroyed");
         // Cache the coroutine for possible later re-usage
         td->my_arena->my_co_cache.push(to_cleanup);
         break;
