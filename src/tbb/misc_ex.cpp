@@ -133,11 +133,12 @@ static std::atomic<do_once_state> hardware_concurrency_info;
 
 static int theNumProcs;
 
+
 // Linux control groups support
 class cgroup_info {
 public:
     static bool is_cpu_constrained(int& constrained_num_cpus) {
-        static const int num_cpus = parse_cgroup_cpu_constraints();
+        static const int num_cpus = parse_cpu_constraints();
         if (num_cpus == error_value || num_cpus == unlimited_num_cpus)
             return false;
 
@@ -317,18 +318,21 @@ private:
         return num_cpus;
     }
 
-    static int parse_cgroup_cpu_constraints() {
+    static int parse_cpu_constraints() {
         using unique_mounts_file_t = std::unique_ptr<FILE, decltype(&close_mounts_file)>;
 
         // Reading /proc/self/mounts and /proc/self/cgroup anyway, so open them right away
-        unique_mounts_file_t mounts_file_ptr(setmntent("/proc/self/mounts", "r"), &close_mounts_file);
         unique_file_t cgroup_file_ptr(fopen("/proc/self/cgroup", "r"), &close_file);
-        if (!mounts_file_ptr || !cgroup_file_ptr)
+        if (!cgroup_file_ptr)
+            return error_value; // Failed to open cgroup file
+
+        unique_mounts_file_t mounts_file_ptr(setmntent("/proc/self/mounts", "r"), &close_mounts_file);
+        if (!mounts_file_ptr)
             return error_value;
 
         cgroup_paths relative_paths_cache;
         struct mntent mntent;
-        const std::size_t buffer_size = 4 * 4096; // TODO: Leave a comment why using such size
+        const std::size_t buffer_size = 4096; // Allocate a buffer for reading mount entries
         char mount_entry_buffer[buffer_size];
 
         int found_num_cpus = error_value; // Initialize to an impossible value

@@ -110,7 +110,7 @@ static int get_max_procs() {
 class cgroup_info {
 public:
     static bool is_cpu_constrained(int& constrained_num_cpus) {
-        static const int num_cpus = parse_cgroup_cpu_constraints();
+        static const int num_cpus = parse_cpu_constraints();
         if (num_cpus == error_value || num_cpus == unlimited_num_cpus)
             return false;
 
@@ -119,9 +119,9 @@ public:
     }
 
 private:
-    static void close_mounts_file(std::FILE *file) { endmntent(file); };
+    static void close_mounts_file(FILE *file) { endmntent(file); };
 
-    static void close_file(std::FILE *file) { std::fclose(file); };
+    static void close_file(FILE *file) { fclose(file); };
     using unique_file_t = std::unique_ptr<FILE, decltype(&close_file)>;
 
     static constexpr int unlimited_num_cpus = INT_MAX;
@@ -291,7 +291,7 @@ private:
         return num_cpus;
     }
 
-    static int parse_cgroup_cpu_constraints() {
+    static int parse_cpu_constraints() {
         using unique_mounts_file_t = std::unique_ptr<FILE, decltype(&close_mounts_file)>;
 
         // Reading /proc/self/mounts and /proc/self/cgroup anyway, so open them right away
