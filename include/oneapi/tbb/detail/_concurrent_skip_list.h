@@ -51,6 +51,42 @@ namespace tbb {
 namespace detail {
 namespace d2 {
 
+#if CONCURRENT_MAP_USE_DISTRIBUTED_SIZE
+template <typename SizeType>
+class distributed_size {
+    using size_type = SizeType;
+    static_assert(std::is_unsigned<size_type>::value, "Unsupported size_type for distributed_size");
+    using underlying_size_type = typename std::make_signed<size_type>::type;
+    using atomic_type = std::atomic<underlying_size_type>;
+public:
+    distributed_size() : distributed_size(0) {}
+    distributed_size(size_type value) {
+        my_ets.local().store(value, std::memory_order_relaxed);
+    }
+
+    void operator++() { ++my_ets.local(); }
+    void operator--() { --my_ets.local(); }
+
+    size_type value() const {
+        underlying_size_type result = 0;
+
+        my_ets.combine_each([&](const atomic_type& local_size) {
+            result += local_size.load(std::memory_order_relaxed);
+        });
+        return result;
+    }
+
+    void clear() { my_ets.clear(); }
+
+    void set_value(size_type value) {
+        my_ets.clear();
+        my_ets.local().store(value, std::memory_order_relaxed);
+    }
+private:
+    mutable tbb::enumerable_thread_specific<atomic_type> my_ets;
+};
+#endif
+
 template <typename Value, typename Allocator>
 class skip_list_node {
     using node_ptr = skip_list_node*;
@@ -319,7 +355,11 @@ public:
           my_size(0), my_max_height(0)
     {
         internal_copy(other);
+#if CONCURRENT_MAP_USE_DISTRIBUTED_SIZE
+        __TBB_ASSERT(my_size.value() == other.my_size.value(), "Wrong size of copy-constructed container");
+#else
         __TBB_ASSERT(my_size == other.my_size, "Wrong size of copy-constructed container");
+#endif
     }
 
     concurrent_skip_list( const concurrent_skip_list& other, const allocator_type& alloc )
@@ -327,7 +367,11 @@ public:
           my_size(0), my_max_height(0)
     {
         internal_copy(other);
+#if CONCURRENT_MAP_USE_DISTRIBUTED_SIZE
+        __TBB_ASSERT(my_size.value() == other.my_size.value(), "Wrond size of copy-constructed container");
+#else
         __TBB_ASSERT(my_size == other.my_size, "Wrong size of copy-constructed container");
+#endif
     }
 
     concurrent_skip_list( concurrent_skip_list&& other )
@@ -589,7 +633,11 @@ public:
             head->set_next(level, nullptr);
         }
 
+#if CONCURRENT_MAP_USE_DISTRIBUTED_SIZE
+        my_size.clear();
+#else
         my_size.store(0, std::memory_order_relaxed);
+#endif
         my_max_height.store(0, std::memory_order_relaxed);
     }
 
@@ -618,7 +666,11 @@ public:
     }
 
     size_type size() const {
+#if CONCURRENT_MAP_USE_DISTRIBUTED_SIZE
+        return my_size.value();
+#else
         return my_size.load(std::memory_order_relaxed);
+#endif
     }
 
     size_type max_size() const {
@@ -744,8 +796,13 @@ private:
         my_head_ptr.store(other.my_head_ptr.load(std::memory_order_relaxed), std::memory_order_relaxed);
         other.my_head_ptr.store(nullptr, std::memory_order_relaxed);
 
+#if CONCURRENT_MAP_USE_DISTRIBUTED_SIZE
+        my_size.set_value(other.my_size.value());
+        other.my_size.clear();
+#else
         my_size.store(other.my_size.load(std::memory_order_relaxed), std::memory_order_relaxed);
         other.my_size.store(0, std::memory_order_relaxed);
+#endif
 
         my_max_height.store(other.my_max_height.load(std::memory_order_relaxed), std::memory_order_relaxed);
         other.my_max_height.store(0, std::memory_order_relaxed);
@@ -761,7 +818,11 @@ private:
         if (my_node_allocator == other.get_allocator()) {
             internal_move(std::move(other));
         } else {
+#if CONCURRENT_MAP_USE_DISTRIBUTED_SIZE
+            my_size.clear();
+#else
             my_size.store(0, std::memory_order_relaxed);
+#endif
             my_max_height.store(other.my_max_height.load(std::memory_order_relaxed), std::memory_order_relaxed);
             internal_copy(std::make_move_iterator(other.begin()), std::make_move_iterator(other.end()));
         }
@@ -1047,7 +1108,8 @@ private:
                 prev_nodes[level]->set_next(level, erase_node->next(level));
                 erase_node->set_next(level, nullptr);
             }
-            my_size.fetch_sub(1, std::memory_order_relaxed);
+            // my_size.fetch_sub(1, std::memory_order_relaxed);
+            --my_size;
 
             result.first = erase_node;
             result.second = next_node;
@@ -1182,7 +1244,13 @@ private:
         swap(my_rng, other.my_rng);
 
         swap_atomics_relaxed(my_head_ptr, other.my_head_ptr);
+#if CONCURRENT_MAP_USE_DISTRIBUTED_SIZE
+        size_type this_value = my_size.value();
+        my_size.set_value(other.my_size.value());
+        other.my_size.set_value(this_value);
+#else
         swap_atomics_relaxed(my_size, other.my_size);
+#endif
         swap_atomics_relaxed(my_max_height, other.my_max_height);
     }
 
@@ -1199,7 +1267,11 @@ private:
     key_compare my_compare;
     random_level_generator_type my_rng;
     atomic_node_ptr my_head_ptr;
+#if CONCURRENT_MAP_USE_DISTRIBUTED_SIZE
+    distributed_size<size_type> my_size;
+#else
     std::atomic<size_type> my_size;
+#endif
     std::atomic<size_type> my_max_height;
 
     template<typename OtherTraits>
