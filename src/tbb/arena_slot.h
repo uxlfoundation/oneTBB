@@ -191,7 +191,7 @@ public:
             hd = head.load(std::memory_order_relaxed);
             tl = tail.load(std::memory_order_relaxed);
             unlock_task_pool(the_task_pool);
-            if ( (std::intptr_t)hd > (std::intptr_t)tl || ( hd == tl && !tail_unstable ) ) {
+            if ( (std::intptr_t)hd >= (std::intptr_t)tl && !tail_unstable ) {
                 return false;
             }
         }
