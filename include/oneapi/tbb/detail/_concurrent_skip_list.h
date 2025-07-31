@@ -55,9 +55,6 @@ namespace d2 {
 template <typename SizeType>
 class distributed_size {
     using size_type = SizeType;
-    static_assert(std::is_unsigned<size_type>::value, "Unsupported size_type for distributed_size");
-    using underlying_size_type = typename std::make_signed<size_type>::type;
-    using atomic_type = std::atomic<underlying_size_type>;
 public:
     distributed_size() : distributed_size(0) {}
     distributed_size(size_type value) {
@@ -65,12 +62,18 @@ public:
     }
 
     void operator++() { ++my_ets.local(); }
-    void operator--() { --my_ets.local(); }
+
+    // Should not be called concurrently
+    void operator--() {
+        size_type current_size = value();
+        my_ets.clear();
+        my_ets.local() = current_size - 1;
+    }
 
     size_type value() const {
-        underlying_size_type result = 0;
+        size_type result = 0;
 
-        my_ets.combine_each([&](const atomic_type& local_size) {
+        my_ets.combine_each([&](const std::atomic<size_type>& local_size) {
             result += local_size.load(std::memory_order_relaxed);
         });
         return result;
@@ -83,7 +86,7 @@ public:
         my_ets.local().store(value, std::memory_order_relaxed);
     }
 private:
-    mutable tbb::enumerable_thread_specific<atomic_type> my_ets;
+    mutable tbb::enumerable_thread_specific<std::atomic<size_type>> my_ets;
 };
 #endif
 
