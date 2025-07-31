@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -1219,6 +1220,31 @@ TEST_CASE("task_handle cannot be scheduled into other task_group of the same con
 
     CHECK_NOTHROW(tg.run(tg.defer([]{})));
     CHECK_THROWS_WITH_AS(tg1.run(tg.defer([]{})), "Attempt to schedule task_handle into different task_group", std::runtime_error);
+}
+
+//! \brief \ref requirement
+TEST_CASE("Test safe task submit from external thread") {
+    tbb::task_arena ta{};
+    tbb::task_group tg{};
+
+    bool run = false;
+    auto body = [&] { run = true; };
+    std::thread([&] {
+        tbb::task_handle task = tg.defer(body);
+        ta.execute([&] {
+            tg.run(std::move(task));
+        });
+    }).join();
+
+    ta.execute([&] {
+        tg.wait();
+    });
+
+    run = false;
+    tbb::task_handle task;
+    std::thread([&] { task = tg.defer(body); }).join();
+    tg.run(std::move(task));
+    tg.wait();
 }
 
 #endif // TBB_USE_EXCEPTIONS

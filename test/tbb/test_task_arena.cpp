@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -2067,4 +2068,34 @@ TEST_CASE("worker threads occupy slots in correct range") {
     }
 
     while (counter < 42) { utils::yield(); }
+}
+
+//! \brief \ref error_guessing
+TEST_CASE("Stress test enqueue with task_group from multiple threads") {
+    constexpr std::size_t task_groups_per_thread = 1500;
+    constexpr std::size_t task_submits_per_task_group = 100;
+
+    std::size_t num_threads = utils::get_platform_max_threads();
+    std::vector<tbb::task_arena> arenas(num_threads);
+    std::vector<tbb::task_group> tg(task_groups_per_thread);
+
+    for (std::size_t i = 0; i < 10; ++i) {
+        utils::NativeParallelFor(num_threads, [&] (std::size_t thread_index) {
+            for (std::size_t j = 0; j < task_groups_per_thread; ++j) {
+                for (std::size_t k = 0; k < task_submits_per_task_group; ++k) {
+                    arenas[thread_index].enqueue(tg[j].defer([&] {
+                        utils::doDummyWork(100);
+                    }));
+                }
+            }
+        });
+
+        utils::NativeParallelFor(num_threads, [&] (std::size_t thread_index) {
+            for (std::size_t j = 0; j < task_groups_per_thread; ++j) {
+                arenas[thread_index].execute([&] {
+                    tg[j].wait();
+                });
+            }
+        });
+    }
 }

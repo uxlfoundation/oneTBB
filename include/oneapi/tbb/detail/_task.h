@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2020-2024 Intel Corporation
+    Copyright (c) 2020-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -196,21 +197,32 @@ public:
     {}
 
     void reserve(std::uint32_t delta = 1) override {
-        if (m_ref_count.fetch_add(static_cast<std::uint64_t>(delta)) == 0) {
-            my_parent->reserve();
-        }
+        reserve_post_increment(delta);
     }
 
     void release(std::uint32_t delta = 1) override {
+        release_pre_decrement(delta);
+    }
+
+    std::uint32_t get_num_children() {
+        return static_cast<std::uint32_t>(m_ref_count.load(std::memory_order_acquire));
+    }
+protected:
+    std::uint64_t reserve_post_increment(std::uint32_t delta) {
+        auto ref = m_ref_count.fetch_add(static_cast<std::uint64_t>(delta));
+        if (ref == 0) {
+            my_parent->reserve();
+        }
+        return ref;
+    }
+
+    std::uint64_t release_pre_decrement(std::uint32_t delta) {
         auto parent = my_parent;
         std::uint64_t ref = m_ref_count.fetch_sub(static_cast<std::uint64_t>(delta)) - static_cast<std::uint64_t>(delta);
         if (ref == 0) {
             parent->release();
         }
-    }
-
-    std::uint32_t get_num_child() {
-        return static_cast<std::uint32_t>(m_ref_count.load(std::memory_order_acquire));
+        return ref;
     }
 private:
     wait_tree_vertex_interface* my_parent;
