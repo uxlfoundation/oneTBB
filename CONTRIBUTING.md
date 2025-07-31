@@ -43,4 +43,6 @@ You can find all [open oneTBB pull requests](https://github.com/uxlfoundation/on
   * the copyright year should be `2025` for new files
 * Submit a pull request into the master branch. You can submit changes with a pull request (preferred) or by sending an email patch.  
 
+No code changes may regress support for any currently supported hardware. All contributions must ensure compatibility and functionality across all supported hardware platforms. Contributions that break hardware compatibility may be rejected or reverted.
+
 Continuous Integration (CI) testing is enabled for the repository. Your pull request must pass all checks before it can be merged. We will review your contribution and may provide feedback to guide you if any additional fixes or modifications are necessary. When reviewed and accepted, your pull request will be merged into our GitHub repository. 
