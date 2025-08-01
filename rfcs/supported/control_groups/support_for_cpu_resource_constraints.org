@@ -59,8 +59,16 @@ value for maximum concurrency of a =tbb::task_arena= instance disregarding wheth
 instantiated with =tbb::task_arena::constraints= specified or not. In all of these cases, the
 obtained $quota / period$ ratio will be considered as another limiting factor in addition to the
 affinity mask currently used. The resulting default value will be taken as a minimum between the
-obtained value and the one determined previously. The obtained ratio is rounded to the nearest whole
-number.
+obtained value and the one determined previously.
+
+The $quota / period$ value is rounded up because of the following considerations:
+- It is likely the feature is to be mostly used in containerized environments, which provide a
+  service rather than a single application. In most of the cases, containers sub-divide the platform
+  by whole CPUs. Therefore, the division is going to be without a remainder.
+- Likely the cgroup constraints will impose limitations on a group of processes. Since CPU resources
+  are shared among all the constrained processes, TBB workers will likely be throttled even if ratio
+  is rounded down.
+- To avoid undersubscribing by refraining from utilizing full CPU bandwidth.
 
 ** Implementation Details
 
