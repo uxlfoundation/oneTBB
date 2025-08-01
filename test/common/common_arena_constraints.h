@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2019-2021 Intel Corporation
+    Copyright (c) 2019-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -174,7 +175,6 @@ class system_info {
             "HWLOC cannot detect the number of cpukinds.(reference)");
 
         core_types_parsing_broken = num_cpu_kinds == 0;
-        int current_efficiency = -1;
         cpu_kind_infos.resize(num_cpu_kinds);
         for (auto kind_index = 0; kind_index < num_cpu_kinds; ++kind_index) {
             auto& cki = cpu_kind_infos[kind_index];
@@ -186,13 +186,9 @@ class system_info {
             );
 
             hwloc_require_ex(
-                hwloc_cpukinds_get_info, topology, kind_index, cki.cpuset, &current_efficiency,
+                hwloc_cpukinds_get_info, topology, kind_index, cki.cpuset, /*efficiency*/nullptr,
                 /*nr_infos*/nullptr, /*infos*/nullptr, /*flags*/0
             );
-            if (current_efficiency < 0) {
-                core_types_parsing_broken = true;
-                break;
-            }
             hwloc_bitmap_and(cki.cpuset, cki.cpuset, process_cpuset);
 
             cki.index = hwloc_cpukinds_get_by_cpuset(topology, cki.cpuset, /*flags*/0);
@@ -200,6 +196,48 @@ class system_info {
                 "hwloc failed obtaining kind index via cpuset.(reference)");
 
             cki.concurrency = hwloc_bitmap_weight(cki.cpuset);
+        }
+        // On hybrid CPUs, check if there are cores without L3 cache.
+        if (!core_types_parsing_broken && num_cpu_kinds > 1) {
+            // The first core type mask (least performant cores)
+            auto& cki = cpu_kind_infos.front();
+            hwloc_cpuset_t lp_mask = hwloc_bitmap_dup(cki.cpuset);
+
+            int l3_depth = hwloc_get_type_depth(topology, HWLOC_OBJ_L3CACHE);
+            unsigned l3_count = hwloc_get_nbobjs_by_depth(topology, l3_depth);
+
+            // Iterate through all L3 cache objects and remove their cores from lp_mask.
+            for (unsigned i = 0; i < l3_count; ++i) {
+                hwloc_obj_t l3 = hwloc_get_obj_by_depth(topology, l3_depth, i);
+                if (l3) {
+                    hwloc_bitmap_andnot(lp_mask, lp_mask, l3->cpuset);
+                }
+            }
+
+            if (hwloc_bitmap_iszero(lp_mask)) {
+                // All cores in the front mask have L3 cache, so no need to create a separate core type.
+                hwloc_bitmap_free(lp_mask);
+            } else {
+                hwloc_bitmap_andnot(cki.cpuset, cki.cpuset, lp_mask);
+                if (hwloc_bitmap_iszero(cki.cpuset)) {
+                    // No cores with L3 cache in the front mask, so replace it with the L3-less cores.
+                    hwloc_bitmap_free(cki.cpuset);
+                    cki.cpuset = lp_mask;
+                } else {
+                    // The front mask has SOME cores with L3 cache.
+                    cki.concurrency = hwloc_bitmap_weight(cki.cpuset);
+
+                    // Create a new least performant (L3-less) core type and add it to the front.
+                    auto& lp_cki = *cpu_kind_infos.emplace(cpu_kind_infos.begin());
+                    lp_cki.cpuset = lp_mask;
+                    lp_cki.concurrency = hwloc_bitmap_weight(lp_cki.cpuset);
+
+                    // Increment all CPU kind indices after inserting a new one at beginning.
+                    for (auto& i : cpu_kind_infos) {
+                        i.index++;
+                    }
+                }
+            }
         }
 #endif /*__HYBRID_CPUS_TESTING*/
 

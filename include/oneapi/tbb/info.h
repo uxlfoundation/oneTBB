@@ -61,15 +61,16 @@ struct constraints {
     constraints& set_core_types(const std::vector<core_type_id>& ids) {
         if (ids.empty()) {
             core_type = -1;
-            return *this;
-        }
+        } else if (ids.size() == 1) {
+            core_type = ids[0];
+        } else {
+            // Set a marker bit to indicate multiple core type format
+            core_type = (1 << core_type_id_bits);
 
-        // Set a marker bit to indicate multiple core type format
-        core_type = (1 << core_type_id_bits);
-
-        for (core_type_id id : ids) {
-            __TBB_ASSERT((0 <= id) && (id < core_type_id_bits), "Wrong core type id");
-            core_type |= (1 << id);
+            for (core_type_id id : ids) {
+                __TBB_ASSERT((0 <= id) && (id < static_cast<core_type_id>(core_type_id_bits)), "Wrong core type id");
+                core_type |= (1 << id);
+            }
         }
 
         return *this;
