@@ -44,6 +44,10 @@ they are separated by a whitespace and written in =cpu.max= file. The value of =
 the cgroup v1 or =max= for the cgroup v2 indicates that the processes within such a group do not
 have any bandwidth restriction in place.
 
+*Note*: Cgroups allow setting usage limitations for various platform resources, including the
+affinity mask which is set by the =cpuset= controller. The processes in cgroup inherit the affinity
+mask. So, they are already respected by the library and does not require additional handling.
+
 Although more and more Linux-based distributions of operating systems support cgroup version two,
 there are relevant OSes that implement only the first version of the cgroup interface. In addition,
 modern Linux kernels allow to use different cgroup versions simultaneously, by connecting various
@@ -103,7 +107,7 @@ all of the possible options and stop once the data is found and successfully rea
   root@3f54303c5a7e:/# ls /sys/fs/cgroup/cpu,cpuacct/docker/${container_hash}
   ls: cannot access '/sys/fs/cgroup/cpu,cpuacct/docker/${container_hash}': No such file or directory
 
-  # Running on a host system.
+  # Running in a host system.
   $ ls /sys/fs/cgroup/cpu,cpuacct/docker/${container_hash} | grep "period\|quota"
   cpu.cfs_period_us
   cpu.cfs_quota_us
@@ -115,19 +119,27 @@ all of the possible options and stop once the data is found and successfully rea
   cpu.cfs_quota_us
 #+end_src
 
-Based on the described considerations, the pseudo-code of the algorithm could be:
+*** Minimizing File Reads
+On many modern systems, controllers are automatically mounted under =/sys/fs/cgroup= (v1
+controllers) and =/sys/fs/cgroup/unified= (v2 controllers) [4]. In practice, v2 controllers usually
+automatically mounted under v1 controllers path, that is =/sys/fs/cgroup=. So, to avoid parsing
+=/proc/self/mounts=, these paths can be tried first.
 
-- Loop over mount points from =/proc/self/mounts= until EOF or successful inference of CPU resource
-  constraints:
-  - If mount with =cgroup= fs type is found:
-    - Based on the cgroup version written in fs type as either =cgroup= or =cgroup2= do:
-      - If reading of CPU resource constraints from =<mount-point>= fails:
-        - Find =<relative path>= from =/proc/self/cgroup=
-        - If reading of CPU resource constraints from =<mount-point>/<relative-path>= fails:
-          - =continue= the outer loop with the next mount entry from =/proc/self/mounts=
-      - Otherwise, if reading of CPU resource constraints succeeds in one of the attempts, break the
-        outer loop and report the $quota / period$ value rounded up.
+Since each of the v1 controllers has an associated configuration option that must be set in order to
+employ that controller [4], it makes sense to filter only those mount points that contain =cpu=
+controller in the mount options.
 
+*** The Algorithm Outline
+Based on the described considerations, the algorithm outline should be the following:
+
+1. Find relative path in =/proc/self/cgroup=
+2. Apply it to the most probable paths and look for the information there:
+   - =/sys/fs/cgroup= for cgroup v1 and v2
+   - =/sys/fs/cgroup/unified= for cgroup v2
+3. If not found, loop over =/proc/self/mounts= and find a mount point for cgroupfs
+   - For cgroup v1, make sure the mount options contain =cpu= controller
+4. Concatenate the found mount path with the path from (1) and look for the information there
+5. Repeat from (3) until the info is found or the mount points are exhausted.
 
 * References:
 
