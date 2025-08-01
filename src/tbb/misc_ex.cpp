@@ -147,8 +147,6 @@ public:
     }
 
 private:
-    static void close_mounts_file(FILE *file) { endmntent(file); };
-
     static void close_file(FILE *file) { fclose(file); };
     using unique_file_t = std::unique_ptr<FILE, decltype(&close_file)>;
 
@@ -320,14 +318,14 @@ private:
     }
 
     static int parse_cpu_constraints() {
-        using unique_mounts_file_t = std::unique_ptr<FILE, decltype(&close_mounts_file)>;
-
         // Reading /proc/self/mounts and /proc/self/cgroup anyway, so open them right away
         unique_file_t cgroup_file_ptr(fopen("/proc/self/cgroup", "r"), &close_file);
         if (!cgroup_file_ptr)
             return error_value; // Failed to open cgroup file
 
-        unique_mounts_file_t mounts_file_ptr(setmntent("/proc/self/mounts", "r"), &close_mounts_file);
+        auto close_mounts_file = [](FILE* file) { endmntent(file); };
+        using unique_mounts_file_t = std::unique_ptr<FILE, decltype(close_mounts_file)>;
+        unique_mounts_file_t mounts_file_ptr(setmntent("/proc/self/mounts", "r"), close_mounts_file);
         if (!mounts_file_ptr)
             return error_value;
 
@@ -335,7 +333,7 @@ private:
         //       "/sys/fs/cgroup/<relative_path>/cpu.max" for cgroup v2.
         cgroup_paths relative_paths_cache;
         struct mntent mntent;
-        const std::size_t buffer_size = 4096; // Allocate a buffer for reading mount entries
+        constexpr std::size_t buffer_size = 4096; // Allocate a buffer for reading mount entries
         char mount_entry_buffer[buffer_size];
 
         int found_num_cpus = error_value; // Initialize to an impossible value

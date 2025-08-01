@@ -119,8 +119,6 @@ public:
     }
 
 private:
-    static void close_mounts_file(FILE *file) { endmntent(file); };
-
     static void close_file(FILE *file) { fclose(file); };
     using unique_file_t = std::unique_ptr<FILE, decltype(&close_file)>;
 
@@ -131,7 +129,7 @@ private:
         if (0 == cpu_period)
             return error_value; // Avoid division by zero, use the default number of CPUs
 
-        const long long num_cpus = (cpu_quota + cpu_period / 2) / cpu_period;
+        const long long num_cpus = (cpu_quota + cpu_period - 1) / cpu_period;
         return num_cpus > 0 ? int(num_cpus) : 1; // Ensure at least one CPU is returned
     }
 
@@ -280,6 +278,7 @@ private:
 
         __TBB_ASSERT(std::strncmp(mnt_type, "cgroup", 6) == 0, "Unexpected cgroup type");
 
+        // TODO: Before opening the path, make sure the mnt_opts entry contains "cpu" controller
         if (try_read_cgroup_v1_num_cpus_from(mnt_dir, num_cpus))
             return num_cpus; // Successfully read number of CPUs for cgroup v1
 
@@ -292,17 +291,22 @@ private:
     }
 
     static int parse_cpu_constraints() {
-        using unique_mounts_file_t = std::unique_ptr<FILE, decltype(&close_mounts_file)>;
-
         // Reading /proc/self/mounts and /proc/self/cgroup anyway, so open them right away
-        unique_mounts_file_t mounts_file_ptr(setmntent("/proc/self/mounts", "r"), &close_mounts_file);
         unique_file_t cgroup_file_ptr(fopen("/proc/self/cgroup", "r"), &close_file);
-        if (!mounts_file_ptr || !cgroup_file_ptr)
+        if (!cgroup_file_ptr)
+            return error_value; // Failed to open cgroup file
+
+        auto close_mounts_file = [](FILE* file) { endmntent(file); };
+        using unique_mounts_file_t = std::unique_ptr<FILE, decltype(close_mounts_file)>;
+        unique_mounts_file_t mounts_file_ptr(setmntent("/proc/self/mounts", "r"), close_mounts_file);
+        if (!mounts_file_ptr)
             return error_value;
 
+        // TODO: To avoid parsing /proc/self/mounts, read relative paths first and try opening
+        //       "/sys/fs/cgroup/<relative_path>/cpu.max" for cgroup v2.
         cgroup_paths relative_paths_cache;
         struct mntent mntent;
-        const std::size_t buffer_size = 4 * 4096; // TODO: Leave a comment why using such size
+        constexpr std::size_t buffer_size = 4096; // Allocate a buffer for reading mount entries
         char mount_entry_buffer[buffer_size];
 
         int found_num_cpus = error_value; // Initialize to an impossible value
