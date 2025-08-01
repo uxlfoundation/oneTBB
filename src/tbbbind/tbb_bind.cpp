@@ -300,6 +300,7 @@ public:
     void fill_constraints_affinity_mask(affinity_mask input_mask, int numa_node_index, int core_type_index, int max_threads_per_core) {
         __TBB_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized platform_topology");
         __TBB_ASSERT(numa_node_index < (int)numa_affinity_masks_list.size(), "Wrong NUMA node id");
+#if __TBB_PREVIEW_TASK_ARENA_CONSTRAINTS_EXTENSION_PRESENT
         __TBB_ASSERT(core_type_index == -1 ||
             // In the multiple core type format, the MSB of the first core_type_id_bits bits represents the highest core type id
             (tbb::detail::d1::constraints::single_core_type(core_type_index)
@@ -307,6 +308,9 @@ public:
                  : tbb::detail::log2(core_type_index & ((1 << tbb::detail::d1::constraints::core_type_id_bits) - 1))) <
                 core_types_affinity_masks_list.size(),
             "Wrong core type id");
+#else
+        __TBB_ASSERT(core_type_index < (int)core_types_affinity_masks_list.size(), "Wrong core type id");
+#endif
         __TBB_ASSERT(max_threads_per_core == -1 || max_threads_per_core > 0, "Wrong max_threads_per_core");
 
         hwloc_cpuset_t constraints_mask = hwloc_bitmap_alloc();
@@ -317,6 +321,7 @@ public:
             hwloc_bitmap_and(constraints_mask, constraints_mask, numa_affinity_masks_list[numa_node_index]);
         }
         if (core_type_index >= 0) {
+#if __TBB_PREVIEW_TASK_ARENA_CONSTRAINTS_EXTENSION_PRESENT
             auto core_types = tbb::detail::d1::constraints{}.set_core_type(core_type_index).get_core_types();
             __TBB_ASSERT(!core_types.empty(), "Core types list must not be empty");
 
@@ -329,6 +334,9 @@ public:
 
             hwloc_bitmap_and(constraints_mask, constraints_mask, core_types_mask);
             hwloc_bitmap_free(core_types_mask);
+#else
+            hwloc_bitmap_and(constraints_mask, constraints_mask, core_types_affinity_masks_list[core_type_index]);
+#endif
         }
         if (max_threads_per_core > 0) {
             // clear input mask
