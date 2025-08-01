@@ -410,7 +410,7 @@ public:
     d1::task* get_critical_task(d1::task*, execution_data_ext&, isolation_type, bool);
 
     template <bool ITTPossible, typename Waiter>
-    d1::task* receive_or_steal_task(thread_data& tls, execution_data_ext& ed, Waiter& waiter,
+    d1::task* receive_or_steal_task(thread_data& tls, execution_data_ext& ed, Waiter& waiter, context_guard_helper& ctxguard,
                                 isolation_type isolation, bool outermost, bool criticality_absence);
 
     template <bool ITTPossible, typename Waiter>
