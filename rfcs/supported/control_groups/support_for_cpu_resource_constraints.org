@@ -126,8 +126,7 @@ Based on the described considerations, the pseudo-code of the algorithm could be
         - If reading of CPU resource constraints from =<mount-point>/<relative-path>= fails:
           - =continue= the outer loop with the next mount entry from =/proc/self/mounts=
       - Otherwise, if reading of CPU resource constraints succeeds in one of the attempts, break the
-        outer loop and report the $quota / period$ value rounded to the nearest integer greater than
-        zero.
+        outer loop and report the $quota / period$ value rounded up.
 
 
 * References:
