@@ -159,7 +159,7 @@ private:
         if (0 == cpu_period)
             return error_value; // Avoid division by zero, use the default number of CPUs
 
-        const long long num_cpus = (cpu_quota + cpu_period / 2) / cpu_period;
+        const long long num_cpus = (cpu_quota + cpu_period - 1) / cpu_period;
         return num_cpus > 0 ? int(num_cpus) : 1; // Ensure at least one CPU is returned
     }
 
@@ -307,6 +307,7 @@ private:
 
         __TBB_ASSERT(std::strncmp(mnt_type, "cgroup", 6) == 0, "Unexpected cgroup type");
 
+        // TODO: Before opening the path, make sure the mnt_opts entry contains "cpu" controller
         if (try_read_cgroup_v1_num_cpus_from(mnt_dir, num_cpus))
             return num_cpus; // Successfully read number of CPUs for cgroup v1
 
@@ -330,6 +331,8 @@ private:
         if (!mounts_file_ptr)
             return error_value;
 
+        // TODO: To avoid parsing /proc/self/mounts, read relative paths first and try opening
+        //       "/sys/fs/cgroup/<relative_path>/cpu.max" for cgroup v2.
         cgroup_paths relative_paths_cache;
         struct mntent mntent;
         const std::size_t buffer_size = 4096; // Allocate a buffer for reading mount entries
