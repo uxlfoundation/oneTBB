@@ -164,6 +164,14 @@ public:
             curr_ctx = ctx;
         }
     }
+    void end_itt_task() {
+        if constexpr (report_tasks) {
+            if (curr_ctx) {
+                ITT_TASK_END;
+                curr_ctx = nullptr;
+            }
+        }
+    }
 #if _WIN64
     void restore_default() {
         if (curr_cpu_ctl_env != guard_cpu_ctl_env) {
@@ -263,6 +271,9 @@ public:
     }
     void reset_wait() {
         my_pause_count = my_yield_count = 0;
+    }
+    int limited_pause_count() {
+        return my_pause_count + my_yield_count;
     }
 };
 
@@ -400,6 +411,7 @@ public:
 
     template <bool ITTPossible, typename Waiter>
     d1::task* receive_or_steal_task(thread_data& tls, execution_data_ext& ed, Waiter& waiter,
+                                context_guard_helper<ITTPossible>& ctxguard,
                                 isolation_type isolation, bool outermost, bool criticality_absence);
 
     template <bool ITTPossible, typename Waiter>
