@@ -111,6 +111,11 @@ inline suspend_point_type::suspend_point_type(arena* a, size_t stack_size, task_
 //------------------------------------------------------------------------
 // Task Dispatcher
 //------------------------------------------------------------------------
+
+// The number of unsuccessful attempts to retrieve a non-local task, after which ITT_TASK_END notification
+// must be sent. If the notification is postponed for too long, data in profiling tools might get skewed.
+inline constexpr int itt_task_search_threshold = 2;
+
 inline task_dispatcher::task_dispatcher(arena* a) {
     m_execute_data_ext.context = a->my_default_ctx;
     m_execute_data_ext.task_disp = this;
@@ -169,8 +174,8 @@ inline d1::task* task_dispatcher::steal_or_get_critical(
 
 template <bool ITTPossible, typename Waiter>
 d1::task* task_dispatcher::receive_or_steal_task(
-    thread_data& tls, execution_data_ext& ed, Waiter& waiter, isolation_type isolation,
-    bool fifo_allowed, bool critical_allowed)
+    thread_data& tls, execution_data_ext& ed, Waiter& waiter, context_guard_helper<ITTPossible>& ctxguard,
+    isolation_type isolation, bool fifo_allowed, bool critical_allowed)
 {
     __TBB_ASSERT(governor::is_thread_data_set(&tls), nullptr);
     // Task to return
@@ -199,6 +204,9 @@ d1::task* task_dispatcher::receive_or_steal_task(
         if (!waiter.continue_execution(slot, t)) {
             __TBB_ASSERT(t == nullptr, nullptr);
             break;
+        }
+        if( ITTPossible && waiter.pause_count()==itt_task_search_threshold ) {
+            ctxguard.end_itt_task();
         }
         // Start searching
         if (t != nullptr) {
@@ -359,9 +367,9 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
                     continue;
                 }
                 // Retrieve the task from global sources
-                t = receive_or_steal_task<ITTPossible>(
-                    *m_thread_data, ed, waiter, isolation, dl_guard.old_properties.fifo_tasks_allowed,
-                    critical_allowed
+                t = receive_or_steal_task(
+                    *m_thread_data, ed, waiter, context_guard, isolation,
+                    dl_guard.old_properties.fifo_tasks_allowed, critical_allowed
                 );
             } while (t != nullptr); // main dispatch loop
             break; // Exit exception loop;

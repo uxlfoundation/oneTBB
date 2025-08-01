@@ -184,6 +184,14 @@ public:
             curr_ctx = ctx;
         }
     }
+    void end_itt_task() {
+        if constexpr (report_tasks) {
+            if (curr_ctx) {
+                ITT_TASK_END;
+                curr_ctx = nullptr;
+            }
+        }
+    }
 #if _WIN64
     void restore_default() {
         if (curr_cpu_ctl_env != guard_cpu_ctl_env) {
@@ -288,6 +296,9 @@ public:
     }
     void reset_wait() {
         my_pause_count = my_yield_count = 0;
+    }
+    int limited_pause_count() {
+        return my_pause_count + my_yield_count;
     }
 };
 

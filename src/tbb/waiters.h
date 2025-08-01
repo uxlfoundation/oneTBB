@@ -45,6 +45,10 @@ public:
         my_backoff.reset_wait();
     }
 
+    int pause_count() {
+        return my_backoff.limited_pause_count();
+    }
+
 protected:
     arena& my_arena;
     stealing_loop_backoff my_backoff;
