@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Сontributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -33,6 +34,7 @@
 #else
 #include <unistd.h>
 #if __unix__
+#include "cgroup_info.h"
 #if __linux__
 #include <sys/sysinfo.h>
 #endif
@@ -190,7 +192,13 @@ static void initialize_hardware_concurrency_info () {
         availableProcs = (maxProcs == INT_MAX) ? sysconf(_SC_NPROCESSORS_ONLN) : maxProcs;
         delete[] processMask;
     }
-    theNumProcs = availableProcs > 0 ? availableProcs : 1; // Fail safety strap
+    int num_procs = availableProcs > 0 ? availableProcs : 1; // Fail safety strap
+    int cgroup_num_cpus = INT_MAX;
+    if (cgroup_info::is_cpu_constrained(cgroup_num_cpus)) {
+        // If cgroup is used, limit the number of processors to the constrained value.
+        num_procs = std::min(num_procs, cgroup_num_cpus);
+    }
+    theNumProcs = num_procs;
     __TBB_ASSERT( theNumProcs <= sysconf(_SC_NPROCESSORS_ONLN), nullptr);
 }
 
