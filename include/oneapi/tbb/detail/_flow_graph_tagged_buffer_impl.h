@@ -303,7 +303,7 @@ public:
     bool find_ref_with_key(const Knoref& k, pointer_type &v) {
         element_type* element_ptr = nullptr;
         bool res = find_element_ref_with_key(k, element_ptr);
-        v = element_ptr->get_value_ptr();
+        if(res) v = element_ptr->get_value_ptr();
         return res;
     }
 
