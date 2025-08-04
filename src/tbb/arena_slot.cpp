@@ -83,7 +83,7 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
                     && H0 == T + 1, "victim/thief arbitration algorithm failure" );
                 (tasks_skipped) ? release_task_pool() : reset_task_pool_and_leave();
                 all_tasks_checked = true;
-                break;
+                break /*do-while*/;
             } else if ( H0 == T ) {
                 // There is only one task in the task pool. If it can be taken, we want to reset the pool
                 if ( task_pool_ptr[T] ) {
