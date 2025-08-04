@@ -549,7 +549,7 @@ inline d1::task* arena::steal_task(unsigned arena_index, FastRandom& frnd, execu
     if (pool == EmptyTaskPool || !(result = victim->steal_task(*this, isolation, k))) {
         return nullptr;
     }
-    result = task_proxy::try_extract_task_from</*is_stolen=*/true>( result, ed );
+    result = task_proxy::try_extract_task_from</*stolen=*/true>( result, ed );
     if (result) {
         // Update the task owner slot id to identify stealing
         ed.original_slot = k;
