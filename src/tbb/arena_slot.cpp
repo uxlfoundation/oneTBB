@@ -43,23 +43,6 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
         tasks_skipped = true;
         return nullptr;
     };
-    // A helper function to detect and handle proxy tasks.
-    // Returns the pointer to the real task, or nullptr if there is no task to execute.
-    auto check_task_proxy = [&](d1::task* task_candidate) -> d1::task* {
-        __TBB_ASSERT(task_candidate, nullptr);
-        __TBB_ASSERT(!is_poisoned( task_candidate ), "A poisoned task cannot be processed");
-        if (!task_accessor::is_proxy_task(*task_candidate)){
-            return task_candidate;
-        }
-        task_proxy& tp = static_cast<task_proxy&>(*task_candidate);
-        if ( d1::task *t = tp.extract_task<task_proxy::pool_bit>() ) {
-            ed.affinity_slot = tp.slot;
-            return t;
-        }
-        // Proxy was empty, so it's our responsibility to free it
-        tp.allocator.delete_object(&tp, ed);
-        return nullptr;
-    };
 
     __TBB_ASSERT(is_task_pool_published(), nullptr);
     accessed_by_owner.store(true, std::memory_order_relaxed);
@@ -108,7 +91,7 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
             }
             if ( result ) {
                 // Isolation matches; check if there is a real task
-                result = check_task_proxy( result );
+                result = task_proxy::try_extract_task_from( result, ed );
                 // If some tasks were skipped, mark the position as a hole, otherwise poison it.
                 if ( tasks_skipped ) {
                     task_pool_ptr[T] = nullptr;

@@ -54,15 +54,15 @@ struct task_proxy : public d1::task {
         return (tat & location_mask) == location_mask;
     }
 
-    //! Returns a pointer to the encapsulated task or nullptr.
+    //! Cleans a task pointer from a tag
     static task* task_ptr ( intptr_t tat ) {
         return (task*)(tat & ~location_mask);
     }
 
-    //! Returns a pointer to the encapsulated task or nullptr, and frees proxy if necessary.
+    //! Returns a pointer to the encapsulated task or nullptr.
     template<intptr_t from_bit>
     inline task* extract_task () {
-        // __TBB_ASSERT( prefix().extra_state == es_task_proxy, "Normal task misinterpreted as a proxy?" );
+        __TBB_ASSERT( task_accessor::is_proxy_task(*this), "A supposed task proxy does not have the proxy trait" );
         intptr_t tat = task_and_tag.load(std::memory_order_acquire);
         __TBB_ASSERT( tat == from_bit || (is_shared(tat) && task_ptr(tat)),
             "Proxy's tag cannot specify both locations if the proxy "
@@ -71,14 +71,33 @@ struct task_proxy : public d1::task {
             const intptr_t cleaner_bit = location_mask & ~from_bit;
             // Attempt to transition the proxy to the "empty" state with
             // cleaner_bit specifying entity responsible for its eventual freeing.
-            // Explicit cast to void* is to work around a seeming ICC 11.1 bug.
             if ( task_and_tag.compare_exchange_strong(tat, cleaner_bit) ) {
                 // Successfully grabbed the task, and left new owner with the job of freeing the proxy
                 return task_ptr(tat);
             }
         }
-        // Proxied task has already been claimed from another proxy location.
+        // The proxied task has already been claimed from the other location.
         __TBB_ASSERT( task_and_tag.load(std::memory_order_relaxed) == from_bit, "Empty proxy cannot contain non-zero task pointer" );
+        return nullptr;
+    }
+
+    //! Checks if a given task is a proxy, then either extracts the real task or frees the proxy.
+    template<bool is_stolen = false>
+    static task* try_extract_task_from ( task* t, execution_data_ext& ed ) {
+        __TBB_ASSERT(t && !is_poisoned(t), "Not a valid task pointer");
+        if (!task_accessor::is_proxy_task(*t)){
+            if constexpr (is_stolen)
+                ed.affinity_slot = d1::any_slot;
+            return t;
+        }
+        task_proxy& tp = static_cast<task_proxy&>(*t);
+        t = tp.extract_task<pool_bit>();
+        if (t) {
+            ed.affinity_slot = tp.slot;
+            return t;
+        }
+        // The task has been consumed, so it's our responsibility to free the proxy.
+        tp.allocator.delete_object(&tp, ed);
         return nullptr;
     }
 

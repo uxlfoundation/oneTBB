@@ -544,29 +544,17 @@ inline d1::task* arena::steal_task(unsigned arena_index, FastRandom& frnd, execu
         ++k; // Adjusts random distribution to exclude self
     }
     arena_slot* victim = &my_slots[k];
-    d1::task **pool = victim->task_pool.load(std::memory_order_relaxed);
-    d1::task *t = nullptr;
-    if (pool == EmptyTaskPool || !(t = victim->steal_task(*this, isolation, k))) {
+    d1::task** pool = victim->task_pool.load(std::memory_order_relaxed);
+    d1::task* result = nullptr;
+    if (pool == EmptyTaskPool || !(result = victim->steal_task(*this, isolation, k))) {
         return nullptr;
     }
-    if (task_accessor::is_proxy_task(*t)) {
-        task_proxy &tp = *(task_proxy*)t;
-        d1::slot_id slot = tp.slot;
-        t = tp.extract_task<task_proxy::pool_bit>();
-        if (!t) {
-            // Proxy was empty, so it's our responsibility to free it
-            tp.allocator.delete_object(&tp, ed);
-            return nullptr;
-        }
-        // Note affinity is called for any stolen task (proxy or general)
-        ed.affinity_slot = slot;
-    } else {
-        // Note affinity is called for any stolen task (proxy or general)
-        ed.affinity_slot = d1::any_slot;
+    result = task_proxy::try_extract_task_from</*is_stolen=*/true>( result, ed );
+    if (result) {
+        // Update the task owner slot id to identify stealing
+        ed.original_slot = k;
     }
-    // Update task owner thread id to identify stealing
-    ed.original_slot = k;
-    return t;
+    return result;
 }
 
 template<task_stream_accessor_type accessor>
