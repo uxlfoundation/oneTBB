@@ -21,7 +21,6 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-
 #include "oneapi/tbb/concurrent_map.h"
 #include <common/test.h>
 #include <common/utils.h>
