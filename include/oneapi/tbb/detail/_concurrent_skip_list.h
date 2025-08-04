@@ -49,24 +49,26 @@
 
 namespace tbb {
 namespace detail {
-namespace d2 {
+namespace d3 {
 
-template <typename Generator, typename SizeType>
+template <typename LevelGenerator, typename SizeType>
 class skip_list_thread_data {
 public:
-    using generator_type = Generator;
+    using level_generator_type = LevelGenerator;
     using size_type = SizeType;
 
     skip_list_thread_data() : my_local_size(0) {}
 
-    std::size_t random_height() { return my_rng(); }
+    std::size_t random_level() { return my_rng(); }
     std::size_t local_size() const { return my_local_size.load(std::memory_order_relaxed); }
 
-    void set_size(size_type value) { my_local_size = value; }
-    void increment_size() { ++my_local_size; }
+    void set_size(size_type size) { my_local_size.store(size, std::memory_order_relaxed); }
+    void increment_size() {
+        my_local_size.store(local_size() + 1, std::memory_order_relaxed);
+    }
 
 private:
-    generator_type my_rng;
+    level_generator_type my_rng;
     std::atomic<size_type> my_local_size;
 };
 
@@ -295,6 +297,8 @@ protected:
     using const_pointer = typename allocator_traits_type::const_pointer;
 
     using random_level_generator_type = typename container_traits::random_level_generator_type;
+    using thread_data_type = skip_list_thread_data<random_level_generator_type, size_type>;
+    using ets_type = tbb::enumerable_thread_specific<thread_data_type>;
 
     using node_ptr = list_node_type*;
 
@@ -434,7 +438,8 @@ public:
     std::pair<iterator, bool> insert( node_type&& nh ) {
         if (!nh.empty()) {
             auto insert_node = d1::node_handle_accessor::get_node_ptr(nh);
-            std::pair<iterator, bool> insert_result = internal_insert_node(insert_node);
+            thread_data_type& td = my_ets.local();
+            std::pair<iterator, bool> insert_result = internal_insert_node(insert_node, td);
             if (insert_result.second) {
                 d1::node_handle_accessor::deactivate(nh);
             }
@@ -966,15 +971,16 @@ private:
 
     template<typename... Args>
     std::pair<iterator, bool> internal_insert( Args&&... args ) {
-        node_ptr new_node = create_value_node(std::forward<Args>(args)...);
-        std::pair<iterator, bool> insert_result = internal_insert_node(new_node);
+        thread_data_type& td = my_ets.local();
+        node_ptr new_node = create_value_node(td, std::forward<Args>(args)...);
+        std::pair<iterator, bool> insert_result = internal_insert_node(new_node, td);
         if (!insert_result.second) {
             delete_value_node(new_node);
         }
         return insert_result;
     }
 
-    std::pair<iterator, bool> internal_insert_node( node_ptr new_node ) {
+    std::pair<iterator, bool> internal_insert_node( node_ptr new_node, thread_data_type& td ) {
         array_type prev_nodes;
         array_type curr_nodes;
         size_type new_height = new_node->height();
@@ -1031,7 +1037,7 @@ private:
                     }
                 }
             }
-            my_ets.local().increment_size();
+            td.increment_size();
             return std::pair<iterator, bool>(iterator(new_node), true);
         }
     }
@@ -1127,8 +1133,8 @@ private:
     }
 
     template <typename... Args>
-    node_ptr create_value_node( Args&&... args ) {
-        node_ptr node = create_node(my_ets.local().random_height());
+    node_ptr create_value_node( thread_data_type& td, Args&&... args ) {
+        node_ptr node = create_node(td.random_level());
 
         // try_call API is not convenient here due to broken
         // variadic capture on GCC 4.8.5
@@ -1226,13 +1232,11 @@ private:
         internal_swap_fields(other);
     }
 
-    using skip_list_ets_type = tbb::enumerable_thread_specific<skip_list_thread_data<random_level_generator_type, size_type>>;
-
     node_allocator_type my_node_allocator;
     key_compare my_compare;
     atomic_node_ptr my_head_ptr;
     std::atomic<size_type> my_max_height;
-    mutable skip_list_ets_type my_ets;
+    mutable ets_type my_ets;
 
     template<typename OtherTraits>
     friend class concurrent_skip_list;
@@ -1289,28 +1293,6 @@ bool operator>=( const concurrent_skip_list<Traits>& lhs, const concurrent_skip_
 }
 #endif // __TBB_CPP20_COMPARISONS_PRESENT && __TBB_CPP20_CONCEPTS_PRESENT
 
-// // Generates a number from the interval [0, MaxLevel).
-// template <std::size_t MaxLevel>
-// class concurrent_geometric_level_generator {
-// public:
-//     static constexpr std::size_t max_level = MaxLevel;
-//     // TODO: modify the algorithm to accept other values of max_level
-//     static_assert(max_level == 32, "Incompatible max_level for rng");
-
-//     concurrent_geometric_level_generator() : engines(std::minstd_rand::result_type(time(nullptr))) {}
-
-//     std::size_t operator()() {
-//         // +1 is required to pass at least 1 into log2 (log2(0) is undefined)
-//         // -1 is required to have an ability to return 0 from the generator (max_level - log2(2^31) - 1)
-//         std::size_t result = max_level - std::size_t(tbb::detail::log2(engines.local()() + 1)) - 1;
-//         __TBB_ASSERT(result <= max_level, nullptr);
-//         return result;
-//     }
-
-// private:
-//     tbb::enumerable_thread_specific<std::minstd_rand> engines;
-// };
-
 // Generates a number from the interval [0, MaxLevel).
 template <std::size_t MaxLevel>
 class geometric_level_generator {
@@ -1332,7 +1314,7 @@ private:
     std::minstd_rand my_engine;
 };
 
-} // namespace d2
+} // namespace d3
 
 } // namespace detail
 } // namespace tbb
