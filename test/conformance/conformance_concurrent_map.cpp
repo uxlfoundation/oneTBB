@@ -22,7 +22,6 @@
 #define NOMINMAX
 #endif
 
-#define CONCURRENT_MAP_USE_DISTRIBUTED_SIZE 1
 #include "oneapi/tbb/concurrent_map.h"
 #include <common/test.h>
 #include <common/utils.h>

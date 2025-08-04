@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2019-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -642,8 +643,8 @@ public:
     size_type size() const {
         size_type total_size = 0;
 
-        my_ets.combine_each([&](const skip_list_thread_data<random_level_generator_type, size_type>& thread_data) {
-            total_size += thread_data.local_size();
+        my_ets.combine_each([&](const thread_data_type& td) {
+            total_size += td.local_size();
         });
 
         return total_size;
