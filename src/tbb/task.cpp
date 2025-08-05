@@ -238,7 +238,9 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
             // TODO: Research the possibility of using better approach for a clean-up
             for (auto it = reference_map.begin(); it != reference_map.end();) {
                 if (it->second->get_num_children() == 0) {
-                    it->second->release_ownership();
+                    auto& node = it->second;
+                    node->~thread_reference_vertex();
+                    cache_aligned_deallocate(node);
                     it = reference_map.erase(it);
                 } else {
                     ++it;

@@ -444,28 +444,28 @@ class thread_reference_vertex: public d1::reference_vertex {
 public:
     using d1::reference_vertex::reference_vertex;
 
-    void reserve(std::uint32_t delta = 1) override {
-        if (reserve_post_increment(delta) == 0) {
-            m_lifetime_ref_counter.fetch_add(1);
-        }
-    }
-
     void release(std::uint32_t delta = 1) override {
-        if (release_pre_decrement(delta) == 0) {
-            release_ownership();
+        auto parent = my_parent;
+        std::uint64_t ref = m_ref_count.fetch_sub(static_cast<std::uint64_t>(delta)) - static_cast<std::uint64_t>(delta);
+        if ((ref & ~m_orphaned_bit) == 0) {
+            parent->release();
+            if (ref & m_orphaned_bit) {
+                this->~thread_reference_vertex();
+                cache_aligned_deallocate(this);
+            }
         }
     }
 
     void release_ownership() {
-        auto ref = m_lifetime_ref_counter.fetch_sub(1);
-        if (ref == 1) {
+        auto ref = m_ref_count.fetch_or(m_orphaned_bit);
+        if (ref == 0) {
             this->~thread_reference_vertex();
             cache_aligned_deallocate(this);
         }
     }
+
 private:
-    // Reserve in advance for task_dispatcher that owns the vertex map
-    std::atomic<uint32_t> m_lifetime_ref_counter{1};
+    static constexpr std::uint64_t m_orphaned_bit = 1ull << 63;
 };
 
 class alignas (max_nfs_size) task_dispatcher {
