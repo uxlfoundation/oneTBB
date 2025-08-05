@@ -400,12 +400,12 @@ struct type_identity {
 template <typename T>
 using type_identity_t = typename type_identity<T>::type;
 
-template <bool B, typename Callable>
-typename std::enable_if<B, void>::type invoke_if(Callable&& f) {
+template <typename Callable>
+void invoke_if(std::true_type, Callable&& f) {
     std::forward<Callable>(f)();
 }
-template <bool B, typename Callable>
-typename std::enable_if<!B, void>::type invoke_if(Callable&&) {}
+template <typename Callable>
+void invoke_if(std::false_type, Callable&&) {}
 
 } // inline namespace d0
 } // namespace detail
