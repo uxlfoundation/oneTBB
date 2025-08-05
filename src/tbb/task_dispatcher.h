@@ -239,7 +239,7 @@ d1::task* task_dispatcher::receive_or_steal_task(
     return t;
 }
 
-template <bool ITTPossible, typename Waiter>
+template <bool ITTPossible, bool Isolated, typename Waiter>
 d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
     assert_pointer_valid(m_thread_data);
     __TBB_ASSERT(m_thread_data->my_task_dispatcher == this, nullptr);
@@ -268,8 +268,11 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
     // The context guard to track fp setting and itt tasks.
     context_guard_helper</*report_tasks=*/ITTPossible> context_guard;
 
+    constexpr std::integral_constant<bool, Isolated> use_isolation;
     // Current isolation context
     const isolation_type isolation = dl_guard.old_execute_data_ext.isolation;
+    __TBB_ASSERT((isolation == no_isolation) != Isolated,
+                 "Isolation mismatch; using a wrong instantiation of local_wait_for_all?");
 
     // Critical work inflection point. Once turned false current execution context has taken
     // critical task on the previous stack frame and cannot take more until that critical path is
@@ -352,7 +355,7 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
                     break;
                 }
                 // Retrieve the task from local task pool
-                if (t || (slot.is_task_pool_published() && (t = slot.get_task(ed, isolation)))) {
+                if (t || (slot.is_task_pool_published() && (t = slot.get_task(ed, isolation, use_isolation)))) {
                     __TBB_ASSERT(ed.original_slot == m_thread_data->my_arena_index, nullptr);
                     ed.context = task_accessor::context(*t);
                     ed.isolation = task_accessor::isolation(*t);
@@ -464,11 +467,15 @@ inline d1::task* task_dispatcher::get_mailbox_task(mail_inbox& my_inbox, executi
 
 template <typename Waiter>
 d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter) {
-    if (governor::is_itt_present()) {
-        return local_wait_for_all</*ITTPossible = */ true>(t, waiter);
-    } else {
-        return local_wait_for_all</*ITTPossible = */ false>(t, waiter);
-    }
+    using instantiation_type = d1::task*(task_dispatcher::*)(d1::task*, Waiter&);
+    static instantiation_type instantiations[] = {
+        &task_dispatcher::local_wait_for_all</*ITTPossible=*/false, /*Isolated=*/false, Waiter>,
+        &task_dispatcher::local_wait_for_all</*ITTPossible=*/false, /*Isolated=*/true,  Waiter>,
+        &task_dispatcher::local_wait_for_all</*ITTPossible=*/true,  /*Isolated=*/false, Waiter>,
+        &task_dispatcher::local_wait_for_all</*ITTPossible=*/true,  /*Isolated=*/true,  Waiter>
+    };
+    const int call_idx = (int(governor::is_itt_present()) << 1) + int(m_execute_data_ext.isolation != no_isolation);
+    return (this->*instantiations[call_idx])(t, waiter);
 }
 
 } // namespace r1
