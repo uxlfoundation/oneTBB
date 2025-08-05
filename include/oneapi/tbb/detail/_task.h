@@ -62,6 +62,7 @@ TBB_EXPORT d1::slot_id __TBB_EXPORTED_FUNC execution_slot(const d1::execution_da
 TBB_EXPORT d1::slot_id __TBB_EXPORTED_FUNC execution_slot(const d1::task_arena_base&);
 TBB_EXPORT d1::task_group_context* __TBB_EXPORTED_FUNC current_context();
 TBB_EXPORT d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex_interface* wc);
+TBB_EXPORT d1::task* __TBB_EXPORTED_FUNC current_task();
 
 // Do not place under __TBB_RESUMABLE_TASKS. It is a stub for unsupported platforms.
 struct suspend_point_type;
@@ -214,6 +215,7 @@ public:
     }
 private:
     wait_tree_vertex_interface* my_parent;
+protected:
     std::atomic<std::uint64_t> m_ref_count;
 };
 
@@ -269,6 +271,7 @@ inline void wait(wait_context& wait_ctx, task_group_context& ctx) {
     call_itt_task_notify(destroy, &wait_ctx);
 }
 
+using r1::current_task;
 using r1::current_context;
 
 class task_traits {
