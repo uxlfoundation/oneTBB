@@ -656,7 +656,7 @@ public:
     }
 
     static void transfer_this_task_completion_to(d2::task_handle& new_task) {
-        d1::task* curr_task = d1::get_current_task();
+        d1::task* curr_task = d1::current_task_ptr();
         __TBB_ASSERT(curr_task != nullptr, "this_task_completion_to was called outside of task body");
         task_handle_task* curr_th_task = dynamic_cast<task_handle_task*>(curr_task);
         // Not using __TBB_ASSERT(curr_th_task) to allow function_stack_task body to use this method

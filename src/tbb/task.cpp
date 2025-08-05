@@ -254,8 +254,8 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
     return ref_counter;
 }
 
-d1::task* get_current_task() {
-    return governor::get_thread_data()->get_current_task();
+d1::task* current_task_ptr() {
+    return governor::get_thread_data()->get_innermost_running_task();
 }
 
 } // namespace r1
