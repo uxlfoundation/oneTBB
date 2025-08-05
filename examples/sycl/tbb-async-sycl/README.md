@@ -20,7 +20,7 @@ Explains a oneTBB Flow Graph and SYCL*-compliant C++ implementation.
 ## Building the `TBB-Async-Sycl` Program
 
 ### Setting Environment Variables
-When working with the Command Line Interface (CLI), you should configure the Intel&reg oneAPI Toolkit using environment variables. Set up your CLI environment by sourcing the `setvars` script every time you open a new terminal window. This practice ensures your compiler, libraries, and tools are ready for development.
+When working with the Command Line Interface (CLI), you should configure the Intel&reg; oneAPI Toolkit using environment variables. Set up your CLI environment by sourcing the `setvars` script every time you open a new terminal window. This practice ensures your compiler, libraries, and tools are ready for development.
 
 > **Note**: If you have not already done so, set up your CLI environment by sourcing the `setvars` script located in the root of your oneAPI installation.
 >
@@ -48,8 +48,8 @@ a [setvars config file](https://www.intel.com/content/www/us/en/develop/document
 You can use Visual Studio Code (VS Code*) extensions to set your environment, create launch configurations, and browse and download samples.
 
 The basic steps to build and run a sample using VS Code include:
- - Download a sample using the extension **Code Sample Browser for Intel&reg Software Development Tools**.
- - Configure the oneAPI environment with the extension **Environment Configurator for Intel&reg Software Development Tools**.
+ - Download a sample using the extension **Code Sample Browser for Intel&reg; Software Development Tools**.
+ - Configure the oneAPI environment with the extension **Environment Configurator for Intel&reg; Software Development Tools**.
  - Open a Terminal in VS Code (**Terminal>New Terminal**).
  - Run the sample in the VS Code terminal using the instructions below.
  - (Linux only) Debug your GPU application with GDB for Intel® oneAPI Toolits using the **Generate Launch Configurations** extension.
