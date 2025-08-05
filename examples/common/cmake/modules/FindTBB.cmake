@@ -60,7 +60,6 @@ if (_tbb_include_dir)
                                           )
                 else()
                     find_library(${_tbb_component_lib_name}_so ${_tbb_component_lib_name} PATHS ${ADDITIONAL_LIB_DIRS})
-
                     set_target_properties(TBB::${_tbb_component} PROPERTIES
                                           IMPORTED_LOCATION_${_TBB_BUILD_MODE} "${${_tbb_component_lib_name}_so}"
                                           )
