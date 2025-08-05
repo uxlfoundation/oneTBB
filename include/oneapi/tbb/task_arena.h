@@ -109,14 +109,13 @@ inline void enqueue_impl(task_handle&& th, d1::task_arena_base* ta) {
 
     auto& ctx = task_handle_accessor::ctx_of(th);
 
+    // Do not access th after release
+    task_handle_task* t = task_handle_accessor::release(th);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    if (task_handle_accessor::has_dependencies(th)) {
-        task_handle_accessor::release(th);
-    } else 
+    if (!t->has_dependencies() || t->release_dependency() != nullptr)
 #endif
     {
-        // Do not access th after release
-        r1::enqueue(*task_handle_accessor::release(th), ctx, ta);
+        r1::enqueue(*t, ctx, ta);
     }
 }
 } //namespace d2
