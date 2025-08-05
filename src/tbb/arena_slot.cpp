@@ -27,7 +27,61 @@ namespace r1 {
 // Arena Slot
 //------------------------------------------------------------------------
 
-d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation) {
+d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation, std::false_type) {
+    suppress_unused_warning(isolation);
+    __TBB_ASSERT(isolation == no_isolation, nullptr);
+    __TBB_ASSERT(is_task_pool_published(), nullptr);
+    bool all_tasks_checked = false;
+    // The current task position in the task pool.
+    std::size_t T0 = tail.load(std::memory_order_relaxed);
+    // The bounds of available tasks in the task pool. H0 is only used when the head bound is reached.
+    std::size_t H0 = (std::size_t)-1, T = T0;
+    d1::task* result = nullptr;
+    do {
+        // The full fence is required to sync the store of `tail` with the load of `head` (write-read barrier)
+        T = --tail;
+        // The acquire load of head is required to guarantee consistency of our task pool
+        // when a thief rolls back the head.
+        if ( (std::intptr_t)( head.load(std::memory_order_acquire) ) > (std::intptr_t)T ) {
+            acquire_task_pool();
+            H0 = head.load(std::memory_order_relaxed);
+            if ( (std::intptr_t)H0 > (std::intptr_t)T ) {
+                // The thief has not backed off - nothing to grab.
+                __TBB_ASSERT( H0 == head.load(std::memory_order_relaxed)
+                    && T == tail.load(std::memory_order_relaxed)
+                    && H0 == T + 1, "victim/thief arbitration algorithm failure" );
+                reset_task_pool_and_leave();
+                all_tasks_checked = true;
+                break /*do-while*/;
+            } else if ( H0 == T ) {
+                reset_task_pool_and_leave();
+                all_tasks_checked = true;
+            } else {
+                // Release task pool if there are still some tasks.
+                // After the release, the tail will be less than T, thus a thief
+                // will not attempt to get a task at the position T.
+                release_task_pool();
+            }
+        }
+        // Get a task from the pool at the position T.
+        __TBB_ASSERT(tail.load(std::memory_order_relaxed) <= T || is_local_task_pool_quiescent(),
+                "Is it safe to get a task at position T?");
+        __TBB_ASSERT( !all_tasks_checked || H0 == T, nullptr );
+        if ( task_pool_ptr[T] ) {
+            result = task_proxy::try_extract_task_from( task_pool_ptr[T], ed );
+        }
+        poison_pointer( task_pool_ptr[T] );
+        if ( result ) break /*do-while*/;
+        __TBB_ASSERT( T0 == T+1, nullptr );
+        T0 = T;
+    } while ( /*!result &&*/ !all_tasks_checked );
+
+    __TBB_ASSERT( (std::intptr_t)tail.load(std::memory_order_relaxed) >= 0, nullptr );
+    __TBB_ASSERT( result || is_quiescent_local_task_pool_reset(), nullptr );
+    return result;
+}
+
+d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation, std::true_type) {
     bool all_tasks_checked = false;
     bool tasks_skipped = false;
 
