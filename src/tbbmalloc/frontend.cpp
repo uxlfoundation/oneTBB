@@ -1948,7 +1948,14 @@ void StartupBlock::free(void *ptr)
  * In theory, we only need values 0 and 2. But value 1 is nonetheless
  * useful for detecting errors in the double-check pattern.
  */
-static std::atomic<intptr_t> mallocInitialized{0};   // implicitly initialized to 0
+#ifdef __cpp_lib_atomic_ref
+// Intentionaly no init value. Guaranteed to be zero-initilized by C++ standard.
+static intptr_t mallocInitializedStorage;
+#define mallocInitialized std::atomic_ref<intptr_t>(mallocInitializedStorage)
+#else
+// Intentionaly no init value. Guaranteed to be zero-initilized by C++11 standard (but not C++20)
+static std::atomic<intptr_t> mallocInitialized;
+#endif
 static MallocMutex initMutex;
 
 /** The leading "\0" is here so that applying "strings" to the binary
