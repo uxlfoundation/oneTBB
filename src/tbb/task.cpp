@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -251,6 +252,10 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
     }
 
     return ref_counter;
+}
+
+d1::task* current_task_ptr() {
+    return governor::get_thread_data()->get_innermost_running_task();
 }
 
 } // namespace r1
