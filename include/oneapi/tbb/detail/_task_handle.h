@@ -112,7 +112,6 @@ public:
     }
 
     void add_successor(task_dynamic_state* successor);
-    void release_continuation();
 
     using successor_list_state_flag = std::uintptr_t;
     static constexpr successor_list_state_flag COMPLETED_FLAG = ~std::uintptr_t(0);
