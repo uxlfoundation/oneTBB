@@ -119,6 +119,10 @@ struct start_reduce : public task {
         task_group_context context(PARALLEL_REDUCE);
         run(range, body, partitioner, context);
     }
+    static void run(const Range& range, Body& body, Partitioner& partitioner, string_resource_index idx) {
+        task_group_context context(idx);
+        run(range, body, partitioner, context);
+    }
     //! Run body for range, serves as callback for partitioner
     void run_body( Range &r ) {
         (*my_body)(r);
@@ -414,7 +418,7 @@ void parallel_reduce( const Range& range, Body& body, const auto_partitioner& pa
 /** @ingroup algorithms **/
 template<typename Range, typename Body>
 void parallel_reduce( const Range& range, Body& body, const static_partitioner& partitioner ) {
-    start_reduce<Range,Body,const static_partitioner>::run( range, body, partitioner );
+    start_reduce<Range,Body,const static_partitioner>::run( range, body, partitioner, PARALLEL_REDUCE_STATIC );
 }
 
 //! Parallel iteration with reduction and affinity_partitioner

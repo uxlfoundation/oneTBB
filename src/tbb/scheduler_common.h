@@ -128,13 +128,20 @@ struct task_accessor {
     context execution **/
 template <bool report_tasks>
 class context_guard_helper {
+    // The number of unsuccessful attempts to retrieve a non-local task, after which ITT_TASK_END notification
+    // should be sent. If the notification is postponed for too long, data in profiling tools might get skewed.
+    // For algorithms ran with a static_partitioner, 0 is used instead.
+    static constexpr int itt_task_end_threshold = 2;
+
     const d1::task_group_context* curr_ctx;
     d1::cpu_ctl_env guard_cpu_ctl_env;
     d1::cpu_ctl_env curr_cpu_ctl_env;
+    int search_count_threshold;
 public:
     context_guard_helper() : curr_ctx(NULL) {
         guard_cpu_ctl_env.get_env();
         curr_cpu_ctl_env = guard_cpu_ctl_env;
+        search_count_threshold = -1;
     }
     ~context_guard_helper() {
         if (curr_cpu_ctl_env != guard_cpu_ctl_env)
@@ -160,13 +167,15 @@ public:
             // reporting begin of new task group context execution frame.
             // using address of task group context object to group tasks (parent).
             // id of task execution frame is NULL and reserved for future use.
+            search_count_threshold = (ctx->my_name == PARALLEL_FOR_STATIC ||
+                                      ctx->my_name == PARALLEL_REDUCE_STATIC )? 0 : itt_task_end_threshold;
             ITT_TASK_BEGIN(ctx, ctx->my_name, NULL);
             curr_ctx = ctx;
         }
     }
-    void end_itt_task() {
-        if constexpr (report_tasks) {
-            if (curr_ctx) {
+    void maybe_end_itt_task(int task_search_count) {
+        if (report_tasks) {
+            if (curr_ctx && task_search_count == search_count_threshold) {
                 ITT_TASK_END;
                 curr_ctx = nullptr;
             }

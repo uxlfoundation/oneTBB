@@ -77,6 +77,10 @@ struct start_for : public task {
         task_group_context context(PARALLEL_FOR);
         run(range, body, partitioner, context);
     }
+    static void run(const Range& range, const Body& body, Partitioner& partitioner, string_resource_index idx) {
+        task_group_context context(idx);
+        run(range, body, partitioner, context);
+    }
 
     static void run(const Range& range, const Body& body, Partitioner& partitioner, task_group_context& context) {
         if ( !range.empty() ) {
@@ -223,7 +227,7 @@ void parallel_for( const Range& range, const Body& body, const auto_partitioner&
 /** @ingroup algorithms **/
 template<typename Range, typename Body>
 void parallel_for( const Range& range, const Body& body, const static_partitioner& partitioner ) {
-    start_for<Range,Body,const static_partitioner>::run(range,body,partitioner);
+    start_for<Range,Body,const static_partitioner>::run(range,body,partitioner,PARALLEL_FOR_STATIC);
 }
 
 //! Parallel iteration over range with affinity_partitioner.
