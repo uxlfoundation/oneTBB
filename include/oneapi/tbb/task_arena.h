@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -109,7 +110,13 @@ inline void enqueue_impl(task_handle&& th, d1::task_arena_base* ta) {
     auto& ctx = task_handle_accessor::ctx_of(th);
 
     // Do not access th after release
-    r1::enqueue(*task_handle_accessor::release(th), ctx, ta);
+    task_handle_task* t = task_handle_accessor::release(th);
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    if (!t->has_dependencies() || t->release_dependency() != nullptr)
+#endif
+    {
+        r1::enqueue(*t, ctx, ta);
+    }
 }
 } //namespace d2
 
