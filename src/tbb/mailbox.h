@@ -82,11 +82,11 @@ struct task_proxy : public d1::task {
     }
 
     //! Checks if a given task is a proxy, then either extracts the real task or frees the proxy.
-    template<bool stolen = false>
-    static task* try_extract_task_from ( task* t, execution_data_ext& ed ) {
+    template<bool B = false>
+    static task* try_extract_task_from ( task* t, execution_data_ext& ed, std::integral_constant<bool, B> stolen = {} ) {
         __TBB_ASSERT(t && !is_poisoned(t), "Not a valid task pointer");
         if (!task_accessor::is_proxy_task(*t)){
-            invoke_if<stolen>([&ed](){
+            invoke_if( stolen, [&ed](){
                 ed.affinity_slot = d1::any_slot;
             });
             return t;
