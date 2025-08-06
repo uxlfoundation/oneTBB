@@ -112,10 +112,6 @@ inline suspend_point_type::suspend_point_type(arena* a, size_t stack_size, task_
 // Task Dispatcher
 //------------------------------------------------------------------------
 
-// The number of unsuccessful attempts to retrieve a non-local task, after which ITT_TASK_END notification
-// must be sent. If the notification is postponed for too long, data in profiling tools might get skewed.
-inline constexpr int itt_task_search_threshold = 2;
-
 inline task_dispatcher::task_dispatcher(arena* a) {
     m_execute_data_ext.context = a->my_default_ctx;
     m_execute_data_ext.task_disp = this;
@@ -205,8 +201,8 @@ d1::task* task_dispatcher::receive_or_steal_task(
             __TBB_ASSERT(t == nullptr, nullptr);
             break;
         }
-        if( ITTPossible && waiter.pause_count()==itt_task_search_threshold ) {
-            ctxguard.end_itt_task();
+        if( ITTPossible ) {
+            ctxguard.maybe_end_itt_task(waiter.pause_count());
         }
         // Start searching
         if (t != nullptr) {
