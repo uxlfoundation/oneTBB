@@ -23,7 +23,7 @@
 #if !defined(__TBB_HardwareConcurrency)
 
 #include "dynamic_link.h"
-#include <stdio.h>
+#include <cstdio>
 #include <limits.h>
 
 #if _WIN32||_WIN64
@@ -34,10 +34,10 @@
 #else
 #include <unistd.h>
 #if __unix__
-#include "cgroup_info.h"
 #if __linux__
 #include <sys/sysinfo.h>
-#endif
+#include "cgroup_info.h"
+#endif // __linux__
 #include <cstring>
 #include <sched.h>
 #include <cerrno>
@@ -193,11 +193,13 @@ static void initialize_hardware_concurrency_info () {
         delete[] processMask;
     }
     int num_procs = availableProcs > 0 ? availableProcs : 1; // Fail safety strap
+#if __linux__
     int cgroup_num_cpus = INT_MAX;
     if (cgroup_info::is_cpu_constrained(cgroup_num_cpus)) {
         // If cgroup is used, limit the number of processors to the constrained value.
         num_procs = std::min(num_procs, cgroup_num_cpus);
     }
+#endif // __linux__
     theNumProcs = num_procs;
     __TBB_ASSERT( theNumProcs <= sysconf(_SC_NPROCESSORS_ONLN), nullptr);
 }
