@@ -204,15 +204,10 @@ class system_info {
             auto& cki = cpu_kind_infos.front();
             hwloc_cpuset_t lp_mask = hwloc_bitmap_dup(cki.cpuset);
 
-            int l3_depth = hwloc_get_type_depth(topology, HWLOC_OBJ_L3CACHE);
-            unsigned l3_count = hwloc_get_nbobjs_by_depth(topology, l3_depth);
-
             // Iterate through all L3 cache objects and remove their cores from lp_mask.
-            for (unsigned i = 0; i < l3_count; ++i) {
-                hwloc_obj_t l3 = hwloc_get_obj_by_depth(topology, l3_depth, i);
-                if (l3) {
-                    hwloc_bitmap_andnot(lp_mask, lp_mask, l3->cpuset);
-                }
+            hwloc_obj_t l3_package = nullptr;
+            while ((l3_package = hwloc_get_next_obj_by_type(topology, HWLOC_OBJ_L3CACHE, l3_package)) != nullptr ) {
+                hwloc_bitmap_andnot(lp_mask, lp_mask, l3_package->cpuset);
             }
 
             if (hwloc_bitmap_iszero(lp_mask)) {
