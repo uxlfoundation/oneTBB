@@ -21,6 +21,8 @@
 #include <climits>
 #include <cstring>
 #include <memory>
+#include <cerrno>
+#include <cstdlib>
 
 #include <mntent.h>
 
@@ -43,8 +45,8 @@ public:
     }
 
 private:
-    static void close_file(FILE *file) { fclose(file); };
-    using unique_file_t = std::unique_ptr<FILE, decltype(&close_file)>;
+    static void close_file(std::FILE *file) { std::fclose(file); };
+    using unique_file_t = std::unique_ptr<std::FILE, decltype(&close_file)>;
 
     static constexpr int unlimited_num_cpus = INT_MAX;
     static constexpr int error_value = 0; // Some impossible value for the number of CPUs
@@ -95,7 +97,7 @@ private:
         const char* last_char = line + rel_path_size - 1;
 
         const char* path_start = nullptr;
-        while (fgets(line, rel_path_size, cgroup_fd)) {
+        while (std::fgets(line, rel_path_size, cgroup_fd)) {
             path_start = nullptr;
 
             if (std::strncmp(line, "0::", 3) == 0) {
@@ -121,15 +123,15 @@ private:
 
     static bool try_read_cgroup_v1_num_cpus_from(const char* dir, int& num_cpus) {
         char path[PATH_MAX] = {0};
-        if (snprintf(path, PATH_MAX, "%s/cpu.cfs_quota_us", dir) < 0)
+        if (std::snprintf(path, PATH_MAX, "%s/cpu.cfs_quota_us", dir) < 0)
             return false;       // Failed to create path
 
-        unique_file_t fd(fopen(path, "r"), &close_file);
+        unique_file_t fd(std::fopen(path, "r"), &close_file);
         if (!fd)
             return false;
 
         long long cpu_quota = 0;
-        if (fscanf(fd.get(), "%lld", &cpu_quota) != 1)
+        if (std::fscanf(fd.get(), "%lld", &cpu_quota) != 1)
             return false;
 
         if (-1 == cpu_quota) {
@@ -137,14 +139,14 @@ private:
             return true;
         }
 
-        if (snprintf(path, PATH_MAX, "%s/cpu.cfs_period_us", dir) < 0)
+        if (std::snprintf(path, PATH_MAX, "%s/cpu.cfs_period_us", dir) < 0)
             return false;       // Failed to create path;
-        fd.reset(fopen(path, "r"));
+        fd.reset(std::fopen(path, "r"));
         if (!fd)
             return false;
 
         long long cpu_period = 0;
-        if (fscanf(fd.get(), "%lld", &cpu_period) != 1)
+        if (std::fscanf(fd.get(), "%lld", &cpu_period) != 1)
             return false;
 
         num_cpus = determine_num_cpus(cpu_quota, cpu_period);
@@ -153,16 +155,16 @@ private:
 
     static bool try_read_cgroup_v2_num_cpus_from(const char* dir, int& num_cpus) {
         char path[PATH_MAX] = {0};
-        if (snprintf(path, PATH_MAX, "%s/cpu.max", dir) < 0)
+        if (std::snprintf(path, PATH_MAX, "%s/cpu.max", dir) < 0)
             return false;       // Failed to create path
 
-        unique_file_t fd(fopen(path, "r"), &close_file);
+        unique_file_t fd(std::fopen(path, "r"), &close_file);
         if (!fd)
             return false;
 
         long long cpu_period = 0;
         char cpu_quota_str[16] = {0};
-        if (fscanf(fd.get(), "%15s %lld", cpu_quota_str, &cpu_period) != 2)
+        if (std::fscanf(fd.get(), "%15s %lld", cpu_quota_str, &cpu_period) != 2)
             return false;
 
         if (std::strncmp(cpu_quota_str, "max", 3) == 0) {
@@ -194,7 +196,7 @@ private:
                 cache_relative_path_for(cgroup_fd, paths_cache);
 
             // Now try reading including relative path
-            if (snprintf(dir, PATH_MAX, "%s/%s", mnt_dir, paths_cache.v2_relative_path) >= 0)
+            if (std::snprintf(dir, PATH_MAX, "%s/%s", mnt_dir, paths_cache.v2_relative_path) >= 0)
                 try_read_cgroup_v2_num_cpus_from(dir, num_cpus);
             return num_cpus;
         }
@@ -208,19 +210,19 @@ private:
         if (!*paths_cache.v1_relative_path)
             cache_relative_path_for(cgroup_fd, paths_cache);
 
-        if (snprintf(dir, PATH_MAX, "%s/%s", mnt_dir, paths_cache.v1_relative_path) >= 0)
+        if (std::snprintf(dir, PATH_MAX, "%s/%s", mnt_dir, paths_cache.v1_relative_path) >= 0)
             try_read_cgroup_v1_num_cpus_from(dir, num_cpus);
         return num_cpus;
     }
 
     static int parse_cpu_constraints() {
         // Reading /proc/self/mounts and /proc/self/cgroup anyway, so open them right away
-        unique_file_t cgroup_file_ptr(fopen("/proc/self/cgroup", "r"), &close_file);
+        unique_file_t cgroup_file_ptr(std::fopen("/proc/self/cgroup", "r"), &close_file);
         if (!cgroup_file_ptr)
             return error_value; // Failed to open cgroup file
 
-        auto close_mounts_file = [](FILE* file) { endmntent(file); };
-        using unique_mounts_file_t = std::unique_ptr<FILE, decltype(close_mounts_file)>;
+        auto close_mounts_file = [](std::FILE* file) { endmntent(file); };
+        using unique_mounts_file_t = std::unique_ptr<std::FILE, decltype(close_mounts_file)>;
         unique_mounts_file_t mounts_file_ptr(setmntent("/proc/self/mounts", "r"), close_mounts_file);
         if (!mounts_file_ptr)
             return error_value;
