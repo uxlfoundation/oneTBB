@@ -17,9 +17,8 @@
 #ifndef _TBB_cgroup_info_H
 #define _TBB_cgroup_info_H
 
-#include <stdio.h>
-#include <limits.h>
-
+#include <cstdio>
+#include <climits>
 #include <cstring>
 #include <memory>
 
