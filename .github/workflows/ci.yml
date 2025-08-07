@@ -147,13 +147,13 @@ jobs:
           fetch-depth: 0
       - name: Run check
         run: |
-          set base_regexp_single_date = "/Copyright (c) .* PLACEHOLDER/s/ \([0-9]\+\)[-0-9]*/ \\1-$(date +%Y)/"
-          set base_regexp_data_range = "/Copyright (c) .* PLACEHOLDER/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/"
+          base_regexp_single_date = "/Copyright (c) .* PLACEHOLDER/s/ \([0-9]\+\)[-0-9]*/ \\1-$(date +%Y)/"
+          base_regexp_data_range = "/Copyright (c) .* PLACEHOLDER/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/"
           
-          set regexp_intel_single_date = $(echo "$base_regexp_single_date" | sed 's/PLACEHOLDER/Intel Corporation/')
-          set regexp_intel_data_range = $(echo "$base_regexp_data_range" | sed 's/PLACEHOLDER/Intel Corporation/')
-          set regexp_uxl_single_date = $(echo "$base_regexp_single_date" | sed 's/PLACEHOLDER/UXL Foundation Contributors/')
-          set regexp_uxl_data_range = $(echo "$base_regexp_data_range" | sed 's/PLACEHOLDER/UXL Foundation Contributors/')
+          regexp_intel_single_date = $(echo "$base_regexp_single_date" | sed 's/PLACEHOLDER/Intel Corporation/')
+          regexp_intel_data_range = $(echo "$base_regexp_data_range" | sed 's/PLACEHOLDER/Intel Corporation/')
+          regexp_uxl_single_date = $(echo "$base_regexp_single_date" | sed 's/PLACEHOLDER/UXL Foundation Contributors/')
+          regexp_uxl_data_range = $(echo "$base_regexp_data_range" | sed 's/PLACEHOLDER/UXL Foundation Contributors/')
 
           echo $regexp_intel_single_date
           echo $regexp_intel_data_range
