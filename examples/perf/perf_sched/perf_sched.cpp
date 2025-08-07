@@ -435,7 +435,7 @@ int main( int argc, char* argv[] ) {
     Perf::RegisterTest<Test_SPMC>();
     Perf::RegisterTest<Test_ShallowTree>();
     Perf::RegisterTest<Test_ShallowTree_Skewed>();
-@endif
+#endif
     Test_PFor_Simple pf_sp(SimplePartitioner), pf_ap(AutoPartitioner);
     Perf::RegisterTest(pf_sp);
     Perf::RegisterTest(pf_ap);

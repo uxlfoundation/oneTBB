@@ -243,7 +243,7 @@ namespace internal {
         std::vector<uintptr_t> hist(num_buckets + 1, 0);
         for ( uintptr_t i = 0; i < n; ++i )
             ++hist[uintptr_t((t[i]-min_val)/bucket_size)];
-        ASSERT (hist[num_buckets] == 1, "");
+        assert(hist[num_buckets] == 1);
         ++hist[num_buckets - 1];
         hist.resize(num_buckets);
         fprintf (f, "Histogram: nvals = %u, min = %g, max = %g, nbuckets = %u\n", (unsigned)n, min_val, max_val, (unsigned)num_buckets);
@@ -271,7 +271,7 @@ namespace internal {
             Initializer () {
                 SYSTEM_INFO si;
                 GetNativeSystemInfo(&si);
-                ASSERT( si.dwNumberOfProcessors <= MaxAffinitySetSize, "Too many CPUs" );
+                assert( (si.dwNumberOfProcessors <= MaxAffinitySetSize) && "Too many CPUs" );
                 AffinitySetSize = min (si.dwNumberOfProcessors, MaxAffinitySetSize);
                 cpu_set_t systemMask = 0;
                 GetProcessAffinityMask( GetCurrentProcess(), &m_processMask, &systemMask );
@@ -279,7 +279,7 @@ namespace internal {
                 for ( DWORD i = 0; i < AffinitySetSize; ++i ) {
                     while ( !(cpu_mask & m_processMask) && cpu_mask )
                         cpu_mask <<= 1;
-                    ASSERT( cpu_mask != 0, "Process affinity set is culled?" );
+                    assert( (cpu_mask != 0) && "Process affinity set is culled?" );
                     m_affinities[i] = cpu_mask;
                     cpu_mask <<= 1;
                 }
@@ -325,7 +325,7 @@ namespace internal {
             Initializer () {
                 CPU_ZERO (&m_processMask);
                 int res = sched_getaffinity( getpid(), sizeof(cpu_set_t), &m_processMask );
-                ASSERT ( res == 0, "sched_getaffinity failed" );
+                assert( (res == 0) && "sched_getaffinity failed" );
             }
         }; // class AffinityHelper::Initializer
 
@@ -369,7 +369,7 @@ namespace internal {
         cpu_set_t orig_mask, target_mask;
         CPU_ZERO( &target_mask );
         CPU_SET( cpu_idx, &target_mask );
-        ASSERT ( CPU_ISSET(cpu_idx, &target_mask), "CPU_SET failed" );
+        assert( (CPU_ISSET(cpu_idx, &target_mask)) && "CPU_SET failed" );
     #endif
     #if _MSC_VER
         orig_mask = SetThreadAffinityMask( GetCurrentThread(), target_mask );
@@ -378,9 +378,9 @@ namespace internal {
     #elif __linux__
         CPU_ZERO( &orig_mask );
         int res = sched_getaffinity( gettid(), sizeof(cpu_set_t), &orig_mask );
-        ASSERT ( res == 0, "sched_getaffinity failed" );
+        assert( (res == 0) && "sched_getaffinity failed" );
         res = sched_setaffinity( gettid(), sizeof(cpu_set_t), &target_mask );
-        ASSERT ( res == 0, "sched_setaffinity failed" );
+        assert( (res == 0) && "sched_setaffinity failed" );
     #endif /* _MSC_VER */
         --nThreads;
         while ( nThreads )
@@ -623,7 +623,7 @@ inline bool __TBB_bool( bool b ) { return b; }
 
     void RunTest ( TestResults& tr, int mastersRange, int w, int p, int m, int a, int& numTests ) {
         size_t r = TestResultIndex(mastersRange, w, p, m, a);
-        ASSERT( r < tr.my_results.size(), NULL );
+        assert( r < tr.my_results.size());
         RunConfig &rc = tr.my_results[r].my_config;
         rc.my_maxConcurrency = MaxConcurrency;
         rc.my_numThreads = p;
@@ -667,7 +667,7 @@ inline bool __TBB_bool( bool b ) { return b; }
 
     void InitTestData ( TestResults& tr, int mastersRange, int w, int p, int m, int a, int& ) {
         size_t r = TestResultIndex(mastersRange, w, p, m, a);
-        ASSERT( r < tr.my_results.size(), NULL );
+        assert( r < tr.my_results.size() );
         tr.my_results[r].my_timing.my_durations.resize( 
             (theSettings.my_opts & UseTaskScheduler ? tr.my_test->MinNumMasters() + m : p) * NumRuns );
     }
@@ -689,7 +689,7 @@ inline bool __TBB_bool( bool b ) { return b; }
             int numWorkloads = theSettings.my_opts & UseSmallestWorkloadOnly ? 1 : t.NumWorkloads();
             int numConfigs = numConfigsBase * numWorkloads;
             if ( t.MaxNumMasters() > 1 ) {
-                ASSERT( theSettings.my_opts & UseTaskScheduler, "Multiple masters mode is only valid for task scheduler tests" );
+                assert( (theSettings.my_opts & UseTaskScheduler) && "Multiple masters mode is only valid for task scheduler tests" );
                 if ( MaxTbbMasters < t.MaxNumMasters() )
                     MaxTbbMasters = t.MaxNumMasters();
                 numConfigs *= t.MaxNumMasters() - t.MinNumMasters() + 1;
@@ -700,7 +700,7 @@ inline bool __TBB_bool( bool b ) { return b; }
             const char* testName = t.Name();
             if ( testName )
                 tr.my_testName = testName;
-            ASSERT( tr.my_testName, "Neither Test::Name() is implemented, nor RTTI is enabled" );
+            assert( tr.my_testName && "Neither Test::Name() is implemented, nor RTTI is enabled" );
             TitleFieldLen = max( TitleFieldLen, strlen(tr.my_testName) );
 
             tr.my_results.resize( numConfigs );

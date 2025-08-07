@@ -33,6 +33,7 @@
 #include <atomic>
 #include <cstring>
 #include <cstdlib>
+#include <cassert>
 
 // TODO: Fix build scripts to provide more reliable build phase identification means
 #ifndef __TBB_PERF_API
@@ -147,7 +148,7 @@ public:
 
         size_type epoch = myEpoch.load(std::memory_order_relaxed);
         int threadsLeft = static_cast<int>(myNumThreads - myNumThreadsFinished.fetch_add(1, std::memory_order_release) - 1);
-        ASSERT(threadsLeft >= 0,"Broken barrier");
+        assert((threadsLeft >= 0) && "Broken barrier");
         if (threadsLeft > 0) {
             /* this thread is not the last; wait until the epoch changes & return false */
             onWaitCallback(myEpoch, epoch); // acquire myEpoch
@@ -156,13 +157,13 @@ public:
         }
         /* reset the barrier, increment the epoch, and return true */
         threadsLeft = static_cast<int>(myNumThreadsFinished.fetch_sub(myNumThreads, std::memory_order_acquire) - myNumThreads);
-        ASSERT(threadsLeft == 0,"Broken barrier");
+        assert((threadsLeft == 0) && "Broken barrier");
         /* This thread is the last one at the barrier in this epoch */
         onOpenBarrierCallback();
         /* wakes up threads waiting to exit in this epoch */
         myLifeTimeGuard.fetch_add(myNumThreads - 1, std::memory_order_relaxed);
         epoch -= myEpoch.fetch_add(1, std::memory_order_release);
-        ASSERT(epoch == 0,"Broken barrier");
+        assert((epoch == 0) && "Broken barrier");
         return true;
     }
 
