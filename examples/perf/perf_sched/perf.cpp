@@ -21,6 +21,7 @@
 #include <vector>
 #include <algorithm>
 #include <cassert>
+#include <cstdarg>
 #include <atomic>
 #include <thread>
 #include <new>
@@ -433,7 +434,7 @@ namespace internal {
             TbbWorkersTrapper& my_owner;
         public:
             TrapperTask ( TbbWorkersTrapper& owner ) : my_owner(owner) {}
-            void operator()() {
+            void operator()() const {
                 my_owner.my_barrier.wait();
                 my_owner.wait_group.wait();
             }
@@ -701,7 +702,8 @@ inline bool __TBB_bool( bool b ) { return b; }
             if ( testName )
                 tr.my_testName = testName;
             assert( tr.my_testName && "Neither Test::Name() is implemented, nor RTTI is enabled" );
-            TitleFieldLen = max( TitleFieldLen, strlen(tr.my_testName) );
+            auto len = strlen(tr.my_testName);
+            if (len > TitleFieldLen) TitleFieldLen = len;
 
             tr.my_results.resize( numConfigs );
             tr.my_serialBaselines.resize( numWorkloads );
@@ -736,7 +738,7 @@ inline bool __TBB_bool( bool b ) { return b; }
                 size_t len = strlen(WorkloadName);
                 tr.my_workloadNames[w] = new char[len + 1];
                 strcpy ( (char*)tr.my_workloadNames[w], WorkloadName );
-                WorkloadFieldLen = max( WorkloadFieldLen, len );
+                if (len > WorkloadFieldLen) WorkloadFieldLen = len;
 
                 rc.my_workloadID = w;
                 if ( theSettings.my_opts & UseBaseline )
