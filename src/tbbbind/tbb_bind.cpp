@@ -216,7 +216,6 @@ private:
                 }
             }
         }
-
         // On hybrid CPUs, check if there are cores without L3 cache.
         if (!core_types_parsing_broken && core_types_number > 1) {
             // The first core type mask (least performant cores)
