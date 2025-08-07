@@ -155,10 +155,10 @@ jobs:
           regexp_uxl_single_date=$(echo "$base_regexp_single_date" | sed 's/PLACEHOLDER/UXL Foundation Contributors/')
           regexp_uxl_data_range=$(echo "$base_regexp_data_range" | sed 's/PLACEHOLDER/UXL Foundation Contributors/')
 
-          echo $regexp_intel_single_date
-          echo $regexp_intel_data_range
-          echo $regexp_uxl_data_range
-          echo $regexp_uxl_single_date
+          echo "$regexp_intel_single_date"
+          echo "$regexp_intel_data_range"
+          echo "$regexp_uxl_data_range"
+          echo "$regexp_uxl_single_date"
 
           sed -i \
             -e "$regexp_intel_single_date" -e "$regexp_intel_data_range" \
