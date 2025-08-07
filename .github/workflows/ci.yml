@@ -156,8 +156,8 @@ jobs:
           set regexp_uxl_data_range = $(echo "$base_regexp_data_range" | sed 's/PLACEHOLDER/UXL Foundation Contributors/')
 
           sed -i \
-            -e "$(regexp_intel_single_date)" -e "$(regexp_intel_data_range)" \
-            -e "$(regexp_uxl_single_date)" -e "$(regexp_uxl_data_range)" \
+            -e "$regexp_intel_single_date" -e "$regexp_intel_data_range" \
+            -e "$regexp_uxl_single_date" -e "$regexp_uxl_data_range" \
             $(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
           git checkout -- third-party-programs.txt
           git diff > years.diff
