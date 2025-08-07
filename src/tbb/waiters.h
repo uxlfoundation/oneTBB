@@ -44,6 +44,10 @@ public:
         my_backoff.reset_wait();
     }
 
+    int pause_count() {
+        return my_backoff.limited_pause_count();
+    }
+
 protected:
     bool is_arena_empty() const {
         return my_arena.my_pool_state.load(std::memory_order_relaxed) == arena::SNAPSHOT_EMPTY;
