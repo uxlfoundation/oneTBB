@@ -99,6 +99,30 @@ inline void Sleep ( int ms ) {
     std::this_thread::sleep_for( sleep_time );
 }
 
+class WaitWhileEq {
+public:
+    //! Assignment not allowed
+    void operator=( const WaitWhileEq& ) = delete;
+
+    template<typename T, typename U>
+    void operator()( const std::atomic<T>& location, U value ) const {
+        int count = 0;
+        while (location.load(std::memory_order_acquire) == value) {
+            if (count < 1000) {
+                ++count;
+            } else if (count < 1100) {
+                std::this_thread::yield();
+                ++count;
+            } else {
+                std::this_thread::sleep_for(std::chrono::microseconds(count/100));
+                if (count < 10000) {
+                    count += 100;
+                }
+            }
+        }
+    }
+};
+
 class SpinBarrier {
 public:
     using size_type = std::size_t;
