@@ -31,11 +31,10 @@
 #include <chrono>
 #include <thread>
 #include <atomic>
-#include <cstring>
-#include <cstdlib>
 #include <cassert>
 
 // TODO: Fix build scripts to provide more reliable build phase identification means
+#define __TBB_PERF_API // requires building perf.dll, currently off
 #ifndef __TBB_PERF_API
 #if _USRDLL
     #if _MSC_VER
@@ -360,60 +359,6 @@ struct SessionSettings {
         , my_histogramName(histogram)
     {}
 }; // struct SessionSettings
-
-//! Controls level of commentary printed via printf-like REMARK() macro.
-/** If true, makes the test print commentary.  If false, test should print "done" and nothing more. */
-static bool Verbose;
-
-#ifndef PERF_DEFAULT_MIN_THREADS
-    #define PERF_DEFAULT_MIN_THREADS 1
-#endif
-
-//! Minimum number of threads
-static int MinThread = PERF_DEFAULT_MIN_THREADS;
-
-#ifndef PERF_DEFAULT_MAX_THREADS
-    #define PERF_DEFAULT_MAX_THREADS 8
-#endif
-
-//! Maximum number of threads
-static int MaxThread = PERF_DEFAULT_MAX_THREADS;
-
-inline void ParseCommandLine( int argc, char* argv[] ) {
-    if( !argc ) Report("Command line with 0 arguments\n");
-    int i = 1;
-    if( i<argc ) {
-        if( std::strncmp( argv[i], "-v", 2 )==0 ) {
-            Verbose = true;
-            ++i;
-        }
-    }
-    if( i<argc ) {
-        char* endptr;
-        MinThread = std::strtol( argv[i], &endptr, 0 );
-        if( *endptr==':' )
-            MaxThread = std::strtol( endptr+1, &endptr, 0 );
-        else if( *endptr=='\0' )
-            MaxThread = MinThread;
-        if( *endptr!='\0' ) {
-            Report("garbled nthread range\n");
-            std::exit(1);
-        }
-        if( MinThread<0 ) {
-            Report("nthread must be nonnegative\n");
-            std::exit(1);
-        }
-        if( MaxThread<MinThread ) {
-            Report("nthread range is backwards\n");
-            std::exit(1);
-        }
-        ++i;
-    }
-    if( i!=argc ) {
-        Report("Usage: %s [-v] [nthread|minthread:maxthread]\n", argv[0] );
-        std::exit(1);
-    }
-}
 
 //! Benchmarking session entry point
 /** Executes all the individual tests registered previously by means of 

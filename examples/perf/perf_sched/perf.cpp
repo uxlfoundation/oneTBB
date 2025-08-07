@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdarg>
+#include <cstring>
 #include <atomic>
 #include <thread>
 #include <new>
@@ -702,8 +703,7 @@ inline bool __TBB_bool( bool b ) { return b; }
             if ( testName )
                 tr.my_testName = testName;
             assert( tr.my_testName && "Neither Test::Name() is implemented, nor RTTI is enabled" );
-            auto len = strlen(tr.my_testName);
-            if (len > TitleFieldLen) TitleFieldLen = len;
+            TitleFieldLen = (std::max)( TitleFieldLen, strlen(tr.my_testName) );
 
             tr.my_results.resize( numConfigs );
             tr.my_serialBaselines.resize( numWorkloads );
@@ -738,7 +738,7 @@ inline bool __TBB_bool( bool b ) { return b; }
                 size_t len = strlen(WorkloadName);
                 tr.my_workloadNames[w] = new char[len + 1];
                 strcpy ( (char*)tr.my_workloadNames[w], WorkloadName );
-                if (len > WorkloadFieldLen) WorkloadFieldLen = len;
+                WorkloadFieldLen = (std::max)( WorkloadFieldLen, len );
 
                 rc.my_workloadID = w;
                 if ( theSettings.my_opts & UseBaseline )
@@ -841,6 +841,59 @@ __TBB_PERF_API void SetWorkloadName( const char* format, ... ) {
     va_end(args);
 }
 
+//! Controls level of commentary printed via printf-like REMARK() macro.
+/** If true, makes the test print commentary.  If false, test should print "done" and nothing more. */
+static bool Verbose;
+
+#ifndef PERF_DEFAULT_MIN_THREADS
+    #define PERF_DEFAULT_MIN_THREADS 1
+#endif
+
+//! Minimum number of threads
+static int MinThread = PERF_DEFAULT_MIN_THREADS;
+
+#ifndef PERF_DEFAULT_MAX_THREADS
+    #define PERF_DEFAULT_MAX_THREADS 8
+#endif
+
+//! Maximum number of threads
+static int MaxThread = PERF_DEFAULT_MAX_THREADS;
+
+inline void ParseCommandLine( int argc, char* argv[] ) {
+    if( !argc ) Report("Command line with 0 arguments\n");
+    int i = 1;
+    if( i<argc ) {
+        if( std::strncmp( argv[i], "-v", 2 )==0 ) {
+            Verbose = true;
+            ++i;
+        }
+    }
+    if( i<argc ) {
+        char* endptr;
+        MinThread = std::strtol( argv[i], &endptr, 0 );
+        if( *endptr==':' )
+            MaxThread = std::strtol( endptr+1, &endptr, 0 );
+        else if( *endptr=='\0' )
+            MaxThread = MinThread;
+        if( *endptr!='\0' ) {
+            Report("garbled nthread range\n");
+            std::exit(1);
+        }
+        if( MinThread<0 ) {
+            Report("nthread must be nonnegative\n");
+            std::exit(1);
+        }
+        if( MaxThread<MinThread ) {
+            Report("nthread range is backwards\n");
+            std::exit(1);
+        }
+        ++i;
+    }
+    if( i!=argc ) {
+        Report("Usage: %s [-v] [nthread|minthread:maxthread]\n", argv[0] );
+        std::exit(1);
+    }
+}
 
 __TBB_PERF_API int TestMain( int argc, char* argv[], const SessionSettings* defaultSettings ) {
 #if _MSC_VER
