@@ -228,7 +228,6 @@ private:
             "HWLOC cannot detect the number of cpukinds.(reference)");
 
         core_types_parsing_broken = num_cpu_kinds == 0;
-        int current_efficiency = -1;
         cpu_kind_infos.resize(num_cpu_kinds);
         for (auto kind_index = 0; kind_index < num_cpu_kinds; ++kind_index) {
             auto& cki = cpu_kind_infos[kind_index];
@@ -243,10 +242,6 @@ private:
                 hwloc_cpukinds_get_info, topology, kind_index, cki.cpuset, /*efficiency*/nullptr,
                 /*nr_infos*/nullptr, /*infos*/nullptr, /*flags*/0
             );
-            if (current_efficiency < 0) {
-                core_types_parsing_broken = true;
-                break;
-            }
             hwloc_bitmap_and(cki.cpuset, cki.cpuset, process_cpuset);
 
             cki.index = hwloc_cpukinds_get_by_cpuset(topology, cki.cpuset, /*flags*/0);
