@@ -29,12 +29,8 @@ target_compile_options(perf_sched PRIVATE ${TBB_CXX_STD_FLAG})
 
 set(EXECUTABLE "$<TARGET_FILE:perf_sched>")
 
-# Parameters of executable N C I:
-# `N` - specifies the fibonacci number which would be calculated.
-# `C` - cutoff that will be used to stop recursive split.
-# `I` - number of iteration to measure benchmark time.
-#set(ARGS 30 16 20 1)
-#set(PERF_ARGS 50 5 20)
+set(ARGS 2) # only run on 2 threads
+#set(PERF_ARGS 1:8)
 
 add_execution_target(run_perf_sched perf_sched ${EXECUTABLE} "${ARGS}")
 #add_execution_target(perf_run_perf_sched perf_sched ${EXECUTABLE} "${PERF_ARGS}")

@@ -45,6 +45,24 @@ namespace Perf {
 
 SessionSettings theSettings;
 
+//! Controls level of commentary printed via printf-like REMARK() macro.
+/** If true, makes the test print commentary.  If false, test should print "done" and nothing more. */
+static bool Verbose;
+
+#ifndef PERF_DEFAULT_MIN_THREADS
+    #define PERF_DEFAULT_MIN_THREADS 1
+#endif
+
+//! Minimum number of threads
+static int MinThread = PERF_DEFAULT_MIN_THREADS;
+
+#ifndef PERF_DEFAULT_MAX_THREADS
+    #define PERF_DEFAULT_MAX_THREADS 8
+#endif
+
+//! Maximum number of threads
+static int MaxThread = PERF_DEFAULT_MAX_THREADS;
+
 namespace internal {
 
     typedef std::vector<duration_t> durations_t;
@@ -252,7 +270,8 @@ namespace internal {
         double bucket = min_val;
         for ( uintptr_t i = 0; i < num_buckets; ++i, bucket+=bucket_size )
             fprintf (f, "%12g\t%u\n", bucket, (unsigned)hist[i]);
-        fclose(f);
+        if (histogramFileName)
+            fclose(f);
     }
 
 #if _MSC_VER
@@ -677,7 +696,7 @@ inline bool __TBB_bool( bool b ) { return b; }
     char WorkloadName[MaxWorkloadNameLen + 1];
 
     void PrepareTests () {
-        printf( "Initializing...\r" );
+        if (Verbose) printf( "Initializing...\r" );
         NumActiveAffModes = theSettings.my_opts & UseAffinityModes ? NumAffinitizationModes : 1;
         TotalConfigs = 0;
         TitleFieldLen = strlen( TestNameColumnTitle );
@@ -745,14 +764,17 @@ inline bool __TBB_bool( bool b ) { return b; }
                     RunTestImpl( tr, rc, &Test::Baseline, tr.my_baselines[w] );
                 if ( tr.my_availableMethods & idRunSerial )
                     RunTestImpl( tr, rc, &Test::RunSerial, tr.my_serialBaselines[w] );
-                printf( "Measuring baselines: %04.1f%%\r",  ++n * 100. / totalWorkloads ); fflush(stdout);
+                if (Verbose) {
+                    printf( "Measuring baselines: %04.1f%%\r",  ++n * 100. / totalWorkloads );
+                    fflush(stdout);
+                }
             }
         }
         TlsTimings = new TimingSeries[MaxThread + MaxTbbMasters - 1];
         if ( theSettings.my_opts & UseTaskScheduler ? MaxTbbMasters : MaxThread )
             WalkTests( &InitTestData, n, false, false, theSettings.my_opts & UseTaskScheduler ? true : false );
         CalibrationTiming.my_durations.reserve( MaxTbbMasters * 3 );
-        printf( "                                                          \r");
+        if (Verbose) printf( "                                                          \r");
     }
 
     FILE* ResFile = NULL;
@@ -764,9 +786,11 @@ inline bool __TBB_bool( bool b ) { return b; }
             vfprintf( ResFile, fmt, args );
             va_end( args );
         }
-        va_start( args, fmt );
-        vprintf( fmt, args );
-        va_end( args );
+        if ( Verbose ) {
+            va_start( args, fmt );
+            vprintf( fmt, args );
+            va_end( args );
+        }
     }
 
     void PrintResults () {
@@ -840,24 +864,6 @@ __TBB_PERF_API void SetWorkloadName( const char* format, ... ) {
     vsnprintf( internal::WorkloadName, MaxWorkloadNameLen, format, args );
     va_end(args);
 }
-
-//! Controls level of commentary printed via printf-like REMARK() macro.
-/** If true, makes the test print commentary.  If false, test should print "done" and nothing more. */
-static bool Verbose;
-
-#ifndef PERF_DEFAULT_MIN_THREADS
-    #define PERF_DEFAULT_MIN_THREADS 1
-#endif
-
-//! Minimum number of threads
-static int MinThread = PERF_DEFAULT_MIN_THREADS;
-
-#ifndef PERF_DEFAULT_MAX_THREADS
-    #define PERF_DEFAULT_MAX_THREADS 8
-#endif
-
-//! Maximum number of threads
-static int MaxThread = PERF_DEFAULT_MAX_THREADS;
 
 inline void ParseCommandLine( int argc, char* argv[] ) {
     if( !argc ) Report("Command line with 0 arguments\n");
