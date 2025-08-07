@@ -146,8 +146,6 @@ jobs:
         with:
           fetch-depth: 0
       - name: Run check
-      # Copyright (c) 2017-2025 Intel Corporation
-      # Copyright (c) 2025 UXL Foundation Contributors
         run: |
           base_regexp_single_date = "/Copyright (c) .* PLACEHOLDER/s/ \([0-9]\+\)[-0-9]*/ \\1-$(date +%Y)/"
           base_regexp_data_range = "/Copyright (c) .* PLACEHOLDER/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/"
