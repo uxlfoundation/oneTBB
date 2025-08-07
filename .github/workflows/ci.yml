@@ -146,10 +146,20 @@ jobs:
         with:
           fetch-depth: 0
       - name: Run check
+      # Copyright (c) 2017-2025 Intel Corporation
+      # Copyright (c) 2025 UXL Foundation Contributors
         run: |
+          base_regexp_single_date = "/Copyright (c) .* PLACEHOLDER/s/ \([0-9]\+\)[-0-9]*/ \\1-$(date +%Y)/"
+          base_regexp_data_range = "/Copyright (c) .* PLACEHOLDER/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/"
+          
+          regexp_intel_single_date = $(echo "$base_regexp_single_date" | sed 's/PLACEHOLDER/Intel Corporation/')
+          regexp_intel_data_range = $(echo "$base_regexp_data_range" | sed 's/PLACEHOLDER/Intel Corporation')
+          regexp_uxl_single_date = $(echo "$base_regexp_single_date" | sed 's/PLACEHOLDER/UXL Foundation Contributors')
+          regexp_uxl_data_range = $(echo "$base_regexp_data_range" | sed 's/PLACEHOLDER/UXL Foundation Contributors')
+
           sed -i \
-            -e "/Copyright (c) .* Intel Corporation/s/ \([0-9]\+\)[-0-9]*/ \\1-$(date +%Y)/" \
-            -e "/Copyright (c) .* Intel Corporation/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/" \
+            -e "$(regexp_intel_single_date)" -e "$(regexp_intel_data_range)" \
+            -e "$(regexp_uxl_single_date)" -e "$(regexp_uxl_data_range)" \
             $(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
           git checkout -- third-party-programs.txt
           git diff > years.diff
