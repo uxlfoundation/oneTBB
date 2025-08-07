@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2019-2023 Intel Corporation
+    Copyright (c) 2019-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -30,6 +31,7 @@
 #include "oneapi/tbb/task_arena.h"
 #include "oneapi/tbb/spin_mutex.h"
 
+#include <bitset>
 #include <vector>
 #include <unordered_set>
 
@@ -238,7 +240,7 @@ private:
             );
 
             hwloc_require_ex(
-                hwloc_cpukinds_get_info, topology, kind_index, cki.cpuset, &current_efficiency,
+                hwloc_cpukinds_get_info, topology, kind_index, cki.cpuset, /*efficiency*/nullptr,
                 /*nr_infos*/nullptr, /*infos*/nullptr, /*flags*/0
             );
             if (current_efficiency < 0) {
@@ -252,6 +254,43 @@ private:
                 "hwloc failed obtaining kind index via cpuset.(reference)");
 
             cki.concurrency = hwloc_bitmap_weight(cki.cpuset);
+        }
+        // On hybrid CPUs, check if there are cores without L3 cache.
+        if (!core_types_parsing_broken && num_cpu_kinds > 1) {
+            // The first core type mask (least performant cores)
+            auto& cki = cpu_kind_infos.front();
+            hwloc_cpuset_t lp_mask = hwloc_bitmap_dup(cki.cpuset);
+
+            // Iterate through all L3 cache objects and remove their cores from lp_mask.
+            hwloc_obj_t l3_package = nullptr;
+            while ((l3_package = hwloc_get_next_obj_by_type(topology, HWLOC_OBJ_L3CACHE, l3_package)) != nullptr ) {
+                hwloc_bitmap_andnot(lp_mask, lp_mask, l3_package->cpuset);
+            }
+
+            if (hwloc_bitmap_iszero(lp_mask)) {
+                // All cores in the front mask have L3 cache, so no need to create a separate core type.
+                hwloc_bitmap_free(lp_mask);
+            } else {
+                hwloc_bitmap_andnot(cki.cpuset, cki.cpuset, lp_mask);
+                if (hwloc_bitmap_iszero(cki.cpuset)) {
+                    // No cores with L3 cache in the front mask, so replace it with the L3-less cores.
+                    hwloc_bitmap_free(cki.cpuset);
+                    cki.cpuset = lp_mask;
+                } else {
+                    // The front mask has SOME cores with L3 cache.
+                    cki.concurrency = hwloc_bitmap_weight(cki.cpuset);
+
+                    // Create a new least performant (L3-less) core type and add it to the front.
+                    auto& lp_cki = *cpu_kind_infos.emplace(cpu_kind_infos.begin());
+                    lp_cki.cpuset = lp_mask;
+                    lp_cki.concurrency = hwloc_bitmap_weight(lp_cki.cpuset);
+
+                    // Increment all CPU kind indices after inserting a new one at beginning.
+                    for (auto& i : cpu_kind_infos) {
+                        i.index++;
+                    }
+                }
+            }
         }
 #endif /*__HYBRID_CPUS_TESTING*/
 
@@ -403,7 +442,32 @@ system_info::affinity_mask prepare_reference_affinity_mask(const tbb::task_arena
     }
 
     if (c.core_type != tbb::task_arena::automatic) {
-        const auto& core_types_info = system_info::get_cpu_kinds_info();
+        auto core_types_info = system_info::get_cpu_kinds_info();
+
+        // Add core type combinations
+        size_t num_core_types = core_types_info.size();
+        for (uint32_t mask = 0; mask < (1u << num_core_types); ++mask) {
+            std::bitset<32> bits(mask);
+            if (bits.count() < 2) {
+                // Skip empty and single-type combinations
+                continue;
+            }
+
+            index_info combination;
+            combination.index = (1 << tbb::task_arena::constraints::core_type_id_bits); // multiple core type format
+            combination.index |= mask;
+            combination.concurrency = 0;
+            combination.cpuset = hwloc_bitmap_alloc();
+
+            for (size_t i = 0; i < num_core_types; ++i) {
+                if (bits[i]) {
+                    combination.concurrency += core_types_info[i].concurrency;
+                    hwloc_bitmap_or(combination.cpuset, combination.cpuset, core_types_info[i].cpuset);
+                }
+            }
+            core_types_info.push_back(combination);
+        }
+
         auto required_info = std::find_if(core_types_info.begin(), core_types_info.end(),
             [&](index_info info) { return info.index == c.core_type; }
         );
@@ -515,6 +579,20 @@ constraints_container generate_constraints_variety() {
 
 #if __HYBRID_CPUS_TESTING
         std::vector<tbb::core_type_id> core_types = tbb::info::core_types();
+
+        // Generate all possible combinations of core_types
+        std::vector<std::vector<tbb::core_type_id>> core_type_combinations;
+        size_t num_core_types = core_types.size();
+        for (uint32_t mask = 0; mask < (1u << num_core_types); ++mask) {
+            std::vector<tbb::core_type_id> combination;
+            for (size_t i = 0; i < num_core_types; ++i) {
+                if (mask & (1u << i)) {
+                    combination.push_back(core_types[i]);
+                }
+            }
+            core_type_combinations.push_back(combination);
+        }
+
         core_types.push_back((tbb::core_type_id)tbb::task_arena::automatic);
 #endif
 
@@ -554,6 +632,41 @@ constraints_container generate_constraints_variety() {
                             .set_numa_id(numa_node)
                             .set_core_type(core_type)
                             .set_max_threads_per_core(max_threads_per_core)
+                    );
+                }
+            }
+            for (const auto& combination : core_type_combinations) {
+                results.insert(constraints{}.set_core_types(combination));
+
+                results.insert(
+                    constraints{}
+                    .set_numa_id(numa_node)
+                    .set_core_types(combination)
+                );
+
+                for (const auto& max_threads_per_core : system_info::get_available_max_threads_values()) {
+                    results.insert(
+                        constraints{}
+                        .set_max_threads_per_core(max_threads_per_core)
+                    );
+
+                    results.insert(
+                        constraints{}
+                        .set_numa_id(numa_node)
+                        .set_max_threads_per_core(max_threads_per_core)
+                    );
+
+                    results.insert(
+                        constraints{}
+                        .set_core_types(combination)
+                        .set_max_threads_per_core(max_threads_per_core)
+                    );
+
+                    results.insert(
+                        constraints{}
+                        .set_numa_id(numa_node)
+                        .set_core_types(combination)
+                        .set_max_threads_per_core(max_threads_per_core)
                     );
                 }
             }
