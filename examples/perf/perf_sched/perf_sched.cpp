@@ -38,21 +38,13 @@ const count_t N_finest = (count_t)(N/log((double)N)/10);
 const count_t N_fine = N_finest * 20;
 const count_t N_med = N_fine * (count_t)log((double)N) / 5;
 
-#if 0 // temporary
-
-class StaticTaskHolder {
-public:
-    tbb::task *my_leafTaskPtr;
-    StaticTaskHolder ();
-};
-
-static StaticTaskHolder s_tasks;
+namespace impl = tbb::detail::d1;
 
 static count_t NumIterations;
 static count_t NumLeafTasks;
 static count_t NumRootTasks;
 
-class LeafTaskBase : public tbb::task {
+class LeafTaskBase : public impl::task {
 public:
     count_t my_ID;
 
@@ -60,21 +52,42 @@ public:
     LeafTaskBase ( count_t id ) : my_ID(id) {}
 };
 
+template<typename Finalizer>
 class SimpleLeafTask : public LeafTaskBase {
-    task* execute () {
+    impl::task* execute (impl::execution_data&) override {
         volatile count_t anchor = 0;
         for ( count_t i=0; i < NumIterations; ++i )
             anchor += i;
-        return NULL;
+        if (wctx) wctx->release();
+        Finalizer{}(this);
+        return nullptr;
     }
+    impl::task* cancel (impl::execution_data&) override {
+        if (wctx) wctx->release();
+        Finalizer{}(this);
+        return nullptr;
+    }
+    impl::wait_context* wctx;
 public:
-    SimpleLeafTask ( count_t ) {}
+    SimpleLeafTask ( count_t ) : wctx(nullptr) {}
+    SimpleLeafTask ( impl::wait_context& w ) : wctx(&w) {}
+    void set_wait_context(impl::wait_context& w) {
+        wctx = &w;
+    }
 };
 
-StaticTaskHolder::StaticTaskHolder () {
-    static SimpleLeafTask s_t1(0);
-    my_leafTaskPtr = &s_t1;
-}
+struct DoNothingFinalizer {
+    template<typename T>
+    void operator(T*/*task*/) {}
+};
+
+struct DeleteFinalizer {
+    template<typename T>
+    void operator(T* task) {
+        delete task;
+    }
+};
+
 
 class Test_SPMC : public Perf::Test {
 protected:
@@ -95,12 +108,12 @@ protected:
     }
     
     void Run ( ThreadInfo& ) {
-        tbb::empty_task &r = *new( tbb::task::allocate_root() ) tbb::empty_task;
-        r.set_ref_count( NumLeafTasks + 1 );
-        for ( count_t i = 0; i < NumLeafTasks; ++i )
-            r.spawn( *new(r.allocate_child()) SimpleLeafTask(0) );
-        r.wait_for_all();
-        tbb::task::destroy(r);
+        tbb::task_group_context tgctx(tbb::task_group_context::isolated);
+        impl::wait_context wctx(NumLeafTasks);
+        for ( count_t i = 0; i < NumLeafTasks; ++i ) {
+            impl::spawn(*new SimpleLeafTask<DeleteFinalizer>(wctx), tgctx);
+        }
+        impl::wait(wctx, tgctx);
     }
 
     void RunSerial ( ThreadInfo& ) {
@@ -112,13 +125,15 @@ protected:
     }
 
 public:
-    Test_SPMC ( LeafTaskBase* leafTaskPtr = NULL ) {
-        static SimpleLeafTask t(0);
+    Test_SPMC ( LeafTaskBase* leafTaskPtr = nullptr ) {
+        static SimpleLeafTask<DoNothingFinalizer> t(0);
         my_leafTaskPtr = leafTaskPtr ? leafTaskPtr : &t;
     }
 }; // class Test_SPMC
 
 const count_t Test_SPMC::workloads[Test_SPMC::numWorkloads] = { 1, 50, 500, 5000 };
+
+#if 0 // temporary
 
 template<class LeafTask>
 class LeavesLauncherTask : public tbb::task {
@@ -431,8 +446,8 @@ public:
 
 int main( int argc, char* argv[] ) {
     Perf::SessionSettings opts (Perf::UseTaskScheduler | Perf::UseSerialBaseline, "perf_sched.txt");   // Perf::UseBaseline, Perf::UseSmallestWorkloadOnly
-#if 0
     Perf::RegisterTest<Test_SPMC>();
+#if 0
     Perf::RegisterTest<Test_ShallowTree>();
     Perf::RegisterTest<Test_ShallowTree_Skewed>();
 #endif
