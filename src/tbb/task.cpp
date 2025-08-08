@@ -239,8 +239,9 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
             for (auto it = reference_map.begin(); it != reference_map.end();) {
                 if (it->second->get_num_children() == 0) {
                     auto& node = it->second;
-                    node->~thread_reference_vertex();
-                    cache_aligned_deallocate(node);
+                    __TBB_ASSERT(!(node->m_ref_count.load(std::memory_order_relaxed) & node->m_orphaned_bit),
+                        "the orphaned bit cannot be set");
+                    node->finalize();
                     it = reference_map.erase(it);
                 } else {
                     ++it;

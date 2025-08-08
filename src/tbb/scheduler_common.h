@@ -440,32 +440,56 @@ struct suspend_point_type {
 #pragma warning( disable: 4324 )
 #endif
 
-class thread_reference_vertex: public d1::reference_vertex {
+class thread_reference_vertex : public d1::wait_tree_vertex_interface {
 public:
-    using d1::reference_vertex::reference_vertex;
+    thread_reference_vertex(wait_tree_vertex_interface *parent, std::uint32_t ref_count)
+        : m_parent{parent}, m_ref_count{ref_count} {}
+
+    void reserve(std::uint32_t delta = 1) override {
+        auto ref = m_ref_count.fetch_add(static_cast<std::uint64_t>(delta));
+        if (ref == 0) {
+            m_parent->reserve();
+        }
+    }
 
     void release(std::uint32_t delta = 1) override {
-        auto parent = my_parent;
+        // Saving the pointer to the parent before decrementing the reference count
+        // since it won't be safe access any members after that
+        auto parent = m_parent;
         std::uint64_t ref = m_ref_count.fetch_sub(static_cast<std::uint64_t>(delta)) - static_cast<std::uint64_t>(delta);
+        // Masking out the orphaned bit to check actual number of references
         if ((ref & ~m_orphaned_bit) == 0) {
             parent->release();
+            // The owning thread has abandoned this vertex so it is our responsibility to finalize it
             if (ref & m_orphaned_bit) {
-                this->~thread_reference_vertex();
-                cache_aligned_deallocate(this);
+                finalize();
             }
         }
     }
 
+    std::uint32_t get_num_children() {
+        auto num_children = m_ref_count.load(std::memory_order_acquire) & ~m_orphaned_bit;
+        return static_cast<std::uint32_t>(num_children);
+    }
+
     void release_ownership() {
         auto ref = m_ref_count.fetch_or(m_orphaned_bit);
+        __TBB_ASSERT(!(ref & m_orphaned_bit), "cannot release ownership twice");
         if (ref == 0) {
-            this->~thread_reference_vertex();
-            cache_aligned_deallocate(this);
+            finalize();
         }
     }
 
+    void finalize() {
+        this->~thread_reference_vertex();
+        cache_aligned_deallocate(this);
+    }
 private:
     static constexpr std::uint64_t m_orphaned_bit = 1ull << 63;
+    wait_tree_vertex_interface* m_parent;
+    std::atomic<std::uint64_t> m_ref_count;
+
+    friend d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex_interface*);
 };
 
 class alignas (max_nfs_size) task_dispatcher {
