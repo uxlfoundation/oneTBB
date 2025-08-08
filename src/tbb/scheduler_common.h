@@ -455,7 +455,7 @@ public:
 
     void release(std::uint32_t delta = 1) override {
         // Saving a reference to the parent before decrementing the reference count
-        // because it won't be safe to access any members after that
+        // because other thread can destroy the vertex after the decrement
         auto& parent = m_parent;
         std::uint64_t ref = m_ref_count.fetch_sub(delta) - delta;
         __TBB_ASSERT_EX((ref & m_overflow_mask) == 0, "Underflow is detected");
