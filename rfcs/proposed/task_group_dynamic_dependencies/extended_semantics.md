@@ -29,16 +29,17 @@
   * 6.4 [Using a ``task_completion_handle`` as a successor](#using-a-task_completion_handle-as-a-successor)
   * 6.5 [Returning ``task_completion_handle`` from submission functions](#returning-task_completion_handle-from-submission-functions)
 * 7 [Naming considerations](#naming-considerations)
-* 8 [Exit criteria & open questions](#exit-criteria--open-questions)
-* 9 [Advanced examples](#advanced-examples)
-  * 9.1 [Recursive Fibonacci](#recursive-fibonacci)
-  * 9.2 [N-bodies problem](#n-bodies-problem)
-  * 9.3 [Wavefront](#wavefront)
-    * 9.3.1 [Non-recursive approach](#non-recursive-approach)
-    * 9.3.2 [Classic recursive approach](#classic-recursive-approach)
-    * 9.3.3 [Eager recursive approach](#eager-recursive-approach)
-    * 9.3.4 [Combination of eager and classic approaches](#combination-of-eager-and-classic-approaches)
-  * 9.4 [File Parser](#file-parser)
+* 8 [Implementation details](#implementation-details)
+* 9 [Exit criteria & open questions](#exit-criteria--open-questions)
+* 10 [Advanced examples](#advanced-examples)
+  * 10.1 [Recursive Fibonacci](#recursive-fibonacci)
+  * 10.2 [N-bodies problem](#n-bodies-problem)
+  * 10.3 [Wavefront](#wavefront)
+    * 10.3.1 [Non-recursive approach](#non-recursive-approach)
+    * 10.3.2 [Classic recursive approach](#classic-recursive-approach)
+    * 10.3.3 [Eager recursive approach](#eager-recursive-approach)
+    * 10.3.4 [Combination of eager and classic approaches](#combination-of-eager-and-classic-approaches)
+  * 10.4 [File Parser](#file-parser)
 
 ## Introduction
 
@@ -712,6 +713,11 @@ the API was renamed to ``tbb::task_group::set_task_order``.
 ``transfer_this_task_completion_to(t)`` was adopted to emphasize that the successors of the currently executing task will proceed only after
 `t` completes. The combination of ``transfer_this_task_completion_to`` and ``task_completion_handle`` indicates that successors
 added after the transfer will be associated with the task that receives the completion, and the ``task_completion_handle`` follows the transferred completion of the task.
+
+## Implementation details
+
+Implementation details for the API added by this RFC are described as part of the
+[separate sub-RFC](implementation_details.md).
 
 ## Exit criteria & open questions
 * Performance targets for this feature should be defined.
