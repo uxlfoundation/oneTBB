@@ -460,7 +460,7 @@ public:
         // Masking out the orphaned bit to check actual number of references
         if ((ref & ~m_orphaned_bit) == 0) {
             parent->release();
-            // The owning thread has abandoned this vertex so it is our responsibility to finalize it
+            // If the owning thread has abandoned this vertex, it is our responsibility to destroy it
             if (ref & m_orphaned_bit) {
                 finalize();
             }
