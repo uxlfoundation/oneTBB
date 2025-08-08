@@ -442,27 +442,29 @@ struct suspend_point_type {
 
 class thread_reference_vertex : public d1::wait_tree_vertex_interface {
 public:
-    thread_reference_vertex(wait_tree_vertex_interface *parent, std::uint32_t ref_count)
+    thread_reference_vertex(wait_tree_vertex_interface& parent, std::uint32_t ref_count)
         : m_parent{parent}, m_ref_count{ref_count} {}
 
     void reserve(std::uint32_t delta = 1) override {
-        auto ref = m_ref_count.fetch_add(static_cast<std::uint64_t>(delta));
+        auto ref = m_ref_count.fetch_add(delta);
+        __TBB_ASSERT_EX(((ref + delta) & m_overflow_mask) == 0, "Overflow is detected");
         if (ref == 0) {
-            m_parent->reserve();
+            m_parent.reserve();
         }
     }
 
     void release(std::uint32_t delta = 1) override {
-        // Saving the pointer to the parent before decrementing the reference count
-        // since it won't be safe access any members after that
-        auto parent = m_parent;
-        std::uint64_t ref = m_ref_count.fetch_sub(static_cast<std::uint64_t>(delta)) - static_cast<std::uint64_t>(delta);
+        // Saving a reference to the parent before decrementing the reference count
+        // because it won't be safe to access any members after that
+        auto& parent = m_parent;
+        std::uint64_t ref = m_ref_count.fetch_sub(delta) - delta;
+        __TBB_ASSERT_EX((ref & m_overflow_mask) == 0, "Underflow is detected");
         // Masking out the orphaned bit to check actual number of references
         if ((ref & ~m_orphaned_bit) == 0) {
-            parent->release();
+            parent.release();
             // If the owning thread has abandoned this vertex, it is our responsibility to destroy it
             if (ref & m_orphaned_bit) {
-                finalize();
+                destroy();
             }
         }
     }
@@ -476,17 +478,18 @@ public:
         auto ref = m_ref_count.fetch_or(m_orphaned_bit);
         __TBB_ASSERT(!(ref & m_orphaned_bit), "cannot release ownership twice");
         if (ref == 0) {
-            finalize();
+            destroy();
         }
     }
 
-    void finalize() {
+    void destroy() {
         this->~thread_reference_vertex();
         cache_aligned_deallocate(this);
     }
 private:
     static constexpr std::uint64_t m_orphaned_bit = 1ull << 63;
-    wait_tree_vertex_interface* m_parent;
+    static constexpr std::uint64_t m_overflow_mask = ~((1ull << 32) - 1) & ~m_orphaned_bit;
+    wait_tree_vertex_interface& m_parent;
     std::atomic<std::uint64_t> m_ref_count;
 
     friend d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex_interface*);

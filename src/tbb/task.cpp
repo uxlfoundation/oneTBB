@@ -241,7 +241,7 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
                     auto& node = it->second;
                     __TBB_ASSERT(!(node->m_ref_count.load(std::memory_order_relaxed) & node->m_orphaned_bit),
                         "the orphaned bit should not yet be set");
-                    node->finalize();
+                    node->destroy();
                     it = reference_map.erase(it);
                 } else {
                     ++it;
@@ -250,7 +250,7 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
         }
 
         reference_map[top_wait_context] = ref_counter =
-            new (cache_aligned_allocate(sizeof(thread_reference_vertex))) thread_reference_vertex(top_wait_context, 0);
+            new (cache_aligned_allocate(sizeof(thread_reference_vertex))) thread_reference_vertex(*top_wait_context, 0);
     }
 
     return ref_counter;
