@@ -56,7 +56,19 @@ public:
     }
 };
 
-template<typename Finalizer>
+struct DoNothingFinalizer {
+    template<typename T>
+    void operator()(T*/*task*/) {}
+};
+
+struct DeleteFinalizer {
+    template<typename T>
+    void operator()(T* task) {
+        delete task;
+    }
+};
+
+template<typename Finalizer = DeleteFinalizer>
 class SimpleLeafTask : public LeafTaskBase {
     impl::task* execute (impl::execution_data&) override {
         volatile count_t anchor = 0;
@@ -74,24 +86,11 @@ class SimpleLeafTask : public LeafTaskBase {
     impl::wait_context* wctx;
 public:
     SimpleLeafTask ( count_t ) : wctx(nullptr) {}
-    SimpleLeafTask ( impl::wait_context& w ) : wctx(&w) {}
+    SimpleLeafTask ( impl::wait_context& w, count_t ) : wctx(&w) {}
     void set_wait_context(impl::wait_context& w) {
         wctx = &w;
     }
 };
-
-struct DoNothingFinalizer {
-    template<typename T>
-    void operator()(T*/*task*/) {}
-};
-
-struct DeleteFinalizer {
-    template<typename T>
-    void operator()(T* task) {
-        delete task;
-    }
-};
-
 
 class Test_SPMC : public Perf::Test {
 protected:
@@ -112,11 +111,10 @@ protected:
     }
     
     void Run ( ThreadInfo& ) {
-        tbb::task_group_context tgctx(tbb::task_group_context::isolated);
+        tbb::task_group_context tgctx;
         impl::wait_context wctx(NumLeafTasks);
-        for ( count_t i = 0; i < NumLeafTasks; ++i ) {
-            impl::spawn(*new SimpleLeafTask<DeleteFinalizer>(wctx), tgctx);
-        }
+        for ( count_t i = 0; i < NumLeafTasks; ++i )
+            impl::spawn(*new SimpleLeafTask<>(wctx, 0), tgctx);
         impl::wait(wctx, tgctx);
     }
 
@@ -137,32 +135,39 @@ public:
 
 const count_t Test_SPMC::workloads[Test_SPMC::numWorkloads] = { 1, 50, 500, 5000 };
 
-#if 0 // temporary
-
 template<class LeafTask>
-class LeavesLauncherTask : public tbb::task {
+class LeavesLauncherTask : public impl::task {
     count_t my_groupId;
+    impl::wait_context my_wctx;
+    impl::wait_context& outer_wctx;
 
-    task* execute () {
+    impl::task* execute (impl::execution_data& ed) override {
         count_t base = my_groupId * NumLeafTasks;
-        set_ref_count(NumLeafTasks + 1);
+        my_wctx.reserve(NumLeafTasks);
         for ( count_t i = 0; i < NumLeafTasks; ++i )
-            spawn( *new(allocate_child()) LeafTask(base + i) );
-        wait_for_all();
-        return NULL;
+            impl::spawn( *new LeafTask(my_wctx, base + i), *ed.context );
+        impl::wait(my_wctx, *ed.context);
+        outer_wctx.release();
+        delete this;
+        return nullptr;
+    }
+    impl::task* cancel (impl::execution_data&) override {
+        outer_wctx.release();
+        delete this;
+        return nullptr;
     }
 public:
-    LeavesLauncherTask ( count_t groupId ) : my_groupId(groupId) {}
+    LeavesLauncherTask ( count_t groupId, impl::wait_context& w )
+        : my_groupId(groupId), my_wctx(0), outer_wctx(w) {}
 };
 
 template<class LeafTask>
 void RunShallowTree () {
-    tbb::empty_task &r = *new( tbb::task::allocate_root() ) tbb::empty_task;
-    r.set_ref_count( NumRootTasks + 1 );
+    tbb::task_group_context tgctx;
+    impl::wait_context wctx(NumRootTasks);
     for ( count_t i = 0; i < NumRootTasks; ++i )
-        r.spawn( *new(r.allocate_child()) LeavesLauncherTask<LeafTask>(i) );
-    r.wait_for_all();
-    tbb::task::destroy(r);
+        impl::spawn( *new LeavesLauncherTask<LeafTask>(i, wctx), tgctx );
+    impl::wait(wctx, tgctx);
 }
 
 class Test_ShallowTree : public Test_SPMC {
@@ -177,9 +182,11 @@ class Test_ShallowTree : public Test_SPMC {
     }
 
     void Run ( ThreadInfo& ) {
-        RunShallowTree<SimpleLeafTask>();
+        RunShallowTree<SimpleLeafTask<>>();
     }
 }; // class Test_ShallowTree
+
+#if 0 // temporary
 
 class LeafTaskSkewed : public LeafTaskBase {
     task* execute () {
@@ -451,8 +458,8 @@ public:
 int main( int argc, char* argv[] ) {
     Perf::SessionSettings opts (Perf::UseTaskScheduler | Perf::UseSerialBaseline, "perf_sched.txt");   // Perf::UseBaseline, Perf::UseSmallestWorkloadOnly
     Perf::RegisterTest<Test_SPMC>();
-#if 0
     Perf::RegisterTest<Test_ShallowTree>();
+#if 0
     Perf::RegisterTest<Test_ShallowTree_Skewed>();
 #endif
     Test_PFor_Simple pf_sp(SimplePartitioner), pf_ap(AutoPartitioner);
