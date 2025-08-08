@@ -488,7 +488,7 @@ public:
     }
 private:
     static constexpr std::uint64_t m_orphaned_bit = 1ull << 63;
-    static constexpr std::uint64_t m_overflow_mask = ~((1ull << 32) - 1) & ~m_orphaned_bit;
+    static constexpr std::uint64_t m_overflow_mask = ~(((1ull << 32) - 1) | m_orphaned_bit);
     wait_tree_vertex_interface& m_parent;
     std::atomic<std::uint64_t> m_ref_count;
 
