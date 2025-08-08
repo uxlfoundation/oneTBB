@@ -45,7 +45,7 @@ struct fib_computation : task_emulation::base_task {
 
     task_emulation::base_task* execute() override {
         task_emulation::base_task* bypass = nullptr;
-        if (n < cutoff) {
+        if (n < CutOff) {
             *x = SerialFib(n);
         }
         else {
