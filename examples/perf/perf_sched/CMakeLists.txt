@@ -29,8 +29,8 @@ target_compile_options(perf_sched PRIVATE ${TBB_CXX_STD_FLAG})
 
 set(EXECUTABLE "$<TARGET_FILE:perf_sched>")
 
-#set(ARGS 2) # only run on 2 threads
-#set(PERF_ARGS 1:8)
+set(ARGS 2) # only run on 2 threads
+set(PERF_ARGS 1:8)
 
 #add_execution_target(run_perf_sched perf_sched ${EXECUTABLE} "${ARGS}")
 #add_execution_target(perf_run_perf_sched perf_sched ${EXECUTABLE} "${PERF_ARGS}")
