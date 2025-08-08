@@ -50,6 +50,10 @@ public:
 
     LeafTaskBase () {}
     LeafTaskBase ( count_t id ) : my_ID(id) {}
+    impl::task* execute_serial() {
+        impl::execution_data ed;
+        return this->execute(ed);
+    }
 };
 
 template<typename Finalizer>
@@ -78,12 +82,12 @@ public:
 
 struct DoNothingFinalizer {
     template<typename T>
-    void operator(T*/*task*/) {}
+    void operator()(T*/*task*/) {}
 };
 
 struct DeleteFinalizer {
     template<typename T>
-    void operator(T* task) {
+    void operator()(T* task) {
         delete task;
     }
 };
@@ -120,7 +124,7 @@ protected:
         const count_t n = NumLeafTasks * NumRootTasks;
         for ( count_t i=0; i < n; ++i ) {
             my_leafTaskPtr->my_ID = i;
-            my_leafTaskPtr->execute();
+            my_leafTaskPtr->execute_serial();
         }
     }
 
