@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2019-2023 Intel Corporation
+    Copyright (c) 2019-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -20,6 +21,8 @@
 #include "../tbb/assert_impl.h" // Out-of-line TBB assertion handling routines are instantiated here.
 #include "oneapi/tbb/detail/_assert.h"
 #include "oneapi/tbb/detail/_config.h"
+#include "oneapi/tbb/detail/_utils.h"
+#include "oneapi/tbb/info.h"
 
 #if _MSC_VER && !__INTEL_COMPILER && !__clang__
 #pragma warning( push )
@@ -192,15 +195,12 @@ private:
         bool core_types_parsing_broken = core_types_number <= 0;
         if (!core_types_parsing_broken) {
             core_types_affinity_masks_list.resize(core_types_number);
-            int efficiency{-1};
 
             for (int core_type = 0; core_type < core_types_number; ++core_type) {
                 hwloc_cpuset_t& current_mask = core_types_affinity_masks_list[core_type];
                 current_mask = hwloc_bitmap_alloc();
 
-                if (!hwloc_cpukinds_get_info(topology, core_type, current_mask, &efficiency, nullptr, nullptr, 0)
-                    && efficiency >= 0
-                ) {
+                if (!hwloc_cpukinds_get_info(topology, core_type, current_mask, nullptr, nullptr, nullptr, 0)) {
                     hwloc_bitmap_and(current_mask, current_mask, process_cpu_affinity_mask);
 
                     if (hwloc_bitmap_weight(current_mask) > 0) {
@@ -210,6 +210,35 @@ private:
                 } else {
                     core_types_parsing_broken = true;
                     break;
+                }
+            }
+        }
+        // On hybrid CPUs, check if there are cores without L3 cache.
+        if (!core_types_parsing_broken && core_types_number > 1) {
+            // The first core type mask (least performant cores)
+            hwloc_cpuset_t& front = core_types_affinity_masks_list.front();
+            hwloc_cpuset_t lp_mask = hwloc_bitmap_dup(front);
+
+            // Iterate through all L3 cache objects and remove their cores from lp_mask.
+            hwloc_obj_t l3_package = nullptr;
+            while ((l3_package = hwloc_get_next_obj_by_type(topology, HWLOC_OBJ_L3CACHE, l3_package)) != nullptr ) {
+                hwloc_bitmap_andnot(lp_mask, lp_mask, l3_package->cpuset);
+            }
+
+            if (hwloc_bitmap_iszero(lp_mask)) {
+                // All cores in the front mask have L3 cache, so no need to create a separate core type.
+                hwloc_bitmap_free(lp_mask);
+            } else {
+                hwloc_bitmap_andnot(front, front, lp_mask);
+                if (hwloc_bitmap_iszero(front)) {
+                    // No cores with L3 cache in the front mask, so replace it with the L3-less cores.
+                    hwloc_bitmap_free(front);
+                    front = lp_mask;
+                } else {
+                    // The front mask has SOME cores with L3 cache.
+                    // Create a new least performant (L3-less) core type and add it to the front.
+                    core_types_affinity_masks_list.insert(core_types_affinity_masks_list.begin(), lp_mask);
+                    core_types_indexes_list.push_back(core_types_number++);
                 }
             }
         }
@@ -316,7 +345,13 @@ public:
     void fill_constraints_affinity_mask(affinity_mask input_mask, int numa_node_index, int core_type_index, int max_threads_per_core) {
         __TBB_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized system_topology");
         __TBB_ASSERT(numa_node_index < (int)numa_affinity_masks_list.size(), "Wrong NUMA node id");
-        __TBB_ASSERT(core_type_index < (int)core_types_affinity_masks_list.size(), "Wrong core type id");
+        __TBB_ASSERT(core_type_index == -1 ||
+            // In the multiple core type format, the MSB of the first core_type_id_bits bits represents the highest core type id
+            (tbb::detail::d1::constraints::single_core_type(core_type_index)
+                 ? (size_t)core_type_index
+                 : tbb::detail::log2(core_type_index & ((1 << tbb::detail::d1::constraints::core_type_id_bits) - 1))) <
+                core_types_affinity_masks_list.size(),
+            "Wrong core type id");
         __TBB_ASSERT(max_threads_per_core == -1 || max_threads_per_core > 0, "Wrong max_threads_per_core");
 
         hwloc_cpuset_t constraints_mask = hwloc_bitmap_alloc();
@@ -327,7 +362,18 @@ public:
             hwloc_bitmap_and(constraints_mask, constraints_mask, numa_affinity_masks_list[numa_node_index]);
         }
         if (core_type_index >= 0) {
-            hwloc_bitmap_and(constraints_mask, constraints_mask, core_types_affinity_masks_list[core_type_index]);
+            auto core_types = tbb::detail::d1::constraints{}.set_core_type(core_type_index).get_core_types();
+            __TBB_ASSERT(!core_types.empty(), "Core types list must not be empty");
+
+            hwloc_cpuset_t core_types_mask = hwloc_bitmap_alloc();
+
+            // Combine affinity masks for specified core types
+            for (int c : core_types) {
+                hwloc_bitmap_or(core_types_mask, core_types_mask, core_types_affinity_masks_list[c]);
+            }
+
+            hwloc_bitmap_and(constraints_mask, constraints_mask, core_types_mask);
+            hwloc_bitmap_free(core_types_mask);
         }
         if (max_threads_per_core > 0) {
             // clear input mask

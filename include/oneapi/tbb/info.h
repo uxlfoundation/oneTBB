@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2019-2022 Intel Corporation
+    Copyright (c) 2019-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -53,11 +54,49 @@ struct constraints {
         core_type = id;
         return *this;
     }
+    constraints& set_core_types(const std::vector<core_type_id>& ids) {
+        if (ids.empty()) {
+            core_type = -1;
+        } else if (ids.size() == 1) {
+            core_type = ids[0];
+        } else {
+            // Set a marker bit to indicate multiple core type format
+            core_type = (1 << core_type_id_bits);
+
+            for (core_type_id id : ids) {
+                __TBB_ASSERT((0 <= id) && (id < static_cast<core_type_id>(core_type_id_bits)), "Wrong core type id");
+                core_type |= (1 << id);
+            }
+        }
+
+        return *this;
+    }
+    std::vector<core_type_id> get_core_types() const {
+        if ((core_type == -1) || single_core_type()) {
+            return {core_type};
+        }
+
+        std::vector<core_type_id> core_type_ids;
+        for (size_t bit_pos = 0; bit_pos < core_type_id_bits; ++bit_pos) {
+            if (core_type & (1 << bit_pos)) {
+                core_type_ids.push_back(static_cast<core_type_id>(bit_pos));
+            }
+        }
+        return core_type_ids;
+    }
+    static bool single_core_type(core_type_id id) {
+        return (id >> core_type_id_bits) == 0;
+    }
+    bool single_core_type() const {
+        return single_core_type(core_type);
+    }
     constraints& set_max_threads_per_core(int threads_number) {
         max_threads_per_core = threads_number;
         return *this;
     }
 
+    // Upper 4 bits reserved for format marker (single vs multiple core types)
+    static constexpr size_t core_type_id_bits = sizeof(core_type_id) * CHAR_BIT - 4;
     numa_node_id numa_id = -1;
     int max_concurrency = -1;
     core_type_id core_type = -1;
