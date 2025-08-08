@@ -87,9 +87,6 @@ class SimpleLeafTask : public LeafTaskBase {
 public:
     SimpleLeafTask ( count_t ) : wctx(nullptr) {}
     SimpleLeafTask ( impl::wait_context& w, count_t ) : wctx(&w) {}
-    void set_wait_context(impl::wait_context& w) {
-        wctx = &w;
-    }
 };
 
 class Test_SPMC : public Perf::Test {
@@ -186,23 +183,31 @@ class Test_ShallowTree : public Test_SPMC {
     }
 }; // class Test_ShallowTree
 
-#if 0 // temporary
-
+template<typename Finalizer = DeleteFinalizer>
 class LeafTaskSkewed : public LeafTaskBase {
-    task* execute () {
+    impl::task* execute (impl::execution_data&) override {
         volatile count_t anchor = 0;
         double K = (double)NumRootTasks * NumLeafTasks;
         count_t n = count_t(sqrt(double(my_ID)) * double(my_ID) * my_ID / (4 * K * K));
         for ( count_t i = 0; i < n; ++i )
             anchor += i;
-        return NULL;
+        if (wctx) wctx->release();
+        Finalizer{}(this);
+        return nullptr;
     }
+    impl::task* cancel (impl::execution_data&) override {
+        if (wctx) wctx->release();
+        Finalizer{}(this);
+        return nullptr;
+    }
+    impl::wait_context* wctx;
 public:
-    LeafTaskSkewed ( count_t id ) : LeafTaskBase(id) {}
+    LeafTaskSkewed ( count_t id ) : LeafTaskBase(id), wctx(nullptr) {}
+    LeafTaskSkewed ( impl::wait_context& w, count_t id ) : LeafTaskBase(id), wctx(&w) {}
 };
 
 class Test_ShallowTree_Skewed : public Test_SPMC {
-    static LeafTaskSkewed SerialTaskBody;
+    static LeafTaskSkewed<DoNothingFinalizer> SerialTaskBody;
 
     const char* Name () { return "ShallowTree_Skewed"; }
 
@@ -215,16 +220,14 @@ class Test_ShallowTree_Skewed : public Test_SPMC {
     }
 
     void Run ( ThreadInfo& ) {
-        RunShallowTree<LeafTaskSkewed>();
+        RunShallowTree<LeafTaskSkewed<>>();
     }
 
 public:
     Test_ShallowTree_Skewed () : Test_SPMC(&SerialTaskBody) {}
 }; // class Test_ShallowTree_Skewed
 
-LeafTaskSkewed Test_ShallowTree_Skewed::SerialTaskBody(0);
-
-#endif // 0 - temporary
+LeafTaskSkewed<DoNothingFinalizer> Test_ShallowTree_Skewed::SerialTaskBody(0);
 
 typedef tbb::blocked_range<count_t> range_t;
 
@@ -457,11 +460,11 @@ public:
 
 int main( int argc, char* argv[] ) {
     Perf::SessionSettings opts (Perf::UseTaskScheduler | Perf::UseSerialBaseline, "perf_sched.txt");   // Perf::UseBaseline, Perf::UseSmallestWorkloadOnly
+
     Perf::RegisterTest<Test_SPMC>();
     Perf::RegisterTest<Test_ShallowTree>();
-#if 0
     Perf::RegisterTest<Test_ShallowTree_Skewed>();
-#endif
+
     Test_PFor_Simple pf_sp(SimplePartitioner), pf_ap(AutoPartitioner);
     Perf::RegisterTest(pf_sp);
     Perf::RegisterTest(pf_ap);
