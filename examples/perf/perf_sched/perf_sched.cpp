@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2020 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@
 #include "tbb/blocked_range.h"
 #include "tbb/parallel_for.h"
 #include "tbb/parallel_reduce.h"
-//#include "task_emulation_layer.h"
 
 #define NUM_CHILD_TASKS     2096
 #define NUM_ROOT_TASKS      256
