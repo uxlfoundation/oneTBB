@@ -31,7 +31,7 @@ long SerialFib( const long n ) {
 }
 
 struct continuation_task : public impl::task {
-    continuation_task(std::uint32_t ref_count) : my_parent{parent}, m_ref_count{ref_count}
+    continuation_task(std::uint32_t ref_count) : m_ref_count{ref_count}
     {}
 
     impl::task* release() {
@@ -60,6 +60,7 @@ struct fib_continuation : continuation_task {
 
     long x{ 0 }, y{ 0 };
     long& sum;
+    continuation_task* continuation;
     impl::small_object_allocator alloc;
 };
 
@@ -78,14 +79,14 @@ struct fib_computation: public impl::task {
             *x = SerialFib(n);
             next = finalize(ed);
         } else {
-            auto c = alloc.new_object<fib_continuation>(x, 2, *continuation, alloc);
-            auto b = alloc.new_object<fib_computation>(n-1, &(c->x), *c, alloc);
-            impl::spawn(*b, ed.context);
+            auto& c = *alloc.new_object<fib_continuation>(*x, 2, *continuation, alloc);
+            auto& b = *alloc.new_object<fib_computation>(n-1, &c.x, c, alloc);
+            impl::spawn(b, *ed.context);
 
             // Recycling
-            continuation = c;
             n -= 2;
-            x = &(c->y);
+            continuation = &c;
+            x = &c.y;
         }
         return next;
     }
@@ -119,7 +120,7 @@ long ParallelFib( const long n ) {
     impl::wait_context wctx(1);
     finish_task finish(wctx);
     impl::small_object_allocator alloc;
-    auto start = alloc.new_object<fib_computation>(n, sum, finish, alloc);
+    auto start = alloc.new_object<fib_computation>(n, &sum, finish, alloc);
     impl::execute_and_wait(*start, tgctx, wctx, tgctx);
 
     return sum;
