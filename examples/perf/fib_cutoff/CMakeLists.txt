@@ -21,14 +21,22 @@ include(../../common/cmake/common.cmake)
 set_common_project_settings(tbb)
 
 add_custom_target(fib_cutoff)
-add_dependencies(fib_cutoff fib_cutoff_task_emu)
+add_dependencies(fib_cutoff fib_cutoff_task_emu fib_cutoff_tasks)
 
 add_executable(fib_cutoff_task_emu time_fibonacci_cutoff.cpp fibonacci_impl_emu.cpp)
+add_executable(fib_cutoff_tasks time_fibonacci_cutoff.cpp fibonacci_impl_tasks.cpp)
+
 target_link_libraries(fib_cutoff_task_emu
                       TBB::tbb
                       Threads::Threads
                       $<$<PLATFORM_ID:Linux>:rt>)  # Link "rt" library on Linux
+target_link_libraries(fib_cutoff_tasks
+                      TBB::tbb
+                      Threads::Threads
+                      $<$<PLATFORM_ID:Linux>:rt>)  # Link "rt" library on Linux
+
 target_compile_options(fib_cutoff_task_emu PRIVATE ${TBB_CXX_STD_FLAG})
+target_compile_options(fib_cutoff_tasks PRIVATE ${TBB_CXX_STD_FLAG})
 
 set(ARGS 2 30 1) # 30-th number on 2 threads, with 1 repetition measured
 set(PERF_ARGS 8 42 5)
@@ -36,3 +44,7 @@ set(PERF_ARGS 8 42 5)
 set(EXECUTABLE "$<TARGET_FILE:fib_cutoff_task_emu>")
 #add_execution_target(run_fib_cutoff fib_cutoff_task_emu ${EXECUTABLE} "${ARGS}")
 #add_execution_target(perf_run_fib_cutoff fib_cutoff_task_emu ${EXECUTABLE} "${PERF_ARGS}")
+
+#set(EXECUTABLE "$<TARGET_FILE:fib_cutoff_tasks>")
+#add_execution_target(run_fib_cutoff fib_cutoff_tasks ${EXECUTABLE} "${ARGS}")
+#add_execution_target(perf_run_fib_cutoff fib_cutoff_tasks ${EXECUTABLE} "${PERF_ARGS}")
