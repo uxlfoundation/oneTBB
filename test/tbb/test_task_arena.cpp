@@ -2079,22 +2079,23 @@ TEST_CASE("Stress test enqueue with task_group from multiple threads") {
     std::vector<tbb::task_arena> arenas(num_threads);
     std::vector<tbb::task_group> tg(task_groups_per_thread);
 
+    auto body = [] { utils::doDummyWork(100); };
     for (std::size_t i = 0; i < 10; ++i) {
         utils::NativeParallelFor(num_threads, [&] (std::size_t thread_index) {
             for (std::size_t j = 0; j < task_groups_per_thread; ++j) {
                 for (std::size_t k = 0; k < task_submits_per_task_group; ++k) {
-                    arenas[thread_index].enqueue(tg[j].defer([&] {
-                        utils::doDummyWork(100);
-                    }));
+                    if (k % 2) {
+                        arenas[thread_index].enqueue(tg[j].defer(body));
+                    } else {
+                        arenas[thread_index].enqueue(body, tg[j]);
+                    }
                 }
             }
         });
 
         utils::NativeParallelFor(num_threads, [&] (std::size_t thread_index) {
             for (std::size_t j = 0; j < task_groups_per_thread; ++j) {
-                arenas[thread_index].execute([&] {
-                    tg[j].wait();
-                });
+                arenas[thread_index].wait_for(tg[j]);
             }
         });
     }

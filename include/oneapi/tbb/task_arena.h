@@ -300,9 +300,11 @@ class task_arena : public task_arena_base {
     }
 
     d2::task_group_status wait_for_impl(d2::task_group& tg) {
-        d2::task_group_status status;
+        d2::task_group_status status = d2::task_group_status::not_complete;
         d2::wait_delegate wd{tg, status};
         r1::execute(*this, wd);
+        __TBB_ASSERT(status != d2::task_group_status::not_complete,
+                "unexpected premature exit from wait_for: task group status is still not complete");
         return status;
     }
 public:
