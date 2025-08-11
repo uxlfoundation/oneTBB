@@ -237,10 +237,10 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
         if (reference_map.size() > max_reference_vertex_map_size) {
             // TODO: Research the possibility of using better approach for a clean-up
             for (auto it = reference_map.begin(); it != reference_map.end();) {
-                __TBB_ASSERT(!(it->second->m_ref_count.load(std::memory_order_relaxed) & it->second->m_orphaned_bit),
-                    "the orphaned bit should not yet be set");
-                if (it->second->get_num_children() == 0) {
-                    auto& node = it->second;
+                __TBB_ASSERT(it->second, nullptr);
+                thread_reference_vertex*& node = it->second;
+                __TBB_ASSERT(!node->is_orphaned(), "the orphaned bit should not yet be set");
+                if (node->get_num_children() == 0) {
                     node->destroy();
                     it = reference_map.erase(it);
                 } else {
