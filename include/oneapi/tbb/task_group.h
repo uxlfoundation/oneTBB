@@ -661,7 +661,7 @@ public:
         task_handle_task* curr_th_task = dynamic_cast<task_handle_task*>(curr_task);
         // Not using __TBB_ASSERT(curr_th_task) to allow function_stack_task body to use this method
         if (curr_th_task != nullptr) {
-            curr_th_task->transfer_successors_to(task_handle_accessor::get_task_dynamic_state(new_task));
+            curr_th_task->transfer_completion_to(new_task);
         }
     }
 #endif
