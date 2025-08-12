@@ -100,10 +100,7 @@ public:
     d1::task_group_context& ctx() const { return m_ctx; }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    // Initializes the dynamic state if:
-    // * the task_completion_handle object was created
-    // * first dependency was added to a task_handle
-    // * Successors were transferred to the current task
+    // Returns the dynamic state associated with the task. If the state has not been initialized, initializes it.
     task_dynamic_state* get_dynamic_state() {
         task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_acquire);
 
@@ -224,7 +221,7 @@ public:
     }
 
     task_completion_handle& operator=(const task_completion_handle& other) {
-        if (this != &other) {
+        if (*this != other) {
             // Release co-ownership on the previously tracked dynamic state
             if (m_task_state) m_task_state->release();
 
@@ -240,7 +237,7 @@ public:
         if (this != &other) {
             // Release co-ownership on the previously tracked dynamic state
             if (m_task_state) m_task_state->release();
-
+    
             m_task_state = other.m_task_state;
             other.m_task_state = nullptr;
         }
@@ -249,14 +246,17 @@ public:
 
     task_completion_handle& operator=(const task_handle& th) {
         __TBB_ASSERT(th, "Assignment of task_completion_state from an empty task_handle");
-        // Release co-ownership on the previously tracked dynamic state
-        if (m_task_state) m_task_state->release();
+        task_dynamic_state* th_state = th.m_handle->get_dynamic_state();
+        if (m_task_state != th_state) {
+            // Release co-ownership on the previously tracked dynamic state
+            if (m_task_state) m_task_state->release();
 
-        m_task_state = th.m_handle->get_dynamic_state();
+            m_task_state = th_state;
 
-        // Reserve co-ownership on the new dynamic state
-        __TBB_ASSERT(m_task_state != nullptr, "No state in the non-empty task_handle");
-        m_task_state->reserve();
+            // Reserve co-ownership on the new dynamic state
+            __TBB_ASSERT(m_task_state != nullptr, "No state in the non-empty task_handle");
+            m_task_state->reserve();
+        }
         return *this;
     }
 
