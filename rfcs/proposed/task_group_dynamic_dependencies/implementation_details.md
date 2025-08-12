@@ -352,8 +352,9 @@ If a new successor is added using `A_comp_handle` after this point, the request 
 
 However, since `B_state` was destroyed after task `B` completed, accessing it would lead to use-after-free behavior.
 
-The solution is to extend the lifetime of `B_state` by incrementing its reference counter in every dynamic state that stores it in `m_new_dynamic_state`.
-The counter is then decreased when `A_state` is destroyed.
+The solution is to extend the lifetime of `B_state` by incrementing its reference counter for the lifetime of `A_state`,
+and similarly for the dynamic state of each task transferring its completion to `B`.
+The counter is then decremented when `A_state` is destroyed.
 
 ## Library ABI changes
 
