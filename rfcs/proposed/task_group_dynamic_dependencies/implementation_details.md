@@ -230,22 +230,14 @@ If the list is in the `completed` state, adding a dependency is no longer meanin
 If the successor list is in the `alive` state, the dependency is registered in the successor's `task_dynamic_state` by incrementing the dependency counter.
 If it was the first increment, an additional count is added to represent the dependency on the `task_handle` owning the successor task.
 
-A `successor_list_node` pointing to the newly created dynamic state is then allocated. After allocation, the state of the successor list is re-checked.
-
-If the task's completion was transferred, the previously allocated successor node is redirected to `m_new_dynamic_state`.
-
-If the task is completed, the successor should is not added to the list. Instead, the dependency is released by decrementing the counter in successor's `task_dynamic_state`,
-and the previously allocated `successor_list_node` is deallocated.
-
-If the list is in the `alive` state, the algorithm attempts to insert the successor node at the head using a CAS operation on `m_successor_list_head`.
+A `successor_list_node` pointing to the newly created dynamic state is then allocated and the algorithm attempts to insert it at the head using a CAS operation on
+`m_successor_list_head`. 
 
 A CAS failure (i.e., an update to `m_successor_list_head`) may indicate one of the following:
-* Another thread added a different predecessor and updated the list head.
-* Another thread completed the task.
-* Another thread transferred the task's completion.
-
-In the first case, the CAS operation should be retried, as the successor still needs to be added.
-In the other two cases, the algorithm must re-evaluate the state of the successor list and apply the appropriate logic.
+* Another thread added a different predecessor and updated the list head. The CAS operation should be retried, as the successor still needs to be added.
+* Another thread completed the task (the successor list is in `completed` state). The successor should not be added t the list. The dependency is released
+  by decrementing the dependency counter in successor's `task_dynamic_state`, and the `successor_list_node` is deallocated.
+* Another thread transferred the task's completion. The insertion of the node is redirected to `m_new_dynamic_state`.
 
 The sequence diagram of `set_task_order` is shown in the picture below:
 
