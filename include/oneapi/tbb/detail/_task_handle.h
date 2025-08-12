@@ -221,7 +221,7 @@ public:
     }
 
     task_completion_handle& operator=(const task_completion_handle& other) {
-        if (*this != other) {
+        if (m_task_state != other.m_task_state) {
             // Release co-ownership on the previously tracked dynamic state
             if (m_task_state) m_task_state->release();
 
