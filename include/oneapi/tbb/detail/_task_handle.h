@@ -112,6 +112,7 @@ public:
     }
 
     void add_successor(task_dynamic_state* successor);
+    void add_successor_node(successor_list_node* new_successor_node, successor_list_node* current_successor_list_head);
 
     using successor_list_state_flag = std::uintptr_t;
     static constexpr successor_list_state_flag COMPLETED_FLAG = ~std::uintptr_t(0);
@@ -310,6 +311,27 @@ inline task_handle_task* release_successor_list(successor_list_node* node) {
     return next_task;
 }
 
+inline void task_dynamic_state::add_successor_node(successor_list_node* new_successor_node,
+                                                   successor_list_node* current_successor_list_head)
+{
+    __TBB_ASSERT(new_successor_node != nullptr, nullptr);
+
+    new_successor_node->set_next_node(current_successor_list_head);
+
+    while (!m_successor_list_head.compare_exchange_strong(current_successor_list_head, new_successor_node)) {
+        // Other thread updated the head of the list
+
+        if (is_completed(current_successor_list_head)) {
+            // Current task has completed while we tried to insert the successor to the list
+            new_successor_node->get_continuation()->release_dependency();
+            new_successor_node->finalize();
+            break;
+        }
+
+        new_successor_node->set_next_node(current_successor_list_head);
+    }
+}
+
 inline void task_dynamic_state::add_successor(task_dynamic_state* successor) {
     __TBB_ASSERT(successor != nullptr, nullptr);
     successor_list_node* current_successor_list_head = m_successor_list_head.load(std::memory_order_acquire);
@@ -319,19 +341,7 @@ inline void task_dynamic_state::add_successor(task_dynamic_state* successor) {
 
         d1::small_object_allocator alloc;
         successor_list_node* new_successor_node = alloc.new_object<successor_list_node>(successor, alloc);
-        new_successor_node->set_next_node(current_successor_list_head);
-
-        while (!m_successor_list_head.compare_exchange_strong(current_successor_list_head, new_successor_node)) {
-            // Other thread updated the head of the list
-
-            if (is_completed(current_successor_list_head)) {
-                // Current task has completed while we tried to insert the successor to the list
-                new_successor_node->finalize();
-                successor->release_dependency();
-                break;
-            }
-            new_successor_node->set_next_node(current_successor_list_head);
-        }
+        add_successor_node(new_successor_node, current_successor_list_head);
     }
 }
 
