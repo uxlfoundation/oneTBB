@@ -211,10 +211,11 @@ public:
     }
 
     task_completion_handle(const task_handle& th)
-        : m_task_state(th.m_handle->get_dynamic_state())
+        : m_task_state(nullptr)
     {
         __TBB_ASSERT(th, "Construction of task_completion_handle from an empty task_handle");
-        // Register new co-owner of the dynamic state
+        m_task_state = th.m_handle->get_dynamic_state();
+        // Register one more co-owner of the dynamic state
         m_task_state->reserve();
     }
 
