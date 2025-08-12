@@ -300,7 +300,7 @@ Previously, these functions unconditionally spawned the task owned by `task_hand
 
 With dynamic dependencies, a `tbb::task_handle` may own a task that cannot be spawned immediately due to unresolved dependencies.
 The submission function must check whether the owned task has any dependencies (i.e., whether `m_num_dependencies` is non-zero) and, if so,
-decrement the counter.
+decrement `m_num_references`.
 
 If the task's dynamic state is not initialized, it cannot have any dependencies and is spawned immediately.
 
@@ -315,8 +315,9 @@ the dynamic state of the currently executing task to point to the dynamic state 
 To determine the dynamic state associated with the currently executing task, a pointer to that task must be retrieved from the task scheduler.
 This is accomplished via the [new entry point](#library-abi-changes) `tbb::task* current_task_ptr()` is added. 
 
-The `transfer_this_task_completion_to` transfers the successors from the currently executing task to `new_task`.
-If the dynamic state of the currently executing task has not been initialized, it cannot have any associated successors.
+The `transfer_this_task_completion_to` function transfers the successors from the currently executing task to `new_task`.
+If the dynamic state of the currently executing task has not been initialized, it cannot have any associated successors or completion handlers.
+This means no further successors can be added.
 
 During the transfer, the `m_new_dynamic_state` pointer is set to the dynamic state of `new_task`. The successors
 are then retrieved from the original successor list and appended to the successor list of  `new_dynamic_state`.
@@ -346,7 +347,7 @@ As described earlier, `A_state::m_new_dynamic_state` is set to point to `B_state
 
 <img src="assets/impl_lifetime_issue.png" width=800>
 
-After task `A` completes, task `B` is executed and subsequently destroyed, along with its associated `B_state`.
+After task `A` completes, task `B` is executed and subsequently destroyed. Since there are no completion handlers associated with `B`, `B_state` is destroyed.
 
 If a new successor is added using `A_comp_handle` after this point, the request will be redirected to `B_state`.
 
@@ -381,9 +382,9 @@ the stored pointer is temporarily replaced and restored once the blocking call c
 The following questions were raised during the review of this this document and should be addressed before promoting the feature to `supported`:
 * When transferring task completion, the end of the successor list is determined by traversing it, which may become a
   performance concern if the list contains many elements. Storing a tail pointer in `task_dynamic_state` may resolve this, assuming a
-  real-world case confirms the performance concern.
+  realistic use case example confirms the performance concerns.
 * Modifications to atomic variables in `task_dynamic_state` may in theory lead to false sharing if multiple threads
-  establish dependencies on the same task object. If this occurs in real workloads, separating the atomic members into distinct cache lines can be considered.
+  establish dependencies on the same task object. If this occurs in practice, separating the atomic members into distinct cache lines can be considered.
 * Consider using reserved space in the `task` class for the dynamic state atomic pointer to avoid increasing the size of the `task_handle_task` class.
 
 ## Dynamic state transition examples
