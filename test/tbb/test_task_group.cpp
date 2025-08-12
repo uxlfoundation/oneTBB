@@ -1614,7 +1614,7 @@ void test_adding_successors_after_transfer(unsigned num_threads, submit_function
     CHECK_MESSAGE(new_successor_task_placeholder == finished_task, "new successor task was not finished");
 }
 
-void test_transferring_successors(unsigned num_threads, submit_function func) {
+void test_transferring_completion(unsigned num_threads, submit_function func) {
     test_recursive_reduction(func);
     test_adding_successors_after_transfer(num_threads, func);
 }
@@ -1655,10 +1655,10 @@ TEST_CASE("test task_group dynamic dependencies") {
         test_predecessors(submit_function::arena_enqueue);
         test_predecessors(submit_function::this_arena_enqueue);
 
-        test_transferring_successors(p, submit_function::run);
-        test_transferring_successors(p, submit_function::run_and_wait);
-        test_transferring_successors(p, submit_function::arena_enqueue);
-        test_transferring_successors(p, submit_function::this_arena_enqueue);
+        test_transferring_completion(p, submit_function::run);
+        test_transferring_completion(p, submit_function::run_and_wait);
+        test_transferring_completion(p, submit_function::arena_enqueue);
+        test_transferring_completion(p, submit_function::this_arena_enqueue);
         
         test_return_task_with_dependencies(submit_function::run);
         test_return_task_with_dependencies(submit_function::run_and_wait);
