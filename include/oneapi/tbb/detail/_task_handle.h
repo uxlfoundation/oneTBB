@@ -112,7 +112,7 @@ public:
             if (m_dynamic_state.compare_exchange_strong(current_state, new_state)) {
                 current_state = new_state;
             } else {
-                // Other thread created the dynamic state
+                // CAS failed, current_state points to the dynamic state created by another thread
                 alloc.delete_object(new_state);
             }
         }
