@@ -102,7 +102,7 @@ private:
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
         task* next_task = task_ptr_or_nullptr(m_func);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        task_handle_task* successor_task = this->complete_task();
+        task_handle_task* successor_task = this->complete_and_try_bypass_successor();
         next_task = combine_tasks(next_task, successor_task);
 #endif
         finalize(&ed);
@@ -125,10 +125,11 @@ namespace {
     d1::task* task_ptr_or_nullptr_impl(std::false_type, F&& f){
         task_handle th = std::forward<F>(f)();
         task_handle_task* task_ptr = task_handle_accessor::release(th);
-        // If task has dependencies, it can't be bypassed
-        if (task_ptr->has_dependencies()) {
-            task_ptr = task_ptr->release_dependency();
+        // If task has unresolved dependencies, it can't be bypassed
+        if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
+            task_ptr = nullptr;
         }
+
         return task_ptr;
     }
 
@@ -516,7 +517,7 @@ protected:
             task_handle_task* t = acs::release(h);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
             // If the task has dependencies and the task_handle is not the last dependency
-            if (t->has_dependencies() && t->release_dependency() == nullptr) {
+            if (t->has_dependencies() && !t->release_dependency()) {
                 d1::wait(m_wait_vertex.get_context(), context());
             } else
 #endif
@@ -616,11 +617,11 @@ public:
         task_handle_task* t = acs::release(h);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
         // Owned task has no dependencies or the task handle is the last dependency
-        if (!t->has_dependencies() || t->release_dependency() != nullptr)
-#endif
-        {
-            d1::spawn(*t, context());
+        if (t->has_dependencies() && !t->release_dependency()) {
+            return;
         }
+#endif
+        d1::spawn(*t, context());
     }
 
     template<typename F>
