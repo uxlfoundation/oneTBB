@@ -1248,3 +1248,125 @@ TEST_CASE("Test safe task submit from external thread") {
 }
 
 #endif // TBB_USE_EXCEPTIONS
+
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+TEST_CASE("test task_completion_handle") {
+    tbb::task_group tg;
+
+    std::atomic<std::size_t> task_placeholder{0};
+    auto task_body = [&] { ++task_placeholder; };
+
+    {
+        // Test empty completion_handle
+        tbb::task_completion_handle completion_handle;
+
+        CHECK_MESSAGE(!completion_handle, "Non-empty completion_handle was default constructed");
+        CHECK_MESSAGE(completion_handle == nullptr, "Unexpected result for comparison of empty completion_handle with nullptr");
+        CHECK_MESSAGE(nullptr == completion_handle, "Unexpected result for comparison of nullptr with empty completion_handle");
+        CHECK_MESSAGE(!(completion_handle != nullptr), "Unexpected result for comparison of empty completion_handle with nullptr");
+        CHECK_MESSAGE(!(nullptr != completion_handle), "Unexpected result for comparison of nullptr with empty completion_handle");
+
+        tbb::task_completion_handle handle_copy(completion_handle);
+        CHECK_MESSAGE(!handle_copy, "Non-empty completion_handle was copied from empty completion_handle");
+        CHECK_MESSAGE(handle_copy == completion_handle, "Unexpected result for comparison of empty completion_handle");
+        CHECK_MESSAGE(!(handle_copy != completion_handle), "Unexpected result for comparison of empty completion_handle");
+
+        tbb::task_completion_handle handle_move(std::move(completion_handle));
+        CHECK_MESSAGE(!handle_move, "Non-empty completion_handle was moved from empty completion_handle");
+        CHECK_MESSAGE(!completion_handle, "Moved-from completion_handle is not empty");
+
+        handle_copy = completion_handle;
+        CHECK_MESSAGE(!handle_copy, "Non-empty completion_handle after copy assignment from empty completion_handle");
+        
+        handle_move = std::move(completion_handle);
+        CHECK_MESSAGE(!handle_move, "Non-empty completion_handle after move assignment from empty completion_handle");
+    }
+    {
+        // Test non-empty completion_handle
+        tbb::task_handle task1_handle = tg.defer(task_body);
+        tbb::task_completion_handle task1_completion_handle = task1_handle;
+
+        CHECK(task1_handle);
+        CHECK_MESSAGE(task1_completion_handle, "Empty completion_handle created from non-empty handle");
+        CHECK_MESSAGE(!(task1_completion_handle == nullptr), "Unexpected result for comparison of non-empty completion_handle with nullptr");
+        CHECK_MESSAGE(!(nullptr == task1_completion_handle), "Unexpected result for comparison of nullptr with non-empty completion_handle");
+        CHECK_MESSAGE(task1_completion_handle != nullptr, "Unexpected result for comparison of non-empty completion_handle with nullptr");
+        CHECK_MESSAGE(nullptr != task1_completion_handle, "Unexpected result for comparison of nullptr with non-empty completion_handle");
+
+        tg.run(std::move(task1_handle));
+        tg.wait();
+        CHECK_MESSAGE(task_placeholder == 1, "Task body was not executed");
+
+        tbb::task_handle task2_handle = tg.defer(task_body);
+        tbb::task_completion_handle task2_completion_handle = task2_handle;
+
+        tg.run_and_wait(std::move(task2_handle));
+        CHECK_MESSAGE(task_placeholder == 2, "Task body was not executed");
+        CHECK_MESSAGE(task2_completion_handle, "Completed task completion_handle is empty");
+
+        tbb::task_handle task3_handle = tg.defer(task_body);
+        tbb::task_completion_handle task3_completion_handle1 = task3_handle;
+        tbb::task_completion_handle task3_completion_handle2 = task3_handle;
+
+        CHECK_MESSAGE(task3_completion_handle1 == task3_completion_handle2, "Unexpected result for comparison of single task completion handles");
+        CHECK_MESSAGE(!(task3_completion_handle1 != task3_completion_handle2), "Unexpected result for comparison of single task completion handles");
+
+        tg.run_and_wait(std::move(task3_handle));
+        CHECK_MESSAGE(task_placeholder == 3, "Task body was not executed");
+
+        task3_completion_handle2 = std::move(task3_completion_handle1);
+        CHECK_MESSAGE(task3_completion_handle2, "Empty task completion_handle after move assignment from non-empty handle");
+        CHECK_MESSAGE(!task3_completion_handle1, "Moved-from task_completion_handle is non-empty");
+
+        tbb::task_handle task4_handle = tg.defer(task_body);        
+        tg.run_and_wait(std::move(task4_handle));
+        CHECK_MESSAGE(task_placeholder == 4, "Task body was not executed");
+    }
+    {
+        // Test submission through enqueue
+        tbb::task_arena arena;
+
+        {
+            tbb::task_handle enqueue_task_handle = tg.defer(task_body);
+            tbb::task_completion_handle enqueue_task_completion_handle = enqueue_task_handle;
+
+            arena.enqueue(std::move(enqueue_task_handle));
+            CHECK_MESSAGE(enqueue_task_completion_handle, "task_completion_handle should not be empty after enqueue");
+            tg.wait();
+            CHECK_MESSAGE(task_placeholder == 5, "Task body was not executed");
+            CHECK_MESSAGE(enqueue_task_completion_handle, "task_completion_handle should not be empty after task completion");
+        }
+        {
+            tbb::task_completion_handle enqueue_task_completion_handle;
+            arena.execute([&] {
+                tbb::task_handle enqueue_task_handle = tg.defer(task_body);
+                enqueue_task_completion_handle = enqueue_task_handle;
+
+                tbb::this_task_arena::enqueue(std::move(enqueue_task_handle));
+                CHECK_MESSAGE(enqueue_task_completion_handle, "task_completion_handle should not be empty after enqueue");
+            });
+            tg.wait();
+            CHECK_MESSAGE(task_placeholder == 6, "Task body was not executed");
+            CHECK_MESSAGE(enqueue_task_completion_handle, "task_completion_handle should not be empty after task completion");
+        }
+    }
+}
+
+TEST_CASE("test task_completion_handle in concurrent environment") {
+    tbb::task_group tg;
+    std::size_t task_placeholder = 0;
+
+    tbb::task_handle task = tg.defer([&] {
+        ++task_placeholder;
+    });
+
+    tbb::parallel_for(0, 100, [&](int) {
+        tbb::task_completion_handle completion_handle(task);
+        CHECK_MESSAGE(completion_handle, "task_completion_handle should not be empty");
+        // TODO: extend this test with adding concurrent dependencies
+    });
+
+    tg.run_and_wait(std::move(task));
+    CHECK_MESSAGE(task_placeholder == 1, "task body was not executed");
+}
+#endif
