@@ -149,6 +149,10 @@ struct task_accessor {
     context execution **/
 template <bool report_tasks>
 class context_guard_helper {
+    // The number of unsuccessful attempts to retrieve a non-local task, after which ITT_TASK_END notification
+    // should be sent. If the notification is postponed for too long, data in profiling tools might get skewed.
+    static constexpr int itt_task_end_threshold = 2;
+
     const d1::task_group_context* curr_ctx;
     d1::cpu_ctl_env guard_cpu_ctl_env;
     d1::cpu_ctl_env curr_cpu_ctl_env;
@@ -181,8 +185,16 @@ public:
             // reporting begin of new task group context execution frame.
             // using address of task group context object to group tasks (parent).
             // id of task execution frame is nullptr and reserved for future use.
-            ITT_TASK_BEGIN(ctx, ctx->my_name, nullptr);
             curr_ctx = ctx;
+            ITT_TASK_BEGIN(ctx, ctx->my_name, nullptr);
+        }
+    }
+    void maybe_end_itt_task(int task_search_count) {
+        if (report_tasks) {
+            if (curr_ctx && task_search_count == itt_task_end_threshold) {
+                ITT_TASK_END;
+                curr_ctx = nullptr;
+            }
         }
     }
 #if _WIN64
@@ -289,6 +301,9 @@ public:
     }
     void reset_wait() {
         my_pause_count = my_yield_count = 0;
+    }
+    int limited_pause_count() {
+        return my_pause_count + my_yield_count;
     }
 };
 
@@ -556,6 +571,7 @@ public:
 
     template <bool ITTPossible, typename Waiter>
     d1::task* receive_or_steal_task(thread_data& tls, execution_data_ext& ed, Waiter& waiter,
+                                context_guard_helper<ITTPossible>& ctxguard,
                                 isolation_type isolation, bool outermost, bool criticality_absence);
 
     template <bool ITTPossible, typename Waiter>
