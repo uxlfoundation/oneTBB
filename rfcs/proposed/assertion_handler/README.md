@@ -167,6 +167,20 @@ against null handler pointers. When `set_assertion_handler(nullptr)` is called, 
 handler rather than allowing null dereference. This approach provides a safe way to restore default behavior, similar
 to how `std::set_terminate` handles null pointers in the standard library.
 
+#### TBBBind Integration
+
+To ensure consistent assertion handling across oneTBB components, the TBBBind shared library will be made dependent on
+the oneTBB shared library. This approach provides unified assertion handling where assertions originating from TBBBind
+will automatically use the custom assertion handler set by the application, creating a consistent user experience.
+
+This dependency addition is acceptable since TBBBind is exclusively used from within the oneTBB shared library and
+does not affect the public API or application dependencies.
+
+TBBMalloc, on the other hand, will not be changed. It will continue to include and reuse the assertion handling
+implementation file from the core oneTBB library source code, maintaining its own assertion behavior that does not
+access the oneTBB custom assertion handler. This design preserves TBBMalloc's portability, as it can be used entirely
+separately from oneTBB and cannot depend on the oneTBB shared library.
+
 ### Platform Considerations
 
 The implementation will add new `set_assertion_handler` and `get_assertion_handler` public entry points to the oneTBB
@@ -206,3 +220,9 @@ The proposed implementation will have minimal performance impact, following the 
 5. **Thread Safety Documentation**: Should the documentation provide specific guidance and examples for
    implementing thread-safe custom handlers, given that this responsibility shifts to the user? Should this
    include migration notes for TBB 2020 users about any differences in threading behavior?
+
+6. **TBBBind Integration Strategy**: Should TBBBind be modified to use the custom assertion handler through a
+   dependency on oneTBB, or should it be left unchanged like TBBMalloc? While making TBBBind dependent on oneTBB
+   would provide unified assertion handling, it may be acceptable to leave TBBBind as-is to maintain simpler
+   dependencies and follow the same pattern as TBBMalloc. What are the trade-offs between consistency of assertion
+   handling versus architectural simplicity?
