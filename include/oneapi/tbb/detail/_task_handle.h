@@ -40,14 +40,14 @@ class task_dynamic_state;
 
 class successor_list_node {
 public:
-    successor_list_node(task_dynamic_state* continuation, d1::small_object_allocator& alloc)
+    successor_list_node(task_dynamic_state* successor_state, d1::small_object_allocator& alloc)
         : m_next_node(nullptr)
-        , m_continuation(continuation)
+        , m_successor_state(successor_state)
         , m_allocator(alloc)
     {}
 
-    task_dynamic_state* get_continuation() const {
-        return m_continuation;
+    task_dynamic_state* get_successor_state() const {
+        return m_successor_state;
     }
 
     successor_list_node* get_next_node() const {
@@ -63,11 +63,9 @@ public:
     }
 private:
     successor_list_node* m_next_node;
-    task_dynamic_state* m_continuation;
+    task_dynamic_state* m_successor_state;
     d1::small_object_allocator m_allocator;
 };
-
-inline task_handle_task* release_successor_list(successor_list_node* list);
 
 class task_dynamic_state {
 public:
@@ -99,25 +97,12 @@ public:
         }
     }
 
-    task_handle_task* release_dependency() {
-        task_handle_task* next_task = nullptr;
-        if (--m_num_dependencies == 0) {
-            next_task = m_task;
-        }
-        return next_task;
+    bool release_dependency() {
+        auto updated_dependency_counter = --m_num_dependencies;
+        return updated_dependency_counter == 0;
     }
 
-    task_handle_task* complete_task() {
-        task_handle_task* next_task = nullptr;
-        successor_list_node* current_successor_list = m_successor_list_head.load(std::memory_order_acquire);
-        // Doing a single check is enough since the this function is called after the task body and
-        // the state of the list cannot change to transferred
-        if (!is_transferred(current_successor_list)) {
-            current_successor_list = fetch_successor_list(COMPLETED_FLAG);
-            next_task = release_successor_list(current_successor_list);
-        }
-        return next_task;
-    }
+    task_handle_task* complete_and_try_bypass_successor();
 
     bool has_dependencies() const {
         return m_num_dependencies.load(std::memory_order_acquire) != 0;
@@ -132,12 +117,12 @@ public:
     static constexpr successor_list_state_flag COMPLETED_FLAG = ~std::uintptr_t(0);
     static constexpr successor_list_state_flag TRANSFERRED_FLAG = ~std::uintptr_t(0) - 1;
 
-    static bool is_completed(successor_list_node* list) {
-        return list == reinterpret_cast<successor_list_node*>(COMPLETED_FLAG);
+    static bool represents_completed_task(successor_list_node* list_head) {
+        return list_head == reinterpret_cast<successor_list_node*>(COMPLETED_FLAG);
     }
 
-    static bool is_transferred(successor_list_node* list) {
-        return list == reinterpret_cast<successor_list_node*>(TRANSFERRED_FLAG);
+    static bool represents_transferred_completion(successor_list_node* list_head) {
+        return list_head == reinterpret_cast<successor_list_node*>(TRANSFERRED_FLAG);
     }
 
     successor_list_node* fetch_successor_list(successor_list_state_flag new_list_state_flag) {
@@ -153,6 +138,8 @@ public:
         successor_list_node* successor_list = fetch_successor_list(TRANSFERRED_FLAG);
         new_dynamic_state->add_successor_list(successor_list);
     }
+
+    task_handle_task* get_task() { return m_task; }
 
 private:
     task_handle_task* m_task;
@@ -227,23 +214,21 @@ public:
         return current_state;
     }
 
-    task_handle_task* complete_task() {
+    task_handle_task* complete_and_try_bypass_successor() {
         task_handle_task* next_task = nullptr;
 
         task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_relaxed);
         if (current_state != nullptr) {
-            next_task = current_state->complete_task();
+            next_task = current_state->complete_and_try_bypass_successor();
         }
         return next_task;
     }
 
-    task_handle_task* release_dependency() {
+    bool release_dependency() {
         task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_relaxed);
         __TBB_ASSERT(current_state != nullptr && current_state->has_dependencies(),
                      "release_dependency was called for task without dependencies");
-        task_handle_task* t = current_state->release_dependency();
-        __TBB_ASSERT(t == nullptr || t == this, nullptr);
-        return t;
+        return current_state->release_dependency();
     }
 
     bool has_dependencies() const {
@@ -323,26 +308,6 @@ inline bool operator!=(std::nullptr_t, task_handle const& th) noexcept {
 }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-inline task_handle_task* release_successor_list(successor_list_node* node) {
-    task_handle_task* next_task = nullptr;
-
-    while (node != nullptr) {
-        successor_list_node* next_node = node->get_next_node();
-        task_handle_task* successor_task = node->get_continuation()->release_dependency();
-        node->finalize();
-        node = next_node;
-
-        if (successor_task) {
-            if (next_task == nullptr) {
-                next_task = successor_task;
-            } else {
-                d1::spawn(*successor_task, successor_task->ctx());
-            }
-        }
-    }
-    return next_task;
-}
-
 inline void task_dynamic_state::add_successor_node(successor_list_node* new_successor_node,
                                                    successor_list_node* current_successor_list_head)
 {
@@ -353,13 +318,13 @@ inline void task_dynamic_state::add_successor_node(successor_list_node* new_succ
     while (!m_successor_list_head.compare_exchange_strong(current_successor_list_head, new_successor_node)) {
         // Other thread updated the head of the list
 
-        if (is_completed(current_successor_list_head)) {
+        if (represents_completed_task(current_successor_list_head)) {
             // Current task has completed while we tried to insert the successor to the list
-            new_successor_node->get_continuation()->release_dependency();
+            new_successor_node->get_successor_state()->release_dependency();
             new_successor_node->finalize();
             break;
-        } else if (is_transferred(current_successor_list_head)) {
-            // Current task has transferred completion to other task, redirect successor to the receiving task
+        } else if (represents_transferred_completion(current_successor_list_head)) {
+            // Redirect successor to the task received the completion
             task_dynamic_state* new_state = m_new_dynamic_state.load(std::memory_order_relaxed);
             __TBB_ASSERT(new_state, "successor list is marked as transferred, but new dynamic state is not set");
             new_state->add_successor_node(new_successor_node, new_state->m_successor_list_head.load(std::memory_order_acquire));
@@ -374,9 +339,9 @@ inline void task_dynamic_state::add_successor(task_dynamic_state* successor) {
     __TBB_ASSERT(successor != nullptr, nullptr);
     successor_list_node* current_successor_list_head = m_successor_list_head.load(std::memory_order_acquire);
 
-    if (!is_completed(current_successor_list_head)) {
-        if (is_transferred(current_successor_list_head)) {
-            // Originally tracked task transferred successor to other task, redirect successor to the receiving task
+    if (!represents_completed_task(current_successor_list_head)) {
+        if (represents_transferred_completion(current_successor_list_head)) {
+            // Redirect successor to the task received the completion
             task_dynamic_state* new_state = m_new_dynamic_state.load(std::memory_order_relaxed);
             __TBB_ASSERT(new_state, "successor list is marked as transferred, but new dynamic state is not set");
             new_state->add_successor(successor);
@@ -417,6 +382,36 @@ inline void task_handle_task::transfer_completion_to(task_handle& receiving_task
     if (current_state != nullptr) {
         current_state->transfer_completion_to(task_handle_accessor::get_task_dynamic_state(receiving_task));
     }
+}
+
+inline task_handle_task* task_dynamic_state::complete_and_try_bypass_successor() {
+    task_handle_task* next_task = nullptr;
+
+    successor_list_node* node = m_successor_list_head.load(std::memory_order_acquire);
+
+    // Doing a single check is enough since the this function is called after the task body and
+    // the state of the list cannot change to transferred
+    if (!represents_transferred_completion(node)) {
+        node = fetch_successor_list(COMPLETED_FLAG);
+
+        while (node != nullptr) {
+            task_dynamic_state* successor_state = node->get_successor_state();
+
+            if (successor_state->release_dependency()) {
+                task_handle_task* successor_task = successor_state->get_task();
+                if (next_task == nullptr) {
+                    next_task = successor_task;
+                } else {
+                    d1::spawn(*successor_task, successor_task->ctx());
+                }
+            }
+
+            successor_list_node* next_node = node->get_next_node();
+            node->finalize();
+            node = next_node;
+        }
+    }
+    return next_task;
 }
 
 class task_completion_handle {
