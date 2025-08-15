@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2023 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -48,5 +49,57 @@ void AssertSameType( const T& /*x*/, const T& /*y*/ ) {}
 
 #define ASSERT_CUSTOM(p,message,file,line)  ((p)?(void)0:utils::ReportError(file,line,#p,message))
 #define ASSERT(p,message)                   ASSERT_CUSTOM(p,message,__FILE__,__LINE__)
+
+#if TRY_BAD_EXPR_ENABLED
+
+//! Check that expression x raises assertion failure with message containing given substring.
+/** Assumes that tbb::set_assertion_handler( utils::AssertionFailureHandler ) was called earlier. */
+#define TRY_BAD_EXPR(x, substr)                                            \
+    {                                                                      \
+        const char* message = nullptr;                                     \
+        bool okay = false;                                                 \
+        try {                                                              \
+            x;                                                             \
+        } catch(utils::AssertionFailure a) {                               \
+            okay = true;                                                   \
+            message = a.message;                                           \
+        }                                                                  \
+        utils::CheckAssertionFailure(__LINE__, #x, okay, message, substr); \
+    }
+
+namespace utils {
+
+//! Exception object that holds a message.
+struct AssertionFailure {
+    const char* message;
+    AssertionFailure( const char* filename, int line, const char* expression, const char* comment );
+};
+
+AssertionFailure::AssertionFailure( const char* filename, int line, const char* expression, const char* comment ) :
+    message(comment)
+{
+    REQUIRE_MESSAGE(filename, "missing filename");
+    REQUIRE_MESSAGE(0 < line, "line number must be positive");
+    // All of our current files have fewer than 4000 lines.
+    REQUIRE_MESSAGE(line < 5000, "dubiously high line number");
+    REQUIRE_MESSAGE(expression, "missing expression");
+}
+
+void AssertionFailureHandler(const char* filename, int line, const char* expression, const char* comment) {
+    throw AssertionFailure(filename, line, expression, comment);
+}
+
+void CheckAssertionFailure(int line, std::string expression, bool okay, const char* message, std::string substr) {
+    REQUIRE_MESSAGE(okay, "Line ", line, ", ", expression, " failed to fail");
+    REQUIRE_MESSAGE(message, "Line ", line, ", ", expression, " failed without a message");
+
+    std::string msg_str = message;
+    REQUIRE_MESSAGE(msg_str.find(substr) != std::string::npos,
+        expression, " failed with message '", msg_str, "' missing substring '", substr, "'");
+}
+
+}
+
+#endif /* TRY_BAD_EXPR_ENABLED */
 
 #endif // __TBB_test_common_utils_assert_H
