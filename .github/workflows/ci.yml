@@ -19,7 +19,7 @@ on:
     branches: [master]
 
   pull_request:
-    branches: [master]
+    branches: [master, dev/kboyarinov/poc-dynamic-dependencies-part1]
     types:
       - opened
       - synchronize
