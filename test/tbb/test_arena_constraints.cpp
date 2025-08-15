@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2019-2023 Intel Corporation
+    Copyright (c) 2019-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -16,6 +17,8 @@
 
 //! \file test_arena_constraints.cpp
 //! \brief Test for [info_namespace scheduler.task_arena] specifications
+
+#define TRY_BAD_EXPR_ENABLED 1 // TODO: find criteria to automatically define this in utils_assert.h
 
 #include "common/common_arena_constraints.h"
 
@@ -207,4 +210,13 @@ TEST_CASE("Test concurrency getters output for constraints with custom concurren
 TEST_CASE("Testing constraints_threads_per_core() reserved entry point") {
     tbb::task_arena::constraints c{};
     tbb::detail::r1::constraints_threads_per_core(c);
+}
+
+//! Using custom assertion handler to test failure on invalid constraints
+//! \brief \ref interface \ref error_guessing
+TEST_CASE("Using custom assertion handler to test failure on invalid constraints") {
+    tbb::set_assertion_handler(utils::AssertionFailureHandler);
+    TRY_BAD_EXPR(tbb::info::default_concurrency(tbb::task_arena::constraints{}.set_max_threads_per_core(0)),
+        "Wrong max_threads_per_core constraints field value.");
+    tbb::set_assertion_handler(nullptr); // Reset to default handler
 }

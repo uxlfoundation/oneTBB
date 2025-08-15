@@ -85,6 +85,7 @@ function(tbbbind_build TBBBIND_NAME REQUIRED_HWLOC_TARGET)
     target_link_libraries(${TBBBIND_NAME}
         PUBLIC
         ${REQUIRED_HWLOC_TARGET}
+        TBB::tbb
         PRIVATE
         ${TBB_LIB_LINK_LIBS}
         ${TBB_COMMON_LINK_LIBS}

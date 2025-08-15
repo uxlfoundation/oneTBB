@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2019-2024 Intel Corporation
+    Copyright (c) 2019-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -17,7 +18,6 @@
 #include <vector>
 #include <mutex>
 
-#include "../tbb/assert_impl.h" // Out-of-line TBB assertion handling routines are instantiated here.
 #include "oneapi/tbb/detail/_assert.h"
 #include "oneapi/tbb/detail/_config.h"
 
