@@ -48,6 +48,12 @@ void tbb_exception_ptr::throw_self() {
     std::rethrow_exception(my_ptr);
 }
 
+void tbb_exception_ptr::throw_self_and_destroy() {
+    auto temp_ptr = my_ptr;
+    destroy();
+    std::rethrow_exception(temp_ptr);
+}
+
 //------------------------------------------------------------------------
 // task_group_context
 //------------------------------------------------------------------------
@@ -66,11 +72,8 @@ void task_group_context_impl::destroy(d1::task_group_context& ctx) {
 #endif
     ctl->~cpu_ctl_env();
 
-    auto exception = ctx.my_exception.load(std::memory_order_relaxed);
-    if (exception) {
-        exception->destroy();
-    }
-    ITT_STACK_DESTROY(ctx.my_itt_caller);
+    // Thread-safe exception cleanup using compare_exchange
+    handle_context_exception(ctx, /*throw_exception=*/false);
 
     poison_pointer(ctx.my_parent);
     poison_pointer(ctx.my_context_list);
@@ -247,19 +250,7 @@ void task_group_context_impl::reset(d1::task_group_context& ctx) {
     //! TODO: Add assertion that this context does not have children
     
     // Thread-safe exception cleanup using compare_exchange
-    tbb_exception_ptr* exception = ctx.my_exception.load(std::memory_order_acquire);
-    while (exception != nullptr) {
-        // Atomically clear the exception if it's still the same one
-        if (ctx.my_exception.compare_exchange_weak(exception, nullptr, 
-                                                   std::memory_order_acq_rel,
-                                                   std::memory_order_acquire)) {
-            // Successfully cleared - now safe to destroy
-            exception->destroy();
-            break;
-        }
-        // compare_exchange_weak failed and updated 'exception' with current value
-        // Retry if another exception was set, or exit if it was cleared by another thread
-    }
+    handle_context_exception(ctx, /*throw_exception=*/false);
     
     // Thread-safe cancellation reset using atomic store
     ctx.my_cancellation_requested.store(0, std::memory_order_relaxed);

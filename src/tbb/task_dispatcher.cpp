@@ -173,11 +173,7 @@ void task_dispatcher::execute_and_wait(d1::task* t, d1::wait_context& wait_ctx, 
         local_td.m_thread_data->my_inbox.set_is_idle(false);
     }
 
-    auto exception = w_ctx.my_exception.load(std::memory_order_acquire);
-    if (exception) {
-        __TBB_ASSERT(w_ctx.is_group_execution_cancelled(), "The task group context with an exception should be canceled.");
-        exception->throw_self();
-    }
+    handle_context_exception(w_ctx, /*throw_exception=*/true);
 }
 
 #if __TBB_RESUMABLE_TASKS
