@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2019-2024 Intel Corporation
+    Copyright (c) 2019-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -200,15 +201,12 @@ private:
         bool core_types_parsing_broken = core_types_number <= 0;
         if (!core_types_parsing_broken) {
             core_types_affinity_masks_list.resize(core_types_number);
-            int efficiency{-1};
 
             for (int core_type = 0; core_type < core_types_number; ++core_type) {
                 hwloc_cpuset_t& current_mask = core_types_affinity_masks_list[core_type];
                 current_mask = hwloc_bitmap_alloc();
 
-                if (!hwloc_cpukinds_get_info(topology, core_type, current_mask, &efficiency, nullptr, nullptr, 0)
-                    && efficiency >= 0
-                ) {
+                if (!hwloc_cpukinds_get_info(topology, core_type, current_mask, nullptr, nullptr, nullptr, 0)) {
                     hwloc_bitmap_and(current_mask, current_mask, process_cpu_affinity_mask);
 
                     if (hwloc_bitmap_weight(current_mask) > 0) {
@@ -218,6 +216,35 @@ private:
                 } else {
                     core_types_parsing_broken = true;
                     break;
+                }
+            }
+        }
+        // On hybrid CPUs, check if there are cores without L3 cache.
+        if (!core_types_parsing_broken && core_types_number > 1) {
+            // The first core type mask (least performant cores)
+            hwloc_cpuset_t& front = core_types_affinity_masks_list.front();
+            hwloc_cpuset_t lp_mask = hwloc_bitmap_dup(front);
+
+            // Iterate through all L3 cache objects and remove their cores from lp_mask.
+            hwloc_obj_t l3_package = nullptr;
+            while ((l3_package = hwloc_get_next_obj_by_type(topology, HWLOC_OBJ_L3CACHE, l3_package)) != nullptr ) {
+                hwloc_bitmap_andnot(lp_mask, lp_mask, l3_package->cpuset);
+            }
+
+            if (hwloc_bitmap_iszero(lp_mask)) {
+                // All cores in the front mask have L3 cache, so no need to create a separate core type.
+                hwloc_bitmap_free(lp_mask);
+            } else {
+                hwloc_bitmap_andnot(front, front, lp_mask);
+                if (hwloc_bitmap_iszero(front)) {
+                    // No cores with L3 cache in the front mask, so replace it with the L3-less cores.
+                    hwloc_bitmap_free(front);
+                    front = lp_mask;
+                } else {
+                    // The front mask has SOME cores with L3 cache.
+                    // Create a new least performant (L3-less) core type and add it to the front.
+                    core_types_affinity_masks_list.insert(core_types_affinity_masks_list.begin(), lp_mask);
+                    core_types_indexes_list.push_back(core_types_number++);
                 }
             }
         }
