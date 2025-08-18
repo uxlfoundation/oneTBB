@@ -1222,6 +1222,31 @@ TEST_CASE("task_handle cannot be scheduled into other task_group of the same con
     CHECK_THROWS_WITH_AS(tg1.run(tg.defer([]{})), "Attempt to schedule task_handle into different task_group", std::runtime_error);
 }
 
+//! \brief \ref requirement
+TEST_CASE("Test safe task submit from external thread") {
+    tbb::task_arena ta{};
+    tbb::task_group tg{};
+
+    bool run = false;
+    auto body = [&] { run = true; };
+    std::thread([&] {
+        tbb::task_handle task = tg.defer(body);
+        ta.execute([&] {
+            tg.run(std::move(task));
+        });
+    }).join();
+
+    ta.execute([&] {
+        tg.wait();
+    });
+
+    run = false;
+    tbb::task_handle task;
+    std::thread([&] { task = tg.defer(body); }).join();
+    tg.run(std::move(task));
+    tg.wait();
+}
+
 #endif // TBB_USE_EXCEPTIONS
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS

@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -439,6 +440,66 @@ struct suspend_point_type {
 #pragma warning( disable: 4324 )
 #endif
 
+class thread_reference_vertex : public d1::wait_tree_vertex_interface {
+public:
+    thread_reference_vertex(wait_tree_vertex_interface& parent, std::uint32_t ref_count)
+        : m_parent{parent}, m_ref_count{ref_count} {}
+
+    void reserve(std::uint32_t delta = 1) override {
+        auto ref = m_ref_count.fetch_add(delta);
+        __TBB_ASSERT_EX(((ref + delta) & m_overflow_mask) == 0, "Overflow is detected");
+        if (ref == 0) {
+            m_parent.reserve();
+        }
+    }
+
+    void release(std::uint32_t delta = 1) override {
+        // Saving a reference to the parent before decrementing the reference count
+        // because other thread can destroy the vertex after the decrement
+        auto& parent = m_parent;
+        std::uint64_t ref = m_ref_count.fetch_sub(delta) - delta;
+        __TBB_ASSERT_EX((ref & m_overflow_mask) == 0, "Underflow is detected");
+        // Masking out the orphaned bit to check actual number of references
+        if ((ref & ~m_orphaned_bit) == 0) {
+            parent.release();
+            // If the owning thread has abandoned this vertex, it is our responsibility to destroy it
+            if (ref & m_orphaned_bit) {
+                destroy();
+            }
+        }
+    }
+
+    std::uint32_t get_num_children() {
+        auto num_children = m_ref_count.load(std::memory_order_acquire) & ~m_orphaned_bit;
+        return static_cast<std::uint32_t>(num_children);
+    }
+
+    void release_ownership() {
+        auto ref = m_ref_count.fetch_or(m_orphaned_bit);
+        __TBB_ASSERT(!(ref & m_orphaned_bit), "cannot release ownership twice");
+        if (ref == 0) {
+            destroy();
+        }
+    }
+
+    void destroy() {
+        this->~thread_reference_vertex();
+        cache_aligned_deallocate(this);
+    }
+
+#if TBB_USE_ASSERT
+    bool is_orphaned() {
+        return m_ref_count.load(std::memory_order_relaxed) & m_orphaned_bit;
+    }
+#endif
+
+private:
+    static constexpr std::uint64_t m_orphaned_bit = 1ull << 63;
+    static constexpr std::uint64_t m_overflow_mask = ~(((1ull << 32) - 1) | m_orphaned_bit);
+    wait_tree_vertex_interface& m_parent;
+    std::atomic<std::uint64_t> m_ref_count;
+};
+
 class alignas (max_nfs_size) task_dispatcher {
 public:
     // TODO: reconsider low level design to better organize dependencies and files.
@@ -477,9 +538,9 @@ public:
     suspend_point_type* m_suspend_point{ nullptr };
 
     //! Used to improve scalability of d1::wait_context by using per thread reference_counter
-    std::unordered_map<d1::wait_tree_vertex_interface*, d1::reference_vertex*,
+    std::unordered_map<d1::wait_tree_vertex_interface*, r1::thread_reference_vertex*,
                        std::hash<d1::wait_tree_vertex_interface*>, std::equal_to<d1::wait_tree_vertex_interface*>,
-                       tbb_allocator<std::pair<d1::wait_tree_vertex_interface* const, d1::reference_vertex*>>
+                       tbb_allocator<std::pair<d1::wait_tree_vertex_interface* const, r1::thread_reference_vertex*>>
                       >
         m_reference_vertex_map;
 
@@ -513,9 +574,8 @@ public:
         }
 
         for (auto& elem : m_reference_vertex_map) {
-            d1::reference_vertex*& node = elem.second;
-            node->~reference_vertex();
-            cache_aligned_deallocate(node);
+            thread_reference_vertex*& node = elem.second;
+            node->release_ownership();
             poison_pointer(node);
         }
 
