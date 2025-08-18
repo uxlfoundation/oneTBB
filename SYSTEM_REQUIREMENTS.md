@@ -33,6 +33,7 @@ This document provides details about hardware, operating system, and software pr
 - Intel(R) Atom* processor family
 - Non-Intel(R) processors compatible with the processors listed above
 
+Changes to the list of supported hardware will be announced in advance with a deprecation period preceding removal or reduction of support.
 
 ## Software
 

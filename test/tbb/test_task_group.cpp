@@ -1231,6 +1231,32 @@ TEST_CASE("task_handle cannot be scheduled into other task_group of the same con
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS && __TBB_GCC_VERSION && !__clang__ && !__INTEL_COMPILER
 #pragma GCC diagnostic pop
 #endif
+
+//! \brief \ref requirement
+TEST_CASE("Test safe task submit from external thread") {
+    tbb::task_arena ta{};
+    tbb::task_group tg{};
+
+    bool run = false;
+    auto body = [&] { run = true; };
+    std::thread([&] {
+        tbb::task_handle task = tg.defer(body);
+        ta.execute([&] {
+            tg.run(std::move(task));
+        });
+    }).join();
+
+    ta.execute([&] {
+        tg.wait();
+    });
+
+    run = false;
+    tbb::task_handle task;
+    std::thread([&] { task = tg.defer(body); }).join();
+    tg.run(std::move(task));
+    tg.wait();
+}
+
 #endif // TBB_USE_EXCEPTIONS
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
@@ -1615,7 +1641,7 @@ void test_adding_successors_after_transfer(unsigned num_threads, submit_function
     CHECK_MESSAGE(new_successor_task_placeholder == finished_task, "new successor task was not finished");
 }
 
-void test_transferring_successors(unsigned num_threads, submit_function func) {
+void test_transferring_completion(unsigned num_threads, submit_function func) {
     test_recursive_reduction(func);
     test_adding_successors_after_transfer(num_threads, func);
 }
@@ -1656,10 +1682,10 @@ TEST_CASE("test task_group dynamic dependencies") {
         test_predecessors(submit_function::arena_enqueue);
         test_predecessors(submit_function::this_arena_enqueue);
 
-        test_transferring_successors(p, submit_function::run);
-        test_transferring_successors(p, submit_function::run_and_wait);
-        test_transferring_successors(p, submit_function::arena_enqueue);
-        test_transferring_successors(p, submit_function::this_arena_enqueue);
+        test_transferring_completion(p, submit_function::run);
+        test_transferring_completion(p, submit_function::run_and_wait);
+        test_transferring_completion(p, submit_function::arena_enqueue);
+        test_transferring_completion(p, submit_function::this_arena_enqueue);
         
         test_return_task_with_dependencies(submit_function::run);
         test_return_task_with_dependencies(submit_function::run_and_wait);

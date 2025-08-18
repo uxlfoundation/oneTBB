@@ -227,7 +227,7 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
     __TBB_ASSERT(top_wait_context, nullptr);
     auto& dispatcher = *governor::get_thread_data()->my_task_dispatcher;
 
-    d1::reference_vertex* ref_counter{nullptr};
+    thread_reference_vertex* ref_counter{nullptr};
     auto& reference_map = dispatcher.m_reference_vertex_map;
     auto pos = reference_map.find(top_wait_context);
     if (pos != reference_map.end()) {
@@ -237,9 +237,11 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
         if (reference_map.size() > max_reference_vertex_map_size) {
             // TODO: Research the possibility of using better approach for a clean-up
             for (auto it = reference_map.begin(); it != reference_map.end();) {
-                if (it->second->get_num_child() == 0) {
-                    it->second->~reference_vertex();
-                    cache_aligned_deallocate(it->second);
+                __TBB_ASSERT(it->second, nullptr);
+                thread_reference_vertex*& node = it->second;
+                __TBB_ASSERT(!node->is_orphaned(), "the orphaned bit should not yet be set");
+                if (node->get_num_children() == 0) {
+                    node->destroy();
                     it = reference_map.erase(it);
                 } else {
                     ++it;
@@ -248,14 +250,14 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
         }
 
         reference_map[top_wait_context] = ref_counter =
-            new (cache_aligned_allocate(sizeof(d1::reference_vertex))) d1::reference_vertex(top_wait_context, 0);
+            new (cache_aligned_allocate(sizeof(thread_reference_vertex))) thread_reference_vertex(*top_wait_context, 0);
     }
 
     return ref_counter;
 }
 
-d1::task* get_current_task() {
-    return governor::get_thread_data()->get_current_task();
+d1::task* current_task_ptr() {
+    return governor::get_thread_data()->get_innermost_running_task();
 }
 
 } // namespace r1

@@ -79,19 +79,6 @@ template<typename F>
 d1::task* task_ptr_or_nullptr(F&& f);
 }
 
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-inline d1::task* combine_tasks(d1::task* body_task, task_handle_task* successor_task) {
-    if (body_task == nullptr) return successor_task;
-    // Successor task can't have dependencies
-    if (successor_task == nullptr) return body_task;
-
-    // There is a task returned from the body and the successor task - bypassing the body task
-    // and spawning the successor one
-    d1::spawn(*successor_task, successor_task->ctx());
-    return body_task;
-}
-#endif
-
 template<typename F>
 class function_task : public task_handle_task  {
     //TODO: apply empty base optimization here
@@ -102,8 +89,15 @@ private:
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
         task* next_task = task_ptr_or_nullptr(m_func);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        task_handle_task* successor_task = this->complete_task();
-        next_task = combine_tasks(next_task, successor_task);
+        task_handle_task* successor_task = this->complete_and_try_get_successor();
+
+        if (next_task != nullptr) {
+            // If there are both task returned from the body and the successor task
+            // Bypassing the body task and spawning the successor one
+            if (successor_task != nullptr) d1::spawn(*successor_task, successor_task->ctx());
+        } else {
+            next_task = successor_task;
+        }
 #endif
         finalize(&ed);
         return next_task;
@@ -129,10 +123,13 @@ namespace {
     template<typename F>
     d1::task* task_ptr_or_nullptr_impl(std::false_type, F&& f){
         task_handle th = std::forward<F>(f)();
-        bool has_dependencies = task_handle_accessor::has_dependencies(th);
-        d1::task* task_ptr = task_handle_accessor::release(th);
-        // If task has dependencies, it can't be bypassed
-        return has_dependencies ? nullptr : task_ptr;
+        task_handle_task* task_ptr = task_handle_accessor::release(th);
+        // If task has unresolved dependencies, it can't be bypassed
+        if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
+            task_ptr = nullptr;
+        }
+
+        return task_ptr;
     }
 
     template<typename F>
@@ -516,14 +513,15 @@ protected:
 
         bool cancellation_status = false;
         try_call([&] {
+            task_handle_task* task_ptr = acs::release(h);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-            if (acs::has_dependencies(h)) {
-                acs::release(h);
+            // If the task has dependencies and the task_handle is not the last dependency
+            if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
                 d1::wait(m_wait_vertex.get_context(), context());
             } else
 #endif
             {
-                execute_and_wait(*acs::release(h), context(), m_wait_vertex.get_context(), context());
+                execute_and_wait(*task_ptr, context(), m_wait_vertex.get_context(), context());
             }
         }).on_completion([&] {
             // TODO: the reset method is not thread-safe. Ensure the correct behavior.
@@ -615,14 +613,14 @@ public:
         using acs = d2::task_handle_accessor;
         __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
 
+        task_handle_task* task_ptr = acs::release(h);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        if (acs::has_dependencies(h)) {
-            acs::release(h);
-        } else
-#endif
-        {
-            d1::spawn(*acs::release(h), context());
+        // Owned task has no dependencies or the task handle is the last dependency
+        if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
+            return;
         }
+#endif
+        d1::spawn(*task_ptr, context());
     }
 
     template<typename F>
@@ -644,28 +642,41 @@ public:
     static void set_task_order(d2::task_handle& pred, d2::task_handle& succ) {
         __TBB_ASSERT(pred != nullptr, "empty predecessor handle is not allowed for set_task_order");
         __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for set_task_order");
-        internal_set_task_order(task_handle_accessor::get_task_dynamic_state(pred),
-                                task_handle_accessor::get_task_dynamic_state(succ));
+        task_dynamic_state* pred_state = task_handle_accessor::get_task_dynamic_state(pred);
+        pred_state->add_successor(succ);
     }
 
     static void set_task_order(d2::task_completion_handle& pred, d2::task_handle& succ) {
         __TBB_ASSERT(pred != nullptr, "empty predecessor completion_handle is not allowed for set_task_order");
         __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for set_task_order");
-        internal_set_task_order(task_completion_handle_accessor::get_task_dynamic_state(pred),
-                                task_handle_accessor::get_task_dynamic_state(succ));
+        task_dynamic_state* pred_state = task_completion_handle_accessor::get_task_dynamic_state(pred);
+        pred_state->add_successor(succ);
     }
 
     static void transfer_this_task_completion_to(d2::task_handle& new_task) {
-        d1::task* curr_task = d1::get_current_task();
+        d1::task* curr_task = d1::current_task_ptr();
         __TBB_ASSERT(curr_task != nullptr, "this_task_completion_to was called outside of task body");
         task_handle_task* curr_th_task = dynamic_cast<task_handle_task*>(curr_task);
         // Not using __TBB_ASSERT(curr_th_task) to allow function_stack_task body to use this method
         if (curr_th_task != nullptr) {
-            curr_th_task->transfer_successors_to(task_handle_accessor::get_task_dynamic_state(new_task));
+            curr_th_task->transfer_completion_to(new_task);
         }
     }
 #endif
 }; // class task_group
+
+class wait_delegate : public d1::delegate_base {
+    bool operator()() const override {
+        status = tg.wait();
+        return true;
+    }
+protected:
+    task_group& tg;
+    task_group_status& status;
+public:
+    wait_delegate(task_group& a_group, task_group_status& tgs)
+        : tg(a_group), status(tgs) {}
+};
 
 #if TBB_PREVIEW_ISOLATED_TASK_GROUP
 class spawn_delegate : public d1::delegate_base {
@@ -679,19 +690,6 @@ public:
     spawn_delegate(d1::task* a_task, d1::task_group_context& ctx)
         : task_to_spawn(a_task), context(ctx)
     {}
-};
-
-class wait_delegate : public d1::delegate_base {
-    bool operator()() const override {
-        status = tg.wait();
-        return true;
-    }
-protected:
-    task_group& tg;
-    task_group_status& status;
-public:
-    wait_delegate(task_group& a_group, task_group_status& tgs)
-        : tg(a_group), status(tgs) {}
 };
 
 template<typename F>
