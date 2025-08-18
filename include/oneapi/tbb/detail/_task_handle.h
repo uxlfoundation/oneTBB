@@ -97,11 +97,11 @@ public:
         return updated_dependency_counter == 0;
     }
 
-    task_handle_task* complete_and_try_bypass_successor();
-
     bool has_dependencies() const {
         return m_num_dependencies.load(std::memory_order_acquire) != 0;
     }
+
+    task_handle_task* complete_and_try_bypass_successor();
 
     void add_successor(task_dynamic_state* successor);
     void add_successor_node(successor_list_node* new_successor_node, successor_list_node* current_successor_list_head);
