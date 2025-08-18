@@ -93,7 +93,7 @@ public:
     }
 
     task_handle_task* complete_and_try_get_successor();
-    
+
     void add_successor(task_handle&  successor);
     void add_successor_node(successor_list_node* new_successor_node, successor_list_node* current_successor_list_head);
     void add_successor_list(successor_list_node* successor_list);
