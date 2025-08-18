@@ -103,13 +103,14 @@ private:
         return next_task;
     }
     d1::task* cancel(d1::execution_data& ed) override {
-        task* t = nullptr;
+        task* task_ptr = nullptr;
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        // TODO: complete_task returns one ready successor task, others are spawned. Should cancel() be called instead?
-        t = this->complete_task();
+        // TODO: complete_and_try_get_successor returns one ready successor task, others are spawned and cancelled by the scheduler
+        // Should cancel() be called directly instead?
+        task_ptr = this->complete_and_try_get_successor();
 #endif
         finalize(&ed);
-        return t;
+        return task_ptr;
     }
 public:
     template<typename FF>

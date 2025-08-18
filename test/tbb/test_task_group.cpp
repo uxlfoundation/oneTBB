@@ -1724,8 +1724,7 @@ TEST_CASE("test task_completion_handle in concurrent environment") {
 TEST_CASE("test dependencies and cancellation") {
     tbb::task_group tg;
 
-    std::size_t execution_placeholder = 0;
-    auto body = [&] { ++execution_placeholder; };
+    auto body = [&] { CHECK_MESSAGE(false, "Some tasks were executed in the cancelled task_group"); };
     std::size_t n_layer_tasks = 10;
     std::size_t n_layers = 4;
 
@@ -1756,6 +1755,5 @@ TEST_CASE("test dependencies and cancellation") {
     }
     tbb::task_group_status status = tg.wait();
     CHECK_MESSAGE(status == tbb::task_group_status::canceled, "Incorrect status of cancelled task_group");
-    CHECK_MESSAGE(execution_placeholder == 0, "Some tasks were executed in the cancelled task_group");
 }
 #endif
