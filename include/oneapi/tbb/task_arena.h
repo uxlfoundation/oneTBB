@@ -33,6 +33,8 @@
 #include "info.h"
 #endif /*__TBB_ARENA_BINDING*/
 
+#include "task_group.h"
+
 namespace tbb {
 namespace detail {
 
@@ -302,6 +304,15 @@ class task_arena : public task_arena_base {
         r1::execute(*this, func);
         return func.consume_result();
     }
+
+    d2::task_group_status wait_for_impl(d2::task_group& tg) {
+        d2::task_group_status status = d2::task_group_status::not_complete;
+        d2::wait_delegate wd{tg, status};
+        r1::execute(*this, wd);
+        __TBB_ASSERT(status != d2::task_group_status::not_complete,
+                "unexpected premature exit from wait_for: task group status is still not complete");
+        return status;
+    }
 public:
     //! Creates task_arena with certain concurrency limits
     /** Sets up settings only, real construction is deferred till the first method invocation
@@ -491,6 +502,22 @@ public:
         d2::enqueue_impl(std::move(th), this);
     }
 
+    //! Adds a task to process a functor into the task_group and then enqueues it into the arena,
+    //! and immediately returns.
+    //! Does not require the calling thread to join the arena.
+    template<typename F>
+    void enqueue(F&& f, d2::task_group& tg) {
+        initialize();
+        d2::enqueue_impl(tg.defer(std::forward<F>(f)), this);
+    }
+
+    //! Waits for all tasks in the task group to complete or be canceled.
+    //! During the wait, may execute tasks in the task_arena.
+    d2::task_group_status wait_for(d2::task_group& tg) {
+        initialize();
+        return wait_for_impl(tg);
+    }
+
     //! Joins the arena and executes a mutable functor, then returns
     //! If not possible to join, wraps the functor into a task, enqueues it and waits for task completion
     //! Can decrement the arena demand for workers, causing a worker to leave and free a slot to the calling thread
@@ -592,6 +619,11 @@ inline void enqueue(d2::task_handle&& th) {
 template<typename F>
 inline void enqueue(F&& f) {
     enqueue_impl(std::forward<F>(f), nullptr);
+}
+
+template<typename F>
+inline void enqueue(F&& f, d2::task_group& tg) {
+    d2::enqueue_impl(tg.defer(std::forward<F>(f)), nullptr);
 }
 
 #if __TBB_PREVIEW_PARALLEL_PHASE

@@ -182,7 +182,7 @@ public:
             if (m_dynamic_state.compare_exchange_strong(current_state, new_state)) {
                 current_state = new_state;
             } else {
-                // Other thread created the dynamic state
+                // CAS failed, current_state points to the dynamic state created by another thread
                 alloc.delete_object(new_state);
             }
         }
@@ -398,6 +398,7 @@ public:
     task_completion_handle& operator=(const task_handle& th) {
         __TBB_ASSERT(th, "Assignment of task_completion_state from an empty task_handle");
         task_dynamic_state* th_state = th.m_handle->get_dynamic_state();
+        __TBB_ASSERT(th_state != nullptr, "No state in the non-empty task_handle");
         if (m_task_state != th_state) {
             // Release co-ownership on the previously tracked dynamic state
             if (m_task_state) m_task_state->release();
@@ -405,7 +406,6 @@ public:
             m_task_state = th_state;
 
             // Reserve co-ownership on the new dynamic state
-            __TBB_ASSERT(m_task_state != nullptr, "No state in the non-empty task_handle");
             m_task_state->reserve();
         }
         return *this;
