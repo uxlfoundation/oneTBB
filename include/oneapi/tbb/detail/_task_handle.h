@@ -38,33 +38,18 @@ class task_handle;
 class task_handle_task;
 class task_dynamic_state;
 
-class successor_list_node {
-public:
-    successor_list_node(task_dynamic_state* successor_state, d1::small_object_allocator& alloc)
-        : m_next_node(nullptr)
-        , m_successor_state(successor_state)
-        , m_allocator(alloc)
+struct successor_list_node {
+    successor_list_node* next_node = nullptr;
+    task_dynamic_state* successor_state = nullptr;
+    d1::small_object_allocator allocator;
+
+    successor_list_node(task_dynamic_state* state, d1::small_object_allocator& alloc)
+        : successor_state(state), allocator(alloc)
     {}
 
-    task_dynamic_state* get_successor_state() const {
-        return m_successor_state;
+    void destroy() {
+        allocator.delete_object(this);
     }
-
-    successor_list_node* get_next_node() const {
-        return m_next_node;
-    }
-
-    void set_next_node(successor_list_node* next_node) {
-        m_next_node = next_node;
-    }
-
-    void finalize() {
-        m_allocator.delete_object(this);
-    }
-private:
-    successor_list_node* m_next_node;
-    task_dynamic_state* m_successor_state;
-    d1::small_object_allocator m_allocator;
 };
 
 class task_dynamic_state {
@@ -92,6 +77,7 @@ public:
         }
     }
 
+    // Returns true if the released dependency was the last remaining one; false otherwise
     bool release_dependency() {
         auto updated_dependency_counter = --m_num_dependencies;
         return updated_dependency_counter == 0;
@@ -101,7 +87,7 @@ public:
         return m_num_dependencies.load(std::memory_order_acquire) != 0;
     }
 
-    task_handle_task* complete_and_try_bypass_successor();
+    task_handle_task* complete_and_try_get_successor();
 
     void add_successor(task_handle&  successor);
     void add_successor_node(successor_list_node* new_successor_node, successor_list_node* current_successor_list_head);
@@ -191,16 +177,17 @@ public:
         return current_state;
     }
 
-    task_handle_task* complete_and_try_bypass_successor() {
+    task_handle_task* complete_and_try_get_successor() {
         task_handle_task* next_task = nullptr;
 
         task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_relaxed);
         if (current_state != nullptr) {
-            next_task = current_state->complete_and_try_bypass_successor();
+            next_task = current_state->complete_and_try_get_successor();
         }
         return next_task;
     }
 
+    // Returns true if the released dependency was the last remaining one; false otherwise
     bool release_dependency() {
         task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_relaxed);
         __TBB_ASSERT(current_state != nullptr && current_state->has_dependencies(),
@@ -288,19 +275,19 @@ inline void task_dynamic_state::add_successor_node(successor_list_node* new_succ
 {
     __TBB_ASSERT(new_successor_node != nullptr, nullptr);
 
-    new_successor_node->set_next_node(current_successor_list_head);
+    new_successor_node->next_node = current_successor_list_head;
 
     while (!m_successor_list_head.compare_exchange_strong(current_successor_list_head, new_successor_node)) {
         // Other thread updated the head of the list
 
         if (represents_completed_task(current_successor_list_head)) {
             // Current task has completed while we tried to insert the successor to the list
-            new_successor_node->get_successor_state()->release_dependency();
-            new_successor_node->finalize();
+            new_successor_node->successor_state->release_dependency();
+            new_successor_node->destroy();
             break;
         }
 
-        new_successor_node->set_next_node(current_successor_list_head);
+        new_successor_node->next_node = current_successor_list_head;
     }
 }
 
@@ -317,13 +304,13 @@ inline void task_dynamic_state::add_successor(task_handle& successor) {
     }
 }
 
-inline task_handle_task* task_dynamic_state::complete_and_try_bypass_successor() {
+inline task_handle_task* task_dynamic_state::complete_and_try_get_successor() {
     successor_list_node* node = fetch_successor_list(COMPLETED_FLAG);
 
     task_handle_task* next_task = nullptr;
 
     while (node != nullptr) {
-        task_dynamic_state* successor_state = node->get_successor_state();
+        task_dynamic_state* successor_state = node->successor_state;
 
         if (successor_state->release_dependency()) {
             task_handle_task* successor_task = successor_state->get_task();
@@ -334,8 +321,8 @@ inline task_handle_task* task_dynamic_state::complete_and_try_bypass_successor()
             }
         }
 
-        successor_list_node* next_node = node->get_next_node();
-        node->finalize();
+        successor_list_node* next_node = node->next_node;
+        node->destroy();
         node = next_node;
     }
 

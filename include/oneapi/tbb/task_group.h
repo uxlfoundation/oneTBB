@@ -79,19 +79,6 @@ template<typename F>
 d1::task* task_ptr_or_nullptr(F&& f);
 }
 
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-inline d1::task* combine_tasks(d1::task* body_task, task_handle_task* successor_task) {
-    if (body_task == nullptr) return successor_task;
-    // Successor task can't have dependencies
-    if (successor_task == nullptr) return body_task;
-
-    // There is a task returned from the body and the successor task - bypassing the body task
-    // and spawning the successor one
-    d1::spawn(*successor_task, successor_task->ctx());
-    return body_task;
-}
-#endif
-
 template<typename F>
 class function_task : public task_handle_task  {
     //TODO: apply empty base optimization here
@@ -102,8 +89,15 @@ private:
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
         task* next_task = task_ptr_or_nullptr(m_func);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        task_handle_task* successor_task = this->complete_and_try_bypass_successor();
-        next_task = combine_tasks(next_task, successor_task);
+        task_handle_task* successor_task = this->complete_and_try_get_successor();
+
+        if (next_task != nullptr) {
+            // If there are both task returned from the body and the successor task
+            // Bypassing the body task and spawning the successor one
+            if (successor_task != nullptr) d1::spawn(*successor_task, successor_task->ctx());
+        } else {
+            next_task = successor_task;
+        }
 #endif
         finalize(&ed);
         return next_task;
@@ -514,15 +508,15 @@ protected:
 
         bool cancellation_status = false;
         try_call([&] {
-            task_handle_task* t = acs::release(h);
+            task_handle_task* task_ptr = acs::release(h);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
             // If the task has dependencies and the task_handle is not the last dependency
-            if (t->has_dependencies() && !t->release_dependency()) {
+            if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
                 d1::wait(m_wait_vertex.get_context(), context());
             } else
 #endif
             {
-                execute_and_wait(*t, context(), m_wait_vertex.get_context(), context());
+                execute_and_wait(*task_ptr, context(), m_wait_vertex.get_context(), context());
             }
         }).on_completion([&] {
             // TODO: the reset method is not thread-safe. Ensure the correct behavior.
@@ -614,14 +608,14 @@ public:
         using acs = d2::task_handle_accessor;
         __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
 
-        task_handle_task* t = acs::release(h);
+        task_handle_task* task_ptr = acs::release(h);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
         // Owned task has no dependencies or the task handle is the last dependency
-        if (t->has_dependencies() && !t->release_dependency()) {
+        if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
             return;
         }
 #endif
-        d1::spawn(*t, context());
+        d1::spawn(*task_ptr, context());
     }
 
     template<typename F>
