@@ -15,6 +15,7 @@ TBB_INSTALL_VARS:BOOL - Enable auto-generated vars installation(packages generat
 TBB_VALGRIND_MEMCHECK:BOOL - Enable scan for memory leaks using Valgrind (OFF by default)
 TBB_FILE_TRIM:BOOL - Enable __FILE__ trim, replace a build-time full path with a relative path in the debug info and macro __FILE__; use it to make
            reproducible location-independent builds (ON by default)
+TBB_RELEASE_PDB:BOOL - Generate pdb files for release libraries (OFF by default)
 ```
 
 ## Configure, build and test

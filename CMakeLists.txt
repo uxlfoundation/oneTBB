@@ -101,6 +101,7 @@ option(TBB4PY_BUILD "Enable tbb4py build" OFF)
 option(TBB_CPF "Enable preview features of the library" OFF)
 option(TBB_FIND_PACKAGE "Enable search for external oneTBB using find_package instead of build from sources" OFF)
 option(TBB_FILE_TRIM "Enable __FILE__ trim" ON)
+option(TBB_RELEASE_PDB "Generate pdb files for release libraries" OFF)
 
 if (NOT DEFINED BUILD_SHARED_LIBS)
     set(BUILD_SHARED_LIBS ON)
