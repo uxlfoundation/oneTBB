@@ -644,16 +644,14 @@ public:
         __TBB_ASSERT(pred != nullptr, "empty predecessor handle is not allowed for set_task_order");
         __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for set_task_order");
         task_dynamic_state* pred_state = task_handle_accessor::get_task_dynamic_state(pred);
-        task_dynamic_state* succ_state = task_handle_accessor::get_task_dynamic_state(succ);
-        pred_state->add_successor(succ_state);
+        pred_state->add_successor(succ);
     }
 
     static void set_task_order(d2::task_completion_handle& pred, d2::task_handle& succ) {
         __TBB_ASSERT(pred != nullptr, "empty predecessor completion_handle is not allowed for set_task_order");
         __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for set_task_order");
         task_dynamic_state* pred_state = task_completion_handle_accessor::get_task_dynamic_state(pred);
-        task_dynamic_state* succ_state = task_handle_accessor::get_task_dynamic_state(succ);
-        pred_state->add_successor(succ_state);
+        pred_state->add_successor(succ);
     }
 #endif
 }; // class task_group

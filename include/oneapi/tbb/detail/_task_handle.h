@@ -103,7 +103,7 @@ public:
         return m_num_dependencies.load(std::memory_order_acquire) != 0;
     }
 
-    void add_successor(task_dynamic_state* successor);
+    void add_successor(task_handle& successor);
     void add_successor_node(successor_list_node* new_successor_node, successor_list_node* current_successor_list_head);
 
     using successor_list_state_flag = std::uintptr_t;
@@ -304,15 +304,15 @@ inline void task_dynamic_state::add_successor_node(successor_list_node* new_succ
     }
 }
 
-inline void task_dynamic_state::add_successor(task_dynamic_state* successor) {
-    __TBB_ASSERT(successor != nullptr, nullptr);
+inline void task_dynamic_state::add_successor(task_handle& successor) {
     successor_list_node* current_successor_list_head = m_successor_list_head.load(std::memory_order_acquire);
 
     if (!represents_completed_task(current_successor_list_head)) {
-        successor->register_dependency();
+        task_dynamic_state* successor_state = task_handle_accessor::get_task_dynamic_state(successor);
+        successor_state->register_dependency();
 
         d1::small_object_allocator alloc;
-        successor_list_node* new_successor_node = alloc.new_object<successor_list_node>(successor, alloc);
+        successor_list_node* new_successor_node = alloc.new_object<successor_list_node>(successor_state, alloc);
         add_successor_node(new_successor_node, current_successor_list_head);
     }
 }
