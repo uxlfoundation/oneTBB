@@ -26,6 +26,7 @@
 #include "common/spin_barrier.h"
 #include "common/utils_concurrency_limit.h"
 
+#include "tbb/assert.h"
 #include "tbb/global_control.h"
 #include "tbb/parallel_for.h"
 #include "tbb/task_group.h"

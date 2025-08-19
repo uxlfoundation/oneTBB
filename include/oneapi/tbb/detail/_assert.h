@@ -47,13 +47,6 @@ TBB_EXPORT assertion_handler_type __TBB_EXPORTED_FUNC get_assertion_handler() no
 #else
 } // namespace r1
 } // namespace detail
-
-inline namespace v1 {
-using detail::r1::assertion_handler_type;
-using detail::r1::set_assertion_handler;
-using detail::r1::get_assertion_handler;
-} // namespace v1
-
 } // namespace tbb
 #endif
 
