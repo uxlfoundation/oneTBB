@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -901,4 +902,59 @@ TEST_CASE("Force thread limit on per-thread reference_vertex") {
     for (int i = 0; i < num_groups; ++i) {
         groups[i].wait();
     }
+}
+
+constexpr std::size_t max_current_task_ptr_test_depth = 1000;
+
+struct current_task_ptr_checking_task : public tbb::detail::d1::task {
+    current_task_ptr_checking_task(std::size_t d, tbb::detail::d1::wait_context& wtc, tbb::task_group_context& ctx)
+        : depth(d), wait_context(wtc), task_group_ctx(ctx) {}
+
+    tbb::detail::d1::task* execute(tbb::detail::d1::execution_data&) override {
+        ++execute_count;
+
+        REQUIRE_MESSAGE(tbb::detail::d1::current_task_ptr() == this,
+                        "Incorrect task returned from current_task_ptr");
+
+        if (depth < max_current_task_ptr_test_depth) {
+            tbb::detail::d1::wait_context next_task_wait_context(1);
+
+            current_task_ptr_checking_task next_task(depth + 1, next_task_wait_context, task_group_ctx);
+            tbb::detail::d1::execute_and_wait(next_task, task_group_ctx, next_task_wait_context, task_group_ctx);
+
+            REQUIRE_MESSAGE(tbb::detail::d1::current_task_ptr() == this,
+                        "Incorrect task returned from current_task_ptr");
+        }
+
+        wait_context.release();
+        return nullptr;
+    }
+
+    tbb::detail::d1::task* cancel(tbb::detail::d1::execution_data&) override {
+        REQUIRE_MESSAGE(false, "current_task_ptr_checking_tasks should not be cancelled");
+        return nullptr;
+    }
+
+    static std::size_t execute_count;
+    std::size_t depth;
+    tbb::detail::d1::wait_context& wait_context;
+    tbb::task_group_context& task_group_ctx;
+};
+
+std::size_t current_task_ptr_checking_task::execute_count = 0;
+
+//! \brief \ref error_guessing
+TEST_CASE("Test current_task_ptr") {
+    tbb::task_group_context test_context;
+    tbb::detail::d1::wait_context root_task_wait(1);
+
+    REQUIRE_MESSAGE(tbb::detail::d1::current_task_ptr() == nullptr,
+                    "Incorrect task returned from current_task_ptr");
+
+    current_task_ptr_checking_task root_task(0, root_task_wait, test_context);
+    tbb::detail::d1::execute_and_wait(root_task, test_context, root_task_wait, test_context);
+
+    REQUIRE_MESSAGE(current_task_ptr_checking_task::execute_count == max_current_task_ptr_test_depth + 1,
+                    "Incorrect number of tasks executed");
+    current_task_ptr_checking_task::execute_count = 0;
 }

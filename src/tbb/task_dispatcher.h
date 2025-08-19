@@ -331,7 +331,9 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
 
                     ITT_CALLEE_ENTER(ITTPossible, t, itt_caller);
 
+                    d1::task* prev_innermost_running_task = m_innermost_running_task;
                     m_innermost_running_task = t;
+                    
                     if (ed.context->is_group_execution_cancelled()) {
                         t = t->cancel(ed);
                     } else {
@@ -345,6 +347,7 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
                     ed.affinity_slot = d1::no_slot;
                     // Reset task owner id for bypassed task
                     ed.original_slot = m_thread_data->my_arena_index;
+                    m_innermost_running_task = prev_innermost_running_task;
                     t = get_critical_task(t, ed, isolation, critical_allowed);
                 }
                 __TBB_ASSERT(m_thread_data && governor::is_thread_data_set(m_thread_data), nullptr);
