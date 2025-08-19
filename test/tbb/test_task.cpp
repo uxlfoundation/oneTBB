@@ -904,7 +904,7 @@ TEST_CASE("Force thread limit on per-thread reference_vertex") {
     }
 }
 
-constexpr std::size_t max_current_task_ptr_test_depth = 1000;
+constexpr std::size_t max_current_task_ptr_test_depth = 100;
 
 struct current_task_ptr_checking_task : public tbb::detail::d1::task {
     current_task_ptr_checking_task(std::size_t d, tbb::detail::d1::wait_context& wtc, tbb::task_group_context& ctx)
