@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -168,23 +168,64 @@ private:
     B body;
 };
 
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+class metainfo_tag_type;
+#endif
+
+// TODO: add description
+struct invoke_body_with_tag_helper {
+    using first_priority = int;
+    using second_priority = double;
+
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+    template <typename Body, typename... Args>
+    static auto invoke(first_priority, Body&& body, metainfo_tag_type&& tag, Args&&... args)
+        noexcept(noexcept(tbb::detail::invoke(std::forward<Body>(body), std::forward<Args>(args)..., std::move(tag))))
+        -> decltype(tbb::detail::invoke(std::forward<Body>(body), std::forward<Args>(args)..., std::move(tag)), void())
+    {
+        tbb::detail::invoke(std::forward<Body>(body), std::forward<Args>(args)..., std::move(tag));
+    }
+#endif
+    template <typename Body, typename... Args>
+    static void invoke(second_priority, Body&& body __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo_tag_type&&),
+                       Args&&... args)
+        noexcept(noexcept(tbb::detail::invoke(std::forward<Body>(body), std::forward<Args>(args)...)))
+    {
+        tbb::detail::invoke(std::forward<Body>(body), std::forward<Args>(args)...);
+    }
+};
+
+// TODO: add comment
+template <typename Body, typename... Args>
+void invoke_body_with_tag(Body&& body __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo_tag_type&& tag), Args&&... args)
+    noexcept(noexcept(invoke_body_with_tag_helper::invoke(1, std::forward<Body>(body) __TBB_FLOW_GRAPH_METAINFO_ARG(std::move(tag)),
+                                                          std::forward<Args>(args)...)))
+{
+    invoke_body_with_tag_helper::invoke(/*overload priority helper*/1,
+                                        std::forward<Body>(body) __TBB_FLOW_GRAPH_METAINFO_ARG(std::move(tag)),
+                                        std::forward<Args>(args)...);
+}
+
+
 //! function_body that takes an Input and a set of output ports
 template<typename Input, typename OutputSet>
 class multifunction_body : no_assign {
 public:
     virtual ~multifunction_body () {}
-    virtual void operator()(const Input &/* input*/, OutputSet &/*oset*/) = 0;
+    virtual void operator()(const Input &/* input*/, OutputSet &/*oset*/
+                            __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo_tag_type&& /*tag*/)) = 0;
     virtual multifunction_body* clone() = 0;
     virtual void* get_body_ptr() = 0;
 };
 
 //! leaf for multifunction.  OutputSet can be a std::tuple or a vector.
-template<typename Input, typename OutputSet, typename B >
+template<typename Input, typename OutputSet, typename B>
 class multifunction_body_leaf : public multifunction_body<Input, OutputSet> {
 public:
     multifunction_body_leaf(const B &_body) : body(_body) { }
-    void operator()(const Input &input, OutputSet &oset) override {
-        tbb::detail::invoke(body, input, oset); // body may explicitly put() to one or more of oset.
+    // body may explicitly put() to one or more of oset.
+    void operator()(const Input &input, OutputSet &oset __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo_tag_type&& tag)) override {
+        invoke_body_with_tag(body __TBB_FLOW_GRAPH_METAINFO_ARG(std::move(tag)), input, oset);
     }
     void* get_body_ptr() override { return &body; }
     multifunction_body_leaf* clone() override {
