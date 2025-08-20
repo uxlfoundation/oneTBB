@@ -931,7 +931,7 @@ struct current_task_ptr_checking_task : public tbb::detail::d1::task {
                 submit(t, arena, task_group_ctx, true);
                 break;
             } case current_task_ptr_submit_type::slot_spawn: {
-                tbb::detail::d1::slot_id task_slot = tbb::this_task_arena::current_thread_index() + 1 % tbb::this_task_arena::max_concurrency();
+                tbb::detail::d1::slot_id task_slot = tbb::detail::d1::slot_id(tbb::this_task_arena::current_thread_index() + 1 % tbb::this_task_arena::max_concurrency());
                 tbb::detail::d1::spawn(t, task_group_ctx, task_slot);
                 break; 
             } case current_task_ptr_submit_type::enqueue: {
