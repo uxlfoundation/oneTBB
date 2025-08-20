@@ -990,8 +990,8 @@ std::atomic<std::size_t> current_task_ptr_checking_task<SubmitType>::execute_cou
 template <current_task_ptr_submit_type SubmitType>
 std::atomic<std::size_t> current_task_ptr_checking_task<SubmitType>::cancel_count{0};
 
-template <current_task_ptr_submit_type SubmitType, bool TestCancel>
-void test_current_task_ptr_base() {
+template <current_task_ptr_submit_type SubmitType>
+void test_current_task_ptr_base(bool test_cancel) {
     tbb::task_arena arena;
     arena.initialize();
     tbb::task_group_context test_context;
@@ -1009,7 +1009,7 @@ void test_current_task_ptr_base() {
     for (std::size_t i = 0; i < num_start_tasks; ++i) {
         start_tasks.emplace_back(0, arena, root_task_wait, test_context);
         submit(start_tasks.back(), arena, test_context, false);
-        if (TestCancel && i == num_start_tasks / 2) {
+        if (test_cancel && i == num_start_tasks / 2) {
             test_context.cancel_group_execution();
         }
     }
@@ -1019,7 +1019,7 @@ void test_current_task_ptr_base() {
     });
 
     std::size_t expected_tasks_count = max_current_task_ptr_test_depth * num_start_tasks + num_start_tasks;
-    if (TestCancel) {
+    if (test_cancel) {
         REQUIRE_MESSAGE(task_type::cancel_count > 0, "Some tasks should be cancelled");
         REQUIRE_MESSAGE(task_type::execute_count + task_type::cancel_count < expected_tasks_count,
                         "Incorrect number of tasks executed or cancelled");
@@ -1031,17 +1031,16 @@ void test_current_task_ptr_base() {
     task_type::cancel_count = 0;
 }
 
-template <bool TestCancel>
-void test_current_task_ptr() {
-    test_current_task_ptr_base<current_task_ptr_submit_type::execute_and_wait, TestCancel>();
-    test_current_task_ptr_base<current_task_ptr_submit_type::submit_non_critical, TestCancel>();
-    test_current_task_ptr_base<current_task_ptr_submit_type::submit_critical, TestCancel>();
-    test_current_task_ptr_base<current_task_ptr_submit_type::slot_spawn, TestCancel>();
-    test_current_task_ptr_base<current_task_ptr_submit_type::enqueue, TestCancel>();
+void test_current_task_ptr(bool test_cancel) {
+    test_current_task_ptr_base<current_task_ptr_submit_type::execute_and_wait>(test_cancel);
+    test_current_task_ptr_base<current_task_ptr_submit_type::submit_non_critical>(test_cancel);
+    test_current_task_ptr_base<current_task_ptr_submit_type::submit_critical>(test_cancel);
+    test_current_task_ptr_base<current_task_ptr_submit_type::slot_spawn>(test_cancel);
+    test_current_task_ptr_base<current_task_ptr_submit_type::enqueue>(test_cancel);
 }
 
 //! \brief \ref error_guessing
 TEST_CASE("Test current_task_ptr") {
-    test_current_task_ptr</*TestCancel = */false>();
-    test_current_task_ptr</*TestCancel = */true>();
+    test_current_task_ptr(/*test_cancel = */false);
+    test_current_task_ptr(/*test_cancel = */true);
 }
