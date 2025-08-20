@@ -1181,6 +1181,11 @@ TEST_CASE("Task handle for scheduler bypass via run_and_wait"){
 #endif //__TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
 #if TBB_USE_EXCEPTIONS
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS && __TBB_GCC_VERSION && !__clang__ && !__INTEL_COMPILER
+// GCC issues a warning in task_handle_task::has_dependencies for empty task_handle
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
 //As these tests are against behavior marked by spec as undefined, they can not be put into conformance tests
 
 //! The test for error in scheduling empty task_handle
@@ -1221,6 +1226,10 @@ TEST_CASE("task_handle cannot be scheduled into other task_group of the same con
     CHECK_NOTHROW(tg.run(tg.defer([]{})));
     CHECK_THROWS_WITH_AS(tg1.run(tg.defer([]{})), "Attempt to schedule task_handle into different task_group", std::runtime_error);
 }
+
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS && __TBB_GCC_VERSION && !__clang__ && !__INTEL_COMPILER
+#pragma GCC diagnostic pop
+#endif
 
 //! \brief \ref requirement
 TEST_CASE("Test safe task submit from external thread") {
@@ -1352,21 +1361,214 @@ TEST_CASE("test task_completion_handle") {
     }
 }
 
+enum class submit_function {
+    run = 0,
+    run_and_wait = 1,
+    arena_enqueue = 2,
+    this_arena_enqueue = 3
+};
+
+void submit(submit_function func, tbb::task_handle&& handle, tbb::task_group& group, tbb::task_arena& arena) {
+    if (func == submit_function::run || func == submit_function::run_and_wait) {
+        group.run(std::move(handle));
+    } else if (func == submit_function::arena_enqueue) {
+        arena.enqueue(std::move(handle));
+    } else {
+        CHECK_MESSAGE(func == submit_function::this_arena_enqueue, "new submit function added but not handled");
+        tbb::this_task_arena::enqueue(std::move(handle));
+    }
+}
+
+void submit_and_wait(submit_function func, tbb::task_handle&& handle, tbb::task_group& group, tbb::task_arena& arena) {
+    if (func != submit_function::run_and_wait) {
+        submit(func, std::move(handle), group, arena);
+        group.wait();
+    } else {
+        group.run_and_wait(std::move(handle));
+    }
+}
+
+struct leaf_task {
+    void operator()() const {
+        *placeholder = value;
+    }
+    std::shared_ptr<std::size_t> placeholder;
+    std::size_t value;
+};
+
+struct combine_task {
+    void operator()() const {
+        *placeholder = *left_leaf + *right_leaf;
+    }
+
+    std::shared_ptr<std::size_t> placeholder;
+    std::shared_ptr<std::size_t> left_leaf;
+    std::shared_ptr<std::size_t> right_leaf;
+};
+
+void test_not_submitted_predecessors(submit_function submit_function_tag) {
+    tbb::task_arena arena;
+    constexpr std::size_t depth = 100; 
+
+    tbb::task_group tg;
+    std::size_t task_initializer = 0;
+
+    std::shared_ptr<std::size_t> left_leaf_placeholder = std::make_shared<std::size_t>(0);
+    tbb::task_completion_handle left_leaf_completion_handle;
+    tbb::task_handle deepest_left_leaf_task;
+
+    for (std::size_t i = 0; i < depth; ++i) {
+        if (i == 0) {
+            deepest_left_leaf_task = tg.defer(leaf_task{left_leaf_placeholder, task_initializer++});
+            left_leaf_completion_handle = deepest_left_leaf_task;
+        }
+
+        std::shared_ptr<std::size_t> right_leaf_placeholder = std::make_shared<std::size_t>(0);
+        tbb::task_handle right_leaf_task = tg.defer(leaf_task{right_leaf_placeholder, task_initializer++});
+
+        std::shared_ptr<std::size_t> combine_placeholder = std::make_shared<std::size_t>(0);
+        tbb::task_handle combine = tg.defer(combine_task{combine_placeholder, left_leaf_placeholder, right_leaf_placeholder});
+        tbb::task_completion_handle combine_completion_handle = combine;
+
+        tbb::task_group::set_task_order(left_leaf_completion_handle, combine);
+        tbb::task_group::set_task_order(right_leaf_task, combine);
+
+        submit(submit_function_tag, std::move(combine), tg, arena);
+        submit(submit_function_tag, std::move(right_leaf_task), tg, arena);
+
+        left_leaf_completion_handle = combine_completion_handle;
+        left_leaf_placeholder = combine_placeholder;
+    }
+    
+    CHECK(deepest_left_leaf_task);
+    CHECK_MESSAGE(*left_leaf_placeholder == 0, "Receiving results from incomplete task graph");
+
+    // "Run" the graph
+    submit_and_wait(submit_function_tag, std::move(deepest_left_leaf_task), tg, arena);
+
+    std::size_t expected_result = 0;
+    std::size_t counter = 0;
+
+    // 2 tasks on the first layer + one task for each next layer
+    for (std::size_t i = 0; i < depth + 1; ++i) {
+        expected_result += counter++;
+    }
+
+    CHECK_MESSAGE(expected_result == *left_leaf_placeholder,
+                  "Unexpected result for task graph execution");
+}
+
+// all_predecessors_completed flag means creating a set of predecessors that a guaranteed to be completed
+// before setting dependencies
+void test_submitted_predecessors(submit_function submit_function_tag, bool all_predecessors_completed) {
+    tbb::task_arena arena;
+    const std::size_t num_predecessors = 500;
+    tbb::task_group tg;
+    std::atomic<std::size_t> task_placeholder{0};
+
+    std::vector<tbb::task_completion_handle> predecessors(num_predecessors);
+
+    for (std::size_t i = 0; i < num_predecessors; ++i) {
+        tbb::task_handle h = tg.defer([&] { ++task_placeholder; });
+        predecessors[i] = h;
+        submit(submit_function_tag, std::move(h), tg, arena);
+    }
+
+    if (all_predecessors_completed) {
+        tg.wait();
+        CHECK_MESSAGE(task_placeholder == num_predecessors, "Not all tasks were executed");
+    }
+
+    tbb::task_handle successor_task = tg.defer([&] {
+        CHECK_MESSAGE(task_placeholder == num_predecessors, "Not all predecessors completed");
+        ++task_placeholder;
+    });
+
+    for (std::size_t i = 0; i < num_predecessors; ++i) {
+        tbb::task_group::set_task_order(predecessors[i], successor_task);
+    }
+
+    if (all_predecessors_completed) {
+        CHECK_MESSAGE(task_placeholder == num_predecessors, "successor task completed before being submitted");
+    }
+    submit_and_wait(submit_function_tag, std::move(successor_task), tg, arena);
+
+    CHECK_MESSAGE(task_placeholder == num_predecessors + 1, "successor task was not completed");
+}
+
+void test_predecessors(submit_function submit_function_tag) {
+    test_not_submitted_predecessors(submit_function_tag);
+    test_submitted_predecessors(submit_function_tag, /*all_predecessors_completed = */true);
+    test_submitted_predecessors(submit_function_tag, /*all_predecessors_completed = */false);
+}
+
+void test_return_task_with_dependencies(submit_function submit_function_tag) {
+    tbb::task_group tg;
+    tbb::task_arena arena;
+
+    std::atomic<std::size_t> predecessor_placeholder(0);
+    std::atomic<std::size_t> successor_placeholder(0);
+
+    tbb::task_handle predecessor = tg.defer([&] {
+        predecessor_placeholder = 1;
+    });
+    tbb::task_completion_handle predecessor_completion_handle = predecessor;
+
+    tbb::task_handle task = tg.defer([&] {
+        tbb::task_handle successor = tg.defer([&, predecessor_completion_handle] {
+            CHECK_MESSAGE(predecessor_placeholder == 1, "Predecessor task was not completed");
+            successor_placeholder = 1;
+        });
+
+        tbb::task_group::set_task_order(predecessor_completion_handle, successor);
+        return successor;
+    });
+
+    submit(submit_function_tag, std::move(task), tg, arena);
+    submit_and_wait(submit_function_tag, std::move(predecessor), tg, arena);
+    CHECK_MESSAGE(successor_placeholder == 1, "Successor task was not completed");
+}
+
+TEST_CASE("test task_group dynamic dependencies") {
+    for (unsigned p = MinThread; p <= MaxThread; ++p) {
+        tbb::global_control limit(tbb::global_control::max_allowed_parallelism, p);
+
+        test_predecessors(submit_function::run);
+        test_predecessors(submit_function::run_and_wait);
+        test_predecessors(submit_function::arena_enqueue);
+        test_predecessors(submit_function::this_arena_enqueue);
+
+        test_return_task_with_dependencies(submit_function::run);
+        test_return_task_with_dependencies(submit_function::run_and_wait);
+        test_return_task_with_dependencies(submit_function::arena_enqueue);
+        test_return_task_with_dependencies(submit_function::this_arena_enqueue);
+    }
+}
+
 TEST_CASE("test task_completion_handle in concurrent environment") {
     tbb::task_group tg;
     std::size_t task_placeholder = 0;
+    const int n = 100;
 
     tbb::task_handle task = tg.defer([&] {
         ++task_placeholder;
     });
 
-    tbb::parallel_for(0, 100, [&](int) {
+    std::atomic<std::size_t> succ_counter(0);
+
+    tbb::parallel_for(0, n, [&](int) {
         tbb::task_completion_handle completion_handle(task);
         CHECK_MESSAGE(completion_handle, "task_completion_handle should not be empty");
-        // TODO: extend this test with adding concurrent dependencies
+        tbb::task_handle succ = tg.defer([&] {
+            CHECK_MESSAGE(task_placeholder == 1, "Predecessor task was not executed");
+            ++succ_counter;
+        });
+        tbb::task_group::set_task_order(completion_handle, succ);
+        tg.run(std::move(succ));
     });
 
     tg.run_and_wait(std::move(task));
     CHECK_MESSAGE(task_placeholder == 1, "task body was not executed");
+    CHECK_MESSAGE(succ_counter == n, "Not all of the successors were executed");
 }
 #endif
