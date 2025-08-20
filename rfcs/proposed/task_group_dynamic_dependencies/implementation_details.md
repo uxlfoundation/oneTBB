@@ -219,7 +219,7 @@ The successor list in `task_dynamic_state` can be in one of the three states:
 
 The `set_task_order` API supports concurrent addition of multiple successors to a single predecessor, as well as multiple predecessors to a single successor.
 
-It begins by retrieving the dynamic states of both the predecessor and successor using `get_dynamic_state()`.
+It retrieves the dynamic states of both the predecessor and successor using `get_dynamic_state()`.
 If the dynamic states do not already exist, they are created.
 
 While registering the successor in the predecessor's dynamic state, the state of the successor list is checked. If the successor list is in the `transferred` state,
