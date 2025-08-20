@@ -87,20 +87,9 @@ class function_task : public task_handle_task  {
 private:
     d1::task* execute(d1::execution_data& ed) override {
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
-        task* next_task = task_ptr_or_nullptr(m_func);
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        task_handle_task* successor_task = this->complete_and_try_get_successor();
-
-        if (next_task != nullptr) {
-            // If there are both task returned from the body and the successor task
-            // Bypassing the body task and spawning the successor one
-            if (successor_task != nullptr) d1::spawn(*successor_task, successor_task->ctx());
-        } else {
-            next_task = successor_task;
-        }
-#endif
+        task* res = task_ptr_or_nullptr(m_func);
         finalize(&ed);
-        return next_task;
+        return res;
     }
     d1::task* cancel(d1::execution_data& ed) override {
         finalize(&ed);
@@ -118,13 +107,7 @@ namespace {
     template<typename F>
     d1::task* task_ptr_or_nullptr_impl(std::false_type, F&& f){
         task_handle th = std::forward<F>(f)();
-        task_handle_task* task_ptr = task_handle_accessor::release(th);
-        // If task has unresolved dependencies, it can't be bypassed
-        if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
-            task_ptr = nullptr;
-        }
-
-        return task_ptr;
+        return task_handle_accessor::release(th);
     }
 
     template<typename F>
@@ -508,16 +491,7 @@ protected:
 
         bool cancellation_status = false;
         try_call([&] {
-            task_handle_task* task_ptr = acs::release(h);
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-            // If the task has dependencies and the task_handle is not the last dependency
-            if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
-                d1::wait(m_wait_vertex.get_context(), context());
-            } else
-#endif
-            {
-                execute_and_wait(*task_ptr, context(), m_wait_vertex.get_context(), context());
-            }
+            execute_and_wait(*acs::release(h), context(), m_wait_vertex.get_context(), context());
         }).on_completion([&] {
             // TODO: the reset method is not thread-safe. Ensure the correct behavior.
             cancellation_status = context().is_group_execution_cancelled();
@@ -608,14 +582,7 @@ public:
         using acs = d2::task_handle_accessor;
         __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
 
-        task_handle_task* task_ptr = acs::release(h);
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        // Owned task has no dependencies or the task handle is the last dependency
-        if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
-            return;
-        }
-#endif
-        d1::spawn(*task_ptr, context());
+        d1::spawn(*acs::release(h), context());
     }
 
     template<typename F>
@@ -632,22 +599,6 @@ public:
     task_group_status run_and_wait(d2::task_handle&& h) {
         return internal_run_and_wait(std::move(h));
     }
-
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    static void set_task_order(d2::task_handle& pred, d2::task_handle& succ) {
-        __TBB_ASSERT(pred != nullptr, "empty predecessor handle is not allowed for set_task_order");
-        __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for set_task_order");
-        task_dynamic_state* pred_state = task_handle_accessor::get_task_dynamic_state(pred);
-        pred_state->add_successor(succ);
-    }
-
-    static void set_task_order(d2::task_completion_handle& pred, d2::task_handle& succ) {
-        __TBB_ASSERT(pred != nullptr, "empty predecessor completion_handle is not allowed for set_task_order");
-        __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for set_task_order");
-        task_dynamic_state* pred_state = task_completion_handle_accessor::get_task_dynamic_state(pred);
-        pred_state->add_successor(succ);
-    }
-#endif
 }; // class task_group
 
 class wait_delegate : public d1::delegate_base {
@@ -751,9 +702,6 @@ using detail::d1::is_current_task_group_canceling;
 using detail::r1::missing_wait;
 
 using detail::d2::task_handle;
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-using detail::d2::task_completion_handle;
-#endif
 }
 
 } // namespace tbb
