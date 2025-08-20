@@ -157,7 +157,7 @@ work's state.
 We therefore think predecessors may be in any state when they are added, 
 as shown below:
 
-<img src="add_dependency.png" width=400>
+<img src="assets/add_dependency.png" width=400>
 
 There are a number of possible options to spell a function for adding
 a single predecessor. Additionally, we may also want a function to allow
@@ -209,7 +209,7 @@ subsequent recursively generated tasks) must be able to create new tasks
 and then update the graph for their outer merge task to wait for the 
 newly created subtasks to complete.
 
-<img src="merge_sort.png" width=800>
+<img src="assets/merge_sort.png" width=800>
 
 A key point of this recursive parallel algorithm is the requirement to change 
 the predecessors of the merge tasks. However, the merge tasks are already 
@@ -260,7 +260,7 @@ to complete.
 
 The dependency graph for this example is:
 
-<img src="three_task_graph.png" width=400>
+<img src="assets/three_task_graph.png" width=400>
 
 #### Predecessors in Unknown States
 
@@ -290,7 +290,7 @@ regardless of state of the task it represents. Any predecessor that is already
 completed when it is added as a predecessor will not delay the start of the dependent
 task.
 
-<img src="unknown_states.png" width=400>
+<img src="assets/unknown_states.png" width=400>
 
 #### Recursive Decomposition
 
@@ -342,6 +342,10 @@ into the following helper functions: `users::do_serial_sort`, `users::create_lef
     }
 
 This task tree matches the one shown earlier for merge-sort. 
+
+## Extended semantics proposal
+
+The detailed proposal for the API and semantics of `task_group` extensions is presented in the [API and Semantics Details sub-RFC](extended_semantics.md).
 
 ## Open Questions in Design
 
