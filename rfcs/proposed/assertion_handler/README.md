@@ -45,11 +45,19 @@ compatibility for applications migrating from TBB 2020 to oneTBB.
 The proposal adds the following new functions to the public API, using the same signatures as TBB 2020 for
 compatibility:
 
+#### Header
+
+```cpp
+#include <oneapi/tbb/global_control.h>
+```
+
+#### Syntax
+
 ```cpp
 namespace tbb {
-    // Type alias for assertion handler function pointer - identical to TBB 2020
-    using assertion_handler_type = void(*)(const char* location, int line,
-                                           const char* expression, const char* comment);
+    // Type alias for assertion handler function pointer - same as TBB 2020, but with C++11 noreturn attribute
+    using assertion_handler_type = [[noreturn]] void(*)(const char* location, int line,
+                                                        const char* expression, const char* comment);
 
     //! Set assertion handler and return its previous value.
     //! If new_handler is nullptr, resets to the default handler.
@@ -220,3 +228,6 @@ void test_assertion_handler(const char* location, int line,
    would provide unified assertion handling, it may be acceptable to leave TBBBind as-is to maintain simpler
    dependencies and follow the same pattern as TBBMalloc. What are the trade-offs between consistency of assertion
    handling versus architectural simplicity?
+
+5. **Header file**: Should we include the new APIs into a single header file (`global_control.h` is currently
+   proposed) or make them available through any public oneTBB header?
