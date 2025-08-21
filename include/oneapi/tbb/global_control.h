@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -193,6 +194,9 @@ using detail::d1::attach;
 using detail::d1::finalize;
 using detail::d1::task_scheduler_handle;
 using detail::r1::unsafe_wait;
+using detail::r1::assertion_handler_type;
+using detail::r1::set_assertion_handler;
+using detail::r1::get_assertion_handler;
 } // namespace v1
 
 } // namespace tbb

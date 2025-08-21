@@ -1,6 +1,5 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -26,7 +25,6 @@
     Any header listed below can be included independently of others.
 **/
 
-#include "oneapi/tbb/assert.h"
 #include "oneapi/tbb/blocked_range.h"
 #include "oneapi/tbb/blocked_range2d.h"
 #include "oneapi/tbb/blocked_range3d.h"
