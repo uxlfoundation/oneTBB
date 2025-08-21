@@ -22,7 +22,7 @@
 
 #include "common/common_arena_constraints.h"
 
-#include "tbb/assert.h"
+#include "tbb/global_control.h"
 #include "tbb/parallel_for.h"
 
 #if __TBB_HWLOC_VALID_ENVIRONMENT && __HWLOC_CPUBIND_PRESENT
