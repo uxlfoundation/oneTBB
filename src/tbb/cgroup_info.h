@@ -109,16 +109,15 @@ private:
                 relative_path = paths_cache.v1_relative_path;
             }
 
-            if (path_start)
-                break;    // Found "cpu" controller path
+            if (path_start) {
+                std::strncpy(relative_path, path_start, rel_path_size);
+                relative_path[rel_path_size - 1] = '\0'; // Ensure null-termination after copy
+
+                char* new_line = std::strrchr(relative_path, '\n');
+                if (new_line)
+                    *new_line = '\0'; // Ensure no new line at the end of the path is copied
+            }
         }
-
-        std::strncpy(relative_path, path_start, rel_path_size);
-        relative_path[rel_path_size - 1] = '\0'; // Ensure null-termination after copy
-
-        char* new_line = std::strrchr(relative_path, '\n');
-        if (new_line)
-            *new_line = '\0';   // Ensure no new line at the end of the path is copied
     }
 
     static bool try_read_cgroup_v1_num_cpus_from(const char* dir, int& num_cpus) {
@@ -215,11 +214,67 @@ private:
         return num_cpus;
     }
 
+    static bool is_cpu_restriction_possible(std::FILE* cgroup_fd, cgroup_paths& relative_paths_cache) {
+        cache_relative_path_for(cgroup_fd, relative_paths_cache);
+
+        bool has_cgroup_v1_cpu_controller = *relative_paths_cache.v1_relative_path;
+        bool has_cgroup_v2 = *relative_paths_cache.v2_relative_path;
+        bool is_cgroup_v2_with_root_path =
+            relative_paths_cache.v2_relative_path[0] == '/' && !relative_paths_cache.v2_relative_path[1];
+        if (!has_cgroup_v2 && !has_cgroup_v1_cpu_controller) {
+            return false; // No CPU constraints found
+        } else if (has_cgroup_v1_cpu_controller || !is_cgroup_v2_with_root_path) {
+            return true;
+        }
+        __TBB_ASSERT(!has_cgroup_v1_cpu_controller && has_cgroup_v2 && is_cgroup_v2_with_root_path, nullptr);
+
+        // Usually PID 1 is the init process
+        unique_file_t init_process_cgroup_file(std::fopen("/proc/1/cgroup", "r"), &close_file);
+        cgroup_paths init_process_cgroup_cache{};
+        cache_relative_path_for(init_process_cgroup_file.get(), init_process_cgroup_cache);
+        if (*init_process_cgroup_cache.v2_relative_path) {
+            // If the init process cgroup path is "/init.scope", it means systemd is used
+            if (!std::strncmp(init_process_cgroup_cache.v2_relative_path, "/init.scope", 11)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    static int try_common_cgroup_mount_path(const cgroup_paths& relative_paths_cache) {
+        int num_cpus = error_value;
+        char dir[PATH_MAX] = {0};
+        if (*relative_paths_cache.v2_relative_path) {
+            if (std::snprintf(dir, PATH_MAX, "%s/%s", "/sys/fs/cgroup", relative_paths_cache.v2_relative_path) >= 0) {
+                try_read_cgroup_v2_num_cpus_from(dir, num_cpus);
+            }
+        }
+
+        if (num_cpus == error_value && *relative_paths_cache.v1_relative_path) {
+            if (std::snprintf(dir, PATH_MAX, "%s/%s", "/sys/fs/cgroup", relative_paths_cache.v1_relative_path) >= 0) {
+                try_read_cgroup_v1_num_cpus_from(dir, num_cpus);
+            }
+        }
+        return num_cpus;
+    }
+
     static int parse_cpu_constraints() {
-        // Reading /proc/self/mounts and /proc/self/cgroup anyway, so open them right away
+        // Reading /proc/self/cgroup anyway, so open it right away
         unique_file_t cgroup_file_ptr(std::fopen("/proc/self/cgroup", "r"), &close_file);
         if (!cgroup_file_ptr)
             return error_value; // Failed to open cgroup file
+
+        cgroup_paths relative_paths_cache;
+        if (!is_cpu_restriction_possible(cgroup_file_ptr.get(), relative_paths_cache)) {
+            return unlimited_num_cpus;
+        }
+
+        int found_num_cpus = error_value; // Initialize to an impossible value
+        found_num_cpus = try_common_cgroup_mount_path(relative_paths_cache);
+        if (found_num_cpus != error_value) {
+            return found_num_cpus;
+        }
 
         auto close_mounts_file = [](std::FILE* file) { endmntent(file); };
         using unique_mounts_file_t = std::unique_ptr<std::FILE, decltype(close_mounts_file)>;
@@ -229,12 +284,10 @@ private:
 
         // TODO: To avoid parsing /proc/self/mounts, read relative paths first and try opening
         //       necessary files in the most probable mount points (see RFC for details)
-        cgroup_paths relative_paths_cache;
         struct mntent mntent;
         constexpr std::size_t buffer_size = 4096; // Allocate a buffer for reading mount entries
         char mount_entry_buffer[buffer_size];
 
-        int found_num_cpus = error_value; // Initialize to an impossible value
         // Read the mounts file and cgroup file to determine the number of CPUs
         while (getmntent_r(mounts_file_ptr.get(), &mntent, mount_entry_buffer, buffer_size)) {
             if (std::strncmp(mntent.mnt_type, "cgroup", 6) == 0) {
