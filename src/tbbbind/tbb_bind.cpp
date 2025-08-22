@@ -18,6 +18,7 @@
 #include <vector>
 #include <mutex>
 
+#include "../tbb/assert_impl.h" // Out-of-line TBB assertion handling routines are instantiated here.
 #include "oneapi/tbb/detail/_assert.h"
 #include "oneapi/tbb/detail/_config.h"
 
@@ -593,6 +594,10 @@ TBBBIND_EXPORT int __TBB_internal_get_default_concurrency(int numa_id, int core_
 
 TBBBIND_EXPORT void __TBB_internal_destroy_system_topology() {
     return system_topology::destroy();
+}
+
+TBBBIND_EXPORT void __TBB_internal_set_tbbbind_assertion_handler(assertion_handler_type handler) {
+    set_assertion_handler(handler);
 }
 
 } // extern "C"
