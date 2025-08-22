@@ -123,12 +123,14 @@ to how `std::set_terminate` handles null pointers in the standard library.
 
 #### TBBBind Integration
 
-To ensure consistent assertion handling across oneTBB components, the TBBBind shared library will be made dependent on
-the oneTBB shared library. This approach provides unified assertion handling where assertions originating from TBBBind
-will automatically use the custom assertion handler set by the application, creating a consistent user experience.
+To ensure consistent assertion handling across oneTBB components, the TBB shared library will provide the TBBBind
+shared library with a pointer to the assertion function (which internally calls the active handler). This approach
+provides unified assertion handling where assertions originating from TBBBind will automatically use the custom
+assertion handler set by the application, creating a consistent user experience.
 
-This dependency addition is acceptable since TBBBind is exclusively used from within the oneTBB shared library and
-does not affect the public API or application dependencies.
+This "soft" runtime dependency addition is acceptable, since TBBBind is exclusively used from within the oneTBB shared
+library. In the unexpected case TBB does not provide the function pointer, the default assertion handler will continue
+to be used.
 
 #### No impact on TBBMalloc
 
@@ -213,23 +215,9 @@ void test_assertion_handler(const char* location, int line,
 
 ## Open Questions
 
-1. **Nested Assertions**: How should the system behave if a custom assertion handler itself triggers an assertion?
-   Should there be protection against infinite recursion, similar to how `std::terminate` handles recursive calls?
-   How did TBB 2020 handle this scenario?
+1. **Extension Status**: Should this feature initially be released as an implementation-specific extension
+   (and perhaps designated as such, e.g. by moving to a special namespace), or should it be immediately
+   added to the oneTBB specification?
 
-2. **Global vs Per-Arena**: Should assertion handlers be global or configurable per task arena? The
-   `std::terminate` model is global, and TBB 2020 used a global handler, which argues for consistency, but
-   per-arena might provide more flexibility.
-
-3. **Experimental Status**: Should this feature initially be released as experimental/preview API to gather user
-   feedback before stabilizing the interface, or should it be considered stable from the start given the proven
-   TBB 2020 design?
-
-4. **TBBBind Integration Strategy**: Should TBBBind be modified to use the custom assertion handler through a
-   dependency on oneTBB, or should it be left unchanged like TBBMalloc? While making TBBBind dependent on oneTBB
-   would provide unified assertion handling, it may be acceptable to leave TBBBind as-is to maintain simpler
-   dependencies and follow the same pattern as TBBMalloc. What are the trade-offs between consistency of assertion
-   handling versus architectural simplicity?
-
-5. **Header file**: Should we include the new APIs into a single header file (`global_control.h` is currently
+2. **Header file**: Should we include the new APIs into a single header file (`global_control.h` is currently
    proposed) or make them available through any public oneTBB header?
