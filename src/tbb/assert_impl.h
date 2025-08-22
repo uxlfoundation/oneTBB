@@ -45,7 +45,7 @@ namespace r1 {
 static std::atomic<tbb::detail::do_once_state> assertion_state;
 
 // TODO: consider extension for formatted error description string
-static void assertion_failure_impl(const char* location, int line, const char* expression, const char* comment) {
+/* [[noreturn]] */ static void assertion_failure_impl(const char* location, int line, const char* expression, const char* comment) {
 #if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     // Workaround for erroneous "unreachable code" during assertion throwing using call_once
     #pragma warning (push)
