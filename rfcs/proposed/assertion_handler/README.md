@@ -130,8 +130,10 @@ will automatically use the custom assertion handler set by the application, crea
 This dependency addition is acceptable since TBBBind is exclusively used from within the oneTBB shared library and
 does not affect the public API or application dependencies.
 
-TBBMalloc, on the other hand, will not be changed. It will continue to include and reuse the assertion handling
-implementation file from the core oneTBB library source code, maintaining its own assertion behavior that does not
+#### No impact on TBBMalloc
+
+TBBMalloc, on the other hand, will not be changed. It will continue to reuse the assertion handling
+implementation from the core oneTBB library source code yet maintain its own assertion behavior that does not
 access the oneTBB custom assertion handler. This design preserves TBBMalloc's portability, as it can be used entirely
 separately from oneTBB and cannot depend on the oneTBB shared library.
 
