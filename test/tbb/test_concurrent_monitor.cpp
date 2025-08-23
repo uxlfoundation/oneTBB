@@ -1,6 +1,5 @@
 /*
-    Copyright (c) 2020-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2020-2021 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -32,8 +31,6 @@
 #include "tbb/global_control.h"
 #include "tbb/task_arena.h"
 #include "../../src/tbb/concurrent_monitor.h"
-
-#define __TBB_BUILD 1 // To enable internal custom assertion handler API definitions used in misc.cpp
 #include "../../src/tbb/misc.cpp"
 
 //! \file test_concurrent_monitor.cpp

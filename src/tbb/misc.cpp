@@ -156,12 +156,14 @@ void detect_cpu_features(cpu_features_type& cpu_features) {
 //------------------------------------------------------------------------
 // custom assertion handler
 //------------------------------------------------------------------------
+#if __TBB_BUILD
 assertion_handler_type __TBB_EXPORTED_FUNC set_assertion_handler(assertion_handler_type new_handler) noexcept {
     return custom_handler::set(new_handler);
 }
 assertion_handler_type __TBB_EXPORTED_FUNC get_assertion_handler() noexcept {
     return custom_handler::get();
 }
+#endif
 
 } // namespace r1
 } // namespace detail
