@@ -431,3 +431,9 @@ TEST_CASE("terminate_on_exception: enabled") {
     CHECK(terminate_handler_called);
 }
 #endif
+
+TEST_CASE("custom assertion handler type") {
+    using documented = /* [[noreturn]] */ void(*)(const char* /* location */, int /* line */,
+                                                  const char* /* expression */, const char* /* comment */);
+    static_assert(std::is_same<oneapi::tbb::assertion_handler_type, documented>::value, "Incorrect assertion handler type");
+}
