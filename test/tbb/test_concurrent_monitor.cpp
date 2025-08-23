@@ -31,6 +31,8 @@
 #include "tbb/global_control.h"
 #include "tbb/task_arena.h"
 #include "../../src/tbb/concurrent_monitor.h"
+
+#define __TBB_BUILD 1 // To enable internal custom assertion handler API definitions used in misc.cpp
 #include "../../src/tbb/misc.cpp"
 
 //! \file test_concurrent_monitor.cpp

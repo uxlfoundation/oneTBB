@@ -279,8 +279,14 @@ TEST_CASE("test concurrent task_scheduler_handle destruction") {
 //! Using custom assertion handler to test failure on invalid max_allowed_parallelism
 //! \brief \ref interface \ref error_guessing
 TEST_CASE("Using custom assertion handler to test failure on invalid max_allowed_parallelism") {
-    tbb::set_assertion_handler(utils::AssertionFailureHandler);
+    auto default_handler = tbb::set_assertion_handler(utils::AssertionFailureHandler);
+    auto custom_handler = tbb::get_assertion_handler();
+    REQUIRE_MESSAGE(custom_handler == utils::AssertionFailureHandler, "Custom assertion handler was not set.");
+
     TRY_BAD_EXPR(tbb::global_control(tbb::global_control::max_allowed_parallelism, 0),
         "max_allowed_parallelism cannot be 0.");
-    tbb::set_assertion_handler(nullptr); // Reset to default handler
+
+    auto handler = tbb::set_assertion_handler(nullptr); // Reset to default handler
+    REQUIRE_MESSAGE(handler == utils::AssertionFailureHandler, "Previos assertion handler was not returned.");
+    REQUIRE_MESSAGE(tbb::get_assertion_handler() == default_handler, "Default assertion handler was not reset.");
 }

@@ -20,6 +20,7 @@
 #include "oneapi/tbb/detail/_exception.h"
 #include "oneapi/tbb/detail/_machine.h"
 
+#include "oneapi/tbb/global_control.h"
 #include "oneapi/tbb/version.h"
 
 #include "misc.h"
@@ -149,6 +150,16 @@ void detect_cpu_features(cpu_features_type& cpu_features) {
         cpu_features.hybrid = (nperflevels > 1);
     }
 #endif
+}
+
+//------------------------------------------------------------------------
+// custom assertion handler
+//------------------------------------------------------------------------
+assertion_handler_type __TBB_EXPORTED_FUNC set_assertion_handler(assertion_handler_type new_handler) noexcept {
+    return custom_handler::set(new_handler);
+}
+assertion_handler_type __TBB_EXPORTED_FUNC get_assertion_handler() noexcept {
+    return custom_handler::get();
 }
 
 } // namespace r1

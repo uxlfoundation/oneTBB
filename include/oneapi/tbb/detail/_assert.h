@@ -36,12 +36,6 @@ namespace r1 {
 
 using assertion_handler_type = decltype(&assertion_failure);
 
-//! Set assertion handler and return its previous value.
-TBB_EXPORT assertion_handler_type __TBB_EXPORTED_FUNC set_assertion_handler(assertion_handler_type new_handler) noexcept;
-
-//! Return the current assertion handler.
-TBB_EXPORT assertion_handler_type __TBB_EXPORTED_FUNC get_assertion_handler() noexcept;
-
 #if __TBBMALLOC_BUILD
 }} // namespaces rml::internal
 #else
