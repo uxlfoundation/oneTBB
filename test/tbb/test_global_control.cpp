@@ -287,6 +287,6 @@ TEST_CASE("Using custom assertion handler to test failure on invalid max_allowed
         "max_allowed_parallelism cannot be 0.");
 
     auto handler = tbb::set_assertion_handler(nullptr); // Reset to default handler
-    REQUIRE_MESSAGE(handler == utils::AssertionFailureHandler, "Previos assertion handler was not returned.");
+    REQUIRE_MESSAGE(handler == utils::AssertionFailureHandler, "Previous assertion handler was not returned.");
     REQUIRE_MESSAGE(tbb::get_assertion_handler() == default_handler, "Default assertion handler was not reset.");
 }
