@@ -411,8 +411,7 @@ static const dynamic_link_descriptor TbbBindLinkTable[] = {
     DLD(__TBB_internal_apply_affinity, apply_affinity_ptr),
     DLD(__TBB_internal_restore_affinity, restore_affinity_ptr),
 #endif
-    DLD(__TBB_internal_get_default_concurrency, get_default_concurrency_ptr),
-    DLD(__TBB_internal_set_tbbbind_assertion_handler, set_assertion_handler_ptr)
+    DLD(__TBB_internal_get_default_concurrency, get_default_concurrency_ptr)
 };
 
 static const unsigned LinkTableSize = sizeof(TbbBindLinkTable) / sizeof(dynamic_link_descriptor);
@@ -488,8 +487,12 @@ void initialization_impl() {
     governor::one_time_init();
 
     if (const char* tbbbind_name = load_tbbbind_shared_object()) {
-        // Set the TBBbind assertion handler to use TBB's assertion_failure function.
+        // If the setter function is present, set the TBBbind assertion handler to use TBB's assertion_failure function.
+        const dynamic_link_descriptor optional_set_assertion_handler[] = // optional (falls back to dummy if not found)
+            {DLD(__TBB_internal_set_tbbbind_assertion_handler, set_assertion_handler_ptr)};
+        dynamic_link(tbbbind_name, optional_set_assertion_handler, 1, nullptr, DYNAMIC_LINK_LOCAL_BINDING);
         set_assertion_handler_ptr(assertion_failure);
+
         initialize_system_topology_ptr(
             processor_groups_num(),
             numa_nodes_count, numa_nodes_indexes,
