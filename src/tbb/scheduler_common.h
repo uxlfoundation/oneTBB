@@ -333,19 +333,14 @@ private:
 //! Utility function to atomically clear and handle exceptions from task_group_context
 /** This function implements thread-safe pattern for clearing exceptions
     from a task_group_context and either destroying or throwing them. **/
-inline bool handle_context_exception(d1::task_group_context& ctx, bool throw_exception = true) {
+inline bool handle_context_exception(d1::task_group_context& ctx) {
     tbb_exception_ptr* exception = ctx.my_exception.load(std::memory_order_acquire);
     while (exception != nullptr) {
         // Atomically clear the exception if it's still the same one
         if (ctx.my_exception.compare_exchange_weak(exception, nullptr, 
                                                    std::memory_order_acq_rel,
                                                    std::memory_order_acquire)) {
-            // Successfully cleared - now safe to handle
-            if (throw_exception) {
-                exception->throw_self_and_destroy();
-            } else {
-                exception->destroy();
-            }
+            exception->throw_self_and_destroy();
             return true;
         }
     }

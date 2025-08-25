@@ -72,8 +72,7 @@ void task_group_context_impl::destroy(d1::task_group_context& ctx) {
 #endif
     ctl->~cpu_ctl_env();
 
-    // Thread-safe exception cleanup using compare_exchange
-    handle_context_exception(ctx, /*throw_exception=*/false);
+    __TBB_ASSERT(!ctx.my_exception.load(std::memory_order_relaxed), "destroy reached with non-null exception");
 
     poison_pointer(ctx.my_parent);
     poison_pointer(ctx.my_context_list);
@@ -249,9 +248,8 @@ void task_group_context_impl::reset(d1::task_group_context& ctx) {
     __TBB_ASSERT(!is_poisoned(ctx.my_context_list), nullptr);
     //! TODO: Add assertion that this context does not have children
     
-    // Thread-safe exception cleanup using compare_exchange
-    handle_context_exception(ctx, /*throw_exception=*/false);
-    
+    __TBB_ASSERT(!ctx.my_exception.load(std::memory_order_relaxed), "reset reached with non-null exception");
+
     // Thread-safe cancellation reset using atomic store
     ctx.my_cancellation_requested.store(0, std::memory_order_relaxed);
 }

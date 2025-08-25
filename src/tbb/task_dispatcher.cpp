@@ -173,7 +173,7 @@ void task_dispatcher::execute_and_wait(d1::task* t, d1::wait_context& wait_ctx, 
         local_td.m_thread_data->my_inbox.set_is_idle(false);
     }
 
-    handle_context_exception(w_ctx, /*throw_exception=*/true);
+    handle_context_exception(w_ctx);
 }
 
 #if __TBB_RESUMABLE_TASKS

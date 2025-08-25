@@ -844,7 +844,7 @@ void task_arena_impl::execute(d1::task_arena_base& ta, d1::delegate_base& d) {
                 a->my_exit_monitors.notify_one(); // do not relax!
             }
             // process possible exception
-            handle_context_exception(exec_context, /*throw_exception=*/true);
+            handle_context_exception(exec_context);
             __TBB_ASSERT(governor::is_thread_data_set(td), nullptr);
             return;
         } // if (index1 == arena::out_of_arena)
