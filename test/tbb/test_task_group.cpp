@@ -1316,8 +1316,7 @@ TEST_CASE("Arena exception handling race condition test") {
                                   &successful_executions, t]() {
                 try {
                     barrier.wait();
-                    arena.execute([throw_to_arena, &barrier, &exception_count, &successful_executions,
-                                   &expected_task_group_caught, t]() {
+                    arena.execute([throw_to_arena, &exception_count, &expected_task_group_caught, t]() {
                         // Create nested task groups that will throw exceptions simultaneously
                         tbb::task_group tg;
                         
@@ -1398,7 +1397,7 @@ TEST_CASE("Task dispatcher exception handling race condition test") {
         for (int t = 0; t < num_concurrent_waits; ++t) {
             threads.emplace_back([&barrier, &shared_tg, 
                                   &expected_exceptions_caught, 
-                                  &unexpected_exceptions_caught, t]() {
+                                  &unexpected_exceptions_caught]() {
                 try {
                     barrier.wait();
 
