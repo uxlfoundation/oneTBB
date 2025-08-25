@@ -1251,7 +1251,7 @@ TEST_CASE("Concurrent exception handling in task_group wait") {
         // Launch multiple threads that will concurrently call wait()
         std::vector<std::thread> waiters;
         for (int i = 0; i < num_waiters; ++i) {
-            waiters.emplace_back([&, i] {
+            waiters.emplace_back([&] {
                 barrier.wait(); // Synchronize start
                 try {
                     tbb::task_group_status status = tg.wait();
