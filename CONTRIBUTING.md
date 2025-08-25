@@ -38,7 +38,7 @@ You can find all [open oneTBB pull requests](https://github.com/uxlfoundation/on
 * Document your code. The oneTBB project uses reStructuredText for documentation.  
   * If your documentation has code samples or examples, place them into the corresponding example folder. 
 * Update the copyright year in the first line of the changing file(s). 
-  For example, if you commit your changes in 2022:
+  For example, if you commit your changes in 2025:
   * the copyright year should be `2005-2025` for existing files
   * the copyright year should be `2025` for new files
 * Submit a pull request into the master branch. You can submit changes with a pull request (preferred) or by sending an email patch.  
