@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -16,6 +17,8 @@
 
 //! \file test_global_control.cpp
 //! \brief Test for [sched.global_control] specification
+
+#define TRY_BAD_EXPR_ENABLED 1 // TODO: find criteria to automatically define this in utils_assert.h
 
 #include "common/test.h"
 
@@ -271,4 +274,19 @@ TEST_CASE("test concurrent task_scheduler_handle destruction") {
     }
     stop = true;
     thr1.join();
+}
+
+//! Using custom assertion handler to test failure on invalid max_allowed_parallelism
+//! \brief \ref interface \ref error_guessing
+TEST_CASE("Using custom assertion handler to test failure on invalid max_allowed_parallelism") {
+    auto default_handler = tbb::set_assertion_handler(utils::AssertionFailureHandler);
+    auto custom_handler = tbb::get_assertion_handler();
+    REQUIRE_MESSAGE(custom_handler == utils::AssertionFailureHandler, "Custom assertion handler was not set.");
+
+    TRY_BAD_EXPR(tbb::global_control(tbb::global_control::max_allowed_parallelism, 0),
+        "max_allowed_parallelism cannot be 0.");
+
+    auto handler = tbb::set_assertion_handler(nullptr); // Reset to default handler
+    REQUIRE_MESSAGE(handler == utils::AssertionFailureHandler, "Previous assertion handler was not returned.");
+    REQUIRE_MESSAGE(tbb::get_assertion_handler() == default_handler, "Default assertion handler was not reset.");
 }

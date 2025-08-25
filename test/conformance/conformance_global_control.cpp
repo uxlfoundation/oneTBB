@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -431,3 +432,9 @@ TEST_CASE("terminate_on_exception: enabled") {
     CHECK(terminate_handler_called);
 }
 #endif
+
+TEST_CASE("custom assertion handler type") {
+    using documented = /* [[noreturn]] */ void(*)(const char* /* location */, int /* line */,
+                                                  const char* /* expression */, const char* /* comment */);
+    static_assert(std::is_same<oneapi::tbb::assertion_handler_type, documented>::value, "Incorrect assertion handler type");
+}

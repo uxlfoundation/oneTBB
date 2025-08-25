@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -30,8 +31,11 @@ namespace r1 {
 /** Normally called from __TBB_ASSERT macro.
   If assertion handler is null, print message for assertion failure and abort.
   Otherwise call the assertion handler. */
-TBB_EXPORT void __TBB_EXPORTED_FUNC assertion_failure(const char *location, int line,
-                                                      const char *expression, const char *comment);
+/* [[noreturn]] */ TBB_EXPORT void __TBB_EXPORTED_FUNC assertion_failure(const char *location, int line,
+                                                                         const char *expression, const char *comment);
+
+using assertion_handler_type = decltype(&assertion_failure);
+
 #if __TBBMALLOC_BUILD
 }} // namespaces rml::internal
 #else
