@@ -41,7 +41,7 @@ namespace r1 {
 
 // Do not move the definition into the assertion_failure_impl function because it will require "magic statics".
 // It will bring a dependency on C++ runtime on some platforms while assert_impl.h is reused in tbbmalloc
-// that should not depend on C++ runtime
+// that should not depend on C++ runtime. For the same reason, we cannot use std::call_once here.
 static std::atomic<tbb::detail::do_once_state> assertion_state;
 
 // TODO: consider extension for formatted error description string
@@ -51,8 +51,6 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
     #pragma warning (push)
     #pragma warning (disable: 4702)
 #endif
-    // We cannot use std::call_once because it brings a dependency on C++ runtime on some platforms
-    // while assert_impl.h is reused in tbbmalloc that should not depend on C++ runtime
     atomic_do_once([&](){
         std::fprintf(stderr, "Assertion %s failed (located in the %s function, line in file: %d)\n",
             expression, location, line);
