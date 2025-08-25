@@ -254,11 +254,13 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
         task_dispatcher& task_disp;
         execution_data_ext old_execute_data_ext;
         properties old_properties;
+        d1::task* old_innermost_running_task;
         bool is_initially_registered;
 
         ~dispatch_loop_guard() {
             task_disp.m_execute_data_ext = old_execute_data_ext;
             task_disp.m_properties = old_properties;
+            task_disp.m_innermost_running_task = old_innermost_running_task;
 
             if (!is_initially_registered) {
                 task_disp.m_thread_data->my_arena->my_tc_client.get_pm_client()->unregister_thread();
@@ -268,7 +270,7 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
             __TBB_ASSERT(task_disp.m_thread_data && governor::is_thread_data_set(task_disp.m_thread_data), nullptr);
             __TBB_ASSERT(task_disp.m_thread_data->my_task_dispatcher == &task_disp, nullptr);
         }
-    } dl_guard{ *this, m_execute_data_ext, m_properties, m_thread_data->my_is_registered };
+    } dl_guard{ *this, m_execute_data_ext, m_properties, m_innermost_running_task, m_thread_data->my_is_registered };
 
     // The context guard to track fp setting and itt tasks.
     context_guard_helper</*report_tasks=*/ITTPossible> context_guard;
@@ -331,6 +333,9 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
                     void* itt_caller = ed.context->my_itt_caller;
                     suppress_unused_warning(itt_caller);
 
+                    d1::task* prev_innermost_running_task = m_innermost_running_task;
+                    m_innermost_running_task = t;
+
                     ITT_CALLEE_ENTER(ITTPossible, t, itt_caller);
 
                     if (ed.context->is_group_execution_cancelled()) {
@@ -346,6 +351,7 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
                     ed.affinity_slot = d1::no_slot;
                     // Reset task owner id for bypassed task
                     ed.original_slot = m_thread_data->my_arena_index;
+                    m_innermost_running_task = prev_innermost_running_task;
                     t = get_critical_task(t, ed, isolation, critical_allowed);
                 }
                 __TBB_ASSERT(m_thread_data && governor::is_thread_data_set(m_thread_data), nullptr);
