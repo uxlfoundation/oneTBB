@@ -542,6 +542,7 @@ if (TARGET TBB::tbb)
     # HWLOC related test
     if (NOT TBB_EMSCRIPTEN)
         tbb_add_tbbbind_test(SUBDIR tbb NAME test_arena_constraints)
+        tbb_add_tbbbind_test(SUBDIR tbb NAME test_tbbbind)
     endif()
 
     if ((NOT "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "mips") AND (NOT TBB_EMSCRIPTEN))
