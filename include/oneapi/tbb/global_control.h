@@ -48,11 +48,13 @@ bool finalize_impl(d1::task_scheduler_handle& handle);
 TBB_EXPORT void __TBB_EXPORTED_FUNC get(d1::task_scheduler_handle&);
 TBB_EXPORT bool __TBB_EXPORTED_FUNC finalize(d1::task_scheduler_handle&, std::intptr_t mode);
 
+#if !TBB_NO_CUSTOM_ASSERTION_HANDLING
 //! Set assertion handler and return its previous value.
 TBB_EXPORT assertion_handler_type __TBB_EXPORTED_FUNC set_assertion_handler(assertion_handler_type new_handler) noexcept;
 
 //! Return the current assertion handler.
 TBB_EXPORT assertion_handler_type __TBB_EXPORTED_FUNC get_assertion_handler() noexcept;
+#endif
 }
 
 namespace d1 {
@@ -201,8 +203,10 @@ using detail::d1::finalize;
 using detail::d1::task_scheduler_handle;
 using detail::r1::unsafe_wait;
 using detail::r1::assertion_handler_type;
+#if !TBB_NO_CUSTOM_ASSERTION_HANDLING
 using detail::r1::set_assertion_handler;
 using detail::r1::get_assertion_handler;
+#endif
 } // namespace v1
 
 } // namespace tbb
