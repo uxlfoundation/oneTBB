@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -16,8 +17,11 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <tbb/concurrent_map.h>
+#include <common/test.h>
+#include <common/utils.h>
 #include "common/concurrent_ordered_common.h"
+
+#include <tbb/concurrent_map.h>
 
 //! \file test_concurrent_map.cpp
 //! \brief Test for [containers.concurrent_map containers.concurrent_multimap] specifications

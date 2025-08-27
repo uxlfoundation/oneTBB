@@ -545,4 +545,8 @@
 #define __TBB_PREVIEW_BLOCKED_ND_RANGE_DEDUCTION_GUIDES 1
 #endif
 
+#if TBB_PREVIEW_CONTAINERS_LAYOUT
+#define __TBB_PREVIEW_CONTAINERS_LAYOUT 1
+#endif
+
 #endif // __TBB_detail__config_H

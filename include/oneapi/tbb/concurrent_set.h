@@ -26,7 +26,7 @@
 
 namespace tbb {
 namespace detail {
-namespace d3 {
+namespace d2 {
 
 template<typename Key, typename KeyCompare, typename RandomGenerator, typename Allocator, bool AllowMultimapping>
 struct set_traits {
@@ -253,13 +253,13 @@ void swap( concurrent_multiset<Key, Compare, Allocator>& lhs,
     lhs.swap(rhs);
 }
 
-} // namespace d3
+} // namespace d2
 } // namespace detail
 
 inline namespace v1 {
 
-using detail::d3::concurrent_set;
-using detail::d3::concurrent_multiset;
+using detail::d2::concurrent_set;
+using detail::d2::concurrent_multiset;
 using detail::split;
 
 } // inline namespace v1

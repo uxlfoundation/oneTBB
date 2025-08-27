@@ -27,7 +27,7 @@
 
 namespace tbb {
 namespace detail {
-namespace d3 {
+namespace d2 {
 
 template<typename Key, typename Value, typename KeyCompare, typename RandomGenerator,
          typename Allocator, bool AllowMultimapping>
@@ -336,13 +336,13 @@ void swap( concurrent_multimap<Key, Value, Compare, Allocator>& lhs,
     lhs.swap(rhs);
 }
 
-} // namespace d3
+} // namespace d2
 } // namespace detail
 
 inline namespace v1 {
 
-using detail::d3::concurrent_map;
-using detail::d3::concurrent_multimap;
+using detail::d2::concurrent_map;
+using detail::d2::concurrent_multimap;
 using detail::split;
 
 } // inline namespace v1

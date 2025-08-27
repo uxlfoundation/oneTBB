@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2019-2021 Intel Corporation
+    Copyright (c) 2019-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -17,10 +18,11 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include "oneapi/tbb/concurrent_set.h"
 #include <common/test.h>
 #include <common/utils.h>
 #include <common/concurrent_ordered_common.h>
+#include "oneapi/tbb/concurrent_set.h"
+
 #include <memory>
 #include <type_traits>
 
