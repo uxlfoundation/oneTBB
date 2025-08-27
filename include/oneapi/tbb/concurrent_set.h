@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2019-2021 Intel Corporation
+    Copyright (c) 2019-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -52,8 +53,8 @@ template <typename Key, typename Compare, typename Allocator>
 class concurrent_multiset;
 
 template <typename Key, typename Compare = std::less<Key>, typename Allocator = tbb::tbb_allocator<Key>>
-class concurrent_set : public concurrent_skip_list<set_traits<Key, Compare, concurrent_geometric_level_generator<32>, Allocator, false>> {
-    using base_type = concurrent_skip_list<set_traits<Key, Compare, concurrent_geometric_level_generator<32>, Allocator, false>>;
+class concurrent_set : public concurrent_skip_list<set_traits<Key, Compare, geometric_level_generator<32>, Allocator, false>> {
+    using base_type = concurrent_skip_list<set_traits<Key, Compare, geometric_level_generator<32>, Allocator, false>>;
 public:
     using key_type = Key;
     using value_type = typename base_type::value_type;
@@ -153,8 +154,8 @@ void swap( concurrent_set<Key, Compare, Allocator>& lhs,
 }
 
 template <typename Key, typename Compare = std::less<Key>, typename Allocator = tbb::tbb_allocator<Key>>
-class concurrent_multiset : public concurrent_skip_list<set_traits<Key, Compare, concurrent_geometric_level_generator<32>, Allocator, true>> {
-    using base_type = concurrent_skip_list<set_traits<Key, Compare, concurrent_geometric_level_generator<32>, Allocator, true>>;
+class concurrent_multiset : public concurrent_skip_list<set_traits<Key, Compare, geometric_level_generator<32>, Allocator, true>> {
+    using base_type = concurrent_skip_list<set_traits<Key, Compare, geometric_level_generator<32>, Allocator, true>>;
 public:
     using key_type = Key;
     using value_type = typename base_type::value_type;
