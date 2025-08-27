@@ -433,6 +433,8 @@ TEST_CASE("terminate_on_exception: enabled") {
 }
 #endif
 
+//! Testing that assertion_handler_type is exactly the type defined in the documentation
+//! \brief \ref interface \ref requirement
 TEST_CASE("custom assertion handler type") {
     using documented = /* [[noreturn]] */ void(*)(const char* /* location */, int /* line */,
                                                   const char* /* expression */, const char* /* comment */);
