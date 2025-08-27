@@ -16,7 +16,7 @@
 */
 
 //! \file test_tbbbind.cpp
-//! \brief Test for TBBbind library
+//! \brief Test for TBBbind library, covers [configuration.debug_features]
 
 #define TRY_BAD_EXPR_ENABLED 1
 #if _WIN32 || _WIN64
@@ -36,39 +36,39 @@ using namespace tbb::detail::r1;
 #include "../../src/tbb/dynamic_link.cpp"
 
 class binding_handler;
-    // dummy implementaion, not used
+    // dummy implementation, not used
 class governor {
     public:
         static unsigned default_num_threads () { return 0; }
 };
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 #include "../../src/tbb/load_tbbbind.cpp"
+#pragma GCC diagnostic pop
 
-// The test relies on an assumption that system_topology::load_tbbbind_shared_object() find same
-// instance of TBBbind as TBB uses internally.
-TEST_CASE("Using custom assertion handler inside TBBbind") {
+#if TBB_USE_ASSERT
+bool canTestTbbBind() {
 #if _WIN32 && !_WIN64
     if (std::thread::hardware_concurrency() > 32) {
         MESSAGE("There is no TBBbind for 32-bit Windows and > 32 logical CPUs");
-        return;
+        return false;
     }
 #endif
 
-    // to initialize internals of governor
-    core_type_count();
+    core_type_count(); // to initialize internals of governor
 
-    tbb::detail::r1::assertion_handler_type custom_handler =
-        [](const char* location, int line, const char* expression, const char*) {
-            throw utils::AssertionFailure(location, line, expression, "overloaded assertion");
-    };
-
-    const char* tbbbind_version = system_topology::load_tbbbind_shared_object();
-    REQUIRE_MESSAGE(tbbbind_version, "TBBbind must be found");
-
-    set_assertion_handler(custom_handler);
-
-#if TBB_USE_ASSERT
-    // Trigger an assertion failure to test the custom handler
-    TRY_BAD_EXPR(deallocate_binding_handler_ptr(nullptr), "overloaded assertion");
+    return system_topology::load_tbbbind_shared_object() != nullptr;
+}
+#else
+// All assertions in TBBbind are available only in TBB_USE_ASSERT mode.
+bool canTestTbbBind() { return false; }
 #endif
+
+
+// The test relies on an assumption that system_topology::load_tbbbind_shared_object() find
+// same instance of TBBbind as TBB uses internally.
+TEST_CASE("Using custom assertion handler inside TBBbind" * doctest::skip(! canTestTbbBind())) {
+    tbb::set_assertion_handler(utils::AssertionFailureHandler);
+    TRY_BAD_EXPR(deallocate_binding_handler_ptr(nullptr), "Trying to deallocate nullptr pointer.");
 }
