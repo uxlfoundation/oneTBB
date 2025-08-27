@@ -559,6 +559,8 @@ public:
                       >
         m_reference_vertex_map;
 
+    d1::task* m_innermost_running_task{ nullptr };
+
     //! Attempt to get a task from the mailbox.
     /** Gets a task only if it has not been executed by its sender or a thief
         that has stolen it from the sender's task pool. Otherwise returns nullptr.
