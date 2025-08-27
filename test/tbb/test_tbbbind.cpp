@@ -44,15 +44,18 @@ class governor {
 
 #include "../../src/tbb/load_tbbbind.cpp"
 
+
+// All assertions in TBBbind are available only in TBB_USE_ASSERT mode,
+// and testing can't be done without TBBbind.
+#if TBB_USE_ASSERT && __TBB_HWLOC_VALID_ENVIRONMENT
+static bool canHandlerBeTested() { return true; }
+#else
+static bool canHandlerBeTested() { return false; }
+#endif
+
 // The test relies on an assumption that system_topology::load_tbbbind_shared_object() find
 // same instance of TBBbind as TBB uses internally.
-TEST_CASE("Using custom assertion handler inside TBBbind"
-#if ! TBB_USE_ASSERT || !__TBB_HWLOC_VALID_ENVIRONMENT
-    // All assertions in TBBbind are available only in TBB_USE_ASSERT mode,
-    // and testing can't be done without TBBbind.
-     * doctest::skip(true)
-#endif
-    ) {
+TEST_CASE("Using custom assertion handler inside TBBbind" * doctest::skip(!canHandlerBeTested())) {
     core_type_count(); // to initialize internals of governor
 
     const char *tbbbind_path = system_topology::load_tbbbind_shared_object();
