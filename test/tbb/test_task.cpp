@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -901,4 +902,142 @@ TEST_CASE("Force thread limit on per-thread reference_vertex") {
     for (int i = 0; i < num_groups; ++i) {
         groups[i].wait();
     }
+}
+
+constexpr std::size_t max_current_task_ptr_test_depth = 10;
+
+enum current_task_ptr_submit_type {
+    execute_and_wait,
+    submit_non_critical,
+    submit_critical,
+    slot_spawn,
+    enqueue
+};
+
+struct current_task_ptr_checking_task : public tbb::detail::d1::task {
+    current_task_ptr_checking_task(std::size_t d, tbb::task_arena& a, tbb::detail::d1::wait_context& wtc,
+                                   tbb::task_group_context& ctx, current_task_ptr_submit_type tag)
+        : depth(d), arena(a), wait_context(wtc), task_group_ctx(ctx), submit_tag(tag) {}
+
+    void submit_and_wait(current_task_ptr_checking_task& t, tbb::detail::d1::wait_context& wait_ctx) {
+        switch (submit_tag) {
+            case current_task_ptr_submit_type::execute_and_wait: {
+                tbb::detail::d1::execute_and_wait(t, task_group_ctx, wait_ctx, task_group_ctx);
+                break;
+            } case current_task_ptr_submit_type::submit_non_critical: {
+                submit(t, arena, task_group_ctx, false);
+                break;
+            } case current_task_ptr_submit_type::submit_critical: {
+                submit(t, arena, task_group_ctx, true);
+                break;
+            } case current_task_ptr_submit_type::slot_spawn: {
+                auto task_slot = tbb::detail::d1::slot_id(tbb::this_task_arena::current_thread_index() + 1 % tbb::this_task_arena::max_concurrency());
+                tbb::detail::d1::spawn(t, task_group_ctx, task_slot);
+                break; 
+            } case current_task_ptr_submit_type::enqueue: {
+                tbb::detail::r1::enqueue(t, task_group_ctx, &arena);
+                break;
+            } default:
+                CHECK(false);
+        }
+
+        if (submit_tag != current_task_ptr_submit_type::execute_and_wait) {
+            arena.execute([&] {
+                tbb::detail::r1::wait(wait_ctx, task_group_ctx);
+            });
+        }
+    }
+
+    tbb::detail::d1::task* execute(tbb::detail::d1::execution_data&) override {
+        ++execute_count;
+
+        REQUIRE_MESSAGE(tbb::detail::d1::current_task_ptr() == this,
+                        "Incorrect task returned from current_task_ptr");
+
+        if (depth < max_current_task_ptr_test_depth) {
+            tbb::detail::d1::wait_context next_task_wait_context(1);
+
+            current_task_ptr_checking_task next_task(depth + 1, arena, next_task_wait_context, task_group_ctx, submit_tag);
+            submit_and_wait(next_task, next_task_wait_context);
+
+            REQUIRE_MESSAGE(tbb::detail::d1::current_task_ptr() == this,
+                        "Incorrect task returned from current_task_ptr");
+        }
+
+        wait_context.release();
+        return nullptr;
+    }
+
+    tbb::detail::d1::task* cancel(tbb::detail::d1::execution_data&) override {
+        REQUIRE_MESSAGE(tbb::detail::d1::current_task_ptr() == this,
+                        "Incorrect task returned from current_task_ptr");
+        ++cancel_count;
+        wait_context.release();
+        return nullptr;
+    }
+
+    static std::atomic<std::size_t> execute_count;
+    static std::atomic<std::size_t> cancel_count;
+    std::size_t depth;
+    tbb::task_arena& arena;
+    tbb::detail::d1::wait_context& wait_context;
+    tbb::task_group_context& task_group_ctx;
+    current_task_ptr_submit_type submit_tag;
+};
+
+std::atomic<std::size_t> current_task_ptr_checking_task::execute_count{0};
+std::atomic<std::size_t> current_task_ptr_checking_task::cancel_count{0};
+
+void test_current_task_ptr_base(current_task_ptr_submit_type submit_tag, bool test_cancel) {
+    tbb::task_arena arena;
+    arena.initialize();
+    tbb::task_group_context test_context;
+
+    constexpr std::size_t num_start_tasks = 5;
+    tbb::detail::d1::wait_context root_task_wait(num_start_tasks);
+
+    REQUIRE_MESSAGE(tbb::detail::d1::current_task_ptr() == nullptr,
+                    "Incorrect task returned from current_task_ptr");
+
+    using task_type = current_task_ptr_checking_task;
+    std::vector<task_type, tbb::cache_aligned_allocator<task_type>> start_tasks;
+    start_tasks.reserve(num_start_tasks);
+
+    for (std::size_t i = 0; i < num_start_tasks; ++i) {
+        start_tasks.emplace_back(0, arena, root_task_wait, test_context, submit_tag);
+        submit(start_tasks.back(), arena, test_context, false);
+        if (test_cancel && i == num_start_tasks / 2) {
+            test_context.cancel_group_execution();
+        }
+    }
+
+    arena.execute([&] {
+        tbb::detail::d1::wait(root_task_wait, test_context);
+    });
+
+    std::size_t expected_tasks_count = max_current_task_ptr_test_depth * num_start_tasks + num_start_tasks;
+    if (test_cancel) {
+        REQUIRE_MESSAGE(task_type::cancel_count > 0, "Some tasks should be cancelled");
+        REQUIRE_MESSAGE(task_type::execute_count + task_type::cancel_count < expected_tasks_count,
+                        "Incorrect number of tasks executed or cancelled");
+    } else {
+        REQUIRE_MESSAGE(task_type::cancel_count == 0, "No tasks should be cancelled");
+        REQUIRE_MESSAGE(task_type::execute_count == expected_tasks_count, "Incorrect number of tasks executed");
+    }
+    task_type::execute_count = 0;
+    task_type::cancel_count = 0;
+}
+
+void test_current_task_ptr(bool test_cancel) {
+    test_current_task_ptr_base(current_task_ptr_submit_type::execute_and_wait, test_cancel);
+    test_current_task_ptr_base(current_task_ptr_submit_type::submit_non_critical, test_cancel);
+    test_current_task_ptr_base(current_task_ptr_submit_type::submit_critical, test_cancel);
+    test_current_task_ptr_base(current_task_ptr_submit_type::slot_spawn, test_cancel);
+    test_current_task_ptr_base(current_task_ptr_submit_type::enqueue, test_cancel);
+}
+
+//! \brief \ref error_guessing
+TEST_CASE("Test current_task_ptr") {
+    test_current_task_ptr(/*test_cancel = */false);
+    test_current_task_ptr(/*test_cancel = */true);
 }
