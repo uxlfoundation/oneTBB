@@ -112,6 +112,7 @@ inline suspend_point_type::suspend_point_type(arena* a, size_t stack_size, task_
 //------------------------------------------------------------------------
 // Task Dispatcher
 //------------------------------------------------------------------------
+
 inline task_dispatcher::task_dispatcher(arena* a) {
     m_execute_data_ext.context = a->my_default_ctx;
     m_execute_data_ext.task_disp = this;
@@ -170,8 +171,8 @@ inline d1::task* task_dispatcher::steal_or_get_critical(
 
 template <bool ITTPossible, typename Waiter>
 d1::task* task_dispatcher::receive_or_steal_task(
-    thread_data& tls, execution_data_ext& ed, Waiter& waiter, isolation_type isolation,
-    bool fifo_allowed, bool critical_allowed)
+    thread_data& tls, execution_data_ext& ed, Waiter& waiter, context_guard_helper<ITTPossible>& ctxguard,
+    isolation_type isolation, bool fifo_allowed, bool critical_allowed)
 {
     __TBB_ASSERT(governor::is_thread_data_set(&tls), nullptr);
     // Task to return
@@ -200,6 +201,9 @@ d1::task* task_dispatcher::receive_or_steal_task(
         if (!waiter.continue_execution(slot, t)) {
             __TBB_ASSERT(t == nullptr, nullptr);
             break;
+        }
+        if( ITTPossible ) {
+            ctxguard.maybe_end_itt_task(waiter.pause_count());
         }
         // Start searching
         if (t != nullptr) {
@@ -329,6 +333,9 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
                     void* itt_caller = ed.context->my_itt_caller;
                     suppress_unused_warning(itt_caller);
 
+                    d1::task* prev_innermost_running_task = m_innermost_running_task;
+                    m_innermost_running_task = t;
+
                     ITT_CALLEE_ENTER(ITTPossible, t, itt_caller);
 
                     m_innermost_running_task = t;
@@ -345,6 +352,7 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
                     ed.affinity_slot = d1::no_slot;
                     // Reset task owner id for bypassed task
                     ed.original_slot = m_thread_data->my_arena_index;
+                    m_innermost_running_task = prev_innermost_running_task;
                     t = get_critical_task(t, ed, isolation, critical_allowed);
                 }
                 __TBB_ASSERT(m_thread_data && governor::is_thread_data_set(m_thread_data), nullptr);
@@ -363,9 +371,9 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
                     continue;
                 }
                 // Retrieve the task from global sources
-                t = receive_or_steal_task<ITTPossible>(
-                    *m_thread_data, ed, waiter, isolation, dl_guard.old_properties.fifo_tasks_allowed,
-                    critical_allowed
+                t = receive_or_steal_task(
+                    *m_thread_data, ed, waiter, context_guard, isolation,
+                    dl_guard.old_properties.fifo_tasks_allowed, critical_allowed
                 );
             } while (t != nullptr); // main dispatch loop
             break; // Exit exception loop;
