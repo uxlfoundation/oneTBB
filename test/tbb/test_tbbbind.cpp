@@ -42,33 +42,21 @@ class governor {
         static unsigned default_num_threads () { return 0; }
 };
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-function"
 #include "../../src/tbb/load_tbbbind.cpp"
-#pragma GCC diagnostic pop
-
-#if TBB_USE_ASSERT
-bool canTestTbbBind() {
-#if _WIN32 && !_WIN64
-    if (std::thread::hardware_concurrency() > 32) {
-        MESSAGE("There is no TBBbind for 32-bit Windows and > 32 logical CPUs");
-        return false;
-    }
-#endif
-
-    core_type_count(); // to initialize internals of governor
-
-    return system_topology::load_tbbbind_shared_object() != nullptr;
-}
-#else
-// All assertions in TBBbind are available only in TBB_USE_ASSERT mode.
-bool canTestTbbBind() { return false; }
-#endif
-
 
 // The test relies on an assumption that system_topology::load_tbbbind_shared_object() find
 // same instance of TBBbind as TBB uses internally.
-TEST_CASE("Using custom assertion handler inside TBBbind" * doctest::skip(! canTestTbbBind())) {
+TEST_CASE("Using custom assertion handler inside TBBbind"
+#if ! TBB_USE_ASSERT || !__TBB_HWLOC_VALID_ENVIRONMENT
+    // All assertions in TBBbind are available only in TBB_USE_ASSERT mode,
+    // and testing can't be done without TBBbind.
+     * doctest::skip(true)
+#endif
+    ) {
+    core_type_count(); // to initialize internals of governor
+
+    const char *tbbbind_path = system_topology::load_tbbbind_shared_object();
+    REQUIRE_MESSAGE(tbbbind_path != nullptr, "Failed to load TBBbind");
     tbb::set_assertion_handler(utils::AssertionFailureHandler);
     TRY_BAD_EXPR(deallocate_binding_handler_ptr(nullptr), "Trying to deallocate nullptr pointer.");
 }
