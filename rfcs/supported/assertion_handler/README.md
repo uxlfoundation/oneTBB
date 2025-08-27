@@ -59,6 +59,7 @@ namespace tbb {
     using assertion_handler_type = [[noreturn]] void(*)(const char* location, int line,
                                                         const char* expression, const char* comment);
 
+#if !__TBB_NO_CUSTOM_ASSERTION_HANDLING
     //! Set assertion handler and return its previous value.
     //! If new_handler is nullptr, resets to the default handler.
     //! Uses the same signature as TBB 2020 for migration compatibility.
@@ -67,10 +68,20 @@ namespace tbb {
     //! Return the current assertion handler.
     //! New function not present in TBB 2020, following std::get_terminate pattern.
     assertion_handler_type get_assertion_handler() noexcept;
+#endif
 }
 ```
 
 Applications that used the custom assertion handler in TBB 2020 can migrate to this proposal with no changes.
+
+#### Specification Extension
+
+This API is introduced as an extension to the oneTBB specification, controlled by the
+`__TBB_NO_CUSTOM_ASSERTION_HANDLING` macro. By default (macro undefined or defined as 0), the extension will
+be enabled: `set_assertion_handler` and `get_assertion_handler` will be declared and exported, and
+`assertion_failure` will dispatch to the active handler. Defining `__TBB_NO_CUSTOM_ASSERTION_HANDLING` to a non-zero
+value before including oneTBB headers will disable the extension: these declarations will be excluded from
+the public API, and the library will always use the default assertion behavior.
 
 ### Proposed Implementation Strategy
 
@@ -212,12 +223,3 @@ void test_assertion_handler(const char* location, int line,
     throw std::runtime_error(msg);
 }
 ```
-
-## Open Questions
-
-1. **Extension Status**: Should this feature initially be released as an implementation-specific extension
-   (and perhaps designated as such, e.g. by moving to a special namespace), or should it be immediately
-   added to the oneTBB specification?
-
-2. **Header file**: Should we include the new APIs into a single header file (`global_control.h` is currently
-   proposed) or make them available through any public oneTBB header?
