@@ -1502,6 +1502,149 @@ void test_predecessors(submit_function submit_function_tag) {
     test_submitted_predecessors(submit_function_tag, /*all_predecessors_completed = */false);
 }
 
+int serial_reduction(int begin, int end) {
+    int result = 0;
+    for (int i = begin; i < end; ++i) {
+        result += i;
+    }
+    return result;
+}
+
+void recursive_reduction(submit_function fn, tbb::task_group& tg, tbb::task_arena& arena, int begin, int end, int* result_placeholder, int cutoff) {
+    int size = end - begin;
+    if (size <= cutoff) {
+        // Do serial reduction
+        *result_placeholder = serial_reduction(begin, end);
+    } else {
+        // Do parallel reduction
+        int* left_placeholder = new int(0);
+        int* right_placeholder = new int(0);
+
+        int middle = begin + size / 2;
+
+        tbb::task_handle left_subtask = tg.defer([=, &tg, &arena] {
+            recursive_reduction(fn, tg, arena, begin, middle, left_placeholder, cutoff);
+        });
+
+        tbb::task_handle right_subtask = tg.defer([=, &tg, &arena]() {
+            recursive_reduction(fn, tg, arena, middle, end, right_placeholder, cutoff);
+        });
+
+        tbb::task_handle reduction = tg.defer([=] {
+            CHECK_MESSAGE(*left_placeholder == serial_reduction(begin, middle), "Incorrect result for left sub-reduction");
+            CHECK_MESSAGE(*right_placeholder == serial_reduction(middle, end), "Incorrect result for right sub-reduction");
+            *result_placeholder = *left_placeholder + *right_placeholder;
+            delete left_placeholder;
+            delete right_placeholder;
+        });
+
+        tbb::task_group::set_task_order(left_subtask, reduction);
+        tbb::task_group::set_task_order(right_subtask, reduction);
+        tbb::task_group::transfer_this_task_completion_to(reduction);
+
+        submit(fn, std::move(left_subtask), tg, arena);
+        submit(fn, std::move(right_subtask), tg, arena);
+        submit(fn, std::move(reduction), tg, arena);
+    }
+}
+
+void test_recursive_reduction(submit_function func) {
+    tbb::task_group tg;
+    tbb::task_arena arena;
+
+    int* result_placeholder = new int(0);
+
+    for (auto n : {2, 5, 10, 100, 1000, 5000, 10000}) {
+        tbb::task_handle do_reduction = tg.defer([=, &tg, &arena] {
+            recursive_reduction(func, tg, arena, 0, n, result_placeholder, /*cutoff = */n < 100 ? 1 : 50);
+        });
+
+        submit_and_wait(func, std::move(do_reduction), tg, arena);
+        CHECK_MESSAGE(*result_placeholder == serial_reduction(0, n), "Incorrect final result for reduction");
+        *result_placeholder = 0;
+    }
+    delete result_placeholder;
+}
+
+void test_adding_successors_after_transfer(unsigned num_threads, submit_function func) {
+    tbb::task_group tg;
+    tbb::task_arena arena;
+
+    const int not_finished_task = 0;
+    const int finished_task = 1;
+
+    std::atomic<int> receiver_task_placeholder{not_finished_task};
+    std::atomic<int> successor_task_placeholder{not_finished_task};
+    std::atomic<int> transferring_task_placeholder{not_finished_task};
+    std::atomic<int> new_successor_task_placeholder{not_finished_task};
+
+    auto receiver_task_body = [&] {
+        CHECK(receiver_task_placeholder == not_finished_task);
+        CHECK(successor_task_placeholder == not_finished_task);
+        CHECK(transferring_task_placeholder == finished_task);
+        CHECK(new_successor_task_placeholder == not_finished_task);
+
+        receiver_task_placeholder = finished_task;
+    };
+
+    tbb::task_handle successor_task = tg.defer([&] {
+        CHECK(receiver_task_placeholder == finished_task);
+        CHECK(successor_task_placeholder == not_finished_task);
+        CHECK(transferring_task_placeholder == finished_task);
+        
+        successor_task_placeholder = finished_task;
+    });
+
+    tbb::task_handle transferring_task = tg.defer([&] {
+        CHECK(receiver_task_placeholder == not_finished_task);
+        CHECK(successor_task_placeholder == not_finished_task);
+        CHECK(transferring_task_placeholder == not_finished_task);
+        CHECK(new_successor_task_placeholder == not_finished_task);
+
+        transferring_task_placeholder = finished_task;
+
+        tbb::task_handle receiver_task = tg.defer(receiver_task_body);
+        tbb::task_group::transfer_this_task_completion_to(receiver_task);
+        submit(func, std::move(receiver_task), tg, arena);
+    });
+
+    tbb::task_handle new_successor_task = tg.defer([&] {
+        CHECK(receiver_task_placeholder == finished_task);
+        CHECK(transferring_task_placeholder == finished_task);
+        CHECK(new_successor_task_placeholder == not_finished_task);
+
+        new_successor_task_placeholder = finished_task;
+    });
+
+    tbb::task_completion_handle transferring_task_completion_handle = transferring_task;
+    
+    tbb::task_group::set_task_order(transferring_task, successor_task);
+
+    submit(func, std::move(successor_task), tg, arena);
+    submit(func, std::move(transferring_task), tg, arena);
+
+    if (num_threads != 1) {
+        // Wait for the transferring task to complete before adding new successor
+        while (transferring_task_placeholder != not_finished_task)
+            ;
+    }
+
+    CHECK_MESSAGE(successor_task_placeholder == not_finished_task, "successor task ran before the receiving task");
+
+    tbb::task_group::set_task_order(transferring_task_completion_handle, new_successor_task);
+    submit_and_wait(func, std::move(new_successor_task), tg, arena);
+
+    CHECK_MESSAGE(receiver_task_placeholder == finished_task, "receiver task was not finished");
+    CHECK_MESSAGE(successor_task_placeholder == finished_task, "successor task was not finished");
+    CHECK_MESSAGE(transferring_task_placeholder == finished_task, "transferring task was not finished");
+    CHECK_MESSAGE(new_successor_task_placeholder == finished_task, "new successor task was not finished");
+}
+
+void test_transferring_completion(unsigned num_threads, submit_function func) {
+    test_recursive_reduction(func);
+    test_adding_successors_after_transfer(num_threads, func);
+}
+
 void test_return_task_with_dependencies(submit_function submit_function_tag) {
     tbb::task_group tg;
     tbb::task_arena arena;
@@ -1538,6 +1681,11 @@ TEST_CASE("test task_group dynamic dependencies") {
         test_predecessors(submit_function::arena_enqueue);
         test_predecessors(submit_function::this_arena_enqueue);
 
+        test_transferring_completion(p, submit_function::run);
+        test_transferring_completion(p, submit_function::run_and_wait);
+        test_transferring_completion(p, submit_function::arena_enqueue);
+        test_transferring_completion(p, submit_function::this_arena_enqueue);
+        
         test_return_task_with_dependencies(submit_function::run);
         test_return_task_with_dependencies(submit_function::run_and_wait);
         test_return_task_with_dependencies(submit_function::arena_enqueue);
