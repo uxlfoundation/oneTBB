@@ -58,10 +58,15 @@ static bool canTestAsserts() { return true; }
 static bool canTestAsserts() { return false; }
 #endif
 
-TEST_CASE("Using custom assertion handler inside TBBbind" * doctest::skip(!isTbbBindAvailable())) {
-     // to initialize internals of governor and so register assertion handler in TBBbind
-    core_type_count();
+// The test harness expects TBBBIND always to be reported as part of TBB_VERSION output,
+// so initialize system_topology even if TBBbind is not available.
+TEST_CASE("initialize system_topology") {
+     // to initialize system_topology and so register assertion handler in TBBbind
+    unsigned cnt = core_type_count();
+    REQUIRE_MESSAGE(cnt > 0, "Invalid core type count, probably system topology is not initialized");
+}
 
+TEST_CASE("Check TBBbind availability" * doctest::skip(!isTbbBindAvailable())) {
     const char *tbbbind_path = system_topology::load_tbbbind_shared_object();
     REQUIRE_MESSAGE(tbbbind_path != nullptr, "Failed to load TBBbind");
 }
