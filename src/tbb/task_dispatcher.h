@@ -338,7 +338,6 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
 
                     ITT_CALLEE_ENTER(ITTPossible, t, itt_caller);
 
-                    m_innermost_running_task = t;
                     if (ed.context->is_group_execution_cancelled()) {
                         t = t->cancel(ed);
                     } else {
