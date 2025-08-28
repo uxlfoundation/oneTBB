@@ -1259,6 +1259,7 @@ TEST_CASE("Test safe task submit from external thread") {
 #endif // TBB_USE_EXCEPTIONS
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+//! \brief \ref interface \ref requirement \ref error_guessing
 TEST_CASE("test task_completion_handle") {
     tbb::task_group tg;
 
@@ -1672,6 +1673,7 @@ void test_return_task_with_dependencies(submit_function submit_function_tag) {
     CHECK_MESSAGE(successor_placeholder == 1, "Successor task was not completed");
 }
 
+//! \brief \ref interface \ref requirement \ref error_guessing
 TEST_CASE("test task_group dynamic dependencies") {
     for (unsigned p = MinThread; p <= MaxThread; ++p) {
         tbb::global_control limit(tbb::global_control::max_allowed_parallelism, p);
@@ -1693,6 +1695,7 @@ TEST_CASE("test task_group dynamic dependencies") {
     }
 }
 
+//! \brief \ref error_guessing
 TEST_CASE("test task_completion_handle in concurrent environment") {
     tbb::task_group tg;
     std::size_t task_placeholder = 0;
