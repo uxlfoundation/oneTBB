@@ -44,22 +44,32 @@ class governor {
 
 #include "../../src/tbb/load_tbbbind.cpp"
 
-
-// All assertions in TBBbind are available only in TBB_USE_ASSERT mode,
-// and testing can't be done without TBBbind.
-#if TBB_USE_ASSERT && __TBB_HWLOC_VALID_ENVIRONMENT
-static bool canHandlerBeTested() { return true; }
+// Testing can't be done without TBBbind.
+#if __TBB_SELF_CONTAINED_TBBBIND || __TBB_HWLOC_VALID_ENVIRONMENT
+static bool isTbbBindAvailable() { return true; }
 #else
-static bool canHandlerBeTested() { return false; }
+static bool isTbbBindAvailable() { return false; }
 #endif
 
-// The test relies on an assumption that system_topology::load_tbbbind_shared_object() find
-// same instance of TBBbind as TBB uses internally.
-TEST_CASE("Using custom assertion handler inside TBBbind" * doctest::skip(!canHandlerBeTested())) {
-    core_type_count(); // to initialize internals of governor
+// All assertions in TBBbind are available only in TBB_USE_ASSERT mode.
+#if TBB_USE_ASSERT
+static bool canTestAsserts() { return true; }
+#else
+static bool canTestAsserts() { return false; }
+#endif
+
+TEST_CASE("Using custom assertion handler inside TBBbind" * doctest::skip(!isTbbBindAvailable())) {
+     // to initialize internals of governor and so register assertion handler in TBBbind
+    core_type_count();
 
     const char *tbbbind_path = system_topology::load_tbbbind_shared_object();
     REQUIRE_MESSAGE(tbbbind_path != nullptr, "Failed to load TBBbind");
+}
+
+// The test relies on an assumption that system_topology::load_tbbbind_shared_object() find
+// same instance of TBBbind as TBB uses internally.
+TEST_CASE("Using custom assertion handler inside TBBbind"
+          * doctest::skip(!isTbbBindAvailable() || !canTestAsserts())) {
     tbb::set_assertion_handler(utils::AssertionFailureHandler);
     TRY_BAD_EXPR(deallocate_binding_handler_ptr(nullptr), "Trying to deallocate nullptr pointer.");
 }
