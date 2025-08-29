@@ -23,6 +23,11 @@
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
+#pragma warning(push)
+#pragma warning(disable: 4324) // warning C4324: structure was padded due to alignment specifier
+#endif
+
 #include "oneapi/tbb/global_control.h"
 #include "common/test.h"
 #include "common/utils_assert.h"
