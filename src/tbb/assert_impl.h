@@ -74,18 +74,18 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
 }
 
 namespace assertion_handler {
-    static std::atomic<assertion_handler_type> handler{assertion_failure_impl}; // initial value is default handler
+static std::atomic<assertion_handler_type> handler{assertion_failure_impl}; // initial value is default handler
 
 #if (__TBB_BUILD || __TBBBIND_BUILD) // only TBB and TBBBind use custom handler
-    static assertion_handler_type set(assertion_handler_type new_handler) noexcept {
-        return handler.exchange(new_handler ? new_handler : assertion_failure_impl, std::memory_order_acq_rel);
-    }
+static assertion_handler_type set(assertion_handler_type new_handler) noexcept {
+    return handler.exchange(new_handler ? new_handler : assertion_failure_impl, std::memory_order_acq_rel);
+}
 #endif
 
-    static assertion_handler_type get() noexcept {
-        return handler.load(std::memory_order_acquire);
-    }
+static assertion_handler_type get() noexcept {
+    return handler.load(std::memory_order_acquire);
 }
+} // namespace assertion_handler
 
 void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line, const char* expression, const char* comment) {
     assertion_handler::get()(location, line, expression, comment);
