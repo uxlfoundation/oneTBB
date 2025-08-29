@@ -50,13 +50,13 @@ void AssertSameType( const T& /*x*/, const T& /*y*/ ) {}
 #define ASSERT_CUSTOM(p,message,file,line)  ((p)?(void)0:utils::ReportError(file,line,#p,message))
 #define ASSERT(p,message)                   ASSERT_CUSTOM(p,message,__FILE__,__LINE__)
 
-#if TRY_BAD_EXPR_ENABLED
+#if TEST_CUSTOM_ASSERTION_HANDLER_ENABLED
 
 #include "tbb/global_control.h"
 
 //! Check that expression x raises assertion failure with message containing given substring.
 /** Calls utils::SetCustomAssertionHandler to set utils::AssertionFailureHandler as a handler. */
-#define TRY_BAD_EXPR(x, substr)                                            \
+#define TEST_CUSTOM_ASSERTION_HANDLER(x, substr)                           \
     {                                                                      \
         auto default_handler = utils::SetCustomAssertionHandler();         \
         const char* message = nullptr;                                     \
@@ -117,6 +117,6 @@ void ResetAssertionHandler(tbb::assertion_handler_type default_handler) {
 
 }
 
-#endif /* TRY_BAD_EXPR_ENABLED */
+#endif /* TEST_CUSTOM_ASSERTION_HANDLER_ENABLED */
 
 #endif // __TBB_test_common_utils_assert_H

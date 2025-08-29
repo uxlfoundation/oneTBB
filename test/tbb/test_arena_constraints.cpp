@@ -18,7 +18,7 @@
 //! \file test_arena_constraints.cpp
 //! \brief Test for [info_namespace scheduler.task_arena] specifications
 
-#define TRY_BAD_EXPR_ENABLED 1 // TODO: find criteria to automatically define this in utils_assert.h
+#define TEST_CUSTOM_ASSERTION_HANDLER_ENABLED 1 // TODO: find criteria to automatically define this in utils_assert.h
 
 #include "common/common_arena_constraints.h"
 
@@ -216,6 +216,7 @@ TEST_CASE("Testing constraints_threads_per_core() reserved entry point") {
 //! Using custom assertion handler to test failure on invalid constraints
 //! \brief \ref interface \ref error_guessing
 TEST_CASE("Using custom assertion handler to test failure on invalid constraints") {
-    TRY_BAD_EXPR(tbb::info::default_concurrency(tbb::task_arena::constraints{}.set_max_threads_per_core(0)),
+    TEST_CUSTOM_ASSERTION_HANDLER(
+        tbb::info::default_concurrency(tbb::task_arena::constraints{}.set_max_threads_per_core(0)),
         "Wrong max_threads_per_core constraints field value.");
 }

@@ -18,7 +18,7 @@
 //! \file test_global_control.cpp
 //! \brief Test for [sched.global_control] specification
 
-#define TRY_BAD_EXPR_ENABLED 1 // TODO: find criteria to automatically define this in utils_assert.h
+#define TEST_CUSTOM_ASSERTION_HANDLER_ENABLED 1 // TODO: find criteria to automatically define this in utils_assert.h
 
 #include "common/test.h"
 
@@ -287,6 +287,6 @@ TEST_CASE("custom assertion handler type") {
 //! Using custom assertion handler to test failure on invalid max_allowed_parallelism
 //! \brief \ref interface \ref error_guessing
 TEST_CASE("Using custom assertion handler to test failure on invalid max_allowed_parallelism") {
-    TRY_BAD_EXPR(tbb::global_control(tbb::global_control::max_allowed_parallelism, 0),
+    TEST_CUSTOM_ASSERTION_HANDLER(tbb::global_control(tbb::global_control::max_allowed_parallelism, 0),
         "max_allowed_parallelism cannot be 0.");
 }
