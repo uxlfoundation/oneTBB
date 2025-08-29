@@ -24,25 +24,96 @@
 #endif
 
 #include "oneapi/tbb/global_control.h"
-#include "oneapi/tbb/info.h"
 #include "common/test.h"
 #include "common/utils_assert.h"
-
-using namespace tbb::detail::r1;
 
 // no need to do it in the test
 #define __TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION 1
 
+// to get dynamic_link()
 #include "../../src/tbb/dynamic_link.cpp"
 
-class binding_handler;
-    // dummy implementation, not used
-class governor {
-    public:
-        static unsigned default_num_threads () { return 0; }
-};
+// have to define, as my_thread_leave in unconditionally used in outermost_worker_waiter
+#define __TBB_PREVIEW_PARALLEL_PHASE 1
 
-#include "../../src/tbb/load_tbbbind.cpp"
+// we need only system_topology::load_tbbbind_shared_object() functionality,
+// so add stubs for the rest of governor.cpp
+#include "../../src/tbb/governor.cpp"
+
+namespace tbb {
+namespace detail {
+namespace r1 {
+
+basic_tls<thread_data*> governor::theTLS;
+rml::tbb_factory governor::theRMLServerFactory;
+bool governor::UsePrivateRML;
+bool governor::is_rethrow_broken;
+cpu_features_type governor::cpu_features;
+::std::atomic<bool> __TBB_InitOnce::InitializationDone{};
+
+void global_control_acquire() { abort(); }
+void handle_perror( int , const char* ) { abort(); }
+void detect_cpu_features(cpu_features_type&) { abort(); }
+bool gcc_rethrow_exception_broken() { abort(); }
+void destroy_process_mask() { abort(); }
+void runtime_warning( const char* , ... ) { abort(); }
+void clear_address_waiter_table() { abort(); }
+void global_control_release() { abort(); }
+void DoOneTimeInitialization() { abort(); }
+bool thread_dispatcher::must_join_workers() const { abort(); }
+int AvailableHwConcurrency() { abort(); }
+#if TBB_USE_ASSERT
+bool is_present(d1::global_control&) { abort(); }
+#endif // TBB_USE_ASSERT
+bool remove_and_check_if_empty(d1::global_control&) { abort(); }
+void PrintExtraVersionInfo( const char*, const char*, ... ) { abort(); }
+
+threading_control* threading_control::register_public_reference() { abort(); }
+std::size_t threading_control::worker_stack_size() { abort(); }
+void threading_control::register_thread(thread_data&) { abort(); }
+void threading_control::unregister_thread(thread_data&) { abort(); }
+bool threading_control::unregister_public_reference(bool) { abort(); }
+bool threading_control::unregister_lifetime_control(bool) { abort(); }
+bool threading_control::is_present() { abort(); }
+
+arena::arena(threading_control*, unsigned, unsigned, unsigned
+#if __TBB_PREVIEW_PARALLEL_PHASE
+          , tbb::task_arena::leave_policy
+#endif
+    ) { abort(); }
+arena& arena::create(threading_control*, unsigned, unsigned, unsigned,
+                    d1::constraints
+#if __TBB_PREVIEW_PARALLEL_PHASE
+                         , tbb::task_arena::leave_policy lp
+#endif
+    ) {
+    static arena a(nullptr, 0, 0, 0, lp);
+    return a;
+}
+void arena::on_thread_leaving(unsigned) { abort(); }
+thread_control_monitor& arena::get_waiting_threads_monitor() {
+    static thread_control_monitor monitor;
+    return monitor;
+}
+
+void observer_list::do_notify_exit_observers(observer_proxy*, bool) { abort(); }
+
+bool task_dispatcher::resume(task_dispatcher&) { abort(); }
+d1::suspend_point task_dispatcher::get_suspend_point() { abort(); }
+
+void small_object_pool_impl::destroy() { abort(); }
+
+namespace rml {
+tbb_server* make_private_server( tbb_client&  ) { abort(); }
+::rml::factory::status_type tbb_factory::open() { abort(); }
+void tbb_factory::close() { abort(); }
+::rml::factory::status_type tbb_factory::make_server(tbb::detail::r1::rml::tbb_server*&,
+                                        tbb::detail::r1::rml::tbb_client&) {
+    abort();
+}
+}
+
+}}}
 
 // Testing can't be done without TBBbind.
 #if __TBB_SELF_CONTAINED_TBBBIND || __TBB_HWLOC_VALID_ENVIRONMENT
@@ -58,23 +129,27 @@ static bool canTestAsserts() { return true; }
 static bool canTestAsserts() { return false; }
 #endif
 
-// The test harness expects TBBBIND always to be reported as part of TBB_VERSION output,
-// so initialize system_topology even if TBBbind is not available.
-TEST_CASE("initialize system_topology") {
-     // to initialize system_topology and so register assertion handler in TBBbind
-    unsigned cnt = core_type_count();
-    REQUIRE_MESSAGE(cnt > 0, "Invalid core type count, probably system topology is not initialized");
-}
-
-TEST_CASE("Check TBBbind availability" * doctest::skip(!isTbbBindAvailable())) {
-    const char *tbbbind_path = system_topology::load_tbbbind_shared_object();
-    REQUIRE_MESSAGE(tbbbind_path != nullptr, "Failed to load TBBbind");
-}
+// Must initialize system_topology and so register assertion handler in TBBbind.
+// The test harness expects TBBBIND status always to be reported as part of TBB_VERSION
+// output, so initialize system_topology even if TBBbind is not available.
+struct Init {
+    Init() {
+        auto constraints = tbb::task_arena::constraints{}
+            .set_max_threads_per_core(1);
+        tbb::task_arena arena( constraints );
+        arena.initialize();
+    }
+} init;
 
 // The test relies on an assumption that system_topology::load_tbbbind_shared_object() find
 // same instance of TBBbind as TBB uses internally.
 TEST_CASE("Using custom assertion handler inside TBBbind"
-          * doctest::skip(!isTbbBindAvailable() || !canTestAsserts())) {
+          * doctest::skip(!isTbbBindAvailable() || !canTestAsserts() || !isTbbBindAvailable())) {
+    // fills pointers to TBBbind entry points
+    const char *tbbbind_path = tbb::detail::r1::system_topology::load_tbbbind_shared_object();
+    REQUIRE_MESSAGE(tbbbind_path != nullptr, "Failed to load TBBbind");
+
     tbb::set_assertion_handler(utils::AssertionFailureHandler);
-    TRY_BAD_EXPR(deallocate_binding_handler_ptr(nullptr), "Trying to deallocate nullptr pointer.");
+    // we are expecting that deallocate_binding_handler_ptr points to TBBbind entry point
+    TRY_BAD_EXPR(tbb::detail::r1::deallocate_binding_handler_ptr(nullptr), "Trying to deallocate nullptr pointer.");
 }
