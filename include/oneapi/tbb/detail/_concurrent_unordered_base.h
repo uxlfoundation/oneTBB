@@ -922,7 +922,7 @@ private:
             node_allocator_traits::deallocate(dummy_node_allocator, node, 1);
         } else {
             // GCC 11.1 issues a warning here that incorrect destructor might be called for dummy_nodes
-            #if (__TBB_GCC_VERSION >= 110100 && __TBB_GCC_VERSION < 150000 ) && !__clang__ && !__INTEL_COMPILER
+            #if (__TBB_GCC_VERSION >= 110100 && __TBB_GCC_VERSION < 160000 ) && !__clang__ && !__INTEL_COMPILER
             volatile
             #endif
             value_node_ptr val_node = static_cast<value_node_ptr>(node);

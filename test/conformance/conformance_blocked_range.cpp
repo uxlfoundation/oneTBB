@@ -133,7 +133,7 @@ TEST_CASE("blocked_range proportional splitting") {
 
     // Test proportional_split -> split conversion
     oneapi::tbb::blocked_range<int> copy(original);
-    oneapi::tbb::split s = oneapi::tbb::split(ps);
+    oneapi::tbb::split s = static_cast<oneapi::tbb::split>(ps);
     oneapi::tbb::blocked_range<int> splitted_copy(copy, s);
     CHECK(copy.size() == original.size() / 2);
     CHECK(splitted_copy.size() == copy.size());
@@ -164,4 +164,3 @@ TEST_CASE("Deduction guides") {
     static_assert(std::is_same<decltype(r3), decltype(r1)>::value);
 }
 #endif
-
