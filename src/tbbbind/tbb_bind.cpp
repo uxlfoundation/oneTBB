@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2019-2024 Intel Corporation
+    Copyright (c) 2019-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -593,6 +594,10 @@ TBBBIND_EXPORT int __TBB_internal_get_default_concurrency(int numa_id, int core_
 
 TBBBIND_EXPORT void __TBB_internal_destroy_system_topology() {
     return system_topology::destroy();
+}
+
+TBBBIND_EXPORT void __TBB_internal_set_tbbbind_assertion_handler(assertion_handler_type handler) {
+    assertion_handler::set(handler);
 }
 
 } // extern "C"

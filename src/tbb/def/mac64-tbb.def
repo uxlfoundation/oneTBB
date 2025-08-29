@@ -22,6 +22,8 @@
 
 # Assertions (assert.cpp)
 __ZN3tbb6detail2r117assertion_failureEPKciS3_S3_
+__ZN3tbb6detail2r121set_assertion_handlerEPFvPKciS3_S3_E
+__ZN3tbb6detail2r121get_assertion_handlerEv
 
 # ITT (profiling.cpp)
 __ZN3tbb6detail2r112itt_task_endENS0_2d115itt_domain_enumE
