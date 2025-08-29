@@ -276,17 +276,17 @@ TEST_CASE("test concurrent task_scheduler_handle destruction") {
     thr1.join();
 }
 
+//! Testing that assertion_handler_type is exactly the type defined in the documentation
+//! \brief \ref interface \ref requirement
+TEST_CASE("custom assertion handler type") {
+    using documented = void(*)(const char* /* location */, int /* line */,
+                               const char* /* expression */, const char* /* comment */);
+    static_assert(std::is_same<oneapi::tbb::assertion_handler_type, documented>::value, "Incorrect assertion handler type");
+}
+
 //! Using custom assertion handler to test failure on invalid max_allowed_parallelism
 //! \brief \ref interface \ref error_guessing
 TEST_CASE("Using custom assertion handler to test failure on invalid max_allowed_parallelism") {
-    auto default_handler = tbb::set_assertion_handler(utils::AssertionFailureHandler);
-    auto custom_handler = tbb::get_assertion_handler();
-    REQUIRE_MESSAGE(custom_handler == utils::AssertionFailureHandler, "Custom assertion handler was not set.");
-
     TRY_BAD_EXPR(tbb::global_control(tbb::global_control::max_allowed_parallelism, 0),
         "max_allowed_parallelism cannot be 0.");
-
-    auto handler = tbb::set_assertion_handler(nullptr); // Reset to default handler
-    REQUIRE_MESSAGE(handler == utils::AssertionFailureHandler, "Previous assertion handler was not returned.");
-    REQUIRE_MESSAGE(tbb::get_assertion_handler() == default_handler, "Default assertion handler was not reset.");
 }

@@ -216,8 +216,6 @@ TEST_CASE("Testing constraints_threads_per_core() reserved entry point") {
 //! Using custom assertion handler to test failure on invalid constraints
 //! \brief \ref interface \ref error_guessing
 TEST_CASE("Using custom assertion handler to test failure on invalid constraints") {
-    tbb::set_assertion_handler(utils::AssertionFailureHandler);
     TRY_BAD_EXPR(tbb::info::default_concurrency(tbb::task_arena::constraints{}.set_max_threads_per_core(0)),
         "Wrong max_threads_per_core constraints field value.");
-    tbb::set_assertion_handler(nullptr); // Reset to default handler
 }

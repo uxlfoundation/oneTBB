@@ -73,7 +73,7 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
 #endif
 }
 
-namespace custom_handler {
+namespace assertion_handler {
     static std::atomic<assertion_handler_type> handler{assertion_failure_impl}; // initial value is default handler
 
 #if (__TBB_BUILD || __TBBBIND_BUILD) // only TBB and TBBBind use custom handler
@@ -88,7 +88,7 @@ namespace custom_handler {
 }
 
 void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line, const char* expression, const char* comment) {
-    custom_handler::get()(location, line, expression, comment);
+    assertion_handler::get()(location, line, expression, comment);
 }
 
 //! Report a runtime warning.

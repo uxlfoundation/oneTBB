@@ -52,10 +52,13 @@ void AssertSameType( const T& /*x*/, const T& /*y*/ ) {}
 
 #if TRY_BAD_EXPR_ENABLED
 
+#include "tbb/global_control.h"
+
 //! Check that expression x raises assertion failure with message containing given substring.
-/** Assumes that tbb::set_assertion_handler( utils::AssertionFailureHandler ) was called earlier. */
+/** Calls utils::SetCustomAssertionHandler to set utils::AssertionFailureHandler as a handler. */
 #define TRY_BAD_EXPR(x, substr)                                            \
     {                                                                      \
+        auto default_handler = utils::SetCustomAssertionHandler();         \
         const char* message = nullptr;                                     \
         bool okay = false;                                                 \
         try {                                                              \
@@ -65,6 +68,7 @@ void AssertSameType( const T& /*x*/, const T& /*y*/ ) {}
             message = a.message;                                           \
         }                                                                  \
         utils::CheckAssertionFailure(__LINE__, #x, okay, message, substr); \
+        utils::ResetAssertionHandler(default_handler);                     \
     }
 
 namespace utils {
@@ -89,6 +93,13 @@ void AssertionFailureHandler(const char* filename, int line, const char* express
     throw AssertionFailure(filename, line, expression, comment);
 }
 
+tbb::assertion_handler_type SetCustomAssertionHandler() {
+    auto default_handler = tbb::set_assertion_handler(AssertionFailureHandler);
+    auto custom_handler = tbb::get_assertion_handler();
+    REQUIRE_MESSAGE(custom_handler == AssertionFailureHandler, "Custom assertion handler was not set.");
+    return default_handler;
+}
+
 void CheckAssertionFailure(int line, std::string expression, bool okay, const char* message, std::string substr) {
     REQUIRE_MESSAGE(okay, "Line ", line, ", ", expression, " failed to fail");
     REQUIRE_MESSAGE(message, "Line ", line, ", ", expression, " failed without a message");
@@ -96,6 +107,12 @@ void CheckAssertionFailure(int line, std::string expression, bool okay, const ch
     std::string msg_str = message;
     REQUIRE_MESSAGE(msg_str.find(substr) != std::string::npos,
         expression, " failed with message '", msg_str, "' missing substring '", substr, "'");
+}
+
+void ResetAssertionHandler(tbb::assertion_handler_type default_handler) {
+    auto handler = tbb::set_assertion_handler(nullptr); // Reset to default handler
+    REQUIRE_MESSAGE(handler == AssertionFailureHandler, "Previous assertion handler was not returned.");
+    REQUIRE_MESSAGE(tbb::get_assertion_handler() == default_handler, "Default assertion handler was not reset.");
 }
 
 }

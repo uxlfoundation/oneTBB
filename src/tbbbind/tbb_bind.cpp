@@ -597,7 +597,7 @@ TBBBIND_EXPORT void __TBB_internal_destroy_system_topology() {
 }
 
 TBBBIND_EXPORT void __TBB_internal_set_tbbbind_assertion_handler(assertion_handler_type handler) {
-    custom_handler::set(handler);
+    assertion_handler::set(handler);
 }
 
 } // extern "C"
