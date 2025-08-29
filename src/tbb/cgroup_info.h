@@ -67,10 +67,13 @@ private:
 
     static const char* look_for_cpu_controller_path(const char* line, const char* last_char) {
         const char* path_start = line;
+        constexpr int cpu_ctrl_str_length = 3;
         while ((path_start = std::strstr(path_start, "cpu"))) {
             // At least ":/" must be at the end of line for a valid cgroups file
-            if (line - path_start == 0 || last_char - path_start <= 3)
+            if (line - path_start == 0 || last_char - path_start <= cpu_ctrl_str_length) {
+                path_start = nullptr;
                 break; // Incorrect line in the cgroup file, skip it
+            }
 
             const char prev_char = *(path_start - 1);
             if (prev_char != ':' && prev_char != ',') {
@@ -78,13 +81,13 @@ private:
                 continue;
             }
 
-            const char next_char = *(path_start + 3);
+            const char next_char = *(path_start + cpu_ctrl_str_length);
             if (next_char != ':' && next_char != ',') {
                 ++path_start; // Not a valid "cpu" controller, continue searching
                 continue;
             }
 
-            path_start = std::strchr(path_start + 3, ':') + 1;
+            path_start = std::strchr(path_start + cpu_ctrl_str_length, ':') + 1;
             __TBB_ASSERT(path_start <= last_char, "Too long path?");
             break;
         }
@@ -97,25 +100,28 @@ private:
         const char* last_char = line + rel_path_size - 1;
 
         const char* path_start = nullptr;
+        constexpr std::size_t cgroup_v2_prefix_size = 3;
         while (std::fgets(line, rel_path_size, cgroup_fd)) {
             path_start = nullptr;
 
-            if (std::strncmp(line, "0::", 3) == 0) {
-                path_start = line + 3; // cgroup v2 unified path
+            if (std::strncmp(line, "0::", cgroup_v2_prefix_size) == 0) {
+                __TBB_ASSERT(!*paths_cache.v2_relative_path, "Found second entry of cgroup v2");
+                path_start = line + cgroup_v2_prefix_size; // cgroup v2 unified path
                 relative_path = paths_cache.v2_relative_path;
             } else {
                 // cgroups v1 allows comount multiple controllers against the same hierarchy
                 path_start = look_for_cpu_controller_path(line, last_char);
+                __TBB_ASSERT(!*paths_cache.v1_relative_path || !path_start,
+                             "Found second entry of cgroup v1 cpu controller");
+
                 relative_path = paths_cache.v1_relative_path;
             }
 
             if (path_start) {
-                std::strncpy(relative_path, path_start, rel_path_size);
-                relative_path[rel_path_size - 1] = '\0'; // Ensure null-termination after copy
-
-                char* new_line = std::strrchr(relative_path, '\n');
-                if (new_line)
-                    *new_line = '\0'; // Ensure no new line at the end of the path is copied
+                // Ensure no new line at the end of the path is copied
+                std::size_t real_rel_path_size = std::strcspn(path_start, "\n");
+                std::strncpy(relative_path, path_start, real_rel_path_size);
+                relative_path[real_rel_path_size] = '\0';
             }
         }
     }
