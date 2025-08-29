@@ -38,6 +38,9 @@
 
 // we need only system_topology::load_tbbbind_shared_object() functionality,
 // so add stubs for the rest of governor.cpp
+#if __clang__
+#pragma GCC diagnostic ignored "-Wunused-private-field"
+#endif
 #include "../../src/tbb/governor.cpp"
 
 namespace tbb {
@@ -50,12 +53,17 @@ bool governor::UsePrivateRML;
 bool governor::is_rethrow_broken;
 cpu_features_type governor::cpu_features;
 ::std::atomic<bool> __TBB_InitOnce::InitializationDone{};
+#if !__TBB_USE_FUTEX
+std::mutex concurrent_monitor_mutex::my_init_mutex;
+#endif
 
 void global_control_acquire() { abort(); }
 void handle_perror( int , const char* ) { abort(); }
 void detect_cpu_features(cpu_features_type&) { abort(); }
 bool gcc_rethrow_exception_broken() { abort(); }
+#if __TBB_USE_OS_AFFINITY_SYSCALL
 void destroy_process_mask() { abort(); }
+#endif
 void runtime_warning( const char* , ... ) { abort(); }
 void clear_address_waiter_table() { abort(); }
 void global_control_release() { abort(); }
@@ -102,6 +110,10 @@ bool task_dispatcher::resume(task_dispatcher&) { abort(); }
 d1::suspend_point task_dispatcher::get_suspend_point() { abort(); }
 
 void small_object_pool_impl::destroy() { abort(); }
+
+#if _WIN32 || _WIN64
+int NumberOfProcessorGroups() { abort(); }
+#endif
 
 namespace rml {
 tbb_server* make_private_server( tbb_client&  ) { abort(); }
