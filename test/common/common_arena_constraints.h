@@ -422,7 +422,9 @@ void test_constraints_affinity_and_concurrency(tbb::task_arena::constraints cons
     int max_threads_per_core = static_cast<int>(system_info::get_maximal_threads_per_core());
 
     int constrained_num_cpus = INT_MAX;
+#if __TBB_USE_CGROUPS
     (void)utils::cgroup_info::is_cpu_constrained(constrained_num_cpus);
+#endif
 
     if (constraints.max_threads_per_core == tbb::task_arena::automatic || constraints.max_threads_per_core == max_threads_per_core) {
         REQUIRE_MESSAGE(hwloc_bitmap_isequal(reference_affinity, arena_affinity),
