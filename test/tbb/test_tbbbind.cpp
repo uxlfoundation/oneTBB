@@ -43,6 +43,8 @@
 #endif
 #include "../../src/tbb/governor.cpp"
 
+#if __TBB_DYNAMIC_LOAD_ENABLED
+
 namespace tbb {
 namespace detail {
 namespace r1 {
@@ -127,6 +129,8 @@ void tbb_factory::close() { abort(); }
 
 }}}
 
+#endif // __TBB_DYNAMIC_LOAD_ENABLED
+
 // Testing can't be done without TBBbind.
 #if __TBB_SELF_CONTAINED_TBBBIND || __TBB_HWLOC_VALID_ENVIRONMENT
 static bool isTbbBindAvailable() { return true; }
@@ -141,6 +145,8 @@ static bool canTestAsserts() { return true; }
 static bool canTestAsserts() { return false; }
 #endif
 
+// this code hangs in  -DBUILD_SHARED_LIBS=OFF case (#1832)
+#if __TBB_DYNAMIC_LOAD_ENABLED
 // Must initialize system_topology and so register assertion handler in TBBbind.
 // The test harness expects TBBBIND status always to be reported as part of TBB_VERSION
 // output, so initialize system_topology even if TBBbind is not available.
@@ -152,6 +158,7 @@ struct Init {
         arena.initialize();
     }
 } init;
+#endif
 
 // The test relies on an assumption that system_topology::load_tbbbind_shared_object() find
 // same instance of TBBbind as TBB uses internally.
@@ -160,6 +167,8 @@ TEST_CASE("Using custom assertion handler inside TBBbind"
     // fills pointers to TBBbind entry points
     const char *tbbbind_path = tbb::detail::r1::system_topology::load_tbbbind_shared_object();
     REQUIRE_MESSAGE(tbbbind_path != nullptr, "Failed to load TBBbind");
+    REQUIRE_MESSAGE(tbb::detail::r1::deallocate_binding_handler_ptr != nullptr,
+                    "Failed to fill deallocate_binding_handler_ptr");
 
     tbb::set_assertion_handler(utils::AssertionFailureHandler);
     // we are expecting that deallocate_binding_handler_ptr points to TBBbind entry point
