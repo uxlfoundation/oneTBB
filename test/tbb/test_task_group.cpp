@@ -1724,6 +1724,7 @@ TEST_CASE("test task_completion_handle in concurrent environment") {
     CHECK_MESSAGE(succ_counter == n, "Not all of the successors were executed");
 }
 
+//! \brief \ref error_guessing
 TEST_CASE("test dependencies and cancellation") {
     tbb::task_group tg;
 
