@@ -26,6 +26,9 @@
 #if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
 #pragma warning(disable: 4324) // warning C4324: structure was padded due to alignment specifier
 #pragma warning(disable: 4702) // warning C4702: unreachable code, the code became unreadchable after stubs adding
+#if __ARM_ARCH
+#pragma warning(disable: 4722) // warning C4722: destructor never returns, potential memory leak
+#endif
 #endif
 
 #include "oneapi/tbb/global_control.h"
