@@ -341,6 +341,11 @@ namespace r1 {
         std::size_t _len;
     } ap_data;
 
+    #if !_WIN32
+    // any function inside the library can be used for the address
+    static void *func_from_lib = (void*)&assertion_failure;
+    #endif
+
     static void init_ap_data() {
     #if _WIN32
         // Get handle of our DLL first.
@@ -379,7 +384,7 @@ namespace r1 {
     #else
         // Get the library path
         Dl_info dlinfo;
-        int res = dladdr( (void*)&dynamic_link, &dlinfo ); // any function inside the library can be used for the address
+        int res = dladdr( func_from_lib, &dlinfo );
         if ( !res ) {
             char const * err = dlerror();
             DYNAMIC_LINK_WARNING( dl_sys_fail, "dladdr", err );
