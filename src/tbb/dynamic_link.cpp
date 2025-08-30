@@ -13,6 +13,7 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 */
+#define TBB_DYNAMIC_LINK_WARNING 1
 
 #include "dynamic_link.h"
 #include "environment.h"
@@ -738,6 +739,9 @@ namespace r1 {
 #endif /* _WIN32 */
         // The argument of loading_flags is ignored on Windows
         library_handle = dlopen( path, loading_flags(flags) );
+#if __linux__
+        fprintf(stderr, "Loading library '%s', %s\n", path, library_handle? "ok" : "fail");
+#endif
 #if _WIN32
         SetErrorMode (prev_mode);
 #endif /* _WIN32 */
