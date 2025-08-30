@@ -738,6 +738,9 @@ namespace r1 {
 #endif /* _WIN32 */
         // The argument of loading_flags is ignored on Windows
         library_handle = dlopen( path, loading_flags(flags) );
+#if __linux__
+        fprintf(stderr, "Loading library '%s', %s\n", path, library_handle? "ok" : "fail");
+#endif
 #if _WIN32
         SetErrorMode (prev_mode);
 #endif /* _WIN32 */

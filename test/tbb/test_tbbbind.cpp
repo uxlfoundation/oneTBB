@@ -26,9 +26,7 @@
 #if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
 #pragma warning(disable: 4324) // warning C4324: structure was padded due to alignment specifier
 #pragma warning(disable: 4702) // warning C4702: unreachable code, the code became unreadchable after stubs adding
-#if __ARM_ARCH
 #pragma warning(disable: 4722) // warning C4722: destructor never returns, potential memory leak
-#endif
 #endif
 
 #include "oneapi/tbb/global_control.h"
@@ -173,6 +171,7 @@ struct Init {
 TEST_CASE("Using custom assertion handler inside TBBbind"
           * doctest::skip(!isTbbBindAvailable() || !canTestAsserts() || !isTbbBindAvailable())) {
     // fills pointers to TBBbind entry points
+    fprintf(stderr, "call tbb::detail::r1::system_topology::load_tbbbind_shared_object\n");
     const char *tbbbind_path = tbb::detail::r1::system_topology::load_tbbbind_shared_object();
     REQUIRE_MESSAGE(tbbbind_path != nullptr, "Failed to load TBBbind");
     REQUIRE_MESSAGE(tbb::detail::r1::deallocate_binding_handler_ptr != nullptr,
