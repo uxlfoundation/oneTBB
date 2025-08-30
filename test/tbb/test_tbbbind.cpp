@@ -114,8 +114,10 @@ thread_control_monitor& arena::get_waiting_threads_monitor() {
 
 void observer_list::do_notify_exit_observers(observer_proxy*, bool) { abort(); }
 
+#if __TBB_RESUMABLE_TASKS
 bool task_dispatcher::resume(task_dispatcher&) { abort(); }
 d1::suspend_point task_dispatcher::get_suspend_point() { abort(); }
+#endif
 
 void small_object_pool_impl::destroy() { abort(); }
 
