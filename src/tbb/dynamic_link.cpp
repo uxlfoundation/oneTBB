@@ -13,6 +13,7 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 */
+#define TBB_DYNAMIC_LINK_WARNING 1
 
 #include "dynamic_link.h"
 #include "environment.h"
