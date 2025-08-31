@@ -341,6 +341,8 @@ namespace r1 {
         std::size_t _len;
     } ap_data;
 
+    extern "C" TBB_EXPORT const char* __TBB_EXPORTED_FUNC TBB_runtime_version();
+
     static void init_ap_data() {
     #if _WIN32
         // Get handle of our DLL first.
@@ -379,7 +381,7 @@ namespace r1 {
     #else
         // any function inside the library can be used for the address
         #if 1
-        static void *func_from_lib = (void*)&assertion_failure;
+        static void *func_from_lib = (void*)&TBB_runtime_version;
         #else
         static void *func_from_lib = (void*)&dynamic_link;
         #endif
