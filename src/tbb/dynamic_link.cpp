@@ -343,7 +343,11 @@ namespace r1 {
 
     #if !_WIN32
     // any function inside the library can be used for the address
+    #if 0
     static void *func_from_lib = (void*)&assertion_failure;
+    #else
+    static void *func_from_lib = (void*)&dynamic_link;
+    #endif
     #endif
 
     static void init_ap_data() {
