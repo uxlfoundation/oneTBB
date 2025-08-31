@@ -341,15 +341,6 @@ namespace r1 {
         std::size_t _len;
     } ap_data;
 
-    #if !_WIN32
-    // any function inside the library can be used for the address
-    #if 0
-    static void *func_from_lib = (void*)&assertion_failure;
-    #else
-    static void *func_from_lib = (void*)&dynamic_link;
-    #endif
-    #endif
-
     static void init_ap_data() {
     #if _WIN32
         // Get handle of our DLL first.
@@ -386,6 +377,13 @@ namespace r1 {
         ap_data._len = (std::size_t)(backslash - ap_data._path) + 1;
         *(backslash+1) = 0;
     #else
+        // any function inside the library can be used for the address
+        #if 1
+        static void *func_from_lib = (void*)&assertion_failure;
+        #else
+        static void *func_from_lib = (void*)&dynamic_link;
+        #endif
+
         // Get the library path
         Dl_info dlinfo;
         int res = dladdr( func_from_lib, &dlinfo );
@@ -396,6 +394,7 @@ namespace r1 {
         } else {
             __TBB_ASSERT_EX( dlinfo.dli_fname!=nullptr, "Unbelievable." );
         }
+        fprintf(stderr, "init_ap_data: dli_fname '%s'\n", dlinfo.dli_fname);
 
         char const *slash = std::strrchr( dlinfo.dli_fname, '/' );
         std::size_t fname_len=0;
