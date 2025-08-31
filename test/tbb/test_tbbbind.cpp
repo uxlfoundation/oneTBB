@@ -37,7 +37,9 @@
 #define __TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION 1
 
 // to get dynamic_link()
+#define __TBB_BUILD 1
 #include "../../src/tbb/dynamic_link.cpp"
+#undef __TBB_BUILD
 
 // have to define, as my_thread_leave in unconditionally used in outermost_worker_waiter
 #define __TBB_PREVIEW_PARALLEL_PHASE 1

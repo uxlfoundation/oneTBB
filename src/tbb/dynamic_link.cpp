@@ -380,7 +380,7 @@ namespace r1 {
         *(backslash+1) = 0;
     #else
         // any function inside the library can be used for the address
-        #if 1
+        #if __TBB_BUILD
         static void *func_from_lib = (void*)&TBB_runtime_version;
         #else
         static void *func_from_lib = (void*)&dynamic_link;
