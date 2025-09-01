@@ -165,6 +165,8 @@ struct Init {
 
 // The test relies on an assumption that system_topology::load_tbbbind_shared_object() find
 // same instance of TBBbind as TBB uses internally.
+//! Testing that assertions called inside TBBbind are handled correctly
+//! \brief \ref interface \ref requirement
 TEST_CASE("Using custom assertion handler inside TBBbind"
           * doctest::skip(!isTbbBindAvailable() || !canTestAsserts() || !isTbbBindAvailable())) {
     // fills pointers to TBBbind entry points
