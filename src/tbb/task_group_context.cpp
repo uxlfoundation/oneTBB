@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2023 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -47,6 +48,12 @@ void tbb_exception_ptr::throw_self() {
     std::rethrow_exception(my_ptr);
 }
 
+void tbb_exception_ptr::throw_self_and_destroy() {
+    auto temp_ptr = my_ptr;
+    destroy();
+    std::rethrow_exception(temp_ptr);
+}
+
 //------------------------------------------------------------------------
 // task_group_context
 //------------------------------------------------------------------------
@@ -65,11 +72,7 @@ void task_group_context_impl::destroy(d1::task_group_context& ctx) {
 #endif
     ctl->~cpu_ctl_env();
 
-    auto exception = ctx.my_exception.load(std::memory_order_relaxed);
-    if (exception) {
-        exception->destroy();
-    }
-    ITT_STACK_DESTROY(ctx.my_itt_caller);
+    __TBB_ASSERT(!ctx.my_exception.load(std::memory_order_relaxed), "destroy reached with non-null exception");
 
     poison_pointer(ctx.my_parent);
     poison_pointer(ctx.my_context_list);
@@ -240,19 +243,15 @@ bool task_group_context_impl::is_group_execution_cancelled(const d1::task_group_
     return ctx.my_cancellation_requested.load(std::memory_order_relaxed) != 0;
 }
 
-// IMPORTANT: It is assumed that this method is not used concurrently!
+// Thread-safe reset implementation using compare_exchange
 void task_group_context_impl::reset(d1::task_group_context& ctx) {
     __TBB_ASSERT(!is_poisoned(ctx.my_context_list), nullptr);
     //! TODO: Add assertion that this context does not have children
-    // No fences are necessary since this context can be accessed from another thread
-    // only after stealing happened (which means necessary fences were used).
+    
+    __TBB_ASSERT(!ctx.my_exception.load(std::memory_order_relaxed), "reset reached with non-null exception");
 
-    auto exception = ctx.my_exception.load(std::memory_order_relaxed);
-    if (exception) {
-        exception->destroy();
-        ctx.my_exception.store(nullptr, std::memory_order_relaxed);
-    }
-    ctx.my_cancellation_requested = 0;
+    // Thread-safe cancellation reset using atomic store
+    ctx.my_cancellation_requested.store(0, std::memory_order_relaxed);
 }
 
 // IMPORTANT: It is assumed that this method is not used concurrently!
