@@ -18,7 +18,7 @@
 //! \file test_tbbbind.cpp
 //! \brief Test for TBBbind library, covers [configuration.debug_features]
 
-#define TRY_BAD_EXPR_ENABLED 1
+#define TEST_CUSTOM_ASSERTION_HANDLER_ENABLED 1
 #if _WIN32 || _WIN64
 #define _CRT_SECURE_NO_WARNINGS
 #endif
@@ -174,7 +174,7 @@ TEST_CASE("Using custom assertion handler inside TBBbind"
     REQUIRE_MESSAGE(tbb::detail::r1::deallocate_binding_handler_ptr != nullptr,
                     "Failed to fill deallocate_binding_handler_ptr");
 
-    tbb::set_assertion_handler(utils::AssertionFailureHandler);
     // we are expecting that deallocate_binding_handler_ptr points to TBBbind entry point
-    TRY_BAD_EXPR(tbb::detail::r1::deallocate_binding_handler_ptr(nullptr), "Trying to deallocate nullptr pointer.");
+    TEST_CUSTOM_ASSERTION_HANDLER(tbb::detail::r1::deallocate_binding_handler_ptr(nullptr),
+                                  "Trying to deallocate nullptr pointer.");
 }
