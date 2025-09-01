@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2023 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@
 #include "common/spin_barrier.h"
 #include "common/test_follows_and_precedes_api.h"
 #include "common/concepts_common.h"
+#include "test_try_put_and_wait.h"
 
 #include <string>
 #include <thread>
@@ -40,8 +41,6 @@
 
 //! \file test_async_node.cpp
 //! \brief Test for [flow_graph.async_node] specification
-
-
 class minimal_type {
     template<typename T>
     friend struct place_wrapper;
@@ -878,3 +877,11 @@ TEST_CASE("constraints for async_node body") {
 }
 
 #endif // __TBB_CPP20_CONCEPTS_PRESENT
+
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+//! \brief \ref error_guessing
+TEST_CASE("test async_node try_put_and_wait") {
+    using node_type = oneapi::tbb::flow::async_node<int, int, tbb::flow::queueing>;
+    test_try_put_and_wait::test_multioutput<node_type>();
+}
+#endif

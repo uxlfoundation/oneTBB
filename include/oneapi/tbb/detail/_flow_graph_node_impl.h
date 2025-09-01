@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -554,6 +554,70 @@ struct init_output_ports {
     }
 }; // struct init_output_ports
 
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+
+class metainfo_tag_type {
+public:
+    metainfo_tag_type() = default;
+
+    metainfo_tag_type(const metainfo_tag_type&) = delete;
+
+    metainfo_tag_type(metainfo_tag_type&& other)
+        : my_metainfo(std::move(other.my_metainfo)) {}
+
+    metainfo_tag_type(const message_metainfo& metainfo) : my_metainfo(metainfo) {
+        for (auto waiter : my_metainfo.waiters()) {
+            waiter->reserve();
+        }
+    }
+
+    metainfo_tag_type& operator=(const metainfo_tag_type&) = delete;
+    metainfo_tag_type& operator=(metainfo_tag_type&& other) {
+        // TODO: should this method be thread-safe?
+        if (this != &other) {
+            reset();
+            my_metainfo = std::move(other.my_metainfo);
+        }
+        return *this;
+    }
+
+    ~metainfo_tag_type() {
+        reset();
+    }
+
+    void merge(const metainfo_tag_type& other_tag) {
+        tbb::spin_mutex::scoped_lock lock(my_mutex);
+
+        // TODO: add comment
+        for (auto waiter : other_tag.my_metainfo.waiters()) {
+            waiter->reserve();
+        }
+        my_metainfo.merge(other_tag.my_metainfo);
+    }
+
+    void reset() {
+        tbb::spin_mutex::scoped_lock lock(my_mutex);
+
+        for (auto waiter : my_metainfo.waiters()) {
+            waiter->release();
+        }
+        my_metainfo = message_metainfo{};
+    }
+private:
+    friend struct metainfo_tag_accessor;
+
+    message_metainfo my_metainfo;
+    tbb::spin_mutex  my_mutex;
+};
+
+struct metainfo_tag_accessor {
+    static const message_metainfo& get_metainfo(const metainfo_tag_type& tag) {
+        return tag.my_metainfo;
+    }
+};
+
+#endif
+
 //! Implements methods for a function node that takes a type Input as input
 //  and has a tuple of output ports specified.
 template< typename Input, typename OutputPortSet, typename Policy, typename A>
@@ -562,6 +626,9 @@ public:
     static const int N = std::tuple_size<OutputPortSet>::value;
     typedef Input input_type;
     typedef OutputPortSet output_ports_type;
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+    typedef metainfo_tag_type tag_type;
+#endif
     typedef multifunction_body<input_type, output_ports_type> multifunction_body_type;
     typedef multifunction_input<Input, OutputPortSet, Policy, A> my_class;
     typedef function_input_base<Input, Policy, A, my_class> base_type;
@@ -570,7 +637,9 @@ public:
     // constructor
     template<typename Body>
     multifunction_input(graph &g, size_t max_concurrency,Body& body, node_priority_t a_priority )
-      : base_type(g, max_concurrency, a_priority, noexcept(tbb::detail::invoke(body, input_type(), my_output_ports)))
+      : base_type(g, max_concurrency, a_priority,
+                  noexcept(invoke_body_with_tag(body __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo_tag_type{}),
+                                                input_type(), my_output_ports)))
       , my_body( new multifunction_body_leaf<input_type, output_ports_type, Body>(body) )
       , my_init_body( new multifunction_body_leaf<input_type, output_ports_type, Body>(body) )
       , my_output_ports(init_output_ports<output_ports_type>::call(g, my_output_ports)){
@@ -599,10 +668,13 @@ public:
     // the task we were successful.
     //TODO: consider moving common parts with implementation in function_input into separate function
     graph_task* apply_body_impl_bypass( const input_type &i
-                                        __TBB_FLOW_GRAPH_METAINFO_ARG(const message_metainfo&) )
+                                        __TBB_FLOW_GRAPH_METAINFO_ARG(const message_metainfo& metainfo) )
     {
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+        metainfo_tag_type tag(metainfo);
+#endif
         fgt_begin_body( my_body );
-        (*my_body)(i, my_output_ports);
+        (*my_body)(i, my_output_ports __TBB_FLOW_GRAPH_METAINFO_ARG(std::move(tag)));
         fgt_end_body( my_body );
         graph_task* ttask = nullptr;
         if(base_type::my_max_concurrency != 0) {
@@ -851,7 +923,25 @@ public:
     multifunction_output(const multifunction_output& other) : base_type(other.my_graph_ref) {}
 
     bool try_put(const output_type &i) {
-        graph_task *res = try_put_task(i);
+        return try_put_impl(i __TBB_FLOW_GRAPH_METAINFO_ARG(message_metainfo{}));
+    }
+
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+    bool try_put(const output_type& i, const metainfo_tag_type& tag) {
+        return try_put_impl(i, metainfo_tag_accessor::get_metainfo(tag));
+    }
+
+    bool try_put(const output_type& i, metainfo_tag_type&& tag) {
+        metainfo_tag_type local_tag = std::move(tag);
+        return try_put_impl(i, metainfo_tag_accessor::get_metainfo(local_tag));
+    }
+#endif
+
+    using base_type::graph_reference;
+
+protected:
+    bool try_put_impl(const output_type& i __TBB_FLOW_GRAPH_METAINFO_ARG(const message_metainfo& metainfo)) {
+        graph_task *res = try_put_task(i __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo));
         if( !res ) return false;
         if( res != SUCCESSFULLY_ENQUEUED ) {
             // wrapping in task_arena::execute() is not needed since the method is called from
@@ -860,10 +950,6 @@ public:
         }
         return true;
     }
-
-    using base_type::graph_reference;
-
-protected:
 
     graph_task* try_put_task(const output_type &i) {
         return my_successors.try_put_task(i);
