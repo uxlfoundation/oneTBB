@@ -168,7 +168,7 @@ struct Init {
 //! Testing that assertions called inside TBBbind are handled correctly
 //! \brief \ref interface \ref requirement
 TEST_CASE("Using custom assertion handler inside TBBbind"
-          * doctest::skip(!isTbbBindAvailable() || !canTestAsserts() || !isTbbBindAvailable())) {
+          * doctest::skip(!isTbbBindAvailable() || !canTestAsserts())) {
     // fills pointers to TBBbind entry points
     const char *tbbbind_path = tbb::detail::r1::system_topology::load_tbbbind_shared_object();
     REQUIRE_MESSAGE(tbbbind_path != nullptr, "Failed to load TBBbind");
