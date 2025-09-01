@@ -341,8 +341,6 @@ namespace r1 {
         std::size_t _len;
     } ap_data;
 
-    void PrintExtraVersionInfo( const char* category, const char* format, ... );
-
     static void init_ap_data() {
     #if _WIN32
         // Get handle of our DLL first.
@@ -380,8 +378,8 @@ namespace r1 {
         *(backslash+1) = 0;
     #else
         // any function inside the library can be used for the address
-        #if __TBB_BUILD
-        static void *func_from_lib = (void*)&PrintExtraVersionInfo;
+        #if USE_EXTERNAL_TBB_SYMBOL
+        static void *func_from_lib = (void*)&TBB_runtime_version;
         #else
         static void *func_from_lib = (void*)&dynamic_link;
         #endif
