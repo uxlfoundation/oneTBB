@@ -119,6 +119,30 @@ all of the possible options and stop once the data is found and successfully rea
   cpu.cfs_quota_us
 #+end_src
 
+*** Determing If Scheduling Constraints Are Set
+As an optimization, it makes sense to first check whether any CPU scheduling constraints can be set.
+This can be achieved by parsing the =/proc/self/cgroup= file to identify entries with either the
+CPU controller for cgroup v1 or any entry associated with cgroup v2.
+Entries in this file are formatted as follows [4]:
+
+=hierarchy-ID:controller-list:relative-path=
+
+For cgroup v1, it is enough to find an entry with =cpu= in the controller-list field. For cgroup v2,
+this is more complex. The controller-list field is always empty for cgroup v2, and the hierarchy ID
+is always =0=. For example: =0::/cgroup-relative-path=. The only quick way to determine whether the
+=cpu.max= setting is absent is by checking if the process uses the root cgroup (=/= relative path)
+or not. If it does, then =cpu.max= cannot be set, as it is only possible to set it for non-root
+cgroups [9]. However, the process can run under a cgroup namespace, where the "virtualized" root
+cgroup may differ from the host's root cgroup [10].
+
+So, for cgroup v2, we additionally need to check if the process is running under a
+cgroup namespace by inspecting the cgroup of PID 1. On Linux, PID 1 corresponds to the init process.
+For distributions using =systemd= (which constitutes the majority of modern Linux-based OSes),
+=/proc/1/cgroup= would typically contain =0::/init.scope= [11]. Therefore, for systemd-based
+distributions, it is sufficient to check whether the relative path in =/proc/1/cgroup= differs from
+=/init.scope=. If it does, the process is running under a cgroup namespace, and it is possible to
+apply CPU scheduling constraints.
+
 *** Minimizing File Reads
 On many modern systems, controllers are automatically mounted under =/sys/fs/cgroup= (v1
 controllers) and =/sys/fs/cgroup/unified= (v2 controllers) [4]. In practice, v2 controllers usually
@@ -132,8 +156,12 @@ controller in the mount options.
 *** The Algorithm Outline
 Based on the described considerations, the algorithm outline should be the following:
 
-1. Find relative path in =/proc/self/cgroup=
-2. Apply it to the most probable paths and look for the information there:
+1. Parse =/proc/self/cgroup= to:
+   - Find relavive paths to cgroup controllers
+   - Determine whether CPU scheduling constraints can be set by:
+     - Looking for =cpu= controller for cgroup v1
+     - For cgroup v2, checking if the process is not running under root cgroup (with PID 1 check)
+2. Apply found relative paths to the most probable paths and look for the information there:
    - =/sys/fs/cgroup= for cgroup v1 and v2
    - =/sys/fs/cgroup/unified= for cgroup v2
 3. If not found, loop over =/proc/self/mounts= and find a mount point for cgroupfs
@@ -151,3 +179,6 @@ Based on the described considerations, the algorithm outline should be the follo
 6. https://www.man7.org/linux/man-pages/man5/proc_mounts.5.html
 7. https://www.man7.org/linux/man-pages/man5/fstab.5.html
 8. https://www.man7.org/linux/man-pages/man3/getmntent.3.html
+9. https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html
+10. https://www.man7.org/linux/man-pages/man7/cgroup_namespaces.7.html
+11. https://www.man7.org/linux/man-pages/man7/systemd.special.7.html
