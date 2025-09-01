@@ -13,7 +13,6 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 */
-#define TBB_DYNAMIC_LINK_WARNING 1
 
 #include "dynamic_link.h"
 #include "environment.h"
@@ -377,9 +376,11 @@ namespace r1 {
         ap_data._len = (std::size_t)(backslash - ap_data._path) + 1;
         *(backslash+1) = 0;
     #else
-        // any function inside the library can be used for the address
-        #if USE_EXTERNAL_TBB_SYMBOL
-        static void *func_from_lib = (void*)&TBB_runtime_version;
+        // There are use cases, when we need to find a library, not just some
+        // shared object providing dynamic_link symbol (it can be shared object
+        // that directly includes dynamic_link.cpp).
+        #if defined(SYMBOL_TO_FIND_LIBRARY)
+        static void *func_from_lib = (void*)&SYMBOL_TO_FIND_LIBRARY;
         #else
         static void *func_from_lib = (void*)&dynamic_link;
         #endif
@@ -747,9 +748,6 @@ namespace r1 {
 #endif /* _WIN32 */
         // The argument of loading_flags is ignored on Windows
         library_handle = dlopen( path, loading_flags(flags) );
-#if __linux__
-        fprintf(stderr, "Loading library '%s', %s\n", path, library_handle? "ok" : "fail");
-#endif
 #if _WIN32
         SetErrorMode (prev_mode);
 #endif /* _WIN32 */

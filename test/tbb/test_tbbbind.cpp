@@ -38,7 +38,7 @@
 
 // to get dynamic_link()
 #include "oneapi/tbb/version.h"
-#define USE_EXTERNAL_TBB_SYMBOL 1
+#define SYMBOL_TO_FIND_LIBRARY TBB_runtime_version
 #include "../../src/tbb/dynamic_link.cpp"
 
 // have to define, as my_thread_leave in unconditionally used in outermost_worker_waiter
@@ -94,24 +94,17 @@ bool threading_control::unregister_public_reference(bool) { abort(); }
 bool threading_control::unregister_lifetime_control(bool) { abort(); }
 bool threading_control::is_present() { abort(); }
 
-arena::arena(threading_control*, unsigned, unsigned, unsigned
-#if __TBB_PREVIEW_PARALLEL_PHASE
-          , tbb::task_arena::leave_policy
-#endif
-    ) { abort(); }
 arena& arena::create(threading_control*, unsigned, unsigned, unsigned,
                     d1::constraints
 #if __TBB_PREVIEW_PARALLEL_PHASE
-                         , tbb::task_arena::leave_policy lp
+                         , tbb::task_arena::leave_policy
 #endif
     ) {
-    static arena a(nullptr, 0, 0, 0, lp);
-    return a;
+    abort();
 }
 void arena::on_thread_leaving(unsigned) { abort(); }
 thread_control_monitor& arena::get_waiting_threads_monitor() {
-    static thread_control_monitor monitor;
-    return monitor;
+    abort();
 }
 
 void observer_list::do_notify_exit_observers(observer_proxy*, bool) { abort(); }

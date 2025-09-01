@@ -444,10 +444,13 @@ static const unsigned LinkTableSize = sizeof(TbbBindLinkTable) / sizeof(dynamic_
 namespace system_topology {
 
 constexpr int automatic = -1;
+
 static std::atomic<do_once_state> initialization_state;
+
 namespace {
 int  numa_nodes_count = 0;
 int* numa_nodes_indexes = nullptr;
+
 int  core_types_count = 0;
 int* core_types_indexes = nullptr;
 
