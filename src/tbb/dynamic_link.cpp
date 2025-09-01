@@ -395,7 +395,6 @@ namespace r1 {
         } else {
             __TBB_ASSERT_EX( dlinfo.dli_fname!=nullptr, "Unbelievable." );
         }
-        fprintf(stderr, "init_ap_data: dli_fname '%s'\n", dlinfo.dli_fname);
 
         char const *slash = std::strrchr( dlinfo.dli_fname, '/' );
         std::size_t fname_len=0;
