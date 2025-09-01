@@ -119,7 +119,7 @@ all of the possible options and stop once the data is found and successfully rea
   cpu.cfs_quota_us
 #+end_src
 
-*** Determing If Scheduling Constraints Are Set
+*** Determining If Scheduling Constraints Are Set
 As an optimization, it makes sense to first check whether any CPU scheduling constraints can be set.
 This can be achieved by parsing the =/proc/self/cgroup= file to identify entries with either the
 CPU controller for cgroup v1 or any entry associated with cgroup v2.
