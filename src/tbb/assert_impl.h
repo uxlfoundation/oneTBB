@@ -39,13 +39,15 @@ namespace detail {
 namespace r1 {
 #endif
 
-// Do not move the definition into the assertion_failure_impl function because it will require "magic statics".
-// It will bring a dependency on C++ runtime on some platforms while assert_impl.h is reused in tbbmalloc
-// that should not depend on C++ runtime. For the same reason, we cannot use std::call_once here.
+// Do not move the definition into the assertion_failure_impl function because it will require
+// "magic statics". It will bring a dependency on C++ runtime on some platforms while assert_impl.h
+// is reused in tbbmalloc that should not depend on C++ runtime. For the same reason, we cannot use
+// std::call_once here.
 static std::atomic<tbb::detail::do_once_state> assertion_state;
 
 // TODO: consider extension for formatted error description string
-/* [[noreturn]] */ static void assertion_failure_impl(const char* location, int line, const char* expression, const char* comment) {
+/* [[noreturn]] */ static void assertion_failure_impl(const char* location, int line,
+                                                      const char* expression, const char* comment) {
 #if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     // Workaround for erroneous "unreachable code" during assertion throwing using call_once
     #pragma warning (push)
@@ -59,7 +61,8 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
             std::fprintf(stderr, "Detailed description: %s\n", comment);
         }
 #if _MSC_VER && _DEBUG
-        if (1 == _CrtDbgReport(_CRT_ASSERT, location, line, "tbb_debug.dll", "%s\r\n%s", expression, comment?comment:"")) {
+        if (1 == _CrtDbgReport(_CRT_ASSERT, location, line, "tbb_debug.dll", "%s\r\n%s",
+                               expression, comment?comment:"")) {
             _CrtDbgBreak();
         } else
 #endif
@@ -74,11 +77,13 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
 }
 
 namespace assertion_handler {
-static std::atomic<assertion_handler_type> handler{assertion_failure_impl}; // initial value is default handler
+// Initial value is default handler
+static std::atomic<assertion_handler_type> handler{assertion_failure_impl};
 
 #if (__TBB_BUILD || __TBBBIND_BUILD) // only TBB and TBBBind use custom handler
 static assertion_handler_type set(assertion_handler_type new_handler) noexcept {
-    return handler.exchange(new_handler ? new_handler : assertion_failure_impl, std::memory_order_acq_rel);
+    return handler.exchange(new_handler ? new_handler : assertion_failure_impl,
+                            std::memory_order_acq_rel);
 }
 #endif
 
@@ -87,7 +92,8 @@ static assertion_handler_type get() noexcept {
 }
 } // namespace assertion_handler
 
-void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line, const char* expression, const char* comment) {
+void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line,
+                                           const char* expression, const char* comment) {
     assertion_handler::get()(location, line, expression, comment);
 }
 

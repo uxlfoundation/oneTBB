@@ -211,7 +211,8 @@ static void DefinitionPresence() {
     TestTypeDefinitionPresence( combinable<int> );
     TestTypeDefinitionPresence( enumerable_thread_specific<int> );
     TestFuncDefinitionPresence( get_assertion_handler, (), tbb::assertion_handler_type );
-    TestFuncDefinitionPresence( set_assertion_handler, (tbb::assertion_handler_type), tbb::assertion_handler_type );
+    TestFuncDefinitionPresence( set_assertion_handler, (tbb::assertion_handler_type),
+                                tbb::assertion_handler_type );
     /* Flow graph names */
     TestTypeDefinitionPresence( flow::graph );
     TestTypeDefinitionPresence( flow::continue_msg );

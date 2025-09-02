@@ -79,7 +79,8 @@ struct AssertionFailure {
     AssertionFailure( const char* filename, int line, const char* expression, const char* comment );
 };
 
-AssertionFailure::AssertionFailure( const char* filename, int line, const char* expression, const char* comment ) :
+AssertionFailure::AssertionFailure( const char* filename, int line,
+                                    const char* expression, const char* comment ) :
     message(comment)
 {
     REQUIRE_MESSAGE(filename, "missing filename");
@@ -89,18 +90,21 @@ AssertionFailure::AssertionFailure( const char* filename, int line, const char* 
     REQUIRE_MESSAGE(expression, "missing expression");
 }
 
-void AssertionFailureHandler(const char* filename, int line, const char* expression, const char* comment) {
+void AssertionFailureHandler(const char* filename, int line,
+                             const char* expression, const char* comment) {
     throw AssertionFailure(filename, line, expression, comment);
 }
 
 tbb::assertion_handler_type SetCustomAssertionHandler() {
     auto default_handler = tbb::set_assertion_handler(AssertionFailureHandler);
     auto custom_handler = tbb::get_assertion_handler();
-    REQUIRE_MESSAGE(custom_handler == AssertionFailureHandler, "Custom assertion handler was not set.");
+    REQUIRE_MESSAGE(custom_handler == AssertionFailureHandler,
+                    "Custom assertion handler was not set.");
     return default_handler;
 }
 
-void CheckAssertionFailure(int line, std::string expression, bool okay, const char* message, std::string substr) {
+void CheckAssertionFailure(int line, std::string expression, bool okay,
+                           const char* message, std::string substr) {
     REQUIRE_MESSAGE(okay, "Line ", line, ", ", expression, " failed to fail");
     REQUIRE_MESSAGE(message, "Line ", line, ", ", expression, " failed without a message");
 
@@ -111,8 +115,10 @@ void CheckAssertionFailure(int line, std::string expression, bool okay, const ch
 
 void ResetAssertionHandler(tbb::assertion_handler_type default_handler) {
     auto handler = tbb::set_assertion_handler(nullptr); // Reset to default handler
-    REQUIRE_MESSAGE(handler == AssertionFailureHandler, "Previous assertion handler was not returned.");
-    REQUIRE_MESSAGE(tbb::get_assertion_handler() == default_handler, "Default assertion handler was not reset.");
+    REQUIRE_MESSAGE(handler == AssertionFailureHandler,
+                    "Previous assertion handler was not returned.");
+    REQUIRE_MESSAGE(tbb::get_assertion_handler() == default_handler,
+                    "Default assertion handler was not reset.");
 }
 
 }

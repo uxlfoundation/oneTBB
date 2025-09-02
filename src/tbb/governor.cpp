@@ -487,10 +487,12 @@ void initialization_impl() {
     governor::one_time_init();
 
     if (const char* tbbbind_name = load_tbbbind_shared_object()) {
-        // If the setter function is present, set the TBBbind assertion handler to use TBB's assertion_failure function.
-        const dynamic_link_descriptor optional_set_assertion_handler[] = // optional (falls back to dummy if not found)
+        // If the setter function is present, set the TBBbind assertion handler to use TBB's
+        // assertion_failure function. If not, set_assertion_handler_ptr falls back to the dummy.
+        const dynamic_link_descriptor optional_set_assertion_handler[] =
             {DLD(__TBB_internal_set_tbbbind_assertion_handler, set_assertion_handler_ptr)};
-        dynamic_link(tbbbind_name, optional_set_assertion_handler, 1, nullptr, DYNAMIC_LINK_LOCAL_BINDING);
+        dynamic_link(tbbbind_name, optional_set_assertion_handler, 1, nullptr,
+                     DYNAMIC_LINK_LOCAL_BINDING);
         set_assertion_handler_ptr(assertion_failure);
 
         initialize_system_topology_ptr(

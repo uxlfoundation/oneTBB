@@ -50,7 +50,8 @@ TBB_EXPORT bool __TBB_EXPORTED_FUNC finalize(d1::task_scheduler_handle&, std::in
 
 //! Set assertion handler and return its previous value.
 //! The handler should not return. If it eventually returns, the behavior is runtime-undefined.
-TBB_EXPORT assertion_handler_type __TBB_EXPORTED_FUNC set_assertion_handler(assertion_handler_type new_handler) noexcept;
+TBB_EXPORT assertion_handler_type __TBB_EXPORTED_FUNC
+set_assertion_handler(assertion_handler_type new_handler) noexcept;
 
 //! Return the current assertion handler.
 TBB_EXPORT assertion_handler_type __TBB_EXPORTED_FUNC get_assertion_handler() noexcept;

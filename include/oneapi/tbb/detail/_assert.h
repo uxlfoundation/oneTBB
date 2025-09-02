@@ -29,8 +29,9 @@ namespace r1 {
 #endif
 //! Process an assertion failure.
 /** Normally called from __TBB_ASSERT macro.
-  If assertion handler is null, print message for assertion failure and abort.
-  Otherwise call the assertion handler. */
+  If assertion handler is not set, the default one is used, which prints the message for assertion
+  failure and aborts. The setting of an assertion handler is available as part of oneTBB
+  specification extension. */
 TBB_EXPORT void __TBB_EXPORTED_FUNC assertion_failure(const char *location, int line,
                                                       const char *expression, const char *comment);
 

@@ -18,7 +18,8 @@
 //! \file test_arena_constraints.cpp
 //! \brief Test for [info_namespace scheduler.task_arena] specifications
 
-#define TEST_CUSTOM_ASSERTION_HANDLER_ENABLED 1 // TODO: find criteria to automatically define this in utils_assert.h
+// TODO: find criteria to automatically define this in utils_assert.h
+#define TEST_CUSTOM_ASSERTION_HANDLER_ENABLED 1
 
 #include "common/common_arena_constraints.h"
 

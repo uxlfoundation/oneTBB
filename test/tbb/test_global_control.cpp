@@ -18,7 +18,8 @@
 //! \file test_global_control.cpp
 //! \brief Test for [sched.global_control] specification
 
-#define TEST_CUSTOM_ASSERTION_HANDLER_ENABLED 1 // TODO: find criteria to automatically define this in utils_assert.h
+// TODO: find criteria to automatically define this in utils_assert.h
+#define TEST_CUSTOM_ASSERTION_HANDLER_ENABLED 1
 
 #include "common/test.h"
 
@@ -281,12 +282,14 @@ TEST_CASE("test concurrent task_scheduler_handle destruction") {
 TEST_CASE("Assertion handler type") {
     using documented = void(*)(const char* /* location */, int /* line */,
                                const char* /* expression */, const char* /* comment */);
-    static_assert(std::is_same<oneapi::tbb::assertion_handler_type, documented>::value, "Incorrect assertion handler type");
+    static_assert(std::is_same<oneapi::tbb::assertion_handler_type, documented>::value,
+                  "Incorrect assertion handler type");
 }
 
 //! Using custom assertion handler to test failure on invalid max_allowed_parallelism
 //! \brief \ref interface \ref error_guessing
 TEST_CASE("Using custom assertion handler to test failure on invalid max_allowed_parallelism") {
-    TEST_CUSTOM_ASSERTION_HANDLER(tbb::global_control(tbb::global_control::max_allowed_parallelism, 0),
+    TEST_CUSTOM_ASSERTION_HANDLER(
+        tbb::global_control(tbb::global_control::max_allowed_parallelism, 0),
         "max_allowed_parallelism cannot be 0.");
 }
