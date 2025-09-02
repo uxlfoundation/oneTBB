@@ -1568,7 +1568,7 @@ void test_recursive_reduction(submit_function func) {
     delete result_placeholder;
 }
 
-void test_adding_successors_after_transfer(unsigned num_threads, submit_function func) {
+void test_adding_successors_after_transfer(submit_function func) {
     tbb::task_group tg;
     tbb::task_arena arena;
 
@@ -1597,17 +1597,16 @@ void test_adding_successors_after_transfer(unsigned num_threads, submit_function
         successor_task_placeholder = finished_task;
     });
 
+    tbb::task_handle receiver_task = tg.defer(receiver_task_body);
+
     tbb::task_handle transferring_task = tg.defer([&] {
         CHECK(receiver_task_placeholder == not_finished_task);
         CHECK(successor_task_placeholder == not_finished_task);
         CHECK(transferring_task_placeholder == not_finished_task);
         CHECK(new_successor_task_placeholder == not_finished_task);
 
-        transferring_task_placeholder = finished_task;
-
-        tbb::task_handle receiver_task = tg.defer(receiver_task_body);
         tbb::task_group::transfer_this_task_completion_to(receiver_task);
-        submit(func, std::move(receiver_task), tg, arena);
+        transferring_task_placeholder = finished_task;
     });
 
     tbb::task_handle new_successor_task = tg.defer([&] {
@@ -1625,12 +1624,12 @@ void test_adding_successors_after_transfer(unsigned num_threads, submit_function
     submit(func, std::move(successor_task), tg, arena);
     submit(func, std::move(transferring_task), tg, arena);
 
-    if (num_threads != 1) {
-        // Wait for the transferring task to complete before adding new successor
-        utils::SpinWaitUntilEq(transferring_task_placeholder, finished_task);
-    }
+    // Wait for the transferring task to complete before adding new successor
+    utils::SpinWaitUntilEq(transferring_task_placeholder, finished_task);
+    CHECK(transferring_task_placeholder == finished_task);
 
     CHECK_MESSAGE(successor_task_placeholder == not_finished_task, "successor task ran before the receiving task");
+    submit(func, std::move(receiver_task), tg, arena);
 
     tbb::task_group::set_task_order(transferring_task_completion_handle, new_successor_task);
     submit_and_wait(func, std::move(new_successor_task), tg, arena);
@@ -1643,7 +1642,7 @@ void test_adding_successors_after_transfer(unsigned num_threads, submit_function
 
 void test_transferring_completion(unsigned num_threads, submit_function func) {
     test_recursive_reduction(func);
-    test_adding_successors_after_transfer(num_threads, func);
+    if (num_threads != 1) test_adding_successors_after_transfer(func);
 }
 
 void test_return_task_with_dependencies(submit_function submit_function_tag) {
