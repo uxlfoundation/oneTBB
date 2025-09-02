@@ -278,7 +278,7 @@ TEST_CASE("test concurrent task_scheduler_handle destruction") {
 
 //! Testing that assertion_handler_type is exactly the type defined in the documentation
 //! \brief \ref interface \ref requirement
-TEST_CASE("custom assertion handler type") {
+TEST_CASE("Assertion handler type") {
     using documented = void(*)(const char* /* location */, int /* line */,
                                const char* /* expression */, const char* /* comment */);
     static_assert(std::is_same<oneapi::tbb::assertion_handler_type, documented>::value, "Incorrect assertion handler type");
