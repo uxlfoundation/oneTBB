@@ -23,116 +23,54 @@
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
-#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
-#pragma warning(disable: 4324) // warning C4324: structure was padded due to alignment specifier
-#pragma warning(disable: 4702) // warning C4702: unreachable code, the code became unreadchable after stubs adding
-#pragma warning(disable: 4722) // warning C4722: destructor never returns, potential memory leak
-#endif
-
 #include "oneapi/tbb/global_control.h"
+#include "oneapi/tbb/task_arena.h"
 #include "common/test.h"
 #include "common/utils_assert.h"
 
 // no need to do it in the test
 #define __TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION 1
 
-// to get dynamic_link()
-#include "oneapi/tbb/version.h"
+#include "oneapi/tbb/version.h" // to get TBB_runtime_version
 #define SYMBOL_TO_FIND_LIBRARY TBB_runtime_version
+// to get dynamic_link()
 #include "../../src/tbb/dynamic_link.cpp"
+#include "../../src/tbb/load_tbbbind.h"
 
-// have to define, as my_thread_leave in unconditionally used in outermost_worker_waiter
-#define __TBB_PREVIEW_PARALLEL_PHASE 1
-
-// we need only system_topology::load_tbbbind_shared_object() functionality,
-// so add stubs for the rest of governor.cpp
-#if __clang__
-#pragma GCC diagnostic ignored "-Wunused-private-field"
-#endif
-#include "../../src/tbb/governor.cpp"
-
-#if __TBB_DYNAMIC_LOAD_ENABLED
+#if __TBB_WEAK_SYMBOLS_PRESENT
+#pragma weak __TBB_internal_deallocate_binding_handler
+#endif /* __TBB_WEAK_SYMBOLS_PRESENT */
 
 namespace tbb {
 namespace detail {
 namespace r1 {
+class binding_handler;
 
-basic_tls<thread_data*> governor::theTLS;
-rml::tbb_factory governor::theRMLServerFactory;
-bool governor::UsePrivateRML;
-bool governor::is_rethrow_broken;
-cpu_features_type governor::cpu_features;
-::std::atomic<bool> __TBB_InitOnce::InitializationDone{};
-#if !__TBB_USE_FUTEX
-std::mutex concurrent_monitor_mutex::my_init_mutex;
-#endif
-
-void global_control_acquire() { abort(); }
-void handle_perror( int , const char* ) { abort(); }
-void detect_cpu_features(cpu_features_type&) { abort(); }
-bool gcc_rethrow_exception_broken() { abort(); }
-#if __TBB_USE_OS_AFFINITY_SYSCALL
-void destroy_process_mask() { abort(); }
-#endif
-void runtime_warning( const char* , ... ) { abort(); }
-void clear_address_waiter_table() { abort(); }
-void global_control_release() { abort(); }
-void DoOneTimeInitialization() { abort(); }
-bool thread_dispatcher::must_join_workers() const { abort(); }
-int AvailableHwConcurrency() { abort(); }
-#if TBB_USE_ASSERT
-bool is_present(d1::global_control&) { abort(); }
-#endif // TBB_USE_ASSERT
-bool remove_and_check_if_empty(d1::global_control&) { abort(); }
-void PrintExtraVersionInfo( const char*, const char*, ... ) { abort(); }
-
-threading_control* threading_control::register_public_reference() { abort(); }
-std::size_t threading_control::worker_stack_size() { abort(); }
-void threading_control::register_thread(thread_data&) { abort(); }
-void threading_control::unregister_thread(thread_data&) { abort(); }
-bool threading_control::unregister_public_reference(bool) { abort(); }
-bool threading_control::unregister_lifetime_control(bool) { abort(); }
-bool threading_control::is_present() { abort(); }
-
-arena& arena::create(threading_control*, unsigned, unsigned, unsigned,
-                    d1::constraints
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                         , tbb::task_arena::leave_policy
-#endif
-    ) {
-    abort();
+extern "C" {
+void __TBB_internal_deallocate_binding_handler( binding_handler* handler_ptr );
 }
-void arena::on_thread_leaving(unsigned) { abort(); }
-thread_control_monitor& arena::get_waiting_threads_monitor() {
-    abort();
-}
-
-void observer_list::do_notify_exit_observers(observer_proxy*, bool) { abort(); }
-
-#if __TBB_RESUMABLE_TASKS
-bool task_dispatcher::resume(task_dispatcher&) { abort(); }
-d1::suspend_point task_dispatcher::get_suspend_point() { abort(); }
-#endif
-
-void small_object_pool_impl::destroy() { abort(); }
-
-#if _WIN32 || _WIN64
-int NumberOfProcessorGroups() { abort(); }
-#endif
-
-namespace rml {
-tbb_server* make_private_server( tbb_client&  ) { abort(); }
-::rml::factory::status_type tbb_factory::open() { abort(); }
-void tbb_factory::close() { abort(); }
-::rml::factory::status_type tbb_factory::make_server(tbb::detail::r1::rml::tbb_server*&,
-                                        tbb::detail::r1::rml::tbb_client&) {
-    abort();
-}
-}
-
 }}}
 
-#endif // __TBB_DYNAMIC_LOAD_ENABLED
+using BindingHandlerType = void (*)(tbb::detail::r1::binding_handler* handler_ptr);
+
+BindingHandlerType GetDeallocateBindingHandler() {
+    using namespace tbb::detail::r1;
+
+    BindingHandlerType deallocate_binding_handler_ptr;
+
+    const dynamic_link_descriptor LinkTable[] = {
+        DLD(__TBB_internal_deallocate_binding_handler, deallocate_binding_handler_ptr)
+    };
+
+    for (const auto& tbbbind_version : tbbbind_libraries_list) {
+        if (dynamic_link(tbbbind_version, LinkTable,
+                         sizeof(LinkTable) / sizeof(dynamic_link_descriptor), nullptr,
+                         DYNAMIC_LINK_LOCAL_BINDING)) {
+            return deallocate_binding_handler_ptr;
+        }
+    }
+    return nullptr;
+}
 
 // Testing can't be done without TBBbind.
 #if __TBB_SELF_CONTAINED_TBBBIND || __TBB_HWLOC_VALID_ENVIRONMENT
@@ -148,15 +86,14 @@ static bool canTestAsserts() { return true; }
 static bool canTestAsserts() { return false; }
 #endif
 
-// this code hangs in  -DBUILD_SHARED_LIBS=OFF case (#1832)
+// this code hangs in -DBUILD_SHARED_LIBS=OFF case (#1832)
 #if __TBB_DYNAMIC_LOAD_ENABLED
 // Must initialize system_topology and so register assertion handler in TBBbind.
-// The test harness expects TBBBIND status always to be reported as part of TBB_VERSION
-// output, so initialize system_topology even if TBBbind is not available.
+// The test harness expects TBBBIND status always to be reported as part of TBB_VERSION output, so
+// initialize system_topology even if TBBbind is not available.
 struct Init {
     Init() {
-        auto constraints = tbb::task_arena::constraints{}
-            .set_max_threads_per_core(1);
+        auto constraints = tbb::task_arena::constraints{}.set_max_threads_per_core(1);
         tbb::task_arena arena( constraints );
         arena.initialize();
     }
@@ -170,12 +107,11 @@ struct Init {
 TEST_CASE("Using custom assertion handler inside TBBbind"
           * doctest::skip(!isTbbBindAvailable() || !canTestAsserts())) {
     // fills pointers to TBBbind entry points
-    const char *tbbbind_path = tbb::detail::r1::system_topology::load_tbbbind_shared_object();
-    REQUIRE_MESSAGE(tbbbind_path != nullptr, "Failed to load TBBbind");
-    REQUIRE_MESSAGE(tbb::detail::r1::deallocate_binding_handler_ptr != nullptr,
+    BindingHandlerType deallocate_binding_handler = GetDeallocateBindingHandler();
+    REQUIRE_MESSAGE(deallocate_binding_handler != nullptr,
                     "Failed to fill deallocate_binding_handler_ptr");
 
-    // we are expecting that deallocate_binding_handler_ptr points to TBBbind entry point
-    TEST_CUSTOM_ASSERTION_HANDLER(tbb::detail::r1::deallocate_binding_handler_ptr(nullptr),
+    // we are expecting that deallocate_binding_handler points to TBBbind entry point
+    TEST_CUSTOM_ASSERTION_HANDLER(deallocate_binding_handler(nullptr),
                                   "Trying to deallocate nullptr pointer.");
 }
