@@ -616,7 +616,7 @@ public:
 
         task_handle_task* task_ptr = acs::release(h);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        // Owned task has no dependencies or the task handle is the last dependency
+        // If the task has dependencies and the task_handle is not the last dependency
         if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
             return;
         }
