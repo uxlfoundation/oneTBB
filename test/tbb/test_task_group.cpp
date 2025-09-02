@@ -1627,8 +1627,7 @@ void test_adding_successors_after_transfer(unsigned num_threads, submit_function
 
     if (num_threads != 1) {
         // Wait for the transferring task to complete before adding new successor
-        while (transferring_task_placeholder != not_finished_task)
-            ;
+        utils::SpinWaitUntilEq(transferring_task_placeholder, finished_task);
     }
 
     CHECK_MESSAGE(successor_task_placeholder == not_finished_task, "successor task ran before the receiving task");
