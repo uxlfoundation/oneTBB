@@ -55,7 +55,7 @@ compatibility:
 
 ```cpp
 namespace tbb {
-#if !__TBB_DISABLE_SPEC_EXTENTIONS
+#if !__TBB_DISABLE_SPEC_EXTENSIONS
     //! Type alias for assertion handler function pointer - same as TBB 2020.
     //! The handler should not return. If it eventually returns, the behavior is runtime-undefined.
     using assertion_handler_type = void(*)(const char* location, int line,
@@ -78,9 +78,9 @@ Applications that used the custom assertion handler in TBB 2020 can migrate to t
 #### Specification Extension
 
 This API is introduced as an extension to the oneTBB specification, controlled by the
-`__TBB_DISABLE_SPEC_EXTENTIONS` macro. By default (macro undefined or defined as 0), the extension will
+`__TBB_DISABLE_SPEC_EXTENSIONS` macro. By default (macro undefined or defined as 0), the extension will
 be enabled: `set_assertion_handler` and `get_assertion_handler` will be declared and exported, and
-`assertion_failure` will dispatch to the active handler. Defining `__TBB_DISABLE_SPEC_EXTENTIONS` to a non-zero
+`assertion_failure` will dispatch to the active handler. Defining `__TBB_DISABLE_SPEC_EXTENSIONS` to a non-zero
 value before including oneTBB headers will disable the extension: these declarations will be excluded from
 the public API, and the library will always use the default assertion behavior.
 

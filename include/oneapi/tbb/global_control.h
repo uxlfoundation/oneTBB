@@ -201,7 +201,7 @@ using detail::d1::attach;
 using detail::d1::finalize;
 using detail::d1::task_scheduler_handle;
 using detail::r1::unsafe_wait;
-#if !__TBB_DISABLE_SPEC_EXTENTIONS
+#if !__TBB_DISABLE_SPEC_EXTENSIONS
 using detail::r1::assertion_handler_type;
 using detail::r1::set_assertion_handler;
 using detail::r1::get_assertion_handler;
