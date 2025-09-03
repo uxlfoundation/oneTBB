@@ -17,6 +17,7 @@
 #ifndef _TBB_cgroup_info_H
 #define _TBB_cgroup_info_H
 
+#include <cstdint>
 #include <cstdio>
 #include <climits>
 #include <cstring>
@@ -60,9 +61,14 @@ private:
     }
 
     static constexpr std::size_t rel_path_size = 256; // Size of the relative path buffer
-    struct cgroup_paths {
-        char v1_relative_path[rel_path_size] = {0};
-        char v2_relative_path[rel_path_size] = {0};
+    struct process_cgroup_data {
+        enum class cgroup_version : std::uint8_t {
+            unknown = 0,
+            v1      = 1,
+            v2      = 2
+        };
+        cgroup_version version { cgroup_version::unknown };
+        char relative_path[rel_path_size] = {0};
     };
 
     static const char* look_for_cpu_controller_path(const char* line, const char* last_char) {
@@ -94,35 +100,36 @@ private:
         return path_start;
     }
 
-    static void cache_relative_path_for(FILE* cgroup_fd, cgroup_paths& paths_cache) {
-        char* relative_path = nullptr;
+    static void parse_proc_cgroup_file(std::FILE* cgroup_fd, process_cgroup_data& pcd, bool look_for_v2_only = false) {
+        using cgroup_version_t = process_cgroup_data::cgroup_version;
+        cgroup_version_t cgroup_version { cgroup_version_t::unknown };
+
         char line[rel_path_size] = {0};
         const char* last_char = line + rel_path_size - 1;
 
         const char* path_start = nullptr;
         constexpr std::size_t cgroup_v2_prefix_size = 3;
         while (std::fgets(line, rel_path_size, cgroup_fd)) {
-            path_start = nullptr;
-
-            if (std::strncmp(line, "0::", cgroup_v2_prefix_size) == 0) {
-                __TBB_ASSERT(!*paths_cache.v2_relative_path, "Found second entry of cgroup v2");
+            if (!path_start && std::strncmp(line, "0::", cgroup_v2_prefix_size) == 0) {
                 path_start = line + cgroup_v2_prefix_size; // cgroup v2 unified path
-                relative_path = paths_cache.v2_relative_path;
-            } else {
+                cgroup_version = cgroup_version_t::v2;
+                if (look_for_v2_only) break;
+            } else if (!look_for_v2_only) {
                 // cgroups v1 allows comount multiple controllers against the same hierarchy
-                path_start = look_for_cpu_controller_path(line, last_char);
-                __TBB_ASSERT(!*paths_cache.v1_relative_path || !path_start,
-                             "Found second entry of cgroup v1 cpu controller");
-
-                relative_path = paths_cache.v1_relative_path;
+                auto v1_path_start = look_for_cpu_controller_path(line, last_char);
+                if (v1_path_start) {
+                    cgroup_version = cgroup_version_t::v1;
+                    path_start = v1_path_start;
+                    break;
+                }
             }
-
-            if (path_start) {
-                // Ensure no new line at the end of the path is copied
-                std::size_t real_rel_path_size = std::strcspn(path_start, "\n");
-                std::strncpy(relative_path, path_start, real_rel_path_size);
-                relative_path[real_rel_path_size] = '\0';
-            }
+        }
+        if (path_start) {
+            // Ensure no new line at the end of the path is copied
+            std::size_t real_rel_path_size = std::strcspn(path_start, "\n");
+            std::strncpy(pcd.relative_path, path_start, real_rel_path_size);
+            pcd.relative_path[real_rel_path_size] = '\0';
+            pcd.version = cgroup_version;
         }
     }
 
@@ -187,60 +194,60 @@ private:
         return num_cpus != error_value; // Return true if valid number of CPUs was determined
     }
 
-    static int parse_cgroup_entry(const char* mnt_dir, const char* mnt_type, FILE* cgroup_fd,
-                                  cgroup_paths& paths_cache)
+    static bool try_read_cgroup_num_cpus_from(const char* dir, int& num_cpus,
+                                              process_cgroup_data::cgroup_version version)
     {
-        int num_cpus = error_value; // Initialize to an impossible value
-        char dir[PATH_MAX] = {0};
-        if (!std::strncmp(mnt_type, "cgroup2", 7)) { // Found cgroup v2 mount entry
-            // At first, try reading CPU quota directly
-            if (try_read_cgroup_v2_num_cpus_from(mnt_dir, num_cpus))
-                return num_cpus; // Successfully read number of CPUs for cgroup v2
-
-            if (!*paths_cache.v2_relative_path)
-                cache_relative_path_for(cgroup_fd, paths_cache);
-
-            // Now try reading including relative path
-            if (std::snprintf(dir, PATH_MAX, "%s/%s", mnt_dir, paths_cache.v2_relative_path) >= 0)
-                try_read_cgroup_v2_num_cpus_from(dir, num_cpus);
-            return num_cpus;
+        // Try reading based on the provided cgroup version
+        if (version == process_cgroup_data::cgroup_version::v2) {
+            return try_read_cgroup_v2_num_cpus_from(dir, num_cpus);
         }
-
-        __TBB_ASSERT(std::strncmp(mnt_type, "cgroup", 6) == 0, "Unexpected cgroup type");
-
-        // TODO: Before opening the path, make sure the mnt_opts entry contains "cpu" controller
-        if (try_read_cgroup_v1_num_cpus_from(mnt_dir, num_cpus))
-            return num_cpus; // Successfully read number of CPUs for cgroup v1
-
-        if (!*paths_cache.v1_relative_path)
-            cache_relative_path_for(cgroup_fd, paths_cache);
-
-        if (std::snprintf(dir, PATH_MAX, "%s/%s", mnt_dir, paths_cache.v1_relative_path) >= 0)
-            try_read_cgroup_v1_num_cpus_from(dir, num_cpus);
-        return num_cpus;
+        __TBB_ASSERT(version == process_cgroup_data::cgroup_version::v1, nullptr);
+        return try_read_cgroup_v1_num_cpus_from(dir, num_cpus);
     }
 
-    static bool is_cpu_restriction_possible(std::FILE* cgroup_fd, cgroup_paths& relative_paths_cache) {
-        cache_relative_path_for(cgroup_fd, relative_paths_cache);
 
-        bool has_cgroup_v1_cpu_controller = *relative_paths_cache.v1_relative_path;
-        bool has_cgroup_v2 = *relative_paths_cache.v2_relative_path;
-        bool is_cgroup_v2_with_root_path =
-            relative_paths_cache.v2_relative_path[0] == '/' && !relative_paths_cache.v2_relative_path[1];
-        if (!has_cgroup_v2 && !has_cgroup_v1_cpu_controller) {
-            return false; // No CPU constraints found
-        } else if (has_cgroup_v1_cpu_controller || !is_cgroup_v2_with_root_path) {
+    static int parse_cgroup_entry(const char* mnt_dir, process_cgroup_data& pcd) {
+        int num_cpus = error_value; // Initialize to an impossible value
+        char dir[PATH_MAX] = {0};
+        if (std::snprintf(dir, PATH_MAX, "%s/%s", mnt_dir, pcd.relative_path) >= 0) {
+            if (try_read_cgroup_num_cpus_from(dir, num_cpus, pcd.version)) {
+                return num_cpus;
+            }
+        }
+
+        return try_read_cgroup_num_cpus_from(mnt_dir, num_cpus, pcd.version) ? num_cpus : error_value;
+    }
+
+    static bool is_cpu_restriction_possible(process_cgroup_data& pcd) {
+        if (pcd.version == process_cgroup_data::cgroup_version::unknown) {
+            return false;
+        } else if (pcd.version == process_cgroup_data::cgroup_version::v1) {
+            return true;
+        } else if (pcd.relative_path[1]) {
             return true;
         }
-        __TBB_ASSERT(!has_cgroup_v1_cpu_controller && has_cgroup_v2 && is_cgroup_v2_with_root_path, nullptr);
+        __TBB_ASSERT(pcd.version == process_cgroup_data::cgroup_version::v2 && *pcd.relative_path == '/', nullptr);
 
-        // Usually PID 1 is the init process
+        // At this point, we have cgroup v2 with a root path, which may indicate that the process is under the root cgroup.
+        // This implies that we shouldn't find any cpu.max file in the cgroup mount path. However, to verify whether
+        // the process is not running within a cgroup namespace, we need to inspect the cgroup information of the init
+        // process. On a host OS, the process with PID 1 is the init system (e.g., systemd). In containerized
+        // environments, though, PID 1 might correspond to a different process (e.g., a shell or application).
+        // In such cases, the /proc/1/cgroup file shouldn't show the "0::/init.scope" entry associated with systemd
+        // if non-root cgroup is used.
         unique_file_t init_process_cgroup_file(std::fopen("/proc/1/cgroup", "r"), &close_file);
-        cgroup_paths init_process_cgroup_cache{};
-        cache_relative_path_for(init_process_cgroup_file.get(), init_process_cgroup_cache);
-        if (*init_process_cgroup_cache.v2_relative_path) {
+        if (!init_process_cgroup_file)
+            return true; // We can't be sure whether it is root cgroup or not, so need to inspect cgroup mount
+
+        process_cgroup_data init_process_cgroup_data{};
+        parse_proc_cgroup_file(init_process_cgroup_file.get(), init_process_cgroup_data, /*look_for_v2_only*/ true);
+        if (init_process_cgroup_data.version != process_cgroup_data::cgroup_version::unknown) {
+            __TBB_ASSERT(init_process_cgroup_data.version == process_cgroup_data::cgroup_version::v2 &&
+                init_process_cgroup_data.relative_path, nullptr);
+
             // If the init process cgroup path is "/init.scope", it means systemd is used
-            if (!std::strncmp(init_process_cgroup_cache.v2_relative_path, "/init.scope", 11)) {
+            // and we are running on the host
+            if (!std::strncmp(init_process_cgroup_data.relative_path, "/init.scope", 11)) {
                 return false;
             }
         }
@@ -248,18 +255,17 @@ private:
         return true;
     }
 
-    static int try_common_cgroup_mount_path(const cgroup_paths& relative_paths_cache) {
+    static int try_common_cgroup_mount_path(const process_cgroup_data& pcd) {
         int num_cpus = error_value;
         char dir[PATH_MAX] = {0};
-        if (*relative_paths_cache.v2_relative_path) {
-            if (std::snprintf(dir, PATH_MAX, "%s/%s", "/sys/fs/cgroup", relative_paths_cache.v2_relative_path) >= 0) {
-                try_read_cgroup_v2_num_cpus_from(dir, num_cpus);
-            }
+        __TBB_ASSERT(*pcd.relative_path, nullptr);
+        if (std::snprintf(dir, PATH_MAX, "%s/%s", "/sys/fs/cgroup", pcd.relative_path) >= 0) {
+            try_read_cgroup_num_cpus_from(dir, num_cpus, pcd.version);
         }
 
-        if (num_cpus == error_value && *relative_paths_cache.v1_relative_path) {
-            if (std::snprintf(dir, PATH_MAX, "%s/%s", "/sys/fs/cgroup", relative_paths_cache.v1_relative_path) >= 0) {
-                try_read_cgroup_v1_num_cpus_from(dir, num_cpus);
+        if (num_cpus == error_value && pcd.version == process_cgroup_data::cgroup_version::v2) {
+            if (std::snprintf(dir, PATH_MAX, "%s/%s", "/sys/fs/cgroup/unified", pcd.relative_path) >= 0) {
+                try_read_cgroup_v2_num_cpus_from(dir, num_cpus);
             }
         }
         return num_cpus;
@@ -271,13 +277,17 @@ private:
         if (!cgroup_file_ptr)
             return error_value; // Failed to open cgroup file
 
-        cgroup_paths relative_paths_cache;
-        if (!is_cpu_restriction_possible(cgroup_file_ptr.get(), relative_paths_cache)) {
+        process_cgroup_data pcd{};
+        parse_proc_cgroup_file(cgroup_file_ptr.get(), pcd);
+
+        if (!is_cpu_restriction_possible(pcd)) {
             return unlimited_num_cpus;
         }
 
+        __TBB_ASSERT(pcd.version != process_cgroup_data::cgroup_version::unknown, nullptr);
+
         int found_num_cpus = error_value; // Initialize to an impossible value
-        found_num_cpus = try_common_cgroup_mount_path(relative_paths_cache);
+        found_num_cpus = try_common_cgroup_mount_path(pcd);
         if (found_num_cpus != error_value) {
             return found_num_cpus;
         }
@@ -288,17 +298,24 @@ private:
         if (!mounts_file_ptr)
             return error_value;
 
-        // TODO: To avoid parsing /proc/self/mounts, read relative paths first and try opening
-        //       necessary files in the most probable mount points (see RFC for details)
+        std::size_t cgroup_mnt_strlen{};
+        const char* cgroup_mnt_str;
+        if (pcd.version == process_cgroup_data::cgroup_version::v2) {
+            cgroup_mnt_str = "cgroup2";
+            cgroup_mnt_strlen = 7;
+        } else {
+            cgroup_mnt_str = "cgroup";
+            cgroup_mnt_strlen = 6;
+        }
+
         struct mntent mntent;
         constexpr std::size_t buffer_size = 4096; // Allocate a buffer for reading mount entries
         char mount_entry_buffer[buffer_size];
 
         // Read the mounts file and cgroup file to determine the number of CPUs
         while (getmntent_r(mounts_file_ptr.get(), &mntent, mount_entry_buffer, buffer_size)) {
-            if (std::strncmp(mntent.mnt_type, "cgroup", 6) == 0) {
-                found_num_cpus = parse_cgroup_entry(mntent.mnt_dir, mntent.mnt_type,
-                                                    cgroup_file_ptr.get(), relative_paths_cache);
+            if (std::strncmp(mntent.mnt_type, cgroup_mnt_str, cgroup_mnt_strlen) == 0) {
+                found_num_cpus = parse_cgroup_entry(mntent.mnt_dir, pcd);
                 if (found_num_cpus != error_value)
                     break;
             }
