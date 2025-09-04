@@ -19,9 +19,12 @@
 
 #include "oneapi/tbb/detail/_template_helpers.h"
 #include "oneapi/tbb/detail/_utils.h"
+#if !__TBB_BUILD && !_WIN32
+#include "oneapi/tbb/version.h" // to get TBB_runtime_version
+#endif
 
 /*
-    This file is used by both TBB and OpenMP RTL. Do not use __TBB_ASSERT() macro
+    This file can be used by both TBB and OpenMP RTL. Do not use __TBB_ASSERT() macro
     and runtime_warning() function because they are not available in OpenMP. Use
     __TBB_ASSERT_EX and DYNAMIC_LINK_WARNING instead.
 */
@@ -376,13 +379,15 @@ namespace r1 {
         ap_data._len = (std::size_t)(backslash - ap_data._path) + 1;
         *(backslash+1) = 0;
     #else
-        // There are use cases, when we need to find a library, not just some
-        // shared object providing dynamic_link symbol (it can be shared object
-        // that directly includes dynamic_link.cpp).
-        #if defined(SYMBOL_TO_FIND_LIBRARY)
-        static void *func_from_lib = (void*)&SYMBOL_TO_FIND_LIBRARY;
-        #else
+        // There is an use case, when we want to find TBB library, not just some shared object
+        // providing "dynamic_link" symbol (it can be shared object that directly includes
+        // dynamic_link.cpp). For this case we use a public TBB symbol. Searching for public symbol
+        // in every case leads to finding main executable instead of TBB library on some version of
+        // Linux.
+        #if __TBB_BUILD
         static void *func_from_lib = (void*)&dynamic_link;
+        #else
+        static void *func_from_lib = (void*)&TBB_runtime_version;
         #endif
 
         // Get the library path

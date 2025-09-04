@@ -31,9 +31,6 @@
 // no need to do it in the test
 #define __TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION 1
 
-#include "oneapi/tbb/version.h" // to get TBB_runtime_version
-#define SYMBOL_TO_FIND_LIBRARY TBB_runtime_version
-// to get dynamic_link()
 #include "../../src/tbb/dynamic_link.cpp"
 #include "../../src/tbb/load_tbbbind.h"
 
