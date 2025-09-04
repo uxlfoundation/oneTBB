@@ -120,7 +120,7 @@ all of the possible options and stop once the data is found and successfully rea
 #+end_src
 
 *** Determining If Scheduling Constraints Are Set
-As an optimization, it makes sense to first check whether any CPU scheduling constraints can be set.
+As an optimization, it makes sense to first check whether any CPU scheduling constraints are set.
 This can be achieved by parsing the =/proc/self/cgroup= file to identify entries with either the
 CPU controller for cgroup v1 or any entry associated with cgroup v2.
 Entries in this file are formatted as follows [4]:
@@ -157,7 +157,7 @@ controller in the mount options.
 Based on the described considerations, the algorithm outline should be the following:
 
 1. Parse =/proc/self/cgroup= to:
-   - Find relavive paths to cgroup controllers
+   - Find relative paths to cgroup controllers
    - Determine whether CPU scheduling constraints can be set by:
      - Looking for =cpu= controller for cgroup v1
      - For cgroup v2, checking if the process is not running under root cgroup (with PID 1 check)
