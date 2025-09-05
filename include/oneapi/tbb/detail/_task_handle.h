@@ -136,8 +136,21 @@ private:
 };
 #endif // __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
+template <typename DerivedType>
+void finalize_base(task_handle_task* p, d1::small_object_allocator& alloc, const d1::execution_data* ed) {
+    if (ed) {
+        alloc.delete_object(static_cast<DerivedType*>(p), *ed);
+    } else {
+        alloc.delete_object(static_cast<DerivedType*>(p));
+    }
+}
+
 class task_handle_task : public d1::task {
-    std::uint64_t m_version_and_traits{};
+    // TODO: large and meaningful comment here
+    using finalize_func_type = void (*)(task_handle_task*, d1::small_object_allocator&, const d1::execution_data*);
+    std::uint64_t m_finalize_func;
+    static_assert(sizeof(finalize_func_type) <= sizeof(m_finalize_func), "Meaningful comment");
+
     d1::wait_tree_vertex_interface* m_wait_tree_vertex;
     d1::task_group_context& m_ctx;
     d1::small_object_allocator m_allocator;
@@ -145,23 +158,28 @@ class task_handle_task : public d1::task {
     std::atomic<task_dynamic_state*> m_dynamic_state;
 #endif
 public:
+
     void finalize(const d1::execution_data* ed = nullptr) {
-        if (ed) {
-            m_allocator.delete_object(this, *ed);
+        finalize_func_type finalize_func = reinterpret_cast<finalize_func_type>(m_finalize_func);
+        // Large and meaningful comment
+        if (finalize_func != nullptr) {
+            (*finalize_func)(this, m_allocator, ed);
         } else {
-            m_allocator.delete_object(this);
+            // TODO: large and meaningful comment here
+            finalize_base<task_handle_task>(this, m_allocator, ed);
         }
     }
 
-    task_handle_task(d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
-        : m_wait_tree_vertex(vertex)
+    task_handle_task(d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx,
+                     d1::small_object_allocator& alloc, finalize_func_type finalize_func)
+        : m_finalize_func(reinterpret_cast<std::uint64_t>(finalize_func))
+        , m_wait_tree_vertex(vertex)
         , m_ctx(ctx)
         , m_allocator(alloc)
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
         , m_dynamic_state(nullptr)
 #endif
     {
-        suppress_unused_warning(m_version_and_traits);
         m_wait_tree_vertex->reserve();
     }
 
