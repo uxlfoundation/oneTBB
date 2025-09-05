@@ -1,4 +1,5 @@
 # Copyright (c) 2020-2025 Intel Corporation
+# Copyright (c) 2025 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -542,6 +543,7 @@ if (TARGET TBB::tbb)
     # HWLOC related test
     if (NOT TBB_EMSCRIPTEN)
         tbb_add_tbbbind_test(SUBDIR tbb NAME test_arena_constraints)
+        tbb_add_tbbbind_test(SUBDIR tbb NAME test_tbbbind)
     endif()
 
     if ((NOT "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "mips") AND (NOT TBB_EMSCRIPTEN))
