@@ -115,8 +115,8 @@ private:
 public:
     template<typename FF>
     function_task(FF&& f, d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
-        : task_handle_task{vertex, ctx, alloc},
-          m_func(std::forward<FF>(f)) {}
+        : task_handle_task{vertex, ctx, alloc, finalize_base<function_task>}
+        , m_func(std::forward<FF>(f)) {}
 };
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS

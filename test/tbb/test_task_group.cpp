@@ -1759,3 +1759,40 @@ TEST_CASE("test dependencies and cancellation") {
     CHECK_MESSAGE(status == tbb::task_group_status::canceled, "Incorrect status of cancelled task_group");
 }
 #endif
+
+struct stateful_task_body {
+    std::size_t& placeholder;
+    char state[1024]{0};
+
+    stateful_task_body(std::size_t& p)
+        : placeholder(p) {}
+
+    void operator()() const {
+        ++placeholder;
+    }
+};
+
+//! \brief \ref regression
+TEST_CASE("Test stateful task body") {
+    tbb::task_group tg;
+    std::size_t placeholder = 0;
+
+    stateful_task_body body{placeholder};
+
+    // Test run + wait
+    tg.run(body);
+    tg.wait();
+    CHECK_MESSAGE(placeholder == 1, "Task was not executed");
+
+    // Test cancellation
+    tg.cancel();
+    tg.run(body);
+    tg.wait();
+    CHECK_MESSAGE(placeholder == 1, "Task was executed in the cancelled task_group");
+
+    // Test task destruction
+    {
+        tbb::task_handle task = tg.defer(body);
+    }
+    CHECK_MESSAGE(placeholder == 1, "Not submitted task was executed");
+}
