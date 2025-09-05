@@ -243,7 +243,7 @@ private:
         parse_proc_cgroup_file(init_process_cgroup_file.get(), init_process_cgroup_data, /*look_for_v2_only*/ true);
         if (init_process_cgroup_data.version != process_cgroup_data::cgroup_version::unknown) {
             __TBB_ASSERT(init_process_cgroup_data.version == process_cgroup_data::cgroup_version::v2 &&
-                init_process_cgroup_data.relative_path, nullptr);
+                *init_process_cgroup_data.relative_path, nullptr);
 
             // If the init process cgroup path is "/init.scope", it means systemd is used
             // and we are running on the host
