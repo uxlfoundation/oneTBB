@@ -54,7 +54,9 @@ compatibility:
 #### Syntax
 
 ```cpp
+namespace oneapi {
 namespace tbb {
+namespace ext {
 #if !__TBB_DISABLE_SPEC_EXTENSIONS
     //! Type alias for assertion handler function pointer - same as TBB 2020.
     //! The handler should not return. If it eventually returns, the behavior is runtime-undefined.
@@ -70,10 +72,11 @@ namespace tbb {
     //! New function not present in TBB 2020, following std::get_terminate pattern.
     assertion_handler_type get_assertion_handler() noexcept;
 #endif
-}
+}}}
 ```
 
-Applications that used the custom assertion handler in TBB 2020 can migrate to this proposal with no changes.
+Applications that used the custom assertion handler in TBB 2020 can migrate to this proposal with no changes
+after manuall injection of namespace `oneapi::tbb::ext` to namespace `tbb`.
 
 #### Specification Extension
 

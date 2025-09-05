@@ -192,7 +192,7 @@ static void TestPreviewNames() {
 #endif
 
 static void DefinitionPresence() {
-    TestTypeDefinitionPresence( assertion_handler_type );
+    TestTypeDefinitionPresence( ext::assertion_handler_type );
     TestTypeDefinitionPresence( cache_aligned_allocator<int> );
     TestTypeDefinitionPresence( tbb_hash_compare<int> );
     TestTypeDefinitionPresence2( concurrent_hash_map<int, int> );
@@ -210,9 +210,11 @@ static void DefinitionPresence() {
     TestTypeDefinitionPresence( concurrent_vector<int> );
     TestTypeDefinitionPresence( combinable<int> );
     TestTypeDefinitionPresence( enumerable_thread_specific<int> );
-    TestFuncDefinitionPresence( get_assertion_handler, (), tbb::assertion_handler_type );
-    TestFuncDefinitionPresence( set_assertion_handler, (tbb::assertion_handler_type),
-                                tbb::assertion_handler_type );
+    TestFuncDefinitionPresence( ext::get_assertion_handler, (),
+                                tbb::ext::assertion_handler_type );
+    TestFuncDefinitionPresence( ext::set_assertion_handler,
+                                (tbb::ext::assertion_handler_type),
+                                tbb::ext::assertion_handler_type );
     /* Flow graph names */
     TestTypeDefinitionPresence( flow::graph );
     TestTypeDefinitionPresence( flow::continue_msg );
