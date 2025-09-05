@@ -1764,6 +1764,9 @@ struct stateful_task_body {
     std::size_t& placeholder;
     char state[1024]{0};
 
+    stateful_task_body(std::size_t& p)
+        : placeholder(p) {}
+
     void operator()() const {
         ++placeholder;
     }
