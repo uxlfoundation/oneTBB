@@ -42,6 +42,22 @@
 #include <emscripten/stack.h>
 #endif
 
+// ASan detection: define HAS_SANITIZE_ADDRESS regardless
+// of the compiler when we are in an address-sanitized build.
+#if defined(HAS_SANITIZE_ADDRESS)
+#undef HAS_SANITIZE_ADDRESS
+#endif
+
+#if defined(__SANITIZE_ADDRESS__)
+// gcc
+#define HAS_SANITIZE_ADDRESS
+#elif defined(__has_feature)
+// clang
+#if __has_feature(address_sanitizer)
+#define HAS_SANITIZE_ADDRESS
+#endif
+#endif
+
 namespace tbb {
 namespace detail {
 namespace r1 {
@@ -170,7 +186,7 @@ static void get_stack_attributes(std::uintptr_t& stack_base, std::size_t& stack_
 
     // Points to the lowest addressable byte of a stack.
     void* stack_limit = nullptr;
-#if __linux__ && !__bg__ && !defined(__SANITIZE_ADDRESS__)
+#if __linux__ && !__bg__ && !defined(HAS_SANITIZE_ADDRESS)
     size_t np_stack_size = 0;
     pthread_attr_t np_attr_stack;
     if (0 == pthread_getattr_np(pthread_self(), &np_attr_stack)) {
