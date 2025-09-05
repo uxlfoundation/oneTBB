@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2019-2021 Intel Corporation
+    Copyright (c) 2019-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -68,8 +69,8 @@ template <typename Key, typename Value, typename Compare, typename Allocator>
 class concurrent_multimap;
 
 template <typename Key, typename Value, typename Compare = std::less<Key>, typename Allocator = tbb::tbb_allocator<std::pair<const Key, Value>>>
-class concurrent_map : public concurrent_skip_list<map_traits<Key, Value, Compare, concurrent_geometric_level_generator<32>, Allocator, false>> {
-    using base_type = concurrent_skip_list<map_traits<Key, Value, Compare, concurrent_geometric_level_generator<32>, Allocator, false>>;
+class concurrent_map : public concurrent_skip_list<map_traits<Key, Value, Compare, geometric_level_generator<32>, Allocator, false>> {
+    using base_type = concurrent_skip_list<map_traits<Key, Value, Compare, geometric_level_generator<32>, Allocator, false>>;
 public:
     using key_type = Key;
     using mapped_type = Value;
@@ -218,8 +219,8 @@ void swap( concurrent_map<Key, Value, Compare, Allocator>& lhs,
 }
 
 template <typename Key, typename Value, typename Compare = std::less<Key>, typename Allocator = tbb::tbb_allocator<std::pair<const Key, Value>>>
-class concurrent_multimap : public concurrent_skip_list<map_traits<Key, Value, Compare, concurrent_geometric_level_generator<32>, Allocator, true>> {
-    using base_type = concurrent_skip_list<map_traits<Key, Value, Compare, concurrent_geometric_level_generator<32>, Allocator, true>>;
+class concurrent_multimap : public concurrent_skip_list<map_traits<Key, Value, Compare, geometric_level_generator<32>, Allocator, true>> {
+    using base_type = concurrent_skip_list<map_traits<Key, Value, Compare, geometric_level_generator<32>, Allocator, true>>;
 public:
     using key_type = Key;
     using mapped_type = Value;
