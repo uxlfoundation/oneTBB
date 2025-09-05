@@ -32,10 +32,10 @@ namespace d1 { class task_group_context; class wait_context; struct execution_da
 namespace d2 {
 
 class task_handle;
+class task_handle_task;
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
-class task_handle_task;
 class task_dynamic_state;
 
 struct successor_list_node {
