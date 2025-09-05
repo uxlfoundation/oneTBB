@@ -146,10 +146,11 @@ void finalize_base(task_handle_task* p, d1::small_object_allocator& alloc, const
 }
 
 class task_handle_task : public d1::task {
-    // TODO: large and meaningful comment here
+    // The pointer to the instantiation of finalize_base with the concrete derived type class for correct finalization
+    // Reuse the first std::uint64_t field (was m_version_and_traits) to preserve backward compatibility
     using finalize_func_type = void (*)(task_handle_task*, d1::small_object_allocator&, const d1::execution_data*);
     std::uint64_t m_finalize_func;
-    static_assert(sizeof(finalize_func_type) <= sizeof(m_finalize_func), "Meaningful comment");
+    static_assert(sizeof(finalize_func_type) <= sizeof(m_finalize_func), "Cannot fit finalize pointer into std::uint64_t");
 
     d1::wait_tree_vertex_interface* m_wait_tree_vertex;
     d1::task_group_context& m_ctx;
@@ -161,11 +162,12 @@ public:
 
     void finalize(const d1::execution_data* ed = nullptr) {
         finalize_func_type finalize_func = reinterpret_cast<finalize_func_type>(m_finalize_func);
-        // Large and meaningful comment
         if (finalize_func != nullptr) {
+            // If the finalize function is set for the current instantiation - use it
             (*finalize_func)(this, m_allocator, ed);
         } else {
-            // TODO: large and meaningful comment here
+            // Otherwise, the object was compiled with the old version of the library
+            // preserve the previous behavior to avoid undefined behavior
             finalize_base<task_handle_task>(this, m_allocator, ed);
         }
     }
