@@ -214,7 +214,7 @@ using ::tbb::detail::r1::set_assertion_handler;
 using ::tbb::detail::r1::get_assertion_handler;
 #endif
 } // inline namespace v1
-}
+} // namespace ext
 
 } // namespace tbb
 
