@@ -31,6 +31,7 @@
 // no need to do it in the test
 #define __TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION 1
 
+#define DYNAMIC_LINK_FIND_LIB_WITH_TBB_RUNTIME_VERSION 1
 #include "../../src/tbb/dynamic_link.cpp"
 #include "../../src/tbb/load_tbbbind.h"
 

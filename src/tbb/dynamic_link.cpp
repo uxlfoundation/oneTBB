@@ -384,10 +384,10 @@ namespace r1 {
         // dynamic_link.cpp). For this case we use a public TBB symbol. Searching for public symbol
         // in every case leads to finding main executable instead of TBB library on some version of
         // Linux.
-        #if __TBB_BUILD
-        static void *func_from_lib = (void*)&dynamic_link;
-        #else
+        #if DYNAMIC_LINK_FIND_LIB_WITH_TBB_RUNTIME_VERSION
         static void *func_from_lib = (void*)&TBB_runtime_version;
+        #else
+        static void *func_from_lib = (void*)&dynamic_link;
         #endif
 
         // Get the library path
