@@ -85,6 +85,16 @@ class function_task : public task_handle_task  {
     const F m_func;
 
 private:
+    static void destroy_function_task(task_handle_task* p, d1::small_object_allocator& alloc,
+                                      const d1::execution_data* ed)
+    {
+        if (ed) {
+            alloc.delete_object(static_cast<function_task*>(p), *ed);
+        } else {
+            alloc.delete_object(static_cast<function_task*>(p));
+        }
+    }
+
     d1::task* execute(d1::execution_data& ed) override {
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
         task* next_task = task_ptr_or_nullptr(m_func);
@@ -115,7 +125,7 @@ private:
 public:
     template<typename FF>
     function_task(FF&& f, d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
-        : task_handle_task{vertex, ctx, alloc, destroy_function_task<function_task>}
+        : task_handle_task{vertex, ctx, alloc, destroy_function_task}
         , m_func(std::forward<FF>(f)) {}
 };
 
