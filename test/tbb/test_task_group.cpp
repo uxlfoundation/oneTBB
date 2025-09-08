@@ -1301,7 +1301,7 @@ TEST_CASE("Concurrent exception handling in task_group wait") {
     }
 }
 
-
+//! \brief \ref error_guessing
 TEST_CASE("Arena exception handling race condition test") { 
     const int num_iterations = 5;
     const int num_threads = std::thread::hardware_concurrency();
