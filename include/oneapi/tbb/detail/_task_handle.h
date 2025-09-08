@@ -137,7 +137,7 @@ private:
 #endif // __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
 template <typename DerivedType>
-void destroy_task(task_handle_task* p, d1::small_object_allocator& alloc, const d1::execution_data* ed) {
+void destroy_function_task(task_handle_task* p, d1::small_object_allocator& alloc, const d1::execution_data* ed) {
     if (ed) {
         alloc.delete_object(static_cast<DerivedType*>(p), *ed);
     } else {
@@ -146,7 +146,7 @@ void destroy_task(task_handle_task* p, d1::small_object_allocator& alloc, const 
 }
 
 class task_handle_task : public d1::task {
-    // Pointer to the instantiation of destroy_task with the concrete derived type,
+    // Pointer to the instantiation of destroy_function_task with the concrete derived type,
     // used for correct destruction and deallocation of the task
     using destroy_func_type = void (*)(task_handle_task*, d1::small_object_allocator&, const d1::execution_data*);
 
