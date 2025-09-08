@@ -61,6 +61,7 @@ FOO_TYPE dummy_foo2() { return FOO_DUMMY; }
 #ifdef __TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION
 #warning "Signature verification must not be turned off to fully test dynamic link functionality"
 #endif
+// The direct include since we want to test internal functionality
 #include "src/tbb/dynamic_link.cpp"
 
 
