@@ -43,14 +43,10 @@ void tbb_exception_ptr::destroy() noexcept {
     deallocate_memory(this);
 }
 
-void tbb_exception_ptr::throw_self() {
-    if (governor::rethrow_exception_broken()) fix_broken_rethrow();
-    std::rethrow_exception(my_ptr);
-}
-
-void tbb_exception_ptr::throw_self_and_destroy() {
+void tbb_exception_ptr::rethrow_and_destroy() {
     auto temp_ptr = my_ptr;
     destroy();
+    if (governor::rethrow_exception_broken()) fix_broken_rethrow();
     std::rethrow_exception(temp_ptr);
 }
 
@@ -243,7 +239,7 @@ bool task_group_context_impl::is_group_execution_cancelled(const d1::task_group_
     return ctx.my_cancellation_requested.load(std::memory_order_relaxed) != 0;
 }
 
-// Thread-safe reset implementation using compare_exchange
+// IMPORTANT: If used while tasks are in the context, the cancellation signal can be lost
 void task_group_context_impl::reset(d1::task_group_context& ctx) {
     __TBB_ASSERT(!is_poisoned(ctx.my_context_list), nullptr);
     //! TODO: Add assertion that this context does not have children
