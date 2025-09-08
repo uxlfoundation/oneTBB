@@ -99,7 +99,7 @@ private:
             next_task = successor_task;
         }
 #endif
-        destroy(&ed);
+        this->destroy(&ed);
         return next_task;
     }
     d1::task* cancel(d1::execution_data& ed) override {
@@ -109,7 +109,7 @@ private:
         // Should cancel() be called directly instead?
         task_ptr = this->complete_and_try_get_successor();
 #endif
-        destroy(&ed);
+        this->destroy(&ed);
         return task_ptr;
     }
 public:

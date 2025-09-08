@@ -136,15 +136,6 @@ private:
 };
 #endif // __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
-template <typename DerivedType>
-void destroy_function_task(task_handle_task* p, d1::small_object_allocator& alloc, const d1::execution_data* ed) {
-    if (ed) {
-        alloc.delete_object(static_cast<DerivedType*>(p), *ed);
-    } else {
-        alloc.delete_object(static_cast<DerivedType*>(p));
-    }
-}
-
 class task_handle_task : public d1::task {
     // Pointer to the instantiation of destroy_function_task with the concrete derived type,
     // used for correct destruction and deallocation of the task
@@ -161,8 +152,18 @@ class task_handle_task : public d1::task {
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
     std::atomic<task_dynamic_state*> m_dynamic_state;
 #endif
+protected:
+    template <typename DerivedType>
+    static void destroy_function_task(task_handle_task* p, d1::small_object_allocator& alloc,
+                                      const d1::execution_data* ed)
+    {
+        if (ed) {
+            alloc.delete_object(static_cast<DerivedType*>(p), *ed);
+        } else {
+            alloc.delete_object(static_cast<DerivedType*>(p));
+        }
+    }
 public:
-
     void destroy(const d1::execution_data* ed = nullptr) {
         destroy_func_type destroy_func = reinterpret_cast<destroy_func_type>(m_destroy_func);
         if (destroy_func != nullptr) {
