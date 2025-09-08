@@ -22,6 +22,8 @@
 #include "utils_report.h"
 
 #include <cstdlib>
+#include <csetjmp>
+#include <memory>
 
 #define REPORT_FATAL_ERROR REPORT
 
@@ -56,6 +58,7 @@ void AssertSameType( const T& /*x*/, const T& /*y*/ ) {}
 
 //! Check that expression x raises assertion failure with message containing given substring.
 /** Calls utils::SetCustomAssertionHandler to set utils::AssertionFailureHandler as a handler. */
+#if TBB_USE_EXCEPTIONS
 #define TEST_CUSTOM_ASSERTION_HANDLER(x, substr)                           \
     {                                                                      \
         auto default_handler = utils::SetCustomAssertionHandler();         \
@@ -70,6 +73,23 @@ void AssertSameType( const T& /*x*/, const T& /*y*/ ) {}
         utils::CheckAssertionFailure(__LINE__, #x, okay, message, substr); \
         utils::ResetAssertionHandler(default_handler);                     \
     }
+#else
+#define TEST_CUSTOM_ASSERTION_HANDLER(x, substr)                           \
+    {                                                                      \
+        auto default_handler = utils::SetCustomAssertionHandler();         \
+        const char* message = nullptr;                                     \
+        bool okay = false;                                                 \
+        if (setjmp(utils::g_assertion_jmp_buf)) {                          \
+            okay = true;                                                   \
+            message = utils::g_assertion_failure->message;                 \
+        } else {                                                           \
+            x;                                                             \
+        }                                                                  \
+        utils::CheckAssertionFailure(__LINE__, #x, okay, message, substr); \
+        utils::ResetAssertionHandler(default_handler);                     \
+        utils::g_assertion_failure.reset();                                \
+    }
+#endif // TBB_USE_EXCEPTIONS
 
 namespace utils {
 
@@ -90,10 +110,21 @@ AssertionFailure::AssertionFailure( const char* filename, int line,
     REQUIRE_MESSAGE(expression, "missing expression");
 }
 
+#if TBB_USE_EXCEPTIONS
 void AssertionFailureHandler(const char* filename, int line,
                              const char* expression, const char* comment) {
     throw AssertionFailure(filename, line, expression, comment);
 }
+#else
+static std::jmp_buf g_assertion_jmp_buf;
+static std::unique_ptr<AssertionFailure> g_assertion_failure {nullptr};
+void AssertionFailureHandler(const char* filename, int line,
+                             const char* expression, const char* comment) {
+
+    g_assertion_failure.reset(new AssertionFailure(filename, line, expression, comment));
+    std::longjmp(g_assertion_jmp_buf, 1);
+}
+#endif
 
 tbb::assertion_handler_type SetCustomAssertionHandler() {
     auto default_handler = tbb::set_assertion_handler(AssertionFailureHandler);
