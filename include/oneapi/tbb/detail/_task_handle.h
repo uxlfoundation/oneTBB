@@ -137,7 +137,7 @@ private:
 #endif // __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
 template <typename DerivedType>
-void finalize_base(task_handle_task* p, d1::small_object_allocator& alloc, const d1::execution_data* ed) {
+void destroy_task(task_handle_task* p, d1::small_object_allocator& alloc, const d1::execution_data* ed) {
     if (ed) {
         alloc.delete_object(static_cast<DerivedType*>(p), *ed);
     } else {
@@ -146,11 +146,14 @@ void finalize_base(task_handle_task* p, d1::small_object_allocator& alloc, const
 }
 
 class task_handle_task : public d1::task {
-    // The pointer to the instantiation of finalize_base with the concrete derived type class for correct finalization
-    // Reuse the first std::uint64_t field (was m_version_and_traits) to preserve backward compatibility
-    using finalize_func_type = void (*)(task_handle_task*, d1::small_object_allocator&, const d1::execution_data*);
-    std::uint64_t m_finalize_func;
-    static_assert(sizeof(finalize_func_type) <= sizeof(m_finalize_func), "Cannot fit finalize pointer into std::uint64_t");
+    // Pointer to the instantiation of destroy_task with the concrete derived type,
+    // used for correct destruction and deallocation of the task
+    using destroy_func_type = void (*)(task_handle_task*, d1::small_object_allocator&, const d1::execution_data*);
+
+    // Reuses the first std::uint64_t field (previously m_version_and_traits) to maintain backward compatibility
+    // The type of the first field remains std::uint64_t to preserve alignment and offset of subsequent member variables.
+    static_assert(sizeof(destroy_func_type) <= sizeof(std::uint64_t), "Cannot fit destroy pointer into std::uint64_t");
+    std::uint64_t m_destroy_func;
 
     d1::wait_tree_vertex_interface* m_wait_tree_vertex;
     d1::task_group_context& m_ctx;
@@ -160,21 +163,22 @@ class task_handle_task : public d1::task {
 #endif
 public:
 
-    void finalize(const d1::execution_data* ed = nullptr) {
-        finalize_func_type finalize_func = reinterpret_cast<finalize_func_type>(m_finalize_func);
-        if (finalize_func != nullptr) {
-            // If the finalize function is set for the current instantiation - use it
-            (*finalize_func)(this, m_allocator, ed);
+    void destroy(const d1::execution_data* ed = nullptr) {
+        destroy_func_type destroy_func = reinterpret_cast<destroy_func_type>(m_destroy_func);
+        if (destroy_func != nullptr) {
+            // If the destroy function is set for the current instantiation - use it
+            (*destroy_func)(this, m_allocator, ed);
         } else {
             // Otherwise, the object was compiled with the old version of the library
-            // preserve the previous behavior to avoid undefined behavior
-            finalize_base<task_handle_task>(this, m_allocator, ed);
+            // Destroy the object and let the memory leak since the derived type is unknown
+            // and the object cannot be deallocated properly
+            this->~task_handle_task();
         }
     }
 
     task_handle_task(d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx,
-                     d1::small_object_allocator& alloc, finalize_func_type finalize_func)
-        : m_finalize_func(reinterpret_cast<std::uint64_t>(finalize_func))
+                     d1::small_object_allocator& alloc, destroy_func_type destroy_func)
+        : m_destroy_func(reinterpret_cast<std::uint64_t>(destroy_func))
         , m_wait_tree_vertex(vertex)
         , m_ctx(ctx)
         , m_allocator(alloc)
@@ -247,10 +251,10 @@ public:
 };
 
 class task_handle {
-    struct task_handle_task_finalizer_t{
-        void operator()(task_handle_task* p){ p->finalize(); }
+    struct task_handle_task_deleter {
+        void operator()(task_handle_task* p){ p->destroy(); }
     };
-    using handle_impl_t = std::unique_ptr<task_handle_task, task_handle_task_finalizer_t>;
+    using handle_impl_t = std::unique_ptr<task_handle_task, task_handle_task_deleter>;
 
     handle_impl_t m_handle = {nullptr};
 public:

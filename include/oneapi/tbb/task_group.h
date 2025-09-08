@@ -99,7 +99,7 @@ private:
             next_task = successor_task;
         }
 #endif
-        finalize(&ed);
+        destroy(&ed);
         return next_task;
     }
     d1::task* cancel(d1::execution_data& ed) override {
@@ -109,13 +109,13 @@ private:
         // Should cancel() be called directly instead?
         task_ptr = this->complete_and_try_get_successor();
 #endif
-        finalize(&ed);
+        destroy(&ed);
         return task_ptr;
     }
 public:
     template<typename FF>
     function_task(FF&& f, d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
-        : task_handle_task{vertex, ctx, alloc, finalize_base<function_task>}
+        : task_handle_task{vertex, ctx, alloc, destroy_task<function_task>}
         , m_func(std::forward<FF>(f)) {}
 };
 
