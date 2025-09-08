@@ -207,8 +207,6 @@ using detail::r1::unsafe_wait;
 namespace ext {
 inline namespace v1 {
 #if !__TBB_DISABLE_SPEC_EXTENSIONS
-#define TBB_EXT_CUSTOM_ASSERTION_HANDLER 1
-
 using ::tbb::detail::r1::assertion_handler_type;
 using ::tbb::detail::r1::set_assertion_handler;
 using ::tbb::detail::r1::get_assertion_handler;

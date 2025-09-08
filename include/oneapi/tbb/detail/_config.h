@@ -545,4 +545,8 @@
 #define __TBB_PREVIEW_BLOCKED_ND_RANGE_DEDUCTION_GUIDES 1
 #endif
 
+#if !__TBB_DISABLE_SPEC_EXTENSIONS
+#define TBB_EXT_CUSTOM_ASSERTION_HANDLER 1
+#endif
+
 #endif // __TBB_detail__config_H
