@@ -112,6 +112,8 @@ static int get_max_procs() {
 // Linux control groups support
 class cgroup_info {
 public:
+    // The algorithm deliberately goes over slow but reliable paths to determine possible CPU
+    // constraints. This helps to make sure the optimizations in the code are correct.
     static bool is_cpu_constrained(int& constrained_num_cpus) {
         static const int num_cpus = parse_cpu_constraints();
         if (num_cpus == error_value || num_cpus == unlimited_num_cpus)
@@ -281,7 +283,6 @@ private:
 
         __TBB_ASSERT(std::strncmp(mnt_type, "cgroup", 6) == 0, "Unexpected cgroup type");
 
-        // TODO: Before opening the path, make sure the mnt_opts entry contains "cpu" controller
         if (try_read_cgroup_v1_num_cpus_from(mnt_dir, num_cpus))
             return num_cpus; // Successfully read number of CPUs for cgroup v1
 
@@ -305,8 +306,6 @@ private:
         if (!mounts_file_ptr)
             return error_value;
 
-        // TODO: To avoid parsing /proc/self/mounts, read relative paths first and try opening
-        //       "/sys/fs/cgroup/<relative_path>/cpu.max" for cgroup v2.
         cgroup_paths relative_paths_cache;
         struct mntent mntent;
         constexpr std::size_t buffer_size = 4096; // Allocate a buffer for reading mount entries
