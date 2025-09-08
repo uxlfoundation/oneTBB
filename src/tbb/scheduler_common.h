@@ -350,8 +350,7 @@ inline void handle_context_exception(d1::task_group_context& ctx) {
     tbb_exception_ptr* exception = ctx.my_exception.load(std::memory_order_acquire);
     if (exception) {
         if (ctx.my_exception.compare_exchange_strong(exception, nullptr, 
-                                                     std::memory_order_acq_rel,
-                                                     std::memory_order_acquire)) {
+                                                     std::memory_order_acq_rel)) {
             exception->rethrow_and_destroy();
         }
     }
