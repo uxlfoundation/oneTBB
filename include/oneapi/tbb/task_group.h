@@ -86,21 +86,48 @@ class function_task : public task_handle_task  {
     const F m_func;
 
 private:
+    static void destroy_function_task(task_handle_task* p, d1::small_object_allocator& alloc,
+                                      const d1::execution_data* ed)
+    {
+        if (ed) {
+            alloc.delete_object(static_cast<function_task*>(p), *ed);
+        } else {
+            alloc.delete_object(static_cast<function_task*>(p));
+        }
+    }
+
     d1::task* execute(d1::execution_data& ed) override {
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
-        task* res = task_ptr_or_nullptr(m_func);
-        finalize(&ed);
-        return res;
+        task* next_task = task_ptr_or_nullptr(m_func);
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        task_handle_task* successor_task = this->complete_and_try_get_successor();
+
+        if (next_task != nullptr) {
+            // If there are both task returned from the body and the successor task
+            // Bypassing the body task and spawning the successor one
+            if (successor_task != nullptr) d1::spawn(*successor_task, successor_task->ctx());
+        } else {
+            next_task = successor_task;
+        }
+#endif
+        this->destroy(&ed);
+        return next_task;
     }
     d1::task* cancel(d1::execution_data& ed) override {
-        finalize(&ed);
-        return nullptr;
+        task* task_ptr = nullptr;
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        // TODO: complete_and_try_get_successor returns one ready successor task, others are spawned and cancelled by the scheduler
+        // Should cancel() be called directly instead?
+        task_ptr = this->complete_and_try_get_successor();
+#endif
+        this->destroy(&ed);
+        return task_ptr;
     }
 public:
     template<typename FF>
     function_task(FF&& f, d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
-        : task_handle_task{vertex, ctx, alloc},
-          m_func(std::forward<FF>(f)) {}
+        : task_handle_task{vertex, ctx, alloc, destroy_function_task}
+        , m_func(std::forward<FF>(f)) {}
 };
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
@@ -108,7 +135,13 @@ namespace {
     template<typename F>
     d1::task* task_ptr_or_nullptr_impl(std::false_type, F&& f){
         task_handle th = std::forward<F>(f)();
-        return task_handle_accessor::release(th);
+        task_handle_task* task_ptr = task_handle_accessor::release(th);
+        // If task has unresolved dependencies, it can't be bypassed
+        if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
+            task_ptr = nullptr;
+        }
+
+        return task_ptr;
     }
 
     template<typename F>
@@ -493,7 +526,16 @@ protected:
 
         bool cancellation_status = false;
         try_call([&] {
-            execute_and_wait(*acs::release(h), context(), m_wait_vertex.get_context(), context());
+            task_handle_task* task_ptr = acs::release(h);
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+            // If the task has dependencies and the task_handle is not the last dependency
+            if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
+                d1::wait(m_wait_vertex.get_context(), context());
+            } else
+#endif
+            {
+                execute_and_wait(*task_ptr, context(), m_wait_vertex.get_context(), context());
+            }
         }).on_completion([&] {
             // TODO: the reset method is not thread-safe. Ensure the correct behavior.
             cancellation_status = context().is_group_execution_cancelled();
@@ -584,7 +626,14 @@ public:
         using acs = d2::task_handle_accessor;
         __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
 
-        d1::spawn(*acs::release(h), context());
+        task_handle_task* task_ptr = acs::release(h);
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        // If the task has dependencies and the task_handle is not the last dependency
+        if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
+            return;
+        }
+#endif
+        d1::spawn(*task_ptr, context());
     }
 
     template<typename F>
@@ -601,6 +650,32 @@ public:
     task_group_status run_and_wait(d2::task_handle&& h) {
         return internal_run_and_wait(std::move(h));
     }
+
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    static void set_task_order(d2::task_handle& pred, d2::task_handle& succ) {
+        __TBB_ASSERT(pred != nullptr, "empty predecessor handle is not allowed for set_task_order");
+        __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for set_task_order");
+        task_dynamic_state* pred_state = task_handle_accessor::get_task_dynamic_state(pred);
+        pred_state->add_successor(succ);
+    }
+
+    static void set_task_order(d2::task_completion_handle& pred, d2::task_handle& succ) {
+        __TBB_ASSERT(pred != nullptr, "empty predecessor completion_handle is not allowed for set_task_order");
+        __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for set_task_order");
+        task_dynamic_state* pred_state = task_completion_handle_accessor::get_task_dynamic_state(pred);
+        pred_state->add_successor(succ);
+    }
+
+    static void transfer_this_task_completion_to(d2::task_handle& new_task) {
+        d1::task* curr_task = d1::current_task_ptr();
+        __TBB_ASSERT(curr_task != nullptr, "this_task_completion_to was called outside of task body");
+        task_handle_task* curr_th_task = dynamic_cast<task_handle_task*>(curr_task);
+        // Not using __TBB_ASSERT(curr_th_task) to allow function_stack_task body to use this method
+        if (curr_th_task != nullptr) {
+            curr_th_task->transfer_completion_to(new_task);
+        }
+    }
+#endif
 }; // class task_group
 
 class wait_delegate : public d1::delegate_base {
@@ -704,6 +779,9 @@ using detail::d1::is_current_task_group_canceling;
 using detail::r1::missing_wait;
 
 using detail::d2::task_handle;
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+using detail::d2::task_completion_handle;
+#endif
 }
 
 } // namespace tbb

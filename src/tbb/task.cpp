@@ -256,6 +256,10 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
     return ref_counter;
 }
 
+d1::task* __TBB_EXPORTED_FUNC current_task_ptr() {
+    return governor::get_thread_data()->get_innermost_running_task();
+}
+
 } // namespace r1
 } // namespace detail
 } // namespace tbb

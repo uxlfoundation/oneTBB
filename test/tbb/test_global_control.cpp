@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -16,6 +17,9 @@
 
 //! \file test_global_control.cpp
 //! \brief Test for [sched.global_control] specification
+
+// TODO: find criteria to automatically define this in utils_assert.h
+#define TEST_CUSTOM_ASSERTION_HANDLER_ENABLED 1
 
 #include "common/test.h"
 
@@ -271,4 +275,21 @@ TEST_CASE("test concurrent task_scheduler_handle destruction") {
     }
     stop = true;
     thr1.join();
+}
+
+//! Testing that assertion_handler_type is exactly the type defined in the documentation
+//! \brief \ref interface \ref requirement
+TEST_CASE("Assertion handler type") {
+    using documented = void(*)(const char* /* location */, int /* line */,
+                               const char* /* expression */, const char* /* comment */);
+    static_assert(std::is_same<oneapi::tbb::assertion_handler_type, documented>::value,
+                  "Incorrect assertion handler type");
+}
+
+//! Using custom assertion handler to test failure on invalid max_allowed_parallelism
+//! \brief \ref interface \ref error_guessing
+TEST_CASE("Using custom assertion handler to test failure on invalid max_allowed_parallelism") {
+    TEST_CUSTOM_ASSERTION_HANDLER(
+        tbb::global_control(tbb::global_control::max_allowed_parallelism, 0),
+        "max_allowed_parallelism cannot be 0.");
 }

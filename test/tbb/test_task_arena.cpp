@@ -1983,6 +1983,11 @@ TEST_CASE("Workers oversubscription") {
 #endif
 
 #if TBB_USE_EXCEPTIONS
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS && __TBB_GCC_VERSION && !__clang__ && !__INTEL_COMPILER
+// GCC issues a warning in task_handle_task::has_dependencies for empty task_handle
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
 //! The test for error in scheduling empty task_handle
 //! \brief \ref requirement
 TEST_CASE("Empty task_handle cannot be scheduled"
@@ -1994,7 +1999,11 @@ TEST_CASE("Empty task_handle cannot be scheduled"
     CHECK_THROWS_WITH_AS(ta.enqueue(tbb::task_handle{}),                    "Attempt to schedule empty task_handle", std::runtime_error);
     CHECK_THROWS_WITH_AS(tbb::this_task_arena::enqueue(tbb::task_handle{}), "Attempt to schedule empty task_handle", std::runtime_error);
 }
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS && __TBB_GCC_VERSION && !__clang__ && !__INTEL_COMPILER
+#pragma GCC diagnostic pop
 #endif
+#endif // TBB_USE_EXCEPTIONS
+
 
 #if !EMSCRIPTEN
 //! For emscripten, FPU control state has not been set correctly

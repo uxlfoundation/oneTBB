@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -345,6 +346,7 @@ bool __TBB_EXPORTED_FUNC finalize(d1::task_scheduler_handle& handle, std::intptr
 #pragma weak __TBB_internal_apply_affinity
 #pragma weak __TBB_internal_restore_affinity
 #pragma weak __TBB_internal_get_default_concurrency
+#pragma weak __TBB_internal_set_tbbbind_assertion_handler
 
 extern "C" {
 void __TBB_internal_initialize_system_topology(
@@ -362,6 +364,8 @@ void __TBB_internal_apply_affinity( binding_handler* handler_ptr, int slot_num )
 void __TBB_internal_restore_affinity( binding_handler* handler_ptr, int slot_num );
 
 int __TBB_internal_get_default_concurrency( int numa_id, int core_type_id, int max_threads_per_core );
+
+void __TBB_internal_set_tbbbind_assertion_handler( assertion_handler_type handler );
 }
 #endif /* __TBB_WEAK_SYMBOLS_PRESENT */
 
@@ -372,6 +376,7 @@ static void dummy_deallocate_binding_handler ( binding_handler* ) { }
 static void dummy_apply_affinity ( binding_handler*, int ) { }
 static void dummy_restore_affinity ( binding_handler*, int ) { }
 static int dummy_get_default_concurrency( int, int, int ) { return governor::default_num_threads(); }
+static void dummy_set_assertion_handler( assertion_handler_type ) { }
 
 // Handlers for communication with TBBbind
 static void (*initialize_system_topology_ptr)(
@@ -391,6 +396,8 @@ static void (*restore_affinity_ptr)( binding_handler* handler_ptr, int slot_num 
     = dummy_restore_affinity;
 int (*get_default_concurrency_ptr)( int numa_id, int core_type_id, int max_threads_per_core )
     = dummy_get_default_concurrency;
+void (*set_assertion_handler_ptr)( assertion_handler_type handler )
+    = dummy_set_assertion_handler;
 
 #if _WIN32 || _WIN64 || __unix__ || __APPLE__
 
@@ -480,6 +487,14 @@ void initialization_impl() {
     governor::one_time_init();
 
     if (const char* tbbbind_name = load_tbbbind_shared_object()) {
+        // If the setter function is present, set the TBBbind assertion handler to use TBB's
+        // assertion_failure function. If not, set_assertion_handler_ptr falls back to the dummy.
+        const dynamic_link_descriptor optional_set_assertion_handler[] =
+            {DLD(__TBB_internal_set_tbbbind_assertion_handler, set_assertion_handler_ptr)};
+        dynamic_link(tbbbind_name, optional_set_assertion_handler, 1, nullptr,
+                     DYNAMIC_LINK_LOCAL_BINDING);
+        set_assertion_handler_ptr(assertion_failure);
+
         initialize_system_topology_ptr(
             processor_groups_num(),
             numa_nodes_count, numa_nodes_indexes,
