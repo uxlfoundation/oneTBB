@@ -19,7 +19,7 @@
 
 #include "oneapi/tbb/detail/_template_helpers.h"
 #include "oneapi/tbb/detail/_utils.h"
-#if !__TBB_BUILD && !_WIN32
+#if DYNAMIC_LINK_FIND_LIB_WITH_TBB_RUNTIME_VERSION
 #include "oneapi/tbb/version.h" // to get TBB_runtime_version
 #endif
 
