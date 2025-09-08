@@ -1448,6 +1448,7 @@ TEST_CASE("Task dispatcher exception handling race condition test") {
     }
 }
 
+//! \brief \ref error_guessing
 TEST_CASE("Mixed arena and task_group race test") {
     const int num_iterations = 50;
     
