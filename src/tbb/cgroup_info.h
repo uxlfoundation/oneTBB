@@ -127,6 +127,7 @@ private:
         if (path_start) {
             // Ensure no new line at the end of the path is copied
             std::size_t real_rel_path_size = std::strcspn(path_start, "\n");
+            __TBB_ASSERT(real_rel_path_size < rel_path_size, nullptr);
             std::strncpy(pcd.relative_path, path_start, real_rel_path_size);
             pcd.relative_path[real_rel_path_size] = '\0';
             pcd.version = cgroup_version;
