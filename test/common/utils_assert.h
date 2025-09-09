@@ -79,7 +79,7 @@ void AssertSameType( const T& /*x*/, const T& /*y*/ ) {}
         auto default_handler = utils::SetCustomAssertionHandler();         \
         const char* message = nullptr;                                     \
         bool okay = false;                                                 \
-        if (!setjmp(utils::g_assertion_jmp_buf)) {                          \
+        if (!setjmp(utils::g_assertion_jmp_buf)) {                         \
             x;                                                             \
         } else {                                                           \
             okay = true;                                                   \
