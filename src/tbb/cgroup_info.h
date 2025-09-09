@@ -110,6 +110,11 @@ private:
         const char* path_start = nullptr;
         constexpr std::size_t cgroup_v2_prefix_size = 3;
         while (std::fgets(line, rel_path_size, cgroup_fd)) {
+            // Both cgroup v1 and v2 mounts may be present. However,
+            // a specific controller can only be active in one of them. If the cgroup v1 CPU
+            // controller is found first, the search can stop immediately, as the CPU controller will not
+            // be active in cgroup v2. But if the cgroup v2 controller is found first, the search must
+            // continue, as the cgroup v1 CPU controller might appear later in the file.
             if (!path_start && std::strncmp(line, "0::", cgroup_v2_prefix_size) == 0) {
                 path_start = line + cgroup_v2_prefix_size; // cgroup v2 unified path
                 cgroup_version = cgroup_version_t::v2;
