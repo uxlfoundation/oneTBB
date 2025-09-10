@@ -247,7 +247,6 @@ void task_group_context_impl::reset(d1::task_group_context& ctx) {
     
     handle_context_exception(ctx, /* do not rethrow */ false);
 
-    // Thread-safe cancellation reset using atomic store
     ctx.my_cancellation_requested.store(0, std::memory_order_relaxed);
 }
 
