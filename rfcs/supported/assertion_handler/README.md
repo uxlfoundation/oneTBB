@@ -77,9 +77,11 @@ namespace ext {
 
 Applications that used the custom assertion handler in TBB 2020 can migrate to this proposal with minimal changes
 by adding the `set_assertion_handler` function name to `namespace tbb`:
+```cpp
 namespace tbb {
     using oneapi::tbb::ext::set_assertion_handler;
 }
+```
 
 #### Specification Extension
 
@@ -89,6 +91,10 @@ be enabled: `set_assertion_handler` and `get_assertion_handler` will be declared
 `assertion_failure` will dispatch to the active handler. Defining `__TBB_DISABLE_SPEC_EXTENSIONS` to a non-zero
 value before including oneTBB headers will disable the extension: these declarations will be excluded from
 the public API, and the library will always use the default assertion behavior.
+
+The availability of the extension can be checked with `TBB_EXT_CUSTOM_ASSERTION_HANDLER` macro. The value of it
+will be increased after adding of incompatibe changes. The macro is available after inclusion of
+`oneapi/tbb/version.h` header.
 
 ### Proposed Implementation Strategy
 
