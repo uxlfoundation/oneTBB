@@ -352,6 +352,8 @@ inline void handle_context_exception(d1::task_group_context& ctx, bool rethrow =
     if (exception) {
         if (ctx.my_exception.compare_exchange_strong(exception, nullptr, 
                                                      std::memory_order_acq_rel)) {
+            // TODO: An exception should not be captured and then not rethrown.
+            //       Either add asserts or remove corner cases.
             if (rethrow)
                 exception->rethrow_and_destroy();
             else
