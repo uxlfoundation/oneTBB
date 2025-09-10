@@ -21,13 +21,18 @@
 // TODO: find criteria to automatically define this in utils_assert.h
 #define TEST_CUSTOM_ASSERTION_HANDLER_ENABLED 1
 
+#include "tbb/global_control.h"
+// checking that inclusion of global_control.h is enough to get TBB_EXT_CUSTOM_ASSERTION_HANDLER
+#if TBB_EXT_CUSTOM_ASSERTION_HANDLER != 202510
+    #error "TBB_EXT_CUSTOM_ASSERTION_HANDLER must be set to 202510"
+#endif
+
 #include "common/test.h"
 
 #include "common/utils.h"
 #include "common/spin_barrier.h"
 #include "common/utils_concurrency_limit.h"
 
-#include "tbb/global_control.h"
 #include "tbb/parallel_for.h"
 #include "tbb/task_group.h"
 #include "tbb/task_arena.h"

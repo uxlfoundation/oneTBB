@@ -547,7 +547,7 @@
 #endif
 
 #if !__TBB_DISABLE_SPEC_EXTENSIONS
-#define TBB_EXT_CUSTOM_ASSERTION_HANDLER 1
+#define TBB_EXT_CUSTOM_ASSERTION_HANDLER 202510
 #endif
 
 #endif // __TBB_detail__config_H
