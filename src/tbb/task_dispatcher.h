@@ -380,8 +380,17 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
             if (global_control::active_value(global_control::terminate_on_exception) == 1) {
                 do_throw_noexcept([] { throw; });
             }
-            ed.context->cancel_group_execution();
-            ed.context->my_exception.store(tbb_exception_ptr::allocate(), std::memory_order_release);
+
+            tbb_exception_ptr* exception = ed.context->my_exception.load(std::memory_order_acquire);
+            if (!exception) {
+                auto e = tbb_exception_ptr::allocate();
+                if (ed.context->my_exception.compare_exchange_strong(exception, e,
+                                                                     std::memory_order_acq_rel)) {
+                    ed.context->cancel_group_execution();
+                } else {
+                    e->destroy();
+                }
+            }
         }
     } // Infinite exception loop
     __TBB_ASSERT(t == nullptr, nullptr);
