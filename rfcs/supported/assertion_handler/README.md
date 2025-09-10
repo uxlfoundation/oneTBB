@@ -75,8 +75,11 @@ namespace ext {
 }}}
 ```
 
-Applications that used the custom assertion handler in TBB 2020 can migrate to this proposal with no changes
-after manual injection of namespace `oneapi::tbb::ext` to namespace `tbb`.
+Applications that used the custom assertion handler in TBB 2020 can migrate to this proposal with minimal changes
+by adding the `set_assertion_handler` function name to `namespace tbb`:
+namespace tbb {
+    using oneapi::tbb::ext::set_assertion_handler;
+}
 
 #### Specification Extension
 
