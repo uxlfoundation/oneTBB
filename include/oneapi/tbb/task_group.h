@@ -603,6 +603,19 @@ public:
         return cancellation_status ? canceled : complete;
     }
 
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    task_group_status wait_for(task_completion_handle& comp_handle) {
+        bool cancellation_status = false;
+        d1::task_group_context& ctx = context();
+        try_call([&] {
+            task_completion_handle_accessor::get_dynamic_state(comp_handle)->wait_for_completion(ctx);
+        }).on_completion([&] {
+            cancellation_status = ctx.is_group_execution_cancelled();
+        });
+        return cancellation_status ? canceled : complete;
+    }
+#endif
+
     void cancel() {
         context().cancel_group_execution();
     }
