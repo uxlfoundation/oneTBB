@@ -1241,7 +1241,7 @@ TEST_CASE("task_handle cannot be scheduled into other task_group of the same con
 //! \brief \ref error_guessing \ref interface
 TEST_CASE("Concurrent exception handling in task_group wait") {
     if (tbb::this_task_arena::max_concurrency() < 3) {
-        // Test requires at least 3 threads: main + 2 waiters
+        // Test requires at least 3 threads: main + 2 workers
         return;
     }
 
