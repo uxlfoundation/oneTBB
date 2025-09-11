@@ -1758,6 +1758,85 @@ TEST_CASE("test dependencies and cancellation") {
     tbb::task_group_status status = tg.wait();
     CHECK_MESSAGE(status == tbb::task_group_status::canceled, "Incorrect status of cancelled task_group");
 }
+
+struct placeholder_task {
+    tbb::task_handle operator()() const {
+        CHECK(placeholder == 0);
+        placeholder = 1;
+
+        return std::move(bypass_handle);
+    }
+
+    placeholder_task(std::size_t& p) : placeholder(p) {}
+    placeholder_task(std::size_t& p, tbb::task_handle&& handle)
+        : placeholder(p), bypass_handle(std::move(handle)) {}
+
+    std::size_t& placeholder;
+    mutable tbb::task_handle bypass_handle;
+};
+
+TEST_CASE("test single task wait") {
+    for (unsigned p = MinThread; p <= MaxThread; ++p) {
+        tbb::global_control limit(tbb::global_control::max_allowed_parallelism, p);
+        tbb::task_group tg;
+
+        std::atomic<std::size_t> execution_allowed(0);
+        std::size_t controlled_task_placeholder(0);
+
+        tbb::task_handle controlled_task = tg.defer([&] {
+            utils::SpinWaitWhileEq(execution_allowed, 0ul);
+            controlled_task_placeholder = 1;
+        });
+
+        std::size_t left_leaf_placeholder = 0;
+        std::size_t right_leaf_placeholder = 0;
+        std::size_t combine_placeholder = 0;
+
+        std::size_t left_upper_level_placeholder = 0;
+        std::size_t right_upper_level_placeholder = 0;
+
+        tbb::task_handle left_leaf = tg.defer(placeholder_task(left_leaf_placeholder));
+        tbb::task_handle right_leaf = tg.defer(placeholder_task(right_leaf_placeholder));
+
+        tbb::task_handle bypass_task = tg.defer([] {});
+        tbb::task_handle combine = tg.defer(placeholder_task(combine_placeholder, std::move(bypass_task)));
+        
+        tbb::task_handle left_upper_level = tg.defer(placeholder_task(left_upper_level_placeholder));
+        tbb::task_handle right_upper_level = tg.defer(placeholder_task(right_upper_level_placeholder));
+
+        tbb::task_group::set_task_order(left_leaf, combine);
+        tbb::task_group::set_task_order(right_leaf, combine);
+        tbb::task_group::set_task_order(combine, controlled_task);
+        tbb::task_group::set_task_order(controlled_task, left_upper_level);
+        tbb::task_group::set_task_order(controlled_task, right_upper_level);
+
+        tbb::task_completion_handle combine_handle = combine;
+
+        tg.run(std::move(left_upper_level));
+        tg.run(std::move(right_upper_level));
+        tg.run(std::move(controlled_task));
+        tg.run(std::move(combine));
+        tg.run(std::move(left_leaf));
+        tg.run(std::move(right_leaf));
+
+        tg.wait_for(combine_handle);
+        REQUIRE_MESSAGE(left_leaf_placeholder == 1, "left leaf not completed");
+        REQUIRE_MESSAGE(right_leaf_placeholder == 1, "right leaf not completed");
+        REQUIRE_MESSAGE(combine_placeholder == 1, "combine task not completed");
+        REQUIRE_MESSAGE(controlled_task_placeholder == 0, "controlled task completed");
+        REQUIRE_MESSAGE(left_upper_level_placeholder == 0, "left upper level task completed");
+        REQUIRE_MESSAGE(right_upper_level_placeholder == 0, "right upper level task completed");
+
+        // Allow execution of controlled task
+        execution_allowed = 1;
+
+        tg.wait();
+
+        REQUIRE_MESSAGE(controlled_task_placeholder == 1, "controlled task not completed");
+        REQUIRE_MESSAGE(left_upper_level_placeholder == 1, "left upper level task not completed");
+        REQUIRE_MESSAGE(right_upper_level_placeholder == 1, "right upper level task not completed");
+    }
+}
 #endif
 
 struct stateful_task_body {

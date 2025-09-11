@@ -313,6 +313,17 @@ class task_arena : public task_arena_base {
                 "unexpected premature exit from wait_for: task group status is still not complete");
         return status;
     }
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    d2::task_group_status wait_for_impl(d2::task_completion_handle& comp_handle) {
+        d2::task_group_status status = d2::task_group_status::not_complete;
+        d2::wait_completion_handle_delegate wd{comp_handle, status};
+        r1::execute(*this, wd);
+        __TBB_ASSERT(status != d2::task_group_status::not_complete,
+                "unexpected premature exit from wait_for: task group status is still not complete");
+        return status;
+    }
+#endif
+
 public:
     //! Creates task_arena with certain concurrency limits
     /** Sets up settings only, real construction is deferred till the first method invocation
@@ -517,6 +528,13 @@ public:
         initialize();
         return wait_for_impl(tg);
     }
+
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    d2::task_group_status wait_for(d2::task_completion_handle& comp_handle) {
+        initialize();
+        return wait_for_impl(comp_handle);
+    }
+#endif
 
     //! Joins the arena and executes a mutable functor, then returns
     //! If not possible to join, wraps the functor into a task, enqueues it and waits for task completion

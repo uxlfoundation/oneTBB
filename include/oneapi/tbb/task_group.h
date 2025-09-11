@@ -136,7 +136,7 @@ namespace {
         task_handle th = std::forward<F>(f)();
         task_handle_task* task_ptr = task_handle_accessor::release(th);
         // If task has unresolved dependencies, it can't be bypassed
-        if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
+        if (task_ptr && task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
             task_ptr = nullptr;
         }
 
@@ -608,7 +608,7 @@ public:
         bool cancellation_status = false;
         d1::task_group_context& ctx = context();
         try_call([&] {
-            task_completion_handle_accessor::get_dynamic_state(comp_handle)->wait_for_completion(ctx);
+            task_completion_handle_accessor::get_task_dynamic_state(comp_handle)->wait_for_completion(ctx);
         }).on_completion([&] {
             cancellation_status = ctx.is_group_execution_cancelled();
         });
@@ -701,6 +701,27 @@ public:
     wait_delegate(task_group& a_group, task_group_status& tgs)
         : tg(a_group), status(tgs) {}
 };
+
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+class wait_completion_handle_delegate : public d1::delegate_base {
+    bool operator()() const override {
+        task_dynamic_state* state = task_completion_handle_accessor::get_task_dynamic_state(comp_handle);
+        d1::task_group_context& ctx = state->get_task()->ctx();
+        try_call([&] {
+            state->wait_for_completion(ctx);
+        }).on_completion([&] {
+            status = ctx.is_group_execution_cancelled() ? canceled : complete;
+        });
+        return true;
+    }
+protected:
+    task_completion_handle& comp_handle;
+    task_group_status& status;
+public:
+    wait_completion_handle_delegate(task_completion_handle& handle, task_group_status& tgs)
+        : comp_handle(handle), status(tgs) {}
+};
+#endif
 
 #if TBB_PREVIEW_ISOLATED_TASK_GROUP
 class spawn_delegate : public d1::delegate_base {
