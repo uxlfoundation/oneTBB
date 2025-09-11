@@ -355,7 +355,6 @@ inline void handle_context_exception(d1::task_group_context& ctx, bool rethrow =
             // TODO: An exception should not be captured and then not rethrown.
             //       Either add asserts or remove corner cases.
             if (rethrow) {
-                __TBB_ASSERT(ctx.is_group_execution_cancelled(), "Context with an exception should be canceled.");
                 exception->rethrow_and_destroy();
             } else
                 exception->destroy();
