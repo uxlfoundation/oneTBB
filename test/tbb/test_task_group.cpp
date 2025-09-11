@@ -16,6 +16,15 @@
 */
 
 #include "common/test.h"
+
+#if _MSC_VER
+#pragma warning (push)
+#if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
+    // Suppress pointless "unreachable code" warning.
+    #pragma warning (disable: 4702)
+#endif
+#endif //#if _MSC_VER
+
 #include "common/utils.h"
 #include "oneapi/tbb/detail/_config.h"
 #include "tbb/global_control.h"
@@ -2114,3 +2123,7 @@ TEST_CASE("Test stateful task body") {
     }
     CHECK_MESSAGE(placeholder == 1, "Not submitted task was executed");
 }
+
+#if _MSC_VER
+#pragma warning (pop)
+#endif
