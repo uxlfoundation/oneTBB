@@ -245,7 +245,7 @@ void task_group_context_impl::reset(d1::task_group_context& ctx) {
     __TBB_ASSERT(!is_poisoned(ctx.my_context_list), nullptr);
     //! TODO: Add assertion that this context does not have children
     
-    handle_context_exception(ctx, /* do not rethrow */ false);
+    handle_context_exception(ctx, /* rethrow = */ false);
 
     ctx.my_cancellation_requested.store(0, std::memory_order_relaxed);
 }
