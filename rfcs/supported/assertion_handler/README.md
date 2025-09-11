@@ -92,7 +92,7 @@ be enabled: `set_assertion_handler` and `get_assertion_handler` will be declared
 value before including oneTBB headers will disable the extension: these declarations will be excluded from
 the public API, and the library will always use the default assertion behavior.
 
-The availability of the extension can be checked with `TBB_EXT_CUSTOM_ASSERTION_HANDLER` macro. The value of it
+The availability of the extension can be checked with `TBB_EXT_CUSTOM_ASSERTION_HANDLER` macro. The value of the macro
 will be increased after adding of incompatibe changes. The macro is available after inclusion of
 `oneapi/tbb/version.h` header.
 
