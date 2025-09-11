@@ -300,3 +300,17 @@ TEST_CASE("Using custom assertion handler to test failure on invalid max_allowed
         tbb::global_control(tbb::global_control::max_allowed_parallelism, 0),
         "max_allowed_parallelism cannot be 0.");
 }
+
+namespace tbb {
+    using oneapi::tbb::ext::set_assertion_handler;
+    using oneapi::tbb::ext::assertion_handler_type;
+}
+
+//! Check that namespace injection allows to provide TBB 2020 source compatibility
+//! \brief \ref interface
+TEST_CASE("Check that namespace injection allows to provide TBB 2020 source compatibility") {
+    tbb::assertion_handler_type new_handler = [](const char*, int, const char*, const char*) {};
+
+    tbb::assertion_handler_type old_handler = tbb::set_assertion_handler(new_handler);
+    (void)old_handler;
+}
