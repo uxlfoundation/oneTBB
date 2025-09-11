@@ -310,5 +310,5 @@ TEST_CASE("Check that namespace injection allows to provide TBB 2020 source comp
     tbb::assertion_handler_type new_handler = [](const char*, int, const char*, const char*) {};
 
     tbb::assertion_handler_type old_handler = tbb::set_assertion_handler(new_handler);
-    (void)old_handler;
+    REQUIRE(old_handler != nullptr);
 }
