@@ -68,7 +68,7 @@ void task_group_context_impl::destroy(d1::task_group_context& ctx) {
 #endif
     ctl->~cpu_ctl_env();
 
-    handle_context_exception(ctx, /* do not rethrow */ false);
+    handle_context_exception(ctx, /* rethrow = */ false);
     ITT_STACK_DESTROY(ctx.my_itt_caller);
 
     poison_pointer(ctx.my_parent);
