@@ -63,7 +63,9 @@ BindingHandlerType GetDeallocateBindingHandler() {
     for (const auto& tbbbind_version : tbbbind_libraries_list) {
         if (dynamic_link(tbbbind_version, LinkTable,
                          sizeof(LinkTable) / sizeof(dynamic_link_descriptor), nullptr,
-                         DYNAMIC_LINK_LOCAL_BINDING)) {
+                         // use DYNAMIC_LINK_GLOBAL because we must not load TBBbind, we need to
+                         // find already loaded TBBbind to get the symbol from it
+                         DYNAMIC_LINK_GLOBAL)) {
             return deallocate_binding_handler_ptr;
         }
     }
