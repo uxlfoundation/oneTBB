@@ -14,7 +14,6 @@
     limitations under the License.
 */
 
-//! \file test_tbb_version.cpp
 //! Test for the availability of extensions
 //! \file test_tbb_version.cpp
 //! \brief Test for [configuration.feature_macros] specification
