@@ -1274,7 +1274,9 @@ void Backend::startUseBlock(MemRegion *region, FreeBlock *fBlock, bool addToBin)
     lastBl->memRegion = region;
 
     if (addToBin) {
-        unsigned targetBin = sizeToBin(blockSz);
+        int targetBin = sizeToBin(blockSz);
+        MALLOC_ASSERT(targetBin >= 0, ASSERT_TEXT);
+
         // during adding advance regions, register bin for a largest block in region
         advRegBins.registerBin(targetBin);
         if (region->type == MEMREG_SLAB_BLOCKS) {
