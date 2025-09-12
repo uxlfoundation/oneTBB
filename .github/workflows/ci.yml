@@ -32,6 +32,10 @@ env:
   MACOS_BUILD_CONCURRENCY: 3
   TEST_TIMEOUT: 180
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ !contains(github.ref, 'refs/heads/main') }}
+
 jobs:
   codespell:
     runs-on: [ubuntu-22.04]
