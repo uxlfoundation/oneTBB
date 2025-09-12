@@ -34,7 +34,7 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ !contains(github.ref, 'refs/heads/main') }}
+  cancel-in-progress: ${{ !contains(github.ref, 'refs/heads/master') }}
 
 jobs:
   codespell:
