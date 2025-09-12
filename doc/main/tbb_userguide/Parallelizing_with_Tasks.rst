@@ -4,7 +4,7 @@ Parallelizing with Tasks
 ========================
 
 When parallel loops or the flow graph are not sufficient, the |full_name|
-library supports parallelization directly with tasks. Independent tasks
+library supports parallelization directly with tasks. Tasks
 can be created using the function ``oneapi::tbb::parallel_invoke`` or
 the class ``oneapi::tbb::task_group``. 
 
