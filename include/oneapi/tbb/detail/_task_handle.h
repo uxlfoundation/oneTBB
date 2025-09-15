@@ -114,6 +114,7 @@ public:
 
     void add_successor(task_handle&  successor);
     void wait_for_completion(d1::task_group_context&);
+    void run_self_and_wait_for_completion(d1::task_group_context&);
     void add_notify_node(notify_list_node* new_notify_node, notify_list_node* current_notify_list_head);
     void add_notify_list(notify_list_node* notify_list);
 
@@ -397,6 +398,18 @@ inline void task_dynamic_state::wait_for_completion(d1::task_group_context& ctx)
             add_notify_node(&waiter_node, current_notify_list_head);
             d1::wait(waiter_node.task_wait_context, ctx);
         }
+    }
+}
+
+inline void task_dynamic_state::run_self_and_wait_for_completion(d1::task_group_context& ctx) {
+    __TBB_ASSERT(!has_dependencies(), nullptr);
+    notify_list_node* current_notify_list_head = m_notify_list_head.load(std::memory_order_acquire);
+    
+    if (!represents_completed_task(current_notify_list_head)) {
+        __TBB_ASSERT(!represents_transferred_completion(current_notify_list_head), "non-submitted task completion cannot be transferred");
+        notify_waiter_node waiter_node;
+        add_notify_node(&waiter_node, current_notify_list_head);
+        d1::execute_and_wait(*get_task(), ctx, waiter_node.task_wait_context, ctx);
     }
 }
 

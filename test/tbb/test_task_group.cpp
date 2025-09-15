@@ -1760,21 +1760,30 @@ TEST_CASE("test dependencies and cancellation") {
 }
 
 struct placeholder_task {
-    tbb::task_handle operator()() const {
+    void operator()() const {
         CHECK(placeholder == 0);
         placeholder = 1;
-
-        return std::move(bypass_handle);
     }
 
     placeholder_task(std::size_t& p) : placeholder(p) {}
-    placeholder_task(std::size_t& p, tbb::task_handle&& handle)
-        : placeholder(p), bypass_handle(std::move(handle)) {}
 
     std::size_t& placeholder;
+};
+
+struct bypass_placeholder_task : placeholder_task {
+    tbb::task_handle operator()() const {
+        CHECK(bypass_handle);
+        placeholder_task::operator()();
+        return std::move(bypass_handle);
+    }
+
+    bypass_placeholder_task(std::size_t& p, tbb::task_handle&& handle)
+        : placeholder_task(p), bypass_handle(std::move(handle)) {}
+
     mutable tbb::task_handle bypass_handle;
 };
 
+//! \brief \ref error_guessing
 TEST_CASE("test single task wait") {
     for (unsigned p = MinThread; p <= MaxThread; ++p) {
         tbb::global_control limit(tbb::global_control::max_allowed_parallelism, p);
@@ -1799,7 +1808,7 @@ TEST_CASE("test single task wait") {
         tbb::task_handle right_leaf = tg.defer(placeholder_task(right_leaf_placeholder));
 
         tbb::task_handle bypass_task = tg.defer([] {});
-        tbb::task_handle combine = tg.defer(placeholder_task(combine_placeholder, std::move(bypass_task)));
+        tbb::task_handle combine = tg.defer(bypass_placeholder_task(combine_placeholder, std::move(bypass_task)));
         
         tbb::task_handle left_upper_level = tg.defer(placeholder_task(left_upper_level_placeholder));
         tbb::task_handle right_upper_level = tg.defer(placeholder_task(right_upper_level_placeholder));
@@ -1815,11 +1824,12 @@ TEST_CASE("test single task wait") {
         tg.run(std::move(left_upper_level));
         tg.run(std::move(right_upper_level));
         tg.run(std::move(controlled_task));
-        tg.run(std::move(combine));
+        // tg.run(std::move(combine));
         tg.run(std::move(left_leaf));
         tg.run(std::move(right_leaf));
 
-        tg.wait_for(combine_handle);
+        // tg.wait_for(combine_handle);
+        tg.run_and_wait_for(std::move(combine));
         REQUIRE_MESSAGE(left_leaf_placeholder == 1, "left leaf not completed");
         REQUIRE_MESSAGE(right_leaf_placeholder == 1, "right leaf not completed");
         REQUIRE_MESSAGE(combine_placeholder == 1, "combine task not completed");

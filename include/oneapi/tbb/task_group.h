@@ -136,7 +136,7 @@ namespace {
         task_handle th = std::forward<F>(f)();
         task_handle_task* task_ptr = task_handle_accessor::release(th);
         // If task has unresolved dependencies, it can't be bypassed
-        if (task_ptr && task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
+        if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
             task_ptr = nullptr;
         }
 
@@ -542,6 +542,31 @@ protected:
         return cancellation_status ? canceled : complete;
     }
 
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    task_group_status internal_run_and_wait_for(d2::task_handle&& h) {
+        __TBB_ASSERT(h != nullptr, "Attempt to schedule empty task_handle");
+        __TBB_ASSERT(&d2::task_handle_accessor::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
+        
+        bool cancellation_status = false;
+        d1::task_group_context& ctx = context();
+        try_call([&] {
+            task_handle_task* task_ptr = d2::task_handle_accessor::release(h);
+            task_dynamic_state* state = task_ptr->get_dynamic_state();
+
+            // If the task has dependencies and the task_handle is not the last dependency
+            if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
+                state->wait_for_completion(ctx);
+            } else {
+                state->run_self_and_wait_for_completion(ctx);
+            }
+        }).on_completion([&] {
+            cancellation_status = ctx.is_group_execution_cancelled();
+        });
+        return cancellation_status ? canceled : complete;
+
+    }
+#endif
+
     template<typename F>
     d1::task* prepare_task(F&& f) {
         d1::small_object_allocator alloc{};
@@ -663,6 +688,10 @@ public:
     }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    task_group_status run_and_wait_for(d2::task_handle&& h) {
+        return internal_run_and_wait_for(std::move(h));
+    }
+
     static void set_task_order(d2::task_handle& pred, d2::task_handle& succ) {
         __TBB_ASSERT(pred != nullptr, "empty predecessor handle is not allowed for set_task_order");
         __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for set_task_order");
