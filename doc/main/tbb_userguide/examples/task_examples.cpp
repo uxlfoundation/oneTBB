@@ -173,19 +173,17 @@ TreeNode* generate_random_tree(size_t num_nodes, std::mt19937& gen,
                                std::uniform_int_distribution<int>& dist, int& target) {
     if (num_nodes == 0) return nullptr;
     
-    // Generate unique values for all nodes using unordered_set for fast lookup
-    std::vector<int> unique_values;
-    std::unordered_set<int> used_values;
-    unique_values.reserve(num_nodes);
-    
-    while (unique_values.size() < num_nodes) {
-        int value = dist(gen);
-        // Check if value is already used (O(1) average time complexity)
-        if (used_values.find(value) == used_values.end()) {
-            unique_values.push_back(value);
-            used_values.insert(value);
-        }
+    // Generate unique values for all nodes
+    std::size_t universe_size = dist.b();
+    std::vector<int> universe(universe_size);
+    std::iota(universe.begin(), universe.end(), 1);
+    std::vector<int> unique_values(num_nodes);
+    for (size_t i = 0; i < num_nodes; ++i, --universe_size) {
+        const std::size_t index = (dist(gen) - 1) % universe_size;
+        unique_values[i] = universe[index];
+        std::swap(universe[index], universe[universe_size - 1]);
     }
+
     
     // Build tree using unique values
     auto root = new TreeNode{unique_values[0]};
