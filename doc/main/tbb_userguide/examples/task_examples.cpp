@@ -306,7 +306,7 @@ int main() {
         double speedup_invoke = static_cast<double>(serial_duration.count()) / parallel_invoke_duration.count();
         double speedup_basic = static_cast<double>(serial_duration.count()) / parallel_duration.count();
         double speedup_cancel = static_cast<double>(serial_duration.count()) / cancellation_duration.count();
-         std::cout << "Speedup (invoke):                " << speedup_invoke << "x\n";
+        std::cout << "Speedup (invoke):                " << speedup_invoke << "x\n";
         std::cout << "Speedup (basic):                 " << speedup_basic << "x\n";
         std::cout << "Speedup (cancellation):          " << speedup_cancel << "x\n";
     }
