@@ -1,4 +1,4 @@
-.. _Creating_Tasks_with_task_group:
+.. _creating_tasks_with_task_group:
 
 Creating Tasks with task_group
 ==============================
@@ -12,15 +12,31 @@ will be in advance.
 Here is code that uses ``oneapi::tbb::task_group`` to implement a parallel search in
 a binary tree:
 
+Nodes are represented by ``struct TreeNode``.
+
+.. literalinclude:: ./examples/task_examples.cpp
+    :language: c++
+    :start-after: /*begin_treenode*/
+    :end-before: /*end_treenode*/
+
+A recursive base case is used after a minimum size threshold is reached to avoid parallel overheads.
+Since more than one thread can call the base case concurrently as part of the same tree, ``result``
+is held in an atomic variable.
+
+.. literalinclude:: ./examples/task_examples.cpp
+    :language: c++
+    :start-after: /*begin_sequential_tree_search*/
+    :end-before: /*end_sequential_tree_search*/
+
+In ``parallel_tree_search_impl``, ``task_group::run`` is used to create a new task for searching
+in the right subtree if both subtrees are valid. The recursion does not wait on the ``task_group``
+at each level and reuses the current task to search one of the subtrees. This can reduce the
+overhead of task creation and management, allowing for efficient use of resources.
+
 .. literalinclude:: ./examples/task_examples.cpp
     :language: c++
     :start-after: /*begin_parallel_search*/
     :end-before: /*end_parallel_search*/
-
-In ``parallel_search_impl``, ``task_group::run`` is used to create a new task for searching
-in the right subtree. Unlike ``parallel_invoke``, the recursion does not wait at each level
-and reuses the current task to search in the left subtree. This can reduce the
-overhead of task creation and management, allowing for more efficient use of resources.
 
 This example uses recursion to create many tasks. The depth of the parallel recursion is
 limited by the ``depth_threshold`` parameter. After this depth is reached, no new tasks

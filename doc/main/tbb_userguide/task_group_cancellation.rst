@@ -11,6 +11,26 @@ condition is met that makes further execution unnecessary.
 Here is an example of how to use task cancellation with ``oneapi::tbb::task_group``
 using an explicit ``oneapi::tbb::task_group_context``:
 
+
+Nodes are represented by ``struct TreeNode``.
+
+.. literalinclude:: ./examples/task_examples.cpp
+    :language: c++
+    :start-after: /*begin_treenode*/
+    :end-before: /*end_treenode*/
+
+A recursive base case is used after a minimum size threshold is reached to avoid parallel overheads.
+Since more than one thread can call the base case concurrently as part of the same tree, ``result``
+is held in an atomic variable.
+
+.. literalinclude:: ./examples/task_examples.cpp
+    :language: c++
+    :start-after: /*begin_sequential_tree_search*/
+    :end-before: /*end_sequential_tree_search*/
+
+The function ``parallel_tree_search_cancellable_impl`` cancels the ``task_group`` when a result
+is found.
+
 .. literalinclude:: ./examples/task_examples.cpp
     :language: c++
     :start-after: /*begin_parallel_search_cancellation*/

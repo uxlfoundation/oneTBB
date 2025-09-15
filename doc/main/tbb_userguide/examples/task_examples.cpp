@@ -23,25 +23,26 @@
 #include <memory>
 #include <queue>
 #include <unordered_set>
+#include <numeric>
 
 #include "oneapi/tbb.h"
 
 const int initial_depth_threshold = 10;
 
-/*begin_search_serial*/
-// Binary tree node structure
+/*begin_treenode*/
 struct TreeNode {
     int value;
     TreeNode* left = nullptr;
     TreeNode* right = nullptr;
     
-    // Destructor to clean up children
     ~TreeNode() {
         delete left;
         delete right;
     }
 };
+/*end_treenode*/
 
+/*begin_search_serial*/
 void serial_tree_search(TreeNode* node, int target, TreeNode*& result) {
     if (node && !result) {
         if (node->value == target) {
@@ -54,23 +55,27 @@ void serial_tree_search(TreeNode* node, int target, TreeNode*& result) {
 }
 /*end_search_serial*/
 
-/*begin_parallel_invoke_search*/
+/*begin_sequential_tree_search*/
 void sequential_tree_search(TreeNode* node, int target, std::atomic<TreeNode*>& result) {
     if (node && !result.load()) { 
         if (node->value == target) {
-            result.store(node);
+            TreeNode* expected = nullptr;
+            result.compare_exchange_strong(expected, node);
         } else {
             sequential_tree_search(node->left, target, result);
             sequential_tree_search(node->right, target, result);
         }
     }
 }
+/*end_sequential_tree_search*/
 
+/*begin_parallel_invoke_search*/
 void parallel_invoke_search(TreeNode* node, int target, std::atomic<TreeNode*>& result,
                             size_t depth_threshold = initial_depth_threshold) {
     if (node && !result.load()) { 
         if (node->value == target) {
-            result.store(node);
+            TreeNode* expected = nullptr;
+            result.compare_exchange_strong(expected, node);
         } else if (depth_threshold == 0) {
             sequential_tree_search(node, target, result);
         } else {
@@ -89,13 +94,12 @@ void parallel_tree_search_impl(tbb::task_group& tg, TreeNode* node, int target,
                                size_t depth_threshold = initial_depth_threshold) {
     if (node && !result.load()) { 
         if (node->value == target) {
-            result.store(node);
+            TreeNode* expected = nullptr;
+            result.compare_exchange_strong(expected, node);
         } else if (depth_threshold == 0) {
-            // at parallel cutoff
             sequential_tree_search(node, target, result);
         } else if (node->left) {
             if (node->right) {
-                // have two children, run the right as independent task
                 tg.run([node, target, &result, &tg, depth_threshold] {
                     parallel_tree_search_impl(tg, node->right, target, result, depth_threshold - 1);
                 });
@@ -130,8 +134,10 @@ void parallel_tree_search_cancellable_impl(tbb::task_group& tg, TreeNode* node, 
                                            size_t depth_threshold = initial_depth_threshold) {
     if (node && !ctx.is_group_execution_cancelled()) {
        if (node->value == target) {
-            result.store(node);
-            ctx.cancel_group_execution(); // Cancel remaining tasks
+            TreeNode* expected = nullptr;
+            if (result.compare_exchange_strong(expected, node)) {
+                ctx.cancel_group_execution();
+            }
        } else if (depth_threshold == 0) {
             sequential_tree_search(node, target, result);
             if (result.load() != nullptr) {
@@ -139,7 +145,6 @@ void parallel_tree_search_cancellable_impl(tbb::task_group& tg, TreeNode* node, 
             }
         } else if (node->left) {
             if (node->right) {
-                // have two children, run the right one in the task_group
                 tg.run([node, target, &result, &tg, &ctx, depth_threshold] {
                     parallel_tree_search_cancellable_impl(tg, node->right, target, result, ctx, depth_threshold - 1);
                 });
@@ -158,10 +163,8 @@ TreeNode* parallel_tree_search_cancellable(TreeNode* root, int target) {
     tbb::task_group_context ctx;
     tbb::task_group tg(ctx);
     
-    // Start the divide and conquer search with cancellation support
     parallel_tree_search_cancellable_impl(tg, root, target, result, ctx);
     
-    // Wait for all tasks to complete or be cancelled
     tg.wait();
 
     return result.load();
