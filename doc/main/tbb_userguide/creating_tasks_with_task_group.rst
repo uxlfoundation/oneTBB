@@ -4,7 +4,7 @@ Creating Tasks with task_group
 ==============================
 
 The |full_name| library supports parallelization directly with tasks. The class 
-``oneapi::tbb::task_group`` is used to run and wait for independent tasks in a less
+``oneapi::tbb::task_group`` is used to run and wait for tasks in a less
 structured way than ``oneapi::tbb::parallel_invoke``. It is useful when you want to
 create a set of tasks that can be run in parallel, but you do not know how many there
 will be in advance.
