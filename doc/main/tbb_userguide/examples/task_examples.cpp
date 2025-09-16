@@ -59,8 +59,7 @@ void serial_tree_search(TreeNode* node, int target, TreeNode*& result) {
 void sequential_tree_search(TreeNode* node, int target, std::atomic<TreeNode*>& result) {
     if (node && !result.load()) { 
         if (node->value == target) {
-            TreeNode* expected = nullptr;
-            result.compare_exchange_strong(expected, node);
+            result.store(node); // overwrite is ok since any result is valid
         } else {
             sequential_tree_search(node->left, target, result);
             sequential_tree_search(node->right, target, result);
@@ -74,8 +73,7 @@ void parallel_invoke_search(TreeNode* node, int target, std::atomic<TreeNode*>& 
                             size_t depth_threshold = initial_depth_threshold) {
     if (node && !result.load()) { 
         if (node->value == target) {
-            TreeNode* expected = nullptr;
-            result.compare_exchange_strong(expected, node);
+            result.store(node); // overwrite is ok since any result is valid
         } else if (depth_threshold == 0) {
             sequential_tree_search(node, target, result);
         } else {
@@ -94,8 +92,7 @@ void parallel_tree_search_impl(tbb::task_group& tg, TreeNode* node, int target,
                                size_t depth_threshold = initial_depth_threshold) {
     if (node && !result.load()) { 
         if (node->value == target) {
-            TreeNode* expected = nullptr;
-            result.compare_exchange_strong(expected, node);
+            result.store(node); // overwrite is ok since any result is valid
         } else if (depth_threshold == 0) {
             sequential_tree_search(node, target, result);
         } else if (node->left) {
@@ -134,10 +131,8 @@ void parallel_tree_search_cancellable_impl(tbb::task_group& tg, TreeNode* node, 
                                            size_t depth_threshold = initial_depth_threshold) {
     if (node && !ctx.is_group_execution_cancelled()) {
        if (node->value == target) {
-            TreeNode* expected = nullptr;
-            if (result.compare_exchange_strong(expected, node)) {
-                ctx.cancel_group_execution();
-            }
+            result.store(node); // overwrite is ok since any result is valid
+            ctx.cancel_group_execution();
        } else if (depth_threshold == 0) {
             sequential_tree_search(node, target, result);
             if (result.load() != nullptr) {
