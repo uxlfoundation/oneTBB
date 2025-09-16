@@ -7,7 +7,7 @@ The use of a shared ``task_group`` object across different threads is safe and e
 in many common cases, such as recursive algorithms. But sometimes it is difficult
 to reason about the concurrent use of a single shared ``task_group`` across threads.
 
-In :ref:`creating_tasks_with_task_group`, tasks that are executing within a ``task_group`` add additional tasks
+In :ref:`creating_tasks_with_task_group`, tasks that are executing within a ``task_group`` add more tasks
 by calling ``run`` on the same ``task_group`` object. The call to ``task_group::wait`` is then made
 from the single thread that started the recursive parallel algorithm. The calls to ``run`` are logically nested
 within a recursive algorithm and that single call to ``wait`` is guaranteed to wait
