@@ -41,8 +41,9 @@ when that call to ``wait`` returns.
 
 Both of these guarantees mean that if you use C++ mechanisms to order the calls to ``run``
 and ``wait`` on the same ``task_group``, this ordering will be respected. But if you do not
-enforce an ordering, then there can be races between when a task is ``run`` in a ``task_group`` and
-the ``wait`` on that ``task_group`` in another thread.
+enforce an ordering, task submissions and waits on different threads are not synchronized.
+That is, it is unknown if a task in the ``task_group`` will be complete when
+a ``wait`` on that ``task_group`` by another thread returns.
 
 Use of cancellation or exceptions complicates the semantics of concurrent calls to ``wait``
 on the same ``task_group`` object. The ``task_group::wait`` function resets the ``task_group_context`` associated
