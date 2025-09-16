@@ -1,6 +1,6 @@
 .. _task_group_cancellation:
 
-task_group cancellation
+task_group Cancellation
 =======================
 
 The |full_name| library provides a way to cancel tasks using
