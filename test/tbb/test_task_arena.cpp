@@ -51,8 +51,8 @@
 
 //--------------------------------------------------//
 // Validation function to check that current_thread_index() and execution_slot() return
-// the same value. The exported function tbb::detail::r1::execution_slot is maintained
-// for backwards compatibility only.
+// the same value for a thread running within initialized task_arena. The exported function
+// tbb::detail::r1::execution_slot is maintained for backwards compatibility only.
 void check_slot_compatibility(int expected_idx, const tbb::task_arena& arena) {
     int execution_slot_idx = int(tbb::detail::r1::execution_slot(arena));
     CHECK_MESSAGE(expected_idx == execution_slot_idx,
