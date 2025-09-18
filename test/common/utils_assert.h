@@ -56,6 +56,15 @@ void AssertSameType( const T& /*x*/, const T& /*y*/ ) {}
 
 #include "tbb/global_control.h"
 
+ 
+// Suppress warning about setjmp/longjmp usage in C++ in MSVC.
+// It is not guaranteed by the standard that stack-frame objects are destroyed correctly if longjmp is used.
+// But since we use it only in testing and only when exceptions are not possible, it should be acceptable.
+#if _MSC_VER && !TBB_USE_EXCEPTIONS
+#pragma warning(push)
+#pragma warning(disable : 4611)
+#endif
+
 //! Check that expression x raises assertion failure with message containing given substring.
 /** Calls utils::SetCustomAssertionHandler to set utils::AssertionFailureHandler as a handler. */
 #if TBB_USE_EXCEPTIONS
@@ -124,6 +133,10 @@ void AssertionFailureHandler(const char* filename, int line,
     g_assertion_failure.reset(new AssertionFailure(filename, line, expression, comment));
     std::longjmp(g_assertion_jmp_buf, 1);
 }
+#endif
+
+#if _MSC_VER && !TBB_USE_EXCEPTIONS
+#pragma warning(pop)
 #endif
 
 tbb::ext::assertion_handler_type SetCustomAssertionHandler() {
