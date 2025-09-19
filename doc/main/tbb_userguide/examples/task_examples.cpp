@@ -130,23 +130,24 @@ void parallel_tree_search_cancellable_impl(tbb::task_group& tg, TreeNode* node, 
                                            tbb::task_group_context& ctx,
                                            size_t depth_threshold = initial_depth_threshold) {
     if (node && !ctx.is_group_execution_cancelled()) {
-       if (node->value == target) {
+        if (node->value == target) {
             result.store(node); // overwrite is ok since any result is valid
-            ctx.cancel_group_execution();
-       } else if (depth_threshold == 0) {
+            ctx.cancel_group_execution(); // multiple cancellations are ok due to single wait
+        } else if (depth_threshold == 0) {
             sequential_tree_search(node, target, result);
             if (result.load() != nullptr) {
                 ctx.cancel_group_execution();
             }
-        } else if (node->left) {
-            if (node->right) {
-                tg.run([node, target, &result, &tg, &ctx, depth_threshold] {
-                    parallel_tree_search_cancellable_impl(tg, node->right, target, result, ctx, depth_threshold - 1);
-                });
-            }
-            parallel_tree_search_cancellable_impl(tg, node->left, target, result, ctx, depth_threshold - 1);
-        } else if (node->right) {
-            parallel_tree_search_cancellable_impl(tg, node->right, target, result, ctx, depth_threshold - 1);
+        } else {
+            // Run on left and right subtrees in parallel
+            tg.run([node, target, &result, &tg, &ctx, depth_threshold] {
+                parallel_tree_search_cancellable_impl(tg, node->left, target, result, ctx,
+                                                      depth_threshold - 1);
+            });
+            tg.run([node, target, &result, &tg, &ctx, depth_threshold] {
+                parallel_tree_search_cancellable_impl(tg, node->right, target, result, ctx,
+                                                      depth_threshold - 1);
+            });
         }
     }
 }
