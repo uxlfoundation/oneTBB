@@ -28,10 +28,8 @@ is held in an atomic variable.
     :start-after: /*begin_sequential_tree_search*/
     :end-before: /*end_sequential_tree_search*/
 
-In ``parallel_tree_search_impl``, ``task_group::run`` is used to create a new task for searching
-in the right subtree if both subtrees are valid. The recursion does not wait on the ``task_group``
-at each level and reuses the current task to search one of the subtrees. This can reduce the
-overhead of task creation and management, allowing for efficient use of resources.
+In ``parallel_tree_search_impl``, ``task_group::run`` is used to create new tasks for searching
+in the subtrees. The recursion does not wait on the ``task_group`` at each level.
 
 .. literalinclude:: ./examples/task_examples.cpp
     :language: c++
