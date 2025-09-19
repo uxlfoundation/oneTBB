@@ -1,4 +1,5 @@
 # Copyright (c) 2020-2025 Intel Corporation
+# Copyright (c) 2025 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -420,7 +421,18 @@ if (TARGET TBB::tbb)
     if (NOT TBB_TCM_TESTING)
         tbb_add_test(SUBDIR tbb NAME test_arena_priorities DEPENDENCIES TBB::tbb)
     endif()
-    tbb_add_test(SUBDIR tbb NAME test_dynamic_link DEPENDENCIES TBB::tbb)
+
+    tbb_add_test(SUBDIR tbb NAME test_dynamic_link)
+    add_dependencies(test_dynamic_link TBB::tbb)
+    target_include_directories(test_dynamic_link PRIVATE
+        $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>)
+    set_property(TARGET test_dynamic_link PROPERTY BUILD_RPATH_USE_ORIGIN TRUE)
+    set_property(TARGET test_dynamic_link PROPERTY BUILD_RPATH "$ORIGIN")
+    target_compile_definitions(test_dynamic_link PRIVATE "TBBLIB_NAME=\"$<TARGET_FILE_NAME:TBB::tbb>\"")
+    # Making unsigned library which the test fails loading
+    add_library(stub_unsigned SHARED ${CMAKE_CURRENT_SOURCE_DIR}/tbb/stub_unsigned_lib.cpp)
+    add_dependencies(test_dynamic_link stub_unsigned)
+
     if (LINKER_HAS_NO_AS_NEEDED)
         # The linker may not detect a dependency on pthread in static variable constructors.
         target_link_libraries(test_dynamic_link PRIVATE "-Wl,--no-as-needed")
@@ -491,6 +503,7 @@ if (TARGET TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_environment_whitebox DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_hw_concurrency DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_eh_thread DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR tbb NAME test_tbb_version DEPENDENCIES TBB::tbb)
     if (NOT TBB_TCM_TESTING)
         tbb_add_test(SUBDIR tbb NAME test_global_control DEPENDENCIES TBB::tbb)
     endif()
@@ -531,6 +544,7 @@ if (TARGET TBB::tbb)
     # HWLOC related test
     if (NOT TBB_EMSCRIPTEN)
         tbb_add_tbbbind_test(SUBDIR tbb NAME test_arena_constraints)
+        tbb_add_tbbbind_test(SUBDIR tbb NAME test_tbbbind)
     endif()
 
     if ((NOT "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "mips") AND (NOT TBB_EMSCRIPTEN))
