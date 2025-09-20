@@ -147,6 +147,8 @@ resources that are near to the data they access. oneTBB already provides low-lev
 `tbb::info` and `tbb::task_arena`, but we should up-level this support into the high-level algorithms,
 flow graph and containers where appropriate.
 
+See [sub-RFC for describing data placement](describe-data-placement.org)
+
 ### Improved out-of-the-box performance for high-level oneTBB features.
 
 For high-level oneTBB features that are modified to provide improved NUMA support, we can try to 
