@@ -286,6 +286,10 @@ arena::arena(threading_control* control, unsigned num_slots, unsigned num_reserv
 #if __TBB_PREVIEW_PARALLEL_PHASE
     my_thread_leave.set_initial_state(lp);
 #endif
+    pool_mask = new (cache_aligned_allocate(num_slots * sizeof(pool_mask_type))) pool_mask_type{};
+    for (std::size_t i = 0; i < my_num_slots; ++i) {
+        new (pool_mask + i) pool_mask_type{};
+    }
 }
 
 arena& arena::allocate_arena(threading_control* control, unsigned num_slots, unsigned num_reserved_slots,
@@ -351,6 +355,10 @@ void arena::free_arena () {
     std::memset( storage, 0, allocation_size(my_num_slots) );
 #endif /* TBB_USE_ASSERT */
     cache_aligned_deallocate( storage );
+    for (std::size_t i = 0; i < my_num_slots; ++i) {
+        pool_mask[i].~pool_mask_type();
+    }
+    cache_aligned_deallocate(pool_mask);
 }
 
 bool arena::has_enqueued_tasks() {
