@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2005-2024 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -31,10 +31,36 @@
 #define INTEL_ITTNOTIFY_API_PRIVATE
 #endif
 
-#include "tools_api/ittnotify.h"
-#include "tools_api/legacy/ittnotify.h"
+#include "ittnotify.h"
+#include "legacy/ittnotify.h"
+
+typedef enum ___itt_group_id
+{
+    __itt_group_none      		= 0,
+    __itt_group_legacy    		= 1<<0,
+    __itt_group_control   		= 1<<1,
+    __itt_group_thread    		= 1<<2,
+    __itt_group_mark      		= 1<<3,
+    __itt_group_sync      		= 1<<4,
+    __itt_group_fsync     		= 1<<5,
+    __itt_group_jit       		= 1<<6,
+    __itt_group_model     		= 1<<7,
+    __itt_group_splitter_min 	= 1<<7,
+    __itt_group_counter   		= 1<<8,
+    __itt_group_frame     		= 1<<9,
+    __itt_group_stitch    		= 1<<10,
+    __itt_group_heap      		= 1<<11,
+    __itt_group_splitter_max 	= 1<<12,
+    __itt_group_structure 		= 1<<12,
+    __itt_group_suppress 		= 1<<13,
+    __itt_group_arrays    		= 1<<14,
+    __itt_group_module    		= 1<<15,
+    __itt_group_all       		= -1
+} __itt_group_id;
+
 extern "C" void __itt_fini_ittlib(void);
 extern "C" void __itt_release_resources(void);
+extern "C" int __itt_init_ittlib(const char *, __itt_group_id);
 
 #if _WIN32||_WIN64
     #undef _T

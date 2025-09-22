@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_library(tbbmalloc 
+add_library(tbbmalloc
     backend.cpp
     backref.cpp
     frontend.cpp
     large_objects.cpp
     tbbmalloc.cpp
     ../tbb/itt_notify.cpp)
-    
+
 if (WIN32)
     target_sources(tbbmalloc PRIVATE tbbmalloc.rc)
 endif()
@@ -104,13 +104,14 @@ endif()
 
 target_link_libraries(tbbmalloc
     PRIVATE
+    ittapi::ittnotify
     Threads::Threads
     ${TBB_LIB_LINK_LIBS}
     ${TBB_COMMON_LINK_LIBS}
 )
 
 if(TBB_BUILD_APPLE_FRAMEWORKS)
-    set_target_properties(tbbmalloc PROPERTIES 
+    set_target_properties(tbbmalloc PROPERTIES
         FRAMEWORK TRUE
         FRAMEWORK_VERSION ${TBBMALLOC_BINARY_VERSION}.${TBB_BINARY_MINOR_VERSION}
         XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER com.intel.tbbmalloc
