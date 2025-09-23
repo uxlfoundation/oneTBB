@@ -116,6 +116,9 @@ We can consider the following options for providing isolation in `task_arena::wa
 - somehow extend the `task_group` class to optionally support work isolation (might require incompatible changes);
 - add an isolation tag (automatically or on demand) only when a `task_group` is used with `task_arena`.
 
+For more details and analysis, see [the document describing `isolated_task_group`](
+https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/experimental/isolated_task_group).
+
 ## Open Questions
 
 - Is there any value in implementing this proposal first as experimental/preview API?
