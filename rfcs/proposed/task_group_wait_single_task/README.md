@@ -242,7 +242,7 @@ When a task completes, it traverses its notification list as follows:
 
 The diagram below illustrates a notification list for a task with two successors and two ``wait_for`` calls awaiting its completion:
 
-<img src="notify_list_before_completion.png" width=300>
+<img src="notify_list_before_completion.png" width=800>
 
 To differentiate between completed and canceled tasks and return the correct ``task_status``, distinct signals are sent while traversing the
 notification list after ``task::execute`` and ``task::cancel``.
@@ -273,7 +273,7 @@ tg.wait();
 The internal task graph is illustrated on the diagram below. ``SN`` and ``WN`` refer to the successor and waiter nodes in the notification list,
 respectively.
 
-<img src="avoid_bypass_graph.png" width=200>
+<img src="avoid_bypass_graph.png" width=400>
 
 For simplicity, assume that the task graph is executed within a single-threaded arena.
 
@@ -379,7 +379,7 @@ should not continue.
 
 The first alternative approach is to assign a single ``wait_context`` to each task and reuse it for all waiters. The ``wait_context`` would become a field within the ``task_dynamic_state`` class:
 
-<img src="wait_context_part_of_state.png" width=300>
+<img src="wait_context_part_of_state.png" width=800>
 
 This allows reuse of a single context object for all ``wait_for`` calls, but introduces challenges in supporting completion transfer.
 If completion is transferred to another task, a different ``wait_context`` object from the new task's state should be used:
