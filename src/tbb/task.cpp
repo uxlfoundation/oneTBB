@@ -260,6 +260,10 @@ d1::task* __TBB_EXPORTED_FUNC current_task_ptr() {
     return governor::get_thread_data()->get_innermost_running_task();
 }
 
+d1::wait_context* __TBB_EXPORTED_FUNC current_wait_context_ptr() {
+    return governor::get_thread_data()->get_innermost_wait_context_ptr();
+}
+
 } // namespace r1
 } // namespace detail
 } // namespace tbb

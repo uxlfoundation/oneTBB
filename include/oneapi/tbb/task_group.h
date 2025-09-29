@@ -467,6 +467,14 @@ enum task_group_status {
     canceled
 };
 
+// #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+// enum task_status {
+//     not_complete,
+//     complete,
+//     canceled
+// };
+// #endif
+
 class task_group;
 class structured_task_group;
 #if TBB_PREVIEW_ISOLATED_TASK_GROUP

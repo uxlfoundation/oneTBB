@@ -560,6 +560,7 @@ public:
         m_reference_vertex_map;
 
     d1::task* m_innermost_running_task{ nullptr };
+    d1::wait_context* m_innermost_wait_context_ptr{ nullptr };
 
     //! Attempt to get a task from the mailbox.
     /** Gets a task only if it has not been executed by its sender or a thief

@@ -40,7 +40,7 @@ class task_dynamic_state;
 
 struct notify_list_node {
     notify_list_node* next_node = nullptr;
-    virtual task_handle_task* notify() = 0;
+    virtual std::pair<task_handle_task*, bool> notify() = 0;
     virtual void destroy() {}
     virtual ~notify_list_node() = default;
 };
@@ -52,7 +52,7 @@ struct notify_successor_node : notify_list_node {
     notify_successor_node(task_dynamic_state* state, d1::small_object_allocator& alloc)
         : successor_state(state), allocator(alloc) {}
 
-    task_handle_task* notify() override;
+    std::pair<task_handle_task*, bool> notify() override;
 
     void destroy() override {
         allocator.delete_object(this);
@@ -64,9 +64,10 @@ struct notify_waiter_node : notify_list_node {
 
     notify_waiter_node() : task_wait_context(1) {}
 
-    virtual task_handle_task* notify() override {
+    virtual std::pair<task_handle_task*, bool> notify() override {
         task_wait_context.release();
-        return nullptr;
+        bool bypass_allowed = r1::current_wait_context_ptr() != &task_wait_context;
+        return {nullptr, bypass_allowed};
     }
 };
 
@@ -155,12 +156,12 @@ private:
     d1::small_object_allocator m_allocator;
 };
 
-inline task_handle_task* notify_successor_node::notify() {
+inline std::pair<task_handle_task*, bool> notify_successor_node::notify() {
     task_handle_task* successor_task = nullptr;
     if (successor_state->release_dependency()) {
         successor_task = successor_state->get_task();
     }
-    return successor_task;
+    return {successor_task, true};
 }
 #endif // __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
@@ -441,14 +442,19 @@ inline task_handle_task* task_dynamic_state::complete_and_try_get_successor() {
 
     // Doing a single check is enough since the this function is called after the task body and
     // the state of the list cannot change to transferred
+    bool bypass_allowed = true;
+
     if (!represents_transferred_completion(node)) {
         node = fetch_notify_list(COMPLETED_FLAG);
 
         while (node != nullptr) {
-            task_handle_task* successor_task = node->notify();
+            std::pair<task_handle_task*, bool> res = node->notify();
+            if (!res.second) bypass_allowed = false;
+            task_handle_task* successor_task = res.first;
+
             if (next_task == nullptr) {
                 next_task = successor_task;
-            } else if (successor_task != nullptr) {
+            } else if (res.first != nullptr) {
                 d1::spawn(*successor_task, successor_task->ctx());
             }
 
@@ -456,6 +462,11 @@ inline task_handle_task* task_dynamic_state::complete_and_try_get_successor() {
             node->destroy();
             node = next_node;
         }
+    }
+
+    if (next_task && !bypass_allowed) {
+        d1::spawn(*next_task, next_task->ctx());
+        next_task = nullptr;
     }
     return next_task;
 }

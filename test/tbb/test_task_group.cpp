@@ -1807,8 +1807,9 @@ TEST_CASE("test single task wait") {
         tbb::task_handle left_leaf = tg.defer(placeholder_task(left_leaf_placeholder));
         tbb::task_handle right_leaf = tg.defer(placeholder_task(right_leaf_placeholder));
 
-        tbb::task_handle bypass_task = tg.defer([] {});
-        tbb::task_handle combine = tg.defer(bypass_placeholder_task(combine_placeholder, std::move(bypass_task)));
+        // tbb::task_handle bypass_task = tg.defer([] {});
+        // tbb::task_handle combine = tg.defer(bypass_placeholder_task(combine_placeholder, std::move(bypass_task)));
+        tbb::task_handle combine = tg.defer(placeholder_task(combine_placeholder));
         
         tbb::task_handle left_upper_level = tg.defer(placeholder_task(left_upper_level_placeholder));
         tbb::task_handle right_upper_level = tg.defer(placeholder_task(right_upper_level_placeholder));
