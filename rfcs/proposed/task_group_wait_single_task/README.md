@@ -111,6 +111,9 @@ If the group execution is cancelled, the tracked task may still execute, and ret
 completion status.
 If execution is not cancelled, the function would need to track whether other tasks remain in the group and return ``not_complete` if any are still pending.
 
+If the task group execution is canceled and the originally executed task has transferred its completion to another task that was canceled, the
+waiting function will return ``task_status::canceled``.
+
 To address this, a new enum ``task_status`` is proposed to track the status of the awaited task. ``task_status::complete`` indicates that the tracked 
 task was executed and completed, while ``task_status::canceled`` signifies that the task was not executed due to group cancellation.
 
@@ -218,6 +221,8 @@ to execute tasks with any of its predecessor's tags.
 As an initial step, it makes sense to isolate the waiting thread so that it only executes tasks related to the same ``task_group`` as the awaited task - similar to the improvement described in the [RFC for another overload of ``task_arena::wait_for``](../task_arena_waiting/task_group_interop.md).
 
 ## Exit Criteria and Open Questions
+
+The following questions should be resolved before promoting the feature out of the ``experimental`` stage.
 
 * Performance targets for this feature should be clearly defined.
 * Should the ``enqueue_and_wait`` API be added to ``task_arena``? Refer to the
@@ -367,11 +372,12 @@ task_handle_task* notify_list(notification_list_node* node, bool is_cancel_signa
 }
 ```
 
-This solution does not restrict the thread that is notified by another thread of the task completion from entering the bypass loop of the currently
-executing task.
+While the proposed solution avoids task bypassing when the waiting thread executes the task it is explicitly waiting for, bypassing remains
+unrestricted in other scenarios. For example, if the waiting thread executes a task unrelated to the awaited one, such as a ``parallel_for``
+task in the same arena, it may still enter the bypass loop, even if the reference count of the awaited ``wait_context`` is zero.
 
-An alternative approach is to implement a general solution within the scheduler that exits the bypass loop and spawns the bypassed task if execution
-should not continue.
+An alternative approach to address this limitation is to implement a general mechanism within the scheduler that forces the thread to exit the
+bypass loop and spawn the returned task if further execution should not be continued (i.e., ``waiter.continue_execution()`` returns ``false``).
 
 ## Alternative Implementation Approaches
 
