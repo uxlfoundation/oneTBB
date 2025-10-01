@@ -39,8 +39,14 @@ class task_handle_task;
 class task_dynamic_state;
 
 struct notify_list_node {
+    // First element is a pointer to a bypassed task
+    // Second element is true if bypass is allowed
+    using notify_result_type = std::pair<task_handle_task*, bool>;
+
     notify_list_node* next_node = nullptr;
-    virtual std::pair<task_handle_task*, bool> notify() = 0;
+
+    virtual notify_result_type notify_on_completion() = 0;
+    virtual notify_result_type notify_on_cancellation() = 0;
     virtual void destroy() {}
     virtual ~notify_list_node() = default;
 };
@@ -52,7 +58,16 @@ struct notify_successor_node : notify_list_node {
     notify_successor_node(task_dynamic_state* state, d1::small_object_allocator& alloc)
         : successor_state(state), allocator(alloc) {}
 
-    std::pair<task_handle_task*, bool> notify() override;
+    notify_result_type notify_common();
+
+    notify_result_type notify_on_completion() override {
+        return notify_common();
+    }
+
+    notify_result_type notify_on_cancellation() override {
+        return notify_common();
+    }
+    
 
     void destroy() override {
         allocator.delete_object(this);
@@ -61,13 +76,23 @@ struct notify_successor_node : notify_list_node {
 
 struct notify_waiter_node : notify_list_node {
     d1::wait_context task_wait_context;
+    bool was_canceled;
 
-    notify_waiter_node() : task_wait_context(1) {}
+    notify_waiter_node() : task_wait_context(1), was_canceled(false) {}
 
-    virtual std::pair<task_handle_task*, bool> notify() override {
+    notify_result_type notify_common() {
         task_wait_context.release();
         bool bypass_allowed = r1::current_wait_context_ptr() != &task_wait_context;
         return {nullptr, bypass_allowed};
+    }
+
+    virtual notify_result_type notify_on_completion() override {
+        return notify_common();
+    }
+
+    virtual notify_result_type notify_on_cancellation() override {
+        was_canceled = true;
+        return notify_common();
     }
 };
 
@@ -112,24 +137,32 @@ public:
     }
 
     task_handle_task* complete_and_try_get_successor();
+    task_handle_task* cancel_and_try_get_successor();
 
     void add_successor(task_handle&  successor);
-    void wait_for_completion(d1::task_group_context&);
-    void run_self_and_wait_for_completion(d1::task_group_context&);
+    bool wait_for_completion(d1::task_group_context&);
+    bool run_self_and_wait_for_completion(d1::task_group_context&);
     void add_notify_node(notify_list_node* new_notify_node, notify_list_node* current_notify_list_head);
     void add_notify_list(notify_list_node* notify_list);
 
     using notify_list_state_flag = std::uintptr_t;
     static constexpr notify_list_state_flag COMPLETED_FLAG = ~std::uintptr_t(0);
     static constexpr notify_list_state_flag TRANSFERRED_FLAG = ~std::uintptr_t(1);
+    static constexpr notify_list_state_flag CANCELED_FLAG = ~std::uintptr_t(2);
 
     static bool represents_completed_task(notify_list_node* list_head) {
         return list_head == reinterpret_cast<notify_list_node*>(COMPLETED_FLAG);
     }
 
+    static bool represents_canceled_task(notify_list_node* list_head) {
+        return list_head == reinterpret_cast<notify_list_node*>(CANCELED_FLAG);
+    }
+
     static bool represents_transferred_completion(notify_list_node* list_head) {
         return list_head == reinterpret_cast<notify_list_node*>(TRANSFERRED_FLAG);
     }
+
+    task_handle_task* try_get_successor(notify_list_state_flag);
 
     notify_list_node* fetch_notify_list(notify_list_state_flag new_list_state_flag) {
         return m_notify_list_head.exchange(reinterpret_cast<notify_list_node*>(new_list_state_flag));
@@ -156,7 +189,7 @@ private:
     d1::small_object_allocator m_allocator;
 };
 
-inline std::pair<task_handle_task*, bool> notify_successor_node::notify() {
+inline std::pair<task_handle_task*, bool> notify_successor_node::notify_common() {
     task_handle_task* successor_task = nullptr;
     if (successor_state->release_dependency()) {
         successor_task = successor_state->get_task();
@@ -248,6 +281,16 @@ public:
         task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_relaxed);
         if (current_state != nullptr) {
             next_task = current_state->complete_and_try_get_successor();
+        }
+        return next_task;
+    }
+
+    task_handle_task* cancel_and_try_get_successor() {
+        task_handle_task* next_task = nullptr;
+
+        task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_relaxed);
+        if (current_state != nullptr) {
+            next_task = current_state->cancel_and_try_get_successor();
         }
         return next_task;
     }
@@ -349,7 +392,12 @@ inline void task_dynamic_state::add_notify_node(notify_list_node* new_notify_nod
 
         if (represents_completed_task(current_notify_list_head)) {
             // Current task has completed while we tried to insert the node to the list
-            new_notify_node->notify();
+            new_notify_node->notify_on_completion();
+            new_notify_node->destroy();
+            break;
+        } else if (represents_canceled_task(current_notify_list_head)) {
+            // Current task has canceled while we tried to insert the node to the list
+            new_notify_node->notify_on_cancellation();
             new_notify_node->destroy();
             break;
         } else if (represents_transferred_completion(current_notify_list_head)) {
@@ -368,7 +416,7 @@ inline void task_dynamic_state::add_notify_node(notify_list_node* new_notify_nod
 inline void task_dynamic_state::add_successor(task_handle& successor) {
     notify_list_node* current_notify_list_head = m_notify_list_head.load(std::memory_order_acquire);
 
-    if (!represents_completed_task(current_notify_list_head)) {
+    if (!represents_completed_task(current_notify_list_head) && !represents_canceled_task(current_notify_list_head)) {
         if (represents_transferred_completion(current_notify_list_head)) {
             // Redirect successor to the task received the completion
             task_dynamic_state* new_completion_point = m_new_completion_point.load(std::memory_order_relaxed);
@@ -385,11 +433,14 @@ inline void task_dynamic_state::add_successor(task_handle& successor) {
     }
 }
 
-inline void task_dynamic_state::wait_for_completion(d1::task_group_context& ctx) {
+inline bool task_dynamic_state::wait_for_completion(d1::task_group_context& ctx) {
     notify_list_node* current_notify_list_head = m_notify_list_head.load(std::memory_order_acquire);
+    bool was_canceled = false;
 
     if (!represents_completed_task(current_notify_list_head)) {
-        if (represents_transferred_completion(current_notify_list_head)) {
+        if (represents_canceled_task(current_notify_list_head)) {
+            was_canceled = true;
+        } else if (represents_transferred_completion(current_notify_list_head)) {
             // Redirect waiter to the task received the completion
             task_dynamic_state* new_completion_point = m_new_completion_point.load(std::memory_order_relaxed);
             __TBB_ASSERT(new_completion_point, "notify list is marked as transferred, but new dynamic state is not set");
@@ -398,20 +449,25 @@ inline void task_dynamic_state::wait_for_completion(d1::task_group_context& ctx)
             notify_waiter_node waiter_node;
             add_notify_node(&waiter_node, current_notify_list_head);
             d1::wait(waiter_node.task_wait_context, ctx);
+            was_canceled = waiter_node.was_canceled;
         }
     }
+
+    return was_canceled;
 }
 
-inline void task_dynamic_state::run_self_and_wait_for_completion(d1::task_group_context& ctx) {
+inline bool task_dynamic_state::run_self_and_wait_for_completion(d1::task_group_context& ctx) {
     __TBB_ASSERT(!has_dependencies(), nullptr);
     notify_list_node* current_notify_list_head = m_notify_list_head.load(std::memory_order_acquire);
-    
-    if (!represents_completed_task(current_notify_list_head)) {
-        __TBB_ASSERT(!represents_transferred_completion(current_notify_list_head), "non-submitted task completion cannot be transferred");
-        notify_waiter_node waiter_node;
-        add_notify_node(&waiter_node, current_notify_list_head);
-        d1::execute_and_wait(*get_task(), ctx, waiter_node.task_wait_context, ctx);
-    }
+
+    __TBB_ASSERT(!represents_completed_task(current_notify_list_head), "non-submitted task cannot be completed");
+    __TBB_ASSERT(!represents_canceled_task(current_notify_list_head), "non-submitted task cannot be canceled");
+    __TBB_ASSERT(!represents_transferred_completion(current_notify_list_head), "non-submitted task completion cannot be transferred");
+
+    notify_waiter_node waiter_node;
+    add_notify_node(&waiter_node, current_notify_list_head);
+    d1::execute_and_wait(*get_task(), ctx, waiter_node.task_wait_context, ctx);
+    return waiter_node.was_canceled;
 }
 
 inline void task_dynamic_state::add_notify_list(notify_list_node* notify_list) {
@@ -428,6 +484,7 @@ inline void task_dynamic_state::add_notify_list(notify_list_node* notify_list) {
 
     while (!m_notify_list_head.compare_exchange_strong(current_notify_list_head, notify_list)) {
         __TBB_ASSERT(!represents_completed_task(current_notify_list_head) &&
+                     !represents_canceled_task(current_notify_list_head) &&
                      !represents_transferred_completion(current_notify_list_head),
                      "Task receiving the completion was executed or completed");
         // Other thread updated the head of the list
@@ -435,33 +492,28 @@ inline void task_dynamic_state::add_notify_list(notify_list_node* notify_list) {
     }
 }
 
-inline task_handle_task* task_dynamic_state::complete_and_try_get_successor() {
+inline task_handle_task* task_dynamic_state::try_get_successor(notify_list_state_flag state_flag) {
+    __TBB_ASSERT(state_flag == COMPLETED_FLAG || state_flag == CANCELED_FLAG, "Unexpected state_flag");
+    notify_list_node* node = fetch_notify_list(state_flag);
     task_handle_task* next_task = nullptr;
-
-    notify_list_node* node = m_notify_list_head.load(std::memory_order_acquire);
-
-    // Doing a single check is enough since the this function is called after the task body and
-    // the state of the list cannot change to transferred
     bool bypass_allowed = true;
 
-    if (!represents_transferred_completion(node)) {
-        node = fetch_notify_list(COMPLETED_FLAG);
+    while (node != nullptr) {
+        notify_list_node::notify_result_type result = state_flag == COMPLETED_FLAG ?
+                                                      node->notify_on_completion() :
+                                                      node->notify_on_cancellation();
+        if (!result.second) bypass_allowed = false;
+        task_handle_task* successor_task = result.first;
 
-        while (node != nullptr) {
-            std::pair<task_handle_task*, bool> res = node->notify();
-            if (!res.second) bypass_allowed = false;
-            task_handle_task* successor_task = res.first;
-
-            if (next_task == nullptr) {
-                next_task = successor_task;
-            } else if (res.first != nullptr) {
-                d1::spawn(*successor_task, successor_task->ctx());
-            }
-
-            notify_list_node* next_node = node->next_node;
-            node->destroy();
-            node = next_node;
+        if (next_task == nullptr) {
+            next_task = successor_task;
+        } else if (successor_task != nullptr) {
+            d1::spawn(*successor_task, successor_task->ctx());
         }
+
+        notify_list_node* next_node = node->next_node;
+        node->destroy();
+        node = next_node;
     }
 
     if (next_task && !bypass_allowed) {
@@ -469,6 +521,24 @@ inline task_handle_task* task_dynamic_state::complete_and_try_get_successor() {
         next_task = nullptr;
     }
     return next_task;
+}
+
+inline task_handle_task* task_dynamic_state::complete_and_try_get_successor() {
+    task_handle_task* next_task = nullptr;
+    notify_list_node* node = m_notify_list_head.load(std::memory_order_acquire);
+
+    // Doing a single check is enough since the this function is called after the task body and
+    // the state of the list cannot change to transferred
+    if (!represents_transferred_completion(node)) {
+        next_task = try_get_successor(COMPLETED_FLAG);
+    }
+    return next_task;
+}
+
+inline task_handle_task* task_dynamic_state::cancel_and_try_get_successor() {
+    __TBB_ASSERT(!represents_transferred_completion(m_notify_list_head.load(std::memory_order_relaxed)),
+                 "canceled task completion cannot be transferred");
+    return try_get_successor(CANCELED_FLAG);
 }
 
 inline void task_handle_task::transfer_completion_to(task_handle& receiving_task) {

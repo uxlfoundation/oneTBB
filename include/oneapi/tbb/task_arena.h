@@ -314,12 +314,12 @@ class task_arena : public task_arena_base {
         return status;
     }
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    d2::task_group_status wait_for_impl(d2::task_completion_handle& comp_handle) {
-        d2::task_group_status status = d2::task_group_status::not_complete;
+    d2::task_status wait_for_impl(d2::task_completion_handle& comp_handle) {
+        d2::task_status status = d2::task_status::not_complete;
         d2::wait_completion_handle_delegate wd{comp_handle, status};
         r1::execute(*this, wd);
-        __TBB_ASSERT(status != d2::task_group_status::not_complete,
-                "unexpected premature exit from wait_for: task group status is still not complete");
+        __TBB_ASSERT(status != d2::task_status::not_complete,
+                "unexpected premature exit from wait_for: task status is still not complete");
         return status;
     }
 #endif
@@ -530,7 +530,7 @@ public:
     }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    d2::task_group_status wait_for(d2::task_completion_handle& comp_handle) {
+    d2::task_status wait_for(d2::task_completion_handle& comp_handle) {
         initialize();
         return wait_for_impl(comp_handle);
     }

@@ -117,7 +117,7 @@ private:
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
         // TODO: complete_and_try_get_successor returns one ready successor task, others are spawned and cancelled by the scheduler
         // Should cancel() be called directly instead?
-        task_ptr = this->complete_and_try_get_successor();
+        task_ptr = this->cancel_and_try_get_successor();
 #endif
         this->destroy(&ed);
         return task_ptr;
@@ -467,13 +467,13 @@ enum task_group_status {
     canceled
 };
 
-// #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-// enum task_status {
-//     not_complete,
-//     complete,
-//     canceled
-// };
-// #endif
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+enum class task_status {
+    not_complete,
+    complete,
+    canceled
+};
+#endif
 
 class task_group;
 class structured_task_group;
@@ -551,27 +551,20 @@ protected:
     }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    task_group_status internal_run_and_wait_for(d2::task_handle&& h) {
+    task_status internal_run_and_wait_for(d2::task_handle&& h) {
         __TBB_ASSERT(h != nullptr, "Attempt to schedule empty task_handle");
         __TBB_ASSERT(&d2::task_handle_accessor::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
         
-        bool cancellation_status = false;
-        d1::task_group_context& ctx = context();
-        try_call([&] {
-            task_handle_task* task_ptr = d2::task_handle_accessor::release(h);
-            task_dynamic_state* state = task_ptr->get_dynamic_state();
+        task_handle_task* task_ptr = task_handle_accessor::release(h);
+        task_dynamic_state* state = task_ptr->get_dynamic_state();
+        bool was_canceled = false;
 
-            // If the task has dependencies and the task_handle is not the last dependency
-            if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
-                state->wait_for_completion(ctx);
-            } else {
-                state->run_self_and_wait_for_completion(ctx);
-            }
-        }).on_completion([&] {
-            cancellation_status = ctx.is_group_execution_cancelled();
-        });
-        return cancellation_status ? canceled : complete;
-
+        if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
+            was_canceled = state->wait_for_completion(context());
+        } else {
+            was_canceled = state->run_self_and_wait_for_completion(context());
+        }
+        return was_canceled ? task_status::canceled : task_status::complete;
     }
 #endif
 
@@ -637,15 +630,11 @@ public:
     }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    task_group_status wait_for(task_completion_handle& comp_handle) {
-        bool cancellation_status = false;
-        d1::task_group_context& ctx = context();
-        try_call([&] {
-            task_completion_handle_accessor::get_task_dynamic_state(comp_handle)->wait_for_completion(ctx);
-        }).on_completion([&] {
-            cancellation_status = ctx.is_group_execution_cancelled();
-        });
-        return cancellation_status ? canceled : complete;
+    task_status wait_for(task_completion_handle& comp_handle) {
+        __TBB_ASSERT(comp_handle, "Attempt to wait for completion of empty handle");
+        task_dynamic_state* state = task_completion_handle_accessor::get_task_dynamic_state(comp_handle);
+        bool was_canceled = state->wait_for_completion(context());
+        return was_canceled ? task_status::canceled : task_status::complete;
     }
 #endif
 
@@ -696,7 +685,7 @@ public:
     }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    task_group_status run_and_wait_for(d2::task_handle&& h) {
+    task_status run_and_wait_for(d2::task_handle&& h) {
         return internal_run_and_wait_for(std::move(h));
     }
 
@@ -744,19 +733,15 @@ class wait_completion_handle_delegate : public d1::delegate_base {
     bool operator()() const override {
         task_dynamic_state* state = task_completion_handle_accessor::get_task_dynamic_state(comp_handle);
         d1::task_group_context& ctx = state->get_task()->ctx();
-        try_call([&] {
-            state->wait_for_completion(ctx);
-        }).on_completion([&] {
-            status = ctx.is_group_execution_cancelled() ? canceled : complete;
-        });
+        status = state->wait_for_completion(ctx) ? task_status::canceled : task_status::complete;
         return true;
     }
 protected:
     task_completion_handle& comp_handle;
-    task_group_status& status;
+    task_status& status;
 public:
-    wait_completion_handle_delegate(task_completion_handle& handle, task_group_status& tgs)
-        : comp_handle(handle), status(tgs) {}
+    wait_completion_handle_delegate(task_completion_handle& handle, task_status& ts)
+        : comp_handle(handle), status(ts) {}
 };
 #endif
 
@@ -850,6 +835,7 @@ using detail::r1::missing_wait;
 using detail::d2::task_handle;
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 using detail::d2::task_completion_handle;
+using detail::d2::task_status;
 #endif
 }
 
