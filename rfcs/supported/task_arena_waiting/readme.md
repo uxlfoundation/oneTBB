@@ -62,12 +62,11 @@ In this case, the task group "registers" a deferred task to run `foo()`, which i
 to the task arena. The task is added by the calling thread, so we can be sure that `tg.wait` will not
 return until the task completes.
 
-## Proposal
-
-### 1. Simplify the use of a task group
+## Implemented improvements
 
 To address extra complexity and verbosity of using together `task_arena` and `task_group`, the `enqueue` method
-of `task_arena` could take `task_group` as the second argument, and a new method could wait for a task group:
+of `task_arena` is overloaded to take `task_group` as the second argument, and a new method is added to wait
+for a task group:
 ```cpp
 ta.enqueue([]{ foo(); }, tg); // corresponds to: ta.enqueue(tg.defer([]{ foo(); }));
 ta.wait_for(tg);              // corresponds to: ta.execute([&tg]{ tg.wait(); });
