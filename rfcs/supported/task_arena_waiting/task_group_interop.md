@@ -30,7 +30,7 @@ namespace oneapi::tbb {
 } // namespace oneapi::tbb
 ```
 
-## Design discussion
+## Design
 
 ### Enqueue a function as a part of a task group
 
@@ -70,6 +70,8 @@ class (see `oneapi/tbb/task_group.h`) and directly call the `execute` library en
 
 There is no need to have a similar function in the `this_task_arena` namespace, as it would be
 no different from calling `tg.wait()`.
+
+## Future Questions
 
 ### Should `execute` be extended as well?
 
@@ -115,9 +117,3 @@ We can consider the following options for providing isolation in `task_arena::wa
 - keep the `isolated_task_group` class and support it in the proposed `task_arena` extensions;
 - somehow extend the `task_group` class to optionally support work isolation (might require incompatible changes);
 - add an isolation tag (automatically or on demand) only when a `task_group` is used with `task_arena`.
-
-## Open Questions
-
-- Is there any value in implementing this proposal first as experimental/preview API?
-- Should a new overload for `execute` be added, that takes a task group argument?
-- Whether/how work isolation is supported needs to be decided
