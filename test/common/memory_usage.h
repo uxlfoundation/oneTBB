@@ -93,7 +93,7 @@ namespace utils {
         bool status = GetProcessMemoryInfo(GetCurrentProcess(), &mem, sizeof(mem)) != 0;
         ASSERT(status, nullptr);
         return stat == currentUsage ? mem.PagefileUsage : mem.PeakPagefileUsage;
-#elif __unix__
+#elif __unix__ && !defined(__QNX__)
         long unsigned size = 0;
         FILE* fst = fopen("/proc/self/status", "r");
         ASSERT(fst != nullptr, nullptr);

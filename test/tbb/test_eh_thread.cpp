@@ -45,19 +45,31 @@ void limitThreads(size_t limit)
 {
     rlimit rlim;
 
+#   ifdef __QNX__
+    int ret = getrlimit(RLIMIT_NTHR, &rlim);
+#   else
     int ret = getrlimit(RLIMIT_NPROC, &rlim);
+#   endif
     CHECK_MESSAGE(0 == ret, "getrlimit has returned an error");
 
     rlim.rlim_cur = (rlim.rlim_max == (rlim_t)RLIM_INFINITY) ? limit : utils::min((rlim_t)limit, rlim.rlim_max);
 
+#   ifdef __QNX__
+    ret = setrlimit(RLIMIT_NTHR, &rlim);
+#   else
     ret = setrlimit(RLIMIT_NPROC, &rlim);
+#   endif
     CHECK_MESSAGE(0 == ret, "setrlimit has returned an error");
 }
 
 size_t getThreadLimit() {
     rlimit rlim;
 
+#   ifdef __QNX__
+    int ret = getrlimit(RLIMIT_NTHR, &rlim);
+#   else
     int ret = getrlimit(RLIMIT_NPROC, &rlim);
+#   endif
     CHECK_MESSAGE(0 == ret, "getrlimit has returned an error");
     return rlim.rlim_cur;
 }
