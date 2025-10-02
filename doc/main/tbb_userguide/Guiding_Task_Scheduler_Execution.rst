@@ -49,14 +49,19 @@ assign a NUMA node identifier to the ``task_arena::constraints::numa_id`` field.
     std::vector<tbb::task_group> task_groups(numa_indexes.size());
 
     for(unsigned j = 0; j < numa_indexes.size(); j++) {
-        arenas[j].initialize(tbb::task_arena::constraints(numa_indexes[j]));
-        arenas[j].execute([&task_groups, &j](){ 
-            task_groups[j].run([](){/*some parallel stuff*/});
-        });
+        arenas[j].initialize(tbb::task_arena::constraints(numa_indexes[j]), /*reserved_slots*/ 0);
     }
 
+    for(unsigned j = 1; j < numa_indexes.size(); j++) {
+        arenas[j].enqueue([](){/*some parallel work*/}, task_groups[j]);
+    }
+
+    arenas[j].execute([&task_groups](){
+        task_groups[0].run([](){/*some parallel work*/});
+    });
+
     for(unsigned j = 0; j < numa_indexes.size(); j++) {
-        arenas[j].execute([&task_groups, &j](){ task_groups[j].wait(); });
+        arenas[j].wait_for(task_groups[j]);
     }
 
 Set Core Type
