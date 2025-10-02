@@ -125,8 +125,8 @@ inline bool task_dispatcher::can_steal() {
     return reinterpret_cast<std::uintptr_t>(&anchor) > m_stealing_threshold;
 }
 #else
-// ASan allocates fake stack which not necessarily grows downwards, therefore we can't rely on
-// stack overflow protection mechanism when Address Sanitizer is enabled.
+// ASan allocates fake stack which not necessarily monotonically grows downwards, therefore
+// we can't rely on stack overflow protection mechanism when Address Sanitizer is enabled.
 inline bool task_dispatcher::can_steal() { return true; }
 #endif
 
