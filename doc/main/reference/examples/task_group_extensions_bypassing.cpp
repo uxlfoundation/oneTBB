@@ -18,11 +18,6 @@
 #include <vector>
 
 constexpr std::size_t N = 10000;
-void foo(std::size_t begin, std::size_t end) {}
-
-/*begin_task_group_extensions_bypassing_example*/
-#define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
-#include "oneapi/tbb/task_group.h"
 
 std::vector<std::size_t> global_vector(N, 0);
 
@@ -31,6 +26,12 @@ void foo(std::size_t begin, std::size_t end) {
         global_vector[i] = 42;
     }
 }
+
+/*begin_task_group_extensions_bypassing_example*/
+#define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
+#include "oneapi/tbb/task_group.h"
+
+void foo(std::size_t begin, std::size_t end);
 
 struct for_task {
     static constexpr std::size_t serial_threshold = 16;
