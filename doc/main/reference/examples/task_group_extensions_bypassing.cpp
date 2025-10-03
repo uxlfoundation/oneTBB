@@ -66,7 +66,7 @@ void calculate_parallel_for(std::vector<std::size_t>& vec) {
     // Run the root task
     tg.run_and_wait(for_task{0, vec.size(), tg});
 }
-/*begin_task_group_extensions_bypassing_example*/
+/*end_task_group_extensions_bypassing_example*/
 
 #include <iostream>
 
