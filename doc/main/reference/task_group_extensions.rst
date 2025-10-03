@@ -4,20 +4,21 @@ task_group extensions
 =====================
 
 .. note::
-    To enable these extensions, set the ``TBB_PREVIEW_TASK_GROUP_EXTENSIONS`` macro to 1.
+    To enable these extensions, define the ``TBB_PREVIEW_TASK_GROUP_EXTENSIONS`` macro with a value of ``1``.
 
 .. contents::
     :local:
-    :depth: 1
+    :depth: 3
 
 Description
 ***********
 
-|full_name| implementation extends the
+The |full_name| implementation extends the
 `tbb::task_group specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_group/task_group_cls>`_
 with the following extensions:
-1. Task bypassing support, which expands the requirements for user-provided function objects by allowing it to return another task as a hint for further execution.
-2. Dynamic Dependencies support, which provide API for establishing predecessor-successor relationships between tasks.
+
+1. Task bypassing support extends the requirements for user-provided function objects by allowing them to return a ``task_handle`` as a hint for subsequent execution.
+2. Dynamic Dependencies support introduces an API for defining predecessor-successor relationships between tasks.
 
 API
 ***
@@ -27,6 +28,7 @@ Header
 
 .. code:: cpp
 
+    #define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
     #include <oneapi/tbb/task_group.h>
     #include <oneapi/tbb/task_arena.h>
 
@@ -34,6 +36,7 @@ Synopsis
 --------
 
 .. code:: cpp
+
     // <oneapi/tbb/task_group.h> synopsis
     namespace oneapi {
         namespace tbb {
@@ -95,6 +98,7 @@ Synopsis
     } // namespace oneapi
 
 .. code:: cpp
+
     // // <oneapi/tbb/task_arena.h> synopsis
     namespace oneapi {
         namespace tbb {
@@ -113,10 +117,9 @@ Synopsis
 Task Bypassing support
 ----------------------
 
-TODO insert link
-
-Support for Task Bypassing allows to hint the scheduler which task should be executed next by returning a corresponding ``task_handle`` from the task body.
-It is not guaranteed that the task will be actually executed next and by the same thread.
+`Task Bypassing <../tbb_userguide/Task_Scheduler_Bypass.html>` support allows developers to reduce task scheduling overhead by providing a hint to the scheduler
+about which task should be executed next by returning a corresponding ``task_handle`` object from the task body.
+Execution of the hinted task is not guaranteed to occur immediately, nor to be performed by the same thread.
 
 .. code:: cpp
 
@@ -129,6 +132,7 @@ Member Functions of ``task_group`` Class
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code:: cpp
+
     template <typename F>
     task_handle defer(F&& f);
 
@@ -138,93 +142,58 @@ Member Functions of ``task_group`` Class
     template <typename F>
     void run(F&& f);
 
-Function object ``F`` might return a ``task_handle`` object. If the returned handle is not empty and owns a task without dependencies, it is used as an optimization hint for
-a task that would be executed next.
+The function object ``F`` may return a ``task_handle`` object. If the returned handle is non-empty and owns a task without dependencies, it serves as an optimization
+hint for a task that could be executed next.
 
-If the returned handle was created using a ``task_group`` differ from ``*this``, the behavior is undefined.
+If the returned handle was created by a ``task_group`` other than ``*this``, the behavior is undefined.
 
 Example
 ^^^^^^^
 
 Consider an example of implementing a parallel for loop using ``task_group`` and divide-and-conquer pattern.
 
-TODO make me testable
-
-.. code:: cpp
-    #define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
-    #include <oneapi/tbb/task_group.h>
-
-    void foo(std::size_t begin, std::size_t end);
-
-    struct for_task {
-        static constexpr std::size_t serial_threshold = 16;
-        tbb::task_handle operator()() {
-            tbb::task_handle next_task;
-            std::size_t size = end - begin;
-            if (size < serial_threshold) {
-                // Execute the work serially
-                foo(begin, end);
-            } else {
-                // Processed range to big - split it
-                std::size_t middle = begin + size / 2;
-                tbb::task_handle left_subtask = tg.defer(for_task{begin, middle, tg});
-                tbb::task_handle right_subtask = tg.defer(for_task{middle, end, tg});
-
-                // Submit the right subtask for execution
-                tg.run(for_task{middle, end, tg});
-
-                // Bypass the left part
-                next_task = tg.defer(for_task{begin, middle, tg});
-            }
-            return next_task;
-        }
-
-        std::size_t begin;
-        std::size_t end;
-        tbb::task_group& tg;
-    }; // struct for_task
-
-    int main() {
-        tbb::task_group tg;
-        // Run the root task
-        tg.run_and_wait(for_task{0, N, tg});
-    }
+.. literalinclude:: .examples/task_group_extensions_bypassing.cpp
+    :language: c++
+    :start-after: /*begin_task_group_extensions_bypassing_example*/
+    :end-before: /*end_task_group_extensions_bypassing_example*/
 
 Task Dynamic Dependencies
 -------------------------
 
-The Dynamic Dependencies APIs allows to establish predecessor-successor dependency between task meaning a successor task can begin execution only after all of its predecessors
-are completed.
+The Dynamic Dependencies API enables developers to define predecessor-successor relationships between tasks,
+meaning a successor task can begin execution only after all of its predecessors are completed.
 
-The task in any state (``created``, ``submitted``, ``executing`` and ``completed``) can be used as predecessors, but only the ``created`` tasks are allowed as successors.
+Tasks in any state (``created``, ``submitted``, ``executing``, or ``completed``) can serve as predecessors, but only tasks in the ``created`` state may be used as successors.
 
-``tbb::task_handle`` represents a task in ``created`` state. The ``task_completion_handle`` object can represent a task in any state.
-
-.. code:: cpp
-    tbb::task_handle task = tg.defer(task_body); // task is in created state, represented by task_handle 
-    tbb::task_completion_handle comp_handle = task; // task is still in created state, represented by both task_handle and task_completion_handle
-
-    tg.run(std::move(task)); // task is in submitted state, represented by task_completion_handle only
-    // Starting from this point, the task can be taken for execution
-
-    // task is in executing state when some thread starts executing task_body
-    // Once the task_body is completed, the task is in completed state
-
-    // At any point, comp_handle can be used as a predecessor 
-
-The function ``tbb::task_group::set_task_order(pred, succ)`` establishes a predecessor-successor dependency between ``pred`` and ``succ``:
+A ``tbb::task_handle`` represents a task in the ``created`` state, while a ``task_completion_handle`` can represent a task in any state.
 
 .. code:: cpp
+
+    tbb::task_handle task = tg.defer(task_body); // The task is in the created state and is represented by a task_handle 
+    tbb::task_completion_handle comp_handle = task; // The task remains in the created state and is represented by both task_handle and task_completion_handle
+
+    tg.run(std::move(task)); // The task is in the submitted state, represented by task_completion_handle only
+    // From this point onward, the task becomes eligible for execution
+
+    // The task enters the executing state when a thread begins executing task_body
+    // Once task_body completes, the task transitions to the completed state
+
+    // At any stage, comp_handle may be used as a predecessor 
+
+The ``tbb::task_group::set_task_order(pred, succ)`` function establishes a dependency such that ``succ`` cannot begin execution until ``pred`` has completed.
+
+.. code:: cpp
+
     tbb::task_handle predecessor = tg.defer(pred_body);
     tbb::task_handle successor = tg.defer(succ_body);
 
     tbb::task_group::set_task_order(predecessor, successor);
 
-The feature also allows to transfer the completion of the task to another ``created`` task using ``tbb::task_group::transfer_this_task_completion_to``.
-This function should be called from inside the task body. All of the successors of the currently executed tasks would be executed after the task
-received the completion.
+The feature also allows transferring the completion of the currently executing task to another ``created`` task using ``tbb::task_group::transfer_this_task_completion_to``.
+This function must be invoked from within the task body. All successors of the currently executing task will execute only after the task receiving the completion has finished.
 
 .. code:: cpp
+
     tbb::task_handle t = tg.defer([] {
         tbb::task_group comp_receiver = tg.defer(receiver_body);
         tbb::task_group::transfer_this_task_completion_to(comp_receiver);
@@ -233,8 +202,8 @@ received the completion.
     tbb::task_handle succ = tg.defer(succ_body);
 
     tbb::task_group::set_task_order(t, succ);
-    // Since t body transfers it's completion to comp_receiver
-    // succ_body will be executed after receiver_body
+    // Since t transfers its completion to comp_receiver,
+    // succ_body will execute after receiver_body
 
 ``task_completion_handle`` Class
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -243,25 +212,29 @@ Constructors
 ~~~~~~~~~~~~
 
 .. code:: cpp
+
     task_completion_handle();
 
-Constructs an empty completion handle that does not refer to any task.
+Constructs an empty ``task_completion_handle`` that does not refer to any task.
 
 .. code:: cpp
+
     task_completion_handle(const task_handle& handle);
 
-Constructs a completion handle that refers to the task owned by ``handle``.
+Constructs a ``task_completion_handle`` that refers to the task associated with ``handle``.
 If ``handle`` is empty, the behavior is undefined.
 
 .. code:: cpp
+
     task_completion_handle(const task_completion_handle& other);
 
-Copies ``other`` to ``*this``. After this ``*this`` and ``other`` refer to the same task.
+Copies ``other`` into ``*this``. After the copy, both ``*this`` and ``other`` refer to the same task.
 
 .. code:: cpp
+
     task_completion_handle(task_completion_handle&& other);
 
-Moves ``other`` to ``*this``. After this, ``*this`` refers to the task that was referred by ``other``. ``other`` is left in an empty state.
+Moves ``other`` into ``*this``. After the move, ``*this`` refers to the task previously referenced by ``other``, which is left in an empty state.
 
 Destructors
 ~~~~~~~~~~~
@@ -270,30 +243,33 @@ Destructors
 
     ~task_completion_handle();
 
-Destroys the completion handle.
+Destroys the ``task_completion_handle``.
 
 Assignment
 ~~~~~~~~~~
 
 .. code:: cpp
+
     task_completion_handle& operator=(const task_handle& handle);
 
-Replaces task referred to by ``*this`` with the task owned by ``handle``.
+Replaces the task referenced by ``*this`` with the task associated with ``handle``.
 If ``handle`` is empty, the behavior is undefined.
 
 *Returns*: a reference to ``*this``.
 
 .. code:: cpp
+
     task_completion_handle& operator=(const task_completion_handle& other);
 
-Copy-assigns ``other`` to ``*this``. After this, ``*this`` and ``other`` refer to the same task.
+Performs copy assignment from ``other`` to ``*this``. After the assignment, both refer to the same task.
 
 *Returns*: a reference to ``*this``.
 
 .. code:: cpp
+
     task_completion_handle& operator=(task_completion_handle&& other);
 
-Move assigns ``other`` to ``*this``. After this, ``*this`` refers to the task that was referred by ``other``. ``other`` is left in an empty state.
+Performs move assignment from ``other`` to ``*this``. After the move, ``*this`` refers to the task previously referenced by ``other``, which is left empty.
 
 *Returns*: a reference to ``*this``.
 
@@ -301,39 +277,46 @@ Observers
 ~~~~~~~~~
 
 .. code:: cpp
+
     explicit operator bool() const noexcept;
 
-*Returns*: ``true`` if ``*this`` refers to any task, ``false`` otherwise.
+*Returns*: ``true`` if ``*this`` references a task; otherwise, ``false``.
 
 Comparison
 ~~~~~~~~~~
 
 .. code:: cpp
+
     bool operator==(const task_completion_handle& lhs, const task_completion_handle& rhs) noexcept;
 
-*Returns*: ``true`` if ``lhs`` refers to the same task as ``rhs``, ``false`` otherwise.
+*Returns*: ``true`` if ``lhs`` and ``rhs`` reference the same task; otherwise, ``false``.
 
 .. code:: cpp
+
     bool operator!=(const task_completion_handle& lhs, const task_completion_handle& rhs) noexcept;
 
 Equivalent to ``!(lhs == rhs)``.
 
 .. code:: cpp
+
     bool operator==(const task_completion_handle& t, std::nullptr_t) noexcept;
 
-*Returns*: ``true`` if ``t`` is empty, ``false`` otherwise.
+*Returns*: ``true`` if ``t`` does not reference any task; otherwise, ``false``.
 
 .. code:: cpp
+
     bool operator!=(const task_completion_handle& t, std::nullptr_t) noexcept;
 
 Equivalent to ``!(t == nullptr)``.
 
 .. code:: cpp
+
     bool operator==(std::nullptr_t, const task_completion_handle& t) noexcept;
 
 Equivalent to ``t == nullptr``.
 
 .. code:: cpp
+
     bool operator!=(std::nullptr_t, const task_completion_handle& t) noexcept;
 
 Equivalent to ``!(t == nullptr)``.
@@ -342,84 +325,94 @@ Member Functions of ``task_handle`` Class
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code:: cpp
+
     ~task_handle();
 
-Destroys the ``task_handle`` object and associated task if it exists.
-If the associated task is a predecessor or a successor, the behavior is undefined.
+Destroys the ``task_handle`` object and its associated task, if any.
+If the associated task is involved in a predecessor-successor relationship, the behavior is undefined.
 
 Member Functions of ``task_group`` Class
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code:: cpp
+
     void run(task_handle&& handle);
 
-Schedules the task object owned by ``handle`` for the execution if the dependencies are satisfied. 
+Schedules the task object associated with ``handle`` for execution, provided its dependencies are satisfied.
 
 .. note::
-    If the task owned by ``handle`` has incomplete predecessors, the task will be scheduled for execution once all of them complete.
-    ``run`` function do not wait the predecessors to complete.
+    If the task associated with ``handle`` has incomplete predecessors, it will be scheduled for execution once all of them have completed.
+    The ``run`` function does not wait for predecessors to complete.
 
 .. code:: cpp
+
     static void set_task_order(task_handle& pred, task_handle& succ);
 
-Registers the task owned by ``pred`` as a predecessor that must complete before the task owned by ``succ`` can begin execution.
+Registers the task associated with ``pred`` as a predecessor that must complete before the task associated with ``succ`` can begin execution.
 
-It is thread-safe to concurrently add multiple predecessors to a single successor, and to register the same predecessor to multiple successors.
+It is thread-safe to concurrently add multiple predecessors to a single successor and to register the same predecessor with multiple successors.
 
-It is thread-safe to concurrently add successors to both the task transferring its completion and the task receiving it.
+It is thread-safe to concurrently add successors to both the task transferring its completion and the task receiving the completion.
 
-In any of the following cases, the behavior is undefined:
-* ``pred`` or ``succ`` is an empty handle.
-* If tasks owned by ``pred`` and ``succ`` belong to different ``task_group``s.
+The behavior is undefined in the following cases:
+
+* Either ``pred`` or ``succ`` is an empty.
+* The tasks referenced by ``pred`` and ``succ`` belong to different ``task_group`` instances.
 
 .. code:: cpp
+
     static void set_task_order(task_completion_handle& pred, task_handle& succ);
 
-Registers the task referred by ``pred`` as a predecessor that must complete before the task owned by ``succ`` can begin execution.
+Registers the task referenced by ``pred`` as a predecessor that must complete before the task associated with ``succ`` can begin execution.
 
-It is thread-safe to concurrently add multiple predecessors to a single successor, and to register the same predecessor to multiple successors.
+It is thread-safe to concurrently add multiple predecessors to a single successor and to register the same predecessor with multiple successors.
 
-It is thread-safe to concurrently add successors to both the task transferring its completion and the task receiving it.
+It is thread-safe to concurrently add successors to both the task transferring its completion and the task receiving the completion.
 
-In any of the following cases, the behavior is undefined:
-* ``pred`` or ``succ`` is empty.
-* If the task referred by ``pred`` and the task owned by ``succ`` belong to different ``task_group``s.
-* If the task referred by ``pred`` was destroyed without being submitted for execution.
+The behavior is undefined in the following cases:
+
+* Either ``pred`` or ``succ`` is empty.
+* The tasks referred by ``pred`` and ``succ`` belong to different ``task_group`` instances.
+* The task referred by ``pred`` was destroyed before begin submitted for execution.
 
 .. code:: cpp
+
     static void transfer_this_task_completion_to(task_handle& handle);
 
-Transfers the completion of the currently executing task to the task owned by ``handle``.
+Transfers the completion of the currently executing task to the task associated with ``handle``.
 
-After the transfer, the successors of the currently executing task will become successors of the task owned by ``handle``.
+After the transfer, the successors of the currently executing task will be reassigned to the task associated with ``handle``.
 
-It is thread-safe to concurrently transfer successors to the task while adding successors to it, or while other threads are adding successors to the
-currently executing task.
+It is thread-safe to transfer successors to the task while concurrently adding successors to it or to the currently executing task.
 
-In any of the following cases, the behavior is undefined:
-* ``h`` is an empty handle.
+The behavior is undefined in the following cases:
+
+* ``handle`` is empty.
 * The function is called outside the body of a ``task_group`` task.
-* The function is called for the task, completion ow which was already transferred.
-* The currently executing task and the task owned by ``handle`` belong to different ``task_group``s.
+* The function is called for the task whose completion has already been transferred.
+* The currently executing task and the task associated with ``handle`` belong to different ``task_group`` instances.
 
 Member Functions of ``task_arena`` Class
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code:: cpp
+
     void enqueue(task_handle&& handle);
 
-Enqueues a task owned by ``handle`` into the ``task_arena`` for processing if the dependencies are satisfied.
+Enqueues the task associated with ``handle`` into the ``task_arena`` for processing, provided its dependencies are satisfied.
 
 .. note::
-    If the task owned by ``handle`` has incomplete predecessors, the task will be scheduled for execution once all of them complete.
-    ``enqueue`` function do not wait the predecessors to complete.
+
+    If the task associated with ``handle`` has incomplete predecessors, it will be scheduled for execution once all of them have completed.
+    The ``enqueue`` function does not wait for predecessors to complete.
 
 Example
 ^^^^^^^
 
-The example above implements the parallel reduction over the range using the API described above:
+The following example demonstrates how to perform parallel reduction over a range using the described API.
 
 .. code:: cpp
+
     struct reduce_task {
         static constexpr std::size_t serial_threshold = 16;
 
@@ -428,24 +421,23 @@ The example above implements the parallel reduction over the range using the API
 
             std::size_t size = end - begin;
             if (size < serial_threshold) {
-                // Do serial reduction
+                // Perform serial reduction
                 for (std::size_t i = begin; i < end; ++i) {
                     *result += i;
                 }
             } else {
-                // The processed range is too big, split it
+                // The range is too large to process directly
+                // Divide it into smaller segments for parallel execution
                 std::size_t middle = begin + size / 2;
 
-                std::size_t* left_result = new std::size_t(0);
+                std::shared_ptr<std::size_t> left_result = std::make_shared<std::size_t>(0);
                 tbb::task_handle left_leaf = tg.defer(reduce_task{begin, middle, left_result, tg});
 
-                std::size_t* right_result = new std::size_t(0);
+                std::shared_ptr<std::size_t> right_result = std::make_shared<std::size_t>(0);
                 tbb::task_handle right_leaf = tg.defer(reduce_task{middle, end, right_result, tg});
 
-                tbb::task_handle join_task = tg.defer([]() {
+                tbb::task_handle join_task = tg.defer([=]() {
                     *result = *left_result + *right_result;
-                    delete left_result;
-                    delete right_result;
                 });
 
                 tbb::task_group::set_task_order(left_leaf, join_task);
@@ -453,24 +445,26 @@ The example above implements the parallel reduction over the range using the API
 
                 tbb::task_group::transfer_this_task_completion_to(join_task);
 
+                // Save the left leaf for further bypassing
                 next_task = std::move(left_leaf);
 
                 tg.run(std::move(right_leaf));
                 tg.run(join_task);
             }
+
             return next_task;
         }
 
         std::size_t begin;
         std::size_t end;
-        std::size_t* result;
+        std::shared_ptr<std::size_t> result;
         tbb::task_group& tg;
     };
 
     int main() {
         tbb::task_group tg;
 
-        std::size_t reduce_result = 0;
+        std::shared_ptr<std::size_t> reduce_result = std::make_shared<std::size_t>(0);
         reduce_task root_reduce_task(0, N, reduce_result, tg);
     }
 
