@@ -46,7 +46,10 @@ That is, it is unknown if a task in the ``task_group`` will be complete when
 a ``wait`` on that ``task_group`` by another thread returns.
 
 Use of cancellation or exceptions complicates the semantics of concurrent calls to ``wait``
-on the same ``task_group`` object. The ``task_group::wait`` function resets the ``task_group_context`` associated
+on the same ``task_group`` object. An example of task cancellation in a ``task_group`` can
+be found in :ref:`Cancellation_Without_An_Exception`.
+
+The ``task_group::wait`` function resets the ``task_group_context`` associated
 with the ``task_group``. Cancellations or exceptions combined with concurrent calls to ``wait`` on a shared
 ``task_group`` can result in behavior that may seem unexpected or difficult to reason about. 
 

@@ -14,5 +14,4 @@ the class ``oneapi::tbb::task_group``.
 
    ../tbb_userguide/creating_tasks_with_parallel_invoke
    ../tbb_userguide/creating_tasks_with_task_group
-   ../tbb_userguide/task_group_cancellation
    ../tbb_userguide/task_group_thread_safety

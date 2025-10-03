@@ -6,7 +6,7 @@ Creating Tasks with parallel_invoke
 Suppose you want to search a binary tree for the node that contains a specific value.
 Here is sequential code to do this:
 
-Nodes are represented by ``struct TreeNode``.
+Nodes are represented by ``struct TreeNode``:
 
 .. literalinclude:: ./examples/task_examples.cpp
     :language: c++

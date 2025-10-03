@@ -9,24 +9,9 @@ structured way than ``oneapi::tbb::parallel_invoke``. It is useful when you want
 create a set of tasks that can be run in parallel, but you do not know how many there
 will be in advance.
 
-Here is code that uses ``oneapi::tbb::task_group`` to implement a parallel search in
-a binary tree:
-
-Nodes are represented by ``struct TreeNode``.
-
-.. literalinclude:: ./examples/task_examples.cpp
-    :language: c++
-    :start-after: /*begin_treenode*/
-    :end-before: /*end_treenode*/
-
-A recursive base case is used after a minimum size threshold is reached to avoid parallel overheads.
-Since more than one thread can call the base case concurrently as part of the same tree, ``result``
-is held in an atomic variable.
-
-.. literalinclude:: ./examples/task_examples.cpp
-    :language: c++
-    :start-after: /*begin_sequential_tree_search*/
-    :end-before: /*end_sequential_tree_search*/
+Here is code that uses ``oneapi::tbb::task_group`` to implement a parallel search in a
+binary tree. This code uses ``struct TreeNode`` and the function ``sequential_tree_search``
+that are described in :ref:`creating_tasks_with_parallel_invoke`.
 
 In ``parallel_tree_search_impl``, ``task_group::run`` is used to create new tasks for searching
 in the subtrees. The recursion does not wait on the ``task_group`` at each level.
