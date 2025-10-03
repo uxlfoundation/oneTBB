@@ -16,8 +16,6 @@
 
 #include <cstdint>
 
-constexpr std::size_t N = 10000;
-
 /*begin_task_group_extensions_reduction_example*/
 
 #define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
@@ -83,7 +81,7 @@ std::size_t calculate_parallel_sum(std::size_t begin, std::size_t end) {
     tbb::task_group tg;
 
     std::shared_ptr<std::size_t> reduce_result = std::make_shared<std::size_t>(0);
-    reduce_task root_reduce_task(begin, end, reduce_result, tg);
+    reduce_task root_reduce_task{begin, end, reduce_result, tg};
     tg.run_and_wait(root_reduce_task);
 
     return *reduce_result;
@@ -94,7 +92,8 @@ std::size_t calculate_parallel_sum(std::size_t begin, std::size_t end) {
 #include <iostream>
 
 int main() {
-    std::size_t serial_sum = N * (N + 1) / 2;
+    constexpr std::size_t N = 10000;
+    std::size_t serial_sum = N * (N - 1) / 2;
     std::size_t parallel_sum = calculate_parallel_sum(0, N);
 
     if (serial_sum != parallel_sum) std::cerr << "Incorrect reduction result" << std::endl;

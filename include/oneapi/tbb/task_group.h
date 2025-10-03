@@ -137,7 +137,7 @@ namespace {
         task_handle th = std::forward<F>(f)();
         task_handle_task* task_ptr = task_handle_accessor::release(th);
         // If task has unresolved dependencies, it can't be bypassed
-        if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
+        if (task_ptr && task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
             task_ptr = nullptr;
         }
 
