@@ -67,7 +67,7 @@ struct reduce_task {
             next_task = std::move(left_leaf);
 
             tg.run(std::move(right_leaf));
-            tg.run(join);
+            tg.run(std::move(join));
         }
 
         return next_task;
