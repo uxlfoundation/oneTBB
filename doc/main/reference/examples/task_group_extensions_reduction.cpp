@@ -14,6 +14,8 @@
     limitations under the License.
 */
 
+#include <cstdint>
+
 constexpr std::size_t N = 10000;
 
 /*begin_task_group_extensions_reduction_example*/
@@ -24,7 +26,7 @@ constexpr std::size_t N = 10000;
 struct reduce_task {
     static constexpr std::size_t serial_threshold = 16;
 
-    tbb::task_handle operator()() {
+    tbb::task_handle operator()() const {
         tbb::task_handle next_task;
 
         std::size_t size = end - begin;

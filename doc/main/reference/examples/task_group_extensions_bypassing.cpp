@@ -14,6 +14,9 @@
     limitations under the License.
 */
 
+#include <cstdint>
+#include <vector>
+
 constexpr std::size_t N = 10000;
 void foo(std::size_t begin, std::size_t end) {}
 
@@ -31,7 +34,7 @@ void foo(std::size_t begin, std::size_t end) {
 
 struct for_task {
     static constexpr std::size_t serial_threshold = 16;
-    tbb::task_handle operator()() {
+    tbb::task_handle operator()() const {
         tbb::task_handle next_task;
         std::size_t size = end - begin;
         if (size < serial_threshold) {
