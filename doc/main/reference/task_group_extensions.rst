@@ -17,7 +17,7 @@ The |full_name| implementation extends the
 `tbb::task_group specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_group/task_group_cls>`_
 with the following extensions:
 
-1. Task bypassing support extends the requirements for user-provided function objects by allowing them to return a ``task_handle`` as a hint for subsequent execution.
+1. Task Bypassing support extends the requirements for user-provided function objects by allowing them to return a ``task_handle`` as a hint for subsequent execution.
 2. Dynamic Dependencies support introduces an API for defining predecessor-successor relationships between tasks.
 
 API
@@ -62,8 +62,10 @@ Synopsis
    
                 explicit operator bool() const noexcept;
 
-                friend bool operator==(const task_completion_handle& lhs, const task_completion_handle& rhs) noexcept;
-                friend bool operator!=(const task_completion_handle& lhs, const task_completion_handle& rhs) noexcept;
+                friend bool operator==(const task_completion_handle& lhs,
+                                       const task_completion_handle& rhs) noexcept;
+                friend bool operator!=(const task_completion_handle& lhs,
+                                       const task_completion_handle& rhs) noexcept;
 
                 friend bool operator==(const task_completion_handle& t, std::nullptr_t) noexcept;
                 friend bool operator!=(const task_completion_handle& t, std::nullptr_t) noexcept;
@@ -117,8 +119,9 @@ Synopsis
 Task Bypassing support
 ----------------------
 
-`Task Bypassing <../tbb_userguide/Task_Scheduler_Bypass.html>` support allows developers to reduce task scheduling overhead by providing a hint to the scheduler
+`Task Bypassing <../tbb_userguide/Task_Scheduler_Bypass.html>`_ support allows developers to reduce task scheduling overhead by providing a hint to the scheduler
 about which task should be executed next by returning a corresponding ``task_handle`` object from the task body.
+
 Execution of the hinted task is not guaranteed to occur immediately, nor to be performed by the same thread.
 
 .. code:: cpp
@@ -169,10 +172,13 @@ A ``tbb::task_handle`` represents a task in the ``created`` state, while a ``tas
 
 .. code:: cpp
 
-    tbb::task_handle task = tg.defer(task_body); // The task is in the created state and is represented by a task_handle 
-    tbb::task_completion_handle comp_handle = task; // The task remains in the created state and is represented by both task_handle and task_completion_handle
+    tbb::task_handle task = tg.defer(task_body);
+    // The task is in the created state and is represented by a task_handle 
+    tbb::task_completion_handle comp_handle = task;
+    // The task remains in the created state and is represented by both task_handle and task_completion_handle
 
-    tg.run(std::move(task)); // The task is in the submitted state, represented by task_completion_handle only
+    tg.run(std::move(task));
+    // The task is in the submitted state, represented by task_completion_handle only
     // From this point onward, the task becomes eligible for execution
 
     // The task enters the executing state when a thread begins executing task_body
@@ -411,62 +417,10 @@ Example
 
 The following example demonstrates how to perform parallel reduction over a range using the described API.
 
-.. code:: cpp
-
-    struct reduce_task {
-        static constexpr std::size_t serial_threshold = 16;
-
-        void operator()() {
-            tbb::task_handle next_task;
-
-            std::size_t size = end - begin;
-            if (size < serial_threshold) {
-                // Perform serial reduction
-                for (std::size_t i = begin; i < end; ++i) {
-                    *result += i;
-                }
-            } else {
-                // The range is too large to process directly
-                // Divide it into smaller segments for parallel execution
-                std::size_t middle = begin + size / 2;
-
-                std::shared_ptr<std::size_t> left_result = std::make_shared<std::size_t>(0);
-                tbb::task_handle left_leaf = tg.defer(reduce_task{begin, middle, left_result, tg});
-
-                std::shared_ptr<std::size_t> right_result = std::make_shared<std::size_t>(0);
-                tbb::task_handle right_leaf = tg.defer(reduce_task{middle, end, right_result, tg});
-
-                tbb::task_handle join_task = tg.defer([=]() {
-                    *result = *left_result + *right_result;
-                });
-
-                tbb::task_group::set_task_order(left_leaf, join_task);
-                tbb::task_group::set_task_order(right_leaf, join_task);
-
-                tbb::task_group::transfer_this_task_completion_to(join_task);
-
-                // Save the left leaf for further bypassing
-                next_task = std::move(left_leaf);
-
-                tg.run(std::move(right_leaf));
-                tg.run(join_task);
-            }
-
-            return next_task;
-        }
-
-        std::size_t begin;
-        std::size_t end;
-        std::shared_ptr<std::size_t> result;
-        tbb::task_group& tg;
-    };
-
-    int main() {
-        tbb::task_group tg;
-
-        std::shared_ptr<std::size_t> reduce_result = std::make_shared<std::size_t>(0);
-        reduce_task root_reduce_task(0, N, reduce_result, tg);
-    }
+.. literalinclude:: .examples/task_group_extensions_reduction.cpp
+    :language: c++
+    :start-after: /*begin_task_group_extensions_reduction_example*/
+    :end-before: /*end_task_group_extensions_reduction_example*/
 
 .. rubric:: See also
 
