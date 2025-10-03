@@ -26,6 +26,16 @@ constexpr std::size_t N = 10000;
 struct reduce_task {
     static constexpr std::size_t serial_threshold = 16;
 
+    struct join_task {
+        void operator()() const {
+            *result = *left + *right;
+        }
+
+        std::shared_ptr<std::size_t> left;
+        std::shared_ptr<std::size_t> right;
+        std::shared_ptr<std::size_t> result;
+    };
+
     tbb::task_handle operator()() const {
         tbb::task_handle next_task;
 
@@ -46,20 +56,18 @@ struct reduce_task {
             std::shared_ptr<std::size_t> right_result = std::make_shared<std::size_t>(0);
             tbb::task_handle right_leaf = tg.defer(reduce_task{middle, end, right_result, tg});
 
-            tbb::task_handle join_task = tg.defer([=]() {
-                *result = *left_result + *right_result;
-            });
+            tbb::task_handle join = tg.defer(join_task{left_result, right_result, result});
 
-            tbb::task_group::set_task_order(left_leaf, join_task);
-            tbb::task_group::set_task_order(right_leaf, join_task);
+            tbb::task_group::set_task_order(left_leaf, join);
+            tbb::task_group::set_task_order(right_leaf, join);
 
-            tbb::task_group::transfer_this_task_completion_to(join_task);
+            tbb::task_group::transfer_this_task_completion_to(join);
 
             // Save the left leaf for further bypassing
             next_task = std::move(left_leaf);
 
             tg.run(std::move(right_leaf));
-            tg.run(join_task);
+            tg.run(join);
         }
 
         return next_task;
