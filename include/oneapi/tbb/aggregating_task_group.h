@@ -20,7 +20,12 @@ namespace d2 {
 
 struct task_list_node {
     task_list_node(task_handle_task* t, d1::small_object_allocator& a)
-        : task(t), next(nullptr), alloc(a)
+        : task(t)
+        , next(nullptr)
+#if TRY_DIVIDE_AND_CONQUER
+        , num_elements_before(0)
+#endif
+        , alloc(a)
     {
         __TBB_ASSERT(t != nullptr, "Task should be assigned to task_list_node");
     } 
@@ -33,6 +38,9 @@ struct task_list_node {
 
     task_handle_task* task;
     task_list_node* next;
+#if TRY_DIVIDE_AND_CONQUER
+    std::size_t num_elements_before;
+#endif
     d1::small_object_allocator alloc;
 };
 
@@ -44,6 +52,77 @@ void destroy_task(T* task, const d1::execution_data* ed, d1::small_object_alloca
         alloc.delete_object(task);
     }
 }
+
+#if TRY_DIVIDE_AND_CONQUER
+inline constexpr std::size_t divide_and_conquer_grainsize = 16;
+
+class divide_and_conquer_task : public d1::task {
+    task_list_node*            m_list;
+    d1::task_group_context&    m_ctx;
+    d1::small_object_allocator m_alloc;
+public:
+    divide_and_conquer_task(task_list_node* list, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
+        : m_list(list), m_ctx(ctx), m_alloc(alloc)
+    {}
+
+    d1::task* execute(d1::execution_data& ed) override {
+        __TBB_ASSERT(m_list != nullptr, "List should not be empty");
+        std::size_t num_items = m_list->num_elements_before + 1;
+        d1::task* next_task = nullptr;
+
+        if (num_items < divide_and_conquer_grainsize) {
+            next_task = m_list->task;
+            __TBB_ASSERT(next_task != nullptr, nullptr);
+
+            task_list_node* next_node = m_list->next;
+            task_list_node::destroy(m_list);
+            m_list = next_node;
+
+            while (m_list != nullptr) {
+                __TBB_ASSERT(m_list->task != nullptr, nullptr);
+                d1::spawn(*m_list->task, m_list->task->ctx());
+
+                next_node = m_list->next;
+                task_list_node::destroy(m_list);
+                m_list = next_node;
+            }
+        } else {
+            // Continue divide and conquer
+            // Finding a middle of the list
+            std::size_t middle = num_items / 2;
+
+            task_list_node* left_leaf_last_node = m_list;
+
+            while (left_leaf_last_node->num_elements_before != middle) {
+                left_leaf_last_node->num_elements_before -= middle;
+                __TBB_ASSERT(left_leaf_last_node != nullptr, nullptr);
+                left_leaf_last_node = left_leaf_last_node->next;
+            }
+
+            task_list_node* right_leaf_first_node = left_leaf_last_node->next;
+            
+            // Terminate the left leaf
+            left_leaf_last_node->next = nullptr;
+            
+            d1::small_object_allocator alloc;
+            divide_and_conquer_task* left_leaf_processing = alloc.new_object<divide_and_conquer_task>(m_list, m_ctx, alloc);
+            divide_and_conquer_task* right_leaf_processing = alloc.new_object<divide_and_conquer_task>(right_leaf_first_node, m_ctx, alloc);
+
+            d1::spawn(*right_leaf_processing, m_ctx);
+            next_task = left_leaf_processing;
+        }
+
+        destroy_task(this, &ed, m_alloc);
+        return next_task;
+    }
+
+    d1::task* cancel(d1::execution_data&) override {
+        __TBB_ASSERT(false, nullptr);
+        return nullptr;
+    } 
+};
+
+#else
 
 class chunk_processing_task : public d1::task {
     task_list_node*            m_chunk_begin;
@@ -82,6 +161,7 @@ public:
         return nullptr;
     }
 }; // class chunk_processing_task
+#endif
 
 class gathering_task : public d1::task {
     std::atomic<task_list_node*>& m_list_to_gather;
@@ -121,6 +201,51 @@ public:
         // std::cout << "Gathering task processed " << num << " tasks" << std::endl;
         // return next_task;
 
+#if TRY_DIVIDE_AND_CONQUER
+        std::size_t num_items = task_list->num_elements_before + 1;
+
+        if (num_items < divide_and_conquer_grainsize) {
+            next_task = task_list->task;
+            __TBB_ASSERT(next_task != nullptr, nullptr);
+
+            task_list_node* next_node = task_list->next;
+            task_list_node::destroy(task_list);
+            task_list = next_node;
+
+            while (task_list != nullptr) {
+                __TBB_ASSERT(task_list->task != nullptr, nullptr);
+                d1::spawn(*task_list->task, task_list->task->ctx());
+
+                next_node = task_list->next;
+                task_list_node::destroy(task_list);
+                task_list = next_node;
+            }
+        } else {
+            // Do divide and conquer
+            // Finding a middle of the list
+            std::size_t middle = num_items / 2;
+
+            task_list_node* left_leaf_last_node = task_list;
+
+            while (left_leaf_last_node->num_elements_before != middle) {
+                left_leaf_last_node->num_elements_before -= middle;
+                __TBB_ASSERT(left_leaf_last_node != nullptr, nullptr);
+                left_leaf_last_node = left_leaf_last_node->next;
+            }
+
+            task_list_node* right_leaf_first_node = left_leaf_last_node->next;
+            
+            // Terminate the left leaf
+            left_leaf_last_node->next = nullptr;
+            
+            d1::small_object_allocator alloc;
+            divide_and_conquer_task* left_leaf_processing = alloc.new_object<divide_and_conquer_task>(task_list, m_ctx, alloc);
+            divide_and_conquer_task* right_leaf_processing = alloc.new_object<divide_and_conquer_task>(right_leaf_first_node, m_ctx, alloc);
+
+            d1::spawn(*right_leaf_processing, m_ctx);
+            next_task = left_leaf_processing;
+        }
+#else
         while (task_list != nullptr) {
             task_list_node* chunk_begin = task_list;
             task_list_node* chunk_last = nullptr;
@@ -160,6 +285,7 @@ public:
                 }
             }
         }
+#endif
         destroy_task(this, &ed, m_alloc);
         return next_task;
     }
@@ -241,6 +367,9 @@ public:
         task_list_node* current_list_head = m_task_list.load(std::memory_order_relaxed);
 
         new_list_node->next = current_list_head;
+#if TRY_DIVIDE_AND_CONQUER
+        new_list_node->num_elements_before = current_list_head ? current_list_head->num_elements_before + 1 : 0;
+#endif
 
         // Only the owning thread and the gathering task access m_task_list
         // gathering task only doing exchange(nullptr)
@@ -249,12 +378,15 @@ public:
             // gathering task took the list for processing
             // current_list_head is updated by the CAS
             new_list_node->next = current_list_head;
+#if TRY_DIVIDE_AND_CONQUER
+            new_list_node->num_elements_before = 0;
+#endif
         }
 
         if (current_list_head == nullptr) {
             // The first item in the list
-            r1::enqueue(*prepare_gathering_task(alloc), context(), nullptr);
-            // spawn(*prepare_gathering_task(alloc), context());
+            // r1::enqueue(*prepare_gathering_task(alloc), context(), nullptr);
+            d1::spawn(*prepare_gathering_task(alloc), context());
         }
     }
 
