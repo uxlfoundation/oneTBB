@@ -54,7 +54,7 @@ void destroy_task(T* task, const d1::execution_data* ed, d1::small_object_alloca
 }
 
 #if TRY_DIVIDE_AND_CONQUER
-inline constexpr std::size_t divide_and_conquer_grainsize = 16;
+inline constexpr std::size_t divide_and_conquer_grainsize = 3;
 
 class divide_and_conquer_task : public d1::task {
     task_list_node*            m_list;
@@ -95,14 +95,15 @@ public:
 
             while (left_leaf_last_node->num_elements_before != middle) {
                 left_leaf_last_node->num_elements_before -= middle;
-                __TBB_ASSERT(left_leaf_last_node != nullptr, nullptr);
                 left_leaf_last_node = left_leaf_last_node->next;
+                __TBB_ASSERT(left_leaf_last_node != nullptr, nullptr);
             }
-
+            
             task_list_node* right_leaf_first_node = left_leaf_last_node->next;
             
             // Terminate the left leaf
             left_leaf_last_node->next = nullptr;
+            left_leaf_last_node->num_elements_before = 0;
             
             d1::small_object_allocator alloc;
             divide_and_conquer_task* left_leaf_processing = alloc.new_object<divide_and_conquer_task>(m_list, m_ctx, alloc);
@@ -237,6 +238,7 @@ public:
             
             // Terminate the left leaf
             left_leaf_last_node->next = nullptr;
+            left_leaf_last_node->num_elements_before = 0;
             
             d1::small_object_allocator alloc;
             divide_and_conquer_task* left_leaf_processing = alloc.new_object<divide_and_conquer_task>(task_list, m_ctx, alloc);
