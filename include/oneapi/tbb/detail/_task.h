@@ -51,6 +51,7 @@ class task_arena_base;
 namespace d2 {
 class task_group;
 class task_group_base;
+class aggregating_task_group;
 }
 
 namespace r1 {
@@ -183,6 +184,7 @@ public:
 private:
     friend class d2::task_group;
     friend class d2::task_group_base;
+    friend class d2::aggregating_task_group;
 
     bool continue_execution() const {
         return m_wait.continue_execution();
