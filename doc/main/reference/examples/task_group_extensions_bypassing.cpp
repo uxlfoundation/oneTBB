@@ -42,10 +42,8 @@ struct for_task {
             // Execute the work serially
             foo(begin, end);
         } else {
-            // Processed range to big - split it
+            // Enough work to split the range
             std::size_t middle = begin + size / 2;
-            tbb::task_handle left_subtask = tg.defer(for_task{begin, middle, tg});
-            tbb::task_handle right_subtask = tg.defer(for_task{middle, end, tg});
 
             // Submit the right subtask for execution
             tg.run(for_task{middle, end, tg});
