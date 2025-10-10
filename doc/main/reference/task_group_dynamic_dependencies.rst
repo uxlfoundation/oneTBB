@@ -15,8 +15,8 @@ Description
 
 The |full_name| implementation extends the
 `tbb::task_group specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_group/task_group_cls>`_
-with an API for defining predecessor-successor relationships between tasks
-meaning a successor task can begin execution only after all of its predecessors are completed.
+with an API for defining predecessor-successor relationships between tasks,
+such that a successor task can begin execution only after all of its predecessors are completed.
 
 The Dynamic Dependencies API enables developers to define predecessor-successor relationships between tasks,
 meaning a successor task can begin execution only after all of its predecessors are completed.
