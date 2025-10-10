@@ -85,7 +85,6 @@ std::size_t calculate_parallel_sum(std::size_t begin, std::size_t end) {
 
     return *reduce_result;
 }
-
 /*end_task_group_extensions_reduction_example*/
 
 #include <iostream>
