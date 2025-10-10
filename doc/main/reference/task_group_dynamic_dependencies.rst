@@ -18,8 +18,6 @@ The |full_name| implementation extends the
 with an API for defining predecessor-successor relationships between tasks,
 such that a successor task can begin execution only after all of its predecessors are completed.
 
-The Dynamic Dependencies API enables developers to define predecessor-successor relationships between tasks,
-meaning a successor task can begin execution only after all of its predecessors are completed.
 
 Tasks in any state (``created``, ``submitted``, ``executing``, or ``completed``) can serve as predecessors, but only tasks in the ``created`` state may be used as successors.
 
