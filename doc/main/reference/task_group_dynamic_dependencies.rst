@@ -312,6 +312,8 @@ It is thread-safe to concurrently add multiple predecessors to a single successo
 
 It is thread-safe to concurrently add successors to both the task transferring its completion and the task receiving the completion.
 
+It is thread-safe to concurrently add a predecessor while the ``task_handle`` associated with the same predecessor task is being run.
+
 The behavior is undefined in the following cases:
 
 * Either ``pred`` or ``succ`` is empty.
