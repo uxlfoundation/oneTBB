@@ -59,7 +59,7 @@ template <typename RandomAccessIterator, typename Function>
 void parallel_for(RandomAccessIterator begin, RandomAccessIterator end, Function f) {
     tbb::task_group tg;
     // Run the root task
-    tg,run_and_wait(for_task<RandomAccessIterator, Function>{begin, end, std::move(f), tg});
+    tg.run_and_wait(for_task<RandomAccessIterator, Function>{begin, end, std::move(f), tg});
 }
 /*end_task_group_extensions_bypassing_example*/
 
