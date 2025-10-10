@@ -17,7 +17,6 @@
 #include <cstdint>
 
 /*begin_task_group_extensions_reduction_example*/
-
 #define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
 #include "oneapi/tbb/task_group.h"
 
