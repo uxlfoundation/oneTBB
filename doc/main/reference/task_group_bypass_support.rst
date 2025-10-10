@@ -20,7 +20,7 @@ to allow them to return a ``task_handle`` object.
 `Task Bypassing <../tbb_userguide/Task_Scheduler_Bypass.html>`_ allows developers to reduce task scheduling overhead by providing a hint about
 which task should be executed next.
 
-Execution of the hinted task is not guaranteed to occur immediately, nor to be performed by the same thread.
+Execution of the deferred task owned by a returned ``task_handle`` is not guaranteed to occur immediately, nor to be performed by the same thread.
 
 .. code:: cpp
 
