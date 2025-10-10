@@ -56,7 +56,7 @@ struct for_task {
 
 // Function accepts std::iterator_traits<RandomAccessIterator>::reference argument
 template <typename RandomAccessIterator, typename Function>
-void for_each(RandomAccessIterator begin, RandomAccessIterator end, Function f) {
+void parallel_for(RandomAccessIterator begin, RandomAccessIterator end, Function f) {
     tbb::task_group tg;
     // Run the root task
     tg,run_and_wait(for_task<RandomAccessIterator, Function>{begin, end, std::move(f), tg});
@@ -68,13 +68,7 @@ int main() {
 
     std::vector<std::size_t> v(N, 0);
 
-    void foo(std::size_t begin, std::size_t end) {
-        for (std::size_t i = begin; i < end; ++i) {
-            global_vector[i] = 42;
-        }
-    }
-
-    for_each(v.begin(), v.end(), [](std::size_t& item) {
+    parallel_for(v.begin(), v.end(), [](std::size_t& item) {
         item = 42;
     });
 
