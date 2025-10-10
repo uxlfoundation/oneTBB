@@ -20,7 +20,7 @@ individual tasks.
 * 6.2 [Avoid ``wait_context`` Usage](#avoid-wait_context-usage)
 
 ## Introduction
-The ``tbb::task_group`` class represents a collection of tasks that execute concurrently. Tasks can be dynamically added to the group during executing.
+The ``tbb::task_group`` class represents a collection of tasks that execute concurrently. Tasks can be dynamically added to the group during execution.
 
 The [Task Group Dynamic Dependencies preview feature](../task_group_dynamic_dependencies/README.md) extends the ``task_group`` API to support task dependencies, ensuring that a *successor* task begins execution only after all its *predecessors* have completed.
 
@@ -41,7 +41,8 @@ sycl::event task2 = q.memset(some_memory_ptr, 0, 1024);
 sycl::event task3 = q.submit([&](sycl::handler& h) {
     h.depends_on(std::vector<sycl::event>{task1, task2});
 
-    // task1_body executes and some_memory_ptr is set before task3_body runs
+    // task1_body executes
+    // some_memory_ptr is set before task3_body runs
     h.single_task(task3_body);
 });
 
@@ -85,7 +86,7 @@ class handler {
 };
 ```
 
-Since the example above also uses ``sycl::event::wait`` for wait for the completion of a single task (``task3``), implementing this behavior with
+Since the example above also uses ``sycl::event::wait`` to wait for the completion of a single task (``task3``), implementing this behavior with
 a ``task_group`` requires support for waiting on a single ``task_completion_handle`` object.
 
 ## Proposal
@@ -109,7 +110,7 @@ The current waiting functions return a ``task_group_status``, which can have thr
 Since the new waiting functions track the progress of a single task, returning a ``task_group_status`` may be misleading.
 If the group execution is cancelled, the tracked task may still execute, and returning ``canceled`` does not accurately reflect the task's 
 completion status.
-If execution is not cancelled, the function would need to track whether other tasks remain in the group and return ``not_complete` if any are still pending.
+If execution is not cancelled, the function would need to track whether other tasks remain in the group and return ``not_complete`` if any are still pending.
 
 If the task group execution is canceled and the originally executed task has transferred its completion to another task that was canceled, the
 waiting function will return ``task_status::canceled``.
@@ -198,8 +199,8 @@ arena.enqueue(std::move(task));
 task_status status = arena.wait_for(comp_handle);
 ```
 
-One of possible name for such an extension is ``task_arena::enqueue_and_wait_for(task_handle&& task)``.
-This function is semantically close to ``task_arena::execute`` (which may submit the task and waits for its completion), but it guarantees that
+One possible name for such an extension is ``task_arena::enqueue_and_wait_for(task_handle&& task)``.
+This function is semantically close to ``task_arena::execute`` (which may submit the task and wait for its completion), but it guarantees that
 the task is enqueued into the arena.
 
 A similar function could also be added to the ``tbb::this_task_arena`` namespace.
@@ -219,6 +220,46 @@ This would require changes to the current isolation mechanism to support multipl
 to execute tasks with any of its predecessor's tags. 
 
 As an initial step, it makes sense to isolate the waiting thread so that it only executes tasks related to the same ``task_group`` as the awaited task - similar to the improvement described in the [RFC for another overload of ``task_arena::wait_for``](../task_arena_waiting/task_group_interop.md).
+
+### ``run_and_wait_task`` Accepting the Task Body
+
+The following API extension for ``task_group`` may also be beneficial to avoid unnecessary ``task_handle`` creation before the wait:
+
+```cpp
+class task_group {
+    template <typename Func>
+    task_status run_and_wait_task(const Func& f);
+};
+```
+
+This API is semantically equivalent to ``return run_and_wait_for(defer(f));``. 
+
+Since, in this API, the ``task_handle`` owning the task is not accessible by user, the awaited task cannot have any dependencies and is likely to be executed by the calling thread.
+If ``f`` does not invoke ``transfer_this_task_completion_to``, usage of the function makes no sense since the thread can just call ``f()`` directly. 
+
+But when ``f`` does invoke ``transfer_this_task_completion_to(other_task)``, the function would wait for ``other_task`` (that may have dependencies) to complete.
+
+Consider the following example:
+
+```cpp
+// Run the root divide-and-conquer task
+tg.run_and_wait_task([&tg] {
+    auto left_leaf = tg.defer(...);
+    auto right_leaf = tg.defer(...);
+    auto join = tg.defer(...);
+
+    tbb::task_group::set_task_order(left_leaf, join);
+    tbb::task_group::set_task_order(right_leaf, join);
+    tbb::task_group::transfer_this_task_completion_to(join);
+
+    tg.run(std::move(left_leaf));
+    tg.run(std::move(right_leaf));
+    tg.run(std::move(join));
+});
+```
+
+``run_and_wait_task`` will exit only after the ``join`` task completes. If several divide-and-conquer tasks are executed in the same ``task_group``, such a function can
+be used to wait for the completion of each individual task.
 
 ## Exit Criteria and Open Questions
 
@@ -299,85 +340,24 @@ the thread will only exit after each is bypassed sequentially.
 However, since the current thread notifies the ``wait_context`` it is waiting on via the corresponding waiter node, it is more appropriate to avoid
 bypassing the next task. Instead, the task should be spawned, and ``run_and_wait_task`` should exit after executing ``middle_task``.
 
-This can be implemented by storing a pointer to the innermost ``wait_context`` that the current thread is waiting on, within the task
-dispatcher associated with the calling thread.
+For the initial implementation, it is proposed to completely avoid bypassing the task returned from the notification list and to spawn it.
 
-When the wait node is notified, the thread checks whether the context pointer in the node matches the one the current thread is waiting on.
-If so, a signal is sent to the notification step to avoid bypassing.
+There are several approaches that can be implemented in the future to improve this approach.
 
-This check requires introducing a new entry point to access the ``wait_context`` stored in the task dispatcher.
-The pseudo code is shown below:
+One approach is to store a pointer to the innermost ``wait_context`` that the current thread is waiting on, within the task dispatcher associated
+with the calling thread.
 
-```cpp
-struct notification_list_node {
-    // First element is a task pointer to bypass
-    // Second element is true if the bypass is allowed
-    using notify_result = std::pair<task_handle_task*, bool>;
-    virtual notify_result notify(bool is_cancel_signal) = 0;
-};
+When the wait node is notified, the thread checks whether the context pointer in the node matches the one the current thread is waiting on and avoids
+bypassing if they match.
 
-struct successor_list_node : notification_list_node {
-    task_dynamic_state* my_successor_state;
+Implementing the check requires introducing a new entry point to access the ``wait_context`` stored in the task dispatcher.
 
-    notify_result notify(bool is_cancel_signal) override {
-        // Releasing the last dependency makes successor task available for execution
-        if (my_successor_state->release_dependency() == 0) {
-            // Second element is true since successor_list_node do not prohibit bypassing
-            return {my_successor_state->get_task(), true}; 
-        } else {
-            return {nullptr, true};
-        }
-    }
-};
-
-struct wait_list_node : notification_list_node {
-    wait_context my_wait_context{1};
-
-    notify_result notify(bool is_cancel_signal) override {
-        my_wait_context.release();
-        if (r1::get_current_wait_context() == &my_wait_context) {
-            // Signal the notification step to stop bypass loop
-            return {nullptr, false};
-        } else {
-            return {nullptr, true};
-        }
-    }
-};
-
-// called from task::execute or task::cancel
-task_handle_task* notify_list(notification_list_node* node, bool is_cancel_signal) {
-    task_handle_task* bypass_task = nullptr;
-    bool bypass_allowed = true;
-
-    while (node != nullptr) {
-        notification_list_node::notify_result result = node->notify(is_cancel_signal);
-
-        if (!result.second) bypass_allowed = false;
-
-        if (bypass_task == nullptr) {
-            bypass_task = result.first;
-        } else if (result.first) {
-            spawn(*result.first);
-        }
-
-        node = node->next();
-    }
-
-    if (bypass_task && !bypass_allowed) {
-        spawn(*bypass_task);
-        return nullptr;
-    } else {
-        return bypass_task;
-    }
-}
-```
-
-While the proposed solution avoids task bypassing when the waiting thread executes the task it is explicitly waiting for, bypassing remains
+While this approach avoids task bypassing when the waiting thread executes the task it is explicitly waiting for, bypassing remains
 unrestricted in other scenarios. For example, if the waiting thread executes a task unrelated to the awaited one, such as a ``parallel_for``
 task in the same arena, it may still enter the bypass loop, even if the reference count of the awaited ``wait_context`` is zero.
 
-An alternative approach to address this limitation is to implement a general mechanism within the scheduler that forces the thread to exit the
-bypass loop and spawn the returned task if further execution should not be continued (i.e., ``waiter.continue_execution()`` returns ``false``).
+An alternative approach is to implement a general mechanism within the scheduler that forces the thread to exit the bypass loop and spawn the returned task
+if further execution should not be continued (i.e., ``waiter.continue_execution()`` returns ``false``).
 
 ## Alternative Implementation Approaches
 
@@ -387,8 +367,12 @@ The first alternative approach is to assign a single ``wait_context`` to each ta
 
 <img src="wait_context_part_of_state.png" width=800>
 
-This allows reuse of a single context object for all ``wait_task`` calls, but introduces challenges in supporting completion transfer.
-If completion is transferred to another task, a different ``wait_context`` object from the new task's state should be used:
+The advantage of this approach compared to the recommended one is that a single ``wait_context`` object can be reused across all ``wait_task`` calls waiting on the same task.
+
+On the other hand, this approach creates a ``wait_context`` object for every task, including those not awaited by any ``wait_task`` calls. 
+In contrast, the recommended approach creates a context object only when a ``wait_task`` call is made.
+
+Another disadvantage of this approach is that the ``wait_context`` the thread is waiting on must be updated if completion is transferred to another task:
 
 ```cpp
 // wait_task(comp_handle) implementation
@@ -424,7 +408,7 @@ corresponding ``wait_task`` call.
 ``wait_interface::wait_id`` should return a unique identifier for the wait, enabling notification of waiting threads via the concurrent monitor
 in the TBB scheduler.
 
-Existing entry point can be implemented using ``wait_interface``:
+The existing entry point can be implemented using ``wait_interface``:
 
 ```cpp
 // Existing class, fields and functions
@@ -498,5 +482,8 @@ void wait_task(task_completion_handle& comp_handle) {
 }
 ```
 
-A single ``r1::wait`` call cannot handle completion transfer, as the ``wait_id`` must be updated to ensure correct thread notification when the
-transferred task completes.
+One advantage of this approach over the recommended one is that it eliminates the need to instantiate a ``wait_context`` object, enabling the scheduler to
+directly access the awaited task's state.
+
+The primary disadvantage - similar to the [first alternative](#assign-single-wait_context-to-the-task) - is that a single ``r1::wait`` call is insufficient to handle completion
+transfer. This limitation arises because the ``wait_id`` must be updated to ensure accurate thread notification when the completion of the task has been transferred.
