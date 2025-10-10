@@ -15,6 +15,7 @@
 */
 
 #include <cstdint>
+#include <iostream>
 
 /*begin_task_group_extensions_reduction_example*/
 #define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
@@ -86,8 +87,6 @@ std::size_t calculate_parallel_sum(std::size_t begin, std::size_t end) {
     return *reduce_result;
 }
 /*end_task_group_extensions_reduction_example*/
-
-#include <iostream>
 
 int main() {
     constexpr std::size_t N = 10000;

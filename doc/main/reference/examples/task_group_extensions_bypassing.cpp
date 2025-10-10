@@ -16,64 +16,71 @@
 
 #include <cstdint>
 #include <vector>
+#include <iostream>
 
-constexpr std::size_t N = 10000;
-
-std::vector<std::size_t> global_vector(N, 0);
-
-void foo(std::size_t begin, std::size_t end) {
-    for (std::size_t i = begin; i < end; ++i) {
-        global_vector[i] = 42;
-    }
-}
+static constexpr std::size_t serial_threshold = 16;
 
 /*begin_task_group_extensions_bypassing_example*/
 #define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
 #include "oneapi/tbb/task_group.h"
 
-void foo(std::size_t begin, std::size_t end);
-
+template <typename Iterator, typename Function>
 struct for_task {
-    static constexpr std::size_t serial_threshold = 16;
     tbb::task_handle operator()() const {
         tbb::task_handle next_task;
-        std::size_t size = end - begin;
+
+        auto size = std::distance(begin, end);
         if (size < serial_threshold) {
             // Execute the work serially
-            foo(begin, end);
+            for (Iterator it = begin; it != end; ++it) {
+                f(*it);
+            }
         } else {
             // Enough work to split the range
-            std::size_t middle = begin + size / 2;
+            Iterator middle = begin + size / 2;
 
             // Submit the right subtask for execution
-            tg.run(for_task{middle, end, tg});
+            tg.run(for_task<Iterator, Function>{middle, end, f, tg});
 
-            // Bypass the left part
-            next_task = tg.defer(for_task{begin, middle, tg});
+            // Bypass the left subtask
+            next_task = tg.defer(for_task<Iterator, Function>{begin, middle, f, tg});
         }
         return next_task;
     }
 
-    std::size_t begin;
-    std::size_t end;
+    Iterator begin;
+    Iterator end;
+    Function f;
     tbb::task_group& tg;
 }; // struct for_task
 
-void calculate_parallel_for(std::vector<std::size_t>& vec) {
+// Function accepts std::iterator_traits<RandomAccessIterator>::reference argument
+template <typename RandomAccessIterator, typename Function>
+void for_each(RandomAccessIterator begin, RandomAccessIterator end, Function f) {
     tbb::task_group tg;
     // Run the root task
-    tg.run_and_wait(for_task{0, vec.size(), tg});
+    tg,run_and_wait(for_task<RandomAccessIterator, Function>{begin, end, std::move(f), tg});
 }
 /*end_task_group_extensions_bypassing_example*/
 
-#include <iostream>
-
 int main() {
-    calculate_parallel_for(global_vector);
+    constexpr std::size_t N = 10000;
 
-    for (std::size_t i = 0; i < global_vector.size(); ++i) {
-        if (global_vector[i] != 42) {
-            std::cerr << "Error in " << i << " index" << std::endl;
+    std::vector<std::size_t> v(N, 0);
+
+    void foo(std::size_t begin, std::size_t end) {
+        for (std::size_t i = begin; i < end; ++i) {
+            global_vector[i] = 42;
+        }
+    }
+
+    for_each(v.begin(), v.end(), [](std::size_t& item) {
+        item = 42;
+    });
+
+    for (std::size_t i = 0; i < v.size(); ++i) {
+        if (v[i] != 42) {
+            std::cerr << "Error in " << i << "index" << std::endl;
             return 1;
         }
     }
