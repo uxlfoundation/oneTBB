@@ -316,7 +316,7 @@ The behavior is undefined in the following cases:
 
 * Either ``pred`` or ``succ`` is empty.
 * The tasks referred by ``pred`` and ``succ`` belong to different ``task_group`` instances.
-* The task referred by ``pred`` was destroyed before begin submitted for execution.
+* The task referred by ``pred`` was destroyed before being submitted for execution.
 
 .. code:: cpp
 
