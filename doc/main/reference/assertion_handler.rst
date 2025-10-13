@@ -4,18 +4,21 @@ Custom Assertion Handler
 ========================
 
 .. note::
-    The availability of the extension can be checked with the ``TBB_EXT_CUSTOM_ASSERTION_HANDLER`` macro after
-    including either the ``oneapi/tbb/global_control.h`` or the ``oneapi/tbb/version.h`` header.
+    The availability of the extension can be checked with the ``TBB_EXT_CUSTOM_ASSERTION_HANDLER`` macro defined in
+    ``oneapi/tbb/global_control.h`` and ``oneapi/tbb/version.h`` headers.
 
 .. contents::
     :local:
-    :depth: 1
+    :depth: 2
 
 Description
 ***********
 
-The custom assertion handler mechanism allows applications to set their own assertion handling functions. This proposal
-is modeled on the assertion handler API that existed in TBB and is semantically similar to the standard library's
+OneTBB provides `internal assertion checking
+<https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/configuration/enabling_debugging_features>`_
+that prints an error message and terminates the application when errors are detected in oneTBB header files or
+the debug version of the library. The custom assertion handler mechanism extends this by allowing developers to
+implement their own assertion handling functions. The API is semantically similar to the standard library's
 ``std::set_terminate`` and ``std::get_terminate`` functions.
 
 API
@@ -32,6 +35,8 @@ Synopsis
 --------
 
 .. code:: cpp
+
+    #define TBB_EXT_CUSTOM_ASSERTION_HANDLER 202510
 
     namespace oneapi {
     namespace tbb {
@@ -51,18 +56,18 @@ Types
 
 Type alias for assertion handler function pointer.
 
-.. note:: The handler should not return. If it eventually returns, the behavior is runtime-undefined.
-
 Functions
 ---------
 
 .. cpp:function:: assertion_handler_type set_assertion_handler(assertion_handler_type new_handler) noexcept
 
-Set assertion handler and return its previous value. If ``new_handler`` is ``nullptr``, reset to the default handler.
+Sets assertion handler and returns its previous value. If ``new_handler`` is ``nullptr``, resets to the default handler.
+
+.. note:: ``new_handler`` must not return. If it does, the behavior is undefined.
 
 .. cpp:function:: assertion_handler_type get_assertion_handler() noexcept
 
-Return the current assertion handler.
+Returns the current assertion handler.
 
 Example
 *******
