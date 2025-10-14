@@ -141,7 +141,6 @@ public:
     void leave_task_dispatcher();
     void propagate_task_group_state(std::atomic<uint32_t> d1::task_group_context::* mptr_state, d1::task_group_context& src, uint32_t new_state);
     d1::task* get_innermost_running_task();
-    d1::wait_context* get_innermost_wait_context_ptr();
 
     //! Index of the arena slot the scheduler occupies now, or occupied last time
     unsigned short my_arena_index;
@@ -259,10 +258,6 @@ inline void thread_data::propagate_task_group_state(std::atomic<std::uint32_t> d
 
 inline d1::task* thread_data::get_innermost_running_task() {
     return my_task_dispatcher->m_innermost_running_task;
-}
-
-inline d1::wait_context* thread_data::get_innermost_wait_context_ptr() {
-    return my_task_dispatcher->m_innermost_wait_context_ptr;
 }
 
 } // namespace r1

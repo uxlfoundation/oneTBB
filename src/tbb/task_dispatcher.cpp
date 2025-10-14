@@ -150,29 +150,11 @@ d1::task_group_context* __TBB_EXPORTED_FUNC current_context() {
     }
 }
 
-class wait_guard {
-private:
-    task_dispatcher*  task_disp;
-    d1::wait_context* old_wait_ctx;
-public:
-    wait_guard(task_dispatcher* dispatcher, d1::wait_context& new_wait_ctx)
-        : task_disp(dispatcher)
-        , old_wait_ctx(task_disp->m_innermost_wait_context_ptr)
-    {
-        task_disp->m_innermost_wait_context_ptr = &new_wait_ctx;
-    }
-
-    ~wait_guard() {
-        task_disp->m_innermost_wait_context_ptr = old_wait_ctx;
-    }
-};
-
 void task_dispatcher::execute_and_wait(d1::task* t, d1::wait_context& wait_ctx, d1::task_group_context& w_ctx) {
     // Get an associated task dispatcher
     thread_data* tls = governor::get_thread_data();
     __TBB_ASSERT(tls->my_task_dispatcher != nullptr, nullptr);
     task_dispatcher& local_td = *tls->my_task_dispatcher;
-    wait_guard guard{tls->my_task_dispatcher, wait_ctx};
 
     // TODO: factor out the binding to execute_and_wait_impl
     if (t) {

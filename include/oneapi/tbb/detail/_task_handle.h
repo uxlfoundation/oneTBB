@@ -67,7 +67,6 @@ struct notify_successor_node : notify_list_node {
     notify_result_type notify_on_cancellation() override {
         return notify_common();
     }
-    
 
     void destroy() override {
         allocator.delete_object(this);
@@ -82,8 +81,9 @@ struct notify_waiter_node : notify_list_node {
 
     notify_result_type notify_common() {
         task_wait_context.release();
-        bool bypass_allowed = r1::current_wait_context_ptr() != &task_wait_context;
-        return {nullptr, bypass_allowed};
+
+        // Bypassing from list notification is not allowed if there are waiters in the list
+        return {nullptr, false};
     }
 
     virtual notify_result_type notify_on_completion() override {
@@ -194,6 +194,7 @@ inline std::pair<task_handle_task*, bool> notify_successor_node::notify_common()
     if (successor_state->release_dependency()) {
         successor_task = successor_state->get_task();
     }
+
     return {successor_task, true};
 }
 #endif // __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
