@@ -15,7 +15,7 @@ Description
 ***********
 
 OneTBB provides `internal assertion checking
-<https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/configuration/enabling_debugging_features>`_
+<https://oneapi-spec.uxlfoundation.org/specifications/oneapi/v1.4-rev-1/elements/onetbb/source/configuration/enabling_debugging_features>`_
 that prints an error message and terminates the application when errors are detected in oneTBB header files or
 the debug version of the library. The custom assertion handler mechanism extends this by allowing developers to
 implement their own assertion handling functions. The API is semantically similar to the standard library's
@@ -79,4 +79,4 @@ Example
 
 .. rubric:: See also
 
-* `Enabling Debugging Features specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/configuration/enabling_debugging_features>`_
+* `Enabling Debugging Features specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/v1.4-rev-1/elements/onetbb/source/configuration/enabling_debugging_features>`_
