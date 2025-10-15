@@ -18,6 +18,7 @@
 - [2022.2.0](#onetbb-2022-2-0)
 - [oneTBB 2022.1.0 Release Notes](#onetbb-2022-1-0)
 - [oneTBB 2022.0.0 Release Notes](#onetbb-2022-0-0)
+- [:tada: New Features](#tada-new-features)
 
 # 2022.2.0
 
