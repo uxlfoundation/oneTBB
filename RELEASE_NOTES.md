@@ -343,7 +343,7 @@
 - On Windows OS on ARM64*, when compiling an application using oneTBB with the Microsoft* Compiler, the compiler issues a warning C4324 that a structure was padded due to the alignment specifier. Consider suppressing the warning by specifying /wd4324 to the compiler command line.
 - oneTBB does not support fork(), to work-around the issue, consider using task_scheduler_handle to join oneTBB worker threads before using fork().
 
-## :hammer: Fixed Issues
+## :hammer: Issues Fixed
 - Enabled full support of Address Sanitizer and Thread Sanitizer.
 - Fixed a race condition in tbbmalloc that may cause a crash in realloc() when using tbbmalloc_proxy.
 - Enabled GCC* 11 support.
