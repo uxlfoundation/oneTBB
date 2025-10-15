@@ -14,12 +14,6 @@
 * limitations under the License.
 *******************************************************************************/-->
 
-# Table of Contents <!-- omit in toc -->
-- [oneTBB 2022.2.0 Release Notes](#onetbb-2022.2.0-release-notes)
-- [oneTBB 2022.1.0 Release Notes](#onetbb-2022-1-0)
-- [oneTBB 2022.0.0 Release Notes](#onetbb-2022-0-0)
-- [:tada: New Features](#tada-new-features)
-
 # oneTBB 2022.2.0 Release Notes
 
 ## :tada: New Features
