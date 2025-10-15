@@ -10,6 +10,7 @@
 #include "detail/_task_handle.h"
 #include "task_group.h"
 #include "task_arena.h"
+#include "concurrent_vector.h"
 #include <atomic>
 
 #include <iostream>
@@ -18,34 +19,8 @@ namespace tbb {
 namespace detail {
 namespace d2 {
 
-struct task_list_node {
-    task_list_node(task_handle_task* t, d1::small_object_allocator& a)
-        : task(t)
-        , next(nullptr)
-#if TRY_DIVIDE_AND_CONQUER
-        , num_elements_before(0)
-#endif
-        , alloc(a)
-    {
-        __TBB_ASSERT(t != nullptr, "Task should be assigned to task_list_node");
-    } 
-
-    static void destroy(task_list_node* node) {
-        __TBB_ASSERT(node != nullptr, nullptr);
-        d1::small_object_allocator alloc = node->alloc;
-        alloc.delete_object(node);
-    }
-
-    task_handle_task* task;
-    task_list_node* next;
-#if TRY_DIVIDE_AND_CONQUER
-    std::size_t num_elements_before;
-#endif
-    d1::small_object_allocator alloc;
-};
-
 template <typename T>
-void destroy_task(T* task, const d1::execution_data* ed, d1::small_object_allocator alloc) {
+void destroy_task(T* task, const d1::execution_data* ed, d1::small_object_allocator& alloc) {
     if (ed) {
         alloc.delete_object(task, *ed);
     } else {
@@ -53,247 +28,218 @@ void destroy_task(T* task, const d1::execution_data* ed, d1::small_object_alloca
     }
 }
 
-#if TRY_DIVIDE_AND_CONQUER
-inline constexpr std::size_t divide_and_conquer_grainsize = 3;
+class chunk_root_task;
 
-class divide_and_conquer_task : public d1::task {
-    task_list_node*            m_list;
-    d1::task_group_context&    m_ctx;
-    d1::small_object_allocator m_alloc;
+class list_task : public d1::task {
+protected:
+    list_task*                      m_next_task;
+#if COUNT_NUMS
+    std::size_t                     m_num_elements_before;
+#endif
+    d1::wait_tree_vertex_interface* m_wait_tree_vertex;
+    d1::task_group_context&         m_ctx;
+    d1::small_object_allocator      m_allocator;
+
 public:
-    divide_and_conquer_task(task_list_node* list, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
-        : m_list(list), m_ctx(ctx), m_alloc(alloc)
+    list_task(d1::task_group_context& ctx, d1::small_object_allocator& allocator)
+        : m_next_task(nullptr)
+#if COUNT_NUMS
+        , m_num_elements_before(0)
+#endif
+        , m_wait_tree_vertex(nullptr)
+        , m_ctx(ctx)
+        , m_allocator(allocator)
     {}
 
-    d1::task* execute(d1::execution_data& ed) override {
-        __TBB_ASSERT(m_list != nullptr, "List should not be empty");
-        std::size_t num_items = m_list->num_elements_before + 1;
-        d1::task* next_task = nullptr;
-
-        if (num_items < divide_and_conquer_grainsize) {
-            next_task = m_list->task;
-            __TBB_ASSERT(next_task != nullptr, nullptr);
-
-            task_list_node* next_node = m_list->next;
-            task_list_node::destroy(m_list);
-            m_list = next_node;
-
-            while (m_list != nullptr) {
-                __TBB_ASSERT(m_list->task != nullptr, nullptr);
-                d1::spawn(*m_list->task, m_list->task->ctx());
-
-                next_node = m_list->next;
-                task_list_node::destroy(m_list);
-                m_list = next_node;
-            }
-        } else {
-            // Continue divide and conquer
-            // Finding a middle of the list
-            std::size_t middle = num_items / 2;
-
-            task_list_node* left_leaf_last_node = m_list;
-
-            while (left_leaf_last_node->num_elements_before != middle) {
-                left_leaf_last_node->num_elements_before -= middle;
-                left_leaf_last_node = left_leaf_last_node->next;
-                __TBB_ASSERT(left_leaf_last_node != nullptr, nullptr);
-            }
-            
-            task_list_node* right_leaf_first_node = left_leaf_last_node->next;
-            
-            // Terminate the left leaf
-            left_leaf_last_node->next = nullptr;
-            left_leaf_last_node->num_elements_before = 0;
-            
-            d1::small_object_allocator alloc;
-            divide_and_conquer_task* left_leaf_processing = alloc.new_object<divide_and_conquer_task>(m_list, m_ctx, alloc);
-            divide_and_conquer_task* right_leaf_processing = alloc.new_object<divide_and_conquer_task>(right_leaf_first_node, m_ctx, alloc);
-
-            d1::spawn(*right_leaf_processing, m_ctx);
-            next_task = left_leaf_processing;
-        }
-
-        destroy_task(this, &ed, m_alloc);
-        return next_task;
+    ~list_task() override {
+        __TBB_ASSERT(m_wait_tree_vertex != nullptr, "m_wait_tree_vertex should be set before the destruction");
+        m_wait_tree_vertex->release();
     }
 
-    d1::task* cancel(d1::execution_data&) override {
-        __TBB_ASSERT(false, nullptr);
-        return nullptr;
-    } 
+    virtual void destroy(d1::execution_data& ed) = 0;
+
+    d1::task_group_context& ctx() const { return m_ctx; }
+    list_task*& next() { return m_next_task; }
+    d1::wait_tree_vertex_interface*& wait_tree_vertex() { return m_wait_tree_vertex; }
+#if COUNT_NUMS
+    std::size_t& num_elements_before() { return m_num_elements_before; }
+#endif
 };
 
-#else
+template <typename F>
+class function_list_task : public list_task {
+    // TODO: enable EBO for this task before releasing
+    const F m_function;
 
-class chunk_processing_task : public d1::task {
-    task_list_node*            m_chunk_begin;
-    d1::small_object_allocator m_alloc;
 public:
-    chunk_processing_task(task_list_node* chunk_begin, d1::small_object_allocator& alloc)
-        : m_chunk_begin(chunk_begin)
-        , m_alloc(alloc)
+    template <typename FF>
+    function_list_task(FF&& function, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
+        : list_task(ctx, alloc)
+        , m_function(std::forward<FF>(function))
     {}
 
     d1::task* execute(d1::execution_data& ed) override {
-        __TBB_ASSERT(m_chunk_begin != nullptr, "Chunk should not be empty");
-        task_list_node* task_node = m_chunk_begin;
-
-        // Prepare task for bypassing
-        task_list_node* next_node = task_node->next;
-        d1::task* next_task = task_node->task;
-        task_list_node::destroy(task_node);
-        task_node = next_node;
-
-        while (task_node != nullptr) {
-            next_node = task_node->next;
-
-            __TBB_ASSERT(task_node->task != nullptr, nullptr);
-            d1::spawn(*task_node->task, task_node->task->ctx());
-
-            task_list_node::destroy(task_node);
-            task_node = next_node;
-        }
-        destroy_task(this, &ed, m_alloc);
-        return next_task;
+        __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
+        m_function();
+        destroy(ed);
+        return nullptr;
     }
 
     d1::task* cancel(d1::execution_data& ed) override {
-        __TBB_ASSERT(false, "Should not be executed yet");
+        __TBB_ASSERT(false, "Cancel should not be called yet");
         return nullptr;
     }
-}; // class chunk_processing_task
-#endif
 
-class gathering_task : public d1::task {
-    std::atomic<task_list_node*>& m_list_to_gather;
-    d1::task_group_context& m_ctx;
-    d1::small_object_allocator m_alloc;
+    void destroy(d1::execution_data& ed) override {
+        destroy_task(this, &ed, m_allocator);
+    }
+};
 
-    // TODO: which value should it have
-    // 3 is from parallel_invoke implementation
-    static constexpr std::size_t chunk_size = 3;
+class chunk_root_task : public d1::task, public d1::wait_tree_vertex_interface {
+    d1::task_group_context&         m_ctx;
+    d1::wait_tree_vertex_interface* m_root_wait_tree_vertex;
+    
+    list_task*                      m_first_task;
+    list_task*                      m_second_task;
+    list_task*                      m_third_task;
+    
+    std::atomic<std::size_t>        m_ref_count;
+    d1::small_object_allocator&     m_allocator;
 public:
-    gathering_task(std::atomic<task_list_node*>& list_to_gather, d1::task_group_context& ctx,
-                   d1::small_object_allocator& alloc)
-        : m_list_to_gather(list_to_gather)
-        , m_ctx(ctx)
-        , m_alloc(alloc)
-    {}
+    chunk_root_task(list_task* first_task, list_task* second_task, list_task* third_task,
+                    d1::task_group_context& ctx, d1::wait_tree_vertex_interface* root_vertex,
+                    d1::small_object_allocator& allocator)
+        : m_ctx(ctx)
+        , m_root_wait_tree_vertex(root_vertex)
+        , m_first_task(first_task), m_second_task(second_task), m_third_task(third_task)
+        , m_ref_count(4) // 3 for child tasks, one for self
+        , m_allocator(allocator)
+    {
+        __TBB_ASSERT(first_task != nullptr && second_task != nullptr && third_task != nullptr, nullptr);
+        m_root_wait_tree_vertex->reserve();
+    }
+
+    void reserve(std::uint32_t = 1) override {
+        __TBB_ASSERT(false, "Should not be called");
+    }
+
+    void release(std::uint32_t delta = 1) override {
+        if (--m_ref_count == 0) {
+            d1::wait_tree_vertex_interface* root_wait_vertex = m_root_wait_tree_vertex;
+            // TODO: investigate how to propagate the execution data here
+            // destroy_task(this, nullptr, m_allocator);
+            this->~chunk_root_task();
+
+            root_wait_vertex->release();
+        }
+    }
 
     d1::task* execute(d1::execution_data& ed) override {
         __TBB_ASSERT(ed.context == &m_ctx, "The task group context should be used for all tasks");
-        task_list_node* task_list = m_list_to_gather.exchange(nullptr);
-        __TBB_ASSERT(task_list != nullptr, "Gathering task should not grab an empty list");
-        d1::task* next_task = nullptr;
-        // d1::task* next_task = task_list->task;
+        d1::task* bypass_task = nullptr;
 
-        // task_list = task_list->next;
-
-        // std::size_t num = 0;
-        // while (task_list != nullptr) {
-        //     // d1::spawn(*task_list->task, task_list->task->ctx());
-        //     __TBB_ASSERT(task_list->task != nullptr, nullptr);
-        //     __TBB_ASSERT(&m_ctx == &task_list->task->ctx(), nullptr);
-        //     d1::spawn(*task_list->task, m_ctx);
-        //     task_list = task_list->next;
-        //     ++num;
-        // }
-
-        // std::cout << "Gathering task processed " << num << " tasks" << std::endl;
-        // return next_task;
-
-#if TRY_DIVIDE_AND_CONQUER
-        std::size_t num_items = task_list->num_elements_before + 1;
-
-        if (num_items < divide_and_conquer_grainsize) {
-            next_task = task_list->task;
-            __TBB_ASSERT(next_task != nullptr, nullptr);
-
-            task_list_node* next_node = task_list->next;
-            task_list_node::destroy(task_list);
-            task_list = next_node;
-
-            while (task_list != nullptr) {
-                __TBB_ASSERT(task_list->task != nullptr, nullptr);
-                d1::spawn(*task_list->task, task_list->task->ctx());
-
-                next_node = task_list->next;
-                task_list_node::destroy(task_list);
-                task_list = next_node;
-            }
+        m_first_task->wait_tree_vertex() = this;
+        if (&m_ctx == &m_first_task->ctx()) {
+            bypass_task = m_first_task;
         } else {
-            // Do divide and conquer
-            // Finding a middle of the list
-            std::size_t middle = num_items / 2;
-
-            task_list_node* left_leaf_last_node = task_list;
-
-            while (left_leaf_last_node->num_elements_before != middle) {
-                left_leaf_last_node->num_elements_before -= middle;
-                __TBB_ASSERT(left_leaf_last_node != nullptr, nullptr);
-                left_leaf_last_node = left_leaf_last_node->next;
-            }
-
-            task_list_node* right_leaf_first_node = left_leaf_last_node->next;
-            
-            // Terminate the left leaf
-            left_leaf_last_node->next = nullptr;
-            left_leaf_last_node->num_elements_before = 0;
-            
-            d1::small_object_allocator alloc;
-            divide_and_conquer_task* left_leaf_processing = alloc.new_object<divide_and_conquer_task>(task_list, m_ctx, alloc);
-            divide_and_conquer_task* right_leaf_processing = alloc.new_object<divide_and_conquer_task>(right_leaf_first_node, m_ctx, alloc);
-
-            d1::spawn(*right_leaf_processing, m_ctx);
-            next_task = left_leaf_processing;
+            r1::spawn(*m_first_task, m_first_task->ctx());
         }
-#else
-        while (task_list != nullptr) {
-            task_list_node* chunk_begin = task_list;
-            task_list_node* chunk_last = nullptr;
 
-            std::size_t count = 0;
-            while (task_list != nullptr && count < chunk_size) {
-                chunk_last = task_list;
-                task_list = task_list->next;
-                ++count;
-            }
-            
-            if (count == chunk_size) {
-                // Form a chunk
-                chunk_last->next = nullptr; // Terminate the chunk
-                d1::small_object_allocator alloc;
-                chunk_processing_task* process_chunk = alloc.new_object<chunk_processing_task>(chunk_begin, alloc);
-                if (next_task == nullptr) {
-                    next_task = process_chunk;
-                } else {
-                    d1::spawn(*process_chunk, m_ctx);
-                }
-            } else {
-                // Not enough tasks to form a chunk
-                // Spawn tasks 
-                while (chunk_begin != nullptr) {
-                    __TBB_ASSERT(chunk_begin->task != nullptr, nullptr);
-
-                    if (next_task == nullptr) {
-                        next_task = chunk_begin->task;
-                    } else {
-                        d1::spawn(*chunk_begin->task, chunk_begin->task->ctx());
-                    }
-
-                    task_list_node* next_node = chunk_begin->next;
-                    task_list_node::destroy(chunk_begin);
-                    chunk_begin = next_node;
-                }
-            }
+        m_second_task->wait_tree_vertex() = this;
+        if (bypass_task == nullptr && &m_ctx == &m_second_task->ctx()) {
+            bypass_task = m_second_task;
+        } else {
+            r1::spawn(*m_second_task, m_second_task->ctx());
         }
-#endif
-        destroy_task(this, &ed, m_alloc);
-        return next_task;
+
+        m_third_task->wait_tree_vertex() = this;
+        if (bypass_task == nullptr && &m_ctx == &m_third_task->ctx()) {
+            bypass_task = m_third_task;
+        } else {
+            r1::spawn(*m_third_task, m_third_task->ctx());
+        }
+
+        release();
+        return bypass_task;
     }
 
     d1::task* cancel(d1::execution_data& ed) override {
-        __TBB_ASSERT(false, "Should not be executed yet");
+        __TBB_ASSERT(false, "Should not be called");
+        return nullptr;
+    }
+};
+
+#if COUNT_NUMS
+static tbb::concurrent_vector<std::size_t> statistics;
+#endif
+
+class grab_task : public d1::task {
+    std::atomic<list_task*>&        m_list_to_grab;
+    d1::wait_tree_vertex_interface* m_wait_tree_vertex;
+    d1::task_group_context&         m_ctx;
+    d1::small_object_allocator      m_allocator;
+public:
+    grab_task(std::atomic<list_task*>& list_to_grab, d1::wait_tree_vertex_interface* wait_tree_vertex,
+              d1::task_group_context& ctx, d1::small_object_allocator& allocator)
+        : m_list_to_grab(list_to_grab)
+        , m_wait_tree_vertex(wait_tree_vertex)
+        , m_ctx(ctx)
+        , m_allocator(allocator)
+    {
+        __TBB_ASSERT(m_wait_tree_vertex != nullptr, nullptr);
+        m_wait_tree_vertex->reserve();
+    }
+
+    ~grab_task() {
+        m_wait_tree_vertex->release();
+    }
+
+    d1::task* execute(d1::execution_data& ed) override {
+        __TBB_ASSERT(ed.context == &m_ctx, "The task group context should be used for all tasks");
+        list_task* task_ptr = m_list_to_grab.exchange(nullptr);
+        __TBB_ASSERT(task_ptr != nullptr, "Grab task should take at least one task");
+
+#if COUNT_NUMS
+        statistics.emplace_back(task_ptr->num_elements_before() + 1);
+#endif
+
+        d1::task* bypass_task = nullptr;
+
+        d1::small_object_allocator alloc;
+        // Chunk loop
+        while (task_ptr != nullptr && task_ptr->next() != nullptr && task_ptr->next()->next() != nullptr) {
+            list_task* next_task = task_ptr->next()->next()->next();
+            chunk_root_task* chunk_task = alloc.new_object<chunk_root_task>(task_ptr, task_ptr->next(), task_ptr->next()->next(),
+                                                                            m_ctx, m_wait_tree_vertex, alloc);
+
+            if (bypass_task == nullptr) {
+                bypass_task = chunk_task;
+            } else {
+                r1::spawn(*chunk_task, m_ctx);
+            }
+            task_ptr = next_task;
+        }
+
+        // Not enough tasks to form a chunk
+        while (task_ptr != nullptr) {
+            list_task* next_task = task_ptr->next();
+
+            m_wait_tree_vertex->reserve();
+            task_ptr->wait_tree_vertex() = m_wait_tree_vertex;
+
+            if (bypass_task == nullptr && &m_ctx == &task_ptr->ctx()) {
+                bypass_task = task_ptr;
+            } else {
+                r1::spawn(*task_ptr, task_ptr->ctx());
+            }
+            task_ptr = next_task;
+        }
+        destroy_task(this, &ed, m_allocator);
+        return bypass_task;
+    }
+
+    d1::task* cancel(d1::execution_data& ed) override {
+        __TBB_ASSERT(false, "Should not be called");
         return nullptr;
     }
 };
@@ -302,20 +248,10 @@ class aggregating_task_group {
 private:
     d1::wait_context_vertex m_wait_vertex;
     d1::task_group_context  m_context;
-    static thread_local std::atomic<task_list_node*> m_task_list;
+    static thread_local std::atomic<list_task*> m_task_list;
 
     d1::task_group_context& context() noexcept {
         return m_context.actual_context();
-    }
-
-    template <typename F>
-    task_handle_task* prepare_task(F&& f, d1::small_object_allocator& alloc) {
-        return alloc.new_object<function_task<typename std::decay<F>::type>>(std::forward<F>(f),
-            r1::get_thread_reference_vertex(&m_wait_vertex), context(), alloc);
-    }
-
-    gathering_task* prepare_gathering_task(d1::small_object_allocator& alloc) {
-        return alloc.new_object<gathering_task>(m_task_list, context(), alloc);
     }
 
 public:
@@ -363,32 +299,32 @@ public:
     template <typename F>
     void run(F&& f) {
         d1::small_object_allocator alloc;
-        task_handle_task* t = prepare_task(std::forward<F>(f), alloc);
-        
-        task_list_node* new_list_node = alloc.new_object<task_list_node>(t, alloc);
-        task_list_node* current_list_head = m_task_list.load(std::memory_order_relaxed);
+        using task_type = function_list_task<typename std::decay<F>::type>;
+        list_task* t = alloc.new_object<task_type>(std::forward<F>(f), context(), alloc);
 
-        new_list_node->next = current_list_head;
-#if TRY_DIVIDE_AND_CONQUER
-        new_list_node->num_elements_before = current_list_head ? current_list_head->num_elements_before + 1 : 0;
+        list_task* current_list_head = m_task_list.load(std::memory_order_relaxed);
+        t->next() = current_list_head;
+#if COUNT_NUMS
+        if (current_list_head) t->num_elements_before() = 1 + current_list_head->num_elements_before();
 #endif
 
-        // Only the owning thread and the gathering task access m_task_list
-        // gathering task only doing exchange(nullptr)
-        while (!m_task_list.compare_exchange_strong(current_list_head, new_list_node)) {
+        // Only the owning thread and the grab task access m_task_list
+        // grab task only doing exchange(nullptr)
+        while (!m_task_list.compare_exchange_strong(current_list_head, t)) {
             __TBB_ASSERT(current_list_head == nullptr, nullptr);
-            // gathering task took the list for processing
-            // current_list_head is updated by the CAS
-            new_list_node->next = current_list_head;
-#if TRY_DIVIDE_AND_CONQUER
-            new_list_node->num_elements_before = 0;
+            // grab task took the list for processing
+            // current_list_head is updated by CAS
+            t->next() = current_list_head;
+#if COUNT_NUMS
+            t->num_elements_before() = 0;
 #endif
         }
 
         if (current_list_head == nullptr) {
-            // The first item in the list
-            // r1::enqueue(*prepare_gathering_task(alloc), context(), nullptr);
-            d1::spawn(*prepare_gathering_task(alloc), context());
+            // The first item in the list, spawn the grab task
+            grab_task* grab = alloc.new_object<grab_task>(m_task_list, r1::get_thread_reference_vertex(&m_wait_vertex),
+                                                          context(), alloc);
+            r1::spawn(*grab, context());
         }
     }
 
@@ -396,7 +332,7 @@ public:
     task_group_status run_and_wait(const F& f);
 }; // class aggregating_task_group
 
-thread_local std::atomic<task_list_node*> aggregating_task_group::m_task_list;
+thread_local std::atomic<list_task*> aggregating_task_group::m_task_list;
 
 } // namespace d2
 } // namespace detail
