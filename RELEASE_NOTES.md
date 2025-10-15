@@ -351,7 +351,7 @@
 - Fixed a possible memory leak when the static or affinity partitioners are used.
 - Fixed possible system oversubscription when using a process mask and an explicit number of threads in the task arena.
 
-## :octocat: Open-source Contributions Integrated
+## :octocat: Open-Source Contributions Integrated
 - Enabled PowerPC* Linux* OS support. Contributed by Mircho Rodozov (https://github.com/oneapi-src/oneTBB/pull/461)
 - Improved UNIX* system support and enabled QNX Neutrino* RTOS support. Contributed by Pablo Romero (https://github.com/oneapi-src/oneTBB/pull/440)
 - Enabled experimental Bazel* build system support. Contributed by Julian Amann (https://github.com/oneapi-src/oneTBB/pull/442)
