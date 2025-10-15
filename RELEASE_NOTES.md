@@ -14,6 +14,7 @@
 * limitations under the License.
 *******************************************************************************/-->
 
+{{TOC:1}}
 # Table of Contents <!-- omit in toc -->
 - [2022.2.0](#2022.2.0)
 - [oneTBB 2022.1.0 Release Notes](#onetbb-2022-1-0)
