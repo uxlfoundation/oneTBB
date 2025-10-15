@@ -252,6 +252,9 @@ public:
     task_handle(task_handle&&) = default;
     task_handle& operator=(task_handle&&) = default;
 
+    template <typename Body>
+    Body& get_function();
+
     explicit operator bool() const noexcept { return static_cast<bool>(m_handle); }
 
     friend bool operator==(task_handle const& th, std::nullptr_t) noexcept;

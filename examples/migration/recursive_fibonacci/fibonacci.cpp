@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2023 Intel Corporation
+    Copyright (c) 2023-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -14,8 +15,10 @@
     limitations under the License.
 */
 
+#define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
 #include "fibonacci_single_task.h"
 #include "fibonacci_two_tasks.h"
+#include "fibonacci_task_group.h"
 
 #include <iostream>
 #include <numeric>
@@ -49,13 +52,24 @@ int main(int argc, char* argv[]) {
     int numbers = argc > 1 ? strtol(argv[1], nullptr, 0) : 50;
     cutoff = argc > 2 ? strtol(argv[2], nullptr, 0) : 16;
     unsigned long ntrial = argc > 3 ? (unsigned long)strtoul(argv[3], nullptr, 0) : 20;
+    int mode = argc > 4 ? strtol(argv[4], nullptr, 0) : 0;
+    std::cout << "Mode = " << mode << std::endl;
+
     testing_enabled = argc > 4 ? (bool)strtol(argv[4], nullptr, 0) : false;
 
-    auto res = measure(fibonacci_two_tasks, numbers, ntrial);
-    std::cout << "Fibonacci two tasks impl N = " << res.first << " Avg time = " << res.second
-              << " ms" << std::endl;
+    if (mode == 0 || mode == 1) {
+        auto res = measure(fibonacci_two_tasks, numbers, ntrial);
+        std::cout << "Fibonacci two tasks impl N = " << res.first << " Avg time = " << res.second
+                << " ms" << std::endl;
+    }
 
-    res = measure(fibonacci_single_task, numbers, ntrial);
-    std::cout << "Fibonacci single task impl N = " << res.first << " Avg time = " << res.second
-              << " ms" << std::endl;
+    // res = measure(fibonacci_single_task, numbers, ntrial);
+    // std::cout << "Fibonacci single task impl N = " << res.first << " Avg time = " << res.second
+    //           << " ms" << std::endl;
+
+    if (mode == 0 || mode == 2) {
+        auto res = measure(fibonacci_task_group, numbers, ntrial);
+        std::cout << "Fibonacci task_group impl N = " << res.first << " Avg time = " << res.second
+                << " ms" << std::endl;
+    }
 }

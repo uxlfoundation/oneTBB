@@ -123,12 +123,27 @@ private:
         this->destroy(&ed);
         return task_ptr;
     }
+
+    
 public:
+    F& get_function_object() {
+        return const_cast<F&>(m_func);
+    }
+    
     template<typename FF>
     function_task(FF&& f, d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
         : task_handle_task{vertex, ctx, alloc, destroy_function_task}
         , m_func(std::forward<FF>(f)) {}
 };
+
+template <typename Function>
+inline Function& task_handle::get_function() {
+    __TBB_ASSERT(m_handle, nullptr);
+    function_task<Function>* as_function_task = dynamic_cast<function_task<Function>*>(m_handle.get());
+    __TBB_ASSERT(as_function_task != nullptr, nullptr);
+
+    return as_function_task->get_function_object();
+}
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 namespace {
