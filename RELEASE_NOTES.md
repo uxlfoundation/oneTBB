@@ -15,11 +15,11 @@
 *******************************************************************************/-->
 
 # Table of Contents <!-- omit in toc -->
-- [oneTBB 2022.2.0 Release Notes](#onetbb-2022-2-0)
+- [2022.2.0](#onetbb-2022-2-0)
 - [oneTBB 2022.1.0 Release Notes](#onetbb-2022-1-0)
 - [oneTBB 2022.0.0 Release Notes](#onetbb-2022-0-0)
 
-# oneTBB 2022.2.0 Release Notes
+# 2022.2.0
 
 ## :tada: New Features
 - Improved Hybrid CPU and NUMA Platforms API Support: Enhanced API availability for better compatibility with Hybrid CPU and NUMA platforms.
@@ -92,7 +92,7 @@
 - Fixed build issues on ARM64* when using Bazel. Contributed by snadampal (https://github.com/uxlfoundation/oneTBB/pull/1571).
 - Suppressed deprecation warnings for CMake versions earlier than 3.10 when using the latest CMake. Contributed by Vladislav Shchapov (https://github.com/uxlfoundation/oneTBB/pull/1585).
 
-# oneTBB 2022.0.0 Release Notes {#onetbb-2022-0-0}
+# oneTBB 2022.0.0 Release Notes
 
 ## :tada: Preview Features
 - Extended the Flow Graph receiving nodes with a new ``try_put_and_wait`` API that submits a message to the graph and waits for its completion.
