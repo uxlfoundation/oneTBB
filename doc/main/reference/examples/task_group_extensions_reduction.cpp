@@ -17,12 +17,13 @@
 #include <cstdint>
 #include <iostream>
 
+static constexpr std::size_t serial_threshold = 16;
+
 /*begin_task_group_extensions_reduction_example*/
 #define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
 #include "oneapi/tbb/task_group.h"
 
 struct reduce_task {
-    static constexpr std::size_t serial_threshold = 16;
 
     struct join_task {
         void operator()() const {
