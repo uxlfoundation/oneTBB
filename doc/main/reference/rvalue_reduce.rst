@@ -10,6 +10,7 @@ Parallel Reduction for rvalues
 .. role:: specext
 
 .. raw:: html
+
    <style> .specext {background-color:yellow;} </style>
 
 Description
@@ -26,7 +27,7 @@ Modifications of the API specifications are :specext:`highlighted`.
 
 **ParallelReduceFunc Requirements: Pseudo-Signature, Semantics**
 
-.. cpp:function:: :specext:`Value Func::operator()(const Range& range, Value&& x) const`
+.. cpp:function:: Value Func::operator()(const Range& range, Value&& x) const
 
 :specext:`or`
 
@@ -42,14 +43,7 @@ Modifications of the API specifications are :specext:`highlighted`.
 
 **ParallelReduceReduction Requirements: Pseudo-Signature, Semantics**
 
-.. cpp:function:: Value Reduction::operator()(const Value& x, const Value& y) const
-
-    Combines results ``x`` and ``y``.
-    ``Value`` type must be the same as a corresponding template parameter for the 
-    :doc:`parallel_reduce algorithm <../../algorithms/functions/parallel_reduce_func>` algorithm.
-
-
-.. cpp:function:: :specext:`Value Reduction::operator()(Value&& x, Value&& y) const`
+.. cpp:function:: Value Reduction::operator()(Value&& x, Value&& y) const
 
 :specext:`or`
 
