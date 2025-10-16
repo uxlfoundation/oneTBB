@@ -98,12 +98,10 @@ void parallel_tree_search_impl(tbb::task_group& tg, TreeNode* node, int target,
         } else {
             // Run on left and right subtrees in parallel
             tg.run([node, target, &result, &tg, depth_threshold] {
-                parallel_tree_search_impl(tg, node->left, target, result,
-                                          depth_threshold - 1);
+                parallel_tree_search_impl(tg, node->left, target, result, depth_threshold - 1);
             });
             tg.run([node, target, &result, &tg, depth_threshold] {
-                parallel_tree_search_impl(tg, node->right, target, result,
-                                          depth_threshold - 1);
+                parallel_tree_search_impl(tg, node->right, target, result, depth_threshold - 1);
             });
         }
     }
