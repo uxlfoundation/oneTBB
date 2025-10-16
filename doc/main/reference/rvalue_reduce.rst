@@ -7,6 +7,11 @@ Parallel Reduction for rvalues
     :local:
     :depth: 1
 
+.. role:: specext
+
+.. raw:: html
+   <style> .specext {background-color:yellow;} </style>
+
 Description
 ***********
 
@@ -14,43 +19,47 @@ Description
 `ParallelReduceReduction <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/named_requirements/algorithms/par_reduce_reduction>`_
 to optimize operating with ``rvalues`` using functional form of ``tbb::parallel_reduce`` and ``tbb::parallel_deterministic_reduce`` algorithms.
 
-API
-***
+Extensions
+**********
 
-Header
-------
+Modifications of the API specifications are :specext:`highlighted`.
 
-.. code:: cpp
+**ParallelReduceFunc Requirements: Pseudo-Signature, Semantics**
 
-    #include <oneapi/tbb/parallel_reduce.h>
+.. cpp:function:: :specext:`Value Func::operator()(const Range& range, Value&& x) const`
 
-ParallelReduceFunc Requirements: Pseudo-Signature, Semantics
-------------------------------------------------------------
-
-.. cpp:function:: Value Func::operator()(const Range& range, Value&& x) const
-
-or
+:specext:`or`
 
 .. cpp:function:: Value Func::operator()(const Range& range, const Value& x) const
 
-    Accumulates the result for a subrange, starting with initial value ``x``. The ``Range`` type must meet the
+    Accumulates the result for a subrange, starting with initial value ``x``.
+    The ``Range`` type must meet the
     `Range requirements <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/named_requirements/algorithms/range>`_.
-    The ``Value`` type must be the same as a corresponding template parameter for the `parallel_reduce algorithm <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/algorithms/functions/parallel_reduce_func>`_.
+    The ``Value`` type must be the same as a corresponding template parameter for the
+    `parallel_reduce algorithm <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/algorithms/functions/parallel_reduce_func>`_.
 
-    If both ``rvalue`` and ``lvalue`` forms are provided, the ``rvalue`` is preferred.
+    :specext:`If both ``rvalue`` and ``lvalue`` forms are provided, the ``rvalue`` is preferred.`
 
-ParallelReduceReduction Requirements: Pseudo-Signature, Semantics
------------------------------------------------------------------
-
-.. cpp:function:: Value Reduction::operator()(Value&& x, Value&& y) const
-
-or
+**ParallelReduceReduction Requirements: Pseudo-Signature, Semantics**
 
 .. cpp:function:: Value Reduction::operator()(const Value& x, const Value& y) const
 
-    Combines the ``x`` and ``y`` results. The ``Value`` type must be the same as a corresponding template parameter for the `parallel_reduce algorithm <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/algorithms/functions/parallel_reduce_func>`_.
+    Combines results ``x`` and ``y``.
+    ``Value`` type must be the same as a corresponding template parameter for the 
+    :doc:`parallel_reduce algorithm <../../algorithms/functions/parallel_reduce_func>` algorithm.
 
-    If both ``rvalue`` and ``lvalue`` forms are provided, the ``rvalue`` is preferred.
+
+.. cpp:function:: :specext:`Value Reduction::operator()(Value&& x, Value&& y) const`
+
+:specext:`or`
+
+.. cpp:function:: Value Reduction::operator()(const Value& x, const Value& y) const
+
+    Combines the ``x`` and ``y`` results.
+    The ``Value`` type must be the same as a corresponding template parameter for the
+    `parallel_reduce algorithm <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/algorithms/functions/parallel_reduce_func>`_.
+
+    :specext:`If both ``rvalue`` and ``lvalue`` forms are provided, the ``rvalue`` is preferred.`
 
 Example
 *******
