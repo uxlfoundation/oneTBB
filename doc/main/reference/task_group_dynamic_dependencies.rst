@@ -264,7 +264,7 @@ Member Functions of ``task_handle`` Class
 
 Destroys the ``task_handle`` object and associated task if it exists.
 
-.. admonition:: Specification Update
+.. admonition:: Extension
 
     If the associated task is involved in a predecessor-successor relationship, the behavior is undefined.
 
@@ -275,7 +275,8 @@ Member Functions of ``task_group`` Class
 
     void run(task_handle&& handle);
 
-Makes the task object associated with ``handle`` available for execution once its dependencies are satisfied. A task associated with a ``task_handle`` will never execute unless it is run.
+Makes the task object associated with ``handle`` available for execution once its dependencies are satisfied
+A task associated with a ``task_handle`` will never execute unless it is run, enqueued or bypassed.
 
 .. note::
     If the task associated with ``handle`` has incomplete predecessors, it will be scheduled for execution once all of them have completed.
@@ -338,7 +339,8 @@ Member Functions of ``task_arena`` Class
 
     void enqueue(task_handle&& handle);
 
-Enqueues the task associated with ``handle`` into the ``task_arena`` for processing, provided its dependencies are satisfied.
+Enqueues the task object associated with ``handle`` into ``task_arena`` for processing once its dependencies are satisfied.
+A task associated with a ``task_handle`` will never execute unless it is run, enqueued or bypassed.
 
 .. note::
 

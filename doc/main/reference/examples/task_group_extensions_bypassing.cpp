@@ -55,7 +55,7 @@ struct for_task {
 }; // struct for_task
 
 template <typename RandomAccessIterator, typename Function>
-void parallel_for_each(RandomAccessIterator begin, RandomAccessIterator end, Function f) {
+void for_each(RandomAccessIterator begin, RandomAccessIterator end, Function f) {
     tbb::task_group tg;
     // Run the root task
     tg.run_and_wait(for_task<RandomAccessIterator, Function>{begin, end, std::move(f), tg});
@@ -63,11 +63,11 @@ void parallel_for_each(RandomAccessIterator begin, RandomAccessIterator end, Fun
 /*end_task_group_extensions_bypassing_example*/
 
 int main() {
-    constexpr std::size_t N = 10000;
+    constexpr std::size_t N = 1000;
 
-    std::vector<std::size_t> v(N, 0);
+    std::size_t array[N];
 
-    parallel_for_each(v.begin(), v.end(), [](std::size_t& item) {
+    for_each(array, array + N, [](std::size_t& item) {
         item = 42;
     });
 
