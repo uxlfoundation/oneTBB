@@ -13,8 +13,8 @@ from the single thread that started the recursive parallel algorithm. The calls 
 within a recursive algorithm and that single call to ``wait`` is guaranteed to wait
 for all of the children tasks, even those added from other worker threads.
 
-In less structured cases, calls to ``task_group::run`` and ``task_group::wait`` on the same object
-from different threads do not offer such simple guarantees. Here is a diagram that shows a single ``task_group``
+In less structured cases with calls to both ``task_group::run`` and ``task_group::wait`` on the same object
+from different threads, the behavior is more sophisticated. Here is a diagram that shows a single ``task_group``
 object that is accessed in parallel by three different threads. Each thread runs some tasks and then calls wait
 on the shared ``task_group``:
 
