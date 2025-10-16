@@ -177,7 +177,7 @@ Copies ``other`` into ``*this``. After the copy, both ``*this`` and ``other`` re
 
     task_completion_handle(task_completion_handle&& other);
 
-Moves ``other`` into ``*this``. After the move, ``*this`` refers to the task previously referenced by ``other``, which is left in an empty state.
+Moves ``other`` into ``*this``. After the move, ``*this`` refers to the task previously referenced by ``other``, which is left empty.
 
 Destructors
 ~~~~~~~~~~~
