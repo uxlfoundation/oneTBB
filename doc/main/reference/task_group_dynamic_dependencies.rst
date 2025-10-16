@@ -281,7 +281,7 @@ Member Functions of ``task_group`` Class
 
     void run(task_handle&& handle);
 
-Schedules the task object associated with ``handle`` for execution, provided its dependencies are satisfied.
+Makes the task object associated with ``handle`` available for execution once its dependencies are satisfied. A task associated with a ``task_handle`` will never execute unless it is run.
 
 .. note::
     If the task associated with ``handle`` has incomplete predecessors, it will be scheduled for execution once all of them have completed.
