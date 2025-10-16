@@ -86,7 +86,7 @@ If the returned handle was created by a ``task_group`` other than ``*this``, the
 Example
 -------
 
-The example below demonstrates how to implement a parallel for loop using ``task_group`` and divide-and-conquer pattern.
+The example below demonstrates how to process a sequence in parallel using ``task_group`` and the divide-and-conquer pattern.
 
 .. literalinclude:: ./examples/task_group_extensions_bypassing.cpp
     :language: c++
