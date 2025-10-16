@@ -82,8 +82,8 @@ A thread that has canceled a ``task_group`` and then ``runs`` more tasks may see
 a ``wait`` on another thread completed and reset the ``task_group`` before those tasks were ``run``, effectively
 uncanceling the ``task_group``.
 
-Exceptions that are thrown from a ``task_group`` task cause the cancellation of the ``task_group`` and so
-applications that throw exceptions and have concurrent waits, can have similarly complicated behavior. In
+Exceptions that are thrown from a ``task_group`` task cause the cancellation of the ``task_group``, so
+applications that throw exceptions and have concurrent waits can have similarly complicated behavior. In
 addition, exceptions that originate in tasks ``run`` in a ``task_group`` by one thread may propagate to the call
 to ``wait`` on another thread.
 
