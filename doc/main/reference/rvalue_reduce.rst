@@ -41,7 +41,7 @@ Additions to the API specifications are :specadd:`highlighted`.
     The ``Value`` type must be the same as a corresponding template parameter for the
     `parallel_reduce algorithm <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/algorithms/functions/parallel_reduce_func>`_.
 
-    .. class:: specadd
+    .. container:: specadd
     
        If both ``rvalue`` and ``lvalue`` forms are provided, the ``rvalue`` is preferred.
 
@@ -59,7 +59,7 @@ Additions to the API specifications are :specadd:`highlighted`.
     The ``Value`` type must be the same as a corresponding template parameter for the
     `parallel_reduce algorithm <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/algorithms/functions/parallel_reduce_func>`_.
 
-    .. class:: specadd
+    .. container:: specadd
 
        If both ``rvalue`` and ``lvalue`` forms are provided, the ``rvalue`` is preferred.
 
