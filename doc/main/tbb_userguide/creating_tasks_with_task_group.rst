@@ -26,7 +26,7 @@ limited by the ``depth_threshold`` parameter. After this depth is reached, no ne
 are created. The value of ``result`` is periodically checked to see if the value has been
 found by other concurrent tasks, and if so, the search in the current task is terminated.
 
-In this example, tasks that execute within the ``task_group tg`` add additional tasks
+In this example, tasks that execute within the ``task_group tg`` create additional tasks
 by calling ``run`` on the same ``task_group`` object. These calls are thread-safe and the 
 call to ``tg.wait()`` will block until all of these tasks are complete. Although these
 additional tasks might be added from different worker threads, these additions are logically nested
