@@ -71,8 +71,8 @@ int main() {
         item = 42;
     });
 
-    for (std::size_t i = 0; i < v.size(); ++i) {
-        if (v[i] != 42) {
+    for (std::size_t i = 0; i < N; ++i) {
+        if (array[i] != 42) {
             std::cerr << "Error in " << i << "index" << std::endl;
             return 1;
         }
