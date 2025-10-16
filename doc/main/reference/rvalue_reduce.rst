@@ -7,11 +7,11 @@ Parallel Reduction for rvalues
     :local:
     :depth: 1
 
-.. role:: specext
+.. role:: specadd
 
 .. raw:: html
 
-   <style> .specext {background-color:yellow;} </style>
+   <style> .specadd {background-color:palegreen;} </style>
 
 Description
 ***********
@@ -23,13 +23,15 @@ to optimize operating with ``rvalues`` using functional form of ``tbb::parallel_
 Extensions
 **********
 
-Modifications of the API specifications are :specext:`highlighted`.
+Additions to the API specifications are :specadd:`highlighted`.
 
 **ParallelReduceFunc Requirements: Pseudo-Signature, Semantics**
 
-.. cpp:function:: Value Func::operator()(const Range& range, Value&& x) const
+.. container:: specadd
 
-:specext:`or`
+   .. cpp:function:: Value Func::operator()(const Range& range, Value&& x) const
+
+   or
 
 .. cpp:function:: Value Func::operator()(const Range& range, const Value& x) const
 
@@ -39,13 +41,15 @@ Modifications of the API specifications are :specext:`highlighted`.
     The ``Value`` type must be the same as a corresponding template parameter for the
     `parallel_reduce algorithm <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/algorithms/functions/parallel_reduce_func>`_.
 
-    :specext:`If both ``rvalue`` and ``lvalue`` forms are provided, the ``rvalue`` is preferred.`
+    :specadd:`If both ``rvalue`` and ``lvalue`` forms are provided, the ``rvalue`` is preferred.`
 
 **ParallelReduceReduction Requirements: Pseudo-Signature, Semantics**
 
-.. cpp:function:: Value Reduction::operator()(Value&& x, Value&& y) const
+.. container:: specadd
 
-:specext:`or`
+   .. cpp:function:: Value Reduction::operator()(Value&& x, Value&& y) const
+
+   or
 
 .. cpp:function:: Value Reduction::operator()(const Value& x, const Value& y) const
 
@@ -53,7 +57,7 @@ Modifications of the API specifications are :specext:`highlighted`.
     The ``Value`` type must be the same as a corresponding template parameter for the
     `parallel_reduce algorithm <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/algorithms/functions/parallel_reduce_func>`_.
 
-    :specext:`If both ``rvalue`` and ``lvalue`` forms are provided, the ``rvalue`` is preferred.`
+    :specadd:`If both ``rvalue`` and ``lvalue`` forms are provided, the ``rvalue`` is preferred.`
 
 Example
 *******
