@@ -29,6 +29,10 @@ Execution of the deferred task owned by a returned ``task_handle`` is not guaran
         return next_task;
     }
 
+.. note::
+    
+    To allow a task to be bypassed, the ``task_handle`` that owns it must **not** be explicitly submitted to ``task_group::run`` or any other submission function.
+
 API
 ***
 

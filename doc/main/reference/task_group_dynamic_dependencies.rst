@@ -18,27 +18,28 @@ The |full_name| implementation extends the
 with an API for defining predecessor-successor relationships between tasks,
 such that a successor task can begin execution only after all of its predecessors are completed.
 
+An **unsubmitted** task is one that has not been explicitly submitted for execution, such as by passing a ``task_handle`` to ``task_group::run``.
 
-Tasks in any state (``created``, ``submitted``, ``executing``, or ``completed``) can serve as predecessors, but only tasks in the ``created`` state may be used as successors.
+A **submitted** task is one that has been explicitly submitted for execution.
 
-A ``tbb::task_handle`` represents a task in the ``created`` state, while a ``task_completion_handle`` can represent a task in any state.
+A non-empty ``task_handle`` object represents an unsubmitted task, while a ``task_completion_handle`` can represent either submitted or unsubmitted tasks.
+
+Both submitted and unsubmitted tasks can serve as predecessors. However, only unsubmitted tasks may be used as successors.
 
 .. code:: cpp
 
     tbb::task_handle task = tg.defer(task_body);
-    // The task is in the created state and is represented by a task_handle 
+    // task is unsubmitted
+
     tbb::task_completion_handle comp_handle = task;
-    // The task remains in the created state
-    // It is represented by both task_handle and task_completion_handle
+    // task is unsubmitted
+    // both task_handle and task_completion_handle represents the task
 
     tg.run(std::move(task));
-    // The task is in the submitted state, represented by task_completion_handle only
-    // From this point onward, the task becomes eligible for execution
+    // task is submitted
+    // task_handle is empty, task_completion_handle represents a task
 
-    // The task enters the executing state when a thread begins executing task_body
-    // Once task_body completes, the task transitions to the completed state
-
-    // At any stage, comp_handle may be used as a predecessor 
+    // At any stage, comp_handle may be used to add successors to the task
 
 The ``tbb::task_group::set_task_order(pred, succ)`` function establishes a dependency such that ``succ`` cannot begin execution until ``pred`` has completed.
 
@@ -243,23 +244,13 @@ Equivalent to ``!(lhs == rhs)``.
 .. code:: cpp
 
     bool operator==(const task_completion_handle& t, std::nullptr_t) noexcept;
+    bool operator==(std::nullptr_t, const task_completion_handle& t) noexcept;
 
 *Returns*: ``true`` if ``t`` does not reference any task; otherwise, ``false``.
 
 .. code:: cpp
 
     bool operator!=(const task_completion_handle& t, std::nullptr_t) noexcept;
-
-Equivalent to ``!(t == nullptr)``.
-
-.. code:: cpp
-
-    bool operator==(std::nullptr_t, const task_completion_handle& t) noexcept;
-
-Equivalent to ``t == nullptr``.
-
-.. code:: cpp
-
     bool operator!=(std::nullptr_t, const task_completion_handle& t) noexcept;
 
 Equivalent to ``!(t == nullptr)``.
@@ -271,8 +262,11 @@ Member Functions of ``task_handle`` Class
 
     ~task_handle();
 
-Destroys the ``task_handle`` object and its associated task, if any.
-If the associated task is involved in a predecessor-successor relationship, the behavior is undefined.
+Destroys the ``task_handle`` object and associated task if it exists.
+
+.. admonition:: Specification Update
+
+    If the associated task is involved in a predecessor-successor relationship, the behavior is undefined.
 
 Member Functions of ``task_group`` Class
 ----------------------------------------

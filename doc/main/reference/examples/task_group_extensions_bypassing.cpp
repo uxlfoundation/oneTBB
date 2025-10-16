@@ -54,7 +54,6 @@ struct for_task {
     tbb::task_group& tg;
 }; // struct for_task
 
-// Function accepts std::iterator_traits<RandomAccessIterator>::reference argument
 template <typename RandomAccessIterator, typename Function>
 void for_each(RandomAccessIterator begin, RandomAccessIterator end, Function f) {
     tbb::task_group tg;
@@ -68,7 +67,7 @@ int main() {
 
     std::vector<std::size_t> v(N, 0);
 
-    parallel_for(v.begin(), v.end(), [](std::size_t& item) {
+    for_each(v.begin(), v.end(), [](std::size_t& item) {
         item = 42;
     });
 
