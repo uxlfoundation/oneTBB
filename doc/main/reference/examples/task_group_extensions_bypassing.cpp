@@ -29,7 +29,7 @@ struct for_task {
     tbb::task_handle operator()() const {
         tbb::task_handle next_task;
 
-        auto size = std::distance(begin, end);
+        auto size = end - begin;
         if (size < serial_threshold) {
             // Execute the work serially
             for (Iterator it = begin; it != end; ++it) {
