@@ -49,7 +49,7 @@ The ``tbb::task_group::set_task_order(pred, succ)`` function establishes a depen
 
     tbb::task_group::set_task_order(predecessor, successor);
 
-The feature also allows transferring the completion of the currently executing task to another ``created`` task using ``tbb::task_group::transfer_this_task_completion_to``.
+The ``tbb::task_group::transfer_this_task_completion_to`` function allows transferring the completion of the currently executing task to another task.
 This function must be invoked from within the task body. All successors of the currently executing task will execute only after the task receiving the completion has finished.
 
 .. code:: cpp
