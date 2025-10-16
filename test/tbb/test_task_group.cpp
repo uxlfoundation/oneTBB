@@ -1172,6 +1172,16 @@ TEST_CASE("Task handle for scheduler bypass"){
 
     tg.wait();
     CHECK_MESSAGE(run == true, "task handle returned by user lambda (bypassed) should be run");
+
+    // Test returning an empty handle
+    run = false;
+    tg.run([&] {
+        run = true;
+        return tbb::task_handle{};
+    });
+
+    tg.wait();
+    CHECK(run == true);
 }
 
 //! The test for task_handle inside other task waiting with run_and_wait
@@ -1187,6 +1197,13 @@ TEST_CASE("Task handle for scheduler bypass via run_and_wait"){
     });
 
     CHECK_MESSAGE(run == true, "task handle returned by user lambda (bypassed) should be run");
+
+    // Test returning an empty handle
+    run = false;
+    tg.run_and_wait([&] {
+        run = true;
+    });
+    CHECK(run == true);
 }
 #endif //__TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
