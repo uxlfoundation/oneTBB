@@ -28,7 +28,7 @@ found by other concurrent tasks, and if so, the search in the current task is te
 
 In this example, tasks that execute within the ``task_group tg`` create additional tasks
 by calling ``run`` on the same ``task_group`` object. These calls are thread-safe and the 
-call to ``tg.wait()`` will block until all of these tasks are complete. Although these
-additional tasks might be added from different worker threads, these additions are logically nested
+call to ``tg.wait()`` will block until all of these tasks are complete. Although
+tasks might be added from different worker threads, these additions are logically nested
 within the top-most calls to ``tg.run``. There is therefore no race in adding these tasks from
 the worker threads and waiting for them in the main thread.
