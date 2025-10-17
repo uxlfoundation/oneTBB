@@ -126,25 +126,27 @@ TreeNode* parallel_tree_search(TreeNode* root, int target) {
 /*begin_parallel_search_cancellation*/
 void parallel_tree_search_cancellable_impl(tbb::task_group& tg, TreeNode* node, int target, 
                                            std::atomic<TreeNode*>& result, 
-                                           tbb::task_group_context& ctx,
                                            size_t depth_threshold = initial_depth_threshold) {
-    if (node && !ctx.is_group_execution_cancelled()) {
+    // tbb::is_current_task_group_canceling() checks asoociated task_group_context
+    if (node && !tbb::is_current_task_group_canceling()) {
         if (node->value == target) {
             result.store(node); // overwrite is ok since any result is valid
-            ctx.cancel_group_execution(); // multiple cancellations are ok due to single wait
+            // cancel the task_group_context associated with task_group
+            tg.cancel(); // multiple cancellations are ok due to single wait
         } else if (depth_threshold == 0) {
             sequential_tree_search(node, target, result);
             if (result.load() != nullptr) {
-                ctx.cancel_group_execution();
+                // cancel the task_group_context associated with task_group
+                tg.cancel(); // multiple cancellations are ok due to single wait
             }
         } else {
             // Run on left and right subtrees in parallel
-            tg.run([node, target, &result, &tg, &ctx, depth_threshold] {
-                parallel_tree_search_cancellable_impl(tg, node->left, target, result, ctx,
+            tg.run([node, target, &result, &tg, depth_threshold] {
+                parallel_tree_search_cancellable_impl(tg, node->left, target, result,
                                                       depth_threshold - 1);
             });
-            tg.run([node, target, &result, &tg, &ctx, depth_threshold] {
-                parallel_tree_search_cancellable_impl(tg, node->right, target, result, ctx,
+            tg.run([node, target, &result, &tg, depth_threshold] {
+                parallel_tree_search_cancellable_impl(tg, node->right, target, result,
                                                       depth_threshold - 1);
             });
         }
@@ -155,10 +157,9 @@ TreeNode* parallel_tree_search_cancellable(TreeNode* root, int target) {
     if (!root) return nullptr;
     
     std::atomic<TreeNode*> result{nullptr};
-    tbb::task_group_context ctx;
-    tbb::task_group tg(ctx);
+    tbb::task_group tg;
     
-    parallel_tree_search_cancellable_impl(tg, root, target, result, ctx);
+    parallel_tree_search_cancellable_impl(tg, root, target, result);
     
     tg.wait();
 

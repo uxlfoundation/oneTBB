@@ -43,7 +43,7 @@ that search the left and right subtrees of the current node in parallel:
     :start-after: /*begin_parallel_invoke_search*/
     :end-before: /*end_parallel_invoke_search*/
 
-If the value is found the pointer to the node that contains the value is stored
+If the value is found, the pointer to the node that contains the value is stored
 in the ``std::atomic<TreeNode*> result``. This example uses recursion to create many tasks, instead of
 just two. The depth of the parallel recursion is limited by the ``depth_threshold`` parameter. After this depth is
 reached, the search falls back to a sequential approach. The value of ``result`` is periodically checked
