@@ -285,6 +285,7 @@ Schedules the task object pointed by ``h`` for the execution.
 .. note::
 
     The failure to satisfy the following conditions leads to undefined behavior:
+    
     * ``h`` is not empty.
     * ``*this`` is the same ``task_group`` that ``h`` is created with.
 
