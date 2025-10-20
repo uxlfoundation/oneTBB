@@ -342,7 +342,7 @@ bypassing the next task. Instead, the task should be spawned, and ``run_and_wait
 
 For the initial implementation, it is proposed to completely avoid bypassing the task returned from the notification list and to spawn it instead.
 
-There are several approaches that can be implemented in the future to improve this approach.
+There are several ways to improve the implementation in the future.
 
 One approach is to store a pointer to the innermost ``wait_context`` that the current thread is waiting on, within the task dispatcher associated
 with the calling thread.
