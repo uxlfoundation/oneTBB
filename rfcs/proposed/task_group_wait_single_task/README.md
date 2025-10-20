@@ -214,7 +214,7 @@ task or its associated ``task_group``.
 
 Ideally, the waiting thread should only execute tasks that contribute to the completion of the awaited task. In such a model, all tasks
 within the same subgraph would need to share a common isolation tag. In theory, a successor could inherit the isolation tag from
-its predecessor. However, multiple predecessors will have different tags.
+its predecessor. However, multiple predecessors may have different tags.
 
 This would require changes to the current isolation mechanism to support multiple isolation tags, allowing a thread waiting for a successor
 to execute tasks with any of its predecessor's tags. 
