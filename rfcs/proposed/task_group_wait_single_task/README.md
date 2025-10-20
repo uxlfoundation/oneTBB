@@ -265,7 +265,7 @@ be used to wait for the completion of each individual task.
 
 The following questions should be resolved before promoting the feature out of the ``experimental`` stage.
 
-* Performance targets for this feature should be clearly defined.
+* Performance targets for this feature should be clearly defined and met.
 * Should the ``enqueue_and_wait`` API be added to ``task_arena``? Refer to the
   [Run-and-wait methods for ``task_arena`` section](#run-and-wait-methods-for-task_arena) for more details.
 * Should work isolation constraints be applied while waiting for a task to complete? See the
