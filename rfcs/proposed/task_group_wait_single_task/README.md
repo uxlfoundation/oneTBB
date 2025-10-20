@@ -32,7 +32,7 @@ Although waiting for all tasks suits many use cases, some workflows would benefi
 Consider an example using an out-of-order SYCL queue.
 
 ```cpp
-sycl::queue q{sycl::property::queue::in_order{false}};
+sycl::queue q{};
 
 // Creating multiple tasks for the queue
 sycl::event task1 = q.single_task(task1_body);
@@ -46,7 +46,7 @@ sycl::event task3 = q.submit([&](sycl::handler& h) {
     h.single_task(task3_body);
 });
 
-task3.wait(); // wait for event 
+task3.wait(); // wait a single task 
 
 // Submit additional work
 q.wait();
@@ -179,7 +179,7 @@ This is semantically equivalent to: ``execute([&] { tg.wait_task(comp_handle); }
 
 Returns: ``task_status::completed`` if the task was executed and ``task_status::canceled`` otherwise.
 
-Introducing ``wait_for`` in the ``this_task_arena`` namespace is unnecessary, as it would be functionally identical to calling the ``task_group::wait_for`` API directly.
+Introducing ``wait_for`` in the ``this_task_arena`` namespace is unnecessary, as it would be functionally identical to calling the ``task_group::wait_task`` API directly.
 
 ## Future Enhancements
 
@@ -232,7 +232,7 @@ class task_group {
 };
 ```
 
-This API is semantically equivalent to ``return run_and_wait_for(defer(f));``. 
+This API is semantically equivalent to ``return run_and_wait_task(defer(f));``. 
 
 Since, in this API, the ``task_handle`` owning the task is not accessible by user, the awaited task cannot have any dependencies and is likely to be executed by the calling thread.
 If ``f`` does not invoke ``transfer_this_task_completion_to``, usage of the function makes no sense since the thread can just call ``f()`` directly. 
