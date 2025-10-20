@@ -63,7 +63,7 @@ class queue {
         tbb::task_handle task = m_task_group.defer(body);
         tbb::task_completion_handle comp_handle = task;
         m_task_group.run(std::move(task));
-        return {comp_handle};
+        return comp_handle;
     }
 
     void wait() { m_task_group.wait(); }
@@ -214,7 +214,7 @@ task or its associated ``task_group``.
 
 Ideally, the waiting thread should only execute tasks that contribute to the completion of the awaited task. In such a model, all tasks
 within the same subgraph would need to share a common isolation tag. In theory, a successor could inherit the isolation tag from
-its predecessor. However, multiple predecessors will have different tags.
+its predecessor. However, multiple predecessors may have different tags.
 
 This would require changes to the current isolation mechanism to support multiple isolation tags, allowing a thread waiting for a successor
 to execute tasks with any of its predecessor's tags. 
@@ -265,7 +265,7 @@ be used to wait for the completion of each individual task.
 
 The following questions should be resolved before promoting the feature out of the ``experimental`` stage.
 
-* Performance targets for this feature should be clearly defined.
+* Performance targets for this feature should be clearly defined and met.
 * Should the ``enqueue_and_wait`` API be added to ``task_arena``? Refer to the
   [Run-and-wait methods for ``task_arena`` section](#run-and-wait-methods-for-task_arena) for more details.
 * Should work isolation constraints be applied while waiting for a task to complete? See the
@@ -340,9 +340,9 @@ the thread will only exit after each is bypassed sequentially.
 However, since the current thread notifies the ``wait_context`` it is waiting on via the corresponding waiter node, it is more appropriate to avoid
 bypassing the next task. Instead, the task should be spawned, and ``run_and_wait_task`` should exit after executing ``middle_task``.
 
-For the initial implementation, it is proposed to completely avoid bypassing the task returned from the notification list and to spawn it.
+For the initial implementation, it is proposed to completely avoid bypassing the task returned from the notification list and to spawn it instead.
 
-There are several approaches that can be implemented in the future to improve this approach.
+There are several ways to improve the implementation in the future.
 
 One approach is to store a pointer to the innermost ``wait_context`` that the current thread is waiting on, within the task dispatcher associated
 with the calling thread.
