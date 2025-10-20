@@ -45,7 +45,7 @@
 - Improved support for profiling tools by allowing the oneTBB notifications to be ignored by tools and by better timing of task completion notifications.
 - Fixed incorrect deallocation of tasks in task_group (https://github.com/uxlfoundation/oneTBB/issues/1834).
 - Improved performance scalability of spin_mutex::lock, spin_mutex::try_lock and queuing_mutex::scoped_lock::try_acquire.
-- Fixed potential oversubscription issue by respecting CPU quota and period limitations provided via cgroups settings on Linux* (https://github.com/uxlfoundation/oneTBB/issues/190, (https://github.com/uxlfoundation/oneTBB/issues/1760)).
+- Fixed potential oversubscription issue by respecting CPU quota and period limitations provided via cgroups settings on Linux* (https://github.com/uxlfoundation/oneTBB/issues/190, https://github.com/uxlfoundation/oneTBB/issues/1760).
 
 ## :octocat: Open-Source Contributions Integrated
 - Fixed CMake build issue on some architectures. Contributed by lmarz (https://github.com/uxlfoundation/oneTBB/pull/1768).
