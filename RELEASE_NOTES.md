@@ -41,11 +41,11 @@
 
 ## :hammer: Issues Fixed
 - Fixed overwrite_node and write_once_node to prevent premature trigger of continue_node successors.
-- Fixed keys duplication in concurrent_hash_map when the container is initialized using a pair of iterators, or std::initializer_list ([#1764](https://github.com/uxlfoundation/oneTBB/issues/1764)).
+- Fixed keys duplication in concurrent_hash_map when the container is initialized using a pair of iterators, or std::initializer_list (https://github.com/uxlfoundation/oneTBB/issues/1764).
 - Improved support for profiling tools by allowing the oneTBB notifications to be ignored by tools and by better timing of task completion notifications.
-- Fixed incorrect deallocation of tasks in task_group ([#1834](https://github.com/uxlfoundation/oneTBB/issues/1834)).
+- Fixed incorrect deallocation of tasks in task_group (https://github.com/uxlfoundation/oneTBB/issues/1834).
 - Improved performance scalability of spin_mutex::lock, spin_mutex::try_lock and queuing_mutex::scoped_lock::try_acquire.
-- Fixed potential oversubscription issue by respecting CPU quota and period limitations provided via cgroups settings on Linux* ([#190](https://github.com/uxlfoundation/oneTBB/issues/190), [#1760](https://github.com/uxlfoundation/oneTBB/issues/1760)).
+- Fixed potential oversubscription issue by respecting CPU quota and period limitations provided via cgroups settings on Linux* (https://github.com/uxlfoundation/oneTBB/issues/190, (https://github.com/uxlfoundation/oneTBB/issues/1760)).
 
 ## :octocat: Open-Source Contributions Integrated
 - Fixed CMake build issue on some architectures. Contributed by lmarz (https://github.com/uxlfoundation/oneTBB/pull/1768).
