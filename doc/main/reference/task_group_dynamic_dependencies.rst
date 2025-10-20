@@ -275,12 +275,18 @@ Member Functions of ``task_group`` Class
 
     void run(task_handle&& handle);
 
-Makes the task object associated with ``handle`` available for execution once its dependencies are satisfied
-A task associated with a ``task_handle`` will never execute unless it is run, enqueued or bypassed.
+Schedules the task object pointed by ``h`` for the execution.
+
+.. admonition:: Extension
+
+    If the task associated with ``h`` has predecessors, scheduling the task execution is postponed until all
+    of the predecessors have completed, while the function returns immediately.
 
 .. note::
-    If the task associated with ``handle`` has incomplete predecessors, it will be scheduled for execution once all of them have completed.
-    The ``run`` function does not wait for predecessors to complete.
+
+    The failure to satisfy the following conditions leads to undefined behavior:
+    * ``h`` is not empty.
+    * ``*this`` is the same ``task_group`` that ``h`` is created with.
 
 .. code:: cpp
 
@@ -338,6 +344,20 @@ Member Functions of ``task_arena`` Class
 .. code:: cpp
 
     void enqueue(task_handle&& handle);
+
+Enqueues a task owned by ``h`` into the ``task_arena`` for processing.
+
+.. admonition:: Extension
+
+    If the task associated with ``h`` has predecessors, scheduling the task execution is postponed until all
+    of the predecessors have completed, while the function returns immediately.
+
+The behavior of this function is identical to the generic version (``template<typename F> void task_arena::enqueue(F&& f)``),
+except parameter type.
+
+.. note::
+
+    ``h`` should not be empty to avoid an undefined behavior.
 
 Enqueues the task object associated with ``handle`` into ``task_arena`` for processing once its dependencies are satisfied.
 A task associated with a ``task_handle`` will never execute unless it is run, enqueued or bypassed.
