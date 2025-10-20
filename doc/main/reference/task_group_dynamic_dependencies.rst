@@ -22,7 +22,7 @@ An **unsubmitted** task is one that has not been explicitly submitted for execut
 
 A **submitted** task is one that has been explicitly submitted for execution.
 
-A non-empty ``task_handle`` object represents an unsubmitted task, while a ``task_completion_handle`` can represent either submitted or unsubmitted tasks.
+A non-empty ``task_handle`` object represents an unsubmitted task, while a ``task_completion_handle`` can represent any task.
 
 Both submitted and unsubmitted tasks can serve as predecessors. However, only unsubmitted tasks may be used as successors.
 
