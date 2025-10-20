@@ -63,7 +63,7 @@ class queue {
         tbb::task_handle task = m_task_group.defer(body);
         tbb::task_completion_handle comp_handle = task;
         m_task_group.run(std::move(task));
-        return {comp_handle};
+        return comp_handle;
     }
 
     void wait() { m_task_group.wait(); }
