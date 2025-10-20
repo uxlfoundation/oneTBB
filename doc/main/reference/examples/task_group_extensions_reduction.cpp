@@ -82,11 +82,10 @@ struct reduce_task {
 std::size_t calculate_parallel_sum(std::size_t begin, std::size_t end) {
     tbb::task_group tg;
 
-    std::shared_ptr<std::size_t> reduce_result = std::make_shared<std::size_t>(0);
-    reduce_task root_reduce_task{begin, end, reduce_result, tg};
-    tg.run_and_wait(root_reduce_task);
+    std::size_t reduce_result = 0;
+    tg.run_and_wait(reduce_task{begin, end, reduce_result, tg});
 
-    return *reduce_result;
+    return reduce_result;
 }
 /*end_task_group_extensions_reduction_example*/
 
