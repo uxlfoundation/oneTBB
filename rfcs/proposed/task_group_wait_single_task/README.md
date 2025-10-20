@@ -340,7 +340,7 @@ the thread will only exit after each is bypassed sequentially.
 However, since the current thread notifies the ``wait_context`` it is waiting on via the corresponding waiter node, it is more appropriate to avoid
 bypassing the next task. Instead, the task should be spawned, and ``run_and_wait_task`` should exit after executing ``middle_task``.
 
-For the initial implementation, it is proposed to completely avoid bypassing the task returned from the notification list and to spawn it.
+For the initial implementation, it is proposed to completely avoid bypassing the task returned from the notification list and to spawn it instead.
 
 There are several approaches that can be implemented in the future to improve this approach.
 
