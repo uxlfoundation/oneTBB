@@ -49,9 +49,9 @@ Changes to the list of supported hardware will be announced in advance with a de
   - Debian* 11, 12
   - Fedora* 41, 42
   - Rocky* Linux* 9
-  - Red Hat* Enterprise Linux* 8, 9
+  - Red Hat* Enterprise Linux* 8, 9, 10
   - SuSE* Linux* Enterprise Server 15
-  - Ubuntu* 22.04, 24.04
+  - Ubuntu* 22.04, 24.04, 25.04
 - Systems with macOS* operating systems:
   - macOS* 12.x, 13.x, 14.x, 15.x
 - Systems with Android* operating systems:
