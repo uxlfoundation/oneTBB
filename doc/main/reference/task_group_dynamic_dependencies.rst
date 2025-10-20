@@ -18,9 +18,9 @@ The |full_name| implementation extends the
 with an API for defining predecessor-successor relationships between tasks,
 such that a successor task can begin execution only after all of its predecessors are completed.
 
-An **unsubmitted** task is one that has not been explicitly submitted for execution, such as by passing a ``task_handle`` to ``task_group::run``.
+An **unsubmitted** task is one that has not been submitted for execution, such as by passing a ``task_handle`` to ``task_group::run``.
 
-A **submitted** task is one that has been explicitly submitted for execution.
+A **submitted** task is one that has been submitted for execution.
 
 A non-empty ``task_handle`` object represents an unsubmitted task, while a ``task_completion_handle`` can represent either submitted or unsubmitted tasks.
 
@@ -55,9 +55,10 @@ This function must be invoked from within the task body. All successors of the c
 
 .. code:: cpp
 
-    tbb::task_handle t = tg.defer([] {
-        tbb::task_group comp_receiver = tg.defer(receiver_body);
+    tbb::task_handle t = tg.defer([&tg] {
+        tbb::task_handle comp_receiver = tg.defer(receiver_body);
         tbb::task_group::transfer_this_task_completion_to(comp_receiver);
+        tg.run(std::move(comp_receiver));
     });
 
     tbb::task_handle succ = tg.defer(succ_body);
@@ -291,6 +292,7 @@ Schedules the task object pointed by ``h`` for the execution.
 .. code:: cpp
 
     static void set_task_order(task_handle& pred, task_handle& succ);
+    static void set_task_order(task_completion_handle& pred, task_handle& succ);
 
 Registers the task associated with ``pred`` as a predecessor that must complete before the task associated with ``succ`` can begin execution.
 
@@ -298,28 +300,13 @@ It is thread-safe to concurrently add multiple predecessors to a single successo
 
 It is thread-safe to concurrently add successors to both the task transferring its completion and the task receiving the completion.
 
-The behavior is undefined in the following cases:
-
-* Either ``pred`` or ``succ`` is an empty.
-* The tasks referenced by ``pred`` and ``succ`` belong to different ``task_group`` instances.
-
-.. code:: cpp
-
-    static void set_task_order(task_completion_handle& pred, task_handle& succ);
-
-Registers the task referenced by ``pred`` as a predecessor that must complete before the task associated with ``succ`` can begin execution.
-
-It is thread-safe to concurrently add multiple predecessors to a single successor and to register the same predecessor with multiple successors.
-
-It is thread-safe to concurrently add successors to both the task transferring its completion and the task receiving the completion.
-
-It is thread-safe to concurrently add a predecessor while the ``task_handle`` associated with the same predecessor task is being run.
+It is thread-safe to concurrently add a successor to a ``task_completion_handle`` while the ``task_handle`` associated with the same task is being run.
 
 The behavior is undefined in the following cases:
 
 * Either ``pred`` or ``succ`` is empty.
 * The tasks referred by ``pred`` and ``succ`` belong to different ``task_group`` instances.
-* The task referred by ``pred`` was destroyed before being submitted for execution.
+* The task referred by ``task_completion_handle`` was destroyed without being submitted for execution.
 
 .. code:: cpp
 
@@ -358,14 +345,6 @@ except parameter type.
 .. note::
 
     ``h`` should not be empty to avoid an undefined behavior.
-
-Enqueues the task object associated with ``handle`` into ``task_arena`` for processing once its dependencies are satisfied.
-A task associated with a ``task_handle`` will never execute unless it is run, enqueued or bypassed.
-
-.. note::
-
-    If the task associated with ``handle`` has incomplete predecessors, it will be scheduled for execution once all of them have completed.
-    The ``enqueue`` function does not wait for predecessors to complete.
 
 Example
 -------

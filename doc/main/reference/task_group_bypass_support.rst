@@ -29,10 +29,6 @@ Execution of the deferred task owned by a returned ``task_handle`` is not guaran
         return next_task;
     }
 
-.. note::
-    
-    To allow a task to be bypassed, the ``task_handle`` that owns it must **not** be explicitly submitted to ``task_group::run`` or any other submission function.
-
 API
 ***
 
@@ -82,10 +78,18 @@ Member Functions
     template <typename F>
     void run(F&& f);
 
-The function object ``F`` may return a ``task_handle`` object. If the returned handle is non-empty and owns a task without dependencies, it serves as an optimization
-hint for a task that could be executed next.
+The ``F`` type must meet the *Function Objects* requirements described in the [function.objects] section of the ISO C++ Standard.
 
-If the returned handle was created by a ``task_group`` other than ``*this``, the behavior is undefined.
+.. admonition:: Extension
+
+    ``F`` may return a ``task_handle`` object. If the returned handle is non-empty and owns a task without dependencies, it serves as an optimization hint
+    for a task that could be executed next.
+
+    If the returned handle was created by a ``task_group`` other than ``*this``, the behavior is undefined.     
+
+.. note::
+    
+    The returned ``task_handle`` must not be explicitly submitted with ``task_group::run`` or another submission function.
 
 Example
 -------

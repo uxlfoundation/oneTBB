@@ -27,12 +27,12 @@ struct reduce_task {
 
     struct join_task {
         void operator()() const {
-            *result = *left + *right;
+            result = *left + *right;
         }
 
-        std::shared_ptr<std::size_t> left;
-        std::shared_ptr<std::size_t> right;
-        std::shared_ptr<std::size_t> result;
+        std::size_t& result;
+        std::unique_ptr<std::size_t> left;
+        std::unique_ptr<std::size_t> right;
     };
 
     tbb::task_handle operator()() const {
@@ -42,20 +42,21 @@ struct reduce_task {
         if (size < serial_threshold) {
             // Perform serial reduction
             for (std::size_t i = begin; i < end; ++i) {
-                *result += i;
+                result += i;
             }
         } else {
             // The range is too large to process directly
             // Divide it into smaller segments for parallel execution
             std::size_t middle = begin + size / 2;
 
-            std::shared_ptr<std::size_t> left_result = std::make_shared<std::size_t>(0);
-            tbb::task_handle left_leaf = tg.defer(reduce_task{begin, middle, left_result, tg});
+            auto left_result = std::make_unique<std::size_t>(0);
+            auto right_result = std::make_unique<std::size_t>(0);
 
-            std::shared_ptr<std::size_t> right_result = std::make_shared<std::size_t>(0);
-            tbb::task_handle right_leaf = tg.defer(reduce_task{middle, end, right_result, tg});
+            
+            tbb::task_handle left_leaf = tg.defer(reduce_task{begin, middle, *left_result, tg});
+            tbb::task_handle right_leaf = tg.defer(reduce_task{middle, end, *right_result, tg});
 
-            tbb::task_handle join = tg.defer(join_task{left_result, right_result, result});
+            tbb::task_handle join = tg.defer(join_task{result, std::move(left_result), std::move(right_result)});
 
             tbb::task_group::set_task_order(left_leaf, join);
             tbb::task_group::set_task_order(right_leaf, join);
@@ -74,7 +75,7 @@ struct reduce_task {
 
     std::size_t begin;
     std::size_t end;
-    std::shared_ptr<std::size_t> result;
+    std::size_t& result;
     tbb::task_group& tg;
 };
 

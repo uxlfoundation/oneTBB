@@ -55,7 +55,7 @@ struct for_task {
 }; // struct for_task
 
 template <typename RandomAccessIterator, typename Function>
-void for_each(RandomAccessIterator begin, RandomAccessIterator end, Function f) {
+void par_for_each(RandomAccessIterator begin, RandomAccessIterator end, Function f) {
     tbb::task_group tg;
     // Run the root task
     tg.run_and_wait(for_task<RandomAccessIterator, Function>{begin, end, std::move(f), tg});
@@ -67,7 +67,7 @@ int main() {
 
     std::size_t array[N];
 
-    for_each(array, array + N, [](std::size_t& item) {
+    par_for_each(array, array + N, [](std::size_t& item) {
         item = 42;
     });
 
