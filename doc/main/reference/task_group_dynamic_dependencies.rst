@@ -18,9 +18,9 @@ The |full_name| implementation extends the
 with an API for defining predecessor-successor relationships between tasks,
 such that a successor task can begin execution only after all of its predecessors are completed.
 
-An **unsubmitted** task is one that has not been submitted for execution, such as by passing a ``task_handle`` to ``task_group::run``.
+An **unsubmitted** task is one that has not been submitted for execution.
 
-A **submitted** task is one that has been submitted for execution.
+A **submitted** task is one that has been submitted for execution, such as by passing a ``task_handle`` to ``task_group::run``.
 
 A non-empty ``task_handle`` object represents an unsubmitted task, while a ``task_completion_handle`` can represent any task.
 
