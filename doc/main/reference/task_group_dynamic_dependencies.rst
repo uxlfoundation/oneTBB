@@ -37,7 +37,7 @@ Both submitted and unsubmitted tasks can serve as predecessors. However, only un
 
     tg.run(std::move(task));
     // task is submitted
-    // task_handle is empty, task_completion_handle represents a task
+    // task_handle is empty, task_completion_handle represents the task
 
     // At any stage, comp_handle may be used to add successors to the task
 
