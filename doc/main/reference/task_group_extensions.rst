@@ -3,6 +3,8 @@
 task_group extensions
 =====================
 
+This section documents ``task_group`` API extensions for advanced use cases.
+
 .. note::
     To enable these extensions, define the ``TBB_PREVIEW_TASK_GROUP_EXTENSIONS`` macro with a value of ``1``.
 
