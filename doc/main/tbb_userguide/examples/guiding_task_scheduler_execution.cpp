@@ -21,7 +21,7 @@
 #include <oneapi/tbb/task_group.h>
 
 void set_numa_node_example() {
-/* begin_set_numa_node_example */
+/*begin_set_numa_node_example*/
     std::vector<tbb::numa_node_id> numa_nodes = tbb::info::numa_nodes();
     std::vector<tbb::task_arena> arenas(numa_nodes.size());
     std::vector<tbb::task_group> task_groups(numa_nodes.size());
@@ -43,7 +43,7 @@ void set_numa_node_example() {
     for(unsigned j = 0; j < numa_nodes.size(); j++) {
         arenas[j].wait_for(task_groups[j]);
     }
-/* end_set_numa_node_example */
+/*end_set_numa_node_example*/
 }
 
 int main() {
