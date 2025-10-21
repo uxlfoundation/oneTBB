@@ -331,9 +331,30 @@ Member Functions of ``task_arena`` Class
 
 .. code:: cpp
 
-    void enqueue(task_handle&& handle);
+    void enqueue(task_handle&& h);
 
 Enqueues a task owned by ``h`` into the ``task_arena`` for processing.
+
+.. admonition:: Extension
+
+    If the task associated with ``h`` has predecessors, scheduling the task execution is postponed until all
+    of the predecessors have completed, while the function returns immediately.
+
+The behavior of this function is identical to the generic version (``template<typename F> void task_arena::enqueue(F&& f)``),
+except parameter type.
+
+.. note::
+
+    ``h`` should not be empty to avoid an undefined behavior.
+
+``this_task_arena`` Namespace
+-----------------------------
+
+.. code:: cpp
+
+    void enqueue(task_handle&& h);
+
+Enqueues a task owned by ``h`` into the ``task_arena`` that is currently used by the calling thread.
 
 .. admonition:: Extension
 
