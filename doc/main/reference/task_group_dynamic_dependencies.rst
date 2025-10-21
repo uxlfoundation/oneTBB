@@ -33,7 +33,7 @@ Both submitted and unsubmitted tasks can serve as predecessors. However, only un
 
     tbb::task_completion_handle comp_handle = task;
     // task is unsubmitted
-    // both task_handle and task_completion_handle represents the task
+    // both task_handle and task_completion_handle represent the task
 
     tg.run(std::move(task));
     // task is submitted
