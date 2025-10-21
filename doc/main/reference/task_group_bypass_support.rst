@@ -85,11 +85,9 @@ The ``F`` type must meet the *Function Objects* requirements described in the [f
     ``F`` may return a ``task_handle`` object. If the returned handle is non-empty and owns a task without dependencies, it serves as an optimization hint
     for a task that could be executed next.
 
-    If the returned handle was created by a ``task_group`` other than ``*this``, the behavior is undefined.     
+    The returned ``task_handle`` must not be explicitly submitted with ``task_group::run`` or another submission function, otherwise, the behavior is undefined.
 
-.. note::
-    
-    The returned ``task_handle`` must not be explicitly submitted with ``task_group::run`` or another submission function.
+    If the returned handle was created by a ``task_group`` other than ``*this``, the behavior is undefined.     
 
 Example
 -------
