@@ -107,16 +107,19 @@ The current waiting functions return a ``task_group_status``, which can have thr
 * ``tbb::task_group_status::complete`` - The group execution is not cancelled, and all tasks in the group have completed.
 * ``tbb::task_group_status::canceled`` - The group execution is cancelled, and the completion status of tasks is unknown.
 
-Since the new waiting functions track the progress of a single task, returning a ``task_group_status`` may be misleading.
-If the group execution is cancelled, the tracked task may still execute, and returning ``canceled`` does not accurately reflect the task's 
+Returning the same set of statuses from the new waiting functions is not sufficient.
+
+If the group execution is cancelled, the tracked task may still execute, and returning ``canceled`` does not accurately reflect the task's
 completion status.
-If execution is not cancelled, the function would need to track whether other tasks remain in the group and return ``not_complete`` if any are still pending.
+If the execution is not cancelled, the function would need to track whether other tasks remain in the group and return ``not_complete`` if any are still pending.
+
+To address this and to make new waiting functions consistent in the return type with other functions in ``task_group`` and ``task_arena``,
+it is proposed to introduce a new status ``task_complete`` that indicates that the awaited task is completed.
+It is unknown either the ``task_group`` is cancelled or not, since the task can still be completed even if the group execution was cancelled.
 
 If the task group execution is canceled and the originally executed task has transferred its completion to another task that was canceled, the
-waiting function will return ``task_status::canceled``.
+waiting function will return ``task_group_status::canceled``.
 
-To address this, a new enum ``task_status`` is proposed to track the status of the awaited task. ``task_status::complete`` indicates that the tracked 
-task was executed and completed, while ``task_status::canceled`` signifies that the task was not executed due to group cancellation.
 
 The proposed API is summarized below:
 
@@ -125,20 +128,21 @@ The proposed API is summarized below:
 namespace oneapi {
 namespace tbb {
 
-enum class task_status {
-    not_complete,
-    complete,
-    canceled
-};
+enum task_group_status { // Existing API
+    not_complete,        // Existing API
+    complete,            // Existing API
+    canceled,            // Existing API
+    task_complete        // Proposed API 
+}
 
 class task_group {
-    task_status wait_task(task_completion_handle& comp_handle);
-    task_status run_and_wait_task(task_handle&& handle);
+    task_group_status wait_task(task_completion_handle& comp_handle);
+    task_group_status run_and_wait_task(task_handle&& handle);
 };
 
 // Defined in <oneapi/tbb/task_arena.h>
 class task_arena {
-    task_status wait_for(task_completion_handle& comp_handle);
+    task_group_status wait_for(task_completion_handle& comp_handle);
 };
 
 } // namespace tbb
