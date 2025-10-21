@@ -274,7 +274,7 @@ Member Functions of ``task_group`` Class
 
 .. code:: cpp
 
-    void run(task_handle&& handle);
+    void run(task_handle&& h);
 
 Schedules the task object pointed by ``h`` for the execution.
 
