@@ -30,9 +30,9 @@ void destroy_task(T* task, const d1::execution_data* ed, d1::small_object_alloca
 
 class chunk_root_task;
 
-class list_task : public d1::task {
+class listed_task : public d1::task {
 protected:
-    list_task*                      m_next_task;
+    listed_task*                      m_next_task;
 #if COUNT_NUMS
     std::size_t                     m_num_elements_before;
 #endif
@@ -41,7 +41,7 @@ protected:
     d1::small_object_allocator      m_allocator;
 
 public:
-    list_task(d1::task_group_context& ctx, d1::small_object_allocator& allocator)
+    listed_task(d1::task_group_context& ctx, d1::small_object_allocator& allocator)
         : m_next_task(nullptr)
 #if COUNT_NUMS
         , m_num_elements_before(0)
@@ -51,7 +51,7 @@ public:
         , m_allocator(allocator)
     {}
 
-    ~list_task() override {
+    ~listed_task() override {
         __TBB_ASSERT(m_wait_tree_vertex != nullptr, "m_wait_tree_vertex should be set before the destruction");
         m_wait_tree_vertex->release();
     }
@@ -59,7 +59,7 @@ public:
     virtual void destroy(d1::execution_data& ed) = 0;
 
     d1::task_group_context& ctx() const { return m_ctx; }
-    list_task*& next() { return m_next_task; }
+    listed_task*& next() { return m_next_task; }
     d1::wait_tree_vertex_interface*& wait_tree_vertex() { return m_wait_tree_vertex; }
 #if COUNT_NUMS
     std::size_t& num_elements_before() { return m_num_elements_before; }
@@ -67,14 +67,14 @@ public:
 };
 
 template <typename F>
-class function_list_task : public list_task {
+class listed_function_task : public listed_task {
     // TODO: enable EBO for this task before releasing
     const F m_function;
 
 public:
     template <typename FF>
-    function_list_task(FF&& function, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
-        : list_task(ctx, alloc)
+    listed_function_task(FF&& function, d1::task_group_context& ctx, d1::small_object_allocator& alloc)
+        : listed_task(ctx, alloc)
         , m_function(std::forward<FF>(function))
     {}
 
@@ -99,14 +99,14 @@ class chunk_root_task : public d1::task, public d1::wait_tree_vertex_interface {
     d1::task_group_context&         m_ctx;
     d1::wait_tree_vertex_interface* m_root_wait_tree_vertex;
     
-    list_task*                      m_first_task;
-    list_task*                      m_second_task;
-    list_task*                      m_third_task;
+    listed_task*                      m_first_task;
+    listed_task*                      m_second_task;
+    listed_task*                      m_third_task;
     
     std::atomic<std::size_t>        m_ref_count;
     d1::small_object_allocator&     m_allocator;
 public:
-    chunk_root_task(list_task* first_task, list_task* second_task, list_task* third_task,
+    chunk_root_task(listed_task* first_task, listed_task* second_task, listed_task* third_task,
                     d1::task_group_context& ctx, d1::wait_tree_vertex_interface* root_vertex,
                     d1::small_object_allocator& allocator)
         : m_ctx(ctx)
@@ -174,12 +174,12 @@ static tbb::concurrent_vector<std::size_t> statistics;
 #endif
 
 class grab_task : public d1::task {
-    std::atomic<list_task*>&        m_list_to_grab;
+    std::atomic<listed_task*>&        m_list_to_grab;
     d1::wait_tree_vertex_interface* m_wait_tree_vertex;
     d1::task_group_context&         m_ctx;
     d1::small_object_allocator      m_allocator;
 public:
-    grab_task(std::atomic<list_task*>& list_to_grab, d1::wait_tree_vertex_interface* wait_tree_vertex,
+    grab_task(std::atomic<listed_task*>& list_to_grab, d1::wait_tree_vertex_interface* wait_tree_vertex,
               d1::task_group_context& ctx, d1::small_object_allocator& allocator)
         : m_list_to_grab(list_to_grab)
         , m_wait_tree_vertex(wait_tree_vertex)
@@ -196,7 +196,7 @@ public:
 
     d1::task* execute(d1::execution_data& ed) override {
         __TBB_ASSERT(ed.context == &m_ctx, "The task group context should be used for all tasks");
-        list_task* task_ptr = m_list_to_grab.exchange(nullptr);
+        listed_task* task_ptr = m_list_to_grab.exchange(nullptr);
         __TBB_ASSERT(task_ptr != nullptr, "Grab task should take at least one task");
 
 #if COUNT_NUMS
@@ -208,7 +208,7 @@ public:
         d1::small_object_allocator alloc;
         // Chunk loop
         while (task_ptr != nullptr && task_ptr->next() != nullptr && task_ptr->next()->next() != nullptr) {
-            list_task* next_task = task_ptr->next()->next()->next();
+            listed_task* next_task = task_ptr->next()->next()->next();
             chunk_root_task* chunk_task = alloc.new_object<chunk_root_task>(task_ptr, task_ptr->next(), task_ptr->next()->next(),
                                                                             m_ctx, m_wait_tree_vertex, alloc);
 
@@ -222,7 +222,7 @@ public:
 
         // Not enough tasks to form a chunk
         while (task_ptr != nullptr) {
-            list_task* next_task = task_ptr->next();
+            listed_task* next_task = task_ptr->next();
 
             m_wait_tree_vertex->reserve();
             task_ptr->wait_tree_vertex() = m_wait_tree_vertex;
@@ -244,11 +244,66 @@ public:
     }
 };
 
+#ifndef NUM_PER_THREAD_MICRO_LISTS
+#define NUM_PER_THREAD_MICRO_LISTS 1
+#endif
+
+struct task_list {
+    static constexpr std::size_t num_micro_lists = NUM_PER_THREAD_MICRO_LISTS;
+
+    task_list()
+        : push_index(0)
+    {
+        for (std::size_t i = 0; i < num_micro_lists; ++i) {
+            micro_lists[i].store(nullptr, std::memory_order_relaxed);
+        }
+    }
+
+    template <typename F>
+    void push(F&& f, d1::wait_context_vertex& group_wait_context_vertex, d1::task_group_context& group_context) {
+        d1::small_object_allocator alloc;
+        using task_type = listed_function_task<typename std::decay<F>::type>;
+        listed_task* t = alloc.new_object<task_type>(std::forward<F>(f), group_context, alloc);
+
+        std::atomic<listed_task*>& micro_list = micro_lists[push_index];
+        push_index = (push_index + 1) % num_micro_lists;
+
+        listed_task* current_head_task = micro_list.load(std::memory_order_relaxed);
+        t->next() = current_head_task;
+#if COUNT_NUMS
+        t->num_elements_before() = 1 + current_head_task->num_elements_before();
+#endif
+
+        // Only the owning thread and the grab task access micro_list
+        // grab task only doing exchange(nullptr)
+        while (!micro_list.compare_exchange_strong(current_head_task, t)) {
+            // grab task took the list for processing
+            // current_head_task is updated by CAS
+            __TBB_ASSERT(current_head_task == nullptr, nullptr);
+            t->next() = current_head_task;
+#if COUNT_NUMS
+            t->num_elements_before() = 0;
+#endif
+        }
+
+        if (current_head_task == nullptr) {
+            // The first item in the list, spawn the grab task
+            grab_task* grab_t = alloc.new_object<grab_task>(micro_list, r1::get_thread_reference_vertex(&group_wait_context_vertex),
+                                                            group_context, alloc);
+            r1::spawn(*grab_t, group_context);
+        }
+    }
+
+private:
+    std::atomic<listed_task*> micro_lists[num_micro_lists];
+    std::size_t               push_index;
+};
+
 class aggregating_task_group {
 private:
     d1::wait_context_vertex m_wait_vertex;
     d1::task_group_context  m_context;
-    static thread_local std::atomic<list_task*> m_task_list;
+    static thread_local task_list m_task_list;
 
     d1::task_group_context& context() noexcept {
         return m_context.actual_context();
@@ -298,41 +353,14 @@ public:
 
     template <typename F>
     void run(F&& f) {
-        d1::small_object_allocator alloc;
-        using task_type = function_list_task<typename std::decay<F>::type>;
-        list_task* t = alloc.new_object<task_type>(std::forward<F>(f), context(), alloc);
-
-        list_task* current_list_head = m_task_list.load(std::memory_order_relaxed);
-        t->next() = current_list_head;
-#if COUNT_NUMS
-        if (current_list_head) t->num_elements_before() = 1 + current_list_head->num_elements_before();
-#endif
-
-        // Only the owning thread and the grab task access m_task_list
-        // grab task only doing exchange(nullptr)
-        while (!m_task_list.compare_exchange_strong(current_list_head, t)) {
-            __TBB_ASSERT(current_list_head == nullptr, nullptr);
-            // grab task took the list for processing
-            // current_list_head is updated by CAS
-            t->next() = current_list_head;
-#if COUNT_NUMS
-            t->num_elements_before() = 0;
-#endif
-        }
-
-        if (current_list_head == nullptr) {
-            // The first item in the list, spawn the grab task
-            grab_task* grab = alloc.new_object<grab_task>(m_task_list, r1::get_thread_reference_vertex(&m_wait_vertex),
-                                                          context(), alloc);
-            r1::spawn(*grab, context());
-        }
+        m_task_list.push(std::forward<F>(f), m_wait_vertex, context());
     }
 
     template <typename F>
     task_group_status run_and_wait(const F& f);
 }; // class aggregating_task_group
 
-thread_local std::atomic<list_task*> aggregating_task_group::m_task_list;
+thread_local task_list aggregating_task_group::m_task_list;
 
 } // namespace d2
 } // namespace detail

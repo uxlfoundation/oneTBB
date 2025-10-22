@@ -23,11 +23,14 @@
 
 #include "oneapi/tbb/tick_count.h"
 #include "oneapi/tbb/task_group.h"
+#include "oneapi/tbb/aggregating_task_group.h"
 #include "oneapi/tbb/global_control.h"
 
 #include "common/utility/utility.hpp"
 #include "common/utility/measurements.hpp"
 #include "common/utility/get_default_num_threads.hpp"
+
+#define TASK_GROUP_TYPE task_group
 
 #pragma warning(disable : 4996)
 
@@ -228,7 +231,7 @@ bool examine_potentials(std::vector<board_element>& b, bool& progress) {
     return valid_board(b);
 }
 
-void partial_solve(oneapi::tbb::task_group& g,
+void partial_solve(oneapi::tbb::TASK_GROUP_TYPE& g,
                    std::vector<board_element>& b,
                    unsigned first_potential_set) {
     if (fixed_board(b)) {
@@ -267,7 +270,7 @@ unsigned solve(int p, utility::measurements& solve_measurements) {
     nSols = 0;
     std::vector<board_element> start_board(BOARD_SIZE);
     init_board(start_board, init_values);
-    oneapi::tbb::task_group g;
+    oneapi::tbb::TASK_GROUP_TYPE g;
     solve_measurements.start();
     partial_solve(g, start_board, 0);
     g.wait();
