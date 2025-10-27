@@ -79,6 +79,7 @@ public:
             listed_task* next_task = m_task_list->next();
             m_task_list->parent() = this;
 
+            this->reserve();
             if (bypass_task == nullptr && &m_ctx == &m_task_list->ctx()) {
                 bypass_task = m_task_list;
             } else {
@@ -88,6 +89,7 @@ public:
             m_task_list = next_task;
         }
 
+        this->release(ed);
         __TBB_ASSERT(&m_ctx == &bypass_task->ctx(), "Cannot bypass task from different context");
         return bypass_task;
     }
