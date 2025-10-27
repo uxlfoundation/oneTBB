@@ -1,5 +1,6 @@
 #include <oneapi/tbb/task_group.h>
 #include <oneapi/tbb/aggregating_task_group.h>
+#include <oneapi/tbb/parallel_while.h>
 #include <oneapi/tbb/tick_count.h>
 #include <oneapi/tbb/global_control.h>
 #include <vector>
@@ -112,6 +113,38 @@ struct benchmark_nonstop_produce {
     do_calc     body;
 };
 
+struct benchmark_nonstop_produce_parallel_while {
+    benchmark_nonstop_produce_parallel_while(std::size_t sz, benchmark_buffers& benchmark_buffers)
+        : block_size(sz)
+        , do_calc_body(&benchmark_buffers)
+    {}
+
+    void operator()() const {
+        int k = 0;
+        auto generator = [&] {
+            return k++;
+        };
+        auto predicate = [](int i) {
+            return i != work_count;
+        };
+        auto body = [&](int i) {
+            int sub_begin = i;
+            int sub_end = i + block_size;
+
+            if (sub_end > work_count) sub_end = work_count;
+
+            for (int j = sub_begin; j < sub_end; ++j) {
+                do_calc_body(j);
+            }
+        };
+
+        oneapi::tbb::parallel_while(generator, predicate, body);
+    }
+
+    std::size_t block_size;
+    do_calc do_calc_body;
+};
+
 int main(int argc, char* argv[]) {
     std::size_t num_threads = argc > 1 ? strtol(argv[1], nullptr, 0) : tbb::this_task_arena::max_concurrency();
     std::size_t block_size  = argc > 2 ? strtol(argv[2], nullptr, 0) : 100; 
@@ -129,5 +162,9 @@ int main(int argc, char* argv[]) {
 
     benchmark_nonstop_produce<tbb::aggregating_task_group> atg_body(block_size, buffers);
     double atg_median_time = measure(atg_body, reset_buffers{&buffers});
-    std::cout << "Elapsed time (tbb::aggregating_task_group): " << atg_median_time << std::endl;    
+    std::cout << "Elapsed time (tbb::aggregating_task_group): " << atg_median_time << std::endl;
+
+    benchmark_nonstop_produce_parallel_while pwhile_body(block_size, buffers);
+    double pwhile_median_time = measure(pwhile_body, reset_buffers{&buffers});
+    std::cout << "Elapsed time (tbb::parallel_while): " << pwhile_median_time << std::endl;
 }
