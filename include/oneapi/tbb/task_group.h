@@ -58,6 +58,7 @@ template <bool>
 class context_guard_helper;
 struct task_arena_impl;
 class context_list;
+void handle_context_exception(d1::task_group_context& ctx, bool rethrow);
 
 TBB_EXPORT void __TBB_EXPORTED_FUNC execute(d1::task_arena_base&, d1::delegate_base&);
 TBB_EXPORT void __TBB_EXPORTED_FUNC isolate_within_arena(d1::delegate_base&, std::intptr_t);
@@ -136,7 +137,7 @@ namespace {
         task_handle th = std::forward<F>(f)();
         task_handle_task* task_ptr = task_handle_accessor::release(th);
         // If task has unresolved dependencies, it can't be bypassed
-        if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
+        if (task_ptr && task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
             task_ptr = nullptr;
         }
 
@@ -448,6 +449,7 @@ private:
     friend struct r1::task_arena_impl;
     friend struct r1::task_group_context_impl;
     friend class d2::task_group_base;
+    friend void r1::handle_context_exception(d1::task_group_context&, bool rethrow);
 }; // class task_group_context
 
 static_assert(sizeof(task_group_context) == 128, "Wrong size of task_group_context");

@@ -336,12 +336,31 @@ public:
     /** Note that objects of this type can be created only by the allocate() method. **/
     void destroy() noexcept;
 
-    //! Throws the contained exception .
-    void throw_self();
+    //! Throws the contained exception and then destroys this object.
+    void rethrow_and_destroy();
 
 private:
     tbb_exception_ptr(const std::exception_ptr& src) : my_ptr(src) {}
 }; // class tbb_exception_ptr
+
+//! Utility function to atomically clear and handle exceptions from task_group_context
+/** This function implements thread-safe pattern for clearing exceptions
+    from a task_group_context and either destroying or throwing them. **/
+inline void handle_context_exception(d1::task_group_context& ctx, bool rethrow = true) {
+
+    tbb_exception_ptr* exception = ctx.my_exception.load(std::memory_order_acquire);
+    if (exception) {
+        if (ctx.my_exception.compare_exchange_strong(exception, nullptr, 
+                                                     std::memory_order_acq_rel)) {
+            // TODO: An exception should not be captured and then not rethrown.
+            //       Either add asserts or remove corner cases.
+            if (rethrow) {
+                exception->rethrow_and_destroy();
+            } else
+                exception->destroy();
+        }
+    }
+}
 
 //------------------------------------------------------------------------
 // Debugging support

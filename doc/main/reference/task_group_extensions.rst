@@ -3,84 +3,17 @@
 task_group extensions
 =====================
 
-.. note::
-    To enable these extensions, set the ``TBB_PREVIEW_TASK_GROUP_EXTENSIONS`` macro to 1.
-
-.. contents::
-    :local:
-    :depth: 1
-
-Description
-***********
-
-|full_name| implementation extends the `tbb::task_group specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_group/task_group_cls>`_ with the requirements for a user-provided function object.
-   
-
-API
-***
-
-Header
-------
-
-.. code:: cpp
-
-    #include <oneapi/tbb/task_group.h>
-
-Synopsis
---------
-
-.. code:: cpp
-
-    namespace oneapi {
-        namespace tbb {
-   
-           class task_group {
-           public:
-
-               //only the requirements for the return type of function F are changed              
-               template<typename F>
-               task_handle defer(F&& f);
-                   
-               //only the requirements for the return type of function F are changed
-               template<typename F>
-               task_group_status run_and_wait(const F& f);
-    
-               //only the requirements for the return type of function F are changed              
-               template<typename F>
-               void run(F&& f);
-           }; 
-
-        } // namespace tbb
-    } // namespace oneapi
-
-
-
-Member Functions
-----------------
-
-.. cpp:function:: template<typename F> task_handle  defer(F&& f)
-
-As an optimization hint, ``F`` might return a ``task_handle``, which task object can be executed next.
+This section documents ``task_group`` API extensions for advanced use cases.
 
 .. note::
-   The ``task_handle`` returned by the function must be created using ``*this`` ``task_group``. That is, the one for which the run method is called, otherwise it is undefined behavior. 
+    To enable these extensions, define the ``TBB_PREVIEW_TASK_GROUP_EXTENSIONS`` macro with a value of ``1``.
 
-.. cpp:function:: template<typename F> task_group_status run_and_wait(const F& f)
+.. toctree::
+    :titlesonly:
 
-As an optimization hint, ``F`` might return a ``task_handle``, which task object can be executed next.
+    task_group_bypass_support
+    task_group_dynamic_dependencies
 
-.. note::
-   The ``task_handle`` returned by the function must be created using ``*this`` ``task_group``. That is, the one for which the run method is called, otherwise it is undefined behavior. 
-
- 
-.. cpp:function:: template<typename F> void  run(F&& f)
-
-As an optimization hint, ``F`` might return a ``task_handle``, which task object can be executed next.
-
-.. note::
-   The ``task_handle`` returned by the function must be created with ``*this`` ``task_group``. It means, with the one for which run method is called, otherwise it is an undefined behavior. 
-    
-               
 .. rubric:: See also
 
 * `oneapi::tbb::task_group specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_group/task_group_cls>`_

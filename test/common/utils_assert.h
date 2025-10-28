@@ -56,6 +56,14 @@ void AssertSameType( const T& /*x*/, const T& /*y*/ ) {}
 
 #include "tbb/global_control.h"
 
+ 
+// Suppress warning about setjmp/longjmp usage in C++ in MSVC.
+// It is not guaranteed by the standard that stack-frame objects are destroyed correctly if longjmp is used.
+// But since we use it only in testing and only when exceptions are not possible, it should be acceptable.
+#if _MSC_VER && !TBB_USE_EXCEPTIONS
+#pragma warning(disable: 4611)
+#endif
+
 //! Check that expression x raises assertion failure with message containing given substring.
 /** Calls utils::SetCustomAssertionHandler to set utils::AssertionFailureHandler as a handler. */
 #if TBB_USE_EXCEPTIONS
@@ -126,9 +134,9 @@ void AssertionFailureHandler(const char* filename, int line,
 }
 #endif
 
-tbb::assertion_handler_type SetCustomAssertionHandler() {
-    auto default_handler = tbb::set_assertion_handler(AssertionFailureHandler);
-    auto custom_handler = tbb::get_assertion_handler();
+tbb::ext::assertion_handler_type SetCustomAssertionHandler() {
+    auto default_handler = tbb::ext::set_assertion_handler(AssertionFailureHandler);
+    auto custom_handler = tbb::ext::get_assertion_handler();
     REQUIRE_MESSAGE(custom_handler == AssertionFailureHandler,
                     "Custom assertion handler was not set.");
     return default_handler;
@@ -144,11 +152,11 @@ void CheckAssertionFailure(int line, std::string expression, bool okay,
         expression, " failed with message '", msg_str, "' missing substring '", substr, "'");
 }
 
-void ResetAssertionHandler(tbb::assertion_handler_type default_handler) {
-    auto handler = tbb::set_assertion_handler(nullptr); // Reset to default handler
+void ResetAssertionHandler(tbb::ext::assertion_handler_type default_handler) {
+    auto handler = tbb::ext::set_assertion_handler(nullptr); // Reset to default handler
     REQUIRE_MESSAGE(handler == AssertionFailureHandler,
                     "Previous assertion handler was not returned.");
-    REQUIRE_MESSAGE(tbb::get_assertion_handler() == default_handler,
+    REQUIRE_MESSAGE(tbb::ext::get_assertion_handler() == default_handler,
                     "Default assertion handler was not reset.");
 }
 

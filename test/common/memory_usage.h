@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -93,7 +94,7 @@ namespace utils {
         bool status = GetProcessMemoryInfo(GetCurrentProcess(), &mem, sizeof(mem)) != 0;
         ASSERT(status, nullptr);
         return stat == currentUsage ? mem.PagefileUsage : mem.PeakPagefileUsage;
-#elif __unix__
+#elif __unix__ && !defined(__QNX__)
         long unsigned size = 0;
         FILE* fst = fopen("/proc/self/status", "r");
         ASSERT(fst != nullptr, nullptr);

@@ -49,6 +49,16 @@
 //! \brief Test for [scheduler.task_arena scheduler.task_scheduler_observer] specification
 
 //--------------------------------------------------//
+// Validation function to check that current_thread_index() and execution_slot() return
+// the same value for a thread running within initialized task_arena. The exported function
+// tbb::detail::r1::execution_slot is maintained for backwards compatibility only.
+void check_slot_compatibility(int expected_idx, const tbb::task_arena& arena) {
+    int execution_slot_idx = int(tbb::detail::r1::execution_slot(arena));
+    CHECK_MESSAGE(expected_idx == execution_slot_idx,
+        "current_thread_index() and execution_slot() should return the same value");
+}
+
+//--------------------------------------------------//
 // Test that task_arena::initialize and task_arena::terminate work when doing nothing else.
 /* maxthread is treated as the biggest possible concurrency level. */
 void InitializeAndTerminate( int maxthread ) {
@@ -449,6 +459,7 @@ public:
     // Arena's functor
     void operator()() const {
         int idx = tbb::this_task_arena::current_thread_index();
+        check_slot_compatibility(idx, my_a);
         REQUIRE( idx < (my_max_concurrency > 1 ? my_max_concurrency : 2) );
         REQUIRE( my_a.max_concurrency() == tbb::this_task_arena::max_concurrency() );
         int max_arena_concurrency = tbb::this_task_arena::max_concurrency();
@@ -588,6 +599,7 @@ struct TaskArenaValidator {
     void operator()() {
         CHECK_MESSAGE( tbb::this_task_arena::current_thread_index()==my_slot_at_construction,
                 "Current thread index has changed since the validator construction" );
+        check_slot_compatibility(my_slot_at_construction, my_arena);
     }
 };
 
@@ -2123,7 +2135,9 @@ TEST_CASE("Basic test of task_arena and task_group interoperability interface") 
         ta.enqueue([&] {
             utils::ConcurrencyTracker ct;
             barrier.wait();
-            per_thread_array[tbb::this_task_arena::current_thread_index() % num_threads]++;
+            int thread_idx = tbb::this_task_arena::current_thread_index();
+            check_slot_compatibility(thread_idx, ta);
+            per_thread_array[thread_idx % num_threads]++;
         }, tg);
     });
 

@@ -54,7 +54,9 @@ compatibility:
 #### Syntax
 
 ```cpp
+namespace oneapi {
 namespace tbb {
+namespace ext {
 #if !__TBB_DISABLE_SPEC_EXTENSIONS
     //! Type alias for assertion handler function pointer - same as TBB 2020.
     //! The handler should not return. If it eventually returns, the behavior is runtime-undefined.
@@ -70,10 +72,17 @@ namespace tbb {
     //! New function not present in TBB 2020, following std::get_terminate pattern.
     assertion_handler_type get_assertion_handler() noexcept;
 #endif
-}
+}}}
 ```
 
-Applications that used the custom assertion handler in TBB 2020 can migrate to this proposal with no changes.
+Applications that used the custom assertion handler in TBB 2020 can migrate to this proposal with minimal changes
+by adding names to `namespace tbb`:
+```cpp
+namespace tbb {
+    using oneapi::tbb::ext::set_assertion_handler;
+    using oneapi::tbb::ext::assertion_handler_type;
+}
+```
 
 #### Specification Extension
 
@@ -83,6 +92,10 @@ be enabled: `set_assertion_handler` and `get_assertion_handler` will be declared
 `assertion_failure` will dispatch to the active handler. Defining `__TBB_DISABLE_SPEC_EXTENSIONS` to a non-zero
 value before including oneTBB headers will disable the extension: these declarations will be excluded from
 the public API, and the library will always use the default assertion behavior.
+
+The availability of the extension can be checked with the `TBB_EXT_CUSTOM_ASSERTION_HANDLER` macro
+after including either the `oneapi/tbb/global_control.h` or the `oneapi/tbb/version.h` header.
+The value of the macro should be increased when observable modifications are made to the feature.
 
 ### Proposed Implementation Strategy
 

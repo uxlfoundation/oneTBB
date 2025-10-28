@@ -24,6 +24,7 @@
 #include "dynamic_link.h"
 #include "concurrent_monitor.h"
 #include "thread_dispatcher.h"
+#include "load_tbbbind.h"
 
 #include "oneapi/tbb/task_group.h"
 #include "oneapi/tbb/global_control.h"
@@ -40,6 +41,22 @@
 
 #ifdef EMSCRIPTEN
 #include <emscripten/stack.h>
+#endif
+
+// ASan detection: define HAS_SANITIZE_ADDRESS regardless
+// of the compiler when we are in an address-sanitized build.
+#if defined(HAS_SANITIZE_ADDRESS)
+#undef HAS_SANITIZE_ADDRESS
+#endif
+
+#if defined(__SANITIZE_ADDRESS__)
+// gcc
+#define HAS_SANITIZE_ADDRESS
+#elif defined(__has_feature)
+// clang
+#if __has_feature(address_sanitizer)
+#define HAS_SANITIZE_ADDRESS
+#endif
 #endif
 
 namespace tbb {
@@ -170,7 +187,7 @@ static void get_stack_attributes(std::uintptr_t& stack_base, std::size_t& stack_
 
     // Points to the lowest addressable byte of a stack.
     void* stack_limit = nullptr;
-#if __linux__ && !__bg__ && !defined(__SANITIZE_ADDRESS__)
+#if __linux__ && !__bg__ && !defined(HAS_SANITIZE_ADDRESS)
     size_t np_stack_size = 0;
     pthread_attr_t np_attr_stack;
     if (0 == pthread_getattr_np(pthread_self(), &np_attr_stack)) {
@@ -415,28 +432,7 @@ static const dynamic_link_descriptor TbbBindLinkTable[] = {
 };
 
 static const unsigned LinkTableSize = sizeof(TbbBindLinkTable) / sizeof(dynamic_link_descriptor);
-
-#if TBB_USE_DEBUG
-#define DEBUG_SUFFIX "_debug"
-#else
-#define DEBUG_SUFFIX
-#endif /* TBB_USE_DEBUG */
-
-#if _WIN32 || _WIN64
-#define LIBRARY_EXTENSION ".dll"
-#define LIBRARY_PREFIX
-#elif __APPLE__
-#define LIBRARY_EXTENSION __TBB_STRING(.3.dylib)
-#define LIBRARY_PREFIX "lib"
-#elif __unix__
-#define LIBRARY_EXTENSION __TBB_STRING(.so.3)
-#define LIBRARY_PREFIX "lib"
-#endif /* __unix__ */
-
-#define TBBBIND_NAME            LIBRARY_PREFIX "tbbbind"            DEBUG_SUFFIX LIBRARY_EXTENSION
-#define TBBBIND_2_0_NAME        LIBRARY_PREFIX "tbbbind_2_0"        DEBUG_SUFFIX LIBRARY_EXTENSION
-#define TBBBIND_2_5_NAME        LIBRARY_PREFIX "tbbbind_2_5"        DEBUG_SUFFIX LIBRARY_EXTENSION
-#endif /* _WIN32 || _WIN64 || __unix__ */
+#endif /* _WIN32 || _WIN64 || __unix__ || __APPLE__ */
 
 // Representation of system hardware topology information on the TBB side.
 // System topology may be initialized by third-party component (e.g. hwloc)
@@ -462,7 +458,7 @@ const char* load_tbbbind_shared_object() {
     GetNativeSystemInfo(&si);
     if (si.dwNumberOfProcessors > 32) return nullptr;
 #endif /* _WIN32 && !_WIN64 */
-    for (const auto& tbbbind_version : {TBBBIND_2_5_NAME, TBBBIND_2_0_NAME, TBBBIND_NAME}) {
+    for (const auto& tbbbind_version : tbbbind_libraries_list) {
         if (dynamic_link(tbbbind_version, TbbBindLinkTable, LinkTableSize, nullptr, DYNAMIC_LINK_LOCAL_BINDING)) {
             return tbbbind_version;
         }
