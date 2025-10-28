@@ -465,15 +465,10 @@ enum task_group_status {
     not_complete,
     complete,
     canceled
-};
-
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-enum class task_status {
-    not_complete,
-    complete,
-    canceled
-};
+    , task_complete
 #endif
+};
 
 class task_group;
 class structured_task_group;
@@ -551,7 +546,7 @@ protected:
     }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    task_status internal_run_and_wait_task(d2::task_handle&& h) {
+    task_group_status internal_run_and_wait_task(d2::task_handle&& h) {
         __TBB_ASSERT(h != nullptr, "Attempt to schedule empty task_handle");
         __TBB_ASSERT(&d2::task_handle_accessor::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
         
@@ -564,7 +559,7 @@ protected:
         } else {
             was_canceled = state->run_self_and_wait_for_completion(context());
         }
-        return was_canceled ? task_status::canceled : task_status::complete;
+        return was_canceled ? task_group_status::canceled : task_group_status::task_complete;
     }
 #endif
 
@@ -630,11 +625,11 @@ public:
     }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    task_status wait_task(task_completion_handle& comp_handle) {
+    task_group_status wait_task(task_completion_handle& comp_handle) {
         __TBB_ASSERT(comp_handle, "Attempt to wait for completion of empty handle");
         task_dynamic_state* state = task_completion_handle_accessor::get_task_dynamic_state(comp_handle);
         bool was_canceled = state->wait_for_completion(context());
-        return was_canceled ? task_status::canceled : task_status::complete;
+        return was_canceled ? task_group_status::canceled : task_group_status::task_complete;
     }
 #endif
 
@@ -685,7 +680,7 @@ public:
     }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    task_status run_and_wait_task(d2::task_handle&& h) {
+    task_group_status run_and_wait_task(d2::task_handle&& h) {
         return internal_run_and_wait_task(std::move(h));
     }
 
@@ -729,18 +724,18 @@ public:
 };
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-class wait_completion_handle_delegate : public d1::delegate_base {
+class wait_completion_delegate : public d1::delegate_base {
     bool operator()() const override {
         task_dynamic_state* state = task_completion_handle_accessor::get_task_dynamic_state(comp_handle);
         d1::task_group_context& ctx = state->get_task()->ctx();
-        status = state->wait_for_completion(ctx) ? task_status::canceled : task_status::complete;
+        status = state->wait_for_completion(ctx) ? task_group_status::canceled : task_group_status::task_complete;
         return true;
     }
 protected:
     task_completion_handle& comp_handle;
-    task_status& status;
+    task_group_status& status;
 public:
-    wait_completion_handle_delegate(task_completion_handle& handle, task_status& ts)
+    wait_completion_delegate(task_completion_handle& handle, task_group_status& ts)
         : comp_handle(handle), status(ts) {}
 };
 #endif
@@ -835,7 +830,7 @@ using detail::r1::missing_wait;
 using detail::d2::task_handle;
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 using detail::d2::task_completion_handle;
-using detail::d2::task_status;
+using detail::d2::task_complete;
 #endif
 }
 

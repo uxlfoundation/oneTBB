@@ -1805,8 +1805,8 @@ enum class wait_for_function_tag {
     arena_wait_for,
 };
 
-tbb::task_status wait_for(tbb::task_completion_handle& task, tbb::task_group& tg, tbb::task_arena& arena, wait_for_function_tag tag) {
-    tbb::task_status status = tbb::task_status::not_complete;
+tbb::task_group_status wait_for(tbb::task_completion_handle& task, tbb::task_group& tg, tbb::task_arena& arena, wait_for_function_tag tag) {
+    tbb::task_group_status status = tbb::task_group_status::not_complete;
     if (tag == wait_for_function_tag::group_wait_task) {
         status = tg.wait_task(task);
     } else {
@@ -1818,13 +1818,13 @@ tbb::task_status wait_for(tbb::task_completion_handle& task, tbb::task_group& tg
     return status;
 }
 
-tbb::task_status run_and_wait_for(tbb::task_handle&& task, tbb::task_group& tg, tbb::task_arena& arena, wait_for_function_tag tag) {
+tbb::task_group_status run_and_wait_for(tbb::task_handle&& task, tbb::task_group& tg, tbb::task_arena& arena, wait_for_function_tag tag) {
     auto body = [&] {
         if (tag == wait_for_function_tag::group_run_and_wait_task) {
             return tg.run_and_wait_task(std::move(task));
         } else {
             tbb::task_completion_handle comp_handle = task;
-            tg.run(std::move(task));
+            arena.enqueue(std::move(task));
             return wait_for(comp_handle, tg, arena, tag);
         }
     };
@@ -1836,54 +1836,62 @@ tbb::task_status run_and_wait_for(tbb::task_handle&& task, tbb::task_group& tg, 
     }
 }
 
-void test_single_task_wait_with_no_dependencies(unsigned num_threads, bool do_cancellation, wait_for_function_tag tag) {
+void test_single_task_wait_with_no_dependencies(bool do_cancellation, wait_for_function_tag tag) {
     tbb::task_group tg;
-    tbb::task_arena arena(num_threads);
+    tbb::task_arena arena;
 
     std::size_t block_size = 5;
-    std::vector<int> items(num_threads * block_size, 0);
+    std::size_t num_blocks = 100;
+    std::vector<int> items(num_blocks * block_size, 0);
 
-    utils::NativeParallelFor(num_threads, [&](std::size_t index) {
-        std::size_t block_begin = index * block_size;
-        
-        tbb::task_handle block_begin_task;
+    tbb::task_handle first_block_task;
 
-        arena.execute([&] {
-            block_begin_task = tg.defer([&items, block_begin] {
-                ++items[block_begin];
-            });
-
-            for (std::size_t i = 1; i < block_size; ++i) {
-                tg.run([&items, block_begin, i] {
-                    ++items[block_begin + i];
-                });
+    arena.execute([&] {
+        auto process_block = [&](std::size_t block_index) {
+            for (std::size_t i = 0; i < block_size; ++i) {
+                ++items[block_index * block_size + i];
             }
-        });
-        
-        if (do_cancellation) tg.cancel();
+        };
 
-        tbb::task_status status = run_and_wait_for(std::move(block_begin_task), tg, arena, tag);
-        if (do_cancellation) {
-            CHECK_MESSAGE(status == tbb::task_status::canceled, "Incorrect task_status returned");
-            CHECK_MESSAGE(items[block_begin] == 0, "Task was executed but should not");
-        } else {
-            CHECK_MESSAGE(status == tbb::task_status::complete, "Incorrect task_status returned");
-            CHECK_MESSAGE(items[block_begin] == 1, "Task was not executed");
+        first_block_task = tg.defer([=] { process_block(0); });
+
+        for (std::size_t i = 1; i < num_blocks; ++i) {
+            tg.run([=] { process_block(i); });
         }
+
+        if (do_cancellation) tg.cancel();
     });
 
-    tbb::task_group_status group_status = arena.execute([&tg] { return tg.wait(); });
+    tbb::task_group_status task_status = run_and_wait_for(std::move(first_block_task), tg, arena, tag);
+    
+    tbb::task_group_status expected_task_status = tbb::task_group_status::not_complete;
+    tbb::task_group_status expected_group_status = tbb::task_group_status::not_complete;
+    std::size_t expected_item = 0;
+
     if (do_cancellation) {
-        CHECK_MESSAGE(group_status == tbb::task_group_status::canceled, "Incorrect task_group_status returned");
+        expected_task_status = expected_group_status = tbb::task_group_status::canceled;
     } else {
-        CHECK_MESSAGE(group_status == tbb::task_group_status::complete, "Incorrect task_group_status returned");
+        expected_task_status = tbb::task_group_status::task_complete;
+        expected_group_status = tbb::task_group_status::complete;
+        expected_item = 1;
+    }
+    
+    CHECK_MESSAGE(task_status == expected_task_status, "Incorrect task status returned");
+    for (std::size_t i = 0; i < block_size; ++i) {
+        CHECK_MESSAGE(items[i] == expected_item, "Incorrect item processing result");
+    }
+
+    tbb::task_group_status group_status = arena.wait_for(tg);
+    CHECK_MESSAGE(group_status == expected_group_status, "Incorrect group status returned");
+    
+    if (!do_cancellation) {
         for (auto& item : items) {
             CHECK_MESSAGE(item == 1, "Some task was not executed");
         }
     }
 }
 
-void test_single_task_wait_with_dependencies(unsigned num_threads, bool do_cancellation, wait_for_function_tag tag) {
+class test_single_task_wait_graph {
     struct placeholder_task {
         void operator()() const {
             CHECK(placeholder == 0);
@@ -1893,91 +1901,163 @@ void test_single_task_wait_with_dependencies(unsigned num_threads, bool do_cance
         std::size_t& placeholder;
     };
 
-    tbb::task_group tg;
-    tbb::task_arena arena(num_threads);
-    
-    std::atomic<std::size_t> execution_allowed(0);
-    std::size_t controlled_task_placeholder(0);
-
-    tbb::task_handle controlled_task = arena.execute([&] {
-        return tg.defer([&] {
-            utils::SpinWaitWhileEq(execution_allowed, 0ul);
-            controlled_task_placeholder = 1;
-            });
-        });
+    tbb::task_group& m_tg;
+    tbb::task_arena& m_arena;
+    bool             do_cancellation;
 
     std::size_t predecessor1_placeholder = 0;
     std::size_t predecessor2_placeholder = 0;
-    std::size_t successor_placeholder = 0;
-    std::size_t left_upper_placeholder = 0;
-    std::size_t right_upper_placeholder = 0;
+    std::size_t wait_task_placeholder = 0;
+    std::size_t controlled_task_placeholder = 0;
+    std::size_t upper_placeholder = 0;
 
-    tbb::task_handle successor;
+    tbb::task_handle controlled_task;
+    tbb::task_handle predecessor1;
+    tbb::task_handle predecessor2;
+    tbb::task_handle upper_task;
+    tbb::task_handle cancel_task;
+public:
+    tbb::task_handle wait_task;
+    tbb::task_completion_handle wait_comp_handle;
+    std::atomic<std::size_t> execution_allowed{0};
 
-    arena.execute([&] {
-        tbb::task_handle predecessor1 = tg.defer(placeholder_task{predecessor1_placeholder});
-        tbb::task_handle predecessor2 = tg.defer(placeholder_task{predecessor2_placeholder});
-        successor = tg.defer(placeholder_task{successor_placeholder});
-        tbb::task_handle left_upper_task = tg.defer(placeholder_task{left_upper_placeholder});
-        tbb::task_handle right_upper_task = tg.defer(placeholder_task{right_upper_placeholder});
-        
-        tbb::task_handle cancellation_task;
-        if (do_cancellation) {
-            cancellation_task = tg.defer([&tg] { tg.cancel(); });
-        }
+    test_single_task_wait_graph(tbb::task_group& tg, tbb::task_arena& arena, bool do_cancel)
+        : m_tg(tg), m_arena(arena), do_cancellation(do_cancel)
+    {
+        arena.execute([&] {
+            controlled_task = tg.defer([&] {
+                utils::SpinWaitWhileEq(execution_allowed, 0ul);
+                controlled_task_placeholder = 1;
+            });
 
-        tbb::task_group::set_task_order(predecessor1, successor);
-        tbb::task_group::set_task_order(predecessor2, successor);
-        tbb::task_group::set_task_order(successor, controlled_task);
-        tbb::task_group::set_task_order(controlled_task, left_upper_task);
-        tbb::task_group::set_task_order(controlled_task, right_upper_task);
+            predecessor1 = tg.defer(placeholder_task{predecessor1_placeholder});
+            predecessor2 = tg.defer(placeholder_task{predecessor2_placeholder});
+            wait_task = tg.defer(placeholder_task{wait_task_placeholder});
+            upper_task = tg.defer(placeholder_task{upper_placeholder});
 
-        if (do_cancellation) {
-            tbb::task_group::set_task_order(cancellation_task, successor);
-        }
+            if (do_cancellation) {
+                cancel_task = tg.defer([&tg] { tg.cancel(); });
+            }
 
-        tg.run(std::move(left_upper_task));
-        tg.run(std::move(right_upper_task));
-        tg.run(std::move(controlled_task));
-        tg.run(std::move(predecessor1));
-        tg.run(std::move(predecessor2));
+            tbb::task_group::set_task_order(predecessor1, wait_task);
+            tbb::task_group::set_task_order(predecessor2, wait_task);
+            tbb::task_group::set_task_order(wait_task, controlled_task);
+            tbb::task_group::set_task_order(controlled_task, upper_task);
 
-        if (do_cancellation) {
-            tg.run(std::move(cancellation_task));
-        }
-    });
+            if (do_cancellation) {
+                tbb::task_group::set_task_order(cancel_task, wait_task);
+            }
 
-    tbb::task_status status = run_and_wait_for(std::move(successor), tg, arena, tag);
-    if (do_cancellation) {
-        CHECK_MESSAGE(status == tbb::task_status::canceled, "Incorrect task_status returned");
-        CHECK_MESSAGE(successor_placeholder == 0, "successor task should not be executed");
-    } else {
-        CHECK_MESSAGE(status == tbb::task_status::complete, "Incorrect task_status returned");
-        CHECK_MESSAGE(successor_placeholder == 1, "successor task should be executed");
+            wait_comp_handle = wait_task;
+        });
     }
 
-    CHECK_MESSAGE(((controlled_task_placeholder == left_upper_placeholder) == right_upper_placeholder) == 0,
-                  "tasks after the successor task should not finish execution");
+    void run() {
+        m_arena.execute([&] {
+            m_tg.run(std::move(upper_task));
+            m_tg.run(std::move(controlled_task));
+            m_tg.run(std::move(predecessor2));
+            m_tg.run(std::move(predecessor1));
+            if (do_cancellation) {
+                m_tg.run(std::move(cancel_task));
+            }
+        });
+    }
+
+    bool wait_task_executed() {
+        return predecessor1_placeholder == 1 && predecessor2_placeholder == 1 && wait_task_placeholder == 1;
+    }
+
+    bool all_tasks_executed() {
+        return wait_task_executed() && controlled_task_placeholder == 1 && upper_placeholder == 1;
+    }
+};
+
+void test_single_task_wait_with_dependencies(bool do_cancellation, wait_for_function_tag tag) {
+    tbb::task_group tg;
+    tbb::task_arena arena;
+    
+    test_single_task_wait_graph graph(tg, arena, do_cancellation);
+    graph.run();
+
+    tbb::task_group_status task_status = run_and_wait_for(std::move(graph.wait_task), tg, arena, tag);
+
+    if (do_cancellation) {
+        CHECK_MESSAGE(task_status == tbb::task_group_status::canceled, "Incorrect task_group_status returned");
+        CHECK_MESSAGE(!graph.wait_task_executed(), "successor task should not be executed");
+    } else {
+        CHECK_MESSAGE(task_status == tbb::task_group_status::task_complete, "Incorrect task_group_status returned");
+        CHECK_MESSAGE((graph.wait_task_executed() && !graph.all_tasks_executed()), "successor task should be executed");
+    }
     
     // Allow execution of controlled task
-    execution_allowed = 1;
+    graph.execution_allowed = 1;
 
-    tbb::task_group_status group_status = arena.execute([&tg] { return tg.wait(); });
+    tbb::task_group_status group_status = arena.wait_for(tg);
+
     if (do_cancellation) {
         CHECK_MESSAGE(group_status == tbb::task_group_status::canceled, "Incorrect task_group_status returned");
-        CHECK_MESSAGE(((controlled_task_placeholder == left_upper_placeholder) == right_upper_placeholder) == 0,
-                      "tasks should not be executed after cancellation");
+        CHECK_MESSAGE(!graph.all_tasks_executed(), "tasks should not be executed after cancellation");
     } else {
         CHECK_MESSAGE(group_status == tbb::task_group_status::complete, "Incorrect task_group_status returned");
-        CHECK_MESSAGE(((controlled_task_placeholder == left_upper_placeholder) == right_upper_placeholder) == 1,
-                      "task graph not executed");
+        CHECK_MESSAGE(graph.all_tasks_executed(), "task graph not executed");
+    }
+}
+
+void test_single_task_wait_transferring(bool do_cancellation, wait_for_function_tag tag) {
+    tbb::task_group tg;
+    tbb::task_arena arena;
+
+    test_single_task_wait_graph graph(tg, arena, do_cancellation);
+
+    tbb::task_handle transferring_task;
+    std::size_t transfer_task_placeholder = 0;
+
+    arena.execute([&] {
+        transferring_task = tg.defer([&] {
+            transfer_task_placeholder = 1;
+            tbb::task_group::transfer_this_task_completion_to(graph.wait_task);
+            graph.run();
+            tg.run(std::move(graph.wait_task));
+        });
+    });
+
+    tbb::task_completion_handle transfer_comp_handle = transferring_task;
+    tbb::task_group_status task_status = run_and_wait_for(std::move(transferring_task), tg, arena, tag);
+    CHECK_MESSAGE(transfer_task_placeholder == 1, "Transferring task should be executed");
+
+    if (do_cancellation) {
+        if (task_status != tbb::task_group_status::canceled) {
+            std::cout << "A" << std::endl;
+        }
+
+        CHECK_MESSAGE(task_status == tbb::task_group_status::canceled, "Incorrect task_group_status returned");
+        CHECK_MESSAGE(!graph.wait_task_executed(), "successor task should not be executed");
+    } else {
+        CHECK_MESSAGE(task_status == tbb::task_group_status::task_complete, "Incorrect task_group_status returned");
+        CHECK_MESSAGE((graph.wait_task_executed() && !graph.all_tasks_executed()), "successor task should be executed");
+    }
+    
+    // Allow execution of controlled task
+    graph.execution_allowed = 1;
+
+    tbb::task_group_status group_status = arena.wait_for(tg);
+
+    if (do_cancellation) {
+        CHECK_MESSAGE(group_status == tbb::task_group_status::canceled, "Incorrect task_group_status returned");
+        CHECK_MESSAGE(!graph.all_tasks_executed(), "tasks should not be executed after cancellation");
+    } else {
+        CHECK_MESSAGE(group_status == tbb::task_group_status::complete, "Incorrect task_group_status returned");
+        CHECK_MESSAGE(graph.all_tasks_executed(), "task graph not executed");
     }
 }
 
 void test_single_task_wait_base(bool cancellation, wait_for_function_tag tag) {
     for (unsigned num_threads = MinThread; num_threads <= MaxThread; ++num_threads) {
-        test_single_task_wait_with_no_dependencies(num_threads, cancellation, tag);
-        // test_single_task_wait_with_dependencies(num_threads, cancellation, tag);
+        tbb::global_control ctl(tbb::global_control::max_allowed_parallelism, num_threads);
+        test_single_task_wait_with_no_dependencies(cancellation, tag);
+        test_single_task_wait_with_dependencies(cancellation, tag);
+        test_single_task_wait_transferring(cancellation, tag);
     }
 }
 

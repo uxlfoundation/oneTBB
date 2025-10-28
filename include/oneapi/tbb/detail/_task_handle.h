@@ -47,7 +47,6 @@ struct notify_list_node {
 
     virtual notify_result_type notify_on_completion() = 0;
     virtual notify_result_type notify_on_cancellation() = 0;
-    virtual void destroy() {}
     virtual ~notify_list_node() = default;
 };
 
@@ -66,10 +65,6 @@ struct notify_successor_node : notify_list_node {
 
     notify_result_type notify_on_cancellation() override {
         return notify_common();
-    }
-
-    void destroy() override {
-        allocator.delete_object(this);
     }
 };
 
@@ -193,6 +188,7 @@ inline std::pair<task_handle_task*, bool> notify_successor_node::notify_common()
     task_handle_task* successor_task = nullptr;
     if (successor_state->release_dependency()) {
         successor_task = successor_state->get_task();
+        allocator.delete_object(this);
     }
 
     return {successor_task, true};
@@ -394,12 +390,10 @@ inline void task_dynamic_state::add_notify_node(notify_list_node* new_notify_nod
         if (represents_completed_task(current_notify_list_head)) {
             // Current task has completed while we tried to insert the node to the list
             new_notify_node->notify_on_completion();
-            new_notify_node->destroy();
             break;
         } else if (represents_canceled_task(current_notify_list_head)) {
             // Current task has canceled while we tried to insert the node to the list
             new_notify_node->notify_on_cancellation();
-            new_notify_node->destroy();
             break;
         } else if (represents_transferred_completion(current_notify_list_head)) {
             // Redirect notify_node to the task received the completion
@@ -445,7 +439,7 @@ inline bool task_dynamic_state::wait_for_completion(d1::task_group_context& ctx)
             // Redirect waiter to the task received the completion
             task_dynamic_state* new_completion_point = m_new_completion_point.load(std::memory_order_relaxed);
             __TBB_ASSERT(new_completion_point, "notify list is marked as transferred, but new dynamic state is not set");
-            new_completion_point->wait_for_completion(ctx);
+            was_canceled = new_completion_point->wait_for_completion(ctx);
         } else {
             notify_waiter_node waiter_node;
             add_notify_node(&waiter_node, current_notify_list_head);
@@ -500,6 +494,9 @@ inline task_handle_task* task_dynamic_state::try_get_successor(notify_list_state
     bool bypass_allowed = true;
 
     while (node != nullptr) {
+        notify_list_node* next_node = node->next_node;
+
+        // Don't access node after the notification
         notify_list_node::notify_result_type result = state_flag == COMPLETED_FLAG ?
                                                       node->notify_on_completion() :
                                                       node->notify_on_cancellation();
@@ -512,8 +509,6 @@ inline task_handle_task* task_dynamic_state::try_get_successor(notify_list_state
             d1::spawn(*successor_task, successor_task->ctx());
         }
 
-        notify_list_node* next_node = node->next_node;
-        node->destroy();
         node = next_node;
     }
 
