@@ -22,7 +22,7 @@ on:
     paths:
       - 'src/**'
       - 'include/**'
-      - 'tests/**'
+      - 'test/**'
       - 'python/**'
       - '.github/workflows/codeql.yml'
   schedule:
