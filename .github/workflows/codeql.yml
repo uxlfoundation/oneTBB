@@ -19,6 +19,12 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+    paths:
+      - 'src/**'
+      - 'include/**'
+      - 'tests/**'
+      - 'python/**'
+      - '.github/workflows/codeql.yml'
   schedule:
     - cron: '0 0 * * 1'
 
