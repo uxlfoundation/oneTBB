@@ -2368,10 +2368,6 @@ void test_single_task_wait_transferring(bool do_cancellation, wait_for_function_
     CHECK_MESSAGE(transfer_task_placeholder == 1, "Transferring task should be executed");
 
     if (do_cancellation) {
-        if (task_status != tbb::task_group_status::canceled) {
-            std::cout << "A" << std::endl;
-        }
-
         CHECK_MESSAGE(task_status == tbb::task_group_status::canceled, "Incorrect task_group_status returned");
         CHECK_MESSAGE(!graph.wait_task_executed(), "successor task should not be executed");
     } else {
