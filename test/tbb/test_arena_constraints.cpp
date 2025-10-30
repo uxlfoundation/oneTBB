@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2019-2021 Intel Corporation
+    Copyright (c) 2019-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -17,26 +18,15 @@
 //! \file test_arena_constraints.cpp
 //! \brief Test for [info_namespace scheduler.task_arena] specifications
 
+// TODO: find criteria to automatically define this in utils_assert.h
+#define TEST_CUSTOM_ASSERTION_HANDLER_ENABLED 1
+
 #include "common/common_arena_constraints.h"
 
+#include "tbb/global_control.h"
 #include "tbb/parallel_for.h"
 
-#if __TBB_HWLOC_VALID_ENVIRONMENT
-#if __HYBRID_CPUS_TESTING
-//! Testing NUMA topology traversal correctness
-//! \brief \ref interface \ref requirement
-TEST_CASE("Test core types topology traversal correctness") {
-    system_info::initialize();
-    std::vector<index_info> core_types_info = system_info::get_cpu_kinds_info();
-    std::vector<tbb::core_type_id> core_types = tbb::info::core_types();
-
-    REQUIRE_MESSAGE(core_types_info.size() == core_types.size(), "Wrong core types number detected.");
-    for (unsigned i = 0; i < core_types.size(); ++i) {
-        REQUIRE_MESSAGE(core_types[i] == core_types_info[i].index, "Wrong core type index detected.");
-    }
-}
-#endif /*__HYBRID_CPUS_TESTING*/
-
+#if __TBB_HWLOC_VALID_ENVIRONMENT && __HWLOC_CPUBIND_PRESENT
 //! Test affinity and default_concurrency correctness for all available constraints.
 //! \brief \ref error_guessing
 TEST_CASE("Test affinity and default_concurrency correctness for all available constraints.") {
@@ -102,7 +92,7 @@ TEST_CASE("Test constraints propagation during arenas copy construction") {
         test_constraints_affinity_and_concurrency(constraints, copied_affinity);
     }
 }
-#endif /*__TBB_HWLOC_VALID_ENVIRONMENT*/
+#endif /*__TBB_HWLOC_VALID_ENVIRONMENT && __HWLOC_CPUBIND_PRESENT */
 
 // The test cannot be stabilized with TBB malloc under Thread Sanitizer
 #if !__TBB_USE_THREAD_SANITIZER
@@ -222,4 +212,12 @@ TEST_CASE("Test concurrency getters output for constraints with custom concurren
 TEST_CASE("Testing constraints_threads_per_core() reserved entry point") {
     tbb::task_arena::constraints c{};
     tbb::detail::r1::constraints_threads_per_core(c);
+}
+
+//! Using custom assertion handler to test failure on invalid constraints
+//! \brief \ref interface \ref error_guessing
+TEST_CASE("Using custom assertion handler to test failure on invalid constraints") {
+    TEST_CUSTOM_ASSERTION_HANDLER(
+        tbb::info::default_concurrency(tbb::task_arena::constraints{}.set_max_threads_per_core(0)),
+        "Wrong max_threads_per_core constraints field value.");
 }

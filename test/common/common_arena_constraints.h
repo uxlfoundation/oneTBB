@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2019-2021 Intel Corporation
+    Copyright (c) 2019-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Сontributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -16,8 +17,6 @@
 
 #ifndef __TBB_test_common_arena_constraints_H_
 #define __TBB_test_common_arena_constraints_H_
-
-#define TBB_PREVIEW_TASK_ARENA_CONSTRAINTS_EXTENSION 1
 
 #if _WIN32 || _WIN64
 #define _CRT_SECURE_NO_WARNINGS
@@ -91,6 +90,7 @@ int get_processors_group_count() { return 1; }
 #define __HWLOC_HYBRID_CPUS_INTERFACES_VALID (!_WIN32 || _WIN64)
 
 #define __HYBRID_CPUS_TESTING __HWLOC_HYBRID_CPUS_INTERFACES_PRESENT && __HWLOC_HYBRID_CPUS_INTERFACES_VALID
+#define __HWLOC_CPUBIND_PRESENT (!__APPLE__)
 
 // Macro to check hwloc interfaces return codes
 #define hwloc_require_ex(command, ...)                                          \
@@ -181,12 +181,16 @@ private:
 #endif
         hwloc_require_ex(hwloc_topology_load, topology);
 
+#if __HWLOC_CPUBIND_PRESENT
         if ( get_processors_group_count() > 1 ) {
             process_cpuset = hwloc_bitmap_dup(hwloc_topology_get_complete_cpuset(topology));
         } else {
             process_cpuset = hwloc_bitmap_alloc();
             hwloc_require_ex(hwloc_get_cpubind, topology, process_cpuset, 0);
         }
+#else
+        process_cpuset = hwloc_bitmap_dup(hwloc_topology_get_complete_cpuset(topology));
+#endif
 
         hwloc_obj_t current_numa_node = nullptr;
         index_info current_node_info{};
@@ -351,7 +355,11 @@ public:
     static affinity_mask allocate_current_affinity_mask() {
         affinity_mask result = hwloc_bitmap_alloc();
         instance().memory_handler.insert(result);
+#if __HWLOC_CPUBIND_PRESENT
         hwloc_require_ex(hwloc_get_cpubind, instance().topology, result, HWLOC_CPUBIND_THREAD);
+#else
+        hwloc_bitmap_copy(result, hwloc_topology_get_complete_cpuset(instance().topology));
+#endif
         REQUIRE_MESSAGE(!hwloc_bitmap_iszero(result), "Empty current affinity mask.");
         return result;
     }
@@ -413,10 +421,17 @@ void test_constraints_affinity_and_concurrency(tbb::task_arena::constraints cons
     system_info::affinity_mask reference_affinity = prepare_reference_affinity_mask(constraints);
     int max_threads_per_core = static_cast<int>(system_info::get_maximal_threads_per_core());
 
+    int constrained_num_cpus = INT_MAX;
+#if __TBB_USE_CGROUPS
+    (void)utils::cgroup_info::is_cpu_constrained(constrained_num_cpus);
+#endif
+
     if (constraints.max_threads_per_core == tbb::task_arena::automatic || constraints.max_threads_per_core == max_threads_per_core) {
         REQUIRE_MESSAGE(hwloc_bitmap_isequal(reference_affinity, arena_affinity),
-            "Wrong affinity mask was applied for the constraints instance.");
-        REQUIRE_MESSAGE(hwloc_bitmap_weight(reference_affinity) == default_concurrency,
+                        "Wrong affinity mask was applied for the constraints instance.");
+        const int reference_concurrency =
+            std::min(hwloc_bitmap_weight(reference_affinity), constrained_num_cpus);
+        REQUIRE_MESSAGE(reference_concurrency == default_concurrency,
             "Wrong default_concurrency was returned for the constraints instance.");
     } else {
         REQUIRE_MESSAGE(constraints.max_threads_per_core < max_threads_per_core,
@@ -438,10 +453,11 @@ void test_constraints_affinity_and_concurrency(tbb::task_arena::constraints cons
                     "Wrong number of threads may be scheduled to some core.");
             }
         }
-        REQUIRE_MESSAGE(valid_concurrency == default_concurrency,
-            "Wrong default_concurrency was returned for the constraints instance.");
         REQUIRE_MESSAGE(valid_concurrency == hwloc_bitmap_weight(arena_affinity),
             "Wrong number of bits inside the affinity mask.");
+        valid_concurrency = std::min(valid_concurrency, constrained_num_cpus);
+        REQUIRE_MESSAGE(valid_concurrency == default_concurrency,
+            "Wrong default_concurrency was returned for the constraints instance.");
     }
 }
 
@@ -553,16 +569,19 @@ constraints_container generate_constraints_variety() {
 #endif /*__HYBRID_CPUS_TESTING*/
         }
 
+        int max_threads_per_core = system_info::get_available_max_threads_values().back();
         // Some constraints may cause unexpected behavior, which would be fixed later.
         if (get_processors_group_count() > 1) {
-            for(auto it = results.begin(); it != results.end(); ++it) {
-                if (it->max_threads_per_core != tbb::task_arena::automatic
+            for(auto it = results.begin(); it != results.end();) {
+                if (it->max_threads_per_core != max_threads_per_core
                    && (it->numa_id == tbb::task_arena::automatic || tbb::info::numa_nodes().size() == 1)
 #if __HYBRID_CPUS_TESTING
                    && (it->core_type == tbb::task_arena::automatic || tbb::info::core_types().size() == 1)
 #endif /*__HYBRID_CPUS_TESTING*/
                 ) {
                     it = results.erase(it);
+                } else {
+                    ++it;
                 }
             }
         }

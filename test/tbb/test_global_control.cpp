@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -17,13 +18,21 @@
 //! \file test_global_control.cpp
 //! \brief Test for [sched.global_control] specification
 
+// TODO: find criteria to automatically define this in utils_assert.h
+#define TEST_CUSTOM_ASSERTION_HANDLER_ENABLED 1
+
+#include "tbb/global_control.h"
+// checking that inclusion of global_control.h is enough to get TBB_EXT_CUSTOM_ASSERTION_HANDLER
+#if TBB_EXT_CUSTOM_ASSERTION_HANDLER != 202510
+    #error "TBB_EXT_CUSTOM_ASSERTION_HANDLER must be set to 202510"
+#endif
+
 #include "common/test.h"
 
 #include "common/utils.h"
 #include "common/spin_barrier.h"
 #include "common/utils_concurrency_limit.h"
 
-#include "tbb/global_control.h"
 #include "tbb/parallel_for.h"
 #include "tbb/task_group.h"
 #include "tbb/task_arena.h"
@@ -237,7 +246,7 @@ TEST_CASE("prolong lifetime auto init") {
 //! Testing lifetime control advanced
 //! \brief \ref error_guessing
 TEST_CASE("prolong lifetime advanced") {
-    // Exceptions test leaves auto-initialized sheduler after,
+    // Exceptions test leaves auto-initialized scheduler after,
     // because all blocking terminate calls are inside the parallel region,
     // thus resulting in false termination result.
     utils::NativeParallelFor(1,
@@ -245,9 +254,61 @@ TEST_CASE("prolong lifetime advanced") {
 }
 #endif
 
+#if !EMSCRIPTEN
 //! Testing multiple wait
 //! \brief \ref error_guessing
 TEST_CASE("prolong lifetime multiple wait") {
     TestBlockingTerminateNS::TestMultpleWait();
 }
+#endif
 
+//! \brief \ref regression
+TEST_CASE("test concurrent task_scheduler_handle destruction") {
+    std::atomic<bool> stop{ false };
+    std::thread thr1([&] {
+        while (!stop) {
+            auto h = tbb::task_scheduler_handle{ tbb::attach{} };
+            tbb::finalize(h, std::nothrow_t{});
+        }
+    });
+
+    for (int i = 0; i < 1000; ++i) {
+        std::thread thr2([] {
+            tbb::parallel_for(0, 1, [](int) {});
+        });
+        thr2.join();
+    }
+    stop = true;
+    thr1.join();
+}
+
+//! Testing that assertion_handler_type is exactly the type defined in the documentation
+//! \brief \ref interface \ref requirement
+TEST_CASE("Assertion handler type") {
+    using documented = void(*)(const char* /* location */, int /* line */,
+                               const char* /* expression */, const char* /* comment */);
+    static_assert(std::is_same<oneapi::tbb::ext::assertion_handler_type, documented>::value,
+                  "Incorrect assertion handler type");
+}
+
+//! Using custom assertion handler to test failure on invalid max_allowed_parallelism
+//! \brief \ref interface \ref error_guessing
+TEST_CASE("Using custom assertion handler to test failure on invalid max_allowed_parallelism") {
+    TEST_CUSTOM_ASSERTION_HANDLER(
+        tbb::global_control(tbb::global_control::max_allowed_parallelism, 0),
+        "max_allowed_parallelism cannot be 0.");
+}
+
+namespace tbb {
+    using oneapi::tbb::ext::set_assertion_handler;
+    using oneapi::tbb::ext::assertion_handler_type;
+}
+
+//! Check that namespace injection allows to provide TBB 2020 source compatibility
+//! \brief \ref interface
+TEST_CASE("Check that namespace injection allows to provide TBB 2020 source compatibility") {
+    tbb::assertion_handler_type new_handler = [](const char*, int, const char*, const char*) {};
+
+    tbb::assertion_handler_type old_handler = tbb::set_assertion_handler(new_handler);
+    REQUIRE(old_handler != new_handler);
+}

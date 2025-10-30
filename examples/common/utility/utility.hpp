@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@
 #include <cassert>
 #include <cstring>
 #include <cstdlib>
+#include <cmath>
 
 #include <utility>
 #include <string>
@@ -32,6 +33,7 @@
 #include <stdexcept>
 #include <memory>
 #include <iostream>
+#include <chrono>
 // TBB headers should not be used, as some examples may need to be built without TBB.
 
 namespace utility {
@@ -545,6 +547,12 @@ inline void report_elapsed_time(double seconds) {
 inline void report_skipped() {
     std::cout << "skip"
               << "\n";
+}
+
+inline void report_relative_error(double err,
+                                  const std::string& prefix = "Relative_Err : ",
+                                  const std::string& suffix = " %") {
+    std::cout << prefix << err << suffix << std::endl;
 }
 
 inline void parse_cli_arguments(int argc, const char* argv[], utility::cli_argument_pack cli_pack) {

@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -147,9 +148,9 @@ public:
     }
 
     template <typename... Args>
-    void init_buckets_impl( segment_ptr_type ptr, size_type sz, Args&&... args ) {
+    void init_buckets_impl( segment_ptr_type ptr, size_type sz, const Args&... args ) {
         for (size_type i = 0; i < sz; ++i) {
-            bucket_allocator_traits::construct(my_allocator, ptr + i, std::forward<Args>(args)...);
+            bucket_allocator_traits::construct(my_allocator, ptr + i, args...);
         }
     }
 
@@ -292,7 +293,7 @@ public:
         if( sz >= mask ) { // TODO: add custom load_factor
             segment_index_type new_seg = tbb::detail::log2( mask+1 ); //optimized segment_index_of
             __TBB_ASSERT( is_valid(my_table[new_seg-1].load(std::memory_order_relaxed)), "new allocations must not publish new mask until segment has allocated");
-            static const segment_ptr_type is_allocating = segment_ptr_type(2);;
+            static const segment_ptr_type is_allocating = segment_ptr_type(2);
             segment_ptr_type disabled = nullptr;
             if (!(my_table[new_seg].load(std::memory_order_acquire))
                 && my_table[new_seg].compare_exchange_strong(disabled, is_allocating))
@@ -443,9 +444,11 @@ private:
             if( k&(k-2) ) // not the beginning of a segment
                 ++my_bucket;
             else my_bucket = my_map->get_bucket( k );
-            my_node = static_cast<node*>( my_bucket->node_list.load(std::memory_order_relaxed) );
-            if( map_base::is_valid(my_node) ) {
-                my_index = k; return;
+            node_base *n = my_bucket->node_list.load(std::memory_order_relaxed);
+            if( map_base::is_valid(n) ) {
+                my_node = static_cast<node*>(n);
+                my_index = k;
+                return;
             }
             ++k;
         }
@@ -465,9 +468,13 @@ private:
     friend class concurrent_hash_map;
 
     hash_map_iterator( const Container &map, std::size_t index, const bucket *b, node_base *n ) :
-        my_map(&map), my_index(index), my_bucket(b), my_node(static_cast<node*>(n))
+        my_map(&map), my_index(index), my_bucket(b), my_node(nullptr)
     {
-        if( b && !map_base::is_valid(n) )
+        // Cannot directly initialize to n, because it could be an invalid node pointer (e.g., when
+        // setting a midpoint for a 1-element range). If it is, try one from a subsequent bucket.
+        if( map_base::is_valid(n) )
+            my_node = static_cast<node*>(n);
+        else if( b )
             advance_to_next_bucket();
     }
 
@@ -1007,9 +1014,10 @@ public:
         hashcode_type m = this->my_mask.load(std::memory_order_relaxed);
         __TBB_ASSERT((m&(m+1))==0, "data structure is invalid");
         this->my_size.store(0, std::memory_order_relaxed);
-        segment_index_type s = this->segment_index_of( m );
-        __TBB_ASSERT( s+1 == this->pointers_per_table || !this->my_table[s+1].load(std::memory_order_relaxed), "wrong mask or concurrent grow" );
-        do {
+        segment_index_type s = this->segment_index_of( m ) + 1;
+        __TBB_ASSERT( s == this->pointers_per_table || !this->my_table[s].load(std::memory_order_relaxed), "wrong mask or concurrent grow" );
+        while(s != 0) {
+            s--;
             __TBB_ASSERT(this->is_valid(this->my_table[s].load(std::memory_order_relaxed)), "wrong mask or concurrent grow" );
             segment_ptr_type buckets_ptr = this->my_table[s].load(std::memory_order_relaxed);
             size_type sz = this->segment_size( s ? s : 1 );
@@ -1021,7 +1029,7 @@ public:
                     delete_node( n );
                 }
             this->delete_segment(s);
-        } while(s-- > 0);
+        }
         this->my_mask.store(this->embedded_buckets - 1, std::memory_order_relaxed);
     }
 
@@ -1510,12 +1518,16 @@ protected:
         this->reserve(reserve_size); // TODO: load_factor?
         hashcode_type m = this->my_mask.load(std::memory_order_relaxed);
         for(; first != last; ++first) {
-            hashcode_type h = my_hash_compare.hash( (*first).first );
+            const auto& key = (*first).first;
+            hashcode_type h = my_hash_compare.hash(key);
             bucket *b = this->get_bucket( h & m );
             __TBB_ASSERT(!rehash_required(b->node_list.load(std::memory_order_relaxed)), "Invalid bucket in destination table");
-            node* node_ptr = create_node(base_type::get_allocator(), (*first).first, (*first).second);
-            this->add_to_bucket( b, node_ptr );
-            ++this->my_size; // TODO: replace by non-atomic op
+            
+            if (search_bucket(key, b) == nullptr) {
+                node* node_ptr = create_node(base_type::get_allocator(), *first);
+                this->add_to_bucket( b, node_ptr );
+                ++this->my_size; // TODO: replace by non-atomic op
+            }
         }
     }
 

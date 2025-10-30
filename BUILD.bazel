@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 Intel Corporation
+# Copyright (c) 2021-2025 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,8 +16,21 @@
 # use Bazel internally. The Bazel build can have security risks or
 # optimization gaps.
 
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
+load("@rules_license//rules:license.bzl", "license")
+
 package(
-    default_visibility = ["//visibility:public"],
+    default_applicable_licenses = [":license"],
+)
+
+exports_files([
+    "LICENSE",
+])
+
+license(
+    name = "license",
+    license_kinds = ["@rules_license//licenses/spdx:Apache-2.0"],
+    license_text = "LICENSE.txt",
 )
 
 cc_library(
@@ -36,8 +49,9 @@ cc_library(
         "include/oneapi/tbb/detail/*.h",
     ]),
     copts = ["-w"] + select({
-        "@bazel_tools//platforms:windows": [""],
-        "//conditions:default": ["-mwaitpkg"],
+        "@platforms//os:windows": [""],
+        "@platforms//cpu:x86_64": ["-mwaitpkg"],
+        "//conditions:default": [""],
     }),
     defines =
         select({
@@ -47,7 +61,7 @@ cc_library(
             ],
         }) +
         select({
-            "@bazel_tools//platforms:osx": ["_XOPEN_SOURCE"],
+            "@platforms//os:osx": ["_XOPEN_SOURCE"],
             "//conditions:default": [],
         }),
     includes = [
@@ -55,8 +69,8 @@ cc_library(
     ],
     linkopts =
         select({
-            "@bazel_tools//platforms:windows": [],
-            "@bazel_tools//platforms:linux": [
+            "@platforms//os:windows": [],
+            "@platforms//os:linux": [
                 "-ldl",
                 "-pthread",
                 "-lrt",
@@ -77,6 +91,7 @@ cc_library(
         ],
         "//conditions:default": [],
     }),
+    visibility = ["//visibility:public"],
 )
 
 cc_library(
@@ -104,6 +119,7 @@ cc_library(
     local_defines = [
         "__TBBMALLOC_BUILD",
     ],
+    visibility = ["//visibility:public"],
 )
 
 cc_library(
@@ -112,7 +128,62 @@ cc_library(
         "src/tbbmalloc_proxy/function_replacement.cpp",
         "src/tbbmalloc_proxy/proxy.cpp",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         ":tbbmalloc",
+    ],
+)
+
+cc_test(
+    name = "test_mutex",
+    srcs = [
+        "test/tbb/test_mutex.cpp",
+        "test/tbb/test_mutex.h",
+    ] + glob([
+        "test/common/*.h",
+    ]),
+    includes = ["test"],
+    deps = [
+        ":tbb",
+    ],
+)
+
+cc_test(
+    name = "test_parallel_for",
+    srcs = [
+        "test/tbb/test_parallel_for.cpp",
+        "test/tbb/test_partitioner.h",
+    ] + glob([
+        "test/common/*.h",
+    ]),
+    includes = ["test"],
+    deps = [
+        ":tbb",
+    ],
+)
+
+cc_test(
+    name = "test_parallel_reduce",
+    srcs = [
+        "test/tbb/test_parallel_reduce.cpp",
+    ] + glob([
+        "test/common/*.h",
+    ]),
+    includes = ["test"],
+    deps = [
+        ":tbb",
+    ],
+)
+
+cc_test(
+    name = "test_task",
+    srcs = [
+        "test/tbb/test_task.cpp",
+    ] + glob([
+        "test/common/*.h",
+    ]),
+    includes = ["test"],
+    deps = [
+        ":tbb",
     ],
 )

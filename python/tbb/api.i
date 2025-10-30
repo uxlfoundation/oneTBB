@@ -1,6 +1,6 @@
 %pythonbegin %{
 #
-# Copyright (c) 2016-2021 Intel Corporation
+# Copyright (c) 2016-2025 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,7 +34,6 @@ __all__ = ["task_arena",
 #endif
 
 %{
-#define TBB_PREVIEW_WAITING_FOR_WORKERS 1
 #include "tbb/task_arena.h"
 #include "tbb/task_group.h"
 #include "tbb/global_control.h"

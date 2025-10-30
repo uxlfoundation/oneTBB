@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2020-2022 Intel Corporation
+    Copyright (c) 2020-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -45,24 +46,37 @@ void limitThreads(size_t limit)
 {
     rlimit rlim;
 
+#   ifdef __QNX__
+    int ret = getrlimit(RLIMIT_NTHR, &rlim);
+#   else
     int ret = getrlimit(RLIMIT_NPROC, &rlim);
+#   endif
     CHECK_MESSAGE(0 == ret, "getrlimit has returned an error");
 
-    rlim.rlim_cur = (rlim.rlim_max == (rlim_t)RLIM_INFINITY) ? limit : utils::min(limit, rlim.rlim_max);
+    rlim.rlim_cur = (rlim.rlim_max == (rlim_t)RLIM_INFINITY) ? limit : utils::min((rlim_t)limit, rlim.rlim_max);
 
+#   ifdef __QNX__
+    ret = setrlimit(RLIMIT_NTHR, &rlim);
+#   else
     ret = setrlimit(RLIMIT_NPROC, &rlim);
+#   endif
     CHECK_MESSAGE(0 == ret, "setrlimit has returned an error");
 }
 
-static bool g_exception_caught = false;
-static std::mutex m;
-static std::condition_variable cv;
-static std::atomic<bool> stop{ false };
+size_t getThreadLimit() {
+    rlimit rlim;
+
+#   ifdef __QNX__
+    int ret = getrlimit(RLIMIT_NTHR, &rlim);
+#   else
+    int ret = getrlimit(RLIMIT_NPROC, &rlim);
+#   endif
+    CHECK_MESSAGE(0 == ret, "getrlimit has returned an error");
+    return rlim.rlim_cur;
+}
 
 static void* thread_routine(void*)
 {
-    std::unique_lock<std::mutex> lock(m);
-    cv.wait(lock, [] { return stop == true; });
     return nullptr;
 }
 
@@ -74,7 +88,7 @@ public:
         mValid = false;
         pthread_attr_t attr;
         // Limit the stack size not to consume all virtual memory on 32 bit platforms.
-        std::size_t stacksize = utils::max(128*1024, PTHREAD_STACK_MIN);
+        std::size_t stacksize = utils::max(std::size_t(128*1024), std::size_t(PTHREAD_STACK_MIN));
         if (pthread_attr_init(&attr) == 0 && pthread_attr_setstacksize(&attr, stacksize) == 0) {
             mValid = pthread_create(&mHandle, &attr, thread_routine, /* arg = */ nullptr) == 0;
         }
@@ -93,33 +107,18 @@ TEST_CASE("Too many threads") {
         return;
     }
 
-    // Some systems set really big limit (e.g. >45К) for the number of processes/threads
-    limitThreads(1024);
-
-    std::thread /* isolate test */ ([] {
-        std::vector<Thread> threads;
-        stop = false;
-        auto finalize = [&] {
-            stop = true;
-            cv.notify_all();
-            for (auto& t : threads) {
-                t.join();
-            }
-        };
-
-        for (int i = 0;; ++i) {
+    // Some systems set really big limit (e.g. >45K) for the number of processes/threads
+    limitThreads(1);
+    if (getThreadLimit() == 1) {
+        for (int attempt = 0; attempt < 5; ++attempt) {
             Thread thread;
-            if (!thread.isValid()) {
-                break;
-            }
-            threads.push_back(thread);
-            if (i == 1024) {
-                WARN_MESSAGE(false, "setrlimit seems having no effect");
-                finalize();
+            if (thread.isValid()) {
+                WARN_MESSAGE(false, "We were able to create a thread. setrlimit seems having no effect");
+                thread.join();
                 return;
             }
         }
-        g_exception_caught = false;
+        bool g_exception_caught = false;
         try {
             // Initialize the library to create worker threads
             tbb::parallel_for(0, 2, [](int) {});
@@ -132,9 +131,10 @@ TEST_CASE("Too many threads") {
         }
         // Do not CHECK to avoid memory allocation (we can be out of memory)
         if (!g_exception_caught) {
-            FAIL("No exception was caught");
+            FAIL("No exception was thrown on library initialization");
         }
-        finalize();
-    }).join();
+    } else {
+        WARN_MESSAGE(false, "setrlimit seems having no effect");
+    }
 }
 #endif

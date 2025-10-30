@@ -1,4 +1,4 @@
-# Copyright (c) 2021-2022 Intel Corporation
+# Copyright (c) 2021-2025 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,46 +25,68 @@ on:
       - synchronize
       - reopened
 
+permissions: read-all
+
 env:
   BUILD_CONCURRENCY: 2
   MACOS_BUILD_CONCURRENCY: 3
   TEST_TIMEOUT: 180
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ !contains(github.ref, 'refs/heads/master') }}
+
 jobs:
   codespell:
-    runs-on: [ubuntu-20.04]
+    runs-on: [ubuntu-22.04]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v2
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Run scan
         run: |
           sudo apt update && sudo apt install -y codespell
           ${GITHUB_WORKSPACE}/.github/scripts/codespell.sh `pwd`
 
   examples_clang-format:
-    runs-on: [ubuntu-20.04]
+    runs-on: [ubuntu-22.04]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v2
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Run scan
         run: |
-          command -v clang-format-10
+          command -v clang-format
           cp -r examples examples_formatted
-          find examples_formatted -regex '.*\.\(cpp\|hpp\)' -exec clang-format-10 -style=file -i {} \;
+          find examples_formatted -regex '.*\.\(cpp\|hpp\)' -exec clang-format -style=file -i {} \;
           diff -r examples examples_formatted
 
   documentation:
     needs: [codespell]
     env:
       BUILD_TYPE: oss
-    runs-on: [ubuntu-20.04]
+    runs-on: [ubuntu-latest]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v2
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Install prerequisites
         run: |
           pip3 install -U Jinja2
           pip3 install git+https://github.com/executablebooks/sphinx-book-theme.git
+          pip3 install sphinx_design
           echo GITHUB_SHA_SHORT=${GITHUB_SHA::8} >> $GITHUB_ENV
           mkdir html
       - name: Build documentation
@@ -72,25 +94,34 @@ jobs:
           export BUILD_TYPE=${BUILD_TYPE} && sphinx-build doc html
           tar -czvf html.tar.gz html/
       - name: Save docs
-        uses: actions/upload-artifact@v2.2.1
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: oneTBB-html-docs-${{ env.GITHUB_SHA_SHORT }}
           path: html.tar.gz
 
   pages:
     if: ${{ github.ref == 'refs/heads/master' }}
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
     runs-on: ubuntu-latest
     needs: [documentation]
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
       - name: Checkout gh-pages
-        uses: actions/checkout@v2
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           ref: gh-pages
           path: gh-pages
       - name: Set env
         run: echo GITHUB_SHA_SHORT=${GITHUB_SHA::8} >> $GITHUB_ENV
       - name: Download documetation
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: oneTBB-html-docs-${{ env.GITHUB_SHA_SHORT }}
       - name: Publish to github pages
@@ -108,9 +139,14 @@ jobs:
 
   copyright_check:
     if: ${{ github.ref != 'refs/heads/master' }}
-    runs-on: [ubuntu-20.04]
+    runs-on: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v2
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
       - name: Run check
@@ -126,11 +162,16 @@ jobs:
             cat years.diff
             exit 1
           fi
-  python_module_test_ubuntu18-04:
-    runs-on: [ubuntu-18.04]
+  python_module_test_ubuntu_latest:
+    runs-on: [ubuntu-latest]
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v2
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Run testing
         run: |
           mkdir build && cd build
@@ -139,65 +180,101 @@ jobs:
           ctest -R python_test --output-on-failure --timeout ${TEST_TIMEOUT}
 
   linux-testing:
-    name: ${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_preview=${{ matrix.preview }}
+    name: ${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_preview=${{ matrix.preview }}${{ matrix.cmake_static }}
     runs-on: ['${{ matrix.os }}']
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-18.04
+          - os: ubuntu-latest
             c_compiler: gcc
             cxx_compiler: g++
             std: 14
             build_type: relwithdebinfo
             preview: 'OFF'
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             c_compiler: gcc
             cxx_compiler: g++
             std: 17
             build_type: release
             preview: 'ON'
-          - os: ubuntu-20.04
-            c_compiler: gcc-10
-            cxx_compiler: g++-10
+          - os: ubuntu-24.04-arm
+            c_compiler: gcc-14
+            cxx_compiler: g++-14
             std: 20
             build_type: debug
             preview: 'ON'
+          - os: ubuntu-24.04-arm
+            c_compiler: clang
+            cxx_compiler: clang++
+            std: 20
+            build_type: release
+            preview: 'ON'
+          - os: ubuntu-22.04-arm
+            c_compiler: gcc
+            cxx_compiler: g++
+            std: 20
+            build_type: release
+            preview: 'ON'
+            cmake_static: -DBUILD_SHARED_LIBS=OFF
     steps:
-      - uses: actions/checkout@v2
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Run testing
         shell: bash
         run: |
           set -x
           mkdir build && cd build
-          cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} ${{ matrix.cmake_static }} \
             -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_CPF=${{ matrix.preview }} ..
           make VERBOSE=1 -j${BUILD_CONCURRENCY}
           ctest --timeout ${TEST_TIMEOUT} --output-on-failure
 
   macos-testing:
-    name: ${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_preview=${{ matrix.preview }}
+    name: ${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_preview=${{ matrix.preview }}${{ matrix.cmake_static }}
     runs-on: ['${{ matrix.os }}']
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-10.15
+          - os: macos-15
+            c_compiler: clang
+            cxx_compiler: clang++
+            std: 17
+            build_type: debug
+            preview: 'ON'
+          - os: macos-14
             c_compiler: clang
             cxx_compiler: clang++
             std: 14
             build_type: relwithdebinfo
             preview: 'ON'
+          - os: macos-13
+            c_compiler: clang
+            cxx_compiler: clang++
+            std: 20
+            build_type: release
+            preview: 'ON'
+            cmake_static: -DBUILD_SHARED_LIBS=OFF
     steps:
-      - uses: actions/checkout@v2
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Run testing
         shell: bash
         run: |
           set -x
           mkdir build && cd build
-          cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} ${{ matrix.cmake_static }} \
             -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_CPF=${{ matrix.preview }} ..
           make VERBOSE=1 -j${MACOS_BUILD_CONCURRENCY}
           ctest --timeout ${TEST_TIMEOUT} --output-on-failure
@@ -210,14 +287,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-2019
-            generator: Visual Studio 16 2019
+          - os: windows-2025
+            generator: Visual Studio 17 2022
             c_compiler: cl
             cxx_compiler: cl
             std: 14
             build_type: relwithdebinfo
             preview: 'ON'
-            job_name: windows_cl2019_cxx14_relwithdebinfo_preview=ON
+            job_name: windows_cl2022_cxx14_relwithdebinfo_preview=ON
+          - os: windows-11-arm
+            generator: Visual Studio 17 2022
+            c_compiler: cl
+            cxx_compiler: cl
+            std: 20
+            build_type: release
+            preview: 'ON'
+            job_name: windows_11_arm_cl2022_cxx20_release_preview=ON-DBUILD_SHARED_LIBS=OFF
+            cmake_static: -DBUILD_SHARED_LIBS=OFF
           - os: windows-2022
             generator: Visual Studio 17 2022
             c_compiler: cl
@@ -227,12 +313,17 @@ jobs:
             preview: 'OFF'
             job_name: windows_cl2022_cxx17_relwithdebinfo_preview=OFF
     steps:
-      - uses: actions/checkout@v2
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Run testing
         run: |
           mkdir build
           cd build
-          cmake -G "${{ matrix.generator }}" -A x64 -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
+          cmake -G "${{ matrix.generator }}" -A x64 -DCMAKE_CXX_STANDARD=${{ matrix.std }} ${{ matrix.cmake_static }} `
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} `
             -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_CPF=${{ matrix.preview }} ..
           cmake --build . --config ${{ matrix.build_type }} -j -v
@@ -246,26 +337,31 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-18.04
+          - os: ubuntu-latest
             c_compiler: gcc
             cxx_compiler: g++
             std: 14
             build_type: relwithdebinfo
             preview: 'OFF'
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
             c_compiler: gcc
             cxx_compiler: g++
             std: 17
             build_type: release
             preview: 'ON'
-          - os: ubuntu-20.04
-            c_compiler: gcc-10
-            cxx_compiler: g++-10
+          - os: ubuntu-24.04
+            c_compiler: gcc
+            cxx_compiler: g++
             std: 20
             build_type: debug
             preview: 'ON'
     steps:
-      - uses: actions/checkout@v2
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Run testing
         shell: bash
         run: |
@@ -284,14 +380,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-10.15
+          - os: macos-15
             c_compiler: clang
             cxx_compiler: clang++
             std: 14
             build_type: relwithdebinfo
             preview: 'ON'
     steps:
-      - uses: actions/checkout@v2
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Run testing
         shell: bash
         run: |
@@ -310,14 +411,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-2019
-            generator: Visual Studio 16 2019
+          - os: windows-11-arm
+            generator: Visual Studio 17 2022
             c_compiler: cl
             cxx_compiler: cl
             std: 14
             build_type: relwithdebinfo
             preview: 'ON'
-            job_name: examples_windows_cl2019_cxx14_relwithdebinfo_preview=ON
+            job_name: examples_windows_11_arm_cl2022_cxx14_relwithdebinfo_preview=ON
           - os: windows-2022
             generator: Visual Studio 17 2022
             c_compiler: cl
@@ -327,7 +428,12 @@ jobs:
             preview: 'OFF'
             job_name: examples_windows_cl2022_cxx17_relwithdebinfo_preview=OFF
     steps:
-      - uses: actions/checkout@v2
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Run testing
         run: |
           mkdir build
@@ -336,3 +442,63 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} `
             -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_CPF=${{ matrix.preview }} -DTBB_TEST=OFF -DTBB_EXAMPLES=ON ..
           cmake --build . -v --target light_test_examples
+
+  linux-doc-examples-testing:
+    name: doc_examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}
+    runs-on: ['${{ matrix.os }}']
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            c_compiler: gcc
+            cxx_compiler: g++
+            std: 20
+            build_type: relwithdebinfo
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Test doc examples
+        run: |
+          mkdir build && cd build
+          cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
+            -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON ..
+          cmake --build . -v --parallel --target build-doc-examples
+          ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure -L doc-examples
+  
+  windows-doc-examples-testing:
+    name: doc_examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}
+    runs-on: ['${{ matrix.os }}']
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            generator: "Visual Studio 17 2022"
+            c_compiler: cl
+            cxx_compiler: cl
+            std: 20
+            build_type: relwithdebinfo
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - name: Test doc examples
+        run: |
+          mkdir build
+          cd build
+          cmake -G "${{ matrix.generator }}" -A x64 -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} `
+            -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON ..
+          cmake --build . --config ${{ matrix.build_type }} -v --parallel --target build-doc-examples
+          ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure -L doc-examples

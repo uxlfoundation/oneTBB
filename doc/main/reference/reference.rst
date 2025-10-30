@@ -3,22 +3,22 @@
 |short_name| API Reference
 ==========================
 
-For oneTBB API Reference, refer to `oneAPI Specification <https://spec.oneapi.com/>`_. The current supported
+For oneTBB API Reference, refer to `oneAPI Specification <https://github.com/uxlfoundation/oneAPI-spec>`_. The current supported
 version of oneAPI Specification is 1.0.
 
 Specification extensions
 ************************
 
-|full_name| implements the `oneTBB specification <https://spec.oneapi.com/versions/latest/elements/oneTBB/source/nested-index.html>`_.
+|full_name| implements the `oneTBB specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/nested-index>`_.
 This document provides additional details or restrictions where necessary.
 It also describes features that are not included in the oneTBB specification.
 
 .. toctree::
     :titlesonly:
 
-    info_namespace
-    parallel_for_each_semantics
-    parallel_sort_ranges_extension
+    scalable_memory_pools/malloc_replacement_log
+    rvalue_reduce
+    assertion_handler
 
 Preview features
 ****************
@@ -47,7 +47,8 @@ The key properties of a preview feature are:
     scalable_memory_pools
     helpers_for_expressing_graphs
     concurrent_lru_cache_cls
-    constraints_extensions
-    info_namespace_extensions
     task_group_extensions
     custom_mutex_chmap
+    try_put_and_wait
+    parallel_phase_for_task_arena
+    blocked_nd_range_ctad

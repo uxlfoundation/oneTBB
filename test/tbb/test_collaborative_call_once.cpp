@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2022 Intel Corporation
+    Copyright (c) 2022-2024 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -206,6 +206,7 @@ TEST_CASE("only calls once - move only argument") {
     }
 }
 
+#if !EMSCRIPTEN
 //! Stress test for functor to be called only once
 //! \brief \ref interface \ref requirement \ref stress
 TEST_CASE("only calls once - stress test") {
@@ -216,6 +217,9 @@ TEST_CASE("only calls once - stress test") {
     // that makes impossible to create more than ~500 threads.
     // Android has been added to decrease testing time.
     constexpr std::size_t N = tbb::detail::d0::max_nfs_size * 2;
+#elif __TBB_USE_THREAD_SANITIZER
+    // Reduce execution time under Thread Sanitizer
+    constexpr std::size_t N = tbb::detail::d0::max_nfs_size + 64;
 #else 
     constexpr std::size_t N = tbb::detail::d0::max_nfs_size * 4;
 #endif
@@ -243,7 +247,7 @@ TEST_CASE("only calls once - stress test") {
         });
     }
 }
-
+#endif
 #if TBB_USE_EXCEPTIONS
 
 //! Test for collaborative_call_once exception handling
@@ -321,6 +325,7 @@ TEST_CASE("handles exceptions - stress test") {
 
 #endif
 
+#if !EMSCRIPTEN
 //! Test for multiple help from moonlighting threads
 //! \brief \ref interface \ref requirement
 TEST_CASE("multiple help") {
@@ -338,6 +343,7 @@ TEST_CASE("multiple help") {
         });
     });
 }
+#endif
 
 //! Test for collaborative work from different arenas
 //! \brief \ref interface \ref requirement

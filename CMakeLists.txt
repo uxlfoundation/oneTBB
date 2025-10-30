@@ -1,4 +1,4 @@
-# Copyright (c) 2020-2022 Intel Corporation
+# Copyright (c) 2020-2025 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.1)
+# If the running version of CMake is older than 3.12, the extra ... dots will be seen as version component separators,
+# resulting in the ...<max> part being ignored and preserving the pre-3.12 behavior of basing policies on <min>.
+cmake_minimum_required(VERSION 3.5.0...3.31.3)
 
 # Enable CMake policies
+
+if (POLICY CMP0063)
+    # The NEW behavior for this policy is to honor the visibility properties for all target types.
+    cmake_policy(SET CMP0063 NEW)
+    set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
+endif()
+
+if (POLICY CMP0068)
+    # RPATH settings do not affect install_name on macOS since CMake 3.9
+    cmake_policy(SET CMP0068 NEW)
+endif()
 
 if (POLICY CMP0091)
     # The NEW behavior for this policy is to not place MSVC runtime library flags in the default
@@ -22,6 +35,11 @@ if (POLICY CMP0091)
     cmake_policy(SET CMP0091 NEW)
 elseif (DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
     message(FATAL_ERROR "CMAKE_MSVC_RUNTIME_LIBRARY was defined while policy CMP0091 is not available. Use CMake 3.15 or newer.")
+endif()
+
+if (POLICY CMP0148)
+    # CMake 3.27: The FindPythonInterp and FindPythonLibs modules are removed
+    cmake_policy(SET CMP0148 OLD)
 endif()
 
 if (TBB_WINDOWS_DRIVER AND (NOT ("${CMAKE_MSVC_RUNTIME_LIBRARY}" STREQUAL MultiThreaded OR "${CMAKE_MSVC_RUNTIME_LIBRARY}" STREQUAL MultiThreadedDebug)))
@@ -38,19 +56,13 @@ if (APPLE)
     endif()
 endif()
 
-# Until CMake 3.4.0 FindThreads.cmake requires C language enabled.
-# Enable C language before CXX to avoid possible override of CMAKE_SIZEOF_VOID_P.
-if (CMAKE_VERSION VERSION_LESS 3.4)
-    enable_language(C)
-endif()
-
 file(READ include/oneapi/tbb/version.h _tbb_version_info)
 string(REGEX REPLACE ".*#define TBB_VERSION_MAJOR ([0-9]+).*" "\\1" _tbb_ver_major "${_tbb_version_info}")
 string(REGEX REPLACE ".*#define TBB_VERSION_MINOR ([0-9]+).*" "\\1" _tbb_ver_minor "${_tbb_version_info}")
 string(REGEX REPLACE ".*#define TBB_VERSION_PATCH ([0-9]+).*" "\\1" _tbb_ver_patch "${_tbb_version_info}")
 string(REGEX REPLACE ".*#define TBB_INTERFACE_VERSION ([0-9]+).*" "\\1" TBB_INTERFACE_VERSION "${_tbb_version_info}")
 string(REGEX REPLACE ".*#define __TBB_BINARY_VERSION ([0-9]+).*" "\\1" TBB_BINARY_VERSION "${_tbb_version_info}")
-set(TBB_BINARY_MINOR_VERSION ${_tbb_ver_minor})
+string(REGEX REPLACE "..(..)." "\\1" TBB_BINARY_MINOR_VERSION "${TBB_INTERFACE_VERSION}")
 set(TBBMALLOC_BINARY_VERSION 2)
 set(TBBBIND_BINARY_VERSION 3)
 
@@ -85,6 +97,11 @@ endif()
 
 set(CMAKE_CXX_EXTENSIONS OFF) # use -std=c++... instead of -std=gnu++...
 # ---------------------------------------------------------------------------------------------------------
+# Setup symbol visibility properties.
+
+set(CMAKE_VISIBILITY_INLINES_HIDDEN TRUE)
+set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
+# ---------------------------------------------------------------------------------------------------------
 
 # Detect architecture (bitness).
 if (CMAKE_SIZEOF_VOID_P EQUAL 4)
@@ -104,15 +121,42 @@ option(TBBMALLOC_BUILD "Enable tbbmalloc build" ON)
 cmake_dependent_option(TBBMALLOC_PROXY_BUILD "Enable tbbmalloc_proxy build" ON "TBBMALLOC_BUILD" OFF)
 option(TBB_CPF "Enable preview features of the library" OFF)
 option(TBB_FIND_PACKAGE "Enable search for external oneTBB using find_package instead of build from sources" OFF)
-option(TBB_DISABLE_HWLOC_AUTOMATIC_SEARCH "Disable HWLOC automatic search by pkg-config tool" OFF)
+option(TBB_DISABLE_HWLOC_AUTOMATIC_SEARCH "Disable HWLOC automatic search by pkg-config tool" ${CMAKE_CROSSCOMPILING})
 option(TBB_ENABLE_IPO "Enable Interprocedural Optimization (IPO) during the compilation" ON)
+option(TBB_CONTROL_FLOW_GUARD "Enable Control Flow Guard (CFG) during the compilation" OFF)
+option(TBB_FUZZ_TESTING "Enable fuzz testing" OFF)
+option(TBB_INSTALL "Enable installation" ON)
+option(TBB_FILE_TRIM "Enable __FILE__ trim" ON)
+if(LINUX)
+option(TBB_LINUX_SEPARATE_DBG "Enable separation of the debug symbols during the build" OFF)
+endif()
+if(APPLE)
+option(TBB_BUILD_APPLE_FRAMEWORKS "Build as Apple Frameworks" OFF)
+endif()
+
+if (WIN32)
+    if (TBB_VERIFY_DEPENDENCY_SIGNATURE)
+        message(STATUS "Dependency signature verification during dynamic linking in run-time is ENABLED.")
+    elseif (NOT DEFINED TBB_VERIFY_DEPENDENCY_SIGNATURE)
+        message(WARNING
+            "Dependency signature verification during dynamic linking in run-time is disabled by "
+            "default. This may lead to security vulnerabilities. See installation section in "
+            "oneTBB documentation for more details.")
+    else()
+        message(STATUS "Dependency signature verification during dynamic linking in run-time is DISABLED")
+    endif()
+    option(TBB_VERIFY_DEPENDENCY_SIGNATURE
+        "Verify signature of a dependency during its dynamic linking at run-time on Windows*" OFF)
+endif()
 
 if (NOT DEFINED BUILD_SHARED_LIBS)
     set(BUILD_SHARED_LIBS ON)
 endif()
 
 if (NOT BUILD_SHARED_LIBS)
-    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    if(NOT DEFINED CMAKE_POSITION_INDEPENDENT_CODE)
+        set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    endif()
     message(WARNING "You are building oneTBB as a static library. This is highly discouraged and such configuration is not supported. Consider building a dynamic library to avoid unforeseen issues.")
 endif()
 
@@ -121,6 +165,14 @@ if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     message(STATUS "CMAKE_BUILD_TYPE is not specified. Using default: ${CMAKE_BUILD_TYPE}")
     # Possible values of build type for cmake-gui
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
+if (CMAKE_BUILD_TYPE)
+    string(TOLOWER ${CMAKE_BUILD_TYPE} _tbb_build_type)
+    if (_tbb_build_type STREQUAL "debug")
+        set(TBB_ENABLE_IPO OFF)
+    endif()
+    unset(_tbb_build_type)
 endif()
 
 # -------------------------------------------------------------------
@@ -171,10 +223,22 @@ foreach(output_type LIBRARY ARCHIVE PDB RUNTIME)
     endif()
 endforeach()
 
+if (CMAKE_CONFIGURATION_TYPES)
+    # We can't use generator expressions in a cmake variable name.
+    set(TBB_TEST_WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/${TBB_OUTPUT_DIR_BASE}_$<LOWER_CASE:$<CONFIG>>)
+else()
+    set(TBB_TEST_WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+endif()
+
 # -------------------------------------------------------------------
 
 # -------------------------------------------------------------------
 # Common dependencies
+#force -pthread during compilation for Emscripten
+if (EMSCRIPTEN AND NOT EMSCRIPTEN_WITHOUT_PTHREAD)
+   set(THREADS_HAVE_PTHREAD_ARG TRUE)
+endif()
+
 set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
 # -------------------------------------------------------------------
@@ -200,6 +264,20 @@ if (TBB_ENABLE_IPO AND BUILD_SHARED_LIBS AND NOT ANDROID_PLATFORM AND NOT TBB_SA
     endif()
 endif()
 
+if (TBB_FILE_TRIM)
+    file(RELATIVE_PATH TBB_RELATIVE_BIN_PATH ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_SOURCE_DIR})
+    file(TO_NATIVE_PATH ${CMAKE_SOURCE_DIR} NATIVE_TBB_PROJECT_ROOT_DIR)
+    if (TBB_RELATIVE_BIN_PATH)
+        file(TO_NATIVE_PATH ${TBB_RELATIVE_BIN_PATH} NATIVE_TBB_RELATIVE_BIN_PATH)
+    else()
+        file(TO_NATIVE_PATH ${CMAKE_CURRENT_BINARY_DIR} NATIVE_TBB_RELATIVE_BIN_PATH)
+    endif()
+endif ()
+
+if (TBB_CONTROL_FLOW_GUARD)
+    message(STATUS "Control Flow Guard (CFG) enabled")
+endif()
+
 set(TBB_COMPILER_SETTINGS_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/compilers/${CMAKE_CXX_COMPILER_ID}.cmake)
 if (EXISTS ${TBB_COMPILER_SETTINGS_FILE})
     include(${TBB_COMPILER_SETTINGS_FILE})
@@ -207,7 +285,7 @@ else()
     message(WARNING "TBB compiler settings not found ${TBB_COMPILER_SETTINGS_FILE}")
 endif()
 
-if (TBB_FIND_PACKAGE OR TBB_DIR)
+if (TBB_FIND_PACKAGE AND TBB_DIR)
     # Allow specifying external TBB to test with.
     # Do not add main targets and installation instructions in that case.
     message(STATUS "Using external TBB for testing")
@@ -216,47 +294,50 @@ else()
     if (TBB_BUILD)
         add_subdirectory(src/tbb)
     endif()
-    if (NOT "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "mips")
-        if (TBBMALLOC_BUILD)
-            add_subdirectory(src/tbbmalloc)
-            if(TBBMALLOC_PROXY_BUILD AND NOT "${MSVC_CXX_ARCHITECTURE_ID}" MATCHES "ARM64")
-                add_subdirectory(src/tbbmalloc_proxy)
-            endif()
-        endif()
-        if (APPLE OR NOT BUILD_SHARED_LIBS)
-            message(STATUS "TBBBind build targets are disabled due to unsupported environment")
-        else()
-            add_subdirectory(src/tbbbind)
+    if (TBBMALLOC_BUILD)
+        add_subdirectory(src/tbbmalloc)
+        if(TBBMALLOC_PROXY_BUILD AND NOT "${MSVC_CXX_ARCHITECTURE_ID}" MATCHES "ARM64")
+            add_subdirectory(src/tbbmalloc_proxy)
         endif()
     endif()
+    if (NOT BUILD_SHARED_LIBS)
+        message(STATUS "TBBBind build targets are disabled due to unsupported environment")
+    else()
+        add_subdirectory(src/tbbbind)
+    endif()
+    if (TBB_INSTALL)
+        # -------------------------------------------------------------------
+        # Installation instructions
+        include(CMakePackageConfigHelpers)
 
-    # -------------------------------------------------------------------
-    # Installation instructions
-    include(CMakePackageConfigHelpers)
+        install(DIRECTORY include/
+                DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+                COMPONENT devel)
 
-    install(DIRECTORY include/
-            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-            COMPONENT devel)
+        install(EXPORT ${PROJECT_NAME}Targets
+                NAMESPACE TBB::
+                DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+                COMPONENT devel)
+        file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+                   "include(\${CMAKE_CURRENT_LIST_DIR}/${PROJECT_NAME}Targets.cmake)\n")
+        if (NOT BUILD_SHARED_LIBS)
+            file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
+                       "include(CMakeFindDependencyMacro)\nfind_dependency(Threads)\n")
+        endif()
 
-    install(EXPORT ${PROJECT_NAME}Targets
-            NAMESPACE TBB::
-            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
-            COMPONENT devel)
-    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
-               "include(\${CMAKE_CURRENT_LIST_DIR}/${PROJECT_NAME}Targets.cmake)\n")
+        write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+                                         COMPATIBILITY AnyNewerVersion)
 
-    write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-                                     COMPATIBILITY AnyNewerVersion)
+        install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+                      "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+                DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
+                COMPONENT devel)
 
-    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-                  "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
-            COMPONENT devel)
-
-    install(FILES "README.md"
-            DESTINATION ${CMAKE_INSTALL_DOCDIR}
-            COMPONENT devel)
-    # -------------------------------------------------------------------
+        install(FILES "README.md"
+                DESTINATION ${CMAKE_INSTALL_DOCDIR}
+                COMPONENT devel)
+        # -------------------------------------------------------------------
+    endif()
 endif()
 
 if (TBB_TEST)
@@ -266,6 +347,18 @@ endif()
 
 if (TBB_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+
+if (TBB_DOC_EXAMPLES)
+    set(TBB_DOC_EXAMPLES_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/doc/main/examples_testing")
+    if (NOT EXISTS ${TBB_DOC_EXAMPLES_DIRECTORY})
+        message(FATAL_ERROR "Documentation examples are not found while testing was enabled")
+    else()
+        message(STATUS "Enabling testing for examples from documentation")
+        enable_testing()
+        add_subdirectory(${TBB_DOC_EXAMPLES_DIRECTORY})
+    endif()
 endif()
 
 if (TBB_BENCH)
@@ -279,10 +372,27 @@ endif()
 
 if (ANDROID_PLATFORM)
     if ("${ANDROID_STL}" STREQUAL "c++_shared")
-        configure_file(
-        "${ANDROID_NDK}/sources/cxx-stl/llvm-libc++/libs/${ANDROID_ABI}/libc++_shared.so"
-        "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libc++_shared.so"
-        COPYONLY)
+        if (${ANDROID_NDK_MAJOR} GREATER_EQUAL "25")
+            if(ANDROID_ABI STREQUAL "arm64-v8a")
+                set(ANDROID_TOOLCHAIN_NAME "aarch64-linux-android")
+            elseif(ANDROID_ABI STREQUAL "x86_64")
+                set(ANDROID_TOOLCHAIN_NAME "x86_64-linux-android")
+            elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+                set(ANDROID_TOOLCHAIN_NAME "arm-linux-androideabi")
+            elseif(ANDROID_ABI STREQUAL "x86")
+                set(ANDROID_TOOLCHAIN_NAME "i686-linux-android")
+            endif()
+
+            configure_file(
+            "${ANDROID_TOOLCHAIN_ROOT}/sysroot/usr/lib/${ANDROID_TOOLCHAIN_NAME}/libc++_shared.so"
+            "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libc++_shared.so"
+            COPYONLY)
+        else()
+            configure_file(
+                "${ANDROID_NDK}/sources/cxx-stl/llvm-libc++/libs/${ANDROID_ABI}/libc++_shared.so"
+                "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libc++_shared.so"
+                COPYONLY)
+        endif()
     endif()
     # This custom target may be implemented without separate CMake script, but it requires
     # ADB(Android Debug Bridge) executable file availability, so to incapsulate this requirement
