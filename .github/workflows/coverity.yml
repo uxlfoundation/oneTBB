@@ -1,4 +1,5 @@
 # Copyright (c) 2024-2025 Intel Corporation
+# Copyright (c) 2025 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +25,8 @@ permissions: read-all
 
 env:
   BUILD_CONCURRENCY: 4
-  COVERITY_PROJECT: oneapi-src%2FoneTBB
+  COVERITY_PROJECT_LIN: oneapi-src%2FoneTBB
+  COVERITY_PROJECT_WIN: uxlfoundation%2FoneTBB
 
 jobs:
   coverity_linux:
@@ -41,7 +43,7 @@ jobs:
       - name: Download Linux 64 Coverity Tool
         run: |
           curl https://scan.coverity.com/download/cxx/linux64 --output ${GITHUB_WORKSPACE}/cov-linux64-tool.tar.gz \
-            --data "token=${{secrets.COVERITY_TOKEN}}&project=${{env.COVERITY_PROJECT}}"
+            --data "token=${{secrets.COVERITY_TOKEN}}&project=${{env.COVERITY_PROJECT_LIN}}"
           mkdir cov-linux64-tool
           tar -xzf cov-linux64-tool.tar.gz --strip 1 -C cov-linux64-tool
       - name: Build with cov-build
@@ -64,7 +66,7 @@ jobs:
             --form file=@cov-int.tgz \
             --form version="${GITHUB_SHA}" \
             --form description="" \
-              "https://scan.coverity.com/builds?project=${{env.COVERITY_PROJECT}}"
+              "https://scan.coverity.com/builds?project=${{env.COVERITY_PROJECT_LIN}}"
   coverity_windows:
     name: Coverity Windows
     if: github.repository == 'uxlfoundation/oneTBB'
@@ -78,7 +80,7 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - name: Download Windows 64 Coverity Tool
         run: |
-          curl https://scan.coverity.com/download/cxx/win64 -o cov-win64-tool.zip -d "token=${{secrets.COVERITY_TOKEN}}&project=${{env.COVERITY_PROJECT}}"
+          curl https://scan.coverity.com/download/cxx/win64 -o cov-win64-tool.zip -d "token=${{secrets.COVERITY_TOKEN_WIN}}&project=${{env.COVERITY_PROJECT_WIN}}"
           7z x cov-win64-tool.zip
           del cov-win64-tool.zip
           move cov-analysis-win64* cov-win64-tool
@@ -97,4 +99,4 @@ jobs:
           7z a -r cov-int.zip cov-int
       - name: Submit Coverity results for analysis
         run: |
-          curl --form token="${{ secrets.COVERITY_TOKEN }}" --form email="${{ secrets.COVERITY_EMAIL }}" --form file=@cov-int.zip --form version="${GITHUB_SHA}" --form description="" "https://scan.coverity.com/builds?project=${{env.COVERITY_PROJECT}}"
+          curl --form token="${{ secrets.COVERITY_TOKEN_WIN }}" --form email="${{ secrets.COVERITY_EMAIL }}" --form file=@cov-int.zip --form version="${GITHUB_SHA}" --form description="" "https://scan.coverity.com/builds?project=${{env.COVERITY_PROJECT_WIN}}"

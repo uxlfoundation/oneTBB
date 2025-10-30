@@ -5,6 +5,7 @@
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/uxlfoundation/oneTBB/badge)](https://securityscorecards.dev/viewer/?uri=github.com/uxlfoundation/oneTBB)
 [![Gurubase](https://img.shields.io/badge/Gurubase-Ask%20oneTBB%20Guru-006BFF)](https://gurubase.io/g/onetbb)
 [![Coverity Scan Build Status](https://img.shields.io/coverity/scan/30373.svg)](https://scan.coverity.com/projects/oneapi-src-onetbb)
+[![Coverity Scan Build Status](https://img.shields.io/coverity/scan/30373.svg)](https://scan.coverity.com/projects/uxlfoundation-onetbb)
 
 oneTBB is a flexible C++ library that simplifies the work of adding parallelism
 to complex applications, even if you are not a threading expert.  
