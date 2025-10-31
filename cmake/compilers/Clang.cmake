@@ -1,4 +1,5 @@
 # Copyright (c) 2020-2025 Intel Corporation
+# Copyright (c) 2025 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,14 +15,13 @@
 
 if (EMSCRIPTEN)
     set(TBB_EMSCRIPTEN 1)
-    set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} -fexceptions)
-    set(TBB_TEST_LINK_FLAGS  ${TBB_COMMON_LINK_FLAGS} -fexceptions -sINITIAL_MEMORY=65536000 -sALLOW_MEMORY_GROWTH=1 -sMALLOC=mimalloc -sEXIT_RUNTIME=1)
     if (NOT EMSCRIPTEN_WITHOUT_PTHREAD)
         set_property(TARGET Threads::Threads PROPERTY INTERFACE_LINK_LIBRARIES "-pthread")
     endif()
     set(TBB_EMSCRIPTEN_STACK_SIZE 65536)
     set(TBB_LIB_COMPILE_FLAGS -D__TBB_EMSCRIPTEN_STACK_SIZE=${TBB_EMSCRIPTEN_STACK_SIZE})
-    set(TBB_TEST_LINK_FLAGS ${TBB_TEST_LINK_FLAGS} -sTOTAL_STACK=${TBB_EMSCRIPTEN_STACK_SIZE})
+    set(TBB_TEST_COMPILE_FLAGS ${TBB_TEST_COMPILE_FLAGS} -fexceptions)
+    set(TBB_TEST_LINK_FLAGS ${TBB_TEST_LINK_FLAGS} -fexceptions -sINITIAL_MEMORY=65536000 -sALLOW_MEMORY_GROWTH=1 -sMALLOC=mimalloc -sEXIT_RUNTIME=1 -sTOTAL_STACK=${TBB_EMSCRIPTEN_STACK_SIZE})
     unset(TBB_EMSCRIPTEN_STACK_SIZE)
 endif()
 
