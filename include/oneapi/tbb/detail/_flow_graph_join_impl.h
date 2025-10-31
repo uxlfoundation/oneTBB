@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -1458,34 +1459,19 @@
     // join base class type generator
     template<template<class> class PT, typename OutputTuple, typename JP>
     struct join_base {
-        typedef join_node_base<JP, typename wrap_tuple_elements<PT,OutputTuple>::type, OutputTuple> type;
+        using type = join_node_base<JP, typename wrap_tuple_elements<PT, OutputTuple>::type, OutputTuple>;
     };
 
     template<typename OutputTuple, typename K, typename KHash>
     struct join_base<key_matching_port, OutputTuple, key_matching<K,KHash> > {
-        typedef key_matching<K, KHash> key_traits_type;
-        typedef K key_type;
-        typedef KHash key_hash_compare;
-        typedef join_node_base< key_traits_type,
+        using key_type = K;
+        using key_hash_compare = KHash;
+        using key_traits_type = key_matching<key_type, key_hash_compare>;
+
+        using type = join_node_base<key_traits_type,
                 // ports type
-                typename wrap_key_tuple_elements<key_matching_port,key_traits_type,OutputTuple>::type,
-                OutputTuple > type;
-    };
-
-    //! unfolded_join_node : passes input_ports_type to join_node_base.  We build the input port type
-    //  using tuple_element.  The class PT is the port type (reserving_port, queueing_port, key_matching_port)
-    //  and should match the typename.
-
-    template<int M, template<class> class PT, typename OutputTuple, typename JP>
-    class unfolded_join_node : public join_base<M,PT,OutputTuple,JP>::type {
-    public:
-        typedef typename wrap_tuple_elements<M, PT, OutputTuple>::type input_ports_type;
-        typedef OutputTuple output_type;
-    private:
-        typedef join_node_base<JP, input_ports_type, output_type > base_type;
-    public:
-        unfolded_join_node(graph &g) : base_type(g) {}
-        unfolded_join_node(const unfolded_join_node &other) : base_type(other) {}
+                typename wrap_key_tuple_elements<key_matching_port, key_traits_type, OutputTuple>::type,
+                OutputTuple>;
     };
 
 #if __TBB_PREVIEW_MESSAGE_BASED_KEY_MATCHING
@@ -1504,17 +1490,16 @@
     };
 #endif /* __TBB_PREVIEW_MESSAGE_BASED_KEY_MATCHING */
 
-    //! unfolded_join_node : passes input_ports_type to join_node_base.  We build the input port type
-    //  using tuple_element.  The class PT is the port type (reserving_port, queueing_port, key_matching_port)
+    //! unfolded_join_node : passes input_ports_type to join_node_base. We build the input port type
+    //  using tuple_element.  The class PortType is the port type (reserving_port, queueing_port, key_matching_port)
     //  and should match the typename.
-
-    template<template<class> class PT, typename OutputTuple, typename JP>
-    class unfolded_join_node : public join_base<PT, OutputTuple, JP>::type {
+    template<template<class> class PortType, typename OutputTuple, typename JoinPolicy>
+    class unfolded_join_node : public join_base<PortType, OutputTuple, JoinPolicy>::type {
     public:
-        using input_ports_type = typename wrap_tuple_elements<PT, OutputTuple>::type;
+        using input_ports_type = typename wrap_tuple_elements<PortType, OutputTuple>::type;
         using output_type = OutputTuple;
     private:
-        using base_type = join_node_base<JP, input_ports_type, output_type>;
+        using base_type = join_node_base<JoinPolicy, input_ports_type, output_type>;
     public:
         unfolded_join_node(graph& g) : base_type(g) {}
         unfolded_join_node(const unfolded_join_node &other) : base_type(other) {}
@@ -1522,7 +1507,6 @@
 
     // key_matching unfolded_join_node.  This must be a separate specialization because the constructors
     // differ.
-
     template<typename K, typename KHash, typename...Types>
     class unfolded_join_node<key_matching_port, std::tuple<Types...>, key_matching<K, KHash>>
         : public join_base<key_matching_port, std::tuple<Types...>, key_matching<K, KHash>>::type

@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -43,24 +44,24 @@ struct KeyTrait {
 };
 
 // wrap each element of a tuple in a template, and make a tuple of the result.
-template<template<class> class PT, typename TypeTuple>
+template<template<class> class PortType, typename TypeTuple>
 struct wrap_tuple_elements;
 
 // A wrapper that generates the traits needed for each port of a key-matching join,
 // and the type of the tuple of input ports.
-template<template<class> class PT, typename KeyTraits, typename TypeTuple>
+template<template<class> class PortType, typename KeyTraits, typename TypeTuple>
 struct wrap_key_tuple_elements;
 
-template<template<class> class PT,  typename... Args>
-struct wrap_tuple_elements<PT, std::tuple<Args...> >{
-    typedef typename std::tuple<PT<Args>... > type;
+template<template<class> class PortType,  typename... Args>
+struct wrap_tuple_elements<PortType, std::tuple<Args...> >{
+    using type = std::tuple<PortType<Args>...>;
 };
 
-template<template<class> class PT, typename KeyTraits, typename... Args>
-struct wrap_key_tuple_elements<PT, KeyTraits, std::tuple<Args...> > {
-    typedef typename KeyTraits::key_type K;
-    typedef typename KeyTraits::hash_compare_type KHash;
-    typedef typename std::tuple<PT<KeyTrait<K, KHash, Args> >... > type;
+template<template<class> class PortType, typename KeyTraits, typename... Args>
+struct wrap_key_tuple_elements<PortType, KeyTraits, std::tuple<Args...> > {
+    using key_type = typename KeyTraits::key_type;
+    using hash_compare_type = typename KeyTraits::hash_compare_type;
+    using type = std::tuple<PortType<KeyTrait<key_type, hash_compare_type, Args>>...>;
 };
 
 template< int... S > class sequence {};
@@ -309,9 +310,9 @@ struct do_if<T, false> {
 
 using tbb::detail::punned_cast;
 
-template<typename TagType, typename T0, typename... TN>
+template<typename TagType, typename... TN>
 class tagged_msg {
-    using Tuple = std::tuple<T0, TN...>;
+    using Tuple = std::tuple<TN...>;
     
     class variant {
         static const size_t N = std::tuple_size<Tuple>::value;
@@ -387,7 +388,7 @@ public:
     bool is_a() const {return my_msg.template variant_is_a<V>();}
 
     bool is_default_constructed() const {return my_msg.variant_is_default_constructed();}
-};
+}; // class tagged_msg
 
 // template to simplify cast and test for tagged_msg in template contexts
 template<typename V, typename T>

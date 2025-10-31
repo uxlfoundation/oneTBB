@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -227,18 +228,18 @@
     struct indexer_types {
         using output_type = tagged_msg<std::size_t, T0, TN...>;
         using input_ports_type = std::tuple<indexer_input_port<T0>, indexer_input_port<TN>...>;
-        using indexer_FE_type = indexer_node_FE<input_ports_type, output_type, std::tuple<T0, TN...>>;
         using indexer_base_type = indexer_node_base<input_ports_type, output_type, std::tuple<T0, TN...>>;
     };
 
     template<typename T0, typename... TN>
     class unfolded_indexer_node : public indexer_types<T0, TN...>::indexer_base_type {
     public:
-        typedef std::tuple<T0, TN...> tuple_types;
-        typedef typename indexer_types<T0, TN...>::input_ports_type input_ports_type;
-        typedef typename indexer_types<T0, TN...>::output_type output_type;
+        using input_ports_type = typename indexer_types<T0, TN...>::input_ports_type;
+        using output_type = typename indexer_types<T0, TN...>::output_type;
+        using tuple_types = std::tuple<T0, TN...>;
+
     private:
-        typedef typename indexer_types<T0, TN...>::indexer_base_type base_type;
+        using base_type = typename indexer_types<T0, TN...>::indexer_base_type;
     public:
         unfolded_indexer_node(graph& g) : base_type(g) {}
         unfolded_indexer_node(const unfolded_indexer_node &other) : base_type(other) {}

@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -2495,9 +2496,9 @@ public:
     join_node(graph &g) : unfolded_type(g) {}
 #endif  /* __TBB_PREVIEW_MESSAGE_BASED_KEY_MATCHING */
 
-    template<typename... Bodies, typename = typename std::enable_if<sizeof...(Bodies) == N>>
-        __TBB_requires(join_node_functions<OutputTuple, K, Bodies...>)
-    __TBB_NOINLINE_SYM join_node(graph& g, Bodies... bodies) : unfolded_type(g, bodies...) {
+    template <typename Body, typename... Bodies, typename = typename std::enable_if<1 + sizeof...(Bodies) == N>>
+        __TBB_requires(join_node_functions<OutputTuple, K, Body, Bodies...>)
+    __TBB_NOINLINE_SYM join_node(graph& g, Body body, Bodies... bodies) : unfolded_type(g, body, bodies...) {
         fgt_multiinput_node<N>( CODEPTR(), FLOW_JOIN_NODE_TAG_MATCHING, &this->my_graph,
                                                            this->input_ports(), static_cast< sender< output_type > *>(this) );
     }
