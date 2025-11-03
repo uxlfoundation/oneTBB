@@ -728,12 +728,12 @@ struct resubmitting_task : public tbb::detail::d1::task {
     static constexpr int max_task_count = 100000;
     tbb::task_arena& my_arena;
     tbb::task_group_context& my_ctx;
-    struct task_pool_data {
-	std::vector<resubmitting_task> task_pool;
-	std::atomic<int> counter;
 
-	task_pool_data(const std::vector<resubmitting_task>& vec) : task_pool(vec), counter(0)
-	{}
+    struct task_pool_data {
+      std::vector<resubmitting_task> task_pool;
+      std::atomic<int> counter;
+
+      task_pool_data(const std::vector<resubmitting_task> &vec) : task_pool(vec), counter(0) {}
     };
 
     task_pool_data* my_tp_data { nullptr };
@@ -748,11 +748,11 @@ struct resubmitting_task : public tbb::detail::d1::task {
       REQUIRE(my_tp_data);
       int task_index = my_tp_data->counter++;
       if (task_index < max_task_count) {
-        auto &task = my_tp_data->task_pool[task_index];
-        task.my_tp_data = my_tp_data;
-        submit(task, my_arena, my_ctx, true);
+        auto& new_task = my_tp_data->task_pool[task_index];
+        new_task.my_tp_data = my_tp_data;
+        submit(new_task, my_arena, my_ctx, true);
       }
-        return nullptr;
+      return nullptr;
     }
 
     tbb::detail::d1::task* cancel( tbb::detail::d1::execution_data& ) override {
@@ -811,7 +811,7 @@ TEST_CASE("Test with priority inversion") {
             initial_submitters[index].my_tp_data = &tp_data;
             barrier.wait();
             submit(initial_submitters[index], test_arena, test_context, true);
-          });
+      });
     });
 
     std::vector<std::thread> high_priority_threads;
