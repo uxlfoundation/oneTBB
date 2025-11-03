@@ -927,7 +927,7 @@ void run_deep_stealing(tbb::task_group& tg1, tbb::task_group& tg2, int num_tasks
 }
 
 // ASan uses fake stack for stack-use-after-scope detection that makes stack overflow
-// avoidance mechanism incompatible because it is based on assumption that local varaibles are located
+// avoidance mechanism incompatible because it is based on assumption that local variables are located
 // on the real stack.
 #if !__TBB_USE_ADDRESS_SANITIZER
 // TODO: move to the conformance test
