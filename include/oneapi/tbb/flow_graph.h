@@ -982,8 +982,8 @@ class multifunction_node :
 protected:
     static const int N = std::tuple_size<Output>::value;
 public:
-    typedef Input input_type;
-    typedef null_type output_type;
+    using input_type = Input;
+    using output_type = null_type;
     typedef typename wrap_tuple_elements<multifunction_output, Output>::type output_ports_type;
     typedef multifunction_input<
         input_type, output_ports_type, Policy, internals_allocator> input_impl_type;
