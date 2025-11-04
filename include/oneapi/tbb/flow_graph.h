@@ -971,7 +971,7 @@ class multifunction_node :
         Input,
         typename wrap_tuple_elements<
             multifunction_output,  // wrap this around each element
-            Output // the tuple providing the types
+            OutputTuple // Tuple with output types
         >::type,
         Policy,
         cache_aligned_allocator<Input>
