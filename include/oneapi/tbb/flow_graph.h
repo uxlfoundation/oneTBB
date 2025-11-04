@@ -2487,7 +2487,7 @@ template<typename OutputTuple, typename K, typename KHash>
 class join_node<OutputTuple, key_matching<K, KHash>> : public unfolded_join_node<key_matching_port, OutputTuple, key_matching<K, KHash>> {
 private:
     static const int N = std::tuple_size<OutputTuple>::value;
-    typedef unfolded_join_node<key_matching_port, OutputTuple, key_matching<K,KHash> > unfolded_type;
+    using unfolded_type = unfolded_join_node<key_matching_port, OutputTuple, key_matching<K,KHash>>;
 public:
     typedef OutputTuple output_type;
     typedef typename unfolded_type::input_ports_type input_ports_type;
