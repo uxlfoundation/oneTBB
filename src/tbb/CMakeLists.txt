@@ -56,6 +56,7 @@ endif()
 
 if (EMSCRIPTEN)
     set(TBB_LIB_COMPILE_FLAGS ${TBB_LIB_COMPILE_FLAGS} -fexceptions)
+    set(TBB_LIB_LINK_FLAGS ${TBB_LIB_LINK_FLAGS} -fexceptions)
 endif()
 
 # TODO: Add statistics.cpp
