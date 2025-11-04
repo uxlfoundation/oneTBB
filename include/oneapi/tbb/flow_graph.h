@@ -2442,7 +2442,7 @@ template<typename OutputTuple>
 class join_node<OutputTuple, queueing>: public unfolded_join_node<queueing_port, OutputTuple, queueing> {
 private:
     static const int N = std::tuple_size<OutputTuple>::value;
-    typedef unfolded_join_node<queueing_port, OutputTuple, queueing> unfolded_type;
+    using unfolded_type = unfolded_join_node<queueing_port, OutputTuple, queueing>;
 public:
     typedef OutputTuple output_type;
     typedef typename unfolded_type::input_ports_type input_ports_type;
