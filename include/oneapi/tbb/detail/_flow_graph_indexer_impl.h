@@ -231,7 +231,7 @@
         using indexer_base_type = indexer_node_base<input_ports_type, output_type, std::tuple<T0, TN...>>;
     };
 
-    template<typename T0, typename... TN>
+    template<typename... T>
     class unfolded_indexer_node : public indexer_types<T0, TN...>::indexer_base_type {
     public:
         using input_ports_type = typename indexer_types<T0, TN...>::input_ports_type;
