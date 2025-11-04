@@ -1459,7 +1459,9 @@
     // join base class type generator
     template<template<class> class PortType, typename OutputTuple, typename JoinPolicy>
     struct join_base {
-        using type = join_node_base<JP, typename wrap_tuple_elements<PT, OutputTuple>::type, OutputTuple>;
+        using type = join_node_base<JoinPolicy,
+                                    typename wrap_tuple_elements<PortType, OutputTuple>::type,
+                                    OutputTuple>;
     };
 
     template<typename OutputTuple, typename K, typename KHash>
