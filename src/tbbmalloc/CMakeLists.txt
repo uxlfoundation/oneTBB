@@ -31,7 +31,7 @@ target_compile_definitions(tbbmalloc
     PUBLIC
     $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>
     PRIVATE
-    # Disable implicit assertions in libstdc++ headers to not bring dependency on libstdc++
+    # Disable implicit assertions in C++ headers to avoid dependency on libstdc++
     $<$<CONFIG:DEBUG>:_GLIBCXX_NO_ASSERTIONS>
     __TBBMALLOC_BUILD
     $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:__TBB_DYNAMIC_LOAD_ENABLED=0>
