@@ -6512,6 +6512,7 @@ namespace {
         if(wrapped_oss.get().tellp() != std::streampos{}) {                                        \
             DOCTEST_OUTPUT_DEBUG_STRING(wrapped_oss.get().str().c_str());                          \
             wrapped_oss.get().str("");                                                             \
+        }                                                                                          \
         g_no_colors = with_col;                                                                    \
     }
 
@@ -6529,7 +6530,6 @@ namespace {
     };
 
     DOCTEST_THREAD_LOCAL doctest_thread_local_wrapper<std::ostringstream> DebugOutputWindowReporter::wrapped_oss;
-
 #endif // DOCTEST_PLATFORM_WINDOWS
 
     // the implementation of parseOption()
