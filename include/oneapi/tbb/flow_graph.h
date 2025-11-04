@@ -985,9 +985,9 @@ public:
     using input_type = Input;
     using output_type = null_type;
     typedef typename wrap_tuple_elements<multifunction_output, Output>::type output_ports_type;
-    typedef multifunction_input<
-        input_type, output_ports_type, Policy, internals_allocator> input_impl_type;
-    typedef function_input_queue<input_type, internals_allocator> input_queue_type;
+    using input_impl_type =
+        multifunction_input<input_type, output_ports_type, Policy, internals_allocator>;
+    using input_queue_type = function_input_queue<input_type, internals_allocator>;
 private:
     using input_impl_type::my_predecessors;
 public:
