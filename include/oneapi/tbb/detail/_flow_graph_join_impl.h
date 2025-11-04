@@ -1523,10 +1523,9 @@
         using func_initializer_type = std::tuple<type_to_key_function_body<Types, K>*...>;
     public:
 #if __TBB_PREVIEW_MESSAGE_BASED_KEY_MATCHING
-        unfolded_join_node(graph &g)
-            : base_type(g,
-                        func_initializer_type(new type_to_key_function_body_leaf<Types, K,
-                                                                                 key_from_message_body<K, Types>>(key_from_message_body<K, Types>())...))
+        unfolded_join_node(graph &g) : base_type(g, func_initializer_type(
+            new type_to_key_function_body_leaf<Types, K, key_from_message_body<K, Types>>
+                (key_from_message_body<K, Types>())...))
         {}
 #endif
         template<typename... Bodies>
