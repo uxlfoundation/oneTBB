@@ -2412,7 +2412,7 @@ protected:
 template<typename OutputTuple, typename JP=queueing> class join_node;
 
 template<typename OutputTuple>
-class join_node<OutputTuple,reserving>: public unfolded_join_node<reserving_port, OutputTuple, reserving> {
+class join_node<OutputTuple, reserving>: public unfolded_join_node<reserving_port, OutputTuple, reserving> {
 private:
     static const int N = std::tuple_size<OutputTuple>::value;
     typedef unfolded_join_node<reserving_port, OutputTuple, reserving> unfolded_type;
