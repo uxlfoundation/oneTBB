@@ -1457,7 +1457,7 @@
     };  // join_node_base
 
     // join base class type generator
-    template<template<class> class PT, typename OutputTuple, typename JP>
+    template<template<class> class PortType, typename OutputTuple, typename JoinPolicy>
     struct join_base {
         using type = join_node_base<JP, typename wrap_tuple_elements<PT, OutputTuple>::type, OutputTuple>;
     };
