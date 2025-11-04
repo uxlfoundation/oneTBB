@@ -2484,7 +2484,7 @@ concept join_node_functions = requires {
 // template for key_matching join_node
 // tag_matching join_node is a specialization of key_matching, and is source-compatible.
 template<typename OutputTuple, typename K, typename KHash>
-class join_node<OutputTuple, key_matching<K, KHash> > : public unfolded_join_node<key_matching_port, OutputTuple, key_matching<K,KHash> > {
+class join_node<OutputTuple, key_matching<K, KHash>> : public unfolded_join_node<key_matching_port, OutputTuple, key_matching<K, KHash>> {
 private:
     static const int N = std::tuple_size<OutputTuple>::value;
     typedef unfolded_join_node<key_matching_port, OutputTuple, key_matching<K,KHash> > unfolded_type;
