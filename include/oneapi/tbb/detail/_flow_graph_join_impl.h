@@ -1529,9 +1529,8 @@
         {}
 #endif
         template<typename... Bodies>
-        unfolded_join_node(graph &g, Bodies... bodies)
-            : base_type(g,
-                        func_initializer_type(new type_to_key_function_body_leaf<Types, K, Bodies>(bodies)...))
+        unfolded_join_node(graph &g, Bodies... bodies) : base_type(g, func_initializer_type(
+            new type_to_key_function_body_leaf<Types, K, Bodies>(bodies)...))
         {}
         unfolded_join_node(const unfolded_join_node &other) : base_type(other) {}
     };
