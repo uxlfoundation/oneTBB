@@ -55,19 +55,9 @@ tcm_result_t client_renegotiate(tcm_permit_handle_t ph, void *arg,
   return r ? TCM_RESULT_SUCCESS : TCM_RESULT_ERROR_UNKNOWN;
 }
 
-bool test_alternating_clients() {
-  const char* test_name = __func__;
-  test_prolog(test_name);
-
-  tcm_client_id_t clidA, clidB;
-
-  tcm_result_t r = tcmConnect(client_renegotiate, &clidA);
-  if (!check_success(r, "tcmConnect A"))
-    return false;
-
-  r = tcmConnect(client_renegotiate, &clidB);
-  if (!check_success(r, "tcmConnect B"))
-    return false;
+TEST("test_alternating_clients") {
+  tcm_client_id_t clidA = connect_new_client(client_renegotiate);
+  tcm_client_id_t clidB = connect_new_client(client_renegotiate);
 
   tcm_permit_handle_t phA = nullptr, phB = nullptr;
   uint32_t pA_concurrency, pB_concurrency,
@@ -79,51 +69,39 @@ bool test_alternating_clients() {
   tcm_permit_t e = make_active_permit(&e_concurrency);
 
   tcm_permit_request_t req = make_request(0, platform_tcm_concurrency());
-  r = tcmRequestPermit(clidA, req, &phA, &phA, &pA);
-  if (!(check_success(r, "tcmRequestPermit A") && check_permit(e, pA)))
-    return test_fail(test_name);
+  tcm_result_t r = tcmRequestPermit(clidA, req, &phA, &phA, &pA);
+  check_success(r, "tcmRequestPermit A");
+  check_permit(e, pA);
 
   r = tcmRegisterThread(phA);
-  if (!(check_success(r, "tcmRegisterThread A") &&
-        check_permit(e, phA)))
-    return test_fail(test_name);
+  check_success(r, "tcmRegisterThread A");
+  check_permit(e, phA);
 
   r = tcmUnregisterThread();
-  if (!(check_success(r, "tcmUnregisterThread A") &&
-        check_permit(e, phA)))
-    return test_fail(test_name);
+  check_success(r, "tcmUnregisterThread A");
+  check_permit(e, phA);
 
   r = tcmReleasePermit(phA);
-  if (!check_success(r, "tcmReleasePermit A"))
-    return test_fail(test_name);
+  check_success(r, "tcmReleasePermit A");
 
   r = tcmRequestPermit(clidB, req, &phB, &phB, &pB);
-  if (!(check_success(r, "tcmRequestPermit B") && check_permit(e, pB)))
-    return test_fail(test_name);
+  check_success(r, "tcmRequestPermit B");
+  check_permit(e, pB);
 
   r = tcmRegisterThread(phB);
-  if (!(check_success(r, "tcmRegisterThread B") &&
-        check_permit(e, phB)))
-    return test_fail(test_name);
+  check_success(r, "tcmRegisterThread B");
+  check_permit(e, phB);
 
   r = tcmUnregisterThread();
-  if (!(check_success(r, "tcmUnregisterThread B") &&
-        check_permit(e, phB)))
-    return test_fail(test_name);
+  check_success(r, "tcmUnregisterThread B");
+  check_permit(e, phB);
 
   r = tcmReleasePermit(phB);
-  if (!check_success(r, "tcmReleasePermit B"))
-    return test_fail(test_name);
+  check_success(r, "tcmReleasePermit B");
 
-  r = tcmDisconnect(clidA);
-  if (!check_success(r, "tcmDisconnect A"))
-    return test_fail(test_name);
+  disconnect_client(clidA);
+  disconnect_client(clidB);
 
-  r = tcmDisconnect(clidB);
-  if (!check_success(r, "tcmDisconnect B"))
-    return test_fail(test_name);
-
-  return test_epilog(test_name);
 }
 
 #endif // __TCM_TESTS_COMMON_TESTS_HEADER

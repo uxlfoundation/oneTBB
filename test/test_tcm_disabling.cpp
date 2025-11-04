@@ -16,65 +16,45 @@
 
 #include <limits>
 
-const char* tcm_enable_env_name = "TCM_ENABLE";
+static const bool is_tcm_enabled = []() {
+  const char* tcm_enable_env_name = "TCM_ENABLE";
 
-bool is_tcm_enabled() {
-  if (char* tcm_enable_env = std::getenv(tcm_enable_env_name)) {
-    int tcm_enable_env_value = std::atoi(tcm_enable_env);
-    if (tcm_enable_env_value != 0) {
-      return true;
-    }
-  }
-  return false;
-}
+  const char* tcm_enable_env = std::getenv(tcm_enable_env_name);
+  if (!tcm_enable_env)
+      return false;
 
-bool test_tcm_connection(const bool is_success_expected) {
-  const char* test_name = __func__;
-  test_prolog(test_name);
+  const int tcm_enable_env_value = std::atoi(tcm_enable_env);
+  if (tcm_enable_env_value == 0)
+      return false;
 
+  return true;
+}();
+
+TEST("test_tcm_connection") {
   tcm_client_id_t clid = std::numeric_limits<tcm_client_id_t>::max();
   tcm_client_id_t clid_bak = clid;
 
   bool is_connection_successful = succeeded(tcmConnect(nullptr, &clid));
 
-  bool res = true;
-  if (is_success_expected) {
-    res &= check(is_connection_successful, "tcmConnect accepts connection");
-    res &= check(clid_bak != clid, "tcmConnect assigns client id");
+  if (is_tcm_enabled) {
+    check(is_connection_successful, "tcmConnect accepts connection");
+    check(clid_bak != clid, "tcmConnect assigns client id");
+    check_success(tcmDisconnect(clid), "tcmDisconnect returns successfully");
   } else {
-    res &= check(!is_connection_successful, "tcmConnect refuses connection");
-    res &= check(clid_bak == clid, "tcmConnect does not change client id");
+    check(!is_connection_successful, "tcmConnect refuses connection");
+    check(clid_bak == clid, "tcmConnect does not change client id");
   }
-
-  return test_stop(res, test_name);
 }
 
-bool test_tcm_suggesting(const bool is_success_expected) {
-  const char* test_name = __func__;
-  test_prolog(test_name);
-
-  if (is_success_expected) {
+TEST("test_tcm_suggesting") {
+  if (is_tcm_enabled) {
     test_log("Test is skipped because TCM is ENABLED");
-    return test_epilog(test_name);
+    return;
   }
-  bool res = true;
   bool connection_failed = true;
   tcm_client_id_t clid1;
   tcm_client_id_t clid2;
   connection_failed &= !succeeded(tcmConnect(nullptr, &clid1));
   connection_failed &= !succeeded(tcmConnect(nullptr, &clid2));
-  res &= check(connection_failed, "tcmConnect is supposed to fail when it wasn't enabled");
-
-  return test_stop(res, test_name);
-}
-
-int main() {
-  bool res = true;
-
-  const bool is_successful_connection_expected = is_tcm_enabled();
-
-  res &= test_tcm_connection(is_successful_connection_expected);
-  res &= test_tcm_suggesting(is_successful_connection_expected);
-
-  return int(!res);
+  check(connection_failed, "tcmConnect is supposed to fail when it wasn't enabled");
 }

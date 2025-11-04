@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2024 Intel Corporation
+    Copyright (C) 2023-2025 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -18,7 +18,7 @@
 #include "tcm.h"
 
 #include <hwloc/bitmap.h>
-#include <iostream>
+
 #include <memory>
 #include <string>
 
@@ -100,14 +100,8 @@ public:
   int32_t id() { return numa_id; }
 };
 
-bool test_allow_mask_omitting_during_permit_copy(/*tcm_test::system_topology& tp*/) {
-    const char* test_name = __func__;
-    test_prolog(test_name);
-
-    tcm_client_id_t client_id;
-    auto r = tcmConnect(nullptr, &client_id);
-    if (!check_success(r, "tcmConnect succeeded"))
-        return test_fail(test_name);
+TEST("test_allow_mask_omitting_during_permit_copy") {
+    tcm_client_id_t client_id = connect_new_client();
 
     tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
     std::unique_ptr<tcm_cpu_mask_t, mask_deleter> req_mask_guard(&constraints.mask);
@@ -122,44 +116,36 @@ bool test_allow_mask_omitting_during_permit_copy(/*tcm_test::system_topology& tp
     // since constraint's max_concurrency will be inferred to the mask concurrency during the request
     uint32_t e_concurrency = tcm_concurrency(constraints.mask);
     tcm_permit_t eP = make_active_permit(&e_concurrency);
-    r = tcmRequestPermit(client_id, req, /*callback_arg*/nullptr, &ph, &p);
-    if (!(check_success(r, "tcmRequestPermit succeeded") && check_permit(eP, p) &&
-          check(!p.cpu_masks, "The mask has not been allocated by TCM in tcmRequestPermit")))
-        return test_fail(test_name);
+    tcm_result_t r = tcmRequestPermit(client_id, req, /*callback_arg*/nullptr, &ph, &p);
+    check_success(r, "tcmRequestPermit succeeded");
+    check_permit(eP, p);
+    check(!p.cpu_masks, "The mask has not been allocated by TCM in tcmRequestPermit");
 
     r = tcmGetPermitData(ph, &p);
-    if (!(check_success(r, "tcmGetPermitData for " + to_string(ph)) && check_permit(eP, p) &&
-          check(!p.cpu_masks, "The mask has not been allocated by TCM in tcmGetPermitData")))
-        return test_fail(test_name);
+    check_success(r, "tcmGetPermitData for " + to_string(ph));
+    check_permit(eP, p);
+    check(!p.cpu_masks, "The mask has not been allocated by TCM in tcmGetPermitData");
 
     tcm_cpu_mask_t mask = allocate_cpu_mask();
     std::unique_ptr<tcm_cpu_mask_t, mask_deleter> permit_mask_guard(&mask);
     p.cpu_masks = &mask;
-    if (!check(!is_equal(mask, req.cpu_constraints->mask),
-               "Just created and requested mask differs"))
-        return test_fail(test_name);
+    check(!is_equal(mask, req.cpu_constraints->mask), "Just created and requested mask differs");
 
     r = tcmGetPermitData(ph, &p);
     eP.cpu_masks = &req.cpu_constraints->mask; // Expecting the requested mask
-    if (!(check_success(r, "tcmGetPermitData for " + to_string(ph)) && check_permit(eP, p)))
-        return test_fail(test_name);
+    check_success(r, "tcmGetPermitData for " + to_string(ph));
+    check_permit(eP, p);
 
     r = tcmReleasePermit(ph);
-    if (!check_success(r, "tcmReleasePermit succeeded"))
-        return test_fail(test_name);
+    check_success(r, "tcmReleasePermit succeeded");
 
-    r = tcmDisconnect(client_id);
-    if (!check_success(r, "tcmDisconnect succeeded"))
-        return test_fail(test_name);
-
-    return test_epilog(test_name);
+    disconnect_client(client_id);
 }
 
 // ============================================================================
 // Single request
 
 struct one_request_config {
-  std::string test_name;                // test name for logging
   uint32_t* exp_concurrency;             // expected concurrency for client
   int32_t min_concurrency;              // requested min_concurrency for client
   int32_t max_concurrency;              // requested max_concurrency for client
@@ -172,13 +158,8 @@ struct one_request_config {
 struct test_one_request {
   one_request_config config{};
 
-  bool operator()() {
-    test_prolog(config.test_name);
-    tcm_client_id_t clid;
-
-    tcm_result_t r = tcmConnect(nullptr, &clid);
-    if (!check_success(r, "tcmConnect"))
-      return test_fail(config.test_name);
+  void operator()() {
+    tcm_client_id_t clid = connect_new_client();
 
     auto p_mask = config.per_mask;
     auto e_mask = config.exp_mask;
@@ -195,25 +176,20 @@ struct test_one_request {
     req.constraints_size = config.constraints_size;
     req.cpu_constraints = config.constraints;
 
-    r = tcmRequestPermit(clid, req, nullptr, &ph, &p);
-    if (!(check_success(r, "tcmRequestPermit") && check_permit(e, p)))
-      return test_fail(config.test_name);
+    tcm_result_t r = tcmRequestPermit(clid, req, nullptr, &ph, &p);
+    check_success(r, "tcmRequestPermit");
+    check_permit(e, p);
 
     r = tcmReleasePermit(ph);
-    if (!check_success(r, "tcmReleasePermit"))
-      return test_fail(config.test_name);
+    check_success(r, "tcmReleasePermit");
 
-    r = tcmDisconnect(clid);
-    if (!check_success(r, "tcmDisconnect"))
-      return test_fail(config.test_name);
-
-    return test_epilog(config.test_name);
+    disconnect_client(clid);
   }
 };
 
 template <typename MaskGenerator>
 struct test_one_request_low_level_constraints {
-  bool operator()(const std::string& test_name) {
+  void operator()() {
     MaskGenerator mask{};
     auto p_mask = allocate_cpu_mask();
     auto e_mask = mask();
@@ -229,7 +205,6 @@ struct test_one_request_low_level_constraints {
     cpu_constraints.mask = *requested_mask.get();
 
     one_request_config test_config{};
-    test_config.test_name = test_name;
     test_config.exp_concurrency = &concurrency;
     test_config.min_concurrency = 0;
     test_config.max_concurrency = concurrency;
@@ -238,26 +213,23 @@ struct test_one_request_low_level_constraints {
     test_config.exp_mask = expected_mask.get();
     test_config.constraints = &cpu_constraints;
 
-    return test_one_request{test_config}();
+    test_one_request{test_config}();
   }
 };
 
-bool test_one_request_process_mask() {
-  std::string test_name = __func__;
-  return test_one_request_low_level_constraints<process_mask>{}(test_name);
+TEST("Constrained request with process mask as low level constraint") {
+  test_one_request_low_level_constraints<process_mask>{}();
 }
 
-bool test_one_request_first_core_mask() {
-  std::string test_name = __func__;
-  return test_one_request_low_level_constraints<first_core_mask>{}(test_name);
+TEST("Constrained request with first core mask as low level constraint") {
+  test_one_request_low_level_constraints<first_core_mask>{}();
 }
 
-bool test_one_request_first_parsed_numa_mask() {
-  std::string test_name = __func__;
-  return test_one_request_low_level_constraints<first_parsed_numa_mask>{}(test_name);
+TEST("Constrained request with first numa node as low level constraint") {
+  test_one_request_low_level_constraints<first_parsed_numa_mask>{}();
 }
 
-bool test_one_request_first_parsed_numa_id() {
+TEST("Constrained request with first numa node as high level constraint") {
   first_parsed_numa_mask mask{};
   auto p_mask = allocate_cpu_mask();
   auto e_mask = mask();
@@ -272,7 +244,6 @@ bool test_one_request_first_parsed_numa_id() {
   cpu_constraints.numa_id = mask.id();
 
   one_request_config test_config{};
-  test_config.test_name = __func__;
   test_config.exp_concurrency = &concurrency;
   test_config.min_concurrency = 0;
   test_config.max_concurrency = concurrency;
@@ -281,10 +252,11 @@ bool test_one_request_first_parsed_numa_id() {
   test_config.exp_mask = expected_mask.get();
   test_config.constraints = &cpu_constraints;
 
-  return test_one_request{test_config}();
+  test_one_request{test_config}();
 }
 
-bool test_one_request_two_constraints_process_mask_no_oversubscription() {
+TEST("Constrained request with two process masks as low level constraints without oversubscription")
+{
   process_mask mask{};
   const uint32_t size = 2;
 
@@ -306,7 +278,6 @@ bool test_one_request_two_constraints_process_mask_no_oversubscription() {
   }
 
   one_request_config test_config{};
-  test_config.test_name = __func__;
   test_config.exp_concurrency = e_concurrency;
   test_config.min_concurrency = min_concurrency;
   test_config.max_concurrency = total_concurrency;
@@ -315,22 +286,19 @@ bool test_one_request_two_constraints_process_mask_no_oversubscription() {
   test_config.exp_mask = expected_mask;
   test_config.constraints = cpu_constraints;
 
-  bool result = test_one_request{test_config}();
+  test_one_request{test_config}();
 
   for (uint32_t i = 0; i < size; ++i) {
     free_cpu_mask(permit_mask[i]);
     free_cpu_mask(expected_mask[i]);
     free_cpu_mask(cpu_constraints[i].mask);
   }
-
-  return result;
 }
 
 // ============================================================================
 // Two requests
 
 struct two_requests_config {
-  std::string test_name;            // test name for logging
   tcm_callback_t callback;         // clients callback
   uint32_t exp_concurrencyA;        // expected concurrency for client A
   uint32_t exp_concurrencyB;        // expected concurrency for client B
@@ -349,19 +317,9 @@ struct test_two_requests {
   MaskGeneratorA mask_generatorA{};
   MaskGeneratorB mask_generatorB{};
 
-  bool operator()() {
-    test_prolog(config.test_name);
-
-    tcm_client_id_t clidA;
-    tcm_client_id_t clidB;
-
-    tcm_result_t r = tcmConnect(config.callback, &clidA);
-    if (!check_success(r, "tcmConnect for client A"))
-      return test_fail(config.test_name);
-
-    r = tcmConnect(config.callback, &clidB);
-    if (!check_success(r, "tcmConnect for client B"))
-      return test_fail(config.test_name);
+  void operator()() {
+    tcm_client_id_t clidA = connect_new_client(config.callback);
+    tcm_client_id_t clidB = connect_new_client(config.callback);
 
     auto rA_mask = mask_generatorA();
     auto rB_mask = mask_generatorB();
@@ -404,13 +362,13 @@ struct test_two_requests {
     cpu_maskB.mask = *requested_maskB.get();
     tcm_permit_request_t reqB = make_request(config.min_concurrencyB, config.max_concurrencyB, &cpu_maskB, 1);
 
-    r = tcmRequestPermit(clidA, reqA, &phA, &phA, &pA);
-    if (!(check_success(r, "tcmRequestPermit for client A") && check_permit(eA, pA)))
-      return test_fail(config.test_name);
+    tcm_result_t r = tcmRequestPermit(clidA, reqA, &phA, &phA, &pA);
+    check_success(r, "tcmRequestPermit for client A");
+    check_permit(eA, pA);
 
     r = tcmRequestPermit(clidB, reqB, &phB, &phB, &pB);
-    if (!(check_success(r, "tcmRequestPermit for client B") && check_permit(eB, pB)))
-      return test_fail(config.test_name);
+    check_success(r, "tcmRequestPermit for client B");
+    check_permit(eB, pB);
 
     renegotiating_permits = {phB};
     r = tcmReleasePermit(phA);
@@ -418,32 +376,23 @@ struct test_two_requests {
     eB.state = config.new_stateB;
     auto unchanged_permits = list_unchanged_permits({{phB, &pB}});
 
-    if (!(check_success(r, "tcmReleasePermit for client A") && check_permit(eB, phB) &&
-          check(renegotiating_permits == unchanged_permits,
-                "Incorrect renegotiation during permit A release")))
-      return test_fail(config.test_name);
+    check_success(r, "tcmReleasePermit for client A");
+    check_permit(eB, phB);
+    check(renegotiating_permits == unchanged_permits,
+          "Incorrect renegotiation during permit A release");
 
     r = tcmReleasePermit(phB);
-    if (!check_success(r, "tcmReleasePermit for client B"))
-      return test_fail(config.test_name);
+    check_success(r, "tcmReleasePermit for client B");
 
-    r = tcmDisconnect(clidA);
-    if (!check_success(r, "tcmDisconnect for client A"))
-      return test_fail(config.test_name);
-
-    r = tcmDisconnect(clidB);
-    if (!check_success(r, "tcmDisconnect for client B"))
-      return test_fail(config.test_name);
-
-    return test_epilog(config.test_name);
+    disconnect_client(clidA);
+    disconnect_client(clidB);
   }
 };
 
-bool test_two_requests_process_mask_no_oversubscription() {
+TEST("Two constrained requests with process mask as low level constraints without oversubscription") {
   uint32_t concurrencyA = platform_tcm_concurrency() / 2;
   uint32_t concurrencyB = platform_tcm_concurrency() - platform_tcm_concurrency() / 2;
   two_requests_config test_config{};
-  test_config.test_name = __func__;
   test_config.callback = client_renegotiate;
   test_config.exp_concurrencyA = concurrencyA;
   test_config.exp_concurrencyB = concurrencyB;
@@ -455,14 +404,13 @@ bool test_two_requests_process_mask_no_oversubscription() {
   test_config.cur_stateB = TCM_PERMIT_STATE_ACTIVE;
   test_config.new_stateB = TCM_PERMIT_STATE_ACTIVE;
 
-  return test_two_requests<process_mask, process_mask>{test_config}();
+  test_two_requests<process_mask, process_mask>{test_config}();
 }
 
-bool test_two_requests_oversubscribe_first_core() {
+TEST("Two constrained requests oversubscribing first core") {
   uint32_t concurrencyA = uint32_t(tcm_oversubscription_factor * first_core_mask{}.size());
   uint32_t concurrencyB = concurrencyA;
   two_requests_config test_config{};
-  test_config.test_name = __func__;
   test_config.callback = client_renegotiate;
   test_config.exp_concurrencyA = concurrencyA;
   test_config.exp_concurrencyB = 0;
@@ -474,16 +422,15 @@ bool test_two_requests_oversubscribe_first_core() {
   test_config.cur_stateB = TCM_PERMIT_STATE_PENDING;
   test_config.new_stateB = TCM_PERMIT_STATE_ACTIVE;
 
-  return test_two_requests<first_core_mask, first_core_mask>{test_config}();
+  test_two_requests<first_core_mask, first_core_mask>{test_config}();
 }
 
 // ============================================================================
 // Multiple requests
 
-bool test_request_all_numas_one_by_one() {
-  std::string test_name = __func__;
-  test_prolog(test_name);
-
+TEST("Request any NUMA node until all nodes are distributed + one more, correct negotiation when "
+     "one is released")
+{
   const skip_checks_t skip_concurrency_and_mask_checks{
       /*size*/false, /*concurrency*/true, /*state*/false, /*flags*/false, /*mask*/true
   };
@@ -499,9 +446,7 @@ bool test_request_all_numas_one_by_one() {
   tcm_result_t r = TCM_RESULT_ERROR_UNKNOWN;
   std::vector<tcm_client_id_t> client_ids(numa_count + 1);
   for (int i = 0; i < numa_count + 1; ++i) {
-    r = tcmConnect(/*client callback*/nullptr, &client_ids[i]);
-    if (!check_success(r, "tcmConnect for client " + std::to_string(i)))
-      return test_fail(test_name);
+    client_ids[i] = connect_new_client(/*client callback*/nullptr);
   }
 
   // make permit requests
@@ -538,23 +483,17 @@ bool test_request_all_numas_one_by_one() {
 
     // TODO: check concurrency exactly and the masks
     int mask_weight = hardware_concurrency(permits[i].cpu_masks[0]);
-    if (!(check_success(r, "tcmRequestPermit for client " + std::to_string(i)) &&
-          check_permit(expected_permit, permits[i], skip_concurrency_and_mask_checks) &&
-          check(permits[i].concurrencies[0] > 0, "Concurrency was given", /*num_indents*/1) &&
-          check(mask_weight > 0, "Some mask was given", /*num_indents*/1) &&
-          check((numa_count == 1 && platform_hardware_concurrency() == mask_weight) ||
-                mask_weight < platform_hardware_concurrency(), "Given mask is reasonable",
-                /*num_indents*/1)))
-    {
-        return test_fail(test_name);
-    }
+    check_success(r, "tcmRequestPermit for client " + std::to_string(i));
+    check_permit(expected_permit, permits[i], skip_concurrency_and_mask_checks);
+    check(permits[i].concurrencies[0] > 0, "Concurrency was given", /*num_indents*/1);
+    check(mask_weight > 0, "Some mask was given", /*num_indents*/1);
+    check((numa_count == 1 && platform_hardware_concurrency() == mask_weight) ||
+          mask_weight < platform_hardware_concurrency(), "Given mask is reasonable", /*num_indents*/1);
     total_resources_given += permits[i].concurrencies[0];
   }
 
-  if (!check(total_resources_given == uint32_t(platform_hardware_concurrency()),
-             "All resources from the platform have been distributed")) {
-      return test_fail(test_name);
-  }
+  check(total_resources_given == uint32_t(platform_hardware_concurrency()),
+        "All resources from the platform have been distributed");
 
 
   // one additional permit request: one more than the number of NUMA-nodes
@@ -566,9 +505,7 @@ bool test_request_all_numas_one_by_one() {
       client_ids[numa_count], requests[numa_count], /*callback_arg*/nullptr,
       &permit_handles[numa_count], &permits[numa_count]
     );
-    if (!check_success(r, "tcmRequestPermit for one more NUMA node, client " +
-                       std::to_string(numa_count)))
-      return test_fail(test_name);
+    check_success(r, "tcmRequestPermit for one more NUMA node, client " + std::to_string(numa_count));
 
     tcm_cpu_mask_t mask = permits[numa_count].cpu_masks[0];
     mask_concurrency = uint32_t(hardware_concurrency(mask));
@@ -579,12 +516,9 @@ bool test_request_all_numas_one_by_one() {
         std::max(std::min(mask_concurrency, delta), uint32_t(requests[numa_count].min_sw_threads));
     tcm_permit_t expected_permit = make_active_permit(&expected_concurrency);
     skip_checks_t skip_mask_check; skip_mask_check.mask = true;
-    if (!(check_permit(expected_permit, permits[numa_count], skip_mask_check) &&
-          check(hardware_concurrency(permits[numa_count].cpu_masks[0]) > 0, "Mask was given",
-                /*num_indents*/1)))
-    {
-        return test_fail(test_name);
-    }
+    check_permit(expected_permit, permits[numa_count], skip_mask_check);
+    check(hardware_concurrency(permits[numa_count].cpu_masks[0]) > 0, "Mask was given",
+          /*num_indents*/1);
   }
 
   // Find a rival with the last permit
@@ -596,15 +530,10 @@ bool test_request_all_numas_one_by_one() {
           rival_idx = i;
       }
   }
-  if (!check(1 == num_intersects, "Only one permit intersects with the last one")) {
-      return test_fail(test_name);
-  }
+  check(1 == num_intersects, "Only one permit intersects with the last one");
 
-  if (!check(permits[rival_idx].concurrencies[0] == mask_concurrency,
-             "Rival permit occupies whole concurrency of the given mask"))
-  {
-      return test_fail(test_name);
-  }
+  check(permits[rival_idx].concurrencies[0] == mask_concurrency,
+        "Rival permit occupies whole concurrency of the given mask");
 
   const uint32_t rival_previous_concurrency = permits[rival_idx].concurrencies[0];
   tcm_cpu_mask_t mask = allocate_cpu_mask();
@@ -613,46 +542,32 @@ bool test_request_all_numas_one_by_one() {
   r = tcmGetPermitData(permit_handles[rival_idx], &permits[rival_idx]);
   const uint32_t used_concurrency =
       permits[rival_idx].concurrencies[0] + permits[numa_count].concurrencies[0];
-  if (!(check_success(r, "tcmGetPermitData for ph=" + to_string(permit_handles[rival_idx])) &&
-        check(is_equal(mask, permits[rival_idx].cpu_masks[0]),
-              "Masks compare equally", /*num_indents*/1) &&
-        check(rival_previous_concurrency <= used_concurrency &&
-              used_concurrency <= mask_oversubscribed_concurrency,
-              "The resources of the NUMA node is shared between intersecting permits",
-              /*num_indents*/1)))
-  {
-      return test_fail(test_name);
-  }
+  check_success(r, "tcmGetPermitData for ph=" + to_string(permit_handles[rival_idx]));
+  check(is_equal(mask, permits[rival_idx].cpu_masks[0]), "Masks compare equally", /*num_indents*/1);
+  check(rival_previous_concurrency <= used_concurrency &&
+        used_concurrency <= mask_oversubscribed_concurrency,
+        "The resources of the NUMA node is shared between intersecting permits", /*num_indents*/1);
 
   uint32_t expected_concurrency = rival_previous_concurrency;
   tcm_permit_t expected_permit = make_active_permit(&expected_concurrency, &mask);
   r = tcmReleasePermit(permit_handles[rival_idx]);
-  if (!(check_success(r, "tcmReleasePermit for client " + std::to_string(rival_idx)) &&
-        check_permit(expected_permit, permit_handles[numa_count])))
-  {
-      return test_fail(test_name);
-  }
+  check_success(r, "tcmReleasePermit for client " + std::to_string(rival_idx));
+  check_permit(expected_permit, permit_handles[numa_count]);
 
   // release all permits and disconnect the clients
   for (int i = 0; i < numa_count + 1; ++i) {
     if (rival_idx != i) {
       r = tcmReleasePermit(permit_handles[i]);
-      if (!check_success(r, "tcmReleasePermit for client " + std::to_string(i)))
-          return test_fail(test_name);
+      check_success(r, "tcmReleasePermit for client " + std::to_string(i));
     }
-
-    r = tcmDisconnect(client_ids[i]);
-    if (!check_success(r, "tcmDisconnect for client " + std::to_string(i)))
-      return test_fail(test_name);
+    disconnect_client(client_ids[i]);
   }
 
-  return test_epilog(test_name);
 }
 
-bool test_request_all_numas_rigid_one_by_one() {
-  std::string test_name = __func__;
-  test_prolog(test_name);
-
+TEST("Non-negotiable requests for any NUMA node until all nodes are distributed + one more, "
+     "correct activation of pending when one is released")
+{
   const skip_checks_t skip_concurrency_and_mask_checks{
       /*size*/false, /*concurrency*/true, /*state*/false, /*flags*/false, /*mask*/true
   };
@@ -668,9 +583,7 @@ bool test_request_all_numas_rigid_one_by_one() {
   tcm_result_t r = TCM_RESULT_ERROR_UNKNOWN;
   std::vector<tcm_client_id_t> client_ids(numa_count + 1);
   for (int i = 0; i < numa_count + 1; ++i) {
-    r = tcmConnect(/*client callback*/nullptr, &client_ids[i]);
-    if (!check_success(r, "tcmConnect for client " + std::to_string(i)))
-      return test_fail(test_name);
+    client_ids[i] = connect_new_client(/*client callback*/nullptr);
   }
 
   // make permit requests
@@ -707,23 +620,19 @@ bool test_request_all_numas_rigid_one_by_one() {
 
     // TODO: check concurrency exactly and the masks
     int mask_weight = hardware_concurrency(permits[i].cpu_masks[0]);
-    if (!(check_success(r, "tcmRequestPermit for client " + std::to_string(i)) &&
-          check_permit(expected_permit, permits[i], skip_concurrency_and_mask_checks) &&
-          check(permits[i].concurrencies[0] > 0, "Concurrency was given", /*num_indents*/1) &&
-          check(mask_weight > 0, "Some mask was given", /*num_indents*/1) &&
-          check((numa_count == 1 && platform_hardware_concurrency() == mask_weight) ||
-                mask_weight < platform_hardware_concurrency(), "Given mask is reasonable",
-                /*num_indents*/1)))
-    {
-        return test_fail(test_name);
-    }
+    check_success(r, "tcmRequestPermit for client " + std::to_string(i));
+    check_permit(expected_permit, permits[i], skip_concurrency_and_mask_checks);
+    check(permits[i].concurrencies[0] > 0, "Concurrency was given", /*num_indents*/1);
+    check(mask_weight > 0, "Some mask was given", /*num_indents*/1);
+    check((numa_count == 1 && platform_hardware_concurrency() == mask_weight) ||
+          mask_weight < platform_hardware_concurrency(), "Given mask is reasonable",
+          /*num_indents*/1);
+
     total_resources_given += permits[i].concurrencies[0];
   }
 
-  if (!check(total_resources_given == uint32_t(platform_hardware_concurrency()),
-             "All resources from the platform have been distributed")) {
-      return test_fail(test_name);
-  }
+  check(total_resources_given == uint32_t(platform_tcm_concurrency()),
+        "All resources from the platform have been distributed");
 
   // one additional permit request: one more than the number of NUMA-nodes
   uint32_t mask_concurrency = 0, mask_oversubscribed_concurrency = 0;
@@ -734,11 +643,7 @@ bool test_request_all_numas_rigid_one_by_one() {
       client_ids[numa_count], requests[numa_count], /*callback_arg*/nullptr,
       &permit_handles[numa_count], &permits[numa_count]
   );
-  if (!check_success(r, "tcmRequestPermit for one more NUMA node, client " +
-                     std::to_string(numa_count)))
-  {
-      return test_fail(test_name);
-  }
+  check_success(r, "tcmRequestPermit for one more NUMA node, client " + std::to_string(numa_count));
 
   {
       tcm_cpu_mask_t mask = permits[numa_count].cpu_masks[0];
@@ -756,14 +661,10 @@ bool test_request_all_numas_rigid_one_by_one() {
   if (is_required_fits_expected) {
       expected_permit.state = TCM_PERMIT_STATE_ACTIVE;
       copy(mask, permits[numa_count].cpu_masks[0]);
-      if (!check(hardware_concurrency(mask) > 0, "Some mask was given")) {
-          return test_fail(test_name);
-      }
+      check(hardware_concurrency(mask) > 0, "Some mask was given");
   }
   expected_permit.flags.rigid_concurrency = true;
-  if (!check_permit(expected_permit, permits[numa_count])) {
-      return test_fail(test_name);
-  }
+  check_permit(expected_permit, permits[numa_count]);
 
   // Release one and expect the pending permit activates
   r = tcmReleasePermit(permit_handles[0]);
@@ -775,48 +676,15 @@ bool test_request_all_numas_rigid_one_by_one() {
       // The pending rigid concurrency permit should now take the resources released
       result = check_permit(permits[0], permit_handles[numa_count]);
   }
-  if (!(check_success(r, "tcmReleasePermit for client 0") && result))
-  {
-      return test_fail(test_name);
-  }
+  check_success(r, "tcmReleasePermit for client 0");
+  check(result, "Resources were correctly distributed");
 
   // release all permits and disconnect the clients
   for (int i = 0; i < numa_count + 1; ++i) {
     if (0 != i) {
       r = tcmReleasePermit(permit_handles[i]);
-      if (!check_success(r, "tcmReleasePermit for client " + std::to_string(i)))
-          return test_fail(test_name);
+      check_success(r, "tcmReleasePermit for client " + std::to_string(i));
     }
-
-    r = tcmDisconnect(client_ids[i]);
-    if (!check_success(r, "tcmDisconnect for client " + std::to_string(i)))
-      return test_fail(test_name);
+    disconnect_client(client_ids[i]);
   }
-
-  return test_epilog(test_name);
-}
-
-int main() {
-  bool res = true;
-
-  // TODO: Consider making a topology instance global variable
-  tcm_test::system_topology::construct();
-
-  res &= test_allow_mask_omitting_during_permit_copy();
-
-  res &= test_one_request_process_mask();
-  res &= test_one_request_first_core_mask();
-  res &= test_one_request_first_parsed_numa_mask();
-  res &= test_one_request_first_parsed_numa_id();
-  res &= test_one_request_two_constraints_process_mask_no_oversubscription();
-  res &= test_two_requests_process_mask_no_oversubscription();
-  res &= test_two_requests_oversubscribe_first_core();
-  res &= test_request_all_numas_one_by_one();
-  res &= test_request_all_numas_rigid_one_by_one();
-
-  // TODO: Add tests utilizing interfaces: 1) Core type 2) Threads per core
-
-  tcm_test::system_topology::destroy();
-
-  return int(!res);
 }

@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2024 Intel Corporation
+    Copyright (C) 2023-2025 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -304,11 +304,10 @@ inline bool check_permit(const tcm_permit_t& expected, tcm_permit_handle_t ph,
                          const skip_checks_t skip = {}, const unsigned num_indents = 1,
                          const bool report = true)
 {
-    std::string msg;
-    if (report)
-      msg = "check permit_handle=" + to_string(ph) + " is not nullptr";
-    if (!check(ph, msg, num_indents))
-      return false;
+  std::string msg;
+  if (report)
+    msg = "check permit_handle=" + to_string(ph) + " is not nullptr";
+  check(ph, msg, num_indents);
 
   __TCM_ASSERT(expected.size > 0, "Permit size cannot be zero.");
   std::vector<uint32_t> concurrencies(expected.size, 0);
@@ -322,10 +321,8 @@ inline bool check_permit(const tcm_permit_t& expected, tcm_permit_handle_t ph,
 
   tcm_permit_t actual = make_void_permit(concurrencies.data(), cpu_masks.get(), expected.size);
   tcm_result_t reading_result = tcmGetPermitData(ph, &actual);
-  if (!check_success(reading_result)) {
-      return check(false, "Reading data from ph=" + to_string(ph), num_indents,
-                   "tcmGetPermitData() returns status " + std::to_string(reading_result));
-  }
+  check(reading_result == TCM_RESULT_SUCCESS, "Reading data from ph=" + to_string(ph), num_indents,
+        "tcmGetPermitData() returns status " + std::to_string(reading_result));
 
   bool result = check_permit(expected, actual, skip, num_indents, report);
   return result;
@@ -401,6 +398,8 @@ inline tcm_client_id_t connect_new_client(tcm_callback_t callback = nullptr,
   if (!check_success(r, log_message))
     throw tcm_connect_error(error_message.c_str());
 
+  tcm_tests.add_client(client_id);
+
   return client_id;
 }
 
@@ -411,6 +410,8 @@ inline void disconnect_client(const tcm_client_id_t& client_id,
   tcm_result_t r = tcmDisconnect(client_id);
   if (!check_success(r, log_message))
     throw tcm_disconnect_error(error_message.c_str());
+
+  tcm_tests.remove_client(client_id);
 }
 
 inline tcm_permit_handle_t

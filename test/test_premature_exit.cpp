@@ -16,14 +16,13 @@
 
 #include "tcm.h"
 
+#define TCM_TEST_OWN_MAIN
 #include "basic_test_utils.h"
 
 #include <thread>
 #include <atomic>
 #include <cstdlib>              // for std::exit
 #include <string>
-
-#include <iostream>             // for std::cerr
 
 #if __linux__
 #include <dlfcn.h>              // for dlopen, dlsym

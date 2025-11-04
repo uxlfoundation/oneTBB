@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2024 Intel Corporation
+    Copyright (C) 2024-2025 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -23,7 +23,6 @@
 #include <deque>
 #include <future>
 #include <thread>
-#include <memory>
 #include <functional>
 
 // TODO: Add support for CPU constraints
@@ -166,7 +165,7 @@ private:
 
     bool receive_task(task_t& task) {
         std::unique_lock<std::mutex> lock{task_deque_mutex};
-        task_deque_cv.wait_for(lock, std::chrono::milliseconds{200} , [this]
+        task_deque_cv.wait_for(lock, std::chrono::milliseconds{200}, [this]
                     { return !tasks.empty() || is_execution_canceled; });
         if (is_execution_canceled || tasks.empty()) {
             return false;
