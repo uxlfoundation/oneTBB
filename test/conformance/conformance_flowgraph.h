@@ -1,6 +1,5 @@
 /*
     Copyright (c) 2020-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -812,25 +811,4 @@ void test_with_reserving_join_node_class() {
         if at least one successor accepts the tuple must consume messages");
 }
 }
-
-template <std::size_t N>
-struct edge_maker {
-    template <typename Sender, typename NodeType>
-    static void make(Sender& sender, NodeType& node) {
-        oneapi::tbb::flow::make_edge(sender, oneapi::tbb::flow::input_port<N - 1>(node));
-        edge_maker<N - 1>::make(sender, node);
-    }
-
-    template <typename Sender, typename NodeType>
-    static void make(std::vector<Sender>& senders, NodeType& node) {
-        oneapi::tbb::flow::make_edge(senders[N - 1], oneapi::tbb::flow::input_port<N - 1>(node));
-        edge_maker<N - 1>::make(senders, node);
-    }
-};
-
-template <>
-struct edge_maker<0> {
-    template <typename Sender, typename NodeType>
-    static void make(Sender&, NodeType&) {}
-};
 #endif // __TBB_test_conformance_conformance_flowgraph_H

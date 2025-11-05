@@ -961,7 +961,7 @@ protected:
 
 //! implements a function node that supports Input -> (set of outputs)
 // Output is a tuple of output types.
-template<typename Input, typename Output, typename Policy = queueing>
+template<typename Input, typename OutputTuple, typename Policy = queueing>
     __TBB_requires(std::default_initializable<Input> &&
                    std::copy_constructible<Input>)
 class multifunction_node :
@@ -980,11 +980,11 @@ class multifunction_node :
     typedef cache_aligned_allocator<Input> internals_allocator;
 
 protected:
-    static const int N = std::tuple_size<Output>::value;
+    static const int N = std::tuple_size<OutputTuple>::value;
 public:
     using input_type = Input;
     using output_type = null_type;
-    typedef typename wrap_tuple_elements<multifunction_output, Output>::type output_ports_type;
+    using output_ports_type = typename wrap_tuple_elements<multifunction_output, OutputTuple>::type;
     using input_impl_type =
         multifunction_input<input_type, output_ports_type, Policy, internals_allocator>;
     using input_queue_type = function_input_queue<input_type, internals_allocator>;

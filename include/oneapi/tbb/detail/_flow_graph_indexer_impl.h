@@ -224,22 +224,22 @@
     };  //indexer_node_base
 
     // type generators
-    template<typename T0, typename... TN>
+    template<typename... TN>
     struct indexer_types {
-        using output_type = tagged_msg<std::size_t, T0, TN...>;
-        using input_ports_type = std::tuple<indexer_input_port<T0>, indexer_input_port<TN>...>;
-        using indexer_base_type = indexer_node_base<input_ports_type, output_type, std::tuple<T0, TN...>>;
+        using output_type = tagged_msg<std::size_t, TN...>;
+        using input_ports_type = std::tuple<indexer_input_port<TN>...>;
+        using indexer_base_type = indexer_node_base<input_ports_type, output_type, std::tuple<TN...>>;
     };
 
-    template<typename... T>
-    class unfolded_indexer_node : public indexer_types<T0, TN...>::indexer_base_type {
+    template<typename... TN>
+    class unfolded_indexer_node : public indexer_types<TN...>::indexer_base_type {
     public:
-        using input_ports_type = typename indexer_types<T0, TN...>::input_ports_type;
-        using output_type = typename indexer_types<T0, TN...>::output_type;
-        using tuple_types = std::tuple<T0, TN...>;
+        using input_ports_type = typename indexer_types<TN...>::input_ports_type;
+        using output_type = typename indexer_types<TN...>::output_type;
+        using tuple_types = std::tuple<TN...>;
 
     private:
-        using base_type = typename indexer_types<T0, TN...>::indexer_base_type;
+        using base_type = typename indexer_types<TN...>::indexer_base_type;
     public:
         unfolded_indexer_node(graph& g) : base_type(g) {}
         unfolded_indexer_node(const unfolded_indexer_node &other) : base_type(other) {}

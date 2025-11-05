@@ -351,26 +351,6 @@ join_node_type_generator_t<N, JoinPolicy> make_join_node(oneapi::tbb::flow::grap
     return make_join_node_helper<N, JoinPolicy, N, BodyToGenerate...>::make(g, body...);
 }
 
-template <std::size_t N>
-struct tuple_assert_impl {
-    template <typename Tuple, typename Message>
-    static void make(const Tuple& tuple, const Message& message) {
-        CHECK_MESSAGE(std::get<N - 1>(tuple) == message, "Unexpected tuple element");
-        tuple_assert_impl<N - 1>::make(tuple, message);
-    }
-};
-
-template <>
-struct tuple_assert_impl<0> {
-    template <typename Tuple, typename Message>
-    static void make(const Tuple&, const Message&) {}
-};
-
-template <std::size_t N, typename Tuple, typename Message>
-void tuple_assert(const Tuple& tuple, const Message& message) {
-    tuple_assert_impl<N>::make(tuple, message);
-}
-
 template <typename JoinPolicy, std::size_t N, typename... Body>
 void test_join_node_with_n_inputs_impl(Body... body) {
     static_assert(sizeof...(Body) <= 1, "Unexpected arguments");
@@ -391,7 +371,7 @@ void test_join_node_with_n_inputs_impl(Body... body) {
 
     std::size_t body_counter = 0;
     function_node<output_tuple> function(g, serial, [&](const output_tuple& tuple) {
-        tuple_assert<N>(tuple, message);
+        assert_all_items_equal_to(tuple, message);
         ++body_counter;
     });
 
