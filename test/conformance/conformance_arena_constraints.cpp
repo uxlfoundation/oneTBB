@@ -18,6 +18,8 @@
 //! \brief Test for [info_namespace scheduler.task_arena] specifications
 
 #include "common/common_arena_constraints.h"
+#include "common/test.h"
+#include "oneapi/tbb/info.h"
 
 #if __TBB_HWLOC_VALID_ENVIRONMENT
 
@@ -72,13 +74,35 @@ TEST_CASE("Test core types topology traversal correctness") {
 }
 #endif /*__HYBRID_CPUS_TESTING*/
 
+//! Testing create_numa_task_arenas helper function correctness
+//! \brief \ref interface \ref requirement
+TEST_CASE("Test create_numa_task_arenas conformance correctness") {
+  system_info::initialize();
+  auto numa_indices = oneapi::tbb::info::numa_nodes();
+  auto numa_task_arenas = oneapi::tbb::create_numa_task_arenas();
+  REQUIRE_MESSAGE(numa_task_arenas.size() == numa_indices.size(),
+      "create_numa_task_arenas returns the same number of NUMA nodes as tbb::info::numa_nodes()");
+  // Test that arenas are not initialized
+  for (auto& ta : numa_task_arenas) {
+    REQUIRE_MESSAGE(!ta.is_active(),
+        "create_numa_task_arenas must return a vector of non-initialized arenas");
+  }
+
+  for (std::size_t numa_i = 0; numa_i < numa_indices.size(); ++numa_i) {
+    oneapi::tbb::task_arena::constraints c{numa_indices[numa_i]};
+    auto constraint_concurrency = oneapi::tbb::info::default_concurrency(c);
+    REQUIRE_MESSAGE(constraint_concurrency == numa_task_arenas[numa_i].max_concurrency(),
+        "Maximum concurrency level of task_arena should be the same as for constraints");
+  }
+}
+
 #else /*!__TBB_HWLOC_VALID_ENVIRONMENT*/
 
 //! Testing NUMA support interfaces validity when HWLOC is not present on system
 //! \brief \ref interface \ref requirement
 TEST_CASE("Test validity of NUMA interfaces when HWLOC is not present on the system") {
     std::vector<oneapi::tbb::numa_node_id> numa_indexes = oneapi::tbb::info::numa_nodes();
-
+    std::vector<oneapi::tbb::task_arena> numa_arenas = oneapi::tbb::create_numa_task_arenas();
 #if __TBB_SELF_CONTAINED_TBBBIND
     // Do lvalue-to-rvalue conversion to not odr-use tbb::task_arena::automatic
     REQUIRE_MESSAGE(numa_indexes[0] != static_cast<tbb::numa_node_id>(tbb::task_arena::automatic),
@@ -90,6 +114,8 @@ TEST_CASE("Test validity of NUMA interfaces when HWLOC is not present on the sys
         "Index of NUMA node must be pinned to tbb::task_arena::automatic, if we have no HWLOC on the system.");
     REQUIRE_MESSAGE(oneapi::tbb::info::default_concurrency(numa_indexes[0]) == utils::get_platform_max_threads(),
         "Concurrency for NUMA node must be equal to default_num_threads(), if we have no HWLOC on the system.");
+    REQUIRE_MESSAGE(numa_arenas.size() == 1,
+        "Number of NUMA-bound task_arena objects must be one if we have no HWLOC on the system")
 #endif
 }
 

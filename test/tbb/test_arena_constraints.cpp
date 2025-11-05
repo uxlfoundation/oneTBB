@@ -25,6 +25,7 @@
 
 #include "tbb/global_control.h"
 #include "tbb/parallel_for.h"
+#include "tbb/task_scheduler_observer.h"
 
 #if __TBB_HWLOC_VALID_ENVIRONMENT && __HWLOC_CPUBIND_PRESENT
 //! Test affinity and default_concurrency correctness for all available constraints.
@@ -91,6 +92,74 @@ TEST_CASE("Test constraints propagation during arenas copy construction") {
 
         test_constraints_affinity_and_concurrency(constraints, copied_affinity);
     }
+}
+
+struct workerless_arena_observer : tbb::task_scheduler_observer {
+  workerless_arena_observer(tbb::task_arena &ta)
+      : tbb::task_scheduler_observer(ta) {
+    observe(true);
+  }
+  void on_scheduler_entry(bool is_worker) override {
+    REQUIRE(!is_worker);
+  }
+};
+
+//! Test that reserved slots parameter makes expected effect on task_arena objects
+//! \brief \ref interface \ref error_guessing
+TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
+  system_info::initialize();
+  std::vector<index_info> numa_nodes_info = system_info::get_numa_nodes_info();
+  int expected_numa_concurrency = numa_nodes_info[0].concurrency;
+
+  auto numa_task_arenas = tbb::create_numa_task_arenas();
+  if (numa_task_arenas.size() > 1) {
+    for (auto& ta : numa_task_arenas) {
+      utils::SpinBarrier barrier {(std::size_t)ta.max_concurrency()};
+      for (int i = 0; i < ta.max_concurrency(); ++i) {
+        ta.enqueue([&barrier] { barrier.wait(); });
+      }
+    }
+  }
+
+  // Some Windows versions may map 1:1 NUMA node to Processor Group,
+  // so lets filter those configurations out
+  bool is_equal_numa_concurrency =
+      std::all_of(numa_nodes_info.begin(), numa_nodes_info.end(),
+                  [expected_numa_concurrency](const index_info &info) {
+                    return info.concurrency == expected_numa_concurrency;
+                  });
+  if (is_equal_numa_concurrency) {
+    auto external_thread_numa_ta =
+        tbb::create_numa_task_arenas({}, expected_numa_concurrency);
+
+    tbb::task_group tg{};
+    for (auto &ta : external_thread_numa_ta) {
+      workerless_arena_observer observer{ta};
+
+      for (int i = 0; i < 100 * ta.max_concurrency(); ++i) {
+        ta.execute([&tg] { tg.run([] {}); });
+      };
+
+      utils::NativeParallelFor(ta.max_concurrency(),
+                               [&ta, &tg] (int) { ta.wait_for(tg); });
+    }
+  }
+}
+
+//! Test that constraints parameter is progagated to the task_arena construction while ignoring numa_id
+//! \brief \ref interface
+TEST_CASE("Test constraints argument in create_numa_task_arenas") {
+  system_info::initialize();
+  auto numa_indices = tbb::info::numa_nodes();
+  for (const auto& constraints : generate_constraints_variety()) {
+    auto numa_task_arenas = tbb::create_numa_task_arenas(constraints);
+    for (std::size_t i = 0; i < numa_indices.size(); ++i) {
+      tbb::task_arena::constraints expected_constraint = constraints;
+      expected_constraint.set_numa_id(numa_indices[i]);
+      test_constraints_affinity_and_concurrency(expected_constraint,
+                                                get_arena_affinity(numa_task_arenas[i]));
+    }
+  }
 }
 #endif /*__TBB_HWLOC_VALID_ENVIRONMENT && __HWLOC_CPUBIND_PRESENT */
 
