@@ -288,7 +288,7 @@ inline void tcm_tests_data::add_test(const char* test_description,
 inline void test_prolog(const std::string& test_description) {
     std::string status_message = "*    TEST START: " + test_description + "    *";
     auto asterisks = std::string(status_message.length(), '*');
-    logger.log_error("\n\n" + asterisks + "\n" + status_message + "\n" + asterisks);
+    logger.log("\n\n" + asterisks + "\n" + status_message + "\n" + asterisks);
 }
 
 inline void test_epilog(bool succeed, const std::string &test_description) {
@@ -296,9 +296,9 @@ inline void test_epilog(bool succeed, const std::string &test_description) {
     if (!succeed)
         status_message = "*    TEST FAILED: ";
 
-    status_message  += test_description + "    *";
+    status_message += test_description + "    *";
     auto asterisks = std::string(status_message.length(), '*');
-    logger.log_error(asterisks + "\n" + status_message + "\n" + asterisks);
+    logger.log(asterisks + "\n" + status_message + "\n" + asterisks);
 }
 
 inline bool tcm_tests_data::run_test(const test_function_ptr test) {
