@@ -114,10 +114,11 @@ TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
   auto numa_task_arenas = tbb::create_numa_task_arenas();
   if (numa_task_arenas.size() > 1) {
     for (auto& ta : numa_task_arenas) {
-      utils::SpinBarrier barrier {(std::size_t)ta.max_concurrency()};
+      utils::SpinBarrier barrier {(std::size_t)ta.max_concurrency() + 1};
       for (int i = 0; i < ta.max_concurrency(); ++i) {
         ta.enqueue([&barrier] { barrier.wait(); });
       }
+      barrier.wait();
     }
   }
 
