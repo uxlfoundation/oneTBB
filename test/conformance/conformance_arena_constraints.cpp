@@ -18,8 +18,6 @@
 //! \brief Test for [info_namespace scheduler.task_arena] specifications
 
 #include "common/common_arena_constraints.h"
-#include "common/test.h"
-#include "oneapi/tbb/info.h"
 
 #if __TBB_HWLOC_VALID_ENVIRONMENT
 
