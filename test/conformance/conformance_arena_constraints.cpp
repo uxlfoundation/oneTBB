@@ -115,7 +115,7 @@ TEST_CASE("Test validity of NUMA interfaces when HWLOC is not present on the sys
     REQUIRE_MESSAGE(oneapi::tbb::info::default_concurrency(numa_indexes[0]) == utils::get_platform_max_threads(),
         "Concurrency for NUMA node must be equal to default_num_threads(), if we have no HWLOC on the system.");
     REQUIRE_MESSAGE(numa_arenas.size() == 1,
-        "Number of NUMA-bound task_arena objects must be one if we have no HWLOC on the system")
+        "Number of NUMA-bound task_arena objects must be one if we have no HWLOC on the system");
 #endif
 }
 

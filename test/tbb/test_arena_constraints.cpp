@@ -146,7 +146,7 @@ TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
   }
 }
 
-//! Test that constraints parameter is progagated to the task_arena construction while ignoring numa_id
+//! Test that constraints parameter is propagated to the task_arena construction while ignoring numa_id
 //! \brief \ref interface
 TEST_CASE("Test constraints argument in create_numa_task_arenas") {
   system_info::initialize();
