@@ -228,7 +228,7 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          apt update && apt install pkg-config libhwloc-dev hwloc
+          apt update && apt install -y pkg-config libhwloc-dev hwloc
       - name: Run testing
         shell: bash
         run: |
