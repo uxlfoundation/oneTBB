@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2023-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -25,6 +26,7 @@
 #include "tcm_adaptor.h"
 
 #include <iostream>
+#include <numeric>
 
 namespace tbb {
 namespace detail {
@@ -129,8 +131,9 @@ public:
         {
             tcm_client_mutex_type::scoped_lock lock(my_permit_mutex);
 
-            uint32_t new_concurrency{};
-            tcm_permit_t new_permit{ &new_concurrency, nullptr, 1, TCM_PERMIT_STATE_VOID, {} };
+            uint32_t size = my_permit_constraints.empty() ? 1 : my_permit_constraints.size();
+            std::vector<uint32_t> new_concurrencies(size);
+            tcm_permit_t new_permit{ new_concurrencies.data(), nullptr, size, TCM_PERMIT_STATE_VOID, {} };
             auto res = tcm_get_permit_data(my_permit_handle, &new_permit);
             __TBB_ASSERT_EX(res == TCM_RESULT_SUCCESS, nullptr);
 
@@ -139,6 +142,7 @@ public:
             if (!new_permit.flags.stale) {
                 // If there is no other demand in TCM, the permit may still have granted concurrency but
                 // be in the deactivated state thus we enforce 0 allotment to preserve arena invariants.
+                uint32_t new_concurrency = std::accumulate(new_concurrencies.begin(), new_concurrencies.end(), 0);
                 delta = update_concurrency(new_permit.state != TCM_PERMIT_STATE_INACTIVE ? new_concurrency : 0);
             }
         }
@@ -152,11 +156,6 @@ public:
 
         my_permit_request.max_sw_threads = max_workers();
         my_permit_request.min_sw_threads = my_permit_request.max_sw_threads == 0 ? 0 : min_workers();
-
-        if (my_permit_request.constraints_size > 0) {
-            my_permit_request.cpu_constraints->min_concurrency = my_permit_request.min_sw_threads;
-            my_permit_request.cpu_constraints->max_concurrency = my_permit_request.max_sw_threads;
-        }
 
         __TBB_ASSERT(my_permit_request.max_sw_threads >= my_permit_request.min_sw_threads, nullptr);
 
@@ -178,14 +177,20 @@ public:
             constraints.numa_id              != d1::task_arena::automatic ||
             constraints.max_threads_per_core != d1::task_arena::automatic)
         {
-            my_permit_constraints.max_concurrency = constraints.max_concurrency;
-            my_permit_constraints.min_concurrency = 0;
-            my_permit_constraints.core_type_id = constraints.core_type;
-            my_permit_constraints.numa_id = constraints.numa_id;
-            my_permit_constraints.threads_per_core = constraints.max_threads_per_core;
+            auto core_types = constraints.get_core_types();
+            __TBB_ASSERT(!core_types.empty(), nullptr); // At least one real core type or automatic is specified.
 
-            my_permit_request.cpu_constraints = &my_permit_constraints;
-            my_permit_request.constraints_size = 1;
+            // Create a separate constraint entry for each core type, with other fields being the same.
+            my_permit_constraints.assign(core_types.size(), TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER);
+            for (std::size_t i = 0; i < core_types.size(); ++i) {
+                my_permit_constraints[i].core_type_id = core_types[i];
+                my_permit_constraints[i].min_concurrency = 0;
+                my_permit_constraints[i].numa_id = constraints.numa_id;
+                my_permit_constraints[i].threads_per_core = constraints.max_threads_per_core;
+            }
+
+            my_permit_request.cpu_constraints = my_permit_constraints.data();
+            my_permit_request.constraints_size = my_permit_constraints.size();
         }
 
         my_permit_request.min_sw_threads = 0;
@@ -211,7 +216,7 @@ public:
     }
 
 private:
-    tcm_cpu_constraints_t my_permit_constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+    std::vector<tcm_cpu_constraints_t> my_permit_constraints;
     tcm_permit_request_t my_permit_request = TCM_PERMIT_REQUEST_INITIALIZER;
     tcm_permit_handle_t my_permit_handle{};
     tcm_client_mutex_type my_permit_mutex;

@@ -591,7 +591,7 @@ void constraints_assertion(d1::constraints c) {
     int* core_types_begin = system_topology::core_types_indexes;
     int* core_types_end = system_topology::core_types_indexes + system_topology::core_types_count;
     __TBB_ASSERT_RELEASE(c.core_type == system_topology::automatic ||
-        (is_topology_initialized && std::find(core_types_begin, core_types_end, c.core_type) != core_types_end),
+        (is_topology_initialized && (!c.single_core_type() || std::find(core_types_begin, core_types_end, c.core_type) != core_types_end)),
         "The constraints::core_type value is not known to the library. Use tbb::info::core_types() to get the list of possible values.");
 }
 

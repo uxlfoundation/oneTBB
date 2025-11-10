@@ -31,6 +31,7 @@
 #include "oneapi/tbb/task_arena.h"
 #include "oneapi/tbb/spin_mutex.h"
 
+#include <bitset>
 #include <vector>
 #include <unordered_set>
 
@@ -404,7 +405,32 @@ system_info::affinity_mask prepare_reference_affinity_mask(const tbb::task_arena
     }
 
     if (c.core_type != tbb::task_arena::automatic) {
-        const auto& core_types_info = system_info::get_cpu_kinds_info();
+        auto core_types_info = system_info::get_cpu_kinds_info();
+
+        // Add core type combinations
+        size_t num_core_types = core_types_info.size();
+        for (uint32_t mask = 0; mask < (1u << num_core_types); ++mask) {
+            std::bitset<32> bits(mask);
+            if (bits.count() < 2) {
+                // Skip empty and single-type combinations
+                continue;
+            }
+
+            index_info combination;
+            combination.index = (1 << tbb::task_arena::constraints::core_type_id_bits); // multiple core type format
+            combination.index |= mask;
+            combination.concurrency = 0;
+            combination.cpuset = hwloc_bitmap_alloc();
+
+            for (size_t i = 0; i < num_core_types; ++i) {
+                if (bits[i]) {
+                    combination.concurrency += core_types_info[i].concurrency;
+                    hwloc_bitmap_or(combination.cpuset, combination.cpuset, core_types_info[i].cpuset);
+                }
+            }
+            core_types_info.push_back(combination);
+        }
+
         auto required_info = std::find_if(core_types_info.begin(), core_types_info.end(),
             [&](index_info info) { return info.index == c.core_type; }
         );
@@ -524,6 +550,20 @@ constraints_container generate_constraints_variety() {
 
 #if __HYBRID_CPUS_TESTING
         std::vector<tbb::core_type_id> core_types = tbb::info::core_types();
+
+        // Generate all possible combinations of core_types
+        std::vector<std::vector<tbb::core_type_id>> core_type_combinations;
+        size_t num_core_types = core_types.size();
+        for (uint32_t mask = 0; mask < (1u << num_core_types); ++mask) {
+            std::vector<tbb::core_type_id> combination;
+            for (size_t i = 0; i < num_core_types; ++i) {
+                if (mask & (1u << i)) {
+                    combination.push_back(core_types[i]);
+                }
+            }
+            core_type_combinations.push_back(combination);
+        }
+
         core_types.push_back((tbb::core_type_id)tbb::task_arena::automatic);
 #endif
 
@@ -563,6 +603,41 @@ constraints_container generate_constraints_variety() {
                             .set_numa_id(numa_node)
                             .set_core_type(core_type)
                             .set_max_threads_per_core(max_threads_per_core)
+                    );
+                }
+            }
+            for (const auto& combination : core_type_combinations) {
+                results.insert(constraints{}.set_core_types(combination));
+
+                results.insert(
+                    constraints{}
+                    .set_numa_id(numa_node)
+                    .set_core_types(combination)
+                );
+
+                for (const auto& max_threads_per_core : system_info::get_available_max_threads_values()) {
+                    results.insert(
+                        constraints{}
+                        .set_max_threads_per_core(max_threads_per_core)
+                    );
+
+                    results.insert(
+                        constraints{}
+                        .set_numa_id(numa_node)
+                        .set_max_threads_per_core(max_threads_per_core)
+                    );
+
+                    results.insert(
+                        constraints{}
+                        .set_core_types(combination)
+                        .set_max_threads_per_core(max_threads_per_core)
+                    );
+
+                    results.insert(
+                        constraints{}
+                        .set_numa_id(numa_node)
+                        .set_core_types(combination)
+                        .set_max_threads_per_core(max_threads_per_core)
                     );
                 }
             }
