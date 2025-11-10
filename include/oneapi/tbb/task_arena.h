@@ -253,7 +253,12 @@ protected:
 public:
     //! Typedef for number of threads that is automatic.
     static const int automatic = -1;
+    //! Typedef for current thread index in an uninitialized arena.
     static const int not_initialized = -2;
+#if __TBB_PREVIEW_AFFINITY_SELECTOR
+    //! Typedef for core type(s) to be specified by the provided selector.
+    static const int selectable = -2;
+#endif
 };
 
 template<typename R, typename F>
@@ -353,6 +358,26 @@ public:
           )
     {}
 
+#if __TBB_PREVIEW_AFFINITY_SELECTOR
+    //! Creates task arena with a custom selector for core types
+    template <typename Selector,
+              typename = decltype(static_cast<int>(std::declval<Selector>()(std::declval<std::tuple<int, size_t, size_t>>())))>
+    task_arena(const constraints& constraints_, Selector selector_,
+               unsigned reserved_for_masters = 1, priority a_priority = priority::normal
+#if __TBB_PREVIEW_PARALLEL_PHASE
+               , leave_policy lp = leave_policy::automatic
+#endif
+    )
+        : task_arena_base(constraints_, reserved_for_masters, a_priority
+#if __TBB_PREVIEW_PARALLEL_PHASE
+                         , lp
+#endif
+          )
+    {
+        apply_core_type_selector(selector_, my_core_type);
+    }
+#endif
+
     //! Copies settings from another task_arena
     task_arena(const task_arena &a) // copy settings but not the reference or instance
         : task_arena_base(
@@ -429,6 +454,7 @@ public:
     }
 
 #if __TBB_ARENA_BINDING
+    //! Overrides constraints and forces initialization of internal representation
     void initialize(constraints constraints_, unsigned reserved_slots = 1,
                     priority a_priority = priority::normal
 #if __TBB_PREVIEW_PARALLEL_PHASE
@@ -451,6 +477,35 @@ public:
             mark_initialized();
         }
     }
+
+#if __TBB_PREVIEW_AFFINITY_SELECTOR
+    //! Overrides constraints with a custom selector for core types and forces initialization of internal representation
+    template<typename Selector,
+             typename = decltype(static_cast<int>(std::declval<Selector>()(std::declval<std::tuple<int, size_t, size_t>>())))>
+    void initialize(constraints constraints_, Selector selector_,
+                    unsigned reserved_for_masters = 1, priority a_priority = priority::normal
+#if __TBB_PREVIEW_PARALLEL_PHASE
+                    , leave_policy lp = leave_policy::automatic
+#endif
+    )
+    {
+        __TBB_ASSERT(!my_arena.load(std::memory_order_relaxed), "Impossible to modify settings of an already initialized task_arena");
+        if( !is_active() ) {
+            my_numa_id = constraints_.numa_id;
+            my_max_concurrency = constraints_.max_concurrency;
+            my_core_type = constraints_.core_type;
+            my_max_threads_per_core = constraints_.max_threads_per_core;
+            my_num_reserved_slots = reserved_for_masters;
+            my_priority = a_priority;
+#if __TBB_PREVIEW_PARALLEL_PHASE
+            set_leave_policy(lp);
+#endif
+            apply_core_type_selector(selector_, my_core_type);
+            r1::initialize(*this);
+            mark_initialized();
+        }
+    }
+#endif /*__TBB_PREVIEW_AFFINITY_SELECTOR*/
 #endif /*__TBB_ARENA_BINDING*/
 
     //! Attaches this instance to the current arena of the thread

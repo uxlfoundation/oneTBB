@@ -43,6 +43,9 @@
 #ifndef TBB_PREVIEW_MEMORY_POOL
 #define TBB_PREVIEW_MEMORY_POOL 1
 #endif
+#ifndef TBB_PREVIEW_AFFINITY_SELECTOR
+#define TBB_PREVIEW_AFFINITY_SELECTOR 1
+#endif
 #endif
 
 #include "oneapi/tbb/detail/_config.h"

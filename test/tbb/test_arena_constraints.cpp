@@ -33,8 +33,16 @@
 TEST_CASE("Test affinity and default_concurrency correctness for all available constraints.") {
     system_info::initialize();
     for (const auto& constraints: generate_constraints_variety()) {
-        tbb::task_arena ta{constraints};
-        test_constraints_affinity_and_concurrency(constraints, get_arena_affinity(ta));
+        tbb::task_arena ta;
+
+        multi_core_type_helper helper{constraints};
+        if (helper.selectable()) {
+            ta.initialize(helper.constraints, helper);
+        } else {
+            ta.initialize(helper.constraints);
+        }
+
+        test_constraints_affinity_and_concurrency(constraints, helper, get_arena_affinity(ta));
     }
 }
 
@@ -52,11 +60,18 @@ void recursive_arena_binding(constraints_container::iterator current_pos, constr
 
     if (current_pos != end_pos) {
         auto constraints = *current_pos;
-        tbb::task_arena current_level_arena{constraints};
+        tbb::task_arena current_level_arena;
+
+        multi_core_type_helper helper{constraints};
+        if (helper.selectable()) {
+            current_level_arena.initialize(helper.constraints, helper);
+        } else {
+            current_level_arena.initialize(helper.constraints);
+        }
 
         if (is_observer_created(constraints)) {
             system_info::affinity_mask affinity = get_arena_affinity(current_level_arena);
-            test_constraints_affinity_and_concurrency(constraints, affinity);
+            test_constraints_affinity_and_concurrency(constraints, helper, affinity);
         }
 
         current_level_arena.execute(
@@ -85,12 +100,19 @@ TEST_CASE("Test binding with nested arenas") {
 TEST_CASE("Test constraints propagation during arenas copy construction") {
     system_info::initialize();
     for (const auto& constraints: generate_constraints_variety()) {
-        tbb::task_arena constructed{constraints};
+        std::unique_ptr<tbb::task_arena> constructed;
 
-        tbb::task_arena copied(constructed);
+        multi_core_type_helper helper{constraints};
+        if (helper.selectable()) {
+            constructed.reset(new tbb::task_arena{helper.constraints, helper});
+        } else {
+            constructed.reset(new tbb::task_arena{helper.constraints});
+        }
+
+        tbb::task_arena copied{*constructed};
         system_info::affinity_mask copied_affinity = get_arena_affinity(copied);
 
-        test_constraints_affinity_and_concurrency(constraints, copied_affinity);
+        test_constraints_affinity_and_concurrency(constraints, helper, copied_affinity);
     }
 }
 
@@ -100,12 +122,17 @@ TEST_CASE("Test constraints argument in create_numa_task_arenas") {
   system_info::initialize();
   auto numa_indices = tbb::info::numa_nodes();
   for (const auto& constraints : generate_constraints_variety()) {
+    multi_core_type_helper helper{constraints};
+    if (helper.selectable()) {
+      continue; // skip constraints with custom core type selector, because create_numa_task_arenas doesn't support it
+    }
     auto numa_task_arenas = tbb::create_numa_task_arenas(constraints);
     tbb::task_arena::constraints expected_constraint = constraints;
     for (std::size_t i = 0; i < numa_indices.size(); ++i) {
 
       expected_constraint.set_numa_id(numa_indices[i]);
       test_constraints_affinity_and_concurrency(expected_constraint,
+                                                helper,
                                                 get_arena_affinity(numa_task_arenas[i]));
     }
   }

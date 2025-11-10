@@ -58,7 +58,7 @@ public:
 
 numa_binding_observer* construct_binding_observer( d1::task_arena* ta, int num_slots, int numa_id, core_type_id core_type, int max_threads_per_core ) {
     numa_binding_observer* binding_observer = nullptr;
-    if ((core_type >= 0 && core_type_count() > 1) || (numa_id >= 0 && numa_node_count() > 1) || max_threads_per_core > 0) {
+    if ((multi_core_type_codec::is_core_type(core_type) && core_type_count() > 1) || (numa_id >= 0 && numa_node_count() > 1) || max_threads_per_core > 0) {
         binding_observer = new(allocate_memory(sizeof(numa_binding_observer))) numa_binding_observer(ta, num_slots, numa_id, core_type, max_threads_per_core);
         __TBB_ASSERT(binding_observer, "Failure during NUMA binding observer allocation and construction");
     }
