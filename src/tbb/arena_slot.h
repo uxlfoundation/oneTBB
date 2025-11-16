@@ -388,12 +388,7 @@ private:
 
     //! Resets head and tail indices to 0, and leaves task pool
     /** The task pool must be locked by the owner (via acquire_task_pool).**/
-    void reset_task_pool_and_leave() {
-        __TBB_ASSERT(task_pool.load(std::memory_order_relaxed) == LockedTaskPool, "Task pool must be locked when resetting task pool");
-        tail.store(0, std::memory_order_relaxed);
-        head.store(0, std::memory_order_relaxed);
-        leave_task_pool();
-    }
+    void reset_task_pool_and_leave(thread_data* td);
 
     //! Makes relocated tasks visible to thieves and releases the local task pool.
     /** Obviously, the task pool must be locked when calling this method. **/

@@ -25,6 +25,15 @@ namespace r1 {
 //------------------------------------------------------------------------
 // Arena Slot
 //------------------------------------------------------------------------
+void arena_slot::reset_task_pool_and_leave(thread_data* td) {
+    td->my_arena->pool_mask[this_task_arena::current_thread_index()].store(0, std::memory_order_relaxed);
+    __TBB_ASSERT(task_pool.load(std::memory_order_relaxed) == LockedTaskPool, "Task pool must be locked when resetting task pool");
+    tail.store(0, std::memory_order_relaxed);
+    head.store(0, std::memory_order_relaxed);
+    leave_task_pool();
+}
+
+
 d1::task* arena_slot::get_task_impl(size_t T, execution_data_ext& ed, bool& tasks_omitted, isolation_type isolation) {
     __TBB_ASSERT(tail.load(std::memory_order_relaxed) <= T || is_local_task_pool_quiescent(),
             "Is it safe to get a task at position T?");
@@ -81,13 +90,13 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
                 __TBB_ASSERT( H0 == head.load(std::memory_order_relaxed)
                     && T == tail.load(std::memory_order_relaxed)
                     && H0 == T + 1, "victim/thief arbitration algorithm failure" );
-                reset_task_pool_and_leave();
+                reset_task_pool_and_leave(ed.task_disp->m_thread_data);
                 // No tasks in the task pool.
                 task_pool_empty = true;
                 break;
             } else if ( H0 == T ) {
                 // There is only one task in the task pool.
-                reset_task_pool_and_leave();
+                reset_task_pool_and_leave(ed.task_disp->m_thread_data);
                 task_pool_empty = true;
             } else {
                 // Release task pool if there are still some tasks.
@@ -125,6 +134,9 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
                 tail.store(T0, std::memory_order_relaxed);
                 // The release fence is used in publish_task_pool.
                 publish_task_pool();
+                thread_data* td = ed.task_disp->m_thread_data;
+                td->my_arena->pool_mask[this_task_arena::current_thread_index()].store(
+                        1, std::memory_order_relaxed);
                 // Synchronize with snapshot as we published some tasks.
                 ed.task_disp->m_thread_data->my_arena->advertise_new_work<arena::wakeup>();
             }
