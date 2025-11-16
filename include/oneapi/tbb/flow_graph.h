@@ -84,6 +84,13 @@ class continue_msg {};
 
 } // namespace d2
 
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+#define __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo) , metainfo
+
+#else
+#define __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo)
+#endif // __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+
 #if __TBB_CPP20_CONCEPTS_PRESENT
 inline namespace d0 {
 
@@ -114,18 +121,26 @@ concept input_node_body = std::copy_constructible<Body> &&
                               { body(fc) } -> adaptive_same_as<Output>;
                           };
 
-template <typename Body, typename Input, typename OutputPortsType>
+template <typename Body, typename Input, typename OutputPortsType __TBB_FLOW_GRAPH_METAINFO_ARG(typename TagType)>
 concept multifunction_node_body = std::copy_constructible<Body> &&
-                                  std::invocable<Body&, const Input&, OutputPortsType&>;
+                                  std::invocable<Body&, const Input&, OutputPortsType&>
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+                               || std::invocable<Body&, const Input&, OutputPortsType&, std::remove_cvref_t<TagType>&&>
+#endif
+                                  ;
 
 template <typename Sequencer, typename Value>
 concept sequencer = std::copy_constructible<Sequencer> &&
                     std::invocable<Sequencer&, const Value&> &&
                     std::convertible_to<std::invoke_result_t<Sequencer&, const Value&>, std::size_t>;
 
-template <typename Body, typename Input, typename GatewayType>
+template <typename Body, typename Input, typename GatewayType __TBB_FLOW_GRAPH_METAINFO_ARG(typename TagType)>
 concept async_node_body = std::copy_constructible<Body> &&
-                          std::invocable<Body&, const Input&, GatewayType&>;
+                          std::invocable<Body&, const Input&, GatewayType&>
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+                       || std::invocable<Body&, const Input&, GatewayType&, std::remove_cvref_t<TagType>&&>
+#endif
+                          ;
 
 } // inline namespace d0
 #endif // __TBB_CPP20_CONCEPTS_PRESENT
@@ -213,11 +228,6 @@ public:
 private:
     waiters_type my_waiters;
 }; // class message_metainfo
-
-#define __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo) , metainfo
-
-#else
-#define __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo)
 #endif // __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
 
 //! Pure virtual template class that defines a sender of messages of type T
@@ -991,8 +1001,11 @@ public:
 private:
     using input_impl_type::my_predecessors;
 public:
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+    typedef typename input_impl_type::tag_type tag_type;
+#endif
     template<typename Body>
-        __TBB_requires(multifunction_node_body<Body, Input, output_ports_type>)
+        __TBB_requires(multifunction_node_body<Body, Input, output_ports_type __TBB_FLOW_GRAPH_METAINFO_ARG(tag_type)>)
     __TBB_NOINLINE_SYM multifunction_node(
         graph &g, size_t concurrency,
         Body body, Policy = Policy(), node_priority_t a_priority = no_priority
@@ -1005,13 +1018,13 @@ public:
     }
 
     template <typename Body>
-        __TBB_requires(multifunction_node_body<Body, Input, output_ports_type>)
+        __TBB_requires(multifunction_node_body<Body, Input, output_ports_type __TBB_FLOW_GRAPH_METAINFO_ARG(tag_type)>)
     __TBB_NOINLINE_SYM multifunction_node(graph& g, size_t concurrency, Body body, node_priority_t a_priority)
         : multifunction_node(g, concurrency, body, Policy(), a_priority) {}
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
     template <typename Body, typename... Args>
-        __TBB_requires(multifunction_node_body<Body, Input, output_ports_type>)
+        __TBB_requires(multifunction_node_body<Body, Input, output_ports_type __TBB_FLOW_GRAPH_METAINFO_ARG(tag_type)>)
     __TBB_NOINLINE_SYM multifunction_node(const node_set<Args...>& nodes, size_t concurrency, Body body,
                        Policy p = Policy(), node_priority_t a_priority = no_priority)
         : multifunction_node(nodes.graph_reference(), concurrency, body, p, a_priority) {
@@ -1019,7 +1032,7 @@ public:
     }
 
     template <typename Body, typename... Args>
-        __TBB_requires(multifunction_node_body<Body, Input, output_ports_type>)
+        __TBB_requires(multifunction_node_body<Body, Input, output_ports_type __TBB_FLOW_GRAPH_METAINFO_ARG(tag_type)>)
     __TBB_NOINLINE_SYM multifunction_node(const node_set<Args...>& nodes, size_t concurrency, Body body, node_priority_t a_priority)
         : multifunction_node(nodes, concurrency, body, Policy(), a_priority) {}
 #endif // __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
@@ -3132,8 +3145,11 @@ public:
     async_body(const Body &body, gateway_type *gateway)
         : base_type(gateway), my_body(body) { }
 
-    void operator()( const Input &v, Ports & ) noexcept(noexcept(tbb::detail::invoke(my_body, v, std::declval<gateway_type&>()))) {
-        tbb::detail::invoke(my_body, v, *this->my_gateway);
+    void operator()( const Input &v, Ports & __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo_tag_type&& tag) )
+        noexcept(noexcept(invoke_body_with_tag(my_body __TBB_FLOW_GRAPH_METAINFO_ARG(std::move(tag)),
+                                               v, std::declval<gateway_type&>())))
+    {
+        invoke_body_with_tag(my_body __TBB_FLOW_GRAPH_METAINFO_ARG(std::move(tag)), v, *this->my_gateway);
     }
 
     Body get_body() { return my_body; }
@@ -3159,6 +3175,9 @@ public:
     typedef receiver_gateway<output_type> gateway_type;
     typedef async_body_base<gateway_type> async_body_base_type;
     typedef typename base_type::output_ports_type output_ports_type;
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+    typedef typename mfn_input_type::tag_type tag_type;
+#endif
 
 private:
     class receiver_gateway_impl: public receiver_gateway<Output> {
@@ -3178,8 +3197,19 @@ private:
 
         //! Implements gateway_type::try_put for an external activity to submit a message to FG
         bool try_put(const Output &i) override {
-            return my_node->try_put_impl(i);
+            return my_node->try_put_impl(i __TBB_FLOW_GRAPH_METAINFO_ARG(message_metainfo{}));
         }
+
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+        bool try_put(const Output &i, const metainfo_tag_type& tag) override {
+            return my_node->try_put_impl(i, metainfo_tag_accessor::get_metainfo(tag));
+        }
+
+        bool try_put(const Output &i, metainfo_tag_type&& tag) override {
+            metainfo_tag_type local_tag = std::move(tag);
+            return my_node->try_put_impl(i, metainfo_tag_accessor::get_metainfo(local_tag));
+        }
+#endif
 
     private:
         async_node* my_node;
@@ -3189,13 +3219,14 @@ private:
     async_node* self() { return this; }
 
     //! Implements gateway_type::try_put for an external activity to submit a message to FG
-    bool try_put_impl(const Output &i) {
+    bool try_put_impl(const Output &i __TBB_FLOW_GRAPH_METAINFO_ARG(const message_metainfo& metainfo)) {
         multifunction_output<Output> &port_0 = output_port<0>(*this);
         broadcast_cache<output_type>& port_successors = port_0.successors();
         fgt_async_try_put_begin(this, &port_0);
         // TODO revamp: change to std::list<graph_task*>
         graph_task_list tasks;
-        bool is_at_least_one_put_successful = port_successors.gather_successful_try_puts(i, tasks);
+        bool is_at_least_one_put_successful =
+            port_successors.gather_successful_try_puts(i, tasks __TBB_FLOW_GRAPH_METAINFO_ARG(metainfo));
         __TBB_ASSERT( is_at_least_one_put_successful || tasks.empty(),
                       "Return status is inconsistent with the method operation." );
 
@@ -3208,7 +3239,7 @@ private:
 
 public:
     template<typename Body>
-        __TBB_requires(async_node_body<Body, input_type, gateway_type>)
+        __TBB_requires(async_node_body<Body, input_type, gateway_type __TBB_FLOW_GRAPH_METAINFO_ARG(tag_type)>)
     __TBB_NOINLINE_SYM async_node(
         graph &g, size_t concurrency,
         Body body, Policy = Policy(), node_priority_t a_priority = no_priority
@@ -3224,13 +3255,13 @@ public:
     }
 
     template <typename Body>
-        __TBB_requires(async_node_body<Body, input_type, gateway_type>)
+        __TBB_requires(async_node_body<Body, input_type, gateway_type __TBB_FLOW_GRAPH_METAINFO_ARG(tag_type)>)
     __TBB_NOINLINE_SYM async_node(graph& g, size_t concurrency, Body body, node_priority_t a_priority)
         : async_node(g, concurrency, body, Policy(), a_priority) {}
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
     template <typename Body, typename... Args>
-        __TBB_requires(async_node_body<Body, input_type, gateway_type>)
+        __TBB_requires(async_node_body<Body, input_type, gateway_type __TBB_FLOW_GRAPH_METAINFO_ARG(tag_type)>)
     __TBB_NOINLINE_SYM async_node(
         const node_set<Args...>& nodes, size_t concurrency, Body body,
         Policy = Policy(), node_priority_t a_priority = no_priority )
@@ -3239,7 +3270,7 @@ public:
     }
 
     template <typename Body, typename... Args>
-        __TBB_requires(async_node_body<Body, input_type, gateway_type>)
+        __TBB_requires(async_node_body<Body, input_type, gateway_type __TBB_FLOW_GRAPH_METAINFO_ARG(tag_type)>)
     __TBB_NOINLINE_SYM async_node(const node_set<Args...>& nodes, size_t concurrency, Body body, node_priority_t a_priority)
         : async_node(nodes, concurrency, body, Policy(), a_priority) {}
 #endif // __TBB_PREVIEW_FLOW_GRAPH_NODE_SET

@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@
 #include "common/graph_utils.h"
 #include "common/test_follows_and_precedes_api.h"
 #include "common/concepts_common.h"
+#include "test_try_put_and_wait.h"
 
 
 //! \file test_multifunction_node.cpp
@@ -623,3 +624,12 @@ TEST_CASE("constraints for multifunction_node body") {
     static_assert(!can_call_multifunction_node_ctor<input_type, output_type, WrongSecondInputOperatorRoundBrackets<input_type, output_type>>);
 }
 #endif // __TBB_CPP20_CONCEPTS_PRESENT
+
+#if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
+//! \brief \ref error_guessing
+TEST_CASE("multifunction_node try_put_and_wait") {
+    using node_type = oneapi::tbb::flow::multifunction_node<int, std::tuple<int>>;
+    test_try_put_and_wait::test_multioutput<node_type>();
+}
+
+#endif

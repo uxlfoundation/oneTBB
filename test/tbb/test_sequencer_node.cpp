@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@
 #include <cstdio>
 #include <atomic>
 
-#include "test_buffering_try_put_and_wait.h"
+#include "test_try_put_and_wait.h"
 
 //! \file test_sequencer_node.cpp
 //! \brief Test for [flow_graph.sequencer_node] specification
