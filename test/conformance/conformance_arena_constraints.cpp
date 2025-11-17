@@ -100,6 +100,62 @@ TEST_CASE("Test create_numa_task_arenas conformance correctness") {
   }
 }
 
+struct join_arena_observer : tbb::task_scheduler_observer {
+  join_arena_observer(tbb::task_arena &ta, int max_workers, int max_external_threads)
+      : tbb::task_scheduler_observer(ta), max_num_workers(max_workers), max_num_external_threads(max_external_threads)
+  {
+    observe(true);
+  }
+
+  void on_scheduler_entry(bool is_worker) override {
+    int prev;
+    if (is_worker) {
+      prev = num_workers.fetch_add(1, std::memory_order_relaxed);
+      REQUIRE_MESSAGE(prev+1 <= max_num_workers, "More than expected worker threads has joined arena");
+    } else {
+      prev = num_external_threads.fetch_add(1, std::memory_order_relaxed);
+      REQUIRE_MESSAGE(prev+1 <= max_num_external_threads, "More than expected external threads has joined arena");
+    }
+  }
+
+  int max_num_workers;
+  int max_num_external_threads;
+  std::atomic_int num_workers{};
+  std::atomic_int num_external_threads{};
+};
+
+//! Test that reserved slots parameter makes expected effect on task_arena objects
+//! \brief \ref interface \ref error_guessing
+TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
+  system_info::initialize();
+  std::vector<index_info> numa_nodes_info = system_info::get_numa_nodes_info();
+  int expected_numa_concurrency = numa_nodes_info[0].concurrency;
+
+  for (int reserved_slots = 0; reserved_slots < expected_numa_concurrency; ++reserved_slots) {
+      auto numa_task_arenas = tbb::create_numa_task_arenas({}, reserved_slots);
+      for (auto& ta : numa_task_arenas) {
+        int ta_concurrency = ta.max_concurrency();
+        int max_num_workers = ta_concurrency - std::min(ta_concurrency, reserved_slots);
+        join_arena_observer observer {ta, max_num_workers, reserved_slots};
+        utils::SpinBarrier barrier{(std::size_t)ta_concurrency};
+        for (int w = 0; w < max_num_workers; ++w) {
+          ta.enqueue([&barrier] { barrier.wait(); });
+        }
+        utils::NativeParallelFor(reserved_slots,
+            [&ta, &barrier] (int) { ta.execute([&barrier] { barrier.wait(); }); });
+
+        if (reserved_slots == 0 && numa_task_arenas.size() == 1) {
+          // No extra worker is going to join the arena
+          observer.num_workers.fetch_add(1, std::memory_order_relaxed);
+          barrier.wait();
+        }
+
+        REQUIRE(observer.num_workers.load(std::memory_order_relaxed) == max_num_workers);
+        REQUIRE(observer.num_external_threads.load(std::memory_order_relaxed) == reserved_slots);
+      }
+  }
+}
+
 #else /*!__TBB_HWLOC_VALID_ENVIRONMENT*/
 
 //! Testing NUMA support interfaces validity when HWLOC is not present on system

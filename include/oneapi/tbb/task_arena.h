@@ -28,13 +28,14 @@
 #include "detail/_task.h"
 
 #include "detail/_task_handle.h"
-#include <vector>
 
 #if __TBB_ARENA_BINDING
 #include "info.h"
 #endif /*__TBB_ARENA_BINDING*/
 
 #include "task_group.h"
+
+#include <vector>
 
 namespace tbb {
 namespace detail {
