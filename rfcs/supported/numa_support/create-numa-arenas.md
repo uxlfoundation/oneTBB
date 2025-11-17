@@ -1,6 +1,6 @@
 # API to simplify creation of task arenas constrained to NUMA nodes
 
-This describes describes an API to ease creation of a one-per-NUMA-node set of task arenas.
+This RFC describes an API to ease creation of a one-per-NUMA-node set of task arenas.
 
 ## Motivation
 
