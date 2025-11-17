@@ -154,8 +154,9 @@ TEST_CASE("Test constraints argument in create_numa_task_arenas") {
   auto numa_indices = tbb::info::numa_nodes();
   for (const auto& constraints : generate_constraints_variety()) {
     auto numa_task_arenas = tbb::create_numa_task_arenas(constraints);
+    tbb::task_arena::constraints expected_constraint = constraints;
     for (std::size_t i = 0; i < numa_indices.size(); ++i) {
-      tbb::task_arena::constraints expected_constraint = constraints;
+
       expected_constraint.set_numa_id(numa_indices[i]);
       test_constraints_affinity_and_concurrency(expected_constraint,
                                                 get_arena_affinity(numa_task_arenas[i]));

@@ -77,7 +77,13 @@ TEST_CASE("Test core types topology traversal correctness") {
 TEST_CASE("Test create_numa_task_arenas conformance correctness") {
   system_info::initialize();
   auto numa_indices = oneapi::tbb::info::numa_nodes();
-  auto numa_task_arenas = oneapi::tbb::create_numa_task_arenas();
+  using return_type = decltype(oneapi::tbb::create_numa_task_arenas());
+  static_assert(
+      std::is_same<std::vector<oneapi::tbb::task_arena>, return_type>::value, 
+      "Return type of oneapi::tbb::create_numa_task_arenas() does not match the type guaranteed by oneAPI Specification"
+  );
+  return_type numa_task_arenas = oneapi::tbb::create_numa_task_arenas();
+
   REQUIRE_MESSAGE(numa_task_arenas.size() == numa_indices.size(),
       "create_numa_task_arenas returns the same number of NUMA nodes as tbb::info::numa_nodes()");
   // Test that arenas are not initialized
