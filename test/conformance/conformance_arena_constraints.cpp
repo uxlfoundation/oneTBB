@@ -133,25 +133,30 @@ TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
 
   for (int reserved_slots = 0; reserved_slots < expected_numa_concurrency; ++reserved_slots) {
       auto numa_task_arenas = tbb::create_numa_task_arenas({}, reserved_slots);
+      tbb::task_group tg{};
       for (auto& ta : numa_task_arenas) {
         int ta_concurrency = ta.max_concurrency();
         int max_num_workers = ta_concurrency - std::min(ta_concurrency, reserved_slots);
-        join_arena_observer observer {ta, max_num_workers, reserved_slots};
+        int max_num_external_threads = reserved_slots == 0 && numa_task_arenas.size() == 1 ? 1 : reserved_slots;
+
+        join_arena_observer observer {ta, max_num_workers, max_num_external_threads};
         utils::SpinBarrier barrier{(std::size_t)ta_concurrency};
-        for (int w = 0; w < max_num_workers; ++w) {
-          ta.enqueue([&barrier] { barrier.wait(); });
+        for (int w = 0; w < ta_concurrency; ++w) {
+          ta.enqueue([&barrier] { barrier.wait(); }, tg);
         }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
         utils::NativeParallelFor(reserved_slots,
-            [&ta, &barrier] (int) { ta.execute([&barrier] { barrier.wait(); }); });
+            [&ta, &tg] (int) { ta.wait_for(tg); });
 
         if (reserved_slots == 0 && numa_task_arenas.size() == 1) {
           // No extra worker is going to join the arena
           observer.num_workers.fetch_add(1, std::memory_order_relaxed);
-          barrier.wait();
+          ta.wait_for(tg);
         }
 
         REQUIRE(observer.num_workers.load(std::memory_order_relaxed) == max_num_workers);
-        REQUIRE(observer.num_external_threads.load(std::memory_order_relaxed) == reserved_slots);
+        REQUIRE(observer.num_external_threads.load(std::memory_order_relaxed) == max_num_external_threads);
       }
   }
 }
