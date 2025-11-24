@@ -649,7 +649,7 @@ inline std::vector<d1::task_arena> create_numa_task_arenas(d1::constraints c = {
     std::vector<d1::task_arena> numa_arenas;
     numa_arenas.reserve(node_indices.size());
     for (auto numa_id : node_indices) {
-      numa_arenas.emplace_back(c.set_numa_id(numa_id), reserved_slots);
+        numa_arenas.emplace_back(c.set_numa_id(numa_id), reserved_slots);
     }
     return numa_arenas;
 }

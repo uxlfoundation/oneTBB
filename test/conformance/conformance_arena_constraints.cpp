@@ -145,7 +145,12 @@ TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
           ta.enqueue([&barrier] { barrier.wait(); }, tg);
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds{1});
+        // Waiting a bit to give workers an opportunity to occupy more arena slots than
+        // are dedicated to workers. Thus, stressing the expectation that workers cannot occupy
+        // reserved slots.
+        if (reserved_slots > 0)
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+
         utils::NativeParallelFor(reserved_slots,
             [&ta, &tg] (int) { ta.wait_for(tg); });
 
