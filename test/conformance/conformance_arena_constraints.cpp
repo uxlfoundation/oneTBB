@@ -155,7 +155,9 @@ TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
             [&ta, &tg] (int) { ta.wait_for(tg); });
 
         if (reserved_slots == 0 && numa_task_arenas.size() == 1) {
-          // No extra worker is going to join the arena
+          // No extra worker is going to join the arena because having only NUMA node means that
+          // the default total number of workers is equal to concurrnecy of the single NUMA - 1.
+          // Thus, the external thread must join to complete work.
           observer.num_workers.fetch_add(1, std::memory_order_relaxed);
           ta.wait_for(tg);
         }
