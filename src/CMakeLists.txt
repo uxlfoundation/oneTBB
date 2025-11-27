@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2024 Intel Corporation
+# Copyright (C) 2023-2025 Intel Corporation
 #
 # This software and the related documents are Intel copyrighted materials, and your use of them is
 # governed by the express license under which they were provided to you ("License"). Unless the
@@ -111,14 +111,4 @@ install(TARGETS tcm
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-# if (WIN32)
-#   install(IMPORTED_RUNTIME_ARTIFACTS HWLOC::hwloc
-#     RUNTIME
-#       DESTINATION ${CMAKE_INSTALL_BINDIR}
-#   )
-# else()
-#   get_target_property(hwloc_lib HWLOC::hwloc IMPORTED_LOCATION)
-#   get_filename_component(hwloc_lib_dir "${hwloc_lib}" DIRECTORY)
-#   file(GLOB hwloc_binaries ${hwloc_lib_dir}/libhwloc.so*)
-#   install(FILES ${hwloc_binaries} DESTINATION ${CMAKE_INSTALL_LIBDIR})
-# endif()
+tcm_generate_vars(tcm)

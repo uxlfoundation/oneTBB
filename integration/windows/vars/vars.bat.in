@@ -1,0 +1,53 @@
+@echo off
+REM
+REM Copyright (C) 2025 Intel Corporation
+REM
+REM This software and the related documents are Intel copyrighted materials, and your use of them is
+REM governed by the express license under which they were provided to you ("License"). Unless the
+REM License provides otherwise, you may not use, modify, copy, publish, distribute, disclose or
+REM transmit this software or the related documents without Intel's prior written permission.
+REM
+REM This software and the related documents are provided as is, with no express or implied
+REM warranties, other than those that are expressly stated in the License.
+REM
+
+REM Syntax:
+REM  %SCRIPT_NAME% [^<arch^>]
+REM    ^<arch^> should be one of the following
+REM        ia32         : Set up for IA-32  architecture
+REM        intel64      : Set up for Intel(R) 64  architecture
+REM    if ^<arch^> is not set Intel(R) 64 architecture will be used
+
+set "SCRIPT_NAME=%~nx0"
+set "TCM_SCRIPT_DIR=%~d0%~p0"
+set "TCMROOT=%TCM_SCRIPT_DIR%.."
+
+:: Set the default arguments
+set TCM_TARGET_ARCH=intel64
+
+:ParseArgs
+:: Parse the incoming arguments
+if /i "%1"==""             goto SetEnv
+if /i "%1"=="ia32"         (set TCM_TARGET_ARCH=ia32)     & shift & goto ParseArgs
+if /i "%1"=="intel64"      (set TCM_TARGET_ARCH=intel64)  & shift & goto ParseArgs
+
+:SetEnv
+if "%TCM_TARGET_ARCH%" == "ia32" (
+    set "TCM_DEFAULT_BIN_NAME=bin32"
+) else (
+    set "TCM_DEFAULT_BIN_NAME=bin"
+)
+
+set "TCM_BIN_DIR=@BINARY_PATH_PLACEHOLDER@"
+
+if exist "%TCM_BIN_DIR%" (
+    set "PATH=%TCM_BIN_DIR%;%PATH%"
+) else (
+    echo:
+    echo :: ERROR: TCM library directory "%TCM_BIN_DIR%" does not exist
+    echo:
+    exit /b 255
+)
+
+:End
+exit /B 0
