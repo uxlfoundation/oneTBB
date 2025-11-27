@@ -17,6 +17,7 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include <oneapi/tbb/concurrent_set.h>
 #include <common/test.h>
 #include <common/utils.h>
 #include <common/concurrent_ordered_common.h>

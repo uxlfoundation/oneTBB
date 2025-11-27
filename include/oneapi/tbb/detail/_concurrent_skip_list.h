@@ -50,7 +50,7 @@
 
 namespace tbb {
 namespace detail {
-namespace d2 {
+namespace d3 {
 
 template <typename LevelGenerator, typename SizeType>
 class skip_list_thread_data {
@@ -1325,7 +1325,7 @@ private:
     std::minstd_rand my_engine;
 };
 
-} // namespace d2
+} // namespace d3
 
 } // namespace detail
 } // namespace tbb
