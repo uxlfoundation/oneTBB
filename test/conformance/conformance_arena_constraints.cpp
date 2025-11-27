@@ -140,7 +140,7 @@ TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
         int max_num_external_threads = reserved_slots == 0 && numa_task_arenas.size() == 1 ? 1 : reserved_slots;
 
         join_arena_observer observer {ta, max_num_workers, max_num_external_threads};
-        utils::SpinBarrier barrier{(std::size_t)ta_concurrency};
+        utils::SpinBarrier barrier{(std::size_t)ta_concurrency + int(!reserved_slots)};
         for (int w = 0; w < ta_concurrency; ++w) {
           ta.enqueue([&barrier] { barrier.wait(); }, tg);
         }
@@ -148,7 +148,7 @@ TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
         // Waiting a bit to give workers an opportunity to occupy more arena slots than
         // are dedicated to workers. Thus, stressing the expectation that workers cannot occupy
         // reserved slots.
-        if (reserved_slots > 0)
+        if (reserved_slots > 0 && max_num_workers > 0)
             std::this_thread::sleep_for(std::chrono::milliseconds{1});
 
         utils::NativeParallelFor(reserved_slots,
