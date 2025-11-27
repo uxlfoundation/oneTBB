@@ -82,10 +82,10 @@
 		</Expand>
 	</Type>
 
-	<Type Name="tbb::detail::d2::concurrent_map&lt;*,*,*,*&gt;">
-		<AlternativeType Name="tbb::detail::d2::concurrent_multimap&lt;*,*,*,*&gt;"/>
-		<AlternativeType Name="tbb::detail::d2::concurrent_set&lt;*,*,*&gt;"/>
-		<AlternativeType Name="tbb::detail::d2::concurrent_multiset&lt;*,*,*&gt;"/>
+	<Type Name="tbb::detail::d3::concurrent_map&lt;*,*,*,*&gt;">
+		<AlternativeType Name="tbb::detail::d3::concurrent_multimap&lt;*,*,*,*&gt;"/>
+		<AlternativeType Name="tbb::detail::d3::concurrent_set&lt;*,*,*&gt;"/>
+		<AlternativeType Name="tbb::detail::d3::concurrent_multiset&lt;*,*,*&gt;"/>
 		<Expand>
 			<Item Name="[comparator]">my_compare</Item>
 			<Item Name="[allocator]">my_node_allocator</Item>
