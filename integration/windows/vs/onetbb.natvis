@@ -87,10 +87,13 @@
 		<AlternativeType Name="tbb::detail::d3::concurrent_set&lt;*,*,*&gt;"/>
 		<AlternativeType Name="tbb::detail::d3::concurrent_multiset&lt;*,*,*&gt;"/>
 		<Expand>
-			<Item Name="[comparator]">my_compare</Item>
-			<Item Name="[allocator]">my_node_allocator</Item>
-
 			<CustomListItems MaxItemsPerView="1">
+        <!--
+          The size of ordered associative containers is actually located in thread local storage.
+          So, in order to display the size of the container, we have to traverse and sum all elements of TLS.
+          Custom intrinsics do not support loops, only simple expressions, so [size] can not
+          be displayed in DisplayString section.
+        -->
 				<Variable Name="size" InitialValue="0"/>
 				<Variable Name="index" InitialValue="0"/>
 				<Variable Name="segment_index" InitialValue="-1"/>
@@ -102,6 +105,9 @@
 				</Loop>
 				<Item Name="[size]">size</Item>
 			</CustomListItems>
+
+			<Item Name="[comparator]">my_compare</Item>
+			<Item Name="[allocator]">my_node_allocator</Item>
 			
 			<CustomListItems MaxItemsPerView="50">
 				<!--
