@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -14,24 +14,16 @@
     limitations under the License.
 */
 
-#if __cplusplus >= 202002L
+//! Test for the availability of extensions
+//! \file test_tbb_version.cpp
+//! \brief Test for [configuration.feature_macros] specification
 
-/*begin_parallel_sort_ranges_extension_example*/
-#include <array>
-#include <span> // requires C++20
-#include <oneapi/tbb/parallel_sort.h>
-
-std::span<int> get_span() {
-    static std::array<int, 3> arr = {3, 2, 1};
-    return std::span<int>(arr);
-}
+#include "tbb/version.h"
+// checking that inclusion of version.h is enough to get TBB_EXT_CUSTOM_ASSERTION_HANDLER
+#if TBB_EXT_CUSTOM_ASSERTION_HANDLER != 202510
+    #error "TBB_EXT_CUSTOM_ASSERTION_HANDLER must be set to 202510"
+#endif
 
 int main() {
-    tbb::parallel_sort(get_span());
+    return 0;
 }
-/*end_parallel_sort_ranges_extension_example*/
-
-#else
-// Skip
-int main() {}
-#endif

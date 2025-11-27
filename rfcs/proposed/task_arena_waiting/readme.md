@@ -113,23 +113,7 @@ ta.enqueue([]{ foo(); }, tg); // corresponds to: ta.enqueue(tg.defer([]{ foo(); 
 ta.wait_for(tg);              // corresponds to: ta.execute([&tg]{ tg.wait(); });
 ```
 
-The example code to split work across NUMA-bound task arenas could then look like this (assuming also
-a special function that creates and initializes a vector of arenas):
-```cpp
-std::vector<tbb::task_arena> numa_arenas =
-    initialize_constrained_arenas(/*some arguments*/);
-std::vector<tbb::task_group> task_groups(numa_arenas.size());
-
-for(unsigned j = 0; j < numa_arenas.size(); j++) {
-    numa_arenas[j].enqueue( (){/*some parallel stuff*/}, task_groups[j] );
-}
-
-for(unsigned j = 0; j < numa_arenas.size(); j++) {
-    numa_arenas[j].wait_for( task_groups[j] );
-}
-```
-
-See [Improve interoperability with task groups](task_group_interop.md) for more details.
+This part of the proposal [is supported](../../supported/task_arena_waiting/readme.md) since oneTBB 2022.3.
 
 ### 2. Reconsider waiting for all tasks
 
@@ -182,6 +166,6 @@ ta.block_with_progress_delegation([]{ std::this_thread::sleep_for(100ms); });
 
 ## Open Questions
 
+- Implementation feasibility for (2) and (3) needs to be explored
 - API names and semantic details need to be further elaborated
 - Whether/how work isolation is supported needs to be decided
-- Implementation feasibility for (2) and (3) needs to be explored

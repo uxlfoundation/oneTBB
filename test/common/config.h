@@ -82,6 +82,11 @@ const unsigned MByte = 1024*1024;
 
 #if (_WIN32 && !__TBB_WIN8UI_SUPPORT) || (__linux__ && !__ANDROID__ && !__bg__) || __FreeBSD_version >= 701000
 #define __TBB_TEST_SKIP_AFFINITY 0
+#if __linux__
+#define __TBB_USE_CGROUPS 1
+#else
+#define __TBB_USE_CGROUPS 0
+#endif
 #else
 #define __TBB_TEST_SKIP_AFFINITY 1
 #endif
