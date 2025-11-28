@@ -75,97 +75,109 @@ TEST_CASE("Test core types topology traversal correctness") {
 //! Testing create_numa_task_arenas helper function correctness
 //! \brief \ref interface \ref requirement
 TEST_CASE("Test create_numa_task_arenas conformance correctness") {
-  system_info::initialize();
-  auto numa_indices = oneapi::tbb::info::numa_nodes();
-  using return_type = decltype(oneapi::tbb::create_numa_task_arenas());
-  static_assert(
-      std::is_same<std::vector<oneapi::tbb::task_arena>, return_type>::value, 
-      "Return type of oneapi::tbb::create_numa_task_arenas() does not match the type guaranteed by oneAPI Specification"
-  );
-  return_type numa_task_arenas = oneapi::tbb::create_numa_task_arenas();
+    system_info::initialize();
+    auto numa_indices = oneapi::tbb::info::numa_nodes();
+    using return_type = decltype(oneapi::tbb::create_numa_task_arenas());
+    static_assert(
+        std::is_same<std::vector<oneapi::tbb::task_arena>, return_type>::value,
+        "Return type of oneapi::tbb::create_numa_task_arenas() does not match the type guaranteed by oneAPI Specification"
+    );
+    return_type numa_task_arenas = oneapi::tbb::create_numa_task_arenas();
 
-  REQUIRE_MESSAGE(numa_task_arenas.size() == numa_indices.size(),
-      "create_numa_task_arenas returns the same number of NUMA nodes as tbb::info::numa_nodes()");
-  // Test that arenas are not initialized
-  for (auto& ta : numa_task_arenas) {
-    REQUIRE_MESSAGE(!ta.is_active(),
-        "create_numa_task_arenas must return a vector of non-initialized arenas");
-  }
+    REQUIRE_MESSAGE(numa_task_arenas.size() == numa_indices.size(),
+        "create_numa_task_arenas returns the same number of NUMA nodes as tbb::info::numa_nodes()");
+    // Test that arenas are not initialized
+    for (auto& ta : numa_task_arenas) {
+        REQUIRE_MESSAGE(!ta.is_active(),
+            "create_numa_task_arenas must return a vector of non-initialized arenas");
+    }
 
-  for (std::size_t numa_i = 0; numa_i < numa_indices.size(); ++numa_i) {
-    oneapi::tbb::task_arena::constraints c{numa_indices[numa_i]};
-    auto constraint_concurrency = oneapi::tbb::info::default_concurrency(c);
-    REQUIRE_MESSAGE(constraint_concurrency == numa_task_arenas[numa_i].max_concurrency(),
-        "Maximum concurrency level of task_arena should be the same as for constraints");
-  }
+    for (std::size_t numa_i = 0; numa_i < numa_indices.size(); ++numa_i) {
+        oneapi::tbb::task_arena::constraints c{numa_indices[numa_i]};
+        auto constraint_concurrency = oneapi::tbb::info::default_concurrency(c);
+        REQUIRE_MESSAGE(constraint_concurrency == numa_task_arenas[numa_i].max_concurrency(),
+            "Maximum concurrency level of task_arena should be the same as for constraints");
+    }
 }
 
 struct join_arena_observer : tbb::task_scheduler_observer {
-  join_arena_observer(tbb::task_arena &ta, int max_workers, int max_external_threads)
-      : tbb::task_scheduler_observer(ta), max_num_workers(max_workers), max_num_external_threads(max_external_threads)
-  {
-    observe(true);
-  }
-
-  void on_scheduler_entry(bool is_worker) override {
-    int prev;
-    if (is_worker) {
-      prev = num_workers.fetch_add(1, std::memory_order_relaxed);
-      REQUIRE_MESSAGE(prev+1 <= max_num_workers, "More than expected worker threads has joined arena");
-    } else {
-      prev = num_external_threads.fetch_add(1, std::memory_order_relaxed);
-      REQUIRE_MESSAGE(prev+1 <= max_num_external_threads, "More than expected external threads has joined arena");
+    join_arena_observer(tbb::task_arena &ta, int max_workers, int max_external_threads)
+        : tbb::task_scheduler_observer(ta), max_num_workers(max_workers), max_num_external_threads(max_external_threads)
+    {
+        observe(true);
     }
-  }
 
-  int max_num_workers;
-  int max_num_external_threads;
-  std::atomic_int num_workers{};
-  std::atomic_int num_external_threads{};
+    void on_scheduler_entry(bool is_worker) override {
+        int prev;
+        if (is_worker) {
+            prev = num_workers.fetch_add(1, std::memory_order_relaxed);
+            REQUIRE_MESSAGE(prev+1 <= max_num_workers, "More than expected worker threads has joined arena");
+        } else {
+            prev = num_external_threads.fetch_add(1, std::memory_order_relaxed);
+            REQUIRE_MESSAGE(prev+1 <= max_num_external_threads, "More than expected external threads has joined arena");
+        }
+    }
+
+    int max_num_workers;
+    int max_num_external_threads;
+    std::atomic_int num_workers{};
+    std::atomic_int num_external_threads{};
 };
 
 //! Test that reserved slots parameter makes expected effect on task_arena objects
 //! \brief \ref interface \ref error_guessing
 TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
-  system_info::initialize();
-  std::vector<index_info> numa_nodes_info = system_info::get_numa_nodes_info();
-  int expected_numa_concurrency = numa_nodes_info[0].concurrency;
+    system_info::initialize();
+    std::vector<index_info> numa_nodes_info = system_info::get_numa_nodes_info();
+    int expected_numa_concurrency =
+        std::max_element(numa_nodes_info.begin(), numa_nodes_info.end(),
+            [](const index_info &lhs, const index_info &rhs) {
+                return lhs.concurrency < rhs.concurrency;
+            })->concurrency;
 
-  for (int reserved_slots = 0; reserved_slots < expected_numa_concurrency; ++reserved_slots) {
-      auto numa_task_arenas = tbb::create_numa_task_arenas({}, reserved_slots);
-      tbb::task_group tg{};
-      for (auto& ta : numa_task_arenas) {
-        int ta_concurrency = ta.max_concurrency();
-        int max_num_workers = ta_concurrency - std::min(ta_concurrency, reserved_slots);
-        int max_num_external_threads = reserved_slots == 0 && numa_task_arenas.size() == 1 ? 1 : reserved_slots;
+    for (int reserved_slots = 0; reserved_slots <= expected_numa_concurrency; ++reserved_slots) {
+        auto numa_task_arenas = tbb::create_numa_task_arenas({}, reserved_slots);
+        tbb::task_group tg{};
+        // Having only NUMA node means that the default total number of workers is equal to
+        // concurrnecy of the single NUMA - 1. This means that for task_arena with reserved_slots=0
+        // worker threads won't be able to fully saturate the arena.
+        // This flag is set to adjust test expectations accordingly.
+        bool workers_cannot_fully_occupy_arena = numa_nodes_info.size() == 1 && reserved_slots == 0;
+        for (auto& ta : numa_task_arenas) {
+            int ta_concurrency;
+            ta.enqueue([&ta_concurrency] { ta_concurrency = tbb::this_task_arena::max_concurrency(); }, tg);
+            ta.wait_for(tg);
 
-        join_arena_observer observer {ta, max_num_workers, max_num_external_threads};
-        utils::SpinBarrier barrier{(std::size_t)ta_concurrency + int(!reserved_slots)};
-        for (int w = 0; w < ta_concurrency; ++w) {
-          ta.enqueue([&barrier] { barrier.wait(); }, tg);
+            int max_num_workers = ta_concurrency -
+                std::min(ta_concurrency, reserved_slots) -
+                int(workers_cannot_fully_occupy_arena);
+
+            int max_num_external_threads = reserved_slots;
+            int num_tasks = ta_concurrency - int(workers_cannot_fully_occupy_arena);
+
+            join_arena_observer observer {ta, max_num_workers, max_num_external_threads};
+            utils::SpinBarrier barrier{(std::size_t)num_tasks + std::size_t(!reserved_slots)};
+            for (int w = 0; w < num_tasks; ++w) {
+                ta.enqueue([&barrier] { barrier.wait(); }, tg);
+            }
+
+            // Waiting a bit to give workers an opportunity to occupy more arena slots than
+            // are dedicated to workers. Thus, stressing the expectation that workers cannot occupy
+            // reserved slots.
+            if (reserved_slots > 0 && max_num_workers > 0)
+                std::this_thread::sleep_for(std::chrono::milliseconds{1});
+
+            utils::NativeParallelFor(reserved_slots,
+                [&ta, &tg] (int) { ta.wait_for(tg); });
+
+            if (!reserved_slots) {
+              barrier.wait();
+            }
+
+            REQUIRE(observer.num_workers.load(std::memory_order_relaxed) == max_num_workers);
+            REQUIRE(observer.num_external_threads.load(std::memory_order_relaxed) == max_num_external_threads);
         }
-
-        // Waiting a bit to give workers an opportunity to occupy more arena slots than
-        // are dedicated to workers. Thus, stressing the expectation that workers cannot occupy
-        // reserved slots.
-        if (reserved_slots > 0 && max_num_workers > 0)
-            std::this_thread::sleep_for(std::chrono::milliseconds{1});
-
-        utils::NativeParallelFor(reserved_slots,
-            [&ta, &tg] (int) { ta.wait_for(tg); });
-
-        if (reserved_slots == 0 && numa_task_arenas.size() == 1) {
-          // No extra worker is going to join the arena because having only NUMA node means that
-          // the default total number of workers is equal to concurrnecy of the single NUMA - 1.
-          // Thus, the external thread must join to complete work.
-          observer.num_workers.fetch_add(1, std::memory_order_relaxed);
-          ta.wait_for(tg);
-        }
-
-        REQUIRE(observer.num_workers.load(std::memory_order_relaxed) == max_num_workers);
-        REQUIRE(observer.num_external_threads.load(std::memory_order_relaxed) == max_num_external_threads);
-      }
-  }
+    }
 }
 
 #else /*!__TBB_HWLOC_VALID_ENVIRONMENT*/
