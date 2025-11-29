@@ -28,6 +28,7 @@ namespace detail {
 namespace r1 {
 
 inline d1::task* get_self_recall_task(arena_slot& slot);
+std::size_t global_control_active_value_unsafe(d1::global_control::parameter);
 
 class waiter_base {
 public:
@@ -76,7 +77,10 @@ public:
                         return true;
                     }
 
-                    if (!my_arena.my_thread_leave.is_retention_allowed() ||
+                    if (
+#if __TBB_PREVIEW_PARALLEL_PHASE
+                        !my_arena.my_thread_leave.is_retention_allowed() ||
+#endif
                         my_arena.my_threading_control->is_any_other_client_active())
                     {
                         break;
@@ -110,10 +114,10 @@ private:
 
     bool is_delayed_leave_enabled() {
 #if __TBB_PREVIEW_PARALLEL_PHASE
-       return my_arena.my_thread_leave.is_retention_allowed();
+        return my_arena.my_thread_leave.is_retention_allowed();
 #else
-       return !governor::hybrid_cpu();
-#endif   
+        return (global_control_active_value_unsafe(global_control::fast_leave) == 0) && !governor::hybrid_cpu();
+#endif
     }
 
     bool is_worker_should_leave(arena_slot& slot) const {

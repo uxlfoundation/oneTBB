@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -142,13 +143,20 @@ class alignas(max_nfs_size) lifetime_control : public control_storage {
     }
 };
 
-static control_storage* controls[] = {nullptr, nullptr, nullptr, nullptr};
+class alignas(max_nfs_size) fast_leave_control : public control_storage {
+    std::size_t default_value() const override {
+        return 0;
+    }
+};
+
+static control_storage* controls[] = {nullptr, nullptr, nullptr, nullptr, nullptr};
 
 void global_control_acquire() {
     controls[0] = new (cache_aligned_allocate(sizeof(allowed_parallelism_control))) allowed_parallelism_control{};
     controls[1] = new (cache_aligned_allocate(sizeof(stack_size_control))) stack_size_control{};
     controls[2] = new (cache_aligned_allocate(sizeof(terminate_on_exception_control))) terminate_on_exception_control{};
     controls[3] = new (cache_aligned_allocate(sizeof(lifetime_control))) lifetime_control{};
+    controls[4] = new (cache_aligned_allocate(sizeof(fast_leave_control))) fast_leave_control{};
 }
 
 void global_control_release() {

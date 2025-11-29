@@ -66,6 +66,7 @@ public:
         thread_stack_size,
         terminate_on_exception,
         scheduler_handle, // not a public parameter
+        fast_leave,
         parameter_max // insert new parameters above this point
     };
 

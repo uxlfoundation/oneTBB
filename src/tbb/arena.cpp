@@ -528,8 +528,10 @@ struct task_arena_impl {
     static int max_concurrency(const d1::task_arena_base*);
     static void enqueue(d1::task&, d1::task_group_context*, d1::task_arena_base*);
     static d1::slot_id execution_slot(const d1::task_arena_base&);
+#if __TBB_PREVIEW_PARALLEL_PHASE
     static void enter_parallel_phase(d1::task_arena_base*, std::uintptr_t);
     static void exit_parallel_phase(d1::task_arena_base*, std::uintptr_t);
+#endif
 };
 
 void __TBB_EXPORTED_FUNC initialize(d1::task_arena_base& ta) {
@@ -564,6 +566,7 @@ d1::slot_id __TBB_EXPORTED_FUNC execution_slot(const d1::task_arena_base& arena)
     return task_arena_impl::execution_slot(arena);
 }
 
+#if __TBB_PREVIEW_PARALLEL_PHASE
 void __TBB_EXPORTED_FUNC enter_parallel_phase(d1::task_arena_base* ta, std::uintptr_t flags) {
     task_arena_impl::enter_parallel_phase(ta, flags);
 }
@@ -571,6 +574,7 @@ void __TBB_EXPORTED_FUNC enter_parallel_phase(d1::task_arena_base* ta, std::uint
 void __TBB_EXPORTED_FUNC exit_parallel_phase(d1::task_arena_base* ta, std::uintptr_t flags) {
     task_arena_impl::exit_parallel_phase(ta, flags);
 }
+#endif
 
 void task_arena_impl::initialize(d1::task_arena_base& ta) {
     // Enforce global market initialization to properly initialize soft limit
