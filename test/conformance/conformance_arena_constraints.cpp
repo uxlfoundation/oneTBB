@@ -108,20 +108,40 @@ struct join_arena_observer : tbb::task_scheduler_observer {
     }
 
     void on_scheduler_entry(bool is_worker) override {
-        int prev;
+        int current;
+        int expected_peak;
         if (is_worker) {
-            prev = num_workers.fetch_add(1, std::memory_order_relaxed);
-            REQUIRE_MESSAGE(prev+1 <= max_num_workers, "More than expected worker threads has joined arena");
+            current = num_workers.fetch_add(1, std::memory_order_relaxed) + 1;
+            expected_peak = current - 1;
+            while (current > expected_peak &&
+                   !peak_workers.compare_exchange_strong(
+                       expected_peak, current, std::memory_order_relaxed)) {}
+
+            REQUIRE_MESSAGE(current <= max_num_workers, "More than expected worker threads has joined arena");
         } else {
-            prev = num_external_threads.fetch_add(1, std::memory_order_relaxed);
-            REQUIRE_MESSAGE(prev+1 <= max_num_external_threads, "More than expected external threads has joined arena");
+            current = num_external_threads.fetch_add(1, std::memory_order_relaxed) + 1;
+            expected_peak = current - 1;
+            while (current > expected_peak &&
+                   !peak_external_threads.compare_exchange_strong(
+                       expected_peak, current, std::memory_order_relaxed)) {}
+            REQUIRE_MESSAGE(current <= max_num_external_threads, "More than expected external threads has joined arena");
         }
+    }
+
+    void on_scheduler_exit(bool is_worker) override {
+      if (is_worker) {
+        num_workers.fetch_sub(1, std::memory_order_relaxed);
+      } else {
+        num_external_threads.fetch_sub(1, std::memory_order_relaxed);
+      }
     }
 
     int max_num_workers;
     int max_num_external_threads;
     std::atomic_int num_workers{};
     std::atomic_int num_external_threads{};
+    std::atomic_int peak_workers{};
+    std::atomic_int peak_external_threads{};
 };
 
 //! Test that reserved slots parameter makes expected effect on task_arena objects
@@ -174,8 +194,11 @@ TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
               barrier.wait();
             }
 
-            REQUIRE(observer.num_workers.load(std::memory_order_relaxed) == max_num_workers);
-            REQUIRE(observer.num_external_threads.load(std::memory_order_relaxed) == max_num_external_threads);
+            REQUIRE(observer.peak_workers.load(std::memory_order_relaxed) == max_num_workers);
+            REQUIRE(observer.peak_external_threads.load(std::memory_order_relaxed) == max_num_external_threads);
+
+            observer.observe(false);
+            ta.wait_for(tg);
         }
     }
 }
