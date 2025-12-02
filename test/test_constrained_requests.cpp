@@ -20,7 +20,6 @@
 #include <hwloc/bitmap.h>
 
 #include <memory>
-#include <string>
 
 // ============================================================================
 // HWLOC mask utility

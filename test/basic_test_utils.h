@@ -27,7 +27,6 @@
 #include <algorithm>
 #include <iostream>
 #include <iomanip>
-#include <map>
 #include <mutex>
 #include <ostream>
 #include <string>
@@ -126,6 +125,10 @@ struct tests_run_statistics {
 
 class tcm_tests_data {
 public:
+    tcm_tests_data(unsigned reserved_num_tests = 128) {
+        tests.reserve(reserved_num_tests);
+    }
+
     // Keeping track of TCM clients to be able to automatically clean TCM state before each test
     void add_client(tcm_client_id_t client_id);
     void remove_client(tcm_client_id_t client_id);
@@ -133,7 +136,14 @@ public:
 
     // Keeping track of TCM tests
     using test_function_ptr = void (*)();
-    void add_test(const char* test_description, test_function_ptr);
+    struct test_info {
+        const char* filepath;             // File where the test is defined
+        unsigned line;                    // Line number in the file where the test is defined
+        std::string test_description;     // Description of the test
+        test_function_ptr test_func_addr; // The test itself
+    };
+
+    void add_test(test_info&& ti);
     tests_run_statistics run_tests();
 
     // Updating and reading status of a single test
@@ -142,7 +152,7 @@ private:
     bool run_test(const test_function_ptr test);
 
     bool is_clean_run = true;
-    std::map<std::string, test_function_ptr> tests;
+    std::vector<test_info> tests;
 
     std::mutex tcm_clients_mutex;
     std::vector<tcm_client_id_t> tcm_clients;
@@ -181,16 +191,16 @@ private:
 static tcm_test_logger_t</*skip_out_stream*/false, /*skip_err_stream*/false> logger;
 static tcm_tests_data tcm_tests;
 
-#define TEST_PREFACE(name, counter)                                            \
-  static inline void tcm_test##counter();                                      \
-  static inline bool tcm_test_adder##counter = []() {                          \
-    tcm_tests.add_test((name), &tcm_test##counter);                            \
-    return true;                                                               \
-  }();                                                                         \
-  static inline void tcm_test##counter()
+#define TEST_PREFACE(name, filename, linenumber)                                                   \
+  static inline void tcm_test##linenumber();                                                       \
+  static inline bool tcm_test_adder##linenumber = []() {                                           \
+    tcm_tests.add_test({filename, linenumber, (name), &tcm_test##linenumber});                     \
+    return true;                                                                                   \
+  }();                                                                                             \
+  static inline void tcm_test##linenumber()
 
-#define TEST_AUX(name, counter) TEST_PREFACE((name), counter)
-#define TEST(name) TEST_AUX((name), __LINE__)
+#define TEST_AUX(name, filename, linenumber) TEST_PREFACE((name), filename, linenumber)
+#define TEST(name) TEST_AUX((name), __FILE__, __LINE__)
 
 
 bool check(bool b, const std::string& msg, unsigned num_indents = 0,
@@ -279,24 +289,43 @@ inline bool tcm_tests_data::cleanup_test_state() {
     return succeed;
 }
 
-inline void tcm_tests_data::add_test(const char* test_description,
-                                     tcm_tests_data::test_function_ptr test_function)
-{
-    tests[std::string(test_description)] = test_function;
+inline void tcm_tests_data::add_test(test_info&& ti) {
+    tests.push_back(ti);
 }
 
-inline void test_prolog(const std::string& test_description) {
-    std::string status_message = "*    TEST START: " + test_description + "    *";
-    auto asterisks = std::string(status_message.length(), '*');
-    logger.log("\n\n" + asterisks + "\n" + status_message + "\n" + asterisks);
+inline std::string get_filename_from_path(const char* filepath) {
+    if (!filepath)
+        return "<unknown filename>";
+    std::string path{filepath};
+#if _WIN32
+    const char dir_separator = '\\';
+#else
+    const char dir_separator = '/';
+#endif
+    const std::size_t start_idx = path.rfind(dir_separator);
+    if (start_idx == path.npos)
+        return path;            // Did not find the directory separator
+    return path.substr(start_idx + 1, path.length() - start_idx - 1);
 }
 
-inline void test_epilog(bool succeed, const std::string &test_description) {
+inline void test_prolog(const tcm_tests_data::test_info& ti) {
+    std::string status_msg = "*    TEST START: " + ti.test_description + "    *";
+    std::string footer_msg = "* " + get_filename_from_path(ti.filepath) + ":" +
+                             std::to_string(ti.line) + " *";
+    const std::size_t length = std::max(status_msg.length(), footer_msg.length());
+    auto header = std::string(length, '*');
+    const std::size_t asterisk_length = (length - footer_msg.length()) / 2;
+    auto footer_asterisks = std::string(asterisk_length, '*');
+    std::string footer = footer_asterisks + footer_msg + footer_asterisks;
+    logger.log("\n\n" + header + "\n" + status_msg + "\n" + footer);
+}
+
+inline void test_epilog(bool succeed, const tcm_tests_data::test_info& ti) {
     std::string status_message = "*    TEST PASSED: ";
     if (!succeed)
         status_message = "*    TEST FAILED: ";
 
-    status_message += test_description + "    *";
+    status_message += ti.test_description + "    *";
     auto asterisks = std::string(status_message.length(), '*');
     logger.log(asterisks + "\n" + status_message + "\n" + asterisks);
 }
@@ -336,12 +365,12 @@ inline bool tcm_tests_data::run_test(const test_function_ptr test) {
 inline tests_run_statistics tcm_tests_data::run_tests() {
     unsigned num_run_tests = 0, num_succeeded_tests = 0;
 
-    for (const auto& [test_description, test_function] : tests) {
+    for (const test_info& ti : tests) {
         ++num_run_tests;
 
-        test_prolog(test_description);
-        const bool succeed = run_test(test_function);
-        test_epilog(succeed, test_description);
+        test_prolog(ti);
+        const bool succeed = run_test(ti.test_func_addr);
+        test_epilog(succeed, ti);
 
         if (succeed)
             ++num_succeeded_tests;

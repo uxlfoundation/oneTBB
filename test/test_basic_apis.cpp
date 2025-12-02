@@ -867,8 +867,6 @@ TEST("prohibit_request_as_inactive_for_pending") {
 }
 
 TEST("prohibit_permit_reallocation_for_requested_as_inactive") {
-    const char* test_name = __func__;
-    test_prolog(test_name);
     auto client_id = connect_new_client();
     tcm_permit_request_t req =
         make_request(/*min_sw_threads*/ platform_tcm_concurrency(),
