@@ -172,7 +172,7 @@ TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
                 std::min(ta_concurrency, reserved_slots) -
                 int(workers_cannot_fully_occupy_arena);
 
-            int max_num_external_threads = reserved_slots;
+            int max_num_external_threads = std::min(ta_concurrency, reserved_slots);
             int num_tasks = ta_concurrency - int(workers_cannot_fully_occupy_arena);
 
             join_arena_observer observer {ta, max_num_workers, max_num_external_threads};
