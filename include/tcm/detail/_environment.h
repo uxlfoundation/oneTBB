@@ -25,7 +25,7 @@ namespace internal {
         static constexpr int string_size = 16;
         int tcm_enable = tcm_automatic;
         int tcm_version = 0;
-        float tcm_oversubscription_factor = 1.0;
+        float tcm_oversubscription_factor = 1.0f;
         char tcm_resource_distribution_strategy[string_size+1] = "FAIR";
 
         environment() {

@@ -77,9 +77,13 @@ tcm_permit_request_t make_request(int min_sw_threads = tcm_automatic,
 {
     __TCM_ASSERT(!(!constraints ^ !size), "Inconsistent request.");
 
-    return tcm_permit_request_t{
-        min_sw_threads, max_sw_threads, constraints, size, priority, flags, /*reserved*/{0}
-    };
+    tcm_permit_request_t req = TCM_PERMIT_REQUEST_INITIALIZER;
+
+    req.min_sw_threads = min_sw_threads; req.max_sw_threads = max_sw_threads;
+    req.cpu_constraints = constraints; req.constraints_size = size;
+    req.priority = priority; req.flags = flags;
+
+    return req;
 }
 
 tcm_permit_t make_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,

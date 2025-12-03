@@ -146,8 +146,8 @@ TEST("test_allow_mask_omitting_during_permit_copy") {
 
 struct one_request_config {
   uint32_t* exp_concurrency;             // expected concurrency for client
-  int32_t min_concurrency;              // requested min_concurrency for client
-  int32_t max_concurrency;              // requested max_concurrency for client
+  int32_t min_sw_threads;               // requested min_sw_threads for client
+  int32_t max_sw_threads;               // requested max_sw_threads for client
   uint32_t constraints_size;            // size of array of constraints requested
   tcm_cpu_mask_t* per_mask;             // permit mask allocation
   tcm_cpu_mask_t* exp_mask;             // expected cpu mask
@@ -171,7 +171,7 @@ struct test_one_request {
     uint32_t* e_concurrency = config.exp_concurrency;
     tcm_permit_t e = make_active_permit(e_concurrency, e_mask, config.constraints_size);
 
-    tcm_permit_request_t req = make_request(config.min_concurrency, config.max_concurrency);
+    tcm_permit_request_t req = make_request(config.min_sw_threads, config.max_sw_threads);
     req.constraints_size = config.constraints_size;
     req.cpu_constraints = config.constraints;
 
@@ -196,17 +196,19 @@ struct test_one_request_low_level_constraints {
     std::unique_ptr<tcm_cpu_mask_t, mask_deleter> permit_mask(&p_mask);
     std::unique_ptr<tcm_cpu_mask_t, mask_deleter> expected_mask(&e_mask);
     std::unique_ptr<tcm_cpu_mask_t, mask_deleter> requested_mask(&r_mask);
-    uint32_t concurrency = uint32_t(tcm_oversubscription_factor * mask.size());
+    uint32_t available = uint32_t(tcm_oversubscription_factor * platform_hardware_concurrency());
+    uint32_t requested = uint32_t(tcm_oversubscription_factor * mask.size());
+    uint32_t expected = std::min(requested, available);
 
     tcm_cpu_constraints_t cpu_constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
     cpu_constraints.min_concurrency = 0;
-    cpu_constraints.max_concurrency = concurrency;
+    cpu_constraints.max_concurrency = requested;
     cpu_constraints.mask = *requested_mask.get();
 
     one_request_config test_config{};
-    test_config.exp_concurrency = &concurrency;
-    test_config.min_concurrency = 0;
-    test_config.max_concurrency = concurrency;
+    test_config.exp_concurrency = &expected;
+    test_config.min_sw_threads = 0;
+    test_config.max_sw_threads = requested;
     test_config.constraints_size = 1;
     test_config.per_mask = permit_mask.get();
     test_config.exp_mask = expected_mask.get();
@@ -234,18 +236,21 @@ TEST("Constrained request with first numa node as high level constraint") {
   auto e_mask = mask();
   std::unique_ptr<tcm_cpu_mask_t, mask_deleter> permit_mask(&p_mask);
   std::unique_ptr<tcm_cpu_mask_t, mask_deleter> expected_mask(&e_mask);
-  uint32_t concurrency = uint32_t(tcm_oversubscription_factor * mask.size());
+
+  uint32_t available = uint32_t(tcm_oversubscription_factor * platform_hardware_concurrency());
+  uint32_t requested = uint32_t(tcm_oversubscription_factor * mask.size());
+  uint32_t expected = std::min(requested, available);
 
   tcm_cpu_constraints_t cpu_constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
   cpu_constraints.min_concurrency = 0;
-  cpu_constraints.max_concurrency = concurrency;
+  cpu_constraints.max_concurrency = requested;
   cpu_constraints.mask = nullptr;
   cpu_constraints.numa_id = mask.id();
 
   one_request_config test_config{};
-  test_config.exp_concurrency = &concurrency;
-  test_config.min_concurrency = 0;
-  test_config.max_concurrency = concurrency;
+  test_config.exp_concurrency = &expected;
+  test_config.min_sw_threads = 0;
+  test_config.max_sw_threads = requested;
   test_config.constraints_size = 1;
   test_config.per_mask = permit_mask.get();
   test_config.exp_mask = expected_mask.get();
@@ -265,7 +270,7 @@ TEST("Constrained request with two process masks as low level constraints withou
   tcm_cpu_mask_t permit_mask[size];
   tcm_cpu_mask_t expected_mask[size];
   tcm_cpu_constraints_t cpu_constraints[size];
-  int32_t min_concurrency = 0;
+  int32_t min_sw_threads = 0;
   for (uint32_t i = 0; i < size; ++i) {
     permit_mask[i] = allocate_cpu_mask();
     expected_mask[i] = mask();
@@ -273,13 +278,13 @@ TEST("Constrained request with two process masks as low level constraints withou
     cpu_constraints[i].min_concurrency = e_concurrency[i];
     cpu_constraints[i].max_concurrency = e_concurrency[i];
     cpu_constraints[i].mask = mask();
-    min_concurrency += e_concurrency[i];
+    min_sw_threads += cpu_constraints[i].min_concurrency;
   }
 
   one_request_config test_config{};
   test_config.exp_concurrency = e_concurrency;
-  test_config.min_concurrency = min_concurrency;
-  test_config.max_concurrency = total_concurrency;
+  test_config.min_sw_threads = min_sw_threads;
+  test_config.max_sw_threads = total_concurrency;
   test_config.constraints_size = 2;
   test_config.per_mask = permit_mask;
   test_config.exp_mask = expected_mask;
@@ -481,13 +486,14 @@ TEST("Request any NUMA node until all nodes are distributed + one more, correct 
     tcm_permit_t expected_permit = make_active_permit(&expected_concurrency);
 
     // TODO: check concurrency exactly and the masks
-    int mask_weight = hardware_concurrency(permits[i].cpu_masks[0]);
+    const int mask_weight = hardware_concurrency(permits[i].cpu_masks[0]);
+    const int process_hardware_concurrency = hardware_concurrency(process_affinity_mask);
     check_success(r, "tcmRequestPermit for client " + std::to_string(i));
     check_permit(expected_permit, permits[i], skip_concurrency_and_mask_checks);
     check(permits[i].concurrencies[0] > 0, "Concurrency was given", /*num_indents*/1);
     check(mask_weight > 0, "Some mask was given", /*num_indents*/1);
-    check((numa_count == 1 && platform_hardware_concurrency() == mask_weight) ||
-          mask_weight < platform_hardware_concurrency(), "Given mask is reasonable", /*num_indents*/1);
+    check((numa_count == 1 && process_hardware_concurrency == mask_weight) ||
+          mask_weight < process_hardware_concurrency, "Given mask is reasonable", /*num_indents*/1);
     total_resources_given += permits[i].concurrencies[0];
   }
 
@@ -533,7 +539,6 @@ TEST("Request any NUMA node until all nodes are distributed + one more, correct 
 
   check(permits[rival_idx].concurrencies[0] == mask_concurrency,
         "Rival permit occupies whole concurrency of the given mask");
-
   const uint32_t rival_previous_concurrency = permits[rival_idx].concurrencies[0];
   tcm_cpu_mask_t mask = allocate_cpu_mask();
   std::unique_ptr<tcm_cpu_mask_t, mask_deleter> cpu_mask(&mask);
@@ -561,7 +566,6 @@ TEST("Request any NUMA node until all nodes are distributed + one more, correct 
     }
     disconnect_client(client_ids[i]);
   }
-
 }
 
 TEST("Non-negotiable requests for any NUMA node until all nodes are distributed + one more, "
@@ -618,15 +622,14 @@ TEST("Non-negotiable requests for any NUMA node until all nodes are distributed 
     expected_permit.flags.rigid_concurrency = true;
 
     // TODO: check concurrency exactly and the masks
-    int mask_weight = hardware_concurrency(permits[i].cpu_masks[0]);
+    const int mask_weight = hardware_concurrency(permits[i].cpu_masks[0]);
+    const int process_hardware_concurrency = hardware_concurrency(process_affinity_mask);
     check_success(r, "tcmRequestPermit for client " + std::to_string(i));
-    check_permit(expected_permit, permits[i], skip_concurrency_and_mask_checks);
-    check(permits[i].concurrencies[0] > 0, "Concurrency was given", /*num_indents*/1);
+    check_permit(expected_permit, permits[i], skip_concurrency_and_mask_checks) ;
+    check(permits[i].concurrencies[0] > 0, "Concurrency was given", /*num_indents*/1) ;
     check(mask_weight > 0, "Some mask was given", /*num_indents*/1);
-    check((numa_count == 1 && platform_hardware_concurrency() == mask_weight) ||
-          mask_weight < platform_hardware_concurrency(), "Given mask is reasonable",
-          /*num_indents*/1);
-
+    check((numa_count == 1 && process_hardware_concurrency == mask_weight) ||
+          mask_weight < process_hardware_concurrency, "Given mask is reasonable", /*num_indents*/1);
     total_resources_given += permits[i].concurrencies[0];
   }
 
@@ -686,4 +689,146 @@ TEST("Non-negotiable requests for any NUMA node until all nodes are distributed 
     }
     disconnect_client(client_ids[i]);
   }
+}
+
+void test_unconstrained_then_constrained(bool as_nested) {
+    const int32_t full_concurrency = int32_t(platform_tcm_concurrency());
+    tcm_client_id_t client_id = connect_new_client(/*callback*/ nullptr);
+
+    tcm_permit_request_t unconstrained_ph_request = make_request(/*min_sw_threads*/ 1,
+                                                                 /*max_sw_threads*/ tcm_automatic);
+
+    tcm_permit_handle_t unconstrained_ph = request_permit(client_id, unconstrained_ph_request);
+    permit_t unconstrained_permit = get_permit_data(unconstrained_ph);
+    permit_t expected_permit = make_active_permit(full_concurrency);
+    check_permit(expected_permit, unconstrained_permit);
+
+    if (as_nested) register_thread(unconstrained_ph);
+
+    // Making a constrained permit request that should negotiate with the unconstrained one
+    tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+    tcm_cpu_mask_t mask = allocate_cpu_mask();
+    std::unique_ptr<tcm_cpu_mask_t, mask_deleter> permit_mask_guard(&mask);
+    extract_first_n_bits_from_process_affinity_mask(mask, /*n_threads*/full_concurrency / 2);
+    constraints.mask = mask;
+    permit_t expected_constrained_permit = make_active_permit(full_concurrency / 2, &mask);
+
+    tcm_permit_request_t constrained_ph_request = make_request(/*min_sw_threads*/ full_concurrency / 2,
+                                                               /*max_sw_threads*/ tcm_automatic,
+                                                               &constraints, /*size*/ 1);
+
+    tcm_permit_handle_t constrained_ph = request_permit(client_id, constrained_ph_request);
+    permit_t constrained_permit = get_permit_data(constrained_ph, /*allocate mask*/ true);
+
+    // Check constrained permit was granted and negotiation happened
+    check_permit(expected_constrained_permit, constrained_permit);
+    check(constrained_permit.cpu_mask() != mask,
+          "The memory of requested mask is not reused for the mask in granted permit");
+    get_permit_data(unconstrained_ph, unconstrained_permit);
+    tcm_permit_t(expected_permit).concurrencies[0] =
+        full_concurrency - constrained_permit.concurrency() + int(as_nested);
+    check_permit(expected_permit, unconstrained_permit);
+
+    int32_t total_grant = unconstrained_permit.concurrency() + constrained_permit.concurrency();
+    check(total_grant == full_concurrency + int(as_nested), "Total resource grant converges");
+
+    release_permit(constrained_ph);
+
+    // Check resources of unconstrained permit were restored
+    tcm_permit_t(expected_permit).concurrencies[0] = full_concurrency;
+    check_permit(expected_permit, unconstrained_ph);
+
+    if (as_nested) unregister_thread();
+
+    release_permit(unconstrained_ph);
+
+    assert_all_resources_available();
+    disconnect_client(client_id);
+}
+
+void test_constrained_then_unconstrained(bool as_nested) {
+    // Do same in opposite order
+    const int32_t full_concurrency = int32_t(platform_tcm_concurrency());
+    tcm_client_id_t client_id = connect_new_client(/*callback*/ nullptr);
+
+    tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+    tcm_cpu_mask_t mask = allocate_cpu_mask();
+    std::unique_ptr<tcm_cpu_mask_t, mask_deleter> permit_mask_guard(&mask);
+    extract_first_n_bits_from_process_affinity_mask(mask, /*n_threads*/full_concurrency / 2);
+    constraints.mask = mask;
+    permit_t expected_constrained_permit = make_active_permit(full_concurrency / 2, &mask);
+
+    tcm_permit_request_t constrained_ph_request = make_request(/*min_sw_threads*/ 1,
+                                                               /*max_sw_threads*/ tcm_automatic,
+                                                               &constraints, /*size*/ 1);
+
+    const int32_t mask_concurrency = hardware_concurrency(mask);
+    tcm_permit_handle_t constrained_ph = request_permit(client_id, constrained_ph_request);
+    permit_t constrained_permit = get_permit_data(constrained_ph, /*allocate mask*/ true);
+    tcm_permit_t(expected_constrained_permit).concurrencies[0] = mask_concurrency;
+    check_permit(expected_constrained_permit, constrained_permit);
+
+    if (as_nested) register_thread(constrained_ph);
+
+    tcm_permit_request_t unconstrained_ph_request =
+        make_request(/*min_sw_threads*/ full_concurrency - 2, /*max_sw_threads*/ tcm_automatic);
+
+    uint32_t expected_inner_concurrency = std::max(unconstrained_ph_request.min_sw_threads,
+                                                   full_concurrency - mask_concurrency);
+    uint32_t expected_outer_concurrency = mask_concurrency;
+    const bool will_negotiate = full_concurrency <
+                                mask_concurrency + unconstrained_ph_request.min_sw_threads;
+    if (will_negotiate) {
+        expected_outer_concurrency = full_concurrency -
+                                     unconstrained_ph_request.min_sw_threads +
+                                     int(as_nested);
+        expected_outer_concurrency = std::min(expected_outer_concurrency, uint32_t(mask_concurrency));
+    } else {
+        expected_inner_concurrency += int(as_nested);
+    }
+
+    permit_t expected_permit = make_active_permit(expected_inner_concurrency);
+    tcm_permit_handle_t unconstrained_ph = request_permit(client_id, unconstrained_ph_request);
+    permit_t unconstrained_permit = get_permit_data(unconstrained_ph);
+    check_permit(expected_permit, unconstrained_permit);
+
+    // Check unconstrained permit was granted and negotiation happened
+    tcm_permit_t(expected_constrained_permit).concurrencies[0] = expected_outer_concurrency;
+    get_permit_data(constrained_ph, constrained_permit);
+    check_permit(expected_constrained_permit, constrained_permit);
+    check(constrained_permit.cpu_mask() != mask,
+          "The memory of requested mask is not reused for the mask in granted permit");
+
+    int32_t total_grant = unconstrained_permit.concurrency() + constrained_permit.concurrency();
+    check(total_grant == full_concurrency + int(as_nested), "Total resource grant converges");
+
+    release_permit(unconstrained_ph);
+
+    // Check resources of a constrained permit were restored
+    tcm_permit_t(expected_constrained_permit).concurrencies[0] = mask_concurrency;
+    get_permit_data(constrained_ph, constrained_permit);
+    check_permit(expected_constrained_permit, constrained_permit);
+
+    if (as_nested) unregister_thread();
+
+    release_permit(constrained_ph);
+
+    assert_all_resources_available();
+    disconnect_client(client_id);
+}
+
+TEST("Unconstrained + constrained") {
+    test_unconstrained_then_constrained(/*second request nested*/false);
+}
+
+TEST("Constrained + unconstrained") {
+    test_constrained_then_unconstrained(/*second request nested*/false);
+}
+
+TEST("Unconstrained + nested constrained") {
+    test_unconstrained_then_constrained(/*second request nested*/true);
+}
+
+TEST("Constrained + nested unconstrained") {
+    test_constrained_then_unconstrained(/*second request nested*/true);
 }

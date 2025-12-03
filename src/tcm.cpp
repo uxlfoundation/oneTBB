@@ -27,7 +27,6 @@ __TCM_SUPPRESS_WARNING_POP
 #include <cstdlib>
 #include <deque>
 #include <limits>
-#include <map>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -1547,8 +1546,11 @@ protected:
         uint32_t min_required = 0, max_desired = 0; // TODO: these are calculated but not
                                                     // used.
 
-        int available_min = constraint_max;  // holds the number of resources available immediately,
-                                             // not requiring any negotiations
+        __TCM_ASSERT(constraint_max >= current_concurrency, "Incorrectly satisfied constraint found");
+        uint32_t available_concurrency_snapshot = available_concurrency;
+        // Holds the number of resources available immediately, not requiring any negotiations
+        int available_min =
+            std::min(available_concurrency_snapshot, constraint_max - current_concurrency);
 
         // The following is not an exhaustive search, but a reasonable trade-off between
         // correct resource tracking and algorithm complexity.
@@ -1565,7 +1567,7 @@ protected:
         // TODO: refactor lambda-function to avoid side-effects
         auto find_resource_competitors = [&](auto& permit_handles) {
             for (const tcm_permit_handle_t& ph_i : permit_handles) {
-                tcm_permit_request_t& req = ph_i->request;
+                tcm_permit_request_t& req_i = ph_i->request;
                 tcm_permit_data_t& pd_i = ph_i->data;
                 tcm_permit_state_t ph_i_state = get_permit_state(pd_i);
 
@@ -1574,23 +1576,30 @@ protected:
                 if (ph_i == ph)
                     continue;   // The being satisfied permit is not a resource-competitor to itself
 
-                if ( !pd_i.cpu_mask )    // Subscription is tracked separately on the platform level
-                    continue;
-
                 for (unsigned constr_idx = 0; constr_idx < pd_i.size; ++constr_idx) {
-                    __TCM_ASSERT(pd_i.cpu_mask[constr_idx], "Mask must be present for each subconstraint.");
+                    // Start as if it is a permit with unconstrained request
+                    tcm_cpu_mask_t cpu_mask = process_mask;
+                    int32_t required_concurrency = req_i.min_sw_threads;
+                    int32_t index = negotiable_snapshot_t::among_all_constraints;
+                    if (is_constrained(ph_i)) { // If it turned out to be a permit with constraints
+                        __TCM_ASSERT(pd_i.cpu_mask[constr_idx], "Mask must be present for each subconstraint.");
+                        cpu_mask = pd_i.cpu_mask[constr_idx];
+                        required_concurrency = req_i.cpu_constraints[constr_idx].min_concurrency;
+                        index = constr_idx;
+                    }
 
-                    const uint32_t granted = pd_i.concurrency[constr_idx].load(std::memory_order_relaxed);
-                    __TCM_ASSERT(int32_t(granted) >= req.cpu_constraints[constr_idx].min_concurrency,
+                    const uint32_t granted =
+                        pd_i.concurrency[constr_idx].load(std::memory_order_relaxed);
+                    __TCM_ASSERT(int32_t(granted) >= required_concurrency,
                                  "An invalid grant was found.");
 
                     uint32_t negotiable = granted;
                     if (!is_idle(ph_i_state)) {
                         // For active permits can only negotiate up to not less than required
-                        negotiable -= req.cpu_constraints[constr_idx].min_concurrency;
+                        negotiable -= required_concurrency;
                     }
 
-                    stakeholder_t stakeholder{ph_i, int32_t(constr_idx), negotiable};
+                    stakeholder_t stakeholder{ph_i, index, negotiable};
 
                     // Determines whether the stakeholder actually contributes to the subscription
                     // of the interested part of the platform and can be negotiated, so that it is
@@ -1598,10 +1607,10 @@ protected:
                     bool add = false;
 
                     // Try fitting for an individual mask
-                    if (hwloc_bitmap_intersects(mask, pd_i.cpu_mask[constr_idx])) {
-                        hwloc_bitmap_or(per_constraint_union_mask, mask, pd_i.cpu_mask[constr_idx]);
+                    if (hwloc_bitmap_intersects(mask, cpu_mask)) {
+                        hwloc_bitmap_or(per_constraint_union_mask, mask, cpu_mask);
                         const int mc = get_oversubscribed_mask_concurrency(per_constraint_union_mask);
-                        __TCM_ASSERT(uint32_t(mc) >= granted, "Incorrectly granted permit is detected.");
+                        __TCM_ASSERT(uint32_t(mc) >= granted, "Incorrectly granted permit detected.");
                         const int available = mc - granted;
                         available_min = std::min(available_min, available);
                         const auto fitting_result =
@@ -1617,13 +1626,13 @@ protected:
                     }
 
                     // Try fitting into compound masks
-                    if (hwloc_bitmap_intersects(common_mask, pd_i.cpu_mask[constr_idx])) {
+                    if (hwloc_bitmap_intersects(common_mask, cpu_mask)) {
                         // TODO: extract common with the above part
-                        hwloc_bitmap_or(common_mask, common_mask, pd_i.cpu_mask[constr_idx]);
+                        hwloc_bitmap_or(common_mask, common_mask, cpu_mask);
                         const int mc = get_oversubscribed_mask_concurrency(common_mask);
                         common_concurrency += granted;
                         __TCM_ASSERT(uint32_t(mc) >= common_concurrency,
-                                     "Incorrectly granted permit is detected.");
+                                     "Incorrectly granted permit detected.");
                         const int available = mc - common_concurrency;
                         available_min = std::min(available_min, available);
                         const auto fitting_result =
@@ -1660,7 +1669,11 @@ protected:
             while (!separate_masks.empty()) {
                 auto& stakeholder = separate_masks.front();
                 const tcm_permit_data_t &pd_i = stakeholder.ph->data;
-                auto m = pd_i.cpu_mask[stakeholder.constraint_index];
+
+                tcm_cpu_mask_t m = process_mask; // Use process mask for unconstrained requests
+                if (pd_i.cpu_mask)
+                    m = pd_i.cpu_mask[stakeholder.constraint_index];
+
                 if (hwloc_bitmap_intersects(common_mask, m)) {
                     // TODO: extract common with the above part
                     hwloc_bitmap_or(common_mask, common_mask, m);
@@ -2186,6 +2199,8 @@ protected:
                     if (st.constraint_index == negotiable_snapshot_t::among_all_constraints) {
                         st.constraint_index = 0;
                     } else {
+                        __TCM_ASSERT(st.ph->request.cpu_constraints,
+                                     "Accessing constraints of unconstrained request");
                         minimum = st.ph->request.cpu_constraints[st.constraint_index].
                             min_concurrency;
                     }

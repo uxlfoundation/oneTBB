@@ -389,8 +389,8 @@ inline std::set<tcm_permit_handle_t> list_unchanged_permits(const permits_data_t
 // TODO: Make use of these helpers in all the tests, utilizing RAII for releasing permits, closing
 // connections that remain after exception occurs.
 inline tcm_client_id_t connect_new_client(tcm_callback_t callback = nullptr,
-                                          const std::string& error_message = "",
-                                          const std::string& log_message = "tcmConnect")
+                                          const std::string& error_message = "tcmConnect failed",
+                                          const std::string& log_message = "")
 {
   tcm_client_id_t client_id;
 
@@ -404,8 +404,8 @@ inline tcm_client_id_t connect_new_client(tcm_callback_t callback = nullptr,
 }
 
 inline void disconnect_client(const tcm_client_id_t& client_id,
-                              const std::string& error_message = "",
-                              const std::string& log_message = "tcmDisconnect")
+                              const std::string& error_message = "tcmDisconnect failed",
+                              const std::string& log_message = "")
 {
   tcm_result_t r = tcmDisconnect(client_id);
   if (!check_success(r, log_message))
@@ -467,8 +467,9 @@ inline void idle_permit(tcm_permit_handle_t permit_handle, const std::string& er
   }
 }
 
-inline void release_permit(tcm_permit_handle_t ph, const std::string& error_message = "",
-                           const std::string& log_message = "tcmReleasePermit")
+inline void release_permit(tcm_permit_handle_t ph,
+                           const std::string& error_message = "tcmReleasePermit failed",
+                           const std::string& log_message = "")
 {
   auto r = tcmReleasePermit(ph);
 
@@ -502,22 +503,27 @@ class permit_t {
 public:
     permit_t(bool allocate_mask = false)
         : concurrencies(new uint32_t[size]{0}),
-        // TODO: Fix the bug with copying over all the array elements received bitmap from the
-        // HWLOC, while the intention is to allocate separate mask for each element of cpu_masks
-        // array
-          cpu_masks(allocate_mask? new tcm_cpu_mask_t[size]{allocate_cpu_mask()} : nullptr,
-                    masks_guard_t(size)),
+          cpu_masks(allocate_mask? new tcm_cpu_mask_t[size] : nullptr, masks_guard_t(size)),
           permit{
               concurrencies.get(), cpu_masks.get(), size, TCM_PERMIT_STATE_VOID,
               tcm_permit_flags_t{}
           }
     {
-      static_assert(size == 1, "Unsupported code due to wrong initialization of cpu_masks array");
+        if (allocate_mask)
+            for (uint32_t i = 0; i < size; ++i) {
+                cpu_masks[i] = allocate_cpu_mask();
+                __TCM_ASSERT(cpu_masks[i], "Failed allocating CPU mask");
+            }
     }
-    size_t concurrency() {
-      return get_permit_concurrency(permit);
-    }
+
     operator tcm_permit_t&() { return permit; }
+
+    uint32_t concurrency() { return get_permit_concurrency(permit); }
+
+    tcm_const_cpu_mask_t cpu_mask(size_t idx = 0) {
+      __TCM_ASSERT(idx < size, "Index is out of range");
+      return cpu_masks ? cpu_masks[idx] : nullptr;
+    }
 private:
     std::unique_ptr<uint32_t[]> concurrencies;
     std::unique_ptr<tcm_cpu_mask_t[], masks_guard_t> cpu_masks;
@@ -526,19 +532,21 @@ private:
 
 inline void get_permit_data(tcm_permit_handle_t ph, tcm_permit_t& permit,
                             const std::string& error_message = "",
-                            const std::string& log_message = "tcmGetPermitData")
+                            const std::string& log_message = "")
 {
-  auto r = tcmGetPermitData(ph, &permit);
-  if (!check_success(r, log_message)) {
-    throw tcm_get_permit_data_error(error_message.c_str());
-  }
+    std::string log = "tcmGetPermitData for ph=" + to_string(ph);
+    if (!log_message.empty())
+        log = log_message;
+    auto r = tcmGetPermitData(ph, &permit);
+    if (!check_success(r, log)) {
+        throw tcm_get_permit_data_error(error_message.c_str());
+    }
 }
 
 template <int size = 1>
-permit_t<size> get_permit_data(tcm_permit_handle_t ph, const std::string& error_message = "")
-{
-  // TODO: propagate 'allocate_mask' flag to the permit_t class
-  permit_t<size> permit_wrapper;
+permit_t<size> get_permit_data(tcm_permit_handle_t ph, bool allocate_mask = false,
+                               const std::string& error_message = "") {
+  permit_t<size> permit_wrapper(allocate_mask);
   tcm_permit_t& permit = permit_wrapper;
 
   auto r = tcmGetPermitData(ph, &permit);
@@ -549,14 +557,23 @@ permit_t<size> get_permit_data(tcm_permit_handle_t ph, const std::string& error_
   return permit_wrapper;
 }
 
-inline permit_t</*size*/1> make_active_permit(uint32_t expected_concurrency,
-                                              tcm_cpu_mask_t* cpu_masks = nullptr,
-                                              tcm_permit_flags_t flags = {})
+template<int size = 1>
+inline permit_t<size> make_active_permit(uint32_t expected_concurrency,
+                                         tcm_cpu_mask_t* cpu_masks = nullptr,
+                                         tcm_permit_flags_t flags = {})
 {
+  static_assert(size == 1, "Unsupported. TODO: Accept array of concurrencies");
   const bool allocate_mask = bool(cpu_masks);
-  permit_t</*size*/1> permit_wrapper(allocate_mask);
+  permit_t<size> permit_wrapper(allocate_mask);
   tcm_permit_t& permit = permit_wrapper;
   permit.concurrencies[0] = expected_concurrency;
+  if (allocate_mask) {
+      for (int i = 0; i < size; ++i) {
+          __TCM_ASSERT(permit.cpu_masks[i], "Nothing to copy into");
+          __TCM_ASSERT(cpu_masks[i], "Nothing to copy from");
+          hwloc_bitmap_copy(permit.cpu_masks[i], cpu_masks[i]);
+      }
+  }
   permit.state = TCM_PERMIT_STATE_ACTIVE;
   permit.flags = flags;
   return permit_wrapper;
@@ -580,9 +597,43 @@ inline permit_t</*size*/1> make_inactive_permit(tcm_cpu_mask_t* cpu_masks = null
  * The checks are based on the TCM invariants. For example, if all platform resources are occupied
  * then requesting even for any single resource should not be successful.
  *
- * The functions return the state of the TCM as it was before they were started. If the check fails
- * the functions throw an exception.
+ * The functions return the state of the TCM as it was before they were started.
  */
+
+/**
+ * Checks if TCM has available or can negotiate given number of resources.
+ */
+inline bool can_find(tcm_client_id_t client_id, uint32_t num_resources) {
+  // TODO: Add possibility to check resource availability using CPU constraints
+  const int32_t min_sw_threads = num_resources, max_sw_threads = num_resources;
+  tcm_permit_handle_t ph = request_permit(client_id, make_request(min_sw_threads, max_sw_threads));
+  auto expected = make_active_permit(max_sw_threads);
+  bool result = check_permit(expected, ph, skip_checks_t{}, /*num_indents*/ 1, /*report*/ false);
+  release_permit(ph);
+  return result;
+}
+
+/**
+ * Asserts TCM can find at most given number of resources. Throws an exception otherwise.
+ */
+inline
+void assert_can_find_at_most(uint32_t num_resources, std::string&& log_message = "") {
+  std::string num_str = std::to_string(num_resources);
+  if (log_message.empty())
+      log_message = "asserting at most " + num_str + " resources are available";
+
+  test_log("Begin " + log_message);
+
+  tcm_client_id_t client_id = connect_new_client();
+  if (!can_find(client_id, num_resources))
+      throw tcm_exception{num_str + " resources are unavailable"};
+  else if (can_find(client_id, num_resources + 1))
+      throw tcm_exception{"Unexpectedly found more than " + num_str + " resources"};
+
+  disconnect_client(client_id);
+
+  test_log("End " + log_message);
+}
 
 /**
  * Requests permit for all platform resources. Checks that it was granted and releases the permit
@@ -594,13 +645,8 @@ inline void assert_all_resources_available(const std::string& log_message =
   test_log("Begin " + log_message);
 
   tcm_client_id_t client_id = connect_new_client();
-
-  const int32_t min_sw_threads = platform_tcm_concurrency(), max_sw_threads = min_sw_threads;
-  tcm_permit_handle_t ph = request_permit(client_id, make_request(min_sw_threads, max_sw_threads));
-  auto expected_permit = make_active_permit(max_sw_threads);
-  if (!check_permit(expected_permit, ph, skip_checks_t{}, /*num_indents*/1, /*report*/false))
-    throw tcm_exception{"Not all platform resources are available"};
-
+  if (!can_find(client_id, platform_tcm_concurrency()))
+      throw tcm_exception{"Not all platform resources are available"};
   disconnect_client(client_id);
 
   test_log("End " + log_message);
