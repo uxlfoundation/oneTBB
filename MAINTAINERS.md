@@ -113,7 +113,6 @@ opening a PR against MAINTAINERS.md file.
 | Name                  | Github ID             | Affiliation       | Role       |
 | --------------------- | --------------------- | ----------------- | ---------- |
 | Ilya Isaev            | @isaevil              | Intel Corporation | Code Owner |
-| Sarath Nandu R        | @sarathnandu          | Intel Corporation | Code Owner |
 | Alexey Kukanov        | @akukanov             | Intel Corporation | Code Owner |
 | Konstantin Boyarinov  | @kboyarinov           | Intel Corporation | Maintainer |
 | Aleksei Fedotov       | @aleksei-fedotov      | Intel Corporation | Maintainer |
