@@ -166,6 +166,10 @@ TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
         // This flag is set to adjust test expectations accordingly.
         bool workers_cannot_fully_occupy_arena = numa_nodes_info.size() == 1 && reserved_slots == 0;
         for (auto& ta : numa_task_arenas) {
+            // For the case when task_arena is created with both max_concurrency and reserved_slots
+            // equal to 1 oneTBB creates a special additional worker to execute an "enqueue" task.
+            // That may temporarily increase max_concurrency of task_arena to 2 instead of 1, hence
+            // we read max_concurrency during that enqueued task execution.
             int ta_concurrency;
             ta.enqueue([&ta_concurrency] { ta_concurrency = tbb::this_task_arena::max_concurrency(); }, tg);
             ta.wait_for(tg);

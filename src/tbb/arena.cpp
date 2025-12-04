@@ -255,7 +255,7 @@ arena::arena(threading_control* control, unsigned num_slots, unsigned num_reserv
     my_limit = 1;
     // Two slots are mandatory: for the external thread, and for 1 worker (required to support starvation resistant tasks).
     my_num_slots = num_arena_slots(num_slots, num_reserved_slots);
-    my_num_reserved_slots = min(num_reserved_slots, my_num_slots);
+    my_num_reserved_slots = min(num_reserved_slots, num_slots);
     my_max_num_workers = num_slots-my_num_reserved_slots;
     my_priority_level = priority_level;
     my_references = ref_external; // accounts for the external thread
