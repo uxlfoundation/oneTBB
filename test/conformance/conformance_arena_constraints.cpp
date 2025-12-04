@@ -80,7 +80,7 @@ TEST_CASE("Test create_numa_task_arenas conformance correctness") {
     using return_type = decltype(oneapi::tbb::create_numa_task_arenas());
     static_assert(
         std::is_same<std::vector<oneapi::tbb::task_arena>, return_type>::value,
-        "Return type of oneapi::tbb::create_numa_task_arenas() does not match the type guaranteed by oneAPI Specification"
+        "Return type of oneapi::tbb::create_numa_task_arenas() does not match the expected type"
     );
     return_type numa_task_arenas = oneapi::tbb::create_numa_task_arenas();
 
@@ -102,7 +102,8 @@ TEST_CASE("Test create_numa_task_arenas conformance correctness") {
 
 struct join_arena_observer : tbb::task_scheduler_observer {
     join_arena_observer(tbb::task_arena &ta, int max_workers, int max_external_threads)
-        : tbb::task_scheduler_observer(ta), max_num_workers(max_workers), max_num_external_threads(max_external_threads)
+        : tbb::task_scheduler_observer(ta)
+        , max_num_workers(max_workers), max_num_external_threads(max_external_threads)
     {
         observe(true);
     }
@@ -111,6 +112,7 @@ struct join_arena_observer : tbb::task_scheduler_observer {
         int current;
         int expected_peak;
         if (is_worker) {
+            // TODO: Adapt utils::ConcurrencyTracker for its reuse here and in the else branch below
             current = num_workers.fetch_add(1, std::memory_order_relaxed) + 1;
             expected_peak = current - 1;
             while (current > expected_peak &&
@@ -136,8 +138,8 @@ struct join_arena_observer : tbb::task_scheduler_observer {
       }
     }
 
-    int max_num_workers;
-    int max_num_external_threads;
+    const int max_num_workers;
+    const int max_num_external_threads;
     std::atomic_int num_workers{};
     std::atomic_int num_external_threads{};
     std::atomic_int peak_workers{};
