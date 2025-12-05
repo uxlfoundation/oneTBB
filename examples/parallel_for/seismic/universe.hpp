@@ -25,6 +25,7 @@
 #endif
 
 #include "oneapi/tbb/partitioner.h"
+#include "oneapi/tbb/interleaved_vector.h"
 
 #include "common/gui/video.hpp"
 
@@ -48,7 +49,12 @@ private:
     ValueType S[MaxHeight][MaxWidth];
 
     //! Velocity at each grid point
+#if 0
     ValueType V[MaxHeight][MaxWidth];
+#else
+    tbb::interleaved_vector<ValueType, 4*4*1024> V_data{2, MaxHeight * MaxWidth};
+    tbb::mdspan<ValueType, 4*4*1024, MaxWidth> V{&V_data};
+#endif
 
     //! Vertical stress
     ValueType T[MaxHeight][MaxWidth];

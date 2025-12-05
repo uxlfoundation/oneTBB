@@ -16,6 +16,8 @@
 
 #include <cmath>
 #include <cstring>
+#include <numaif.h>
+#include <numa.h>
 
 #include "oneapi/tbb/blocked_range.h"
 #include "oneapi/tbb/parallel_for.h"
@@ -38,6 +40,21 @@ const colorcomp_t MaterialColor[4][3] = {
     { 32, 32, 23 } // SHALE
 };
 
+#if 0
+int find_numa_node_linux(void* addr) {
+    int numa_node = -1;
+    int status[1];
+    void* pages[1] = { addr };
+
+    // Query which node owns this page
+    if (move_pages(0, 1, pages, NULL, status, 0) == 0) {
+        numa_node = status[0];
+    }
+
+    return numa_node;
+}
+#endif
+
 void Universe::InitializeUniverse(video const& colorizer) {
     pulseCounter = pulseTime = 100;
     pulseX = UniverseWidth / 3;
@@ -46,7 +63,7 @@ void Universe::InitializeUniverse(video const& colorizer) {
     for (int i = 0; i < UniverseHeight; ++i)
 #pragma ivdep
         for (int j = 0; j < UniverseWidth; ++j) {
-            T[i][j] = S[i][j] = V[i][j] = ValueType(1.0E-6);
+            T[i][j] = S[i][j] = V(i, j) = ValueType(1.0E-6);
         }
     for (int i = 1; i < UniverseHeight - 1; ++i) {
         for (int j = 1; j < UniverseWidth - 1; ++j) {
@@ -104,11 +121,15 @@ void Universe::InitializeUniverse(video const& colorizer) {
         }
     }
     drawingMemory = colorizer.get_drawing_memory();
+#if 0
+    printf("NUMA node for D: %d\n", find_numa_node_linux(V_data.banks[0]));
+    printf("NUMA node for D: %d\n", find_numa_node_linux(V_data.banks[1]));
+#endif
 }
 void Universe::UpdatePulse() {
     if (pulseCounter > 0) {
         ValueType t = (pulseCounter - pulseTime / 2) * 0.05f;
-        V[pulseY][pulseX] += 64 * sqrt(M[pulseY][pulseX]) * exp(-t * t);
+        V(pulseY, pulseX) += 64 * sqrt(M[pulseY][pulseX]) * exp(-t * t);
         --pulseCounter;
     }
 }
@@ -145,9 +166,9 @@ void Universe::UpdateStress(Rectangle const& r) {
         drawing.set_pos(1, i - r.StartY());
 #pragma ivdep
         for (int j = r.StartX(); j < r.EndX(); ++j) {
-            S[i][j] += M[i][j] * (V[i][j + 1] - V[i][j]);
-            T[i][j] += M[i][j] * (V[i + 1][j] - V[i][j]);
-            int index = (int)(V[i][j] * (ColorMapSize / 2)) + ColorMapSize / 2;
+            S[i][j] += M[i][j] * (V(i, j + 1) - V(i, j));
+            T[i][j] += M[i][j] * (V(i + 1, j) - V(i, j));
+            int index = (int)(V(i, j) * (ColorMapSize / 2)) + ColorMapSize / 2;
             if (index < 0)
                 index = 0;
             if (index >= ColorMapSize)
@@ -182,9 +203,10 @@ void Universe::ParallelUpdateStress(oneapi::tbb::affinity_partitioner& affinity)
 void Universe::UpdateVelocity(Rectangle const& r) {
     for (int i = r.StartY(); i < r.EndY(); ++i)
 #pragma ivdep
+#pragma vector always
         for (int j = r.StartX(); j < r.EndX(); ++j)
-            V[i][j] =
-                D[i][j] * (V[i][j] + L[i][j] * (S[i][j] - S[i][j - 1] + T[i][j] - T[i - 1][j]));
+            V(i, j) =
+                D[i][j] * (V(i, j) + L[i][j] * (S[i][j] - S[i][j - 1] + T[i][j] - T[i - 1][j]));
 }
 
 void Universe::SerialUpdateVelocity() {

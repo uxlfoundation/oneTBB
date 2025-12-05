@@ -364,6 +364,8 @@ bool __TBB_EXPORTED_FUNC finalize(d1::task_scheduler_handle& handle, std::intptr
 #pragma weak __TBB_internal_restore_affinity
 #pragma weak __TBB_internal_get_default_concurrency
 #pragma weak __TBB_internal_set_tbbbind_assertion_handler
+#pragma weak __TBB_internal_allocate_mem
+#pragma weak __TBB_internal_free_mem
 
 extern "C" {
 void __TBB_internal_initialize_system_topology(
@@ -382,6 +384,9 @@ void __TBB_internal_restore_affinity( binding_handler* handler_ptr, int slot_num
 
 int __TBB_internal_get_default_concurrency( int numa_id, int core_type_id, int max_threads_per_core );
 
+void *__TBB_internal_allocate_mem(size_t bank, size_t len);
+int __TBB_internal_free_mem(void* ptr, size_t len);
+
 void __TBB_internal_set_tbbbind_assertion_handler( assertion_handler_type handler );
 }
 #endif /* __TBB_WEAK_SYMBOLS_PRESENT */
@@ -394,6 +399,8 @@ static void dummy_apply_affinity ( binding_handler*, int ) { }
 static void dummy_restore_affinity ( binding_handler*, int ) { }
 static int dummy_get_default_concurrency( int, int, int ) { return governor::default_num_threads(); }
 static void dummy_set_assertion_handler( assertion_handler_type ) { }
+static void *dummy_allocate_mem( size_t /*bank*/, size_t size ) { return malloc(size); }
+static int dummy_free_mem( void *ptr, size_t /*len*/ ) { free(ptr); return 0; }
 
 // Handlers for communication with TBBbind
 static void (*initialize_system_topology_ptr)(
@@ -415,6 +422,10 @@ int (*get_default_concurrency_ptr)( int numa_id, int core_type_id, int max_threa
     = dummy_get_default_concurrency;
 void (*set_assertion_handler_ptr)( assertion_handler_type handler )
     = dummy_set_assertion_handler;
+static void* (*allocate_mem_ptr)( size_t bank, size_t size )
+    = dummy_allocate_mem;
+static int (*free_mem_ptr)( void* ptr, size_t len )
+    = dummy_free_mem;
 
 #if _WIN32 || _WIN64 || __unix__ || __APPLE__
 
@@ -428,7 +439,9 @@ static const dynamic_link_descriptor TbbBindLinkTable[] = {
     DLD(__TBB_internal_apply_affinity, apply_affinity_ptr),
     DLD(__TBB_internal_restore_affinity, restore_affinity_ptr),
 #endif
-    DLD(__TBB_internal_get_default_concurrency, get_default_concurrency_ptr)
+    DLD(__TBB_internal_get_default_concurrency, get_default_concurrency_ptr),
+    DLD(__TBB_internal_allocate_mem, allocate_mem_ptr),
+    DLD(__TBB_internal_free_mem, free_mem_ptr),
 };
 
 static const unsigned LinkTableSize = sizeof(TbbBindLinkTable) / sizeof(dynamic_link_descriptor);
@@ -612,6 +625,15 @@ int __TBB_EXPORTED_FUNC constraints_default_concurrency(const d1::constraints& c
 
 int __TBB_EXPORTED_FUNC constraints_threads_per_core(const d1::constraints&, intptr_t /*reserved*/) {
     return system_topology::automatic;
+}
+
+void *__TBB_EXPORTED_FUNC alloc_interleave(size_t bank, size_t len) {
+    system_topology::initialize();
+    return allocate_mem_ptr(bank, len);
+}
+
+int __TBB_EXPORTED_FUNC free_interleave(void *addr, size_t len) {
+    return free_mem_ptr(addr, len);
 }
 #endif /* __TBB_ARENA_BINDING */
 

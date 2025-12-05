@@ -464,6 +464,26 @@ public:
             assertion_hwloc_wrapper(hwloc_set_cpubind, topology, mask, HWLOC_CPUBIND_THREAD);
         }
     }
+
+    void *allocate_from_nodes(size_t bank, size_t len) {
+        unsigned max_numa_node = hwloc_get_nbobjs_by_type(topology, HWLOC_OBJ_NUMANODE);
+        __TBB_ASSERT(bank < max_numa_node, "Wrong NUMA node id");
+        if (bank >= max_numa_node) {
+            return nullptr;
+        }
+        hwloc_obj_t obj = hwloc_get_obj_by_type(topology, HWLOC_OBJ_NUMANODE, bank);
+
+        void * ptr = hwloc_alloc_membind(topology, len, obj->nodeset,
+                                         HWLOC_MEMBIND_BIND, HWLOC_MEMBIND_BYNODESET);
+        if (ptr == nullptr) {
+            perror("hwloc_alloc_membind failed");
+        }
+        return ptr;
+    }
+
+    int free_to_nodes(void* ptr, size_t len) {
+        return hwloc_free(topology, ptr, len);
+    }
 };
 
 system_topology* system_topology::instance_ptr{nullptr};
@@ -598,6 +618,14 @@ TBBBIND_EXPORT void __TBB_internal_destroy_system_topology() {
 
 TBBBIND_EXPORT void __TBB_internal_set_tbbbind_assertion_handler(assertion_handler_type handler) {
     assertion_handler::set(handler);
+}
+
+TBBBIND_EXPORT void *__TBB_internal_allocate_mem(size_t bank, size_t len) {
+    return system_topology::instance().allocate_from_nodes(bank, len);
+}
+
+TBBBIND_EXPORT int __TBB_internal_free_mem(void* ptr, size_t len) {
+    return system_topology::instance().free_to_nodes(ptr, len);
 }
 
 } // extern "C"

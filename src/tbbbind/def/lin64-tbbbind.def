@@ -25,6 +25,8 @@ __TBB_internal_deallocate_binding_handler;
 __TBB_internal_get_default_concurrency;
 __TBB_internal_destroy_system_topology;
 __TBB_internal_set_tbbbind_assertion_handler;
+__TBB_internal_allocate_mem;
+__TBB_internal_free_mem;
 
 local:
 *;

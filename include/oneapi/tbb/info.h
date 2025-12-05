@@ -78,6 +78,10 @@ TBB_EXPORT void __TBB_EXPORTED_FUNC fill_core_type_indices(int* index_array, int
 
 TBB_EXPORT int __TBB_EXPORTED_FUNC constraints_default_concurrency(const d1::constraints& c, intptr_t reserved = 0);
 TBB_EXPORT int __TBB_EXPORTED_FUNC constraints_threads_per_core(const d1::constraints& c, intptr_t reserved = 0);
+
+TBB_EXPORT void *__TBB_EXPORTED_FUNC alloc_interleave(size_t bank, size_t len);
+TBB_EXPORT int __TBB_EXPORTED_FUNC free_interleave(void *addr, size_t len);
+
 } // namespace r1
 
 namespace d1 {
