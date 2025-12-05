@@ -2,7 +2,8 @@
 #include <iostream>
 #include <cmath>
 
-#include <oneapi/tbb/aggregating_task_group_new.h>
+// #include <oneapi/tbb/aggregating_task_group_new.h>
+#include <oneapi/tbb/exp_task_group.h>
 #include <tbb/parallel_for.h>
 #include <tbb/task_group.h>
 #include <tbb/task_arena.h>
@@ -113,7 +114,7 @@ int main(int argc, char* argv[])
             std::cout << "start aggregating task_group::run::  " << std::flush;
             auto start_time = high_resolution_clock::now();
 
-            tbb::aggregating_task_group tg;
+            tbb::exp_task_group tg;
 
             for(int k=0; k < Count; k += BlockSize) {
 				int subStart = k;
