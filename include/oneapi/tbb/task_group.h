@@ -46,6 +46,7 @@ namespace d1 {
 class delegate_base;
 class task_arena_base;
 class task_group_context;
+class exp_task_group;
 }
 namespace d2 {
 class aggregating_task_group;
@@ -453,6 +454,7 @@ private:
     friend struct r1::task_group_context_impl;
     friend class d2::task_group_base;
     friend class d2::aggregating_task_group;
+    friend class d1::exp_task_group;
     friend void r1::handle_context_exception(d1::task_group_context&, bool rethrow);
 }; // class task_group_context
 
