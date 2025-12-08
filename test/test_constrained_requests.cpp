@@ -20,6 +20,7 @@
 #include <hwloc/bitmap.h>
 
 #include <memory>
+#include <algorithm>
 
 // ============================================================================
 // HWLOC mask utility
@@ -537,7 +538,7 @@ TEST("Request any NUMA node until all nodes are distributed + one more, correct 
   }
   check(1 == num_intersects, "Only one permit intersects with the last one");
 
-  check(permits[rival_idx].concurrencies[0] == mask_concurrency,
+  check(permits[rival_idx].concurrencies[0] == std::min(mask_concurrency, (std::uint32_t)platform_tcm_concurrency()),
         "Rival permit occupies whole concurrency of the given mask");
   const uint32_t rival_previous_concurrency = permits[rival_idx].concurrencies[0];
   tcm_cpu_mask_t mask = allocate_cpu_mask();

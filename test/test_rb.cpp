@@ -11,7 +11,7 @@
 */
 
 #include "test_utils.h"
-#include "concurrency_utils.h"
+#include "test_thread_pool.h"
 
 #include "tcm.h"
 

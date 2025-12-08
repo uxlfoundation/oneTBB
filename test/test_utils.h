@@ -14,7 +14,7 @@
 #define __TCM_TESTS_TEST_UTILS_HEADER
 
 #include "basic_test_utils.h"
-
+#include "concurrency_utils.h"
 #include "test_exceptions.h"
 
 #include "hwloc_test_utils.h"
@@ -104,7 +104,16 @@ inline tcm_const_cpu_mask_t process_affinity_mask = []() {
 
 //! Returns available concurrency on the platform, taking into account the mask of the process.
 inline int32_t platform_hardware_concurrency() {
-  static int32_t c = hardware_concurrency(process_affinity_mask);
+  static int32_t c = [] () -> int32_t { 
+      int process_concurrency = hardware_concurrency(process_affinity_mask);
+#if __linux__
+      int cfs_constraint;
+      if (cgroup_info::is_cpu_constrained(cfs_constraint)) {
+        process_concurrency = std::min(process_concurrency, cfs_constraint);
+      }
+#endif
+      return process_concurrency;
+  } ();
   return c;
 }
 

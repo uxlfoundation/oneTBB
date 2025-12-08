@@ -15,6 +15,11 @@
 #include "tcm/detail/_environment.h"
 #include "tcm.h"
 #include "tcm_permit_rep.h"
+
+#if __linux__
+#include "linux/cgroup_info.h"
+#endif
+
 #include "tracing/_tracer.h"
 
 // MSVC Warning: unreferenced formal parameter
@@ -519,7 +524,17 @@ struct ThreadComposabilityManagerData {
       // TODO: add manual parsing and weight calculation of the process mask
       process_concurrency = (uint32_t)std::thread::hardware_concurrency();
     }
+
+#if __linux__
+    int cfs_constrained_cpus;
+    if (cgroup_info::is_cpu_constrained(cfs_constrained_cpus)) {
+        process_concurrency = std::min((int)process_concurrency, cfs_constrained_cpus);
+    }
+#endif
+
     available_concurrency = platform_resources(process_concurrency);
+    __TCM_ASSERT(available_concurrency >= 1, nullptr);
+
     initially_available_concurrency = available_concurrency;
   }
 

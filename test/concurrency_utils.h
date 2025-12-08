@@ -13,259 +13,233 @@
 #ifndef __TCM_TESTS_CONCURRENCY_UTILS_HEADER
 #define __TCM_TESTS_CONCURRENCY_UTILS_HEADER
 
-#include "common_tests.h"
+#include <cstdint>
+#include <cstdio>
+#include <climits>
+#include <cstring>
+#include <memory>
+#include <cerrno>
+#include <cstdlib>
 
-#include "tcm/detail/_tcm_assert.h"
-#include "tcm.h"
+#if __linux__
+#include <mntent.h>
 
-#include <atomic>
-#include <mutex>
-#include <deque>
-#include <future>
-#include <thread>
-#include <functional>
-
-// TODO: Add support for CPU constraints
-class client_thread_pool {
+// Linux control groups support
+class cgroup_info {
 public:
-    template <typename Func>
-    void parallel_for(int start, int end, const Func & f, const tcm_permit_t &expected_permit) {
-        uint32_t concurrency;
-        tcm_permit_t permit = make_void_permit(&concurrency);
-        request_permit(permit, expected_permit);
-        thread_pool_cv.notify_all();
-
-        // parallel_for preparation
-        int granted_concurrency = get_permit_concurrency(permit);
-        int work_size = end - start;
-        int base_task_size = std::max(1, work_size / granted_concurrency);
-        int task_size_remainder = std::max(0, work_size - granted_concurrency * base_task_size);
-        int s = start + base_task_size;
-
-        // Submit work to workers
-        std::vector<std::future<void>> task_futures;
-        task_futures.reserve(granted_concurrency);
-        for (int id = 1; id < granted_concurrency && s != end; ++id) {
-            int task_size = task_size_remainder-- > 0 ? base_task_size + 1 : base_task_size;
-            int e = s + task_size;
-            task_futures.emplace_back(enqueue(f, s, e));
-            s = e;
-        }
-        // External thread joins
-        register_thread();
-        f(start, start + base_task_size);
-        wait(task_futures);
-        unregister_thread();
-
-        deactivate_permit();
-    }
-
-    template<typename F, typename... Args>
-    std::future<void> enqueue(const F& func, Args&&... args) {
-        task_t task{std::bind(func, std::forward<Args>(args)...)};
-        auto future = task.get_future();
-        {
-            std::lock_guard<std::mutex> lock(task_deque_mutex);
-            tasks.push_back(std::move(task));
-        }
-        task_deque_cv.notify_all();
-        return future;
-    }
-
-    client_thread_pool(std::string rname, uint32_t min_threads, uint32_t max_threads)
-        : runtime_name(rname), min_concurrency(min_threads), max_concurrency(max_threads) 
-    {
-        client = connect_new_client(client_renegotiate, "", "tcmConnect " + runtime_name);
-        initialize_thread_pool();
-    }
-
-    ~client_thread_pool() {
-        {
-            std::lock_guard<std::mutex> task_lock{task_deque_mutex};
-            is_execution_canceled = true;
-        }
-        {
-            std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-            max_joinable = -1;
-        }
-        thread_pool_cv.notify_all();
-        task_deque_cv.notify_all();
-        release_permit(ph, "", "tcmReleasePermit " + runtime_name);
-        for (auto &worker : workers) {
-            worker.join();
-            g_num_created_threads -= 1;
-        }
-        disconnect_client(client, "", "tcmDisconnect " + runtime_name);
-    }
-
-private:
-    using task_t = std::packaged_task<void()>;
-    void wait(std::vector<std::future<void>>& futures) {
-        for (auto&& future : futures) {
-            future.get();
-        }
-        std::lock_guard<std::mutex> lock(exception_mutex);
-        if (pool_exception) {
-            std::rethrow_exception(pool_exception);
-        }
-    }
-
-    void request_permit(tcm_permit_t &permit, const tcm_permit_t &expected_permit) {
-        tcm_permit_request_t request = TCM_PERMIT_REQUEST_INITIALIZER;
-        request.min_sw_threads = min_concurrency;
-        request.max_sw_threads = max_concurrency;
-        auto r = tcmRequestPermit(client, request, &ph, &ph, &permit);
-        if (!(check_success(r, "tcmRequestPermit " + runtime_name) && check_permit(expected_permit, permit))) {
-            throw tcm_request_permit_error{};
-        }
-        if (permit.state == TCM_PERMIT_STATE_PENDING) {
-            while (permit.state == TCM_PERMIT_STATE_PENDING) {
-                std::this_thread::yield();
-                get_permit_data(ph, permit, "", "tcmGetPermitData for ph=" + to_string(ph) + " by "
-                                                + runtime_name);
-            }
-        }
-        std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-        max_joinable = get_permit_concurrency(permit)-1;
-    }
-
-    void deactivate_permit() {
-        ::deactivate_permit(ph, "" ,"tcmDeactivatePermit " + runtime_name);
-        std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-        max_joinable = 0;
-    }
-
-    void register_thread() {
-        ::register_thread(ph, "", "tcmRegisterThread " + runtime_name);
-    }
-
-    void unregister_thread() {
-        ::unregister_thread("", "tcmUnregisterThread " + runtime_name);
-    }
-
-    enum pool_state {thread_exit, thread_continue, thread_join};
-    pool_state try_join_thread_pool() {
-        std::unique_lock<std::mutex> join_lock(thread_pool_mutex);
-        thread_pool_cv.wait(join_lock, [this]
-                            { return max_joinable == -1 || joined_threads < max_joinable; });
-        if (max_joinable == -1) {
-            return pool_state::thread_exit;
-        }
-        if (joined_threads >= max_joinable) {
-            return pool_state::thread_continue;
-        }
-        joined_threads += 1;
-        return thread_join;
-    }
-
-    void exit_thread_pool() {
-        std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-        joined_threads -= 1;
-    }
-
-    bool receive_task(task_t& task) {
-        std::unique_lock<std::mutex> lock{task_deque_mutex};
-        task_deque_cv.wait_for(lock, std::chrono::milliseconds{200}, [this]
-                    { return !tasks.empty() || is_execution_canceled; });
-        if (is_execution_canceled || tasks.empty()) {
+    // The algorithm deliberately goes over slow but reliable paths to determine possible CPU
+    // constraints. This helps to make sure the optimizations in the code are correct.
+    static bool is_cpu_constrained(int& constrained_num_cpus) {
+        static const int num_cpus = parse_cpu_constraints();
+        if (num_cpus == error_value || num_cpus == unlimited_num_cpus)
             return false;
-        }
-        task = std::move(tasks.back());
-        tasks.pop_back();
+
+        constrained_num_cpus = num_cpus;
         return true;
     }
 
-    bool need_to_leave() {
-        std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-        return max_joinable == -1;
+private:
+    static void close_file(std::FILE *file) { std::fclose(file); };
+    using unique_file_t = std::unique_ptr<std::FILE, decltype(&close_file)>;
+
+    static constexpr int unlimited_num_cpus = INT_MAX;
+    static constexpr int error_value = 0; // Some impossible value for the number of CPUs
+
+    static int determine_num_cpus(long long cpu_quota, long long cpu_period) {
+        if (0 == cpu_period)
+            return error_value; // Avoid division by zero, use the default number of CPUs
+
+        const long long num_cpus = (cpu_quota + cpu_period - 1) / cpu_period;
+        return num_cpus > 0 ? int(num_cpus) : 1; // Ensure at least one CPU is returned
     }
 
-    void initialize_thread_pool() {
-        std::call_once(thread_pool_initilized, [this] {
-            auto thread_routine = [this] {
-                while (true) {
-                    try {
-                        pool_state state = try_join_thread_pool();
-                        if (state == pool_state::thread_exit) {
-                            return;
-                        } else if (state == pool_state::thread_continue) {
-                            continue;
-                        }
-                        register_thread();
-                        // Task execution loop
-                        while (true) {
-                            task_t task;
-                            if (receive_task(task)) {
-                                task();
-                            } else {
-                                break;
-                            }
-                        }
-                        unregister_thread();
-                        exit_thread_pool();
-                        if (need_to_leave()) {
-                            return;
-                        }
-                    }
-                    catch (...) {
-                        {
-                            std::lock_guard<std::mutex> exception_lock(exception_mutex);
-                            if (!pool_exception) {
-                                pool_exception = std::current_exception();
-                            }
-                        }
-                        {
-                            std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-                            max_joinable = -1;
-                        }
-                        {
-                            std::lock_guard<std::mutex> task_lock{task_deque_mutex};
-                            is_execution_canceled = true;
-                        }
-                        thread_pool_cv.notify_all();
-                        task_deque_cv.notify_all();
-                        return;
-                    }
-                }
-            };
+    static constexpr std::size_t rel_path_size = 256; // Size of the relative path buffer
+    struct cgroup_paths {
+        char v1_relative_path[rel_path_size] = {0};
+        char v2_relative_path[rel_path_size] = {0};
+    };
 
-            for (uint32_t i = 0;
-                i < max_concurrency - 1 && g_num_created_threads < g_max_threads;
-                ++i)
-            {
-                if (g_num_created_threads.fetch_add(1) >= g_max_threads) {
-                    g_num_created_threads -= 1;
-                }
-                workers.emplace_back(thread_routine);
+    static const char* look_for_cpu_controller_path(const char* line, const char* last_char) {
+        const char* path_start = line;
+        while ((path_start = std::strstr(path_start, "cpu"))) {
+            // At least ":/" must be at the end of line for a valid cgroups file
+            if (line - path_start == 0 || last_char - path_start <= 3)
+                break; // Incorrect line in the cgroup file, skip it
+
+            const char prev_char = *(path_start - 1);
+            if (prev_char != ':' && prev_char != ',') {
+                ++path_start; // Not a valid "cpu" controller, continue searching
+                continue;
             }
-        });
+
+            const char next_char = *(path_start + 3);
+            if (next_char != ':' && next_char != ',') {
+                ++path_start; // Not a valid "cpu" controller, continue searching
+                continue;
+            }
+
+            path_start = std::strchr(path_start + 3, ':') + 1;
+            __TCM_ASSERT(path_start <= last_char, "Too long path?");
+            break;
+        }
+        return path_start;
     }
-    // Auxiliary
-    std::string runtime_name;
-    // Details for permit request
-    uint32_t min_concurrency;
-    uint32_t max_concurrency;
-    // Thread pool's internals
-    std::once_flag thread_pool_initilized;
-    std::vector<std::thread> workers;
-    std::mutex thread_pool_mutex;
-    std::condition_variable thread_pool_cv;
-    int max_joinable{};
-    int joined_threads{};
-    bool is_execution_canceled{false};
-    // Tasking internals
-    std::deque<task_t> tasks;
-    std::condition_variable task_deque_cv;
-    std::mutex task_deque_mutex;
-    std::mutex exception_mutex;
-    std::exception_ptr pool_exception;
-    // TCM related internals
-    tcm_client_id_t client{};
-    tcm_permit_handle_t ph{nullptr};
-    static std::atomic_int g_num_created_threads;
-    static constexpr int g_max_threads = 256;
+
+    static void cache_relative_path_for(FILE* cgroup_fd, cgroup_paths& paths_cache) {
+        char* relative_path = nullptr;
+        char line[rel_path_size] = {0};
+        const char* last_char = line + rel_path_size - 1;
+
+        const char* path_start = nullptr;
+        while (std::fgets(line, rel_path_size, cgroup_fd)) {
+            path_start = nullptr;
+
+            if (std::strncmp(line, "0::", 3) == 0) {
+                path_start = line + 3; // cgroup v2 unified path
+                relative_path = paths_cache.v2_relative_path;
+            } else {
+                // cgroups v1 allows comount multiple controllers against the same hierarchy
+                path_start = look_for_cpu_controller_path(line, last_char);
+                relative_path = paths_cache.v1_relative_path;
+            }
+
+            if (path_start)
+                break;    // Found "cpu" controller path
+        }
+
+        std::strncpy(relative_path, path_start, rel_path_size);
+        relative_path[rel_path_size - 1] = '\0'; // Ensure null-termination after copy
+
+        char* new_line = std::strrchr(relative_path, '\n');
+        if (new_line)
+            *new_line = '\0';   // Ensure no new line at the end of the path is copied
+    }
+
+    static bool try_read_cgroup_v1_num_cpus_from(const char* dir, int& num_cpus) {
+        char path[PATH_MAX] = {0};
+        if (std::snprintf(path, PATH_MAX, "%s/cpu.cfs_quota_us", dir) < 0)
+            return false; // Failed to create path
+
+        unique_file_t fd(std::fopen(path, "r"), &close_file);
+        if (!fd)
+            return false;
+
+        long long cpu_quota = 0;
+        if (std::fscanf(fd.get(), "%lld", &cpu_quota) != 1)
+            return false;
+
+        if (-1 == cpu_quota) {
+            num_cpus = unlimited_num_cpus; // -1 quota means maximum available CPUs
+            return true;
+        }
+
+        if (std::snprintf(path, PATH_MAX, "%s/cpu.cfs_period_us", dir) < 0)
+            return false; // Failed to create path
+
+        fd.reset(std::fopen(path, "r"));
+        if (!fd)
+            return false;
+
+        long long cpu_period = 0;
+        if (std::fscanf(fd.get(), "%lld", &cpu_period) != 1)
+            return false;
+
+        num_cpus = determine_num_cpus(cpu_quota, cpu_period);
+        return num_cpus != error_value; // Return true if valid number of CPUs was determined
+    }
+
+    static bool try_read_cgroup_v2_num_cpus_from(const char* dir, int& num_cpus) {
+        char path[PATH_MAX] = {0};
+        if (std::snprintf(path, PATH_MAX, "%s/cpu.max", dir) < 0)
+            return false;
+
+        unique_file_t fd(std::fopen(path, "r"), &close_file);
+        if (!fd)
+            return false;
+
+        long long cpu_period = 0;
+        char cpu_quota_str[16] = {0};
+        if (std::fscanf(fd.get(), "%15s %lld", cpu_quota_str, &cpu_period) != 2)
+            return false;
+
+        if (std::strncmp(cpu_quota_str, "max", 3) == 0) {
+            num_cpus = unlimited_num_cpus;  // "max" means no CPU constraint
+            return true;
+        }
+
+        errno = 0; // Reset errno before strtoll
+        char* str_end = nullptr;
+        long long cpu_quota = std::strtoll(cpu_quota_str, &str_end, /*base*/ 10);
+        if (errno == ERANGE || str_end == cpu_quota_str)
+            return false;
+
+        num_cpus = determine_num_cpus(cpu_quota, cpu_period);
+        return num_cpus != error_value; // Return true if valid number of CPUs was determined
+    }
+
+    static int parse_cgroup_entry(const char* mnt_dir, const char* mnt_type, FILE* cgroup_fd,
+                                  cgroup_paths& paths_cache)
+    {
+        int num_cpus = error_value; // Initialize to an impossible value
+        char dir[PATH_MAX] = {0};
+        if (!std::strncmp(mnt_type, "cgroup2", 7)) { // Found cgroup v2 mount entry
+            // At first, try reading CPU quota directly
+            if (try_read_cgroup_v2_num_cpus_from(mnt_dir, num_cpus))
+                return num_cpus; // Successfully read number of CPUs for cgroup v2
+
+            if (!*paths_cache.v2_relative_path)
+                cache_relative_path_for(cgroup_fd, paths_cache);
+
+            // Now try reading including relative path
+            if (std::snprintf(dir, PATH_MAX, "%s/%s", mnt_dir, paths_cache.v2_relative_path) >= 0)
+                try_read_cgroup_v2_num_cpus_from(dir, num_cpus);
+            return num_cpus;
+        }
+
+        __TCM_ASSERT(std::strncmp(mnt_type, "cgroup", 6) == 0, "Unexpected cgroup type");
+
+        if (try_read_cgroup_v1_num_cpus_from(mnt_dir, num_cpus))
+            return num_cpus; // Successfully read number of CPUs for cgroup v1
+
+        if (!*paths_cache.v1_relative_path)
+            cache_relative_path_for(cgroup_fd, paths_cache);
+
+        if (std::snprintf(dir, PATH_MAX, "%s/%s", mnt_dir, paths_cache.v1_relative_path) >= 0)
+            try_read_cgroup_v1_num_cpus_from(dir, num_cpus);
+        return num_cpus;
+    }
+
+    static int parse_cpu_constraints() {
+        // Reading /proc/self/mounts and /proc/self/cgroup anyway, so open them right away
+        unique_file_t cgroup_file_ptr(std::fopen("/proc/self/cgroup", "r"), &close_file);
+        if (!cgroup_file_ptr)
+            return error_value; // Failed to open cgroup file
+
+        auto close_mounts_file = [](std::FILE* file) { endmntent(file); };
+        using unique_mounts_file_t = std::unique_ptr<std::FILE, decltype(close_mounts_file)>;
+        unique_mounts_file_t mounts_file_ptr(setmntent("/proc/self/mounts", "r"), close_mounts_file);
+        if (!mounts_file_ptr)
+            return error_value;
+
+        cgroup_paths relative_paths_cache;
+        struct mntent mntent;
+        constexpr std::size_t buffer_size = 4096; // Allocate a buffer for reading mount entries
+        char mount_entry_buffer[buffer_size];
+
+        int found_num_cpus = error_value; // Initialize to an impossible value
+        // Read the mounts file and cgroup file to determine the number of CPUs
+        while (getmntent_r(mounts_file_ptr.get(), &mntent, mount_entry_buffer, buffer_size)) {
+            if (std::strncmp(mntent.mnt_type, "cgroup", 6) == 0) {
+                found_num_cpus = parse_cgroup_entry(mntent.mnt_dir, mntent.mnt_type,
+                                                    cgroup_file_ptr.get(), relative_paths_cache);
+                if (found_num_cpus != error_value)
+                    break;
+            }
+        }
+        return found_num_cpus;
+    }
 };
 
-std::atomic_int client_thread_pool::g_num_created_threads{0};
+#endif // __linux__
 
 #endif // __TCM_TESTS_CONCURRENCY_UTILS_HEADER
