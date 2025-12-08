@@ -131,6 +131,7 @@ opening a PR against MAINTAINERS.md file.
 | Name                   | Github ID             | Affiliation       | Role       |
 | ---------------------- | --------------------- | ----------------- | ---------- |
 | Alexandra Epanchinzeva | @aepanchi             | Independent       | Code Owner |
+| Olga Malysheva         | @omalyshe             | Intel Corporation | Code Owner |
 
 
 ## oneTBB Release Management
