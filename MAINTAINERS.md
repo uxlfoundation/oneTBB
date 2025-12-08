@@ -130,7 +130,7 @@ opening a PR against MAINTAINERS.md file.
 
 | Name                   | Github ID             | Affiliation       | Role       |
 | ---------------------- | --------------------- | ----------------- | ---------- |
-| Alexandra Epanchinzeva | @aepanchi             | Independant       | Code Owner |
+| Alexandra Epanchinzeva | @aepanchi             | Independent       | Code Owner |
 
 
 ## oneTBB Release Management
