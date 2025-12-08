@@ -2,19 +2,20 @@
 
 ## Introduction
 
-In oneTBB 2021.13.0, PR #1352 introduced a change to worker thread behavior that causes them to
-spin after completing work before leaving an arena (delayed leave). While this optimization
-improves performance for workloads with frequent parallel phases by keeping workers readily
-available, it can cause performance regressions for workloads that interleave short parallel phases
-with single-threaded work.
+In oneTBB 2021.13.0, PR https://github.com/uxlfoundation/oneTBB/pull/1352 introduced a change to
+worker thread behavior that causes them to spin after completing work before leaving an arena
+(delayed leave). While this optimization improves performance for workloads with frequent parallel
+phases by keeping workers readily available, it can cause performance regressions for workloads
+that interleave short parallel phases with single-threaded work.
 
 The root cause is that spinning worker threads increase CPU load even when yielding, which can
 reduce clock speeds due to thermal and power management. This is particularly problematic in
 scenarios where single-threaded code constitutes a significant portion of the workload.
 
-Issue #1876 reports this regression with a reproducible example demonstrating ~8% slowdown in
-wall-clock time. The reporter notes that while the `parallel_phase` API provides per-arena control
-over this behavior, a simpler global mechanism would be preferable for many use cases.
+Issue https://github.com/uxlfoundation/oneTBB/issues/1876 reports this regression with a
+reproducible example demonstrating ~8% slowdown in wall-clock time. The reporter notes that while
+the `parallel_phase` API provides per-arena control over this behavior, a simpler global mechanism
+would be preferable for many use cases.
 
 ### Motivation
 
