@@ -2,7 +2,8 @@
 
 /oneTBB/src/tbb/ @kboyarinov
 /oneTBB/src/tbb/ @dnmokhov
-/oneTBB/include/oneapi/tbb/parallel_* @pavelkumbrasev
+/oneTBB/include/oneapi/tbb/parallel_* @kboyarinov
+/oneTBB/include/oneapi/tbb/parallel_* @dnmokhov
 /oneTBB/include/oneapi/tbb/concurrent_* @kboyarinov
 /oneTBB/include/oneapi/tbb/flow_graph* @kboyarinov
 /oneTBB/include/oneapi/tbb/flow_graph* @aleksei-fedotov
