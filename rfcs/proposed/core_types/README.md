@@ -31,7 +31,7 @@ Applications often have workloads that don't fit neatly into a single core type 
 #### 3. **Avoiding Inappropriate Core Selection**
 
 Without the ability to specify "P-cores OR E-cores (but not LP E-cores)" or 
-"LP E-cores and E-cores but not P-cores" applications face dilemmas.
+"LP E-cores OR E-cores but not P-cores" applications face dilemmas.
 For example, without being able to specify "P-cores OR E-cores (but not LP E-cores)":
 - **No constraint**: Work might be scheduled on LP E-cores, causing significant performance degradation
 - **P-cores only**: Leaves E-cores idle, reducing parallelism
@@ -61,6 +61,15 @@ This forces applications to choose one of these suboptimal strategies:
 
 None of these options provide the desired behavior: **"Use P-cores or E-cores, but avoid LP E-cores"** or **"Use any
 efficiency cores (E-core or LP E-core)"**.
+
+### Compatibility Requirements
+
+This proposal must maintain compatibility with previous oneTBB library versions:
+- **API and Backward Compatibility (Old Application + New Library)**: Existing code using the current
+  `set_core_type(core_type_id)` API must compile and behave identically with newer oneTBB binaries.
+- **Binary Compatibility (ABI)**: The `task_arena::constraints` struct layout must remain unchanged.
+- **Forward Compatibility (New Application + Old Library)**: Applications compiled with the proposed new functionality
+  must be able to handle execution against older oneTBB binaries gracefully, without crashes or undefined behavior.
 
 ## Proposal
 
@@ -187,11 +196,27 @@ The design ensures full backward compatibility:
 | **Behavior** | All existing code paths would preserve exact semantics |
 | **ABI** | No changes to struct size or layout |
 
+### Forward Compatibility
+
+With the `constraints` API being header-only, the unmodified ABI, and no new library entry points, applications
+compiled with the proposed new functionality can handle execution against older oneTBB binaries through runtime
+detection and fallback mechanisms. Runtime detection is achieved using `TBB_runtime_interface_version()`, which allows
+applications to verify that the loaded oneTBB binary supports the new API before attempting to use it. When the runtime
+check indicates an older library version, applications can gracefully fall back to alternative strategies: either using
+all available core types (no constraint) or constraining to a single core type using the existing `set_core_type()`
+API. This approach satisfies the forward compatibility requirement stated in the "Compatibility Requirements" section.
+
 ### Usage Examples
+
+Core type capabilities vary by hardware platform, and the benefits of constraining execution are highly
+application-dependent. In most cases, systems with hybrid CPU architecture show reasonable performance without
+additional API calls. However, in some exceptional scenarios, performance may be tuned by specifying preferred
+core types. The following examples demonstrate these advanced use cases.
 
 #### Example 1: Performance-Class Cores (P or E, not LP E)
 
-Most compute workloads should avoid LP E-cores but can use either P-cores or E-cores:
+In rare cases, compute-intensive tasks may be scheduled to LP E-cores. To fully prevent this, execution can be
+constrained to P-cores and E-cores. The example shows how to set multiple preferred core types:
 
 ```cpp
 auto core_types = tbb::info::core_types();
@@ -209,7 +234,8 @@ arena.execute([] {
 
 #### Example 2: Adaptive Core Selection
 
-Different arenas for different workload priorities:
+For applications with well-understood workload characteristics, different arenas may be configured with different core
+type constraints. The example shows how to create arenas for different workload priorities:
 
 ```cpp
 auto core_types = tbb::info::core_types();
@@ -258,6 +284,40 @@ The test infrastructure could generate all possible core type combinations using
 | **Runtime impact** | Negligible compared to task scheduling overhead |
 | **Affinity operations** | Linear in number of core types, performed once at arena creation |
 
+## Alternatives Considered
+
+### Alternative 1: Accept Multiple Constraints Instances
+
+Instead of modifying the `constraints` struct, introduce a new `task_arena` constructor that accepts a vector of
+`constraints` instances. The arena would compute the union of affinity masks from all provided constraints, enabling
+specification of multiple NUMA nodes and core types in a single arena.
+
+```cpp
+// Example usage
+tbb::task_arena arena({
+    tbb::task_arena::constraints{}.set_core_type(core_types[1]),
+    tbb::task_arena::constraints{}.set_core_type(core_types[2])
+});
+```
+
+**Pros:**
+- More scalable: can extend to any other constraint type and specify multiple platform portions as a unified constraint
+- Reuses existing `constraints` struct without modification
+- Avoids bit-packing, format markers, and special value handling
+- No risk of misinterpretation of existing single core type constraints
+
+**Cons:**
+- Requires creating multiple `constraints` objects for simple core type combinations
+- Vector of `constraints` instances vs. single integer field with bit-packing creates memory overhead
+- Unclear how to handle conflicting `max_concurrency` or `max_threads_per_core` across instances
+- Library entry points `constraints_default_concurrency()` and `constraints_threads_per_core()` accept single
+  `constraints`; would require new overloads or replacement APIs, affecting ABI
+
+**Future Extensibility Consideration:** This approach naturally extends to other constraint types—if `set_core_types`
+is added, a corresponding `set_numa_ids` function would likely follow. The choice between a vector of `constraints`
+instances versus dedicated multi-value setters affects API consistency and usability: the former provides a unified
+pattern for combining any constraints, while the latter offers more intuitive, type-specific methods.
+
 ## Open Questions
 
 1. **API Naming**: Is `set_core_types` (plural) sufficiently distinct from `set_core_type` (singular)?
@@ -287,4 +347,5 @@ void clear_core_types();
    - Pros: Simpler logic, easier to extend
    - Cons: Increases struct size, breaks ABI compatibility
 
-6. **Info API**: Should `info::core_types()` be extended to return a count instead of/in addition to a vector?
+6. **Info API**: Should `info::core_types()` be augmented with a method to return a count instead of a vector, e.g.,
+   `info::num_core_types()`?
