@@ -215,9 +215,6 @@ extra complexity. As of now, we know just a few arena set patterns with potentia
 besides NUMA arenas, we can think of splitting CPU resources by core type and of creating a set of
 arenas with different priorities. We do not however recall any requests to simplify these use cases.
 
-## Future Questions
-- At this point arena priority parameter is not considered, simply keeping the default `priority::normal`.
-  Are there use cases for pre-setting priorities? Similarly for the experimental thread leave policy.
-- Are there more practical use cases which could justify the universal function approach?
-- Need to consider alternatives to silently ignoring `numa_id` in constraints, such as an exception
-  or undefined behavior.
+## Future Extensions
+- Consider extending API to support pre-setting arena priority and experimental worker thread leave policy.
+- Revisit the universal function approach if more use cases arise that would benefit from such flexibility.
