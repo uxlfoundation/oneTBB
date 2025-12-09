@@ -52,8 +52,8 @@ private:
 #if 0
     ValueType V[MaxHeight][MaxWidth];
 #else
-    tbb::interleaved_vector<ValueType, 4*4*1024> V_data{2, MaxHeight * MaxWidth};
-    tbb::mdspan<ValueType, 4*4*1024, MaxWidth> V{&V_data};
+    tbb::interleaved_vector<ValueType, 4*1024> V_data{2, MaxHeight * MaxWidth};
+    tbb::mdspan<ValueType, 4*1024, MaxWidth> V{&V_data};
 #endif
 
     //! Vertical stress
