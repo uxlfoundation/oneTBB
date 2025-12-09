@@ -259,7 +259,7 @@ jobs:
             std: 14
             build_type: relwithdebinfo
             preview: 'ON'
-          - os: macos-13
+          - os: macos-14
             c_compiler: clang
             cxx_compiler: clang++
             std: 20
