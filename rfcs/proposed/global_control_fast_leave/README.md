@@ -104,6 +104,7 @@ delayed leave behavior and the global `fast_leave` control is set to enabled, th
 treat the state as if it were fast leave instead, causing the worker to exit immediately.
 
 ```mermaid
+%%{init: {"layout": "elk"}}%%
 flowchart TD
     Start([🚀 No work available in arena:<br/>worker needs to decide whether to leave])
     Start --> ReadState[📖 Read current arena state]
