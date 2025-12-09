@@ -75,6 +75,31 @@ public:
     }
 }; // class task_with_ref_counter
 
+#if TRY_AVOID_SPLIT_TASK
+class tree_task : public task_with_ref_counter {
+private:
+    tree_task*   m_left_task;
+    tree_task*   m_right_task;
+    std::size_t  m_num_subtree_elements;
+
+public:
+    tree_task(task_group_context& ctx, small_object_allocator& allocator)
+        : task_with_ref_counter(ctx, allocator)
+        , m_left_task(nullptr)
+        , m_right_task(nullptr)
+        , m_num_subtree_elements(0)
+    {}
+
+    ~tree_task() override {}
+
+    tree_task*& left() { return m_left_task; }
+    tree_task*& right() { return m_right_task; }
+    std::size_t& num_subtree_elements() { return m_num_subtree_elements; }
+
+    // TODO: should it be static
+    static bool try_split_and_spawn(tree_task* tree_head);
+};
+#else
 class tree_task : public task {
 private:
     tree_task*             m_left_task;
@@ -107,6 +132,7 @@ public:
         m_parent = parent;
     }
 }; // class tree_task
+#endif
 
 template <typename Function>
 class function_tree_task : public tree_task {
@@ -114,6 +140,7 @@ private:
     // TODO: EBO
     const Function m_function;
 
+#if !TRY_AVOID_SPLIT_TASK
     void destroy(execution_data& ed) {
         task_with_ref_counter* parent = m_parent;
         m_allocator.delete_object(this, ed);
@@ -121,6 +148,7 @@ private:
             parent->release(1); // TODO: ed?
         }
     }
+#endif
 public:
     template <typename F>
     function_tree_task(F&& function, task_group_context& ctx, small_object_allocator& allocator)
@@ -130,18 +158,30 @@ public:
 
     d1::task* execute(execution_data& ed) override {
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
-        m_function();
+#if TRY_AVOID_SPLIT_TASK
+        if (!tree_task::try_split_and_spawn(this)) {
+            m_function();
+            release(1, &ed); // release self-reference
+            return nullptr;
+        } else {
+            return this; // re-execute
+        }
+#else
         destroy(ed);
+#endif
         return nullptr;
     }
 
     d1::task* cancel(execution_data& ed) override {
         __TBB_ASSERT(false, "Task cancellation not supported");
+#if !TRY_AVOID_SPLIT_TASK
         destroy(ed);
+#endif
         return nullptr;
     }
 }; // class function_tree_task
 
+#if !TRY_AVOID_SPLIT_TASK
 class split_task : public task_with_ref_counter {
     tree_task* m_task_tree;
 public:
@@ -188,6 +228,7 @@ public:
         }
     }
 };
+#endif
 
 class binary_task_tree;
 
@@ -235,8 +276,16 @@ private:
         __TBB_ASSERT(subtree_head != nullptr, nullptr);
         if (subtree_head->left() == nullptr) {
             subtree_head->left() = new_task;
+#if TRY_AVOID_SPLIT_TASK
+            subtree_head->reserve(1);
+            new_task->set_parent(subtree_head);
+#endif
         } else if (subtree_head->right() == nullptr) {
             subtree_head->right() = new_task;
+#if TRY_AVOID_SPLIT_TASK
+            subtree_head->reserve(1);
+            new_task->set_parent(subtree_head);
+#endif
         } else if (subtree_head->left()->num_subtree_elements() <= subtree_head->right()->num_subtree_elements()) {
             add_task_to_subtree(subtree_head->left(), new_task);
         } else {
@@ -269,6 +318,10 @@ public:
             
             if (current_task_tree->left() == nullptr) {
                 current_task_tree->left() = new_task;
+#if TRY_AVOID_SPLIT_TASK
+                new_task->set_parent(current_task_tree);
+                current_task_tree->reserve(1);
+#endif
             } else {
                 add_task_to_subtree(current_task_tree->left(), new_task);
             }
@@ -326,11 +379,37 @@ public:
     }
 }; // class binary_task_tree
 
+#if TRY_AVOID_SPLIT_TASK
+inline bool tree_task::try_split_and_spawn(tree_task* tree_head) {
+    __TBB_ASSERT(tree_head != nullptr, nullptr);
+    bool is_divisible = tree_head->num_subtree_elements() + 1 > TASK_TREE_GRAINSIZE;
+
+    if (!is_divisible) {
+        if (tree_head->left()) {
+            r1::spawn(*tree_head->left(), tree_head->ctx());
+        }
+        if (tree_head->right()) {
+            r1::spawn(*tree_head->right(), tree_head->ctx());
+        }
+    } else {
+        tree_task* splitted_tree_head = binary_task_tree::split(tree_head);
+        r1::spawn(*splitted_tree_head, tree_head->ctx());
+    }
+
+    return is_divisible;
+}
+#endif
+
 inline task* grab_task::execute(execution_data& ed) {
     __TBB_ASSERT(ed.context == &ctx(), "The task group context should be used for all tasks");
     tree_task* task_tree = m_task_tree.grab_all();
     __TBB_ASSERT(task_tree != nullptr, "Grab task should task at least one task");
 
+#if TRY_AVOID_SPLIT_TASK
+    task_tree->set_parent(this);
+    tree_task::try_split_and_spawn(task_tree);
+    return task_tree;
+#else
     task* t = split_task::split_and_bypass(task_tree, this, ed);
 #if TRY_REUSE_CURRENT_TASK
     if (t == this) {
@@ -346,48 +425,51 @@ inline task* grab_task::execute(execution_data& ed) {
     release(); // release self-reference
 #endif
     return t;
+#endif // TRY_AVOID_SPLIT_TASK
 }
 
+#if !TRY_AVOID_SPLIT_TASK
 task* split_task::split_and_bypass(tree_task* tree, task_with_ref_counter* requester_task, execution_data& ed) {
-        __TBB_ASSERT(tree != nullptr, nullptr);
-        task* bypass_task = nullptr;
+    __TBB_ASSERT(tree != nullptr, nullptr);
+    task* bypass_task = nullptr;
 
-        // Check if the tree is divisible
-        if (tree->num_subtree_elements() + 1 <= TASK_TREE_GRAINSIZE) {
-            __TBB_ASSERT(tree->right() == nullptr, "Broken tree structure");
+    // Check if the tree is divisible
+    if (tree->num_subtree_elements() + 1 <= TASK_TREE_GRAINSIZE) {
+        __TBB_ASSERT(tree->right() == nullptr, "Broken tree structure");
 
-            requester_task->reserve(tree->num_subtree_elements() + 1);
-            bypass_task = tree;
-            tree->set_parent(requester_task);
-            recursive_spawn(tree->left(), requester_task);
-        } else {
-            d1::small_object_allocator alloc;
+        requester_task->reserve(tree->num_subtree_elements() + 1);
+        bypass_task = tree;
+        tree->set_parent(requester_task);
+        recursive_spawn(tree->left(), requester_task);
+    } else {
+        d1::small_object_allocator alloc;
 
-            tree_task* splitted_tree = binary_task_tree::split(tree);
+        tree_task* splitted_tree = binary_task_tree::split(tree);
 
 #if TRY_REUSE_CURRENT_TASK
-            requester_task->reserve(1);
+        requester_task->reserve(1);
 
-            split_task* right = alloc.new_object<split_task>(splitted_tree, requester_task->ctx(), alloc);
-            right->set_parent(requester_task);
-            bypass_task = requester_task;
-            r1::spawn(*right, requester_task->ctx());
+        split_task* right = alloc.new_object<split_task>(splitted_tree, requester_task->ctx(), alloc);
+        right->set_parent(requester_task);
+        bypass_task = requester_task;
+        r1::spawn(*right, requester_task->ctx());
 #else
-            // TODO: measure performance if the current task is bypassed instead, but separate ref counter is not created
-            requester_task->reserve(2);
-            
-            split_task* left = alloc.new_object<split_task>(tree, requester_task->ctx(), alloc);
-            split_task* right = alloc.new_object<split_task>(splitted_tree, requester_task->ctx(), alloc);
+        // TODO: measure performance if the current task is bypassed instead, but separate ref counter is not created
+        requester_task->reserve(2);
+        
+        split_task* left = alloc.new_object<split_task>(tree, requester_task->ctx(), alloc);
+        split_task* right = alloc.new_object<split_task>(splitted_tree, requester_task->ctx(), alloc);
 
-            left->set_parent(requester_task);
-            right->set_parent(requester_task);
-            bypass_task = left;
-            r1::spawn(*right, requester_task->ctx());
+        left->set_parent(requester_task);
+        right->set_parent(requester_task);
+        bypass_task = left;
+        r1::spawn(*right, requester_task->ctx());
 #endif
-        }
-
-        return bypass_task;
     }
+
+    return bypass_task;
+}
+#endif
 
 class exp_task_group {
 private:
