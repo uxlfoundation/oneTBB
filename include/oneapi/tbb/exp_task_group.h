@@ -10,6 +10,18 @@
 #include "task_group.h"
 #include <atomic>
 
+#ifndef TRY_REUSE_CURRENT_TASK
+#define TRY_REUSE_CURRENT_TASK 0
+#endif
+
+#ifndef TRY_SPIN_UNTIL_MIN_SIZE
+#define TRY_SPIN_UNTIL_MIN_SIZE 0
+#endif
+
+#define TASK_TREE_GRAINSIZE           4
+#define RECOMMENDED_MINIMAL_TREE_SIZE 2048
+#define NUM_SIZE_RETRIES              10
+
 namespace tbb {
 namespace detail {
 namespace d1 {
@@ -130,8 +142,6 @@ public:
     }
 }; // class function_tree_task
 
-#define TASK_TREE_GRAINSIZE 4
-
 class split_task : public task_with_ref_counter {
     tree_task* m_task_tree;
 public:
@@ -147,7 +157,13 @@ public:
     d1::task* execute(execution_data& ed) override {
         __TBB_ASSERT(ed.context == &ctx(), "The task group context should be used for all tasks");
         task* t = split_and_bypass(m_task_tree, this, ed);
+#if TRY_REUSE_CURRENT_TASK
+        if (t != this) {
+            release(); // release self-reference
+        }
+#else
         release(); // release self-reference
+#endif
         return t;
     }
 
@@ -267,8 +283,20 @@ public:
 
     tree_task* grab_all() {
         tree_task* current_head = wait_while_busy();
-        
+
+#ifdef TRY_SPIN_UNTIL_MIN_SIZE
+        std::size_t num_retries = 0;
+        // Controlled data race on integer
+        while (current_head->num_subtree_elements() + 1 < RECOMMENDED_MINIMAL_TREE_SIZE &&
+               num_retries++ < NUM_SIZE_RETRIES)
+        {
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+            if (num_retries > NUM_SIZE_RETRIES / 2) d0::yield();
+        }
+#endif
+
         while (!m_head.compare_exchange_strong(current_head, nullptr)) {
+            __TBB_ASSERT(is_busy(current_head), nullptr);
             current_head = wait_while_busy();
         }
         __TBB_ASSERT(!is_busy(current_head), "Incorrect tree grabbed");
@@ -304,8 +332,19 @@ inline task* grab_task::execute(execution_data& ed) {
     __TBB_ASSERT(task_tree != nullptr, "Grab task should task at least one task");
 
     task* t = split_task::split_and_bypass(task_tree, this, ed);
-
+#if TRY_REUSE_CURRENT_TASK
+    if (t == this) {
+        // grab_task cannot be re-executed, substitute split_task instead
+        small_object_allocator alloc;
+        split_task* split = alloc.new_object<split_task>(task_tree, ctx(), alloc);
+        split->set_parent(this);
+        t = split;
+    } else {
+        release(); // release self-reference
+    }
+#else
     release(); // release self-reference
+#endif
     return t;
 }
 
@@ -326,6 +365,14 @@ task* split_task::split_and_bypass(tree_task* tree, task_with_ref_counter* reque
 
             tree_task* splitted_tree = binary_task_tree::split(tree);
 
+#if TRY_REUSE_CURRENT_TASK
+            requester_task->reserve(1);
+
+            split_task* right = alloc.new_object<split_task>(splitted_tree, requester_task->ctx(), alloc);
+            right->set_parent(requester_task);
+            bypass_task = requester_task;
+            r1::spawn(*right, requester_task->ctx());
+#else
             // TODO: measure performance if the current task is bypassed instead, but separate ref counter is not created
             requester_task->reserve(2);
             
@@ -336,6 +383,7 @@ task* split_task::split_and_bypass(tree_task* tree, task_with_ref_counter* reque
             right->set_parent(requester_task);
             bypass_task = left;
             r1::spawn(*right, requester_task->ctx());
+#endif
         }
 
         return bypass_task;
