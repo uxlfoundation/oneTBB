@@ -18,6 +18,10 @@
 #define TRY_SPIN_UNTIL_MIN_SIZE 0
 #endif
 
+#ifndef TRY_AVOID_SPLIT_TASK
+#define TRY_AVOID_SPLIT_TASK 0
+#endif
+
 #define TASK_TREE_GRAINSIZE           4
 #define RECOMMENDED_MINIMAL_TREE_SIZE 2048
 #define NUM_SIZE_RETRIES              10
@@ -337,7 +341,7 @@ public:
     tree_task* grab_all() {
         tree_task* current_head = wait_while_busy();
 
-#ifdef TRY_SPIN_UNTIL_MIN_SIZE
+#if TRY_SPIN_UNTIL_MIN_SIZE
         std::size_t num_retries = 0;
         // Controlled data race on integer
         while (current_head->num_subtree_elements() + 1 < RECOMMENDED_MINIMAL_TREE_SIZE &&
