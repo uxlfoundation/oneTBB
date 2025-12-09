@@ -70,6 +70,8 @@ This proposal must maintain compatibility with previous oneTBB library versions:
 - **Binary Compatibility (ABI)**: The `task_arena::constraints` struct layout must remain unchanged.
 - **Forward Compatibility (New Application + Old Library)**: Applications compiled with the proposed new functionality
   must be able to handle execution against older oneTBB binaries gracefully, without crashes or undefined behavior.
+  This requirement is mandated by the necessity for the key customer, OpenVINO, to support their users
+  that might not be ready to upgrade to the latest version of oneTBB.
 
 ## Proposal
 
@@ -284,9 +286,39 @@ The test infrastructure could generate all possible core type combinations using
 | **Runtime impact** | Negligible compared to task scheduling overhead |
 | **Affinity operations** | Linear in number of core types, performed once at arena creation |
 
-## Alternatives Considered
+### Open Questions
 
-### Alternative 1: Accept Multiple Constraints Instances
+1. **API Naming**: Is `set_core_types` (plural) sufficiently distinct from `set_core_type` (singular)?
+   - Alternative: overload the existing `set_core_type` to accept `vector<core_type_id>`
+   - Alternative: `set_acceptable_core_types` or `allow_core_types`
+
+2. **Empty Vector Semantics**: Should `set_core_types({})` mean "automatic" or throw an exception?
+   - Current proposal: treat as automatic (-1)
+   - Alternative: require at least one core type
+
+3. **Query API**: Should we add convenience methods?
+
+```cpp
+bool has_core_type(core_type_id id) const;
+size_t num_core_types() const;
+```
+
+4. **Builder Pattern Extensions**: Should we support incremental building?
+
+```cpp
+constraints& add_core_type(core_type_id id);
+constraints& remove_core_type(core_type_id id);
+void clear_core_types();
+```
+
+5. **Core Types Data member**: Should we store core types in a new container data member instead of bit-packing?
+   - Pros: Simpler logic, easier to extend
+   - Cons: Increases struct size, breaks ABI compatibility
+
+6. **Info API**: Should `info::core_types()` be augmented with a method to return a count instead of a vector, e.g.,
+   `info::num_core_types()`?
+
+## Alternative 1: Accept Multiple Constraints Instances
 
 Instead of modifying the `constraints` struct, introduce a new `task_arena` constructor that accepts a vector of
 `constraints` instances. The arena would compute the union of affinity masks from all provided constraints, enabling
@@ -318,34 +350,99 @@ is added, a corresponding `set_numa_ids` function would likely follow. The choic
 instances versus dedicated multi-value setters affects API consistency and usability: the former provides a unified
 pattern for combining any constraints, while the latter offers more intuitive, type-specific methods.
 
-## Open Questions
+## Alternative 2: Selector-based API
 
-1. **API Naming**: Is `set_core_types` (plural) sufficiently distinct from `set_core_type` (singular)?
-   - Alternative: overload the existing `set_core_type` to accept `vector<core_type_id>`
-   - Alternative: `set_acceptable_core_types` or `allow_core_types`
+Another alternative proposal takes a different approach to the API, motivated by
+[SYCL device selectors](https://registry.khronos.org/SYCL/specs/sycl-2020/html/sycl-2020.html#sec:device-selection).
+In SYCL, "a device selector which is a ranking function that will give an integer ranking value to all the devices
+on the system". It takes a device as an argument and returns a score for that device, according to user's criteria.
+The SYCL implementation calls that function on each device, and then selects one with the highest score.
 
-2. **Empty Vector Semantics**: Should `set_core_types({})` mean "automatic" or throw an exception?
-   - Current proposal: treat as automatic (-1)
-   - Alternative: require at least one core type
+Similarly, we can create/initialize an arena for core type(s) or NUMA node(s) selected by a user-provided function.
 
-3. **Query API**: Should we add convenience methods?
+### Reasons to consider an alternative
+
+There are several questionable aspects in the "main" proposal above.
+- It shifts away from the original design of `task_arena::constraints` as a simple `struct` with public fields
+  designed for direct use and C++20 designated initialization. While `constraints` could still be used that way
+  with the current API, the new functionality requires to use member functions.
+- Due to the accessibility of `constraints::core_type`, the proposed encoding mechanism cannot be fully encapsulated
+  and hidden, essentially exposing to a degree the implementation details.
+- It assumes that `core_type_id` is a number, or at least that the upper 4 bits do not contribute to its value
+  and can be used for encoding. While that's true for the current implementation, `core_type_id` is specified
+  as an opaque type. That proposal therefore relies on (and, again, exposes) implementation details. It might be
+  acceptable, as changing these details would likely break backward compatibility anyway. But perhaps we can
+  do better and avoid such exposure at all.
+- It mostly sticks to the current usage model of `constraints`, possibly missing an opportunity to simplify
+  the API usage for both basic and advanced scenarios.
+
+### New API (sketched)
+
+#### Header
 
 ```cpp
-bool has_core_type(core_type_id id) const;
-size_t num_core_types() const;
+#include <oneapi/tbb/task_arena.h>
 ```
 
-4. **Builder Pattern Extensions**: Should we support incremental building?
+#### Synopsis
 
 ```cpp
-constraints& add_core_type(core_type_id id);
-constraints& remove_core_type(core_type_id id);
-void clear_core_types();
+namespace oneapi {
+namespace tbb {
+class task_arena {
+
+    // New constructor template
+    template <typename Selector>
+    task_arena(constraints a_constraints, Selector a_selector, unsigned reserved_slots = 1,
+               priority a_priority = priority::normal);
+
+    // New template for overloads of initialize
+    template <typename Selector>
+    /*return type to be defined*/
+    initialize(constraints a_constraints, Selector a_selector, unsigned reserved_slots = 1,
+               priority a_priority = priority::normal);
+
+};
+}}
 ```
 
-5. **Core Types Data member**: Should we store core types in a new container data member instead of bit-packing?
-   - Pros: Simpler logic, easier to extend
-   - Cons: Increases struct size, breaks ABI compatibility
+#### API description
 
-6. **Info API**: Should `info::core_types()` be augmented with a method to return a count instead of a vector, e.g.,
-   `info::num_core_types()`?
+The new templates for construction and initialization of a `task_arena` accept, in addition to `constraints`,
+a *selection function*: a user-specified callable object that ranks core types or NUMA nodes available on the platform.
+
+We can consider at least two variations of what the selection function accepts as its arguments:
+1) the whole vector of core types or NUMA nodes, as returned by `tbb::info` API calls, or
+2) a single `core_type_id` or `noma_node_id` value, packed into a tuple/struct with additional useful information,
+   specifically the number of entities to choose from (e.g., `tbb::info::core_types().size()`) and the position
+   (index) of the given ID value.
+
+In principle, it could be possible for the implementation to support both variations, distinguished at compile time.
+For each ID value, the selection function should return a signed integral number as the score for that ID. In case (1),
+the function should therefore return a vector of scores, one for each element of its input vector.
+
+A negative score would indicate that the corresponding core type or NUMA node should be excluded from use
+by the task arena. A positive score would indicate that the corresponding core type or NUMA node is good to use
+by the task arena, and the bigger the score the better the "resource" is from the user's viewpoint.
+If for whatever reason (some described below) the implementation can only use a single core type or NUMA node,
+it should take the one with the biggest score.
+
+#### Implementation aspects
+
+The key implementation problem is how to pass the additional information about multiple core types (or NUMA nodes)
+to the TBB library functions for arena creation without violating the forward compatibility requirement.
+
+Unlike the main proposal, that is designed as an API to extend `constraints` and is therefore limited by the layout
+of that type and the use of existing entry points that take `constraints` or `task_arena`, the alternative API
+better encapsulates the implementation and can potentially utilize various ways to solve the problem, such as:
+- encoding the extra information into the existing types, e.g. in the above proposed way;
+- [ab]using other existing entry points / data structures with reserved parameters or space to pass information through;
+  - for example, using `task_arena_base::my_arena` (which is currently `nullptr` until the arena is initialized),
+    and indicating that it carries some information via arena's `version_and_traits`;
+- introducing a new class (e.g., `d2::task_arena`) inherited from the same base but having extra fields, again with
+  `version_and_traits` updated to indicate the change at runtime;
+- finding "smart" ways to add new library entry points which however are not used directly in the headers to prevent
+  link-time dependency to the new oneTBB binaries; ideas to consider include runtime-discoverable ABI entries,
+  weak symbols defined in the headers and replaced by identical ones in the new binaries, or callback functions
+  defined in the headers, exported by an application and then discovered by the new binaries at runtime.
+
