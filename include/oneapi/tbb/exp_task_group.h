@@ -160,6 +160,8 @@ public:
         , m_function(std::forward<F>(function))
     {}
 
+    ~function_tree_task() {}
+
     d1::task* execute(execution_data& ed) override {
         __TBB_ASSERT(ed.context == &this->ctx(), "The task group context should be used for all tasks");
 #if TRY_AVOID_SPLIT_TASK
@@ -323,8 +325,8 @@ public:
             if (current_task_tree->left() == nullptr) {
                 current_task_tree->left() = new_task;
 #if TRY_AVOID_SPLIT_TASK
-                new_task->set_parent(current_task_tree);
                 current_task_tree->reserve(1);
+                new_task->set_parent(current_task_tree);
 #endif
             } else {
                 add_task_to_subtree(current_task_tree->left(), new_task);
@@ -411,8 +413,9 @@ inline task* grab_task::execute(execution_data& ed) {
 
 #if TRY_AVOID_SPLIT_TASK
     task_tree->set_parent(this);
-    tree_task::try_split_and_spawn(task_tree);
     return task_tree;
+    // tree_task::try_split_and_spawn(task_tree);
+    // return task_tree;
 #else
     task* t = split_task::split_and_bypass(task_tree, this, ed);
 #if TRY_REUSE_CURRENT_TASK
