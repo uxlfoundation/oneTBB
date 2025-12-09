@@ -4,6 +4,7 @@
 
 ### Motivation
 
+By default, oneTBB includes all available core types in a task arena unless explicitly constrained. 
 The current oneTBB API allows users to constrain task execution to a single core type using
 `task_arena::constraints::set_core_type(core_type_id)`. While this provides control, it creates limitations for
 real-world applications running on processors with more than two core types (e.g., on a system with performance (P),
@@ -11,7 +12,9 @@ efficient (E), and low power efficient (LP E) cores):
 
 #### 1. **Flexibility and Resource Utilization**
 
-Many parallel workloads can execute efficiently on multiple core types. For example:
+While it is often best to allow the OS to use all core types and flexibly schedule threads, some advanced users may find it necessary to constrain scheduling. 
+When there are more than two core types, it may be desired to constrain execution to not just a single core type.
+Many parallel workloads can execute efficiently on multiple core types that make up a subset of the available core types. For example:
 - A parallel algorithm with good scalability works well on both P-cores and E-cores
 - Background processing can run on E-cores or LP E-cores depending on availability
 - Mixed workloads benefit from utilizing any available performance-class cores (P or E)
@@ -27,7 +30,9 @@ Applications often have workloads that don't fit neatly into a single core type 
 
 #### 3. **Avoiding Inappropriate Core Selection**
 
-Without the ability to specify "P-cores OR E-cores (but not LP E-cores)", applications face a dilemma:
+Without the ability to specify "P-cores OR E-cores (but not LP E-cores)" or 
+"LP E-cores and E-cores but not P-cores" applications face dilemmas.
+For example, without being able to specify "P-cores OR E-cores (but not LP E-cores)":
 - **No constraint**: Work might be scheduled on LP E-cores, causing significant performance degradation
 - **P-cores only**: Leaves E-cores idle, reducing parallelism
 - **E-cores only**: Misses opportunities to use faster P-cores when available
@@ -51,7 +56,7 @@ This forces applications to choose one of these suboptimal strategies:
 |----------|------|------|
 | **P-cores only** | Maximum single-threaded performance | Leaves E-cores idle; limited parallelism; higher power |
 | **E-cores only** | Good for parallel workloads | Doesn't utilize P-core performance; excludes LP E-cores |
-| **LP E-cores only** | Minimal power consumption | Severe performance impact for most workloads |
+| **LP E-cores only** | Minimal power consumption | Severe performance impact for some workloads that require large, shared caches. |
 | **No constraint** | Maximum flexibility | May schedule on inappropriate cores (e.g., LP E-cores for compute) |
 
 None of these options provide the desired behavior: **"Use P-cores or E-cores, but avoid LP E-cores"** or **"Use any
