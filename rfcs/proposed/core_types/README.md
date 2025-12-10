@@ -427,7 +427,7 @@ by the task arena, and the bigger the score the better the "resource" is from th
 If for whatever reason (some described below) the implementation can only use a single core type or NUMA node,
 it should take the one with the biggest score.
 
-#### Implementation aspects
+### Implementation aspects
 
 The key implementation problem is how to pass the additional information about multiple core types (or NUMA nodes)
 to the TBB library functions for arena creation without violating the forward compatibility requirement.
@@ -446,3 +446,35 @@ better encapsulates the implementation and can potentially utilize various ways 
   weak symbols defined in the headers and replaced by identical ones in the new binaries, or callback functions
   defined in the headers, exported by an application and then discovered by the new binaries at runtime.
 
+Another question is how to distinguish whether the selector should be applied to core types or to NUMA nodes,
+if/when both are supported with the API. The problem here is that `core_type_id` and `numa_node_id` are currently
+defined as aliases to the same integral type, and therefore we cannot recognize at compile time which information
+to pass to call the selector.
+
+This can be addressed either by adding a special value (distinct from `automatic`) that would indicate which
+constraint parameter should be used with the selector, or by redefining these names to refer to distinct types.
+In the latter case, the types should be fully binary compatible (i.e., have the same layout and set of values)
+with the integral type used now. That looks doable but needs exploration of all compatibility aspects.
+
+### Pros and cons
+
+This alternative approach addresses weak points of the main proposal listed above: it does not change `constraints`,
+does not expose implementation details, and to a certain degree simplifies the creation of constrained arenas
+via a higher level. more descriptive API. It can be implemented in a few different ways. And it also has or may have
+the pros of the Alternative 1 above (which is likely also true in the opposite direction), but does not have its cons
+except for one.
+
+Additionally, this API might have sensible semantics even if it has to operate with an older version
+of the runtime library. Such library can only use a single core type in the constraints, and the API
+implementation in the headers can adjust to that by using the core type with the highest score.
+If the API semantics is defined to allow such behavior, the API can do the oneTBB runtime version check
+internally (instead of users doing it in their code), which is an extra advantage over the main proposal.
+
+One disadvantage of this approach is that neither single nor several instances of `constraints` represent
+the limitations of the created arena. It is still possible to create another arena with the same limitations,
+by reusing the same set of arguments including the selector. It is also possible to have a proper copy
+constructor for `task_arena`, though we need to ensure that the internal state stores all the information needed
+to create another instance. But other APIs, such as the `tbb::info::default_concurrency` function that takes
+a `constraints` argument, currently do not have access to the same information. A possible way to address
+that is to add a parameter for either the selector or the vector(s) of scores it created; however that needs
+additional exploration.
