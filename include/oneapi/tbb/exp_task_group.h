@@ -104,11 +104,13 @@ public:
 
     static void recursive_spawn(tree_task* tree_head) {
         if (tree_head != nullptr) {
-            r1::spawn(*tree_head, tree_head->ctx());
-            recursive_spawn(tree_head->left());
-            recursive_spawn(tree_head->right());
+            tree_task* left = tree_head->left();
+            tree_task* right = tree_head->right();
             tree_head->left() = nullptr;
             tree_head->right() = nullptr;
+            r1::spawn(*tree_head, tree_head->ctx());
+            recursive_spawn(left);
+            recursive_spawn(right);
         }
     }
 };
