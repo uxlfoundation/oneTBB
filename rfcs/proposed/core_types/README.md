@@ -365,8 +365,8 @@ The new templates for construction and initialization of a `task_arena` accept, 
 a *selection function*: a user-specified callable object that ranks core types or NUMA nodes available on the platform.
 
 We can consider at least two variations of what the selection function accepts as its arguments:
-1) the whole vector of core types or NUMA nodes, as returned by `tbb::info` API calls, or
-2) a single `core_type_id` or `noma_node_id` value, packed into a tuple/struct with additional useful information,
+1. the whole vector of core types or NUMA nodes, as returned by `tbb::info` API calls, or
+2. a single `core_type_id` or `noma_node_id` value, packed into a tuple/struct with additional useful information,
    specifically the number of entities to choose from (e.g., `tbb::info::core_types().size()`) and the position
    (index) of the given ID value.
 
@@ -431,6 +431,15 @@ to create another instance. But other APIs, such as the `tbb::info::default_conc
 a `constraints` argument, currently do not have access to the same information. A possible way to address
 that is to add a parameter for either the selector or the vector(s) of scores it created; however that needs
 additional exploration.
+
+### Open questions
+
+1. Need to decide on the parameters and the return type of selectors
+2. What happens if all scores are negative? Options: return an error (exception), switch the parameter
+   to `automatic`, or leave the arena uninitialized.
+3. If selectors take a vector, what happens if the returned vector is smaller or greater than the input one?
+4. For a hypothetical platform having both a few NUMA nodes and different core types, would we allow
+   to select both at the same time, and if yes - how would that work?
 
 ## Usage Examples
 
