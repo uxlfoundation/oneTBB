@@ -7,6 +7,7 @@
 #include <tbb/parallel_for.h>
 #include <tbb/task_group.h>
 #include <tbb/task_arena.h>
+#include <tbb/global_control.h>
 
 
 using namespace std::chrono;
@@ -64,6 +65,8 @@ int main(int argc, char* argv[])
 
 	std::cout << "NumThreads = " << NumThreads << std::endl;
 	std::cout << "NumTasks = " << NumTasks << std::endl;
+
+    tbb::global_control gc(tbb::global_control::max_allowed_parallelism, NumThreads);
 
     constexpr std::size_t NumRuns = 6;
 	std::vector<int> times(NumRuns, 0);
