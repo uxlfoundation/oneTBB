@@ -437,6 +437,7 @@ additional exploration.
 1. Need to decide on the parameters and the return type of selectors
 2. What happens if all scores are negative? Options: return an error (exception), switch the parameter
    to `automatic`, or leave the arena uninitialized.
+   - In SYCL, class constructors with a device selector must throw an exception if no device is selected.
 3. If selectors take a vector, what happens if the returned vector is smaller or greater than the input one?
 4. For a hypothetical platform having both a few NUMA nodes and different core types, would we allow
    to select both at the same time, and if yes - how would that work?
