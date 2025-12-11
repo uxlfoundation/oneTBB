@@ -467,8 +467,8 @@ assert(core_types.size() == 3);
 // [0] = LP E-core, [1] = E-core, [2] = P-core
 
 tbb::task_arena arena({
-    tbb::task_arena::constraints{}.set_core_type(core_types[1]), // E-cores
-    tbb::task_arena::constraints{}.set_core_type(core_types[2])  // P-cores
+    tbb::task_arena::constraints{.core_type = core_types[1]}, // E-cores
+    tbb::task_arena::constraints{.core_type = core_types[2]}  // P-cores
 });
 ```
 
@@ -478,11 +478,11 @@ This example assumes that the selector is called in the loop over the elements o
 and takes a tuple of {`core_type_id`, its index in the vector, the size of the vector}.
 ```cpp
 tbb::task_arena arena(
-    tbb::task_arena::constraints{}.set_core_type(tbb::task_arena::selectable),
+    tbb::task_arena::constraints{.core_type = tbb::task_arena::selectable},
     [](auto /*std::tuple*/ core_type) -> int {
         auto& [id, position, total] = core_type;
-        // positions are ordered from the least to the most performant
-        // [0] = LP E-core, [1] = E-core, [2] = P-core
+        // positions are ordered from the least to the most performant:
+        // 0 = LP E-core, 1 = E-core, 2 = P-core
         return (position == 0)? -1 : position;
     }
 );
@@ -491,7 +491,7 @@ tbb::task_arena arena(
 Or we can call the selector once and get a vector of scores:
 ```cpp
 tbb::task_arena arena(
-    tbb::task_arena::constraints{}.set_core_type(tbb::task_arena::selectable),
+    tbb::task_arena::constraints{.core_type = tbb::task_arena::selectable},
     [](auto /*std::vector*/ core_types) -> std::vector<int> {
         assert(core_types.size() == 3);
         // core_types is ordered from the least to the most performant:
@@ -503,25 +503,75 @@ tbb::task_arena arena(
 ### Example 2: Adaptive Core Selection
 
 For applications with well-understood workload characteristics, different arenas may be configured with different core
-type constraints. The example shows how to create arenas for different workload priorities:
+type constraints. The example shows how to create arenas for different workload categories.
+
+#### Proposed API
 
 ```cpp
 auto core_types = tbb::info::core_types();
+assert(core_types.size() == 3);
 
-// High-priority
-tbb::task_arena high_priority(
+tbb::task_arena latency_driven(
     tbb::task_arena::constraints{}.set_core_type(core_types[2])
 );
 
-// Medium-priority
-tbb::task_arena medium_priority(
+tbb::task_arena throughput_driven(
     tbb::task_arena::constraints{}.set_core_types({core_types[1], core_types[2]})
 );
 
-// Low-priority
-tbb::task_arena low_priority(
+tbb::task_arena background_work(
     tbb::task_arena::constraints{}.set_core_types({core_types[0], core_types[1]})
 );
 ```
 
+#### Alternative 1
 
+```cpp
+auto core_types = tbb::info::core_types();
+assert(core_types.size() == 3);
+
+tbb::task_arena latency_driven(
+    tbb::task_arena::constraints{.core_type = core_types[2]}
+);
+
+tbb::task_arena throughput_driven(
+    tbb::task_arena::constraints{.core_type = core_types[1]},
+    tbb::task_arena::constraints{.core_type = core_types[2]}
+);
+
+tbb::task_arena background_work(
+    tbb::task_arena::constraints{.core_type = core_types[0]},
+    tbb::task_arena::constraints{.core_type = core_types[1]}
+);
+```
+
+#### Alternative 2
+
+```cpp
+auto lowest_latency_selector = [](auto /*std::tuple*/ core_type) -> int {
+    auto& [id, position, total] = core_type;
+    return (position == total - 1)? 1 : -1;
+};
+
+auto throughput_selector = [](auto /*std::tuple*/ core_type) -> int {
+    auto& [id, position, total] = core_type;
+    return (position == 0)? -1 : position;
+};
+
+auto background_selector = [](auto /*std::tuple*/ core_type) -> int {
+    auto& [id, position, total] = core_type;
+    return (position == total - 1)? -1 : total - position;
+};
+
+tbb::task_arena latency_driven(
+    tbb::task_arena::constraints{.core_type = tbb::task_arena::selectable}, lowest_latency_selector
+);
+
+tbb::task_arena throughput_driven(
+    tbb::task_arena::constraints{.core_type = tbb::task_arena::selectable}, throughput_selector
+);
+
+tbb::task_arena background_work(
+    tbb::task_arena::constraints{.core_type = tbb::task_arena::selectable}, background_selector
+);
+```
