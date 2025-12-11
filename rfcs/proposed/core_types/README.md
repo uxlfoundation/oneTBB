@@ -309,9 +309,6 @@ tbb::task_arena arena({
 **Cons:**
 - Requires creating multiple `constraints` objects for simple core type combinations
 - Vector of `constraints` instances vs. single integer field with bit-packing creates memory overhead
-- Unclear how to handle conflicting `max_concurrency` or `max_threads_per_core` across instances
-- Library entry points `constraints_default_concurrency()` and `constraints_threads_per_core()` accept single
-  `constraints`; would require new overloads or replacement APIs, affecting ABI
 
 **Future Extensibility Consideration:** This approach naturally extends to other constraint types—if `set_core_types`
 is added, a corresponding `set_numa_ids` function would likely follow. The choice between a vector of `constraints`
