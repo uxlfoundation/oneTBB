@@ -208,56 +208,6 @@ check indicates an older library version, applications can gracefully fall back 
 all available core types (no constraint) or constraining to a single core type using the existing `set_core_type()`
 API. This approach satisfies the forward compatibility requirement stated in the "Compatibility Requirements" section.
 
-### Usage Examples
-
-Core type capabilities vary by hardware platform, and the benefits of constraining execution are highly
-application-dependent. In most cases, systems with hybrid CPU architecture show reasonable performance without
-additional API calls. However, in some exceptional scenarios, performance may be tuned by specifying preferred
-core types. The following examples demonstrate these advanced use cases.
-
-#### Example 1: Performance-Class Cores (P or E, not LP E)
-
-In rare cases, compute-intensive tasks may be scheduled to LP E-cores. To fully prevent this, execution can be
-constrained to P-cores and E-cores. The example shows how to set multiple preferred core types:
-
-```cpp
-auto core_types = tbb::info::core_types();
-// Assume: [0] = LP E-core, [1] = E-core, [2] = P-core
-
-tbb::task_arena arena(
-    tbb::task_arena::constraints{}
-        .set_core_types({core_types[1], core_types[2]})  // P or E cores
-);
-
-arena.execute([] {
-    // Compute-intensive work
-});
-```
-
-#### Example 2: Adaptive Core Selection
-
-For applications with well-understood workload characteristics, different arenas may be configured with different core
-type constraints. The example shows how to create arenas for different workload priorities:
-
-```cpp
-auto core_types = tbb::info::core_types();
-
-// High-priority
-tbb::task_arena high_priority(
-    tbb::task_arena::constraints{}.set_core_type(core_types[2])
-);
-
-// Medium-priority
-tbb::task_arena medium_priority(
-    tbb::task_arena::constraints{}.set_core_types({core_types[1], core_types[2]})
-);
-
-// Low-priority
-tbb::task_arena low_priority(
-    tbb::task_arena::constraints{}.set_core_types({core_types[0], core_types[1]})
-);
-```
-
 ### Testing Strategy
 
 Tests should cover:
@@ -390,7 +340,10 @@ There are several questionable aspects in the "main" proposal above.
 namespace oneapi {
 namespace tbb {
 class task_arena {
-
+  public:
+    // (Possibly needed) New constant to indicate a selectable constraint
+    static constexpr int selectable = /* unspecified */;
+    
     // New constructor template
     template <typename Selector>
     task_arena(constraints a_constraints, Selector a_selector, unsigned reserved_slots = 1,
@@ -478,3 +431,97 @@ to create another instance. But other APIs, such as the `tbb::info::default_conc
 a `constraints` argument, currently do not have access to the same information. A possible way to address
 that is to add a parameter for either the selector or the vector(s) of scores it created; however that needs
 additional exploration.
+
+## Usage Examples
+
+Core type capabilities vary by hardware platform, and the benefits of constraining execution are highly
+application-dependent. In most cases, systems with hybrid CPU architecture show reasonable performance without
+additional API calls. However, in some exceptional scenarios, performance may be tuned by specifying preferred
+core types. The following examples demonstrate these advanced use cases.
+
+### Example 1: Performance-Class Cores (P or E, not LP E)
+
+In rare cases, compute-intensive tasks may be scheduled to LP E-cores. To fully prevent this, execution can be
+constrained to P-cores and E-cores. The example shows how to set multiple preferred core types.
+
+#### Proposed API
+
+```cpp
+auto core_types = tbb::info::core_types();
+assert(core_types.size() == 3);
+// core_types is ordered from the least to the most performant:
+// [0] = LP E-core, [1] = E-core, [2] = P-core
+
+tbb::task_arena arena(
+    tbb::task_arena::constraints{}
+        .set_core_types({core_types[1], core_types[2]})  // E and P cores
+);
+```
+
+#### Alternative 1
+
+```cpp
+auto core_types = tbb::info::core_types();
+assert(core_types.size() == 3);
+// core_types is ordered from the least to the most performant:
+// [0] = LP E-core, [1] = E-core, [2] = P-core
+
+tbb::task_arena arena({
+    tbb::task_arena::constraints{}.set_core_type(core_types[1]), // E-cores
+    tbb::task_arena::constraints{}.set_core_type(core_types[2])  // P-cores
+});
+```
+
+#### Alternative 2
+
+This example assumes that the selector is called in the loop over the elements of `tbb::info::core_types()`,
+and takes a tuple of {`core_type_id`, its index in the vector, the size of the vector}.
+```cpp
+tbb::task_arena arena(
+    tbb::task_arena::constraints{}.set_core_type(tbb::task_arena::selectable),
+    [](auto /*std::tuple*/ core_type) -> int {
+        auto& [id, position, total] = core_type;
+        // positions are ordered from the least to the most performant
+        // [0] = LP E-core, [1] = E-core, [2] = P-core
+        return (position == 0)? -1 : position;
+    }
+);
+```
+
+Or we can call the selector once and get a vector of scores:
+```cpp
+tbb::task_arena arena(
+    tbb::task_arena::constraints{}.set_core_type(tbb::task_arena::selectable),
+    [](auto /*std::vector*/ core_types) -> std::vector<int> {
+        assert(core_types.size() == 3);
+        // core_types is ordered from the least to the most performant:
+        // [0] = LP E-core, [1] = E-core, [2] = P-core
+        return {-1, 1, 2};
+    }
+);
+```
+### Example 2: Adaptive Core Selection
+
+For applications with well-understood workload characteristics, different arenas may be configured with different core
+type constraints. The example shows how to create arenas for different workload priorities:
+
+```cpp
+auto core_types = tbb::info::core_types();
+
+// High-priority
+tbb::task_arena high_priority(
+    tbb::task_arena::constraints{}.set_core_type(core_types[2])
+);
+
+// Medium-priority
+tbb::task_arena medium_priority(
+    tbb::task_arena::constraints{}.set_core_types({core_types[1], core_types[2]})
+);
+
+// Low-priority
+tbb::task_arena low_priority(
+    tbb::task_arena::constraints{}.set_core_types({core_types[0], core_types[1]})
+);
+```
+
+
