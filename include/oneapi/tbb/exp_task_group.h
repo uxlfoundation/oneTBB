@@ -100,8 +100,17 @@ public:
     tree_task*& right() { return m_right_task; }
     std::size_t& num_subtree_elements() { return m_num_subtree_elements; }
 
-    // TODO: should it be static
     static bool try_split_and_spawn(tree_task* tree_head);
+
+    static void recursive_spawn(tree_task* tree_head) {
+        if (tree_head != nullptr) {
+            r1::spawn(*tree_head, tree_head->ctx());
+            recursive_spawn(tree_head->left());
+            recursive_spawn(tree_head->right());
+            tree_head->left() = nullptr;
+            tree_head->right() = nullptr;
+        }
+    }
 };
 #else
 class tree_task : public task {
@@ -391,12 +400,8 @@ inline bool tree_task::try_split_and_spawn(tree_task* tree_head) {
     bool is_divisible = tree_head->num_subtree_elements() + 1 > TASK_TREE_GRAINSIZE;
 
     if (!is_divisible) {
-        if (tree_head->left()) {
-            r1::spawn(*tree_head->left(), tree_head->ctx());
-        }
-        if (tree_head->right()) {
-            r1::spawn(*tree_head->right(), tree_head->ctx());
-        }
+        recursive_spawn(tree_head->left());
+        recursive_spawn(tree_head->right());
     } else {
         tree_task* splitted_tree_head = binary_task_tree::split(tree_head);
         r1::spawn(*splitted_tree_head, tree_head->ctx());
