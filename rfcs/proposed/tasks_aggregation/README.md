@@ -164,38 +164,98 @@ The first task submitted to the group is appended to the tree, and since the tre
 
 Subsequent task submitted to the group are appended to the tree without spawning any tasks until the ``grab_task`` executes.
 
-Once a consumer worker thread steals and executes the ``grab_task``, 
+Once a consumer worker thread steals and executes the ``grab_task``, it grabs the tree containing some amount of tasks. Let's say it contains 1000 tasks.
 
-<img src="assets/aggregating_group_first_run.png" width=400>
+Starting from this moment, the producer's task tree is empty again, hence subsequent ``run``s would spawn additional ``grab_task``s.
 
-Subsequent tasks submitted to the group are appended to the head of the list without spawning additional aggregating tasks.
+Consumer thread check if the grabbed tree is divisible and if it is - splits the tree into halves, spawns a task representing a second subtree, and re-executes
+the current tree's head to keep dividing the tree until the desired grainsize is achieved. 
 
-<img src="assets/aggregating_group_further_runs.png" width=400>
+Let's consider a grainsize of 150 tasks. Producer thread appended 500 tasks into the task tree before the consumer thread 1 came and grabbed them. 
+Thread 1 splits the tree into two halves (each containing 250 tasks) and spawns a head into thread 1's local task pool.
 
-When a consumer worker thread looks for work, the only task available for stealing is ``agg_task``.
+Assume Thread 2 steals the spawned task from Thread 1 - it will also split the subtree into two halves, each containing 125 tasks, but will spawn the second half to Thread 2's
+local task pool.
 
-<img src="assets/aggregating_group_consumer_thread.png" width=600>
+Thread 3 can now steal the task spawned by Thread 2 and since it is not divisible - spawns the entire subtree to its local task pool.
 
-When the consumer thread executes the ``agg_task``, it grabs the task list and makes it empty again. Further calls to ``run()`` will
-append the task to the empty list and spawn additional *aggregating-task*s to grab the new list.
+Same amount of tasks would be spawned by Thread 2 when the task would be re-executed.
 
-<img src="assets/aggregating_group_aggregating_task.png" width=600>
+Thread 1 would split the tree once more resulting it once more stealing (let's say by Thread 4). 
 
-After grabbing the task list, the consumer thread splits the list into chunks of fixed size. Assume a chunk size of ``2``.
-In the example above, it will create two service *chunk-task*s pointing to the sub-lists. One is spawned, while the other is bypassed.
+Hence, for such a model, instead of spawning 500 tasks by the Producer Thread and further stealing from a single source, 4 threads have spawned 125 tasks each, resulting
+in 4 different task sources for stealing that improves the stealing scalability.
 
-Chunk tasks reserve a reference in the aggregating task's reference counter and maintain another counter for individual listed tasks in the chunk.
-The lifetime of a chunk task is extended until the last listed task in the chunk is executed.
+This model can be interpreted also in the following manner. Consider a producer is going to generate N input work items. As it was mentioned, N is unknown in advance.
+The execution using *aggregating-task-group* would be similar to buffering some amount of inputs, execute async parallel for on top of the buffer and start buffering again.
+So processing *N* input work items can result in *M* ``parallel_for`` invocations over *K0*, *K1*, ..., *KM* iterations where *K0* + *K1* + ... + *KM* == *N*.
 
-<img src="assets/aggregating_group_chunking.png" width=300>
+### Resolving the Reference Counting Bottleneck
 
-Another consumer thread can now steal the *chunk-task* from the first consumer thread's local task pool.
+As it was mentioned in the introduction, ``tbb::task_group`` in the single producer-multiple consumers case suffers from a bottleneck caused by tasks reference counting.
 
-When the consumer thread executes the *chunk-task*, it spawns all tasks except one and bypasses the last.
+Since all of the tasks are created by a single thread, it's ``thread_reference_vertex`` holds a single reference in a ``task_group``s ``wait_context``, while each
+task holds reference in a producer's ``thread_reference_vertex``. Since the tasks are likely stolen and executed by consumer threads, reference counter in producer's
+``thread_reference_vertex`` would be decremented by multiple threads, resulting in negative performance effects.
 
-<img src="assets/aggregating_group_process_chunks.png" width=600>
+In the *aggregating-task-group* task distribution approach, this can be solved by adding a reference counter to each task of the tree. A reference is held:
+1. For a task itself
+2. For a left task in a tree
+3. For a right task in a tree
 
-### Alternative Approaches for Chunking
+Before spawning, the *grab-task* holds a reference in a calling thread ``thread_reference_vertex``. Once it executes and grabs the task tree, it substitutes itself
+with the head of the grabbed subtree in a waiting tree.
+
+The lifetime of each task is extended until the reference counter is non-zero. Similar to 
+
+```mermaid
+flowchart TD
+    producer_vertex[producer thread vertex<br>ref_count = 1] --> tg_wait_context[task_group wait context<br>ref_count = 1]
+    task0[task0<br>ref_count = 2] --> producer_vertex
+    task0 --> task1[task1<br>ref_count = 3]
+    task1 --> task2[task2<br>ref_count = 1]
+    task1 --> task3[task3<br>ref_count = 1]
+    task1 --> task0
+    task2 --> task1
+    task3 --> task1
+
+    linkStyle 0,1,5,6,7 stroke:blue,stroke-width:2px,color:blue
+    linkStyle 2,3,4 stroke:red,stroke-width:2px,color:red
+```
+
+In a diagram above, red arrows denotes a left or right child in a task tree and are not involved in a reference counting.
+Blue arrows denotes a parent relationship in a waiting tree.
+
+When a subtree is split into halves, only the red arrows are changing. The waiting tree remain unchanged.
+Once a task executed it's body, it releases a self-reference held in a reference counter. Once the reference counter reaches zero,
+the task is deallocated and releases a reference in it's parent in a waiting tree.
+
+This approach allows to distribute the reference counting across multiple tasks and avoid bottleneck on a single counter.
+
+### Allocator Bottleneck
+
+Another bottleneck that appears in a single producer- multiple consumer scenario is an allocation bottleneck. In a regular ``task_group`` (as well as
+in most of TBB parallel algorithms), tasks are allocated in a per-thread small object pool. Only an owner thread can allocate from a pool, but multiple
+threads can release a memory to a pool. 
+
+Since all of the tasks are created (i.e. allocated) by a single producer's small object pool, multiple stealers would release the memory to a single pool
+during the group's work. Producer's small object pool becomes another bottleneck in a system.
+
+Current version of the document do not propose concrete solution for this bottleneck. Possible solution may be to avoid deallocating the task tree on the
+consumer's side, but create a service *free-task* pointing to the task tree and submitting it directly to the producer to guarantee that the memory would
+be deallocated by the owner. But since the original tree structure is broken by the constant tree splitting, this approach is not straightforward to implement.
+
+## Performance Analysis
+
+## Alternative Approaches Considered
+
+## Possible APIs
+
+## Open Questions
+
+## Task Tree operations in Details
+
+
 
 Alternative approaches for how the *aggregating-task* should process the grabbed list can be considered.
 
