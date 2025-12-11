@@ -1,4 +1,5 @@
-# Copyright (c) 2016-2023 Intel Corporation
+# Copyright (c) 2016-2025 Intel Corporation
+# Copyright (c) 2025 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,7 +33,7 @@ if any(i in os.environ for i in ["CC", "CXX"]):
         os.environ['LDSHARED'] = os.environ['CXX'] + " -shared"
     print("Environment specifies CC=%s CXX=%s"%(os.environ['CC'], os.environ['CXX']))
 
-intel_compiler = os.getenv('CC', '') in ['icl', 'icpc', 'icc']
+intel_compiler = os.getenv('CC', '') in ['icl', 'icpc', 'icc', 'icx', 'icpx']
 try:
     tbb_root = os.environ['TBBROOT']
     print("Using TBBROOT=", tbb_root)
