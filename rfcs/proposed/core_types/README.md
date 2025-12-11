@@ -483,7 +483,7 @@ tbb::task_arena arena(
         auto& [id, position, total] = core_type;
         // positions are ordered from the least to the most performant:
         // 0 = LP E-core, 1 = E-core, 2 = P-core
-        return (position == 0)? -1 : position;
+        return (total > 1 && position == 0)? -1 : position;
     }
 );
 ```
@@ -551,16 +551,19 @@ tbb::task_arena background_work(
 auto lowest_latency_selector = [](auto /*std::tuple*/ core_type) -> int {
     auto& [id, position, total] = core_type;
     return (position == total - 1)? 1 : -1;
+    // Scores for the whole vector: {-1, -1, 1}
 };
 
 auto throughput_selector = [](auto /*std::tuple*/ core_type) -> int {
     auto& [id, position, total] = core_type;
-    return (position == 0)? -1 : position;
+    return (total > 1 && position == 0)? -1 : position;
+    // Scores for the whole vector: {-1, 1, 2}
 };
 
 auto background_selector = [](auto /*std::tuple*/ core_type) -> int {
     auto& [id, position, total] = core_type;
-    return (position == total - 1)? -1 : total - position;
+    return (total > 1 && position == total - 1)? -1 : total - position;
+    // Scores for the whole vector: {3, 2, -1}
 };
 
 tbb::task_arena latency_driven(
@@ -573,5 +576,85 @@ tbb::task_arena throughput_driven(
 
 tbb::task_arena background_work(
     tbb::task_arena::constraints{.core_type = tbb::task_arena::selectable}, background_selector
+);
+```
+
+### Example 3: Code that does not depend on oneTBB binary versions
+
+This example adjusts the code in Example 1 to illustrates how an application could be written so that
+it uses the new arena capabilities when present, otherwise falls back to the old arena construction.
+
+#### Proposed API
+
+The new API cannot be used with the old binaries which do not recognized encoded constraints.
+Checking `TBB_runtime_interface_version()` is therefore required.
+
+```cpp
+auto core_types = tbb::info::core_types();
+tbb::task_arena::constraints avoid_LPE_cores;
+std::size_t n_types = core_types.size();
+
+if (TBB_runtime_interface_version() < 12190 || n_types < 3) {
+    // an old TBB binary, or LP E-cores are not found / not distinguished
+    avoid_LPE_cores.core_type = core_types.back(); // use only the most performant cores
+} else {
+    // 3 (or more) core types found, use the two most performant ones
+    avoid_LPE_cores.set_core_types(core_types[n_types - 1], core_types[n_types - 2]);
+}
+
+tbb::task_arena arena(avoid_LPE_cores);
+```
+
+#### Alternative 1
+
+The runtime version check can be hidden within the implementation, if we agree that only the first constraint
+applies in case multiple constraints cannot work.
+
+```cpp
+auto core_types = tbb::info::core_types();
+std::vector<tbb::task_arena::constraints> avoid_LPE_cores;
+
+// always use the most performant core type
+avoid_LPE_cores.push_back(tbb::task_arena::constraints{.core_type = core_types.back()});
+ // avoid the lest performant core type
+for (int i = core_types.size() - 2; i > 0; --i) {
+    avoid_LPE_cores.push_back(tbb::task_arena::constraints{.core_type = core_types[i]});
+}
+
+tbb::task_arena arena(avoid_LPE_cores);
+```
+
+Instead of the c
+
+#### Alternative 2
+
+The runtime version check can be hidden within the implementation, and the type with the highest score takes
+precedence. Except for comments, the code is the same as in Example 1.
+
+```cpp
+tbb::task_arena arena(
+    tbb::task_arena::constraints{.core_type = tbb::task_arena::selectable},
+    [](auto /*std::tuple*/ core_type) -> int {
+        auto& [id, position, total] = core_type;
+        return (total > 1 && position == 0)? -1 : position;
+    }
+);
+```
+
+In case selectors take the vector of core types, and without assuming there are exactly three types,
+the selector needs to deal with input of different sizes. It could be like this:
+
+```cpp
+tbb::task_arena arena(
+    tbb::task_arena::constraints{.core_type = tbb::task_arena::selectable},
+    [](auto /*std::vector*/ core_types) -> std::vector<int> {
+        std::size_t n_types = core_types.size();
+        std::vector<int> scores(n_types);
+        scores[0] = -1; // avoid the lest performant core type
+        scores.back() = n_types; // the most performant core is scored highest
+        for (int i = 1; i < n_types - 1; ++i)
+            scores[i] = i;
+        return scores;
+    }
 );
 ```
