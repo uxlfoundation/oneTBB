@@ -47,6 +47,7 @@ struct execution_data;
 class wait_tree_vertex_interface;
 class task_arena_base;
 class exp_task_group;
+class mail_task_group;
 }
 
 namespace d2 {
@@ -187,6 +188,7 @@ private:
     friend class d2::task_group_base;
     friend class d2::aggregating_task_group;
     friend class d1::exp_task_group;
+    friend class d1::mail_task_group;
 
     bool continue_execution() const {
         return m_wait.continue_execution();

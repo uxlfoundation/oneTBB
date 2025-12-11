@@ -77,6 +77,7 @@ int main(int argc, char* argv[])
             tbb::blocked_range<size_t> range(0, NumTasks, 1);
 
             tbb::parallel_for(range, [=](const tbb::blocked_range<size_t>& subRange) {
+                if (subRange.end() - subRange.begin() != 1) throw "Error";
                 for (size_t i = subRange.begin(); i < subRange.end(); ++i) {
                     doCalc(i);
                 }
