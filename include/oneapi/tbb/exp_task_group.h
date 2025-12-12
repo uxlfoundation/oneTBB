@@ -14,8 +14,8 @@
 #define TRY_SPIN_UNTIL_MIN_SIZE 0
 #endif
 
-#define TASK_TREE_GRAINSIZE           256
-#define RECOMMENDED_MINIMAL_TREE_SIZE 4096
+#define TASK_TREE_GRAINSIZE           128
+#define RECOMMENDED_MINIMAL_TREE_SIZE 2048
 #define NUM_SIZE_RETRIES              10
 
 namespace tbb {
