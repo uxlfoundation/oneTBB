@@ -175,7 +175,7 @@ Since the template arguments for `blocked_nd_range` are not specified, there can
 2. Be interpreted as two (or three) dimensional range _[0, 10)_, _[0, 20)_ (and _[0, 5)_). In this case it should be deduced as `blocked_nd_range<int, 3>` 
    and constructed using the constructor `[2]`. 
 
-Current oneTBB implementation prefers the second option since the multi-dimensional ranges are more practical and for consistency with behavior described
+The current oneTBB implementation prefers the second option since the multi-dimensional ranges are more practical and for consistency with the behavior described
 in [Passing single C-array object of size 2 or 3](#passing-single-c-array-object-of-size-2-or-3) section.
 
 ### Passing single C-array object of size 2 or 3
