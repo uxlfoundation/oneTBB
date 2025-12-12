@@ -161,18 +161,8 @@ Revisit the producer-consumer example using *aggregating-task-group* instead of 
 
 When the *aggregating-task-group* is created, the producer's task tree is empty.
 
-The first submitted task is appended and because the tree was empty, a *grab-task* is spawned (added to the local task pool).
-
-Subsequent tasks are appended without spawning until the *grab-task* executes.
-When a worker steals and executes the *grab-task*, it grabs the tree.
-
-From that moment, the producer's tree is empty again, so subsequent ``run`` call spawn additional *grab-task*.
-
-The consumer checks whether the grabbed tree is divisible; if so, it splits the tree into halves, spawns a task for the
-second subtree, and re-executes the head to continue dividing until the desired grainsize is reached.
-
-Assume a grainsize of 150 tasks. The producer appended 500 tasks into the task tree before the consumer thread 1 came 
-and grabbed them. Thread 1 splits the tree into two halves (250 tasks each) and spawns the head of the second half into
+The producer appended 500 tasks into the task tree before the consumer thread 1 came and grabbed them.
+Thread 1 splits the tree into two halves (250 tasks each) and spawns the head of the second half into
 its local pool.
 
 Thread 2 steals that task, splits the subtree into two halves (125 each), and spawns the second half to its own local pool.
@@ -207,7 +197,7 @@ In *aggregating-task-group*, it is addressed by adding per-task reference counte
 3. Its right child (if any)
 
 Before spawning, the *grab-task* holds a reference in a producer's ``thread_reference_vertex``. After execution and grab,
-it replaces itself with the head of the grabbed tree in the waiting tree.
+it replaces itself in the waiting tree with the head of the grabbed tree.
 
 Each task's lifetime extends until its reference count reaches zero.
 
@@ -324,7 +314,7 @@ flowchart TD
     try_grab --> |Success| exit_grab["Exit to tree distribution"]
     try_grab --> |Fail| spin_while_locked
 
-    add_task[add_task<br>producer] --> lock_tree["tree = head.exchange(nullptr)"]
+    add_task[add_task<br>producer] --> lock_tree["tree = head.exchange(locked)"]
     lock_tree --> insert["do insert"]
     insert --> unlock_tree["head.exchange(tree)"]
     unlock_tree --> exit_producer["Exit"]
@@ -335,7 +325,7 @@ flowchart TD
 Consider an empty binary task tree. The first added task becomes the head. The second task is inserted as the head's left child.
 The right child of the head is always ``nullptr`` to maintain the structure described above.
 
-From the third task onward, insert into the subtree (left or right) with fewer items.
+From the third task onward, the algorithm inserts into the subtree (left or right) with fewer items.
 
 ```mermaid
 flowchart TD
@@ -344,7 +334,7 @@ flowchart TD
     head_check --> |Yes| head_insert[head = new_task]
     head_check --> |No| subtree_insert[subtree = head->left]
     subtree_insert --> subtree_check[subtree == nullptr?]
-    subtree_check --> |Yes| subtree_head_insert[subtree = new_task]
+    subtree_check --> |Yes| subtree_head_insert[head->left = new_task]
     subtree_check --> |No| subtree_head_left_check[subtree->left == nullptr?]
     subtree_head_left_check --> |Yes| subtree_head_left_insert[subtree->left = new_task]
     subtree_head_left_check --> |No| subtree_head_right_check[subtree->right == new_task?]
@@ -364,13 +354,13 @@ flowchart TD
 
 As noted above, each node maintains pointer to left/right children and to its parent.
 
-This document proposes requiring the grainsize to be >= 4 to simplify splitting.
+This document proposes requiring the grainsize to be $>= 4$ to simplify splitting.
 
 Splitting occurs only after a grab; thus, the splitting thread exclusively owns the tree, and no synchronization is needed.
 
-Only the first two layers of the tree are needed for splitting. Let's call them ``head`` and ``next``. Splitting is done by setting
-``head->left = next->right``, then ``next->right = nullptr``, and update counters accordingly. 
+Only the first two layers of the tree are needed for splitting. Let's call them ``head`` and ``next``.
 
+Splitting is done by setting ``head->left = next->right``, then ``next->right = nullptr``, and update counters accordingly. 
 Parent pointers are not modified so the waiting tree remains intact for reference counting.
 
 Before splitting
