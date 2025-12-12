@@ -280,6 +280,16 @@ public:
     }
 }; // class binary_task_tree
 
+inline void tree_task::split_and_spawn() {
+    while (num_subtree_elements() + 1 > TASK_TREE_GRAINSIZE) {
+        tree_task* splitted_tree_head = binary_task_tree::split(this);
+        r1::spawn(*splitted_tree_head, ctx());
+    }
+
+    recursive_spawn(left());
+    recursive_spawn(right());
+}
+
 inline task* grab_task::execute(execution_data& ed) {
     __TBB_ASSERT(ed.context == &ctx(), "The task group context should be used for all tasks");
     tree_task* task_tree = m_task_tree.grab_all();
@@ -346,12 +356,6 @@ public:
     template <typename F>
     void run(F&& f) {
         m_task_tree.add_task(std::forward<F>(f), m_wait_vertex, context());
-    }
-
-    template <typename F>
-    void run_and_wait(F&& f) {
-        run(std::forward<F>(f));
-        wait();
     }
 }; // class exp_task_group
 
