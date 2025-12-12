@@ -92,8 +92,8 @@ blocked_nd_range(blocked_range<Value>, blocked_range<Values>...)
 This deduction guide corresponds to the constructor `[1]` for the case of passing _N_ `blocked_range` objects itself.
 It only participates in overload resolution if all of the types in `Values` are same as `Value`.
 
-To cover the case while blocked_ranges are passed as braced-init-lists, the deduction guide taking a set of C-array objects
-is added.
+To cover the case when blocked_ranges are passed as braced-init-lists, a deduction guide is added that takes a set of C-array objects.
+
 
 There are currently two options how to define the deduction guide (or a function) taking the braced-init-list
 of any type- C-array and `std::initializer_list`. The issue with `std::initializer_list` is that it does not allow
