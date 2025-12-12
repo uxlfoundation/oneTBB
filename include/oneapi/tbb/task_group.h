@@ -476,7 +476,13 @@ class isolated_task_group;
 #endif
 
 template <typename F>
-class function_stack_task : public d1::task {
+class function_stack_task
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    : public d2::dynamic_state_task
+#else
+    : public d1::task
+#endif
+{
     const F& m_func;
     d1::wait_tree_vertex_interface* m_wait_tree_vertex;
 
@@ -668,12 +674,12 @@ public:
 
     static void transfer_this_task_completion_to(d2::task_handle& new_task) {
         d1::task* curr_task = d1::current_task_ptr();
-        __TBB_ASSERT(curr_task != nullptr, "this_task_completion_to was called outside of task body");
-        task_handle_task* curr_th_task = dynamic_cast<task_handle_task*>(curr_task);
-        // Not using __TBB_ASSERT(curr_th_task) to allow function_stack_task body to use this method
-        if (curr_th_task != nullptr) {
-            curr_th_task->transfer_completion_to(new_task);
-        }
+        __TBB_ASSERT(curr_task != nullptr, "transfer_this_task_completion_to was called outside of task body");
+#if __TBB_USE_OPTIONAL_RTTI && TBB_USE_DEBUG
+        __TBB_ASSERT(dynamic_cast<dynamic_state_task*>(curr_task) != nullptr,
+                     "transfer_this_task_completion_to was called from a task outside a task_group");
+#endif
+        static_cast<dynamic_state_task*>(curr_task)->transfer_completion_to(new_task);
     }
 #endif
 }; // class task_group
