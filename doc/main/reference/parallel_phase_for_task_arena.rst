@@ -159,7 +159,7 @@ If ``with_fast_leave`` is ``true``, worker threads leave policy is temporarily s
 Example
 *******
 
-.. literalinclude:: .examples/parallel_phase_example.cpp
+.. literalinclude:: ./examples/parallel_phase_example.cpp
    :language: c++
    :start-after: /*begin_parallel_phase_example*/
    :end-before: /*end_parallel_phase_example*/

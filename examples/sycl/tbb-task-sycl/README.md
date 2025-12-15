@@ -1,6 +1,6 @@
 # `TBB-Task-Sycl` Sample
 This sample illustrates how two Intel® oneAPI Threading Building Blocks (oneTBB)
- tasks can execute similar computational kernels, with one task executing the SYCL code and the other task executing the TBB code. This `tbb-task-sycl` sample code is implemented using C++ and SYCL* for CPU and GPU.
+ tasks can execute similar computational kernels, with one task executing the SYCL* code and the other task executing the TBB code. This `tbb-task-sycl` sample code is implemented using C++ and SYCL* for CPU and GPU.
 
 | Optimized for                     | Description
 |:---                               |:---
@@ -19,7 +19,7 @@ The implementation based on TBB tasks and SYCL explained.
 ## Building the TBB-Task-Sycl Program
 
 ### Setting Environment Variables
-When working with the Command Line Interface (CLI), you should configure the oneAPI toolkits using environment variables. Set up your CLI environment by sourcing the `setvars` script every time you open a new terminal window. This practice ensures your compiler, libraries, and tools are ready for development.
+When working with the Command Line Interface (CLI), you should configure the Intel&reg; oneAPI Toolkit using environment variables. Set up your CLI environment by sourcing the `setvars` script every time you open a new terminal window. This practice ensures your compiler, libraries, and tools are ready for development.
 
 > **Note**: If you have not already done so, set up your CLI environment by sourcing the `setvars` script located in the root of your oneAPI installation.
 >
@@ -32,7 +32,7 @@ When working with the Command Line Interface (CLI), you should configure the one
 > - `C:\"Program Files (x86)"\Intel\oneAPI\setvars.bat`
 > - For Windows PowerShell*, use the following command: `cmd.exe "/K" '"C:\Program Files (x86)\Intel\oneAPI\setvars.bat" && powershell'`
 >
-> Microsoft Visual Studio:
+> Microsoft Visual Studio*:
 > - Open a command prompt window and execute `setx SETVARS_CONFIG " "`. This only needs to be set once and will automatically execute the `setvars` script every time Visual Studio is launched.
 >
 >For more information on environment variables, see "Use the setvars Script" for [Linux or macOS](https://www.intel.com/content/www/us/en/develop/documentation/oneapi-programming-guide/top/oneapi-development-environment-setup/use-the-setvars-script-with-linux-or-macos.html), or [Windows](https://www.intel.com/content/www/us/en/develop/documentation/oneapi-programming-guide/top/oneapi-development-environment-setup/use-the-setvars-script-with-windows.html).
@@ -44,16 +44,16 @@ a [setvars config file](https://www.intel.com/content/www/us/en/develop/document
 
 ### Using Visual Studio Code*  (Optional)
 
-You can use Visual Studio Code (VS Code) extensions to set your environment, create launch configurations, and browse and download samples.
+You can use Visual Studio Code (VS Code*) extensions to set your environment, create launch configurations, and browse and download samples.
 
 The basic steps to build and run a sample using VS Code include:
- - Download a sample using the extension **Code Sample Browser for Intel Software Developer Tools**.
- - Configure the oneAPI environment with the extension **Environment Configurator for Intel Software Developer Tools**.
+ - Download a sample using the extension **Code Sample Browser for Intel&reg; Software Development Tools**.
+ - Configure the oneAPI environment with the extension **Environment Configurator for Intel&reg; Software Development Tools**.
  - Open a Terminal in VS Code (**Terminal>New Terminal**).
  - Run the sample in the VS Code terminal using the instructions below.
 
 To learn more about the extensions and how to configure the oneAPI environment, see
-[Using Visual Studio Code with Intel® oneAPI Toolkits](https://software.intel.com/content/www/us/en/develop/documentation/using-vs-code-with-intel-oneapi/top.html).
+[Using Visual Studio Code* to Develop Intel® oneAPI Applications](https://software.intel.com/content/www/us/en/develop/documentation/using-vs-code-with-intel-oneapi/top.html).
 
 ### On a Linux System
     * Build tbb-task-sycl program
@@ -83,5 +83,5 @@ To learn more about the extensions and how to configure the oneAPI environment, 
     Built target run
 
 ### Troubleshooting
-If an error occurs, troubleshoot the problem using the Diagnostics Utility for Intel® oneAPI Toolkits.
+If an error occurs, troubleshoot the problem using the Diagnostics Utility for oneAPI.
 [Learn more](https://www.intel.com/content/www/us/en/develop/documentation/diagnostic-utility-user-guide/top.html).

@@ -1,4 +1,5 @@
 # Copyright (c) 2020-2025 Intel Corporation
+# Copyright (c) 2025 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -270,7 +271,7 @@ function(tbb_add_tbbbind_test)
     set_property(TEST ${_tbbbind_test_NAME} PROPERTY ENVIRONMENT TBB_VERSION=1 APPEND)
 
     # Handle the case when HWLOC was found using pkg-config
-    if (NOT DEFINED HWLOC_TARGET_EXPLICITLY_DEFINED AND TARGET PkgConfig::HWLOC)
+    if (NOT DEFINED HWLOC_TARGET_EXPLICITLY_DEFINED AND TARGET PkgConfig::HWLOC AND TARGET TBB::${TBBBIND_LIBRARY_NAME})
         set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
             PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*${TBBBIND_LIBRARY_NAME}"
             FAIL_REGULAR_EXPRESSION "Status: FAILURE!"
@@ -502,6 +503,7 @@ if (TARGET TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_environment_whitebox DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_hw_concurrency DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_eh_thread DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR tbb NAME test_tbb_version DEPENDENCIES TBB::tbb)
     if (NOT TBB_TCM_TESTING)
         tbb_add_test(SUBDIR tbb NAME test_global_control DEPENDENCIES TBB::tbb)
     endif()
@@ -542,6 +544,7 @@ if (TARGET TBB::tbb)
     # HWLOC related test
     if (NOT TBB_EMSCRIPTEN)
         tbb_add_tbbbind_test(SUBDIR tbb NAME test_arena_constraints)
+        tbb_add_tbbbind_test(SUBDIR tbb NAME test_tbbbind)
     endif()
 
     if ((NOT "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "mips") AND (NOT TBB_EMSCRIPTEN))

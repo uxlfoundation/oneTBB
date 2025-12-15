@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Сontributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -78,6 +79,11 @@ const unsigned MByte = 1024*1024;
 
 #if (_WIN32 && !__TBB_WIN8UI_SUPPORT) || (__linux__ && !__ANDROID__ && !__bg__) || __FreeBSD_version >= 701000
 #define __TBB_TEST_SKIP_AFFINITY 0
+#if __linux__
+#define __TBB_USE_CGROUPS 1
+#else
+#define __TBB_USE_CGROUPS 0
+#endif
 #else
 #define __TBB_TEST_SKIP_AFFINITY 1
 #endif

@@ -846,11 +846,7 @@ void task_arena_impl::execute(d1::task_arena_base& ta, d1::delegate_base& d) {
                 a->my_exit_monitors.notify_one(); // do not relax!
             }
             // process possible exception
-            auto exception = exec_context.my_exception.load(std::memory_order_acquire);
-            if (exception) {
-                __TBB_ASSERT(exec_context.is_group_execution_cancelled(), "The task group context with an exception should be canceled.");
-                exception->throw_self();
-            }
+            handle_context_exception(exec_context);
             __TBB_ASSERT(governor::is_thread_data_set(td), nullptr);
             return;
         } // if (index1 == arena::out_of_arena)
