@@ -446,6 +446,8 @@ additional exploration.
 4. For a hypothetical platform having both a few NUMA nodes and different core types, would we allow
    to select both at the same time, and if yes - how would that work?
 5. Which other usability names would be useful? For example, a named negative score constant?
+6. How should `max_concurrency` interact with scoring? Users might think that scoring also indicates scheduling
+   preference, for example if `max_concurrency` is less than the HW concurrency for selected core types.
 
 ## Usage Examples
 
