@@ -300,6 +300,10 @@ is added, a corresponding `set_numa_ids` function would likely follow. The choic
 instances versus dedicated multi-value setters affects API consistency and usability: the former provides a unified
 pattern for combining any constraints, while the latter offers more intuitive, type-specific methods.
 
+As proposed in the discussion of PR [#1926]{https://github.com/uxlfoundation/oneTBB/pull/1926}, this approach can be
+combined with the Alternative 2 below; namely, a user-defined selector function could create and return a container
+of constraints.
+
 ## Alternative 2: Selector-based API
 
 Another alternative proposal takes a different approach to the API, motivated by
@@ -441,6 +445,7 @@ additional exploration.
 3. If selectors take a vector, what happens if the returned vector is smaller or greater than the input one?
 4. For a hypothetical platform having both a few NUMA nodes and different core types, would we allow
    to select both at the same time, and if yes - how would that work?
+5. Which other usability names would be useful? For example, a named negative score constant?
 
 ## Usage Examples
 
@@ -626,15 +631,13 @@ std::vector<tbb::task_arena::constraints> avoid_LPE_cores;
 
 // always use the most performant core type
 avoid_LPE_cores.push_back(tbb::task_arena::constraints{.core_type = core_types.back()});
- // avoid the lest performant core type
+ // avoid the least performant core type
 for (int i = core_types.size() - 2; i > 0; --i) {
     avoid_LPE_cores.push_back(tbb::task_arena::constraints{.core_type = core_types[i]});
 }
 
 tbb::task_arena arena(avoid_LPE_cores);
 ```
-
-Instead of the c
 
 #### Alternative 2
 
@@ -660,7 +663,7 @@ tbb::task_arena arena(
     [](auto /*std::vector*/ core_types) -> std::vector<int> {
         std::size_t n_types = core_types.size();
         std::vector<int> scores(n_types);
-        scores[0] = -1; // avoid the lest performant core type
+        scores[0] = -1; // avoid the least performant core type
         scores.back() = n_types; // the most performant core is scored highest
         for (int i = 1; i < n_types - 1; ++i)
             scores[i] = i;
