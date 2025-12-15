@@ -495,10 +495,10 @@ and takes a tuple of {`core_type_id`, its index in the vector, the size of the v
 tbb::task_arena arena(
     tbb::task_arena::constraints{.core_type = tbb::task_arena::selectable},
     [](auto /*std::tuple*/ core_type) -> int {
-        auto& [id, position, total] = core_type;
+        auto& [id, index, total] = core_type;
         // positions are ordered from the least to the most performant:
         // 0 = LP E-core, 1 = E-core, 2 = P-core
-        return (total > 1 && position == 0)? -1 : position;
+        return (total > 1 && index == 0)? -1 : index;
     }
 );
 ```
@@ -564,20 +564,20 @@ tbb::task_arena background_work(
 
 ```cpp
 auto lowest_latency_selector = [](auto /*std::tuple*/ core_type) -> int {
-    auto& [id, position, total] = core_type;
-    return (position == total - 1)? 1 : -1;
+    auto& [id, index, total] = core_type;
+    return (index == total - 1)? 1 : -1;
     // Scores for the whole vector: {-1, -1, 1}
 };
 
 auto throughput_selector = [](auto /*std::tuple*/ core_type) -> int {
-    auto& [id, position, total] = core_type;
-    return (total > 1 && position == 0)? -1 : position;
+    auto& [id, index, total] = core_type;
+    return (total > 1 && index == 0)? -1 : index;
     // Scores for the whole vector: {-1, 1, 2}
 };
 
 auto background_selector = [](auto /*std::tuple*/ core_type) -> int {
-    auto& [id, position, total] = core_type;
-    return (total > 1 && position == total - 1)? -1 : total - position;
+    auto& [id, index, total] = core_type;
+    return (total > 1 && index == total - 1)? -1 : total - index;
     // Scores for the whole vector: {3, 2, -1}
 };
 
@@ -631,9 +631,9 @@ std::vector<tbb::task_arena::constraints> avoid_LPE_cores;
 
 // always use the most performant core type
 avoid_LPE_cores.push_back(tbb::task_arena::constraints{.core_type = core_types.back()});
- // avoid the least performant core type
-for (int i = core_types.size() - 2; i > 0; --i) {
-    avoid_LPE_cores.push_back(tbb::task_arena::constraints{.core_type = core_types[i]});
+ // push in the reverse order and avoid the index 0 (the least performant core type)
+for (int index = core_types.size() - 2; index > 0; --index) {
+    avoid_LPE_cores.push_back(tbb::task_arena::constraints{.core_type = core_types[index]});
 }
 
 tbb::task_arena arena(avoid_LPE_cores);
@@ -648,8 +648,8 @@ precedence. Except for comments, the code is the same as in Example 1.
 tbb::task_arena arena(
     tbb::task_arena::constraints{.core_type = tbb::task_arena::selectable},
     [](auto /*std::tuple*/ core_type) -> int {
-        auto& [id, position, total] = core_type;
-        return (total > 1 && position == 0)? -1 : position;
+        auto& [id, index, total] = core_type;
+        return (total > 1 && index == 0)? -1 : index;
     }
 );
 ```
@@ -662,11 +662,13 @@ tbb::task_arena arena(
     tbb::task_arena::constraints{.core_type = tbb::task_arena::selectable},
     [](auto /*std::vector*/ core_types) -> std::vector<int> {
         std::size_t n_types = core_types.size();
+		if (n_types == 1)
+			return {1};
         std::vector<int> scores(n_types);
         scores[0] = -1; // avoid the least performant core type
-        scores.back() = n_types; // the most performant core is scored highest
-        for (int i = 1; i < n_types - 1; ++i)
-            scores[i] = i;
+        for (int index = 1; index < n_types; ++index) {
+            scores[index] = index;
+	    }
         return scores;
     }
 );
