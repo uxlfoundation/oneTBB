@@ -48,7 +48,7 @@ The rest of the code in that example might be rewritten with the API for
   // enqueue work to all but the first arena, using the task groups to track work
   for (int i = 1; i < arenas.size(); i++)
     arenas[i].enqueue(
-      [] { tbb::parallel_for(0, N, [](int j) { f(w); }); }, 
+      [] { tbb::parallel_for(0, N, [](int j) { f(w); }); },
       task_groups[i]
     );
 
@@ -78,8 +78,11 @@ namespace tbb {
 ```
 
 It optionally takes a `constraints` argument to change default arena settings such as maximal concurrency
-(the upper limit on the number of threads), core type etc.; the `numa_id` value in `constraints_`
-is ignored. The second optional argument allows to override the number of reserved slots, which by default
+(the upper limit on the number of threads), core type etc., except for the `numa_id` value.
+The main goal of this API is to achieve simplicity in the creation of NUMA-bound task arenas,
+so passing `constraints` with an explicitly set `numa_id` won't result in an error, and there is no clear
+advantage to providing an error indication. Therefore, the `numa_id` value of `constraints` is ignored.
+The second optional argument allows to override the number of reserved slots, which by default
 is 0 (unlike the `task_arena` construction default of 1) for the reasons described in the introduction.
 
 These arena parameters were selected for pre-setting because there appear to be practical use cases to modify
