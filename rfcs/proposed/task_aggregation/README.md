@@ -157,7 +157,7 @@ flowchart TD
 
 ```
 
-Revisit the producer-consumer example using *aggregating-task-group* instead of ``tbb::task_group``.
+Let's revisit the producer-consumer example using *aggregating-task-group* instead of ``tbb::task_group``.
 
 When the *aggregating-task-group* is created, the producer's task tree is empty.
 
