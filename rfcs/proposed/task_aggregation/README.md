@@ -337,7 +337,7 @@ flowchart TD
     subtree_check --> |Yes| subtree_head_insert[head->left = new_task]
     subtree_check --> |No| subtree_head_left_check[subtree->left == nullptr?]
     subtree_head_left_check --> |Yes| subtree_head_left_insert[subtree->left = new_task]
-    subtree_head_left_check --> |No| subtree_head_right_check[subtree->right == new_task?]
+    subtree_head_left_check --> |No| subtree_head_right_check[subtree->right == nullptr?]
     subtree_head_right_check --> |Yes| subtree_head_right_insert[subtree->right = new_task]
     subtree_head_right_check --> |No| subtree_head_size_check[subtree->left->num_items<br><<br> subtree->right->num_items<br>?]
     subtree_head_size_check --> |Yes| subtree_switch_left[subtree = subtree->left]
