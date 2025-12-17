@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -28,11 +28,8 @@
 #ifdef _WIN32
 #include <intrin.h>
 #ifdef __TBBMALLOC_BUILD
-#define WIN32_LEAN_AND_MEAN
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h> // SwitchToThread()
+// we only need this function; do not include whole of windows.h
+extern "C" __declspec(dllimport) int __stdcall SwitchToThread(void);
 #endif
 #ifdef _MSC_VER
 #if __TBB_x86_64 || __TBB_x86_32
