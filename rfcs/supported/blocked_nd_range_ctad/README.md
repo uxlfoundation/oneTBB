@@ -205,4 +205,4 @@ tbb::blocked_range<int> dim_range(0, 100);
 tbb::blocked_nd_range nd_range(dim_range, {0, 200}, {0, 300}, dim_range);
 ```
 
-These arguments would not match nether on the `[g1]` not `[g2]` and it is unclear how to define the deduction guide that covers this case.
+These arguments would not match neither on the `[g1]` not `[g2]` and it is unclear how to define the deduction guide that covers this case.
