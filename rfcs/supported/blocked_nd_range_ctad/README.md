@@ -190,8 +190,8 @@ tbb::blocked_nd_range range(array);
 Since the `blocked_range` is not constructible from C-array and the braced-init-list is not used, the user expects the range to be deduced as
 `blocked_nd_range<int, 2>` and the constructor `[2]` to be used.
 
-Current oneTBB implementation support such a behavior constraining a braced-init-list deduction guide to allow 2 or more lists and hence
-by resolving resolving an ambiguity described in
+Current oneTBB implementation supports such a behavior constraining a braced-init-list deduction guide to allow 2 or more lists and hence
+by resolving an ambiguity described in
 [Ambiguity while passing the single braced-init-list of size 2 or 3](#ambiguity-while-passing-the-single-braced-init-list-of-size-2-or-3)
 to always prefer a multi-dimensional range.
 
