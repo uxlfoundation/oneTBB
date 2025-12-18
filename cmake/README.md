@@ -156,8 +156,8 @@ cmake -DTBB_WINDOWS_DRIVER=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ..
 #### Example
 
 ```bash
-cmake -DCMAKE_CXX_COMPILER=icpx -DCMAKE_C_COMPILER=icx -DTBB_TEST=off -DCMAKE_HWLOC_1_11_LIBRARY_PATH=<path_to_hwloc_library_file>/libhwloc.so.15
--DCMAKE_HWLOC_1_11_INCLUDE_PATH=<path_to_hwloc_header_directory> -DCMAKE_INSTALL_PREFIX=<path_to_install_oneTBB>/oneTBB_install ..
+cmake -DCMAKE_CXX_COMPILER=icpx -DCMAKE_C_COMPILER=icx -DTBB_TEST=off -DCMAKE_HWLOC_2_5_LIBRARY_PATH=<path_to_hwloc_library_file>/libhwloc.so.15
+-DCMAKE_HWLOC_2_5_INCLUDE_PATH=<path_to_hwloc_header_directory> -DCMAKE_INSTALL_PREFIX=<path_to_install_oneTBB>/oneTBB_install ..
 make -j8 && make install
 ```
 
