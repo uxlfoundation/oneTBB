@@ -210,48 +210,113 @@ void ParallelTest() {
 }
 template<> void ParallelTest<0>() {}
 
+template <typename T, unsigned int N, typename EqPredicate>
+void check_constructed_range(const oneapi::tbb::blocked_nd_range<T, N>& range,
+                             const T (&begins)[N], const T (&ends)[N],
+                             const std::size_t (&grainsizes)[N],
+                             EqPredicate pred)
+{
+    for (std::size_t dim_index = 0; dim_index < N; ++dim_index) {
+        const auto& dim = range.dim(dim_index);
+        CHECK_MESSAGE(pred(dim.begin(), begins[dim_index]), "Incorrect begin of the constructed range");
+        CHECK_MESSAGE(pred(dim.end(), ends[dim_index]), "Incorrect end of the constructed range");
+        CHECK_MESSAGE(dim.grainsize() == grainsizes[dim_index], "Incorrect grainsize of the constructed range");
+    }
+}
+
+template <typename T, unsigned int N>
+void check_constructed_range(const oneapi::tbb::blocked_nd_range<T, N>& range,
+                             const T (&begins)[N], const T (&ends)[N],
+                             const std::size_t (&grainsizes)[N])
+{
+    check_constructed_range(range, begins, ends, grainsizes, std::equal_to<T>{});
+}
+
 //! Testing blocked_nd_range construction
 //! \brief \ref interface
 TEST_CASE("Construction") {
-    oneapi::tbb::blocked_nd_range<int, 1>{ { 0,13,3 } };
+    int begin1 = 0;
+    int end1 = 13;
+    std::size_t grainsize1 = 3;
 
-    oneapi::tbb::blocked_nd_range<int, 1>{ oneapi::tbb::blocked_range<int>{ 0,13,3 } };
+    int begin2 = -8923;
+    int end2 = 8884;
+    std::size_t grainsize2 = 13;
 
-    oneapi::tbb::blocked_nd_range<int, 2>(oneapi::tbb::blocked_range<int>(-8923, 8884, 13), oneapi::tbb::blocked_range<int>(-8923, 5, 13));
+    std::size_t default_grainsize = 1;
 
-    oneapi::tbb::blocked_nd_range<int, 2>({ -8923, 8884, 13 }, { -8923, 8884, 13 });
-
-    oneapi::tbb::blocked_range<int> r1(0, 13);
-
-    oneapi::tbb::blocked_range<int> r2(-12, 23);
-
-    oneapi::tbb::blocked_nd_range<int, 2>({ { -8923, 8884, 13 }, r1});
-
-    oneapi::tbb::blocked_nd_range<int, 2>({ r2, r1 });
-
-    oneapi::tbb::blocked_nd_range<int, 2>(r1, r2);
-
-    int sizes[] = {174, 39, 2481, 93};
-    oneapi::tbb::blocked_nd_range<int, 4> rNd_1(sizes, /*grainsize*/7);
-
-    oneapi::tbb::blocked_nd_range<int, 4> rNd_2({174, 39, 2481, 93}, /*grainsize*/11);
-
-    for (unsigned i = 0; i < rNd_1.dim_count(); ++i) {
-        oneapi::tbb::blocked_nd_range<int, 4>::dim_range_type dim1 = rNd_1.dim(i);
-        oneapi::tbb::blocked_nd_range<int, 4>::dim_range_type dim2 = rNd_2.dim(i);
-        REQUIRE(dim1.begin()==0);
-        REQUIRE(dim2.begin()==0);
-        unsigned int szi = sizes[i]; // to compare with unsigned integrals without warnings
-        REQUIRE(dim1.size()==szi);
-        REQUIRE(dim2.size()==szi);
-        REQUIRE(dim1.grainsize()==7);
-        REQUIRE(dim2.grainsize()==11);
+    {
+        oneapi::tbb::blocked_nd_range<int, 1> r{ {begin1, end1, grainsize1} };
+        check_constructed_range(r, {begin1}, {end1}, {grainsize1});   
+    }
+    {
+        oneapi::tbb::blocked_nd_range<int, 1> r{ {begin1, end1} };
+        check_constructed_range(r, {begin1}, {end1}, {default_grainsize});
+    }
+    {
+        oneapi::tbb::blocked_nd_range<int, 1> r{oneapi::tbb::blocked_range<int>{begin1, end1, grainsize1}};
+        check_constructed_range(r, {begin1}, {end1}, {grainsize1});
+    }
+    {
+        oneapi::tbb::blocked_nd_range<int, 1> r{oneapi::tbb::blocked_range<int>{begin1, end1}};
+        check_constructed_range(r, {begin1}, {end1}, {default_grainsize});
+    }
+    {
+        oneapi::tbb::blocked_nd_range<int, 2> r{{begin1, end1, grainsize1}, {begin2, end2, grainsize2}};
+        check_constructed_range(r, {begin1, begin2}, {end1, end2}, {grainsize1, grainsize2});
+    }
+    {
+        oneapi::tbb::blocked_nd_range<int, 2> r{{begin1, end1}, {begin2, end2, grainsize2}};
+        check_constructed_range(r, {begin1, begin2}, {end1, end2}, {default_grainsize, grainsize2});
+    }
+    {
+        oneapi::tbb::blocked_nd_range<int, 2> r{oneapi::tbb::blocked_range<int>{begin1, end1, grainsize1},
+                                                oneapi::tbb::blocked_range<int>{begin2, end2, grainsize2}};
+        check_constructed_range(r, {begin1, begin2}, {end1, end2}, {grainsize1, grainsize2});
+    }
+    {
+        oneapi::tbb::blocked_nd_range<int, 2> r{oneapi::tbb::blocked_range<int>{begin1, end1},
+                                                oneapi::tbb::blocked_range<int>{begin2, end2, grainsize2}};
+        check_constructed_range(r, {begin1, begin2}, {end1, end2}, {default_grainsize, grainsize2});
+    }
+    {
+        oneapi::tbb::blocked_nd_range<int, 2> r{{begin1, end1, grainsize1},
+                                                oneapi::tbb::blocked_range<int>{begin2, end2, grainsize2}};
+        check_constructed_range(r, {begin1, begin2}, {end1, end2}, {grainsize1, grainsize2});
     }
 
-    oneapi::tbb::blocked_nd_range<AbstractValueType, 4>({ MakeAbstractValue(-3), MakeAbstractValue(13), 8 },
-                                               { MakeAbstractValue(-53), MakeAbstractValue(23), 2 },
-                                               { MakeAbstractValue(-23), MakeAbstractValue(33), 1 },
-                                               { MakeAbstractValue(-13), MakeAbstractValue(43), 7 });
+    int sizes[4] = {174, 39, 2481, 93};
+
+    {
+        oneapi::tbb::blocked_nd_range<int, 4> r(sizes, grainsize1);
+        check_constructed_range(r, {0, 0, 0, 0}, sizes,
+                                {grainsize1, grainsize1, grainsize1, grainsize1});
+    }
+    {
+        oneapi::tbb::blocked_nd_range<int, 4> r({sizes[0], sizes[1], sizes[2], sizes[3]}, grainsize2);
+        check_constructed_range(r, {0, 0, 0, 0}, sizes,
+                                {grainsize2, grainsize2, grainsize2, grainsize2});
+    }
+
+    {
+        AbstractValueType abstract_begins[4] = {MakeAbstractValue(-3), MakeAbstractValue(-53),
+                                                MakeAbstractValue(-23), MakeAbstractValue(-13)};
+
+        AbstractValueType abstract_ends[4] = {MakeAbstractValue(13), MakeAbstractValue(23),
+                                              MakeAbstractValue(33), MakeAbstractValue(43)};
+
+        std::size_t grainsizes[4] = {8, 2, 1, 7};
+
+        oneapi::tbb::blocked_nd_range<AbstractValueType, 4> r{{abstract_begins[0], abstract_ends[0], grainsizes[0]},
+                                                              {abstract_begins[1], abstract_ends[1], grainsizes[1]},
+                                                              {abstract_begins[2], abstract_ends[2], grainsizes[2]},
+                                                              {abstract_begins[3], abstract_ends[3], grainsizes[3]}};
+        
+        auto abstract_eq_pred = [](const AbstractValueType& left, const AbstractValueType& right) {
+            return GetValueOf(left) == GetValueOf(right);
+        };
+        check_constructed_range(r, abstract_begins, abstract_ends, grainsizes, abstract_eq_pred);
+    }
 }
 
 static const std::size_t N = 4;
