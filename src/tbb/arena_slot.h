@@ -182,16 +182,16 @@ public:
         std::size_t hd = head.load(std::memory_order_relaxed), tl = tail.load(std::memory_order_relaxed); 
         if ( (std::intptr_t)hd >= (std::intptr_t)tl ) {
             // Since some tasks might be temporary out of the visible pool bounds, lock the pool to examine closely
-            bool tail_unstable = false;
-            the_task_pool = lock_task_pool();
+            bool tail_stable = true;
+            the_task_pool = lock_task_pool(); // Synchronize with task thieves
             if ( the_task_pool == EmptyTaskPool ) {
                 return false;
             }
-            tail_unstable = accessed_by_owner.load(std::memory_order_acquire);
+            tail_stable = !accessed_by_owner.load(std::memory_order_acquire); // Synchronize with the pool owner
             hd = head.load(std::memory_order_relaxed);
             tl = tail.load(std::memory_order_relaxed);
             unlock_task_pool(the_task_pool);
-            if ( (std::intptr_t)hd >= (std::intptr_t)tl && !tail_unstable ) {
+            if ( (std::intptr_t)hd >= (std::intptr_t)tl && tail_stable ) {
                 return false;
             }
         }
