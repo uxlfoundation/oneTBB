@@ -53,7 +53,7 @@ private:
     ValueType V[MaxHeight][MaxWidth];
 #else
     tbb::interleaved_vector<ValueType, 4*1024> V_data{2, MaxHeight * MaxWidth};
-    tbb::mdspan<ValueType, 4*1024, MaxWidth> V{&V_data};
+    ValueType (*V)[MaxHeight][MaxWidth] = reinterpret_cast<ValueType (*)[MaxHeight][MaxWidth]>(V_data.get());
 #endif
 
     //! Vertical stress

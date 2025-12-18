@@ -1,17 +1,18 @@
 #ifndef __TBB_interleaved_vector_H
 #define __TBB_interleaved_vector_H
 
+#include <new> // for std::align_val_t
+#include "info.h"
 #include "detail/_config.h"
 #include "detail/_utils.h"
 #include "detail/_namespace_injection.h"
 
+#include <numaif.h>
+#include <numa.h>
+#include <errno.h>
+
 namespace tbb {
 namespace detail {
-
-namespace r1 {
-TBB_EXPORT void *__TBB_EXPORTED_FUNC alloc_interleave(size_t bank, size_t len);
-TBB_EXPORT int __TBB_EXPORTED_FUNC free_interleave(void *addr, size_t len);
-} // namespace r1
 
 #define INTERLEAVE_MEM 1
 
@@ -73,6 +74,130 @@ public:
     }
 };
 
+inline int find_numa_node_linux(void* addr) {
+    int numa_node = -1;
+    int status[1];
+    void* pages[1] = { addr };
+
+    // Query which node owns this page
+    if (move_pages(0, 1, pages, NULL, status, 0) == 0) {
+        numa_node = status[0];
+    }
+
+    return numa_node;
+}
+
+#if 1
+
+template<typename T, size_t STRIDE>
+// create single address space, interleave it between NUMA nodes
+struct interleaved_vector {
+    // number of banks must be run-time parameter
+    const std::size_t my_num_banks;
+    std::unique_ptr<T[], std::function<void(T*)>> my_data;
+    interleaved_vector(std::size_t num_banks, std::size_t count) : my_num_banks(num_banks),
+        my_data(new (std::align_val_t(STRIDE)) T[count], [](T* p){ operator delete[](p, std::align_val_t(STRIDE)); }) {
+        __TBB_ASSERT_EX(reinterpret_cast<uintptr_t>(my_data.get()) % STRIDE == 0, "interleaved_vector must be aligned to STRIDE");
+        constexpr size_t page_size = 4*1024;
+        for (size_t i = 0; i < count; ++i)
+            my_data[i] = 0;
+        
+        int count_pages = (count * sizeof(T) + page_size - 1) / page_size;
+        std::unique_ptr<void*[]> pages = std::make_unique<void*[]>(count_pages);
+        std::unique_ptr<int[]> nodes = std::make_unique<int[]>(count_pages);
+        std::unique_ptr<int[]> status = std::make_unique<int[]>(count_pages);
+
+        char *beg_ptr = reinterpret_cast<char*>(my_data.get()),
+            *end_ptr = reinterpret_cast<char*>(my_data.get() + count);
+        // move_pages() has no length parameter, so must be done per page
+        for (char *ptr = beg_ptr; ptr < end_ptr; ptr += page_size) {
+            unsigned page_idx = (ptr - beg_ptr) / page_size;
+            unsigned stride_idx = (ptr - beg_ptr) / STRIDE;
+            int node = stride_idx % 2;
+            pages[page_idx] = ptr;
+            nodes[page_idx] = node;
+        }
+        long ret = move_pages(0, count_pages, pages.get(), nodes.get(), status.get(), 0);
+        if (ret < 0) {
+                printf("interleaved_vector: move_to_node failed errno %d\n", errno);
+                perror("move_pages");
+                throw std::bad_alloc();
+        }
+        for (int i = 0; i < count_pages; ++i)
+            if (status[i] < 0) {
+                printf("interleaved_vector: move_to_node failed at %u status %d\n", i, status[i]);
+                throw std::bad_alloc();
+            }
+
+        char *addr = (char*)my_data.get();
+        printf("interleaved_vector NUMA nodes: %d %d\n", find_numa_node_linux(addr), find_numa_node_linux(addr+4*1024));
+
+        unsigned long nodemask = 0x3;  // nodes 0 and 1
+        ret = mbind(addr, end_ptr - addr, 
+                MPOL_PREFERRED /*| MPOL_F_NUMA_BALANCING*/,
+                &nodemask, 65, 0);
+        if (ret < 0) {
+                printf("interleaved_vector: mbind failed errno %d\n", errno);
+                perror("mbind");
+                throw std::bad_alloc();
+        }
+    }
+    T* get() const {
+        return my_data.get();
+    }
+};
+
+#elif 0
+
+template<typename T, size_t STRIDE>
+// create single address space, interleave it between NUMA nodes
+struct interleaved_vector {
+    // number of banks must be run-time parameter
+    const std::size_t my_num_banks;
+    std::unique_ptr<T[], std::function<void(T*)>> my_data;
+    interleaved_vector(std::size_t num_banks, std::size_t count) :
+        my_num_banks(num_banks),
+        my_data(new (std::align_val_t(STRIDE)) T[count], [](T* p){ operator delete[](p, std::align_val_t(STRIDE)); }) {
+        __TBB_ASSERT_EX(reinterpret_cast<uintptr_t>(my_data.get()) % STRIDE == 0, "interleaved_vector");
+        for (size_t i = 0; i < count; ++i)
+            my_data[i] = 0;
+
+        const char *end_ptr = reinterpret_cast<const char*>(my_data.get() + count);
+        unsigned i = 0;
+        for (char *ptr = reinterpret_cast<char*>(my_data.get());
+             ptr < end_ptr; ptr += STRIDE, ++i) {
+#if 0
+            int node = i % 2;
+            void *pages[] = {ptr};
+            int nodes[] = {node};
+            int status[1];
+            long ret = move_pages(0, 1, pages, nodes, status, 0);
+            if (ret < 0) {
+                printf("interleaved_vector: move_to_node failed at %u errno %d\n", i, errno);
+                perror("move_pages");
+                throw std::bad_alloc();
+            } else if (status[0] < 0) {
+                printf("interleaved_vector: move_to_node failed at %u status %d\n", i, status[0]);
+                throw std::bad_alloc();
+            }
+#else
+            int ret = tbb::detail::r1::move_to_node(ptr,
+                         std::min(STRIDE, static_cast<std::size_t>(end_ptr - ptr)),
+                         (ptr - reinterpret_cast<const char*>(my_data.get())) / STRIDE % my_num_banks);
+            __TBB_ASSERT_EX(ret == 0 && i, "interleaved_vector: move_to_node failed");
+            if (ret != 0) {
+                printf("interleaved_vector: move_to_node failed at %d, errno %d\n", i, ret, errno);
+                throw std::bad_alloc();
+            }
+#endif
+        }
+    }
+    T* get() const {
+        return my_data.get();
+    }
+};
+
+#else
 template<typename T, size_t STRIDE>
 struct interleaved_vector {
     // number of banks must be run-time parameter
@@ -137,7 +262,9 @@ struct interleaved_vector {
     }
     std::size_t size() const { return count; }
 };
+#endif
 
+#if 0
 template <typename T, size_t STRIDE, std::size_t B>
 struct mdspan {
     interleaved_vector<T, STRIDE> *data;
@@ -148,13 +275,16 @@ struct mdspan {
         return (*data)[i * B + j];
     }
 };
+#endif
 
 } // namespace d1
 } // namespace detail
 
 inline namespace v1 {
 using detail::d1::interleaved_vector;
+#if 0
 using detail::d1::mdspan;
+#endif
 } // namespace v1
 
 } // namespace tbb

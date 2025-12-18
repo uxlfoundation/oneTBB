@@ -27,6 +27,7 @@ __TBB_internal_destroy_system_topology;
 __TBB_internal_set_tbbbind_assertion_handler;
 __TBB_internal_allocate_mem;
 __TBB_internal_free_mem;
+__TBB_internal_move_mem;
 
 local:
 *;

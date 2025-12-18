@@ -366,6 +366,7 @@ bool __TBB_EXPORTED_FUNC finalize(d1::task_scheduler_handle& handle, std::intptr
 #pragma weak __TBB_internal_set_tbbbind_assertion_handler
 #pragma weak __TBB_internal_allocate_mem
 #pragma weak __TBB_internal_free_mem
+#pragma weak __TBB_internal_move_mem
 
 extern "C" {
 void __TBB_internal_initialize_system_topology(
@@ -386,6 +387,7 @@ int __TBB_internal_get_default_concurrency( int numa_id, int core_type_id, int m
 
 void *__TBB_internal_allocate_mem(size_t bank, size_t len);
 int __TBB_internal_free_mem(void* ptr, size_t len);
+int __TBB_internal_move_mem(const void* addr, size_t len, size_t bank);
 
 void __TBB_internal_set_tbbbind_assertion_handler( assertion_handler_type handler );
 }
@@ -401,6 +403,7 @@ static int dummy_get_default_concurrency( int, int, int ) { return governor::def
 static void dummy_set_assertion_handler( assertion_handler_type ) { }
 static void *dummy_allocate_mem( size_t /*bank*/, size_t size ) { return malloc(size); }
 static int dummy_free_mem( void *ptr, size_t /*len*/ ) { free(ptr); return 0; }
+static int dummy_move_mem( const void* /*addr*/, size_t /*len*/, size_t /*bank*/ ) { return 0; }
 
 // Handlers for communication with TBBbind
 static void (*initialize_system_topology_ptr)(
@@ -426,6 +429,8 @@ static void* (*allocate_mem_ptr)( size_t bank, size_t size )
     = dummy_allocate_mem;
 static int (*free_mem_ptr)( void* ptr, size_t len )
     = dummy_free_mem;
+static int (*move_mem_ptr)( const void* addr, size_t len, size_t bank )
+    = dummy_move_mem;
 
 #if _WIN32 || _WIN64 || __unix__ || __APPLE__
 
@@ -442,6 +447,7 @@ static const dynamic_link_descriptor TbbBindLinkTable[] = {
     DLD(__TBB_internal_get_default_concurrency, get_default_concurrency_ptr),
     DLD(__TBB_internal_allocate_mem, allocate_mem_ptr),
     DLD(__TBB_internal_free_mem, free_mem_ptr),
+    DLD(__TBB_internal_move_mem, move_mem_ptr),
 };
 
 static const unsigned LinkTableSize = sizeof(TbbBindLinkTable) / sizeof(dynamic_link_descriptor);
@@ -635,6 +641,12 @@ void *__TBB_EXPORTED_FUNC alloc_interleave(size_t bank, size_t len) {
 int __TBB_EXPORTED_FUNC free_interleave(void *addr, size_t len) {
     return free_mem_ptr(addr, len);
 }
+
+int __TBB_EXPORTED_FUNC move_to_node(const void *addr, size_t len, size_t bank) {
+    system_topology::initialize();
+    return move_mem_ptr(addr, len, bank);
+}
+
 #endif /* __TBB_ARENA_BINDING */
 
 } // namespace r1

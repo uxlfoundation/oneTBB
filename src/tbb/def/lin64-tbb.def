@@ -124,6 +124,7 @@ _ZN3tbb6detail2r128constraints_threads_per_coreERKNS0_2d111constraintsEl;
 _ZN3tbb6detail2r124numa_default_concurrencyEi;
 _ZN3tbb6detail2r116alloc_interleaveEmm;
 _ZN3tbb6detail2r115free_interleaveEPvm;
+_ZN3tbb6detail2r112move_to_nodeEPKvmm;
 
 /* Observer (observer_proxy.cpp) */
 _ZN3tbb6detail2r17observeERNS0_2d123task_scheduler_observerEb;

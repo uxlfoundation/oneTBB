@@ -82,6 +82,7 @@ TBB_EXPORT int __TBB_EXPORTED_FUNC constraints_threads_per_core(const d1::constr
 TBB_EXPORT void *__TBB_EXPORTED_FUNC alloc_interleave(size_t bank, size_t len);
 TBB_EXPORT int __TBB_EXPORTED_FUNC free_interleave(void *addr, size_t len);
 
+TBB_EXPORT int __TBB_EXPORTED_FUNC move_to_node(const void *addr, size_t len, size_t bank);
 } // namespace r1
 
 namespace d1 {

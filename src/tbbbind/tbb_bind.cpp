@@ -484,6 +484,29 @@ public:
     int free_to_nodes(void* ptr, size_t len) {
         return hwloc_free(topology, ptr, len);
     }
+
+    int move_to_node(const void* ptr, size_t len, size_t bank) {
+        hwloc_obj_t numa_obj;
+
+        // Get the NUMA node object by index
+        numa_obj = hwloc_get_obj_by_type(topology, HWLOC_OBJ_NUMANODE, bank);
+        if (!numa_obj) {
+            return -1;  // NUMA node not found
+        }
+
+        // Migrate memory to the target NUMA node
+        // HWLOC_MEMBIND_MIGRATE flag forces actual page migration
+        int ret = hwloc_set_area_membind(topology,
+                                         ptr,
+                                         len,
+                                         numa_obj->nodeset,
+                                         HWLOC_MEMBIND_BIND,
+                                         HWLOC_MEMBIND_MIGRATE | HWLOC_MEMBIND_BYNODESET);
+        if (ret) {
+            perror("hwloc_set_area_membind failed");
+        }
+        return ret;
+    }
 };
 
 system_topology* system_topology::instance_ptr{nullptr};
@@ -628,6 +651,9 @@ TBBBIND_EXPORT int __TBB_internal_free_mem(void* ptr, size_t len) {
     return system_topology::instance().free_to_nodes(ptr, len);
 }
 
+TBBBIND_EXPORT int __TBB_internal_move_mem(const void* ptr, size_t len, size_t bank) {
+    return system_topology::instance().move_to_node(ptr, len, bank);
+}
 } // extern "C"
 
 } // namespace r1
