@@ -3,7 +3,7 @@
 ## Introduction
 
 `oneapi::tbb::blocked_nd_range` class was introduced as a representation for recursively divisible N-dimensional range for oneTBB parallel algorithms.
-This document proposes extending its API with the deduction guides since C++17 to allow dropping the explicit template arguments specification while
+This document describes extending its API with the deduction guides since C++17 that allows dropping the explicit template arguments specification while
 creating the object if they can be determined using the arguments provided:
 
 ```cpp
@@ -16,7 +16,7 @@ oneapi::tbb::blocked_range<int> range3(0, 300);
 oneapi::tbb::blocked_nd_range nd_range(range1, range2, range3);
 ```
 
-## Proposal
+## Design description
 
 ### Supported constructors
 
@@ -78,9 +78,9 @@ the number of elements in the braced-init list equal to the number of dimensions
 Constructors `[3]` and `[4]` are intended to split the range into two parts. They are part of _Range_ Named Requirements and used internally in the
 implementation of oneTBB parallel algorithms.
 
-### Proposed deduction guides
+### Deduction guides
 
-This paper proposes to add explicit deduction guides for `blocked_nd_range` class:
+The following explicit deduction guides for ``blocked_nd_range`` class are supported by oneTBB implementation:
 
 ```cpp
 // [g1]
@@ -92,8 +92,8 @@ blocked_nd_range(blocked_range<Value>, blocked_range<Values>...)
 This deduction guide corresponds to the constructor `[1]` for the case of passing _N_ `blocked_range` objects itself.
 It only participates in overload resolution if all of the types in `Values` are same as `Value`.
 
-To cover the case while blocked_ranges are passed as braced-init-lists, it is proposed to add a deduction guide taking 
-a set of C-array objects.
+To cover the case when blocked_ranges are passed as braced-init-lists, a deduction guide is added that takes a set of C-array objects.
+
 
 There are currently two options how to define the deduction guide (or a function) taking the braced-init-list
 of any type- C-array and `std::initializer_list`. The issue with `std::initializer_list` is that it does not allow
@@ -107,7 +107,7 @@ blocked_nd_range(const Value (&...)[Ns])
 ```
 
 This deduction guide only participates in overload resolution if
-1. the number of C-arrays provided is more than 1 (`sizeof...(Ns) > 1`),
+1. the number of C-arrays provided is $>=2$ (`sizeof...(Ns) >= 2`),
 2. Each C-array has the size 2 or 3.
 
 The first constraint is intended to disambiguate between `[1]` and `[2]`.
@@ -132,7 +132,7 @@ blocked_nd_range range1({vector.begin(), vector.end()});
 blocked_nd_range range({vector.begin(), vector.end(), /*grainsize = */5});
 ```
 
-For the constructor `[2]`, the following deduction guide is proposed:
+For the constructor `[2]`, the following deduction guide is provided:
 
 ```cpp
 // [g3]
@@ -140,7 +140,7 @@ template <typename Value, unsigned int N>
 blocked_nd_range(const Value (&)[N])
 ```
 
-For service constructors `[3]` and `[4]`, the following guides are proposed:
+For service constructors `[3]` and `[4]`, the following guides are provided:
 
 ```cpp
 // [g4]
@@ -156,9 +156,9 @@ blocked_nd_range(blocked_nd_range<Value, N>, proportional_split)
 
 From the specification perspective, such a deduction guides can be generated as implicit deduction guides, in the same manner as copy and move constructors.
 But the current oneTBB implementation, these deduction guides are not generated implicitly, so the explicit guides are required.
-Guides `[g4]` and `[g5]` are not proposed to be a part of the spec, only a part of oneTBB implementation.
+Guides `[g4]` and `[g5]` are no part of the spec, only a part of oneTBB implementation.
 
-## Open Questions
+## Design conclusions
 
 ### Ambiguity while passing the single braced-init-list of size 2 or 3
 
@@ -175,8 +175,8 @@ Since the template arguments for `blocked_nd_range` are not specified, there can
 2. Be interpreted as two (or three) dimensional range _[0, 10)_, _[0, 20)_ (and _[0, 5)_). In this case it should be deduced as `blocked_nd_range<int, 3>` 
    and constructed using the constructor `[2]`. 
 
-Since it is unclear which resolution should be chosen, current proposal is not to support such use-case in CTAD and require the user to either explicitly
-specialize the template arguments, or to use array or `blocked_range` type itself to initialize the object.
+The current oneTBB implementation prefers the second option since the multi-dimensional ranges are more practical and for consistency with the behavior described
+in [Passing single C-array object of size 2 or 3](#passing-single-c-array-object-of-size-2-or-3) section.
 
 ### Passing single C-array object of size 2 or 3
 
@@ -190,20 +190,14 @@ tbb::blocked_nd_range range(array);
 Since the `blocked_range` is not constructible from C-array and the braced-init-list is not used, the user expects the range to be deduced as
 `blocked_nd_range<int, 2>` and the constructor `[2]` to be used.
 
-If we add one more explicit deduction guide to support the code above, the single braced-init-list of size 2 or 3 would also match on this guide.
-
-There are the following options how this issue can be resolved:
-* Add a new deduction guide to support the code above. The downside of this approach is that it makes the ambiguity, discussed in the
-  [previous section](#ambiguity-while-passing-the-single-braced-init-list-of-size-2-or-3) to be resolved also and always result in 2 or 3-dimensional
-  range. If the user provided the single braced-init-list to have one-dimensional range, he would face the unexpected behavior without any diagnostics.
-* Document the code above as limitation and do not support it. The downside is  that the code above is considered valid, but    
-  cannot be supported because of the implementation of CTAD and current set of constructors.
-* Support the use-case above but do not support CTAD for braced-init-lists at all. The major downside is that the user would 
-  need to always specify the exact type `tbb::blocked_range` while using the braced-init-list construction.
+Current oneTBB implementation supports such a behavior constraining a braced-init-list deduction guide to allow 2 or more lists and hence
+by resolving an ambiguity described in
+[Ambiguity while passing the single braced-init-list of size 2 or 3](#ambiguity-while-passing-the-single-braced-init-list-of-size-2-or-3)
+to always prefer a multi-dimensional range.
 
 ### Using the constructor `[1]` with "mixed" arguments
 
-There is a limitation of the deduction guides proposed if the constructor `[1]` is used with both arguments of exact `tbb::blocked_range` type
+There is a limitation of the deduction guides if the constructor `[1]` is used with both arguments of exact `tbb::blocked_range` type
 and the braced-init-lists:
 
 ```cpp
@@ -211,17 +205,4 @@ tbb::blocked_range<int> dim_range(0, 100);
 tbb::blocked_nd_range nd_range(dim_range, {0, 200}, {0, 300}, dim_range);
 ```
 
-These arguments would not match nether on the `[g1]` not `[g2]` and it is unclear how to define the deduction guide that covers this case.
-Current proposal is to keep this scenario a limitation for using the CTAD and always require using the consistent set of parameters - or 
-the set of braced-init-lists or the set of `tbb::blocked_range` objects.
-
-## Exit criteria
-
-The following conditions need to be met to move the feature from experimental to fully supported:
-* Collecting feedback on user experience confirming the choices made on the open questions and limitations:
-  * Preference of multi-dimensional range while deducing from the C-array or braced-init-list of size 2 or 3.
-    See [separate section](#passing-single-c-array-object-of-size-2-or-3) for more details.
-  * Limitation for the deduction from the braced-init-list to accept only the lists of items of the same type.
-  * Limitation for the deduction guide `1` in case of mixing `blocked_range` objects and braced-init-lists.
-    See [separate section](#using-the-constructor-1-with-mixed-arguments) for more details.
-* The corresponding oneTBB specification update should be done backed by the user feedback provided.
+These arguments would not match neither on the `[g1]` not `[g2]` and it is unclear how to define the deduction guide that covers this case.
