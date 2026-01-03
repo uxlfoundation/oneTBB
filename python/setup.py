@@ -1,4 +1,5 @@
-# Copyright (c) 2016-2023 Intel Corporation
+# Copyright (c) 2016-2025 Intel Corporation
+# Copyright (c) 2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,8 +18,12 @@
 import platform
 import os
 
-from distutils.core import *
-from distutils.command.build import build
+try:
+    from setuptools import setup, Extension
+    from setuptools.command.build import build
+except ImportError:
+    from distutils.core import setup, Extension
+    from distutils.command.build import build
 
 rundir = os.getcwd()
 os.chdir(os.path.abspath(os.path.dirname(__file__)))
@@ -57,19 +62,31 @@ else:
     compile_flags = ['-std=c++11', '-Wno-unused-variable']
     tbb_lib_name = 'tbb'
 
+tbb_includedirs = os.getenv("TBB_INCLUDEDIRS", "")
+tbb_libdirs = os.getenv("TBB_LIBDIRS", "")
+
+if use_compiler_tbb and (tbb_includedirs or tbb_libdirs):
+    print("Warning: Ignoring TBB_INCLUDEDIRS=%s and TBB_LIBDIRS=%s "
+          "because using oneTBB from Intel (R) C++ Compiler is set"
+          % (tbb_includedirs, tbb_libdirs))
+
 _tbb = Extension("tbb._api", ["tbb/api.i"],
-        include_dirs=[os.path.join(tbb_root, 'include')] if not use_compiler_tbb else [],
+        include_dirs=([os.path.join(tbb_root, 'include')]
+                      + tbb_includedirs.split()
+                     ) if not use_compiler_tbb else [],
         swig_opts   =['-c++', '-O', '-threads'] + (  # add '-builtin' later
               ['-I' + os.path.join(tbb_root, 'include')] if not use_compiler_tbb else []),
         extra_compile_args=compile_flags + tbb_flag,
         extra_link_args=tbb_flag,
         libraries   =([tbb_lib_name] if not use_compiler_tbb else []) +
                      (['irml'] if platform.system() == "Linux" else []),
-        library_dirs=[ rundir,                                              # for custom-builds
+        library_dirs=([rundir,                                              # for custom-builds
                        os.path.join(tbb_root, 'lib', 'intel64', 'gcc4.8'),  # for Linux
                        os.path.join(tbb_root, 'lib'),                       # for MacOS
                        os.path.join(tbb_root, 'lib', 'intel64', 'vc_mt'),   # for Windows
-                     ] if not use_compiler_tbb else [],
+                      ]
+                      + tbb_libdirs.split()
+                     ) if not use_compiler_tbb else [],
         language    ='c++',
         )
 
@@ -98,7 +115,6 @@ setup(  name        ="TBB",
             'Intended Audience :: System Administrators',
             'Intended Audience :: Other Audience',
             'Intended Audience :: Science/Research',
-            'License :: OSI Approved :: Apache Software License',
             'Operating System :: MacOS :: MacOS X',
             'Operating System :: Microsoft :: Windows',
             'Operating System :: POSIX :: Linux',
