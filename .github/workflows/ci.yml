@@ -147,7 +147,7 @@ jobs:
           fetch-depth: 0
       - name: Run check
         run: |
-          COPYRIGHT_BASE = "Copyright (c) .* \(Intel Corporation\|UXL Foundation Contributors\)"
+          COPYRIGHT_BASE="Copyright (c) .* \(Intel Corporation\|UXL Foundation Contributors\)"
 
           sed -i \
             -e "/${COPYRIGHT_BASE}/s/ \([0-9]\+\)[-0-9]*/ \\1-$(date +%Y)/" \
