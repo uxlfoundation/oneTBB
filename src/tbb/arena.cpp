@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -274,6 +275,7 @@ arena::arena(threading_control* control, unsigned num_slots, unsigned num_reserv
         my_slots[i].init_task_streams(i);
         my_slots[i].my_default_task_dispatcher = new(base_td_pointer + i) task_dispatcher(this);
         my_slots[i].my_is_occupied.store(false, std::memory_order_relaxed);
+        my_slots[i].accessed_by_owner.store(false, std::memory_order_relaxed);
     }
     my_fifo_task_stream.initialize(my_num_slots);
     my_resume_task_stream.initialize(my_num_slots);
@@ -372,7 +374,7 @@ bool arena::has_tasks() {
     std::size_t n = my_limit.load(std::memory_order_acquire);
     bool tasks_are_available = false;
     for (std::size_t k = 0; k < n && !tasks_are_available; ++k) {
-        tasks_are_available = !my_slots[k].is_empty();
+        tasks_are_available = my_slots[k].has_tasks();
     }
     tasks_are_available = tasks_are_available || has_enqueued_tasks() || !my_resume_task_stream.empty();
 #if __TBB_CRITICAL_TASKS
@@ -844,11 +846,7 @@ void task_arena_impl::execute(d1::task_arena_base& ta, d1::delegate_base& d) {
                 a->my_exit_monitors.notify_one(); // do not relax!
             }
             // process possible exception
-            auto exception = exec_context.my_exception.load(std::memory_order_acquire);
-            if (exception) {
-                __TBB_ASSERT(exec_context.is_group_execution_cancelled(), "The task group context with an exception should be canceled.");
-                exception->throw_self();
-            }
+            handle_context_exception(exec_context);
             __TBB_ASSERT(governor::is_thread_data_set(td), nullptr);
             return;
         } // if (index1 == arena::out_of_arena)
