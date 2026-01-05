@@ -297,7 +297,7 @@ class ets_base<ets_key_per_instance>: public ets_base<ets_no_key> {
     using tls_key_t = unsigned long;
     void create_key() { my_key = FlsAlloc(nullptr); }
     void destroy_key() { FlsFree(my_key); }
-    void set_tls(void * value) { FlsSetValue(my_key, (LPVOID)value); }
+    void set_tls(void * value) { FlsSetValue(my_key, value); }
     void* get_tls() { return (void *)FlsGetValue(my_key); }
 #else
     using tls_key_t = unsigned long;
