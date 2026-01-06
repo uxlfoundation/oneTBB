@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2019-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@
 #include "oneapi/tbb/detail/_assert.h"
 #include "oneapi/tbb/detail/_config.h"
 #include "oneapi/tbb/detail/_utils.h"
-#include "oneapi/tbb/info.h"
 
 #if _MSC_VER && !__INTEL_COMPILER && !__clang__
 #pragma warning( push )
@@ -359,9 +358,9 @@ public:
         __TBB_ASSERT(numa_node_index < (int)numa_affinity_masks_list.size(), "Wrong NUMA node id");
         __TBB_ASSERT(core_type_index == -1 ||
             // In the multiple core type format, the MSB of the first core_type_id_bits bits represents the highest core type id
-            (tbb::detail::d1::constraints::single_core_type(core_type_index)
+            (multi_core_type_codec::is_single(core_type_index)
                  ? (size_t)core_type_index
-                 : tbb::detail::log2(core_type_index & ((1 << tbb::detail::d1::constraints::core_type_id_bits) - 1))) <
+                 : log2(core_type_index & ((1 << multi_core_type_codec::core_type_id_bits) - 1))) <
                 core_types_affinity_masks_list.size(),
             "Wrong core type id");
         __TBB_ASSERT(max_threads_per_core == -1 || max_threads_per_core > 0, "Wrong max_threads_per_core");
@@ -374,7 +373,7 @@ public:
             hwloc_bitmap_and(constraints_mask, constraints_mask, numa_affinity_masks_list[numa_node_index]);
         }
         if (core_type_index >= 0) {
-            auto core_types = tbb::detail::d1::constraints{}.set_core_type(core_type_index).get_core_types();
+            auto core_types = multi_core_type_codec::decode(core_type_index);
             __TBB_ASSERT(!core_types.empty(), "Core types list must not be empty");
 
             hwloc_cpuset_t core_types_mask = hwloc_bitmap_alloc();

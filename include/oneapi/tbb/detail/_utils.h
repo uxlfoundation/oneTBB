@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2023 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -21,6 +22,8 @@
 #include <cstdint>
 #include <atomic>
 #include <functional>
+#include <vector>
+#include <climits>
 
 #include "_config.h"
 #include "_assert.h"
@@ -154,6 +157,48 @@ T reverse_n_bits(T src, std::size_t n) {
     __TBB_ASSERT(n != 0, "Reverse for 0 bits is undefined behavior.");
     return reverse_bits(src) >> (number_of_bits<T>() - n);
 }
+
+//! Encodes/decodes multiple core type IDs into/from a single integer value using bitmask
+struct multi_core_type_codec {
+    using core_type_id = int;
+
+    static core_type_id encode(const std::vector<core_type_id>& ids) {
+        if (ids.empty()) {
+            return -1;
+        }
+        if (ids.size() == 1) {
+            return ids[0];
+        }
+        // Set a marker bit to indicate multiple core type format
+        core_type_id result = (1 << core_type_id_bits);
+
+        for (core_type_id id : ids) {
+            __TBB_ASSERT((0 <= id) && (id < static_cast<core_type_id>(core_type_id_bits)), "Wrong core type id");
+            result |= (1 << id);
+        }
+
+        return result;
+    }
+    static std::vector<core_type_id> decode(core_type_id core_type) {
+        if ((core_type == -1) || is_single(core_type)) {
+            return {core_type};
+        }
+
+        std::vector<core_type_id> core_type_ids;
+        for (size_t bit_pos = 0; bit_pos < core_type_id_bits; ++bit_pos) {
+            if (core_type & (1 << bit_pos)) {
+                core_type_ids.push_back(static_cast<core_type_id>(bit_pos));
+            }
+        }
+        return core_type_ids;
+    }
+    static bool is_single(core_type_id id) {
+        return (id >> core_type_id_bits) == 0;
+    }
+
+    // Upper 4 bits reserved for format marker (single vs multiple core types)
+    static constexpr size_t core_type_id_bits = sizeof(core_type_id) * CHAR_BIT - 4;
+};
 
 // A function to check if passed integer is a power of two
 template <typename IntegerType>

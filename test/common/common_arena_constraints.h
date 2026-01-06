@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2019-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Сontributors
+    Copyright (c) 2026 UXL Foundation Сontributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@
 #include "oneapi/tbb/spin_mutex.h"
 
 #include <bitset>
+#include <tuple>
 #include <vector>
 #include <unordered_set>
 
@@ -417,7 +418,7 @@ system_info::affinity_mask prepare_reference_affinity_mask(const tbb::task_arena
             }
 
             index_info combination;
-            combination.index = (1 << tbb::task_arena::constraints::core_type_id_bits); // multiple core type format
+            combination.index = (1 << tbb::detail::multi_core_type_codec::core_type_id_bits); // multiple core type format
             combination.index |= mask;
             combination.concurrency = 0;
             combination.cpuset = hwloc_bitmap_alloc();
@@ -607,12 +608,12 @@ constraints_container generate_constraints_variety() {
                 }
             }
             for (const auto& combination : core_type_combinations) {
-                results.insert(constraints{}.set_core_types(combination));
+                results.insert(constraints{}.set_core_type(tbb::detail::multi_core_type_codec::encode(combination)));
 
                 results.insert(
                     constraints{}
                     .set_numa_id(numa_node)
-                    .set_core_types(combination)
+                    .set_core_type(tbb::detail::multi_core_type_codec::encode(combination))
                 );
 
                 for (const auto& max_threads_per_core : system_info::get_available_max_threads_values()) {
@@ -629,14 +630,14 @@ constraints_container generate_constraints_variety() {
 
                     results.insert(
                         constraints{}
-                        .set_core_types(combination)
+                        .set_core_type(tbb::detail::multi_core_type_codec::encode(combination))
                         .set_max_threads_per_core(max_threads_per_core)
                     );
 
                     results.insert(
                         constraints{}
                         .set_numa_id(numa_node)
-                        .set_core_types(combination)
+                        .set_core_type(tbb::detail::multi_core_type_codec::encode(combination))
                         .set_max_threads_per_core(max_threads_per_core)
                     );
                 }
@@ -665,4 +666,30 @@ constraints_container generate_constraints_variety() {
 
     return constraints_variety;
 }
+
+struct multi_core_type_helper {
+    tbb::task_arena::constraints constraints;
+    std::vector<tbb::core_type_id> ids;
+
+    multi_core_type_helper(const tbb::task_arena::constraints& constraints_)
+        : constraints(constraints_),
+          ids(tbb::detail::multi_core_type_codec::decode(constraints.core_type))
+    {
+        if (ids.size() > 1) {
+            constraints.set_core_type(tbb::task_arena::selectable);
+        }
+    }
+
+    bool selectable() const {
+        return constraints.core_type == tbb::task_arena::selectable;
+    }
+
+    int operator()(std::tuple<int, size_t, size_t> core_type) const {
+        auto it = std::find(ids.begin(), ids.end(), std::get<0>(core_type));
+        if (it == ids.end()) {
+            return -1;
+        }
+        return int(it - ids.begin());
+    }
+};
 #endif // __TBB_test_common_arena_constraints_H_

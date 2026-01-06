@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -251,7 +251,10 @@ protected:
 public:
     //! Typedef for number of threads that is automatic.
     static const int automatic = -1;
+    //! Typedef for current thread index in an uninitialized arena.
     static const int not_initialized = -2;
+    //! Typedef for core type(s) to be specified by the provided selector.
+    static const int selectable = -2;
 };
 
 template<typename R, typename F>
@@ -316,6 +319,36 @@ class task_arena : public task_arena_base {
                 "unexpected premature exit from wait_for: task group status is still not complete");
         return status;
     }
+
+    template <typename Selector>
+    void apply_core_type_selector(Selector selector) {
+        if (my_core_type != selectable) {
+            // Core type is already specified, no need to use selector
+            return;
+        }
+
+        int max_score = -1;
+        std::vector<core_type_id> selected_core_types;
+        auto ids = core_types();
+        size_t total = ids.size();
+        for (size_t index = 0; index < total; ++index) {
+            int score = selector(std::make_tuple(ids[index], index, total));
+
+            if (TBB_runtime_interface_version() >= 12180) {
+                if (score >= 0) {
+                    selected_core_types.push_back(ids[index]);
+                }
+            } else {
+                // No runtime multi core type support, so use the one with the highest score
+                if (score > max_score) {
+                    max_score = score;
+                    selected_core_types = {ids[index]};
+                }
+            }
+        }
+        my_core_type = multi_core_type_codec::encode(selected_core_types);
+    }
+
 public:
     //! Creates task_arena with certain concurrency limits
     /** Sets up settings only, real construction is deferred till the first method invocation
@@ -350,6 +383,23 @@ public:
 #endif
           )
     {}
+
+    //! Creates task arena with a custom selector for core types
+    template <typename Selector>
+    task_arena(const constraints& constraints_, Selector selector_,
+               unsigned reserved_for_masters = 1, priority a_priority = priority::normal
+#if __TBB_PREVIEW_PARALLEL_PHASE
+               , leave_policy lp = leave_policy::automatic
+#endif
+    )
+        : task_arena_base(constraints_, reserved_for_masters, a_priority
+#if __TBB_PREVIEW_PARALLEL_PHASE
+                         , lp
+#endif
+          )
+    {
+        apply_core_type_selector(selector_);
+    }
 
     //! Copies settings from another task_arena
     task_arena(const task_arena &a) // copy settings but not the reference or instance
@@ -427,6 +477,7 @@ public:
     }
 
 #if __TBB_ARENA_BINDING
+    //! Overrides constraints and forces initialization of internal representation
     void initialize(constraints constraints_, unsigned reserved_for_masters = 1,
                     priority a_priority = priority::normal
 #if __TBB_PREVIEW_PARALLEL_PHASE
@@ -445,6 +496,32 @@ public:
 #if __TBB_PREVIEW_PARALLEL_PHASE
             set_leave_policy(lp);
 #endif
+            r1::initialize(*this);
+            mark_initialized();
+        }
+    }
+
+    //! Overrides constraints with a custom selector for core types and forces initialization of internal representation
+    template <typename Selector>
+    void initialize(constraints constraints_, Selector selector_,
+                    unsigned reserved_for_masters = 1, priority a_priority = priority::normal
+#if __TBB_PREVIEW_PARALLEL_PHASE
+                    , leave_policy lp = leave_policy::automatic
+#endif
+    )
+    {
+        __TBB_ASSERT(!my_arena.load(std::memory_order_relaxed), "Impossible to modify settings of an already initialized task_arena");
+        if( !is_active() ) {
+            my_numa_id = constraints_.numa_id;
+            my_max_concurrency = constraints_.max_concurrency;
+            my_core_type = constraints_.core_type;
+            my_max_threads_per_core = constraints_.max_threads_per_core;
+            my_num_reserved_slots = reserved_for_masters;
+            my_priority = a_priority;
+#if __TBB_PREVIEW_PARALLEL_PHASE
+            set_leave_policy(lp);
+#endif
+            apply_core_type_selector(selector_);
             r1::initialize(*this);
             mark_initialized();
         }

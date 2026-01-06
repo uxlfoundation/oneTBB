@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2023-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -177,12 +177,12 @@ public:
             constraints.numa_id              != d1::task_arena::automatic ||
             constraints.max_threads_per_core != d1::task_arena::automatic)
         {
-            auto core_types = constraints.get_core_types();
+            auto core_types = multi_core_type_codec::decode(constraints.core_type);
             __TBB_ASSERT(!core_types.empty(), nullptr); // At least one real core type or automatic is specified.
 
             // Create a separate constraint entry for each core type, with other fields being the same.
             my_permit_constraints.assign(core_types.size(), TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER);
-            for (std::size_t i = 0; i < core_types.size(); ++i) {
+            for (size_t i = 0; i < core_types.size(); ++i) {
                 my_permit_constraints[i].core_type_id = core_types[i];
                 my_permit_constraints[i].min_concurrency = 0;
                 my_permit_constraints[i].numa_id = constraints.numa_id;
