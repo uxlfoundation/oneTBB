@@ -154,9 +154,13 @@ jobs:
           CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
           INTEL_COPYRIGHT_BASE="Copyright \(c\) .* Intel Corporation"
           UXL_COPYRIGHT_BASE="Copyright \(c\) .* UXL Foundation Contributors"
+          COPYRIGHT_LINE="Licensed under the Apache License"
           HEADER_LINES=20
+          FILES_WITHOUT_LICENSE=()
 
           for f in $CHANGED_FILES; do
+            
+
             if head -n "$HEADER_LINES" "$f" | grep -qE "${UXL_COPYRIGHT_BASE}"; then
               # Update UXL Copyright years
               echo "Debug: UXL Copyright exists for file ${f}"
@@ -164,22 +168,49 @@ jobs:
               -e "1,${HEADER_LINES}{/${UXL_COPYRIGHT_BASE}/s/ \([0-9]\+\)[-0-9]*/ \\1-$(date +%Y)/}" \
               -e "1,${HEADER_LINES}{/${UXL_COPYRIGHT_BASE}/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/}" \
               "$f"
-            elif head -n "$HEADER_LINES" "$f" | grep -qE "${INTEL_COPYRIGHT_BASE}"; then
-              echo "Debug: Intel Copyright exists for file ${f}"
-              # Insert UXL Copyright after the Intel Copyright
-              sed -E -i "0,/${INTEL_COPYRIGHT_BASE}/s//&\nCopyright (c) $(date +%Y) UXL Foundation Contributors\n/" "$f"
             else
-              echo "Debug: No Intel Copyright for file ${f}"
-              # Insert UXL Copyright at the top of the file
-              sed -E -i "1s/^/Copyright (c) $(date +%Y) UXL Foundation Contributors\n/" "$f"
-            fi
+              # Detecting the copyright prefix from the COPYRIGHT_LINE
+              LICENSE_LINE="$(head -n "$HEADER_LINES" "$f" | grep -m1 "$LICENSE_LINE" || true)"
+              if [ -z "$LICENSE_LINE" ]; then
+                FILES_WITHOUT_LICENSE+=("$f")
+                continue
+              fi
+
+              LICENSE_PREFIX="$(printf '%s' "$LICENSE_LINE" | sed -E "s/^(.*)${LICENSE_LINE}.*/\1/")"
+              if [ -z "$LICENSE_PREFIX" ]; then
+                FILES_WITHOUT_LICENSE+="($f)"
+                continue
+              fi
+
+              if head -n "$HEADER_LINES" "$f" | grep -qE "${INTEL_COPYRIGHT_BASE}"; then
+                echo "Debug: Intel Copyright exists for file ${f}"
+                # Insert UXL Copyright after the Intel Copyright
+                sed -E -i "0,/${INTEL_COPYRIGHT_BASE}/s//&\n${COPYRIGHT_PREFIX}Copyright (c) $(date +%Y) UXL Foundation Contributors\n/" "$f"
+              else
+                echo "Debug: No Intel Copyright for file ${f}"
+                # Insert UXL Copyright at the top of the file
+                sed -E -i "1s/^/${COPYRIGHT_PREFIX}Copyright (c) $(date +%Y) UXL Foundation Contributors\n/" "$f"
+              fi
           done
-          
+
           git checkout -- third-party-programs.txt
           git diff > years.diff
+
+          CHECK_FAILED=false
+
+          if [ "${FILES_WITHOUT_LICENSE[@]}" -gt 0 ]; then
+            echo "License missed for the following files"
+            printf ' - %s\n' "${FILES_WITHOUT_LICENSE[@]}"
+            CHECK_FAILED=true
+          fi
+
           if [[ -s years.diff ]]; then
             echo "Wrong copyright years"
             cat years.diff
+            CHECK_FAILED=true
+          fi
+
+          if [ "$CHECK_FAILED" = true ]; then
             exit 1
           fi
   python_module_test_ubuntu_latest:
