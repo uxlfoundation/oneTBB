@@ -151,12 +151,26 @@ jobs:
           fetch-depth: 0
       - name: Run check
         run: |
-          COPYRIGHT_BASE="Copyright (c) .* \(Intel Corporation\|UXL Foundation Contributors\)"
+          CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
+          INTEL_COPYRIGHT_BASE="Copyright (c) .* Intel Corporation"
+          UXL_COPYRIGHT_BASE="Copyright (c) .* UXL Foundation Contributors"
 
-          sed -i \
-            -e "/${COPYRIGHT_BASE}/s/ \([0-9]\+\)[-0-9]*/ \\1-$(date +%Y)/" \
-            -e "/${COPYRIGHT_BASE}/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/" \
-            $(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
+          for f in $CHANGED_FILES; do
+            if grep -qE "${UXL_COPYRIGHT_BASE}" "$f"; then
+              # Update UXL Copyright years
+              sed -i \
+              -e "/${UXL_COPYRIGHT_BASE}/s/ \([0-9]\+\)[-0-9]*/ \\1-$(date +%Y)/" \
+              -e "/${UXL_COPYRIGHT_BASE}/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/" \
+              "$f"
+            elseif grep -qE "${INTEL_COPYRIGHT_BASE}" "$f"; then
+              # Insert UXL Copyright after the Intel Copyright
+              sed -i "0,/${INTEL_COPYRIGHT_BASE}/s//&\nCopyright (c) $(date +%Y) UXL Foundation Contributors\n/" "$f"
+            else
+              # Insert UXL Copyright at the top of the file
+              sed -i "1s/^/Copyright (c) $(date +%Y) UXL Foundation Contributors\n/" "$f"
+            fi
+          done
+          
           git checkout -- third-party-programs.txt
           git diff > years.diff
           if [[ -s years.diff ]]; then
