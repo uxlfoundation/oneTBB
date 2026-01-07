@@ -152,7 +152,6 @@ jobs:
       - name: Run check
         run: |
           CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
-          INTEL_COPYRIGHT_BASE="Copyright \(c\) .* Intel Corporation"
           UXL_COPYRIGHT_BASE="Copyright \(c\) .* UXL Foundation Contributors"
           COPYRIGHT_LINE_BASE="Licensed under the Apache License"
           HEADER_LINES=20
@@ -167,28 +166,29 @@ jobs:
                 -e "1,${HEADER_LINES}{/${UXL_COPYRIGHT_BASE}/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/}" \
               "$f"
             else
-              # Detecting the copyright prefix from the COPYRIGHT_LINE
+              # Find the COPYRIGHT_LINE_BASE within the first HEADER_LINES
               COPYRIGHT_LINE="$(head -n "$HEADER_LINES" "$f" | grep -m1 -F "$COPYRIGHT_LINE_BASE" || true)"
               if [ -z "$COPYRIGHT_LINE" ]; then
                 FILES_WITHOUT_COPYRIGHT="$FILES_WITHOUT_COPYRIGHT $f"
                 continue
               fi
 
+              # Prefix is everything before COPYRIGHT_LINE_BASE on that line
               COPYRIGHT_PREFIX="${COPYRIGHT_LINE%%$COPYRIGHT_LINE_BASE*}"
               if [ -z "$COPYRIGHT_PREFIX" ]; then
                 FILES_WITHOUT_COPYRIGHT="$FILES_WITHOUT_COPYRIGHT $f"
                 continue
               fi
 
-              if head -n "$HEADER_LINES" "$f" | grep -qE "${INTEL_COPYRIGHT_BASE}"; then
-                echo "Debug: Intel Copyright exists for file ${f}"
-                # Insert UXL Copyright after the Intel Copyright
-                sed -E -i "0,/${INTEL_COPYRIGHT_BASE}/s//&\n${COPYRIGHT_PREFIX}Copyright (c) $(date +%Y) UXL Foundation Contributors\n/" "$f"
-              else
-                echo "Debug: No Intel Copyright for file ${f}"
-                # Insert UXL Copyright at the top of the file
-                sed -E -i "1s/^/${COPYRIGHT_PREFIX}Copyright (c) $(date +%Y) UXL Foundation Contributors\n/" "$f"
+              # Find the line number of COPYRIGHT_LINE_BASE
+              COPYRIGHT_LINE_NUMBER="$(grep -nm1 -F "$COPYRIGHT_LINE_BASE" "$f" | cut -d: -f1)"
+              
+              INSERT_LINE_NUMBER=$((COPYRIGHT_LINE_NUMBER - 2))
+              if [ "$INSERT_LINE_NUMBER" -lt 1 ]; then
+                INSERT_LINE_NUMBER=1
               fi
+
+              sed -E -i "${INSERT_LINE_NUMBER}i\\${COPYRIGHT_PREFIX}Copyright (c) $(date +%Y) UXL Foundation Contributors" "$f"
             fi
           done
 
