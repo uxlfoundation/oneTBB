@@ -197,7 +197,7 @@ jobs:
 
           CHECK_FAILED=false
 
-          if [[ -n "${FILES_WITHOUT_LICENSE" ]]; then
+          if [[ -n "${FILES_WITHOUT_LICENSE}" ]]; then
             echo "License missed for the following files: ${FILES_WITHOUT_LICENSE}"
             CHECK_FAILED=true
           fi
