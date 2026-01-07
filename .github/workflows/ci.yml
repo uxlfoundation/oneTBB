@@ -168,13 +168,13 @@ jobs:
               "$f"
             else
               # Detecting the copyright prefix from the COPYRIGHT_LINE
-              COPYRIGHT_LINE="$(head -n "$HEADER_LINES" "$f" | grep -m1 "$COPYRIGHT_LINE_BASE" || true)"
+              COPYRIGHT_LINE="$(head -n "$HEADER_LINES" "$f" | grep -m1 -F "$COPYRIGHT_LINE_BASE" || true)"
               if [ -z "$COPYRIGHT_LINE" ]; then
                 FILES_WITHOUT_COPYRIGHT="$FILES_WITHOUT_COPYRIGHT $f"
                 continue
               fi
 
-              COPYRIGHT_PREFIX="$(printf '%s' "$COPYRIGHT_LINE" | sed -E "s/^(.*)${COPYRIGHT_LINE}.*/\1/")"
+              COPYRIGHT_PREFIX="${COPYRIGHT_LINE%%$COPYRIGHT_LINE_BASE*}"
               if [ -z "$COPYRIGHT_PREFIX" ]; then
                 FILES_WITHOUT_COPYRIGHT="$FILES_WITHOUT_COPYRIGHT $f"
                 continue
