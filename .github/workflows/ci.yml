@@ -152,8 +152,8 @@ jobs:
       - name: Run check
         run: |
           CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
-          INTEL_COPYRIGHT_BASE="Copyright (c) .* Intel Corporation"
-          UXL_COPYRIGHT_BASE="Copyright (c) .* UXL Foundation Contributors"
+          INTEL_COPYRIGHT_BASE="Copyright \(c\) .* Intel Corporation"
+          UXL_COPYRIGHT_BASE="Copyright \(c\) .* UXL Foundation Contributors"
 
           for f in $CHANGED_FILES; do
             if grep -qE "${UXL_COPYRIGHT_BASE}" "$f"; then
