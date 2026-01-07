@@ -154,7 +154,7 @@ jobs:
           CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
           INTEL_COPYRIGHT_BASE="Copyright \(c\) .* Intel Corporation"
           UXL_COPYRIGHT_BASE="Copyright \(c\) .* UXL Foundation Contributors"
-          COPYRIGHT_LINE="Licensed under the Apache License"
+          COPYRIGHT_LINE_BASE="Licensed under the Apache License"
           HEADER_LINES=20
           FILES_WITHOUT_LICENSE=""
 
@@ -168,7 +168,7 @@ jobs:
               "$f"
             else
               # Detecting the copyright prefix from the COPYRIGHT_LINE
-              COPYRIGHT_LINE="$(head -n "$HEADER_LINES" "$f" | grep -m1 "$COPYRIGHT_LINE" || true)"
+              COPYRIGHT_LINE="$(head -n "$HEADER_LINES" "$f" | grep -m1 "$COPYRIGHT_LINE_BASE" || true)"
               if [ -z "$COPYRIGHT_LINE" ]; then
                 FILES_WITHOUT_COPYRIGHT="$FILES_WITHOUT_COPYRIGHT $f"
                 continue
