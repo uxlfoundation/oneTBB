@@ -163,8 +163,8 @@ jobs:
               # Update UXL Copyright years
               echo "Debug: UXL Copyright exists for file ${f}"
               sed -E -i \
-              -e "1,${HEADER_LINES}{/${UXL_COPYRIGHT_BASE}/s/ \([0-9]\+\)[-0-9]*/ \\1-$(date +%Y)/}" \
-              -e "1,${HEADER_LINES}{/${UXL_COPYRIGHT_BASE}/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/}" \
+                -e "1,${HEADER_LINES}{/${UXL_COPYRIGHT_BASE}/s/ ([0-9]+)[-0-9]*/ \1-$(date +%Y)/}" \
+                -e "1,${HEADER_LINES}{/${UXL_COPYRIGHT_BASE}/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/}" \
               "$f"
             else
               # Detecting the copyright prefix from the COPYRIGHT_LINE
