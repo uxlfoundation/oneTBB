@@ -156,7 +156,7 @@ jobs:
           UXL_COPYRIGHT_BASE="Copyright \(c\) .* UXL Foundation Contributors"
           COPYRIGHT_LINE="Licensed under the Apache License"
           HEADER_LINES=20
-          FILES_WITHOUT_LICENSE=()
+          FILES_WITHOUT_LICENSE=""
 
           for f in $CHANGED_FILES; do
             if head -n "$HEADER_LINES" "$f" | grep -qE "${UXL_COPYRIGHT_BASE}"; then
@@ -170,13 +170,13 @@ jobs:
               # Detecting the copyright prefix from the COPYRIGHT_LINE
               LICENSE_LINE="$(head -n "$HEADER_LINES" "$f" | grep -m1 "$LICENSE_LINE" || true)"
               if [ -z "$LICENSE_LINE" ]; then
-                FILES_WITHOUT_LICENSE+=("$f")
+                FILES_WITHOUT_LICENSE="$FILES_WITHOUT_LICENSE $f"
                 continue
               fi
 
               LICENSE_PREFIX="$(printf '%s' "$LICENSE_LINE" | sed -E "s/^(.*)${LICENSE_LINE}.*/\1/")"
               if [ -z "$LICENSE_PREFIX" ]; then
-                FILES_WITHOUT_LICENSE+="($f)"
+                FILES_WITHOUT_LICENSE="$FILES_WITHOUT_LICENSE $f"
                 continue
               fi
 
@@ -197,9 +197,8 @@ jobs:
 
           CHECK_FAILED=false
 
-          if [ "${FILES_WITHOUT_LICENSE[@]}" -gt 0 ]; then
-            echo "License missed for the following files"
-            printf ' - %s\n' "${FILES_WITHOUT_LICENSE[@]}"
+          if [[ -z "${FILES_WITHOUT_LICENSE" ]]; then
+            echo "License missed for the following files $FILES_WITHOUT_LICENSE"
             CHECK_FAILED=true
           fi
 
