@@ -154,16 +154,17 @@ jobs:
           CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
           INTEL_COPYRIGHT_BASE="Copyright \(c\) .* Intel Corporation"
           UXL_COPYRIGHT_BASE="Copyright \(c\) .* UXL Foundation Contributors"
+          HEADER_LINES=20
 
           for f in $CHANGED_FILES; do
-            if grep -qE "${UXL_COPYRIGHT_BASE}" "$f"; then
+            if head -n "$HEADER_LINES" "$f" | grep -qE "${UXL_COPYRIGHT_BASE}"; then
               # Update UXL Copyright years
               echo "Debug: UXL Copyright exists for file ${f}"
               sed -i \
               -e "/${UXL_COPYRIGHT_BASE}/s/ \([0-9]\+\)[-0-9]*/ \\1-$(date +%Y)/" \
               -e "/${UXL_COPYRIGHT_BASE}/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/" \
               "$f"
-            elif grep -qE "${INTEL_COPYRIGHT_BASE}" "$f"; then
+            elif head -n "$HEADER_LINES" "$f" | grep -qE "${INTEL_COPYRIGHT_BASE}"; then
               echo "Debug: Intel Copyright exists for file ${f}"
               # Insert UXL Copyright after the Intel Copyright
               sed -i "0,/${INTEL_COPYRIGHT_BASE}/s//&\nCopyright (c) $(date +%Y) UXL Foundation Contributors\n/" "$f"
