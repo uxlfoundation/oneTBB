@@ -159,8 +159,6 @@ jobs:
           FILES_WITHOUT_LICENSE=()
 
           for f in $CHANGED_FILES; do
-            
-
             if head -n "$HEADER_LINES" "$f" | grep -qE "${UXL_COPYRIGHT_BASE}"; then
               # Update UXL Copyright years
               echo "Debug: UXL Copyright exists for file ${f}"
@@ -191,6 +189,7 @@ jobs:
                 # Insert UXL Copyright at the top of the file
                 sed -E -i "1s/^/${COPYRIGHT_PREFIX}Copyright (c) $(date +%Y) UXL Foundation Contributors\n/" "$f"
               fi
+            fi
           done
 
           git checkout -- third-party-programs.txt
