@@ -183,7 +183,7 @@ jobs:
               # Find the line number of COPYRIGHT_LINE_BASE
               COPYRIGHT_LINE_NUMBER="$(grep -nm1 -F "$COPYRIGHT_LINE_BASE" "$f" | cut -d: -f1)"
               
-              INSERT_LINE_NUMBER=$((COPYRIGHT_LINE_NUMBER - 2))
+              INSERT_LINE_NUMBER=$((COPYRIGHT_LINE_NUMBER - 1))
               if [ "$INSERT_LINE_NUMBER" -lt 1 ]; then
                 INSERT_LINE_NUMBER=1
               fi
