@@ -162,7 +162,7 @@ jobs:
               -e "/${UXL_COPYRIGHT_BASE}/s/ \([0-9]\+\)[-0-9]*/ \\1-$(date +%Y)/" \
               -e "/${UXL_COPYRIGHT_BASE}/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/" \
               "$f"
-            elseif grep -qE "${INTEL_COPYRIGHT_BASE}" "$f"; then
+            elif grep -qE "${INTEL_COPYRIGHT_BASE}" "$f"; then
               # Insert UXL Copyright after the Intel Copyright
               sed -i "0,/${INTEL_COPYRIGHT_BASE}/s//&\nCopyright (c) $(date +%Y) UXL Foundation Contributors\n/" "$f"
             else
