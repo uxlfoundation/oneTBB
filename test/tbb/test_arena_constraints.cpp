@@ -25,6 +25,7 @@
 
 #include "tbb/global_control.h"
 #include "tbb/parallel_for.h"
+#include "tbb/task_scheduler_observer.h"
 
 #if __TBB_HWLOC_VALID_ENVIRONMENT && __HWLOC_CPUBIND_PRESENT
 //! Test affinity and default_concurrency correctness for all available constraints.
@@ -91,6 +92,23 @@ TEST_CASE("Test constraints propagation during arenas copy construction") {
 
         test_constraints_affinity_and_concurrency(constraints, copied_affinity);
     }
+}
+
+//! Test that constraints parameter is propagated to the task_arena construction while ignoring numa_id
+//! \brief \ref interface
+TEST_CASE("Test constraints argument in create_numa_task_arenas") {
+  system_info::initialize();
+  auto numa_indices = tbb::info::numa_nodes();
+  for (const auto& constraints : generate_constraints_variety()) {
+    auto numa_task_arenas = tbb::create_numa_task_arenas(constraints);
+    tbb::task_arena::constraints expected_constraint = constraints;
+    for (std::size_t i = 0; i < numa_indices.size(); ++i) {
+
+      expected_constraint.set_numa_id(numa_indices[i]);
+      test_constraints_affinity_and_concurrency(expected_constraint,
+                                                get_arena_affinity(numa_task_arenas[i]));
+    }
+  }
 }
 #endif /*__TBB_HWLOC_VALID_ENVIRONMENT && __HWLOC_CPUBIND_PRESENT */
 

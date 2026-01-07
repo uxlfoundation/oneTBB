@@ -255,8 +255,8 @@ arena::arena(threading_control* control, unsigned num_slots, unsigned num_reserv
     my_limit = 1;
     // Two slots are mandatory: for the external thread, and for 1 worker (required to support starvation resistant tasks).
     my_num_slots = num_arena_slots(num_slots, num_reserved_slots);
-    my_num_reserved_slots = num_reserved_slots;
-    my_max_num_workers = num_slots-num_reserved_slots;
+    my_num_reserved_slots = min(num_reserved_slots, num_slots);
+    my_max_num_workers = num_slots-my_num_reserved_slots;
     my_priority_level = priority_level;
     my_references = ref_external; // accounts for the external thread
     my_observers.my_arena = this;
@@ -470,13 +470,13 @@ arena &arena::create(threading_control *control, unsigned num_slots,
 #endif
 ) {
     __TBB_ASSERT(num_slots > 0, NULL);
-    __TBB_ASSERT(num_reserved_slots <= num_slots, NULL);
     // Add public market reference for an external thread/task_arena (that adds an internal reference in exchange).
     arena& a = arena::allocate_arena(control, num_slots, num_reserved_slots, arena_priority_level
 #if __TBB_PREVIEW_PARALLEL_PHASE
                                      , lp
 #endif
     );
+    __TBB_ASSERT(a.my_num_reserved_slots <= a.my_num_slots, NULL);
     a.my_tc_client = control->create_client(a);
     // We should not publish arena until all fields are initialized
     control->publish_client(a.my_tc_client, constraints);
