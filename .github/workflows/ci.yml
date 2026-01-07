@@ -158,6 +158,7 @@ jobs:
           for f in $CHANGED_FILES; do
             if grep -qE "${UXL_COPYRIGHT_BASE}" "$f"; then
               # Update UXL Copyright years
+              echo "Debug: UXL Copyright exists for file ${f}"
               sed -i \
               -e "/${UXL_COPYRIGHT_BASE}/s/ \([0-9]\+\)[-0-9]*/ \\1-$(date +%Y)/" \
               -e "/${UXL_COPYRIGHT_BASE}/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/" \
