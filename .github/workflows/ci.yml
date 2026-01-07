@@ -155,7 +155,7 @@ jobs:
           UXL_COPYRIGHT_BASE="Copyright \(c\) .* UXL Foundation Contributors"
           COPYRIGHT_LINE_BASE="Licensed under the Apache License"
           HEADER_LINES=20
-          FILES_WITHOUT_LICENSE=""
+          FILES_WITHOUT_COPYRIGHT=""
 
           for f in $CHANGED_FILES; do
             if head -n "$HEADER_LINES" "$f" | grep -qE "${UXL_COPYRIGHT_BASE}"; then
@@ -197,8 +197,8 @@ jobs:
 
           CHECK_FAILED=false
 
-          if [[ -n "${FILES_WITHOUT_LICENSE}" ]]; then
-            echo "License missed for the following files: ${FILES_WITHOUT_LICENSE}"
+          if [[ -n "${FILES_WITHOUT_COPYRIGHT}" ]]; then
+            echo "License missed for the following files: ${FILES_WITHOUT_COPYRIGHT}"
             CHECK_FAILED=true
           fi
 
