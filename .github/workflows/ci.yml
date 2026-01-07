@@ -168,15 +168,15 @@ jobs:
               "$f"
             else
               # Detecting the copyright prefix from the COPYRIGHT_LINE
-              LICENSE_LINE="$(head -n "$HEADER_LINES" "$f" | grep -m1 "$LICENSE_LINE" || true)"
-              if [ -z "$LICENSE_LINE" ]; then
-                FILES_WITHOUT_LICENSE="$FILES_WITHOUT_LICENSE $f"
+              COPYRIGHT_LINE="$(head -n "$HEADER_LINES" "$f" | grep -m1 "$COPYRIGHT_LINE" || true)"
+              if [ -z "$COPYRIGHT_LINE" ]; then
+                FILES_WITHOUT_COPYRIGHT="$FILES_WITHOUT_COPYRIGHT $f"
                 continue
               fi
 
-              LICENSE_PREFIX="$(printf '%s' "$LICENSE_LINE" | sed -E "s/^(.*)${LICENSE_LINE}.*/\1/")"
-              if [ -z "$LICENSE_PREFIX" ]; then
-                FILES_WITHOUT_LICENSE="$FILES_WITHOUT_LICENSE $f"
+              COPYRIGHT_PREFIX="$(printf '%s' "$COPYRIGHT_LINE" | sed -E "s/^(.*)${COPYRIGHT_LINE}.*/\1/")"
+              if [ -z "$COPYRIGHT_PREFIX" ]; then
+                FILES_WITHOUT_COPYRIGHT="$FILES_WITHOUT_COPYRIGHT $f"
                 continue
               fi
 
@@ -197,8 +197,8 @@ jobs:
 
           CHECK_FAILED=false
 
-          if [[ -z "${FILES_WITHOUT_LICENSE" ]]; then
-            echo "License missed for the following files $FILES_WITHOUT_LICENSE"
+          if [[ -n "${FILES_WITHOUT_LICENSE" ]]; then
+            echo "License missed for the following files: ${FILES_WITHOUT_LICENSE}"
             CHECK_FAILED=true
           fi
 
