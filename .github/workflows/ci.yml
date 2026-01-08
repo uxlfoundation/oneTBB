@@ -152,43 +152,27 @@ jobs:
       - name: Run check
         run: |
           CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
-          UXL_COPYRIGHT_BASE="Copyright \(c\) .* UXL Foundation Contributors"
-          COPYRIGHT_LINE_BASE="Licensed under the Apache License"
+          UXL_COPYRIGHT="Copyright \(c\) .* UXL Foundation Contributors"
+          APACHE_COPYRIGHT_LINE="Licensed under the Apache License"
           HEADER_LINES=20
-          FILES_WITHOUT_COPYRIGHT=""
+          UXL_COPYRIGHT_MISSED=""
 
-          for f in $CHANGED_FILES; do
-            if head -n "$HEADER_LINES" "$f" | grep -qE "${UXL_COPYRIGHT_BASE}"; then
+          for i in $CHANGED_FILES; do
+            # Skip if APACHE_COPYRIGHT_LINE is not found - probably the file should not contain the copyright
+            if ! head -n "$HEADER_LINES" "$f" | grep -qF "$APACHE_COPYRIGHT_LINE" "$f"; then
+              continue
+            fi
+
+            # Check if UXL_COPYRIGHT exists
+            if head -n "$HEADER_LINES" "$f" | grep -qE "$UXL_COPYRIGHT" "$f"; then
               # Update UXL Copyright years
-              echo "Debug: UXL Copyright exists for file ${f}"
               sed -E -i \
-                -e "1,${HEADER_LINES}{/${UXL_COPYRIGHT_BASE}/s/ ([0-9]+)[-0-9]*/ \1-$(date +%Y)/}" \
-                -e "1,${HEADER_LINES}{/${UXL_COPYRIGHT_BASE}/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/}" \
+                -e "1,${HEADER_LINES}{/${UXL_COPYRIGHT}/s/ ([0-9]+)[-0-9]*/ \1-$(date +%Y)/}" \
+                -e "1,${HEADER_LINES}{/${UXL_COPYRIGHT}/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/}" \
               "$f"
             else
-              # Find the COPYRIGHT_LINE_BASE within the first HEADER_LINES
-              COPYRIGHT_LINE="$(head -n "$HEADER_LINES" "$f" | grep -m1 -F "$COPYRIGHT_LINE_BASE" || true)"
-              if [ -z "$COPYRIGHT_LINE" ]; then
-                FILES_WITHOUT_COPYRIGHT="$FILES_WITHOUT_COPYRIGHT $f"
-                continue
-              fi
-
-              # Prefix is everything before COPYRIGHT_LINE_BASE on that line
-              COPYRIGHT_PREFIX="${COPYRIGHT_LINE%%$COPYRIGHT_LINE_BASE*}"
-              if [ -z "$COPYRIGHT_PREFIX" ]; then
-                FILES_WITHOUT_COPYRIGHT="$FILES_WITHOUT_COPYRIGHT $f"
-                continue
-              fi
-
-              # Find the line number of COPYRIGHT_LINE_BASE
-              COPYRIGHT_LINE_NUMBER="$(grep -nm1 -F "$COPYRIGHT_LINE_BASE" "$f" | cut -d: -f1)"
-              
-              INSERT_LINE_NUMBER=$((COPYRIGHT_LINE_NUMBER - 1))
-              if [ "$INSERT_LINE_NUMBER" -lt 1 ]; then
-                INSERT_LINE_NUMBER=1
-              fi
-
-              sed -E -i "${INSERT_LINE_NUMBER}i\\${COPYRIGHT_PREFIX}Copyright (c) $(date +%Y) UXL Foundation Contributors" "$f"
+              # UXL Copyright missed
+              UXL_COPYRIGHT_MISSED="$UXL_COPYRIGHT_MISSED $f"
             fi
           done
 
@@ -197,13 +181,13 @@ jobs:
 
           CHECK_FAILED=false
 
-          if [[ -n "${FILES_WITHOUT_COPYRIGHT}" ]]; then
-            echo "License missed for the following files: ${FILES_WITHOUT_COPYRIGHT}"
+          if [[ -n "${UXL_COPYRIGHT_MISSED}" ]]; then
+            echo "UXL Copyright missed for the following files: ${UXL_COPYRIGHT_MISSED}"
             CHECK_FAILED=true
           fi
 
           if [[ -s years.diff ]]; then
-            echo "Wrong copyright years"
+            echo "Wrong UXL copyright years"
             cat years.diff
             CHECK_FAILED=true
           fi
