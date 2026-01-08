@@ -46,7 +46,7 @@ sycl::event task3 = q.submit([&](sycl::handler& h) {
     h.single_task(task3_body);
 });
 
-task3.wait(); // wait for event 
+task3.wait(); // wait a single task
 
 // Submit additional work
 q.wait();
