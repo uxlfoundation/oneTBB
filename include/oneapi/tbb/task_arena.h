@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -34,6 +34,8 @@
 #endif /*__TBB_ARENA_BINDING*/
 
 #include "task_group.h"
+
+#include <vector>
 
 namespace tbb {
 namespace detail {
@@ -103,6 +105,9 @@ TBB_EXPORT void __TBB_EXPORTED_FUNC submit(d1::task&, d1::task_group_context&, a
 TBB_EXPORT void __TBB_EXPORTED_FUNC enter_parallel_phase(d1::task_arena_base*, std::uintptr_t);
 TBB_EXPORT void __TBB_EXPORTED_FUNC exit_parallel_phase(d1::task_arena_base*, std::uintptr_t);
 #endif
+
+// Maintained for backwards compatibility
+TBB_EXPORT d1::slot_id __TBB_EXPORTED_FUNC execution_slot(const d1::task_arena_base&);
 } // namespace r1
 
 namespace d2 {
@@ -204,7 +209,7 @@ protected:
         fast_leave_policy_flag      = 1 << 1
     };
 
-    task_arena_base(int max_concurrency, unsigned reserved_for_masters, priority a_priority
+    task_arena_base(int max_concurrency, unsigned reserved_slots, priority a_priority
 #if __TBB_PREVIEW_PARALLEL_PHASE
                     , leave_policy lp
 #endif
@@ -217,7 +222,7 @@ protected:
         , my_initialization_state(do_once_state::uninitialized)
         , my_arena(nullptr)
         , my_max_concurrency(max_concurrency)
-        , my_num_reserved_slots(reserved_for_masters)
+        , my_num_reserved_slots(reserved_slots)
         , my_priority(a_priority)
         , my_numa_id(automatic)
         , my_core_type(automatic)
@@ -225,7 +230,7 @@ protected:
         {}
 
 #if __TBB_ARENA_BINDING
-    task_arena_base(const constraints& constraints_, unsigned reserved_for_masters, priority a_priority
+    task_arena_base(const constraints& constraints_, unsigned reserved_slots, priority a_priority
 #if __TBB_PREVIEW_PARALLEL_PHASE
                     , leave_policy lp
 #endif
@@ -238,7 +243,7 @@ protected:
         , my_initialization_state(do_once_state::uninitialized)
         , my_arena(nullptr)
         , my_max_concurrency(constraints_.max_concurrency)
-        , my_num_reserved_slots(reserved_for_masters)
+        , my_num_reserved_slots(reserved_slots)
         , my_priority(a_priority)
         , my_numa_id(constraints_.numa_id)
         , my_core_type(constraints_.core_type)
@@ -317,16 +322,16 @@ public:
     //! Creates task_arena with certain concurrency limits
     /** Sets up settings only, real construction is deferred till the first method invocation
      *  @arg max_concurrency specifies total number of slots in arena where threads work
-     *  @arg reserved_for_masters specifies number of slots to be used by external threads only.
+     *  @arg reserved_slots specifies number of slots to be used by external threads only.
      *       Value of 1 is default and reflects behavior of implicit arenas.
      **/
-    task_arena(int max_concurrency_ = automatic, unsigned reserved_for_masters = 1,
+    task_arena(int max_concurrency_ = automatic, unsigned reserved_slots = 1,
                priority a_priority = priority::normal
 #if __TBB_PREVIEW_PARALLEL_PHASE
                , leave_policy lp = leave_policy::automatic
 #endif
     )
-        : task_arena_base(max_concurrency_, reserved_for_masters, a_priority
+        : task_arena_base(max_concurrency_, reserved_slots, a_priority
 #if __TBB_PREVIEW_PARALLEL_PHASE
                          , lp
 #endif
@@ -335,13 +340,13 @@ public:
 
 #if __TBB_ARENA_BINDING
     //! Creates task arena pinned to certain NUMA node
-    task_arena(const constraints& constraints_, unsigned reserved_for_masters = 1,
+    task_arena(const constraints& constraints_, unsigned reserved_slots = 1,
                priority a_priority = priority::normal
 #if __TBB_PREVIEW_PARALLEL_PHASE
                , leave_policy lp = leave_policy::automatic
 #endif
     )
-        : task_arena_base(constraints_, reserved_for_masters, a_priority
+        : task_arena_base(constraints_, reserved_slots, a_priority
 #if __TBB_PREVIEW_PARALLEL_PHASE
                          , lp
 #endif
@@ -403,7 +408,7 @@ public:
     }
 
     //! Overrides concurrency level and forces initialization of internal representation
-    void initialize(int max_concurrency_, unsigned reserved_for_masters = 1,
+    void initialize(int max_concurrency_, unsigned reserved_slots = 1,
                     priority a_priority = priority::normal
 #if __TBB_PREVIEW_PARALLEL_PHASE
                     , leave_policy lp = leave_policy::automatic
@@ -413,7 +418,7 @@ public:
         __TBB_ASSERT(!my_arena.load(std::memory_order_relaxed), "Impossible to modify settings of an already initialized task_arena");
         if( !is_active() ) {
             my_max_concurrency = max_concurrency_;
-            my_num_reserved_slots = reserved_for_masters;
+            my_num_reserved_slots = reserved_slots;
             my_priority = a_priority;
 #if __TBB_PREVIEW_PARALLEL_PHASE
             set_leave_policy(lp);
@@ -424,7 +429,7 @@ public:
     }
 
 #if __TBB_ARENA_BINDING
-    void initialize(constraints constraints_, unsigned reserved_for_masters = 1,
+    void initialize(constraints constraints_, unsigned reserved_slots = 1,
                     priority a_priority = priority::normal
 #if __TBB_PREVIEW_PARALLEL_PHASE
                     , leave_policy lp = leave_policy::automatic
@@ -437,7 +442,7 @@ public:
             my_max_concurrency = constraints_.max_concurrency;
             my_core_type = constraints_.core_type;
             my_max_threads_per_core = constraints_.max_threads_per_core;
-            my_num_reserved_slots = reserved_for_masters;
+            my_num_reserved_slots = reserved_slots;
             my_priority = a_priority;
 #if __TBB_PREVIEW_PARALLEL_PHASE
             set_leave_policy(lp);
@@ -637,6 +642,18 @@ inline void end_parallel_phase(bool with_fast_leave) {
 }
 #endif
 
+inline std::vector<d1::task_arena> create_numa_task_arenas(d1::constraints c = {},
+                                                           unsigned reserved_slots = 0)
+{
+    static std::vector<numa_node_id> node_indices = d1::numa_nodes();
+    std::vector<d1::task_arena> numa_arenas;
+    numa_arenas.reserve(node_indices.size());
+    for (auto numa_id : node_indices) {
+        numa_arenas.emplace_back(c.set_numa_id(numa_id), reserved_slots);
+    }
+    return numa_arenas;
+}
+
 using r1::submit;
 
 } // namespace d1
@@ -645,6 +662,7 @@ using r1::submit;
 inline namespace v1 {
 using detail::d1::task_arena;
 using detail::d1::attach;
+using detail::d1::create_numa_task_arenas;
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 using detail::d1::is_inside_task;

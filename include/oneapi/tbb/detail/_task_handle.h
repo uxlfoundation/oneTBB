@@ -267,10 +267,6 @@ private:
 #endif
 
     task_handle(task_handle_task* t) : m_handle {t}{}
-
-    d1::task* release() {
-       return m_handle.release();
-    }
 };
 
 struct task_handle_accessor {

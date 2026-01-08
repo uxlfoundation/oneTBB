@@ -427,9 +427,6 @@ private:
     template <typename C, typename T, typename U>
     friend bool operator!=( const hash_map_iterator<C,T>& i, const hash_map_iterator<C,U>& j );
 
-    template <typename C, typename T, typename U>
-    friend ptrdiff_t operator-( const hash_map_iterator<C,T>& i, const hash_map_iterator<C,U>& j );
-
     template <typename C, typename U>
     friend class hash_map_iterator;
 

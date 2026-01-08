@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -25,50 +26,49 @@ namespace r1 {
 //------------------------------------------------------------------------
 // Arena Slot
 //------------------------------------------------------------------------
-d1::task* arena_slot::get_task_impl(size_t T, execution_data_ext& ed, bool& tasks_omitted, isolation_type isolation) {
-    __TBB_ASSERT(tail.load(std::memory_order_relaxed) <= T || is_local_task_pool_quiescent(),
-            "Is it safe to get a task at position T?");
-
-    d1::task* result = task_pool_ptr[T];
-    __TBB_ASSERT(!is_poisoned( result ), "The poisoned task is going to be processed");
-
-    if (!result) {
-        return nullptr;
-    }
-    bool omit = isolation != no_isolation && isolation != task_accessor::isolation(*result);
-    if (!omit && !task_accessor::is_proxy_task(*result)) {
-        return result;
-    } else if (omit) {
-        tasks_omitted = true;
-        return nullptr;
-    }
-
-    task_proxy& tp = static_cast<task_proxy&>(*result);
-    d1::slot_id aff_id = tp.slot;
-    if ( d1::task *t = tp.extract_task<task_proxy::pool_bit>() ) {
-        ed.affinity_slot = aff_id;
-        return t;
-    }
-    // Proxy was empty, so it's our responsibility to free it
-    tp.allocator.delete_object(&tp, ed);
-
-    if ( tasks_omitted ) {
-        task_pool_ptr[T] = nullptr;
-    }
-    return nullptr;
-}
 
 d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation) {
+    bool all_tasks_checked = false;
+    bool tasks_skipped = false;
+
+    // A helper function to check the task isolation constraint. If not met, sets flags that indicate
+    // skipped tasks. Returns the pointer to the task, or nullptr if the task cannot be executed.
+    auto check_task_isolation = [&](d1::task* task_candidate) -> d1::task* {
+        __TBB_ASSERT(task_candidate, nullptr);
+        __TBB_ASSERT(!is_poisoned( task_candidate ), "A poisoned task cannot be processed");
+        if (isolation == no_isolation || isolation == task_accessor::isolation(*task_candidate)) {
+            return task_candidate;
+        }
+        // The task must be skipped due to isolation mismatch
+        tasks_skipped = true;
+        return nullptr;
+    };
+    // A helper function to detect and handle proxy tasks.
+    // Returns the pointer to the real task, or nullptr if there is no task to execute.
+    auto check_task_proxy = [&](d1::task* task_candidate) -> d1::task* {
+        __TBB_ASSERT(task_candidate, nullptr);
+        __TBB_ASSERT(!is_poisoned( task_candidate ), "A poisoned task cannot be processed");
+        if (!task_accessor::is_proxy_task(*task_candidate)){
+            return task_candidate;
+        }
+        task_proxy& tp = static_cast<task_proxy&>(*task_candidate);
+        if ( d1::task *t = tp.extract_task<task_proxy::pool_bit>() ) {
+            ed.affinity_slot = tp.slot;
+            return t;
+        }
+        // Proxy was empty, so it's our responsibility to free it
+        tp.allocator.delete_object(&tp, ed);
+        return nullptr;
+    };
+
     __TBB_ASSERT(is_task_pool_published(), nullptr);
+    accessed_by_owner.store(true, std::memory_order_relaxed);
     // The current task position in the task pool.
     std::size_t T0 = tail.load(std::memory_order_relaxed);
     // The bounds of available tasks in the task pool. H0 is only used when the head bound is reached.
     std::size_t H0 = (std::size_t)-1, T = T0;
     d1::task* result = nullptr;
-    bool task_pool_empty = false;
-    bool tasks_omitted = false;
     do {
-        __TBB_ASSERT( !result, nullptr );
         // The full fence is required to sync the store of `tail` with the load of `head` (write-read barrier)
         T = --tail;
         // The acquire load of head is required to guarantee consistency of our task pool
@@ -81,67 +81,61 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
                 __TBB_ASSERT( H0 == head.load(std::memory_order_relaxed)
                     && T == tail.load(std::memory_order_relaxed)
                     && H0 == T + 1, "victim/thief arbitration algorithm failure" );
-                reset_task_pool_and_leave();
-                // No tasks in the task pool.
-                task_pool_empty = true;
-                break;
+                (tasks_skipped) ? release_task_pool() : reset_task_pool_and_leave();
+                all_tasks_checked = true;
+                break /*do-while*/;
             } else if ( H0 == T ) {
-                // There is only one task in the task pool.
-                reset_task_pool_and_leave();
-                task_pool_empty = true;
+                // There is only one task in the task pool. If it can be taken, we want to reset the pool
+                if ( task_pool_ptr[T] ) {
+                    result = check_task_isolation( task_pool_ptr[T] ); // may update tasks_skipped
+                }
+                (tasks_skipped) ? release_task_pool() : reset_task_pool_and_leave();
+                all_tasks_checked = true;
             } else {
                 // Release task pool if there are still some tasks.
                 // After the release, the tail will be less than T, thus a thief
-                // will not attempt to get a task at position T.
+                // will not attempt to get a task at the position T.
                 release_task_pool();
             }
         }
-        result = get_task_impl( T, ed, tasks_omitted, isolation );
-        if ( result ) {
-            poison_pointer( task_pool_ptr[T] );
-            break;
-        } else if ( !tasks_omitted ) {
+        // Get a task from the pool at the position T.
+        __TBB_ASSERT(tail.load(std::memory_order_relaxed) <= T || is_local_task_pool_quiescent(),
+                "Is it safe to get a task at position T?");
+        __TBB_ASSERT( !all_tasks_checked || H0 == T, nullptr );
+        if ( task_pool_ptr[T] ) {
+            if (!all_tasks_checked) {
+                result = check_task_isolation( task_pool_ptr[T] ); // may update tasks_skipped
+            }
+            if ( result ) {
+                // Isolation matches; check if there is a real task
+                result = check_task_proxy( result );
+                // If some tasks were skipped, mark the position as a hole, otherwise poison it.
+                if ( tasks_skipped ) {
+                    task_pool_ptr[T] = nullptr;
+                } else {
+                    poison_pointer( task_pool_ptr[T] );
+                }
+
+                if ( result ) break /*do-while*/;
+            }
+        }
+        __TBB_ASSERT( !result, nullptr );
+        if ( !tasks_skipped ) {
             poison_pointer( task_pool_ptr[T] );
             __TBB_ASSERT( T0 == T+1, nullptr );
             T0 = T;
         }
-    } while ( !result && !task_pool_empty );
+    } while ( /*!result &&*/ !all_tasks_checked );
 
-    if ( tasks_omitted ) {
-        if ( task_pool_empty ) {
-            // All tasks have been checked. The task pool should be  in reset state.
-            // We just restore the bounds for the available tasks.
-            // TODO: Does it have sense to move them to the beginning of the task pool?
-            __TBB_ASSERT( is_quiescent_local_task_pool_reset(), nullptr );
-            if ( result ) {
-                // If we have a task, it should be at H0 position.
-                __TBB_ASSERT( H0 == T, nullptr );
-                ++H0;
-            }
-            __TBB_ASSERT( H0 <= T0, nullptr );
-            if ( H0 < T0 ) {
-                // Restore the task pool if there are some tasks.
-                head.store(H0, std::memory_order_relaxed);
-                tail.store(T0, std::memory_order_relaxed);
-                // The release fence is used in publish_task_pool.
-                publish_task_pool();
-                // Synchronize with snapshot as we published some tasks.
-                ed.task_disp->m_thread_data->my_arena->advertise_new_work<arena::wakeup>();
-            }
-        } else {
-            // A task has been obtained. We need to make a hole in position T.
-            __TBB_ASSERT( is_task_pool_published(), nullptr );
-            __TBB_ASSERT( result, nullptr );
-            task_pool_ptr[T] = nullptr;
-            tail.store(T0, std::memory_order_release);
-            // Synchronize with snapshot as we published some tasks.
-            // TODO: consider some approach not to call wakeup for each time. E.g. check if the tail reached the head.
-            ed.task_disp->m_thread_data->my_arena->advertise_new_work<arena::wakeup>();
-        }
+    if ( tasks_skipped ) {
+        __TBB_ASSERT( is_task_pool_published(), nullptr ); // the pool was not reset
+        tail.store(T0, std::memory_order_release);
     }
+    // At this point, skipped tasks - if any - are back in the pool bounds
+    accessed_by_owner.store(false, std::memory_order_release);
 
     __TBB_ASSERT( (std::intptr_t)tail.load(std::memory_order_relaxed) >= 0, nullptr );
-    __TBB_ASSERT( result || tasks_omitted || is_quiescent_local_task_pool_reset(), nullptr );
+    __TBB_ASSERT( result || tasks_skipped || is_quiescent_local_task_pool_reset(), nullptr );
     return result;
 }
 
@@ -153,7 +147,7 @@ d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t
     d1::task* result = nullptr;
     std::size_t H = head.load(std::memory_order_relaxed); // mirror
     std::size_t H0 = H;
-    bool tasks_omitted = false;
+    bool tasks_skipped = false;
     do {
         // The full fence is required to sync the store of `head` with the load of `tail` (write-read barrier)
         H = ++head;
@@ -181,8 +175,8 @@ d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t
             }
             // The task cannot be executed either due to isolation or proxy constraints.
             result = nullptr;
-            tasks_omitted = true;
-        } else if (!tasks_omitted) {
+            tasks_skipped = true;
+        } else if (!tasks_skipped) {
             // Cleanup the task pool from holes until a task is skipped.
             __TBB_ASSERT( H0 == H-1, nullptr );
             poison_pointer( victim_pool[H0] );
@@ -193,8 +187,8 @@ d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t
 
     // emit "task was consumed" signal
     poison_pointer( victim_pool[H-1] );
-    if (tasks_omitted) {
-        // Some proxies in the task pool have been omitted. Set the stolen task to nullptr.
+    if (tasks_skipped) {
+        // Some proxies in the task pool have been skipped. Set the stolen task to nullptr.
         victim_pool[H-1] = nullptr;
         // The release store synchronizes the victim_pool update(the store of nullptr).
         head.store( /*dead: H = */ H0, std::memory_order_release );
@@ -206,10 +200,6 @@ unlock:
     __TBB_cl_evict(&victim_slot.head);
     __TBB_cl_evict(&victim_slot.tail);
 #endif
-    if (tasks_omitted) {
-        // Synchronize with snapshot as the head and tail can be bumped which can falsely trigger EMPTY state
-        a.advertise_new_work<arena::wakeup>();
-    }
     return result;
 }
 
