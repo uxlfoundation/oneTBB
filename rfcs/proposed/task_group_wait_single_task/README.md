@@ -136,8 +136,8 @@ enum task_group_status { // Existing API
 }
 
 class task_group {
-    task_group_status wait_task(task_completion_handle& comp_handle);
-    task_group_status run_and_wait_task(task_handle&& handle);
+    task_group_status wait_for_task(task_completion_handle& comp_handle);
+    task_group_status run_and_wait_for_task(task_handle&& handle);
 };
 
 // Defined in <oneapi/tbb/task_arena.h>
@@ -152,7 +152,7 @@ class task_arena {
 ### Member functions of ``task_group`` class
 
 ```cpp
-task_status wait_task(task_completion_handle& comp_handle);
+task_status wait_for_task(task_completion_handle& comp_handle);
 ```
 
 Waits for the completion of the task represented by ``comp_handle``.
@@ -161,12 +161,12 @@ If completion was transferred to another task using ``tbb::task_group::transfer_
 Returns ``task_status::completed`` if the task was executed, or ``task_status::canceled`` if it was not.
 
 ```cpp
-task_status run_and_wait_task(task_handle&& handle);
+task_status run_and_wait_for_task(task_handle&& handle);
 ```
 
 Schedules the task represented by ``handle`` for execution (if it has no unresolved dependencies), and waits for its completion.
 
-This is semantically equivalent to: ``task_completion_handle comp_handle = handle; run(std::move(handle)); wait_task(comp_handle)``.
+This is semantically equivalent to: ``task_completion_handle comp_handle = handle; run(std::move(handle)); wait_for_task(comp_handle)``.
 
 Returns ``task_status::completed`` if the task was executed, or ``task_status::canceled`` if it was not.
 
@@ -179,11 +179,11 @@ task_status wait_for(task_completion_handle& comp_handle);
 Waits for the completion of the task represented by ``comp_handle``.
 If completion was transferred to another task using ``tbb::task_group::transfer_completion_to``, the function waits for completion of that task.
 
-This is semantically equivalent to: ``execute([&] { tg.wait_task(comp_handle); })``, where ``tg`` is a ``task_group`` where the task referred by ``comp_handle`` is registered.
+This is semantically equivalent to: ``execute([&] { tg.wait_for_task(comp_handle); })``, where ``tg`` is a ``task_group`` where the task referred by ``comp_handle`` is registered.
 
 Returns: ``task_status::completed`` if the task was executed and ``task_status::canceled`` otherwise.
 
-Introducing ``wait_for`` in the ``this_task_arena`` namespace is unnecessary, as it would be functionally identical to calling the ``task_group::wait_task`` API directly.
+Introducing ``wait_for`` in the ``this_task_arena`` namespace is unnecessary, as it would be functionally identical to calling the ``task_group::wait_for_task`` API directly.
 
 ## Future Enhancements
 
@@ -225,18 +225,18 @@ to execute tasks with any of its predecessor's tags.
 
 As an initial step, it makes sense to isolate the waiting thread so that it only executes tasks related to the same ``task_group`` as the awaited task - similar to the improvement described in the [RFC for another overload of ``task_arena::wait_for``](../task_arena_waiting/task_group_interop.md).
 
-### ``run_and_wait_task`` Accepting the Task Body
+### ``run_and_wait_for_task`` Accepting the Task Body
 
 The following API extension for ``task_group`` may also be beneficial to avoid unnecessary ``task_handle`` creation before the wait:
 
 ```cpp
 class task_group {
     template <typename Func>
-    task_status run_and_wait_task(const Func& f);
+    task_status run_and_wait_for_task(const Func& f);
 };
 ```
 
-This API is semantically equivalent to ``return run_and_wait_task(defer(f));``. 
+This API is semantically equivalent to ``return run_and_wait_for_task(defer(f));``. 
 
 Since, in this API, the ``task_handle`` owning the task is not accessible by user, the awaited task cannot have any dependencies and is likely to be executed by the calling thread.
 If ``f`` does not invoke ``transfer_this_task_completion_to``, usage of the function makes no sense since the thread can just call ``f()`` directly. 
@@ -247,7 +247,7 @@ Consider the following example:
 
 ```cpp
 // Run the root divide-and-conquer task
-tg.run_and_wait_task([&tg] {
+tg.run_and_wait_for_task([&tg] {
     auto left_leaf = tg.defer(...);
     auto right_leaf = tg.defer(...);
     auto join = tg.defer(...);
@@ -262,7 +262,7 @@ tg.run_and_wait_task([&tg] {
 });
 ```
 
-``run_and_wait_task`` will exit only after the ``join`` task completes. If several divide-and-conquer tasks are executed in the same ``task_group``, such a function can
+``run_and_wait_for_task`` will exit only after the ``join`` task completes. If several divide-and-conquer tasks are executed in the same ``task_group``, such a function can
 be used to wait for the completion of each individual task.
 
 ## Exit Criteria and Open Questions
@@ -275,7 +275,7 @@ The following questions should be resolved before promoting the feature out of t
 * Should work isolation constraints be applied while waiting for a task to complete? See the
   [Work Isolation Issue section](#work-isolation-issue) for more details.
 * Should ``run_and_wait_for_task`` overload accepting the task body be added? Refer to the
-  [``run_and_wait_for_task`` Accepting the Task Body](#run_and_wait_task-accepting-the-task-body) for more details.
+  [``run_and_wait_for_task`` Accepting the Task Body](#run_and_wait_for_task-accepting-the-task-body) for more details.
 
 ## Implementation Details
 
@@ -284,15 +284,15 @@ To implement the proposed API, the successors list used in [Task Group Dynamic D
 The list can be modified to support two types of nodes representing entities that require notification upon task completion: successor nodes
 and waiter nodes.
 A successor node is an existing construct used to establish dependencies between tasks.
-A waiter node represents a ``wait_context`` object with a reference count of ``1``, assigned to each ``wait_task`` call.
+A waiter node represents a ``wait_context`` object with a reference count of ``1``, assigned to each ``wait_for_task`` call.
 
-Each ``wait_task`` call creates a new waiter node and adds it to the notification list similarly to adding the successor node.
+Each ``wait_for_task`` call creates a new waiter node and adds it to the notification list similarly to adding the successor node.
 
 When a task completes, it traverses its notification list as follows:
 * For each successor node, the dependency counter is decremented.
 * For each waiter node, the reference counter in the associated ``wait_context`` is decremented, notifying the waiting thread of task completion.
 
-The diagram below illustrates a notification list for a task with two successors and two ``wait_task`` calls awaiting its completion:
+The diagram below illustrates a notification list for a task with two successors and two ``wait_for_task`` calls awaiting its completion:
 
 <img src="notify_list_before_completion.png" width=800>
 
@@ -315,7 +315,7 @@ tbb::task_group::set_task_order(middle_task, end_task);
 
 tg.run(std::move(begin_task));
 tg.run(std::move(end_task));
-tg.run_and_wait_task(std::move(middle_task));
+tg.run_and_wait_for_task(std::move(middle_task));
 
 // Post middle task actions
 
@@ -332,19 +332,19 @@ For simplicity, assume that the task graph is executed within a single-threaded 
 In the current implementation of Task Group Dynamic Dependencies, when a task completes and notifies its list,
 one of the next ready-to-execute tasks (with zero dependencies) is bypassed.
 
-When the calling thread invokes ``run_and_wait_task`` call, the ``begin_task`` is executed. After executing its body,
+When the calling thread invokes ``run_and_wait_for_task`` call, the ``begin_task`` is executed. After executing its body,
 it notifies its single successor node in the list. The ``middle_task``'s dependency count becomes zero, and the task is bypassed.
 
 When ``middle_task`` completes, it notifies its list, which contains both a successor node and a waiter node. The successor node notifies
 ``end_task``, making it available for execution. The waiter node decrements the reference count in the associated ``wait_context``, allowing the
-corresponding ``run_and_wait_task`` call to complete.
+corresponding ``run_and_wait_for_task`` call to complete.
 The notified ``wait_context`` is the same context awaited by the calling thread.
 
 If ``end_task`` is bypassed, the calling thread will not exit until all tasks in the graph have completed. If additional tasks follow ``end_task``,
 the thread will only exit after each is bypassed sequentially.
 
 However, since the current thread notifies the ``wait_context`` it is waiting on via the corresponding waiter node, it is more appropriate to avoid
-bypassing the next task. Instead, the task should be spawned, and ``run_and_wait_task`` should exit after executing ``middle_task``.
+bypassing the next task. Instead, the task should be spawned, and ``run_and_wait_for_task`` should exit after executing ``middle_task``.
 
 For the initial implementation, it is proposed to completely avoid bypassing the task returned from the notification list and to spawn it instead.
 
@@ -373,15 +373,15 @@ The first alternative approach is to assign a single ``wait_context`` to each ta
 
 <img src="wait_context_part_of_state.png" width=800>
 
-The advantage of this approach compared to the recommended one is that a single ``wait_context`` object can be reused across all ``wait_task`` calls waiting on the same task.
+The advantage of this approach compared to the recommended one is that a single ``wait_context`` object can be reused across all ``wait_for_task`` calls waiting on the same task.
 
-On the other hand, this approach creates a ``wait_context`` object for every task, including those not awaited by any ``wait_task`` calls. 
-In contrast, the recommended approach creates a context object only when a ``wait_task`` call is made.
+On the other hand, this approach creates a ``wait_context`` object for every task, including those not awaited by any ``wait_for_task`` calls. 
+In contrast, the recommended approach creates a context object only when a ``wait_for_task`` call is made.
 
 Another disadvantage of this approach is that the ``wait_context`` the thread is waiting on must be updated if completion is transferred to another task:
 
 ```cpp
-// wait_task(comp_handle) implementation
+// wait_for_task(comp_handle) implementation
 task_dynamic_state* state = comp_handle.get_dynamic_state();
 
 r1::wait(state->get_wait_context());
@@ -409,7 +409,7 @@ void wait(wait_interface&, task_group_context&); // new entry point for generali
 ```
 
 ``wait_interface::continue_execution`` acts as a predicate. When it returns ``false``, the waiting thread exits the scheduler, completing the 
-corresponding ``wait_task`` call.
+corresponding ``wait_for_task`` call.
 
 ``wait_interface::wait_id`` should return a unique identifier for the wait, enabling notification of waiting threads via the concurrent monitor
 in the TBB scheduler.
@@ -472,7 +472,7 @@ struct wait_on_task : wait_interface {
     }
 };
 
-void wait_task(task_completion_handle& comp_handle) {
+void wait_for_task(task_completion_handle& comp_handle) {
     task_dynamic_state* state = comp_handle.get_dynamic_state();
 
     wait_on_task task_waiter(state);
