@@ -153,17 +153,20 @@ jobs:
       - name: Run check
         run: |
           CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
-          UXL_COPYRIGHT="Copyright \(c\) ([0-9]+)[0-9]* UXL Foundation Contributors"
+          UXL_COPYRIGHT="Copyright \(c\) [0-9]+(-[0-9]+)? UXL Foundation Contributors"
           APACHE_COPYRIGHT_LINE="Licensed under the Apache License"
+          CURRENT_YEAR=$(date +%Y)
 
           FILES_WITH_COPYRIGHT=$(grep -lF "$APACHE_COPYRIGHT_LINE" $CHANGED_FILES)
           FILES_WITH_MISSING_UXL_COPYRIGHT=$(grep -LE "$UXL_COPYRIGHT" $FILES_WITH_COPYRIGHT)
 
           # Update UXL Copyright years
-          sed -E -i \
-            -e "/${UXL_COPYRIGHT}/s/ ([0-9]+)[-0-9]*/ \1-$(date +%Y)/" \
-            -e "/${UXL_COPYRIGHT}/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/" \
-          $FILES_WITH_COPYRIGHT
+          if [ -n "$FILES_WITH_COPYRIGHT" ]; then
+            sed -E -i \
+              -e "/${UXL_COPYRIGHT}/s/ ([0-9]+)[-0-9]*/ \1-${CURRENT_YEAR}/" \
+              -e "/${UXL_COPYRIGHT}/s/${CURRENT_YEAR}-${CURRENT_YEAR}/${CURRENT_YEAR}/" \
+            $FILES_WITH_COPYRIGHT
+          fi
 
           git checkout -- third-party-programs.txt
           git diff > years.diff
