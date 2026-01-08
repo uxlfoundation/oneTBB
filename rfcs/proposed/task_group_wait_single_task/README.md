@@ -46,7 +46,7 @@ sycl::event task3 = q.submit([&](sycl::handler& h) {
     h.single_task(task3_body);
 });
 
-task3.wait(); // wait a single task 
+task3.wait(); // wait a single task
 
 // Submit additional work
 q.wait();
@@ -94,7 +94,7 @@ a ``task_group`` requires support for waiting on a single ``task_completion_hand
 The proposal aims to extend ``tbb::task_group`` and ``tbb::task_arena`` APIs by introducing new waiting functions that accept a
 ``task_completion_handle`` argument.
 These functions exit when the task represented by the handle argument is completed or when the group execution is cancelled.
-The completion of other tasks within the ``task_group`` is not guaranteed.
+Other tasks within the ``task_group`` may not be complete when these new waiting function return.
 
 To simplify the submission and waiting process for a single task, it is also proposed to introduce submit-and-wait functions that accept a
 ``task_handle`` argument.
