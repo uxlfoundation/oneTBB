@@ -33,8 +33,6 @@ namespace tbb {
 namespace detail {
 namespace d1 {
 
-// Dummy change
-
 /*
     The blocked_nd_range_impl uses make_index_sequence<N> to automatically generate a ctor with
     exactly N arguments of the type tbb::blocked_range<Value>. Such ctor provides an opportunity

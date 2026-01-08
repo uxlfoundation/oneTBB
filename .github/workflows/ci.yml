@@ -1,4 +1,5 @@
 # Copyright (c) 2021-2025 Intel Corporation
+# Copyright (c) 2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -182,12 +183,12 @@ jobs:
           CHECK_FAILED=false
 
           if [[ -n "${UXL_COPYRIGHT_MISSED}" ]]; then
-            echo "UXL Copyright missed for the following files: ${UXL_COPYRIGHT_MISSED}"
+            echo "ERROR: UXL Copyright missed for the following files: ${UXL_COPYRIGHT_MISSED}"
             CHECK_FAILED=true
           fi
 
           if [[ -s years.diff ]]; then
-            echo "Wrong UXL copyright years"
+            echo "ERROR: Wrong UXL copyright years"
             cat years.diff
             CHECK_FAILED=true
           fi
