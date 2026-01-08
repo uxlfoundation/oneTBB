@@ -16,7 +16,6 @@
 
 #ifndef __TBB_blocked_range_H
 #define __TBB_blocked_range_H
-// dummy
 
 #include <cstddef>
 
