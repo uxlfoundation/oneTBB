@@ -20,7 +20,7 @@ For more information and examples, please refer to [forum discussion](https://co
  - **tbb** - The folder contains Python module sources.
 
 ## Files
- - **setup.py** - Standard Python setuptools script. Calling it directly is deprecated.
+ - **setup.py** - Standard Python setuptools script. Calling it directly is deprecated since setuptools version 58.3.0.
  - **TBB.py** - Alternative entry point for Python module.
 
 ## CMake predefined targets
