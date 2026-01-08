@@ -274,6 +274,8 @@ The following questions should be resolved before promoting the feature out of t
   [Run-and-wait methods for ``task_arena`` section](#run-and-wait-methods-for-task_arena) for more details.
 * Should work isolation constraints be applied while waiting for a task to complete? See the
   [Work Isolation Issue section](#work-isolation-issue) for more details.
+* Should ``run_and_wait_for_task`` overload accepting the task body be added? Refer to the
+  [``run_and_wait_for_task`` Accepting the Task Body](#run_and_wait_task-accepting-the-task-body) for more details.
 
 ## Implementation Details
 
