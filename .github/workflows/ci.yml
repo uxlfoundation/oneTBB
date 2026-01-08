@@ -166,26 +166,26 @@ jobs:
               -e "/${UXL_COPYRIGHT}/s/ ([0-9]+)[-0-9]*/ \1-${CURRENT_YEAR}/" \
               -e "/${UXL_COPYRIGHT}/s/${CURRENT_YEAR}-${CURRENT_YEAR}/${CURRENT_YEAR}/" \
             $FILES_WITH_COPYRIGHT
-          fi
 
-          git checkout -- third-party-programs.txt
-          git diff > years.diff
+            git checkout -- third-party-programs.txt
+            git diff > years.diff
 
-          CHECK_FAILED=false
+            CHECK_FAILED=false
 
-          if [ -n "$FILES_WITH_MISSING_UXL_COPYRIGHT" ]; then
-            echo "ERROR: UXL Copyright is missed for the following files: ${FILES_WITH_MISSING_UXL_COPYRIGHT}"
-            CHECK_FAILED=true
-          fi
+            if [ -n "$FILES_WITH_MISSING_UXL_COPYRIGHT" ]; then
+              echo "ERROR: UXL Copyright is missed for the following files: ${FILES_WITH_MISSING_UXL_COPYRIGHT}"
+              CHECK_FAILED=true
+            fi
 
-          if [[ -s years.diff ]]; then
-            echo "ERROR: Wrong UXL copyright years"
-            cat years.diff
-            CHECK_FAILED=true
-          fi
+            if [[ -s years.diff ]]; then
+              echo "ERROR: Wrong UXL copyright years"
+              cat years.diff
+              CHECK_FAILED=true
+            fi
 
-          if [ "$CHECK_FAILED" = true ]; then
-            exit 1
+            if [ "$CHECK_FAILED" = true ]; then
+              exit 1
+            fi
           fi
   python_module_test_ubuntu_latest:
     runs-on: [ubuntu-latest]
