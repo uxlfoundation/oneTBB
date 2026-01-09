@@ -17,12 +17,15 @@ find_package(PythonInterp 3.5 REQUIRED)
 
 set(PYTHON_BUILD_WORK_DIR python_build)
 
+configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in  ${CMAKE_CURRENT_SOURCE_DIR}/setup.py)
+
 add_custom_target(
     python_copy
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/tbb ${PYTHON_BUILD_WORK_DIR}/tbb
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/TBB.py ${PYTHON_BUILD_WORK_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/setup.py ${PYTHON_BUILD_WORK_DIR}
-)
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/pyproject.toml ${PYTHON_BUILD_WORK_DIR}
+) 
 
 # Python build requires path to TBB headers
 get_target_property(TBB_INCLUDES tbb INTERFACE_INCLUDE_DIRECTORIES)

@@ -106,7 +106,7 @@ setup(  name        ="TBB",
         author      ="Intel Corporation",
         author_email="inteltbbdevelopers@intel.com",
         license     ="Dual license: Apache or Proprietary",
-        version     ="0.2",
+        version     ="${CMAKE_PROJECT_VERSION}",
         classifiers =[
             'Development Status :: 4 - Beta',
             'Environment :: Console',
