@@ -1,10 +1,10 @@
 # API to simplify creation of task arenas constrained to NUMA nodes
 
-This sub-RFC proposes an API to ease creation of a one-per-NUMA-node set of task arenas.
+This RFC describes an API to ease creation of a one-per-NUMA-node set of task arenas.
 
-## Introduction
+## Motivation
 
-The code example in the [overarching RFC for NUMA support](README.md) shows the likely
+The code example in the [overarching RFC for NUMA support](../../proposed/numa_support/README.md) shows the likely
 pattern of using task arenas to distribute computation across all NUMA domains on a system.
 Let's take a closer look at the part where arenas are created and initialized.
 
@@ -31,9 +31,9 @@ The default constructor of `task_arena` reserves a slot for an application threa
 at the last line explicitly overwrites it to 0 to allow TBB worker threads taking all the slots, however
 this nuance might be unknown and easy to miss, potentially resulting in underutilization of CPU resources.
 
-## Proposal
+## Implemented API
 
-We propose to introduce a special function to create the set of task arenas, one per NUMA node on the system.
+A special function is introduced to create the set of task arenas, one per NUMA node on the system.
 The initialization code equivalent to the example above would be:
 
 ```c++
@@ -41,14 +41,14 @@ The initialization code equivalent to the example above would be:
   std::vector<tbb::task_group> task_groups(arenas.size());
 ```
 
-The rest of the code in that example might be rewritten with the API proposed in
-[Waiting in a task arena](../task_arena_waiting/readme.md):
+The rest of the code in that example might be rewritten with the API for
+[waiting in a task arena](../task_arena_waiting/readme.md):
 
 ```c++
   // enqueue work to all but the first arena, using the task groups to track work
   for (int i = 1; i < arenas.size(); i++)
     arenas[i].enqueue(
-      [] { tbb::parallel_for(0, N, [](int j) { f(w); }); }, 
+      [] { tbb::parallel_for(0, N, [](int j) { f(w); }); },
       task_groups[i]
     );
 
@@ -71,15 +71,18 @@ The function has the following signature:
 
 namespace tbb {
     std::vector<tbb::task_arena> create_numa_task_arenas(
-        task_arena::constraints other_constraints = {},
+        task_arena::constraints constraints_ = {},
         unsigned reserved_slots = 0
     };
 }
 ```
 
 It optionally takes a `constraints` argument to change default arena settings such as maximal concurrency
-(the upper limit on the number of threads), core type etc.; the `numa_id` value in `other_constraints`
-is ignored. The second optional argument allows to override the number of reserved slots, which by default
+(the upper limit on the number of threads), core type etc., except for the `numa_id` value.
+The main goal of this API is to achieve simplicity in the creation of NUMA-bound task arenas,
+so passing `constraints` with an explicitly set `numa_id` won't result in an error, and there is no clear
+advantage to providing an error indication. Therefore, the `numa_id` value of `constraints` is ignored.
+The second optional argument allows to override the number of reserved slots, which by default
 is 0 (unlike the `task_arena` construction default of 1) for the reasons described in the introduction.
 
 These arena parameters were selected for pre-setting because there appear to be practical use cases to modify
@@ -114,7 +117,7 @@ The following critics was provided in the RFC discussion:
 
 - It might be confusing that a single `constraints` object is used to generate multiple arenas,
   especially with part of it (`numa_id`) being ignored.
-- The proposed API addresses just one, albeit important, use case for creating a set of arenas.
+- The API addresses just one, albeit important, use case for creating a set of arenas.
 
 See the "universal function" alternative below for related considerations.
 
@@ -175,7 +178,7 @@ its downsides:
 - It seems very specialized, capable to only address specific and quite narrow set of use cases.
 - Arenas are pre-initialized and so could not be adjusted after creation.
 
-Our proposal, instead, aims at a single usability aspect with incremental improvements/extensions
+This API, instead, aims at a single usability aspect with incremental improvements/extensions
 to the existing oneTBB classes and usage patterns, leaving other aspects to complementary proposals.
 Specifically, the [Waiting in a task arena](../task_arena_waiting/readme.md) RFC improves the joint
 use of a task arena and a task group to submit and wait for work. Combined, these extensions will
@@ -202,7 +205,7 @@ would serve as a pattern for generating a set of constraints bound to NUMA domai
 Using a function to generate arena parameter sets seems even more flexible comparing to a description
 language, as that function would be not limited in which parameters to alter, and how.
 
-Compared to the proposal, this approach would necessarily be more verbose because of the need to
+This approach would necessarily be more verbose because of the need to
 describe or generate a set of constraints. That could however be mitigated for common use cases
 with presets provided by the library allowing for a reasonably concise code. For example:
 ```c++
@@ -215,12 +218,6 @@ extra complexity. As of now, we know just a few arena set patterns with potentia
 besides NUMA arenas, we can think of splitting CPU resources by core type and of creating a set of
 arenas with different priorities. We do not however recall any requests to simplify these use cases.
 
-## Open questions
-- Instead of a free-standing function in namespace `tbb`, should we consider
-  a static member function in class `task_arena`?
-- The proposal does not consider arena priority, simply keeping the default `priority::normal`.
-  Are there use cases for pre-setting priorities? Similarly for the experimental thread leave policy.
-- Are there more practical use cases which could justify the universal function approach?
-- Need to consider alternatives to silently ignoring `numa_id` in constraints, such as an exception
-  or undefined behavior.
-- Are there any reasons for the API to first go out as an experimental feature?
+## Future Extensions
+- Consider extending API to support pre-setting arena priority and experimental worker thread leave policy.
+- Revisit the universal function approach if more use cases arise that would benefit from such flexibility.
