@@ -14,10 +14,10 @@
 #define TBB_examples_seismic_universe_H
 
 #ifndef UNIVERSE_WIDTH
-#define UNIVERSE_WIDTH 1024
+#define UNIVERSE_WIDTH 3840
 #endif
 #ifndef UNIVERSE_HEIGHT
-#define UNIVERSE_HEIGHT 512
+#define UNIVERSE_HEIGHT 2160
 #endif
 
 #include "oneapi/tbb/partitioner.h"
@@ -27,6 +27,7 @@
 class Universe {
 public:
     enum { UniverseWidth = UNIVERSE_WIDTH, UniverseHeight = UNIVERSE_HEIGHT };
+    enum class runtime { tbb, openmp};
 
 private:
     //in order to avoid performance degradation due to cache aliasing issue
@@ -69,8 +70,8 @@ private:
 private:
     enum { DamperSize = 32 };
 
-    std::string stress_runtime;
-    std::string velocity_runtime;
+    runtime stress_runtime;
+    runtime velocity_runtime;
 
     int pulseTime;
     int pulseCounter;
@@ -87,8 +88,8 @@ public:
     bool TryPutNewPulseSource(int x, int y);
     void SetDrawingMemory(const drawing_memory& dmem);
 
-    void SetRuntimeForStress(std::string runtime);
-    void SetRuntimeForVelocity(std::string runtime);
+    void SetRuntimeForStress(runtime runtime_);
+    void SetRuntimeForVelocity(runtime runtime_);
 
 private:
     struct Rectangle;

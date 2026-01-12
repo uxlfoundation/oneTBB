@@ -24,6 +24,8 @@
 #include "seismic_video.hpp"
 #include "universe.hpp"
 
+#include <random>
+
 Universe u;
 
 struct RunOptions {
@@ -34,18 +36,24 @@ struct RunOptions {
     int numberOfFrames;
     std::string stress_runtime;
     std::string velocity_runtime;
+    double stress_runtime_distribution;
+    double velocity_runtime_distribution;
     bool silent;
     bool parallel;
     RunOptions(utility::thread_number_range threads_,
                int number_of_frames_,
                std::string stress_runtime_,
                std::string velocity_runtime_,
+               double stress_runtime_distribution_,
+               double velocity_runtime_distribution_,
                bool silent_,
                bool parallel_)
             : threads(threads_),
               numberOfFrames(number_of_frames_),
               stress_runtime(stress_runtime_),
               velocity_runtime(velocity_runtime_),
+              stress_runtime_distribution(stress_runtime_distribution_),
+              velocity_runtime_distribution(velocity_runtime_distribution_),
               silent(silent_),
               parallel(parallel_) {}
 };
@@ -60,6 +68,8 @@ RunOptions ParseCommandLine(int argc, char *argv[]) {
     bool serial = false;
     std::string stress_runtime{"tbb"};
     std::string velocity_runtime{"tbb"};
+    double stress_runtime_distribution = 0.5;
+    double velocity_runtime_distribution = 0.5;
 
     utility::parse_cli_arguments(
         argc,
@@ -71,21 +81,50 @@ RunOptions ParseCommandLine(int argc, char *argv[]) {
                             "n-of-frames",
                             "number of frames the example processes internally (0 means unlimited)")
             .positional_arg(stress_runtime, "stress-runtime",
-                            "The name of the runtime that will execute UpdateStress - [tbb,openmp]")
+                            "The name of the runtime that will execute UpdateStress - [tbb,openmp,mix]")
             .positional_arg(velocity_runtime, "velocity-runtime",
-                            "The name of the runtime that will execute UpdateVelocity - [tbb,openmp]")
+                            "The name of the runtime that will execute UpdateVelocity - [tbb,openmp,mix]")
+            .positional_arg(stress_runtime_distribution, "stress-runtime-distribution",
+                            "The probability of selecting TBB runtime for UpdateStress loop. Requires --stress-runtime=mix")
+            .positional_arg(velocity_runtime_distribution, "velocity-runtime-distribution",
+                            "The probability of selecting TBB runtime for UpdateVelocity loop. Requires --velocity-runtime=mix")
             .arg(silent, "silent", "no output except elapsed time")
             .arg(serial, "serial", "in GUI mode start with serial version of algorithm"));
-    return RunOptions(threads, numberOfFrames, stress_runtime, velocity_runtime, silent, !serial);
+    return RunOptions(threads, numberOfFrames, stress_runtime, velocity_runtime,
+        stress_runtime_distribution, velocity_runtime_distribution, silent, !serial);
+}
+
+std::vector<Universe::runtime> generate_runtime_mix(int sz, double distribution, int seed) {
+  std::mt19937 gen(seed);
+  std::vector<Universe::runtime> mix;
+  std::bernoulli_distribution bd(distribution);
+  mix.reserve(sz);
+  for (int i = 0; i < sz; ++i) {
+    mix.emplace_back(bd(gen) ? Universe::runtime::tbb : Universe::runtime::openmp);
+  }
+  return mix;
 }
 
 int main(int argc, char *argv[]) {
-    oneapi::tbb::tick_count mainStartTime = oneapi::tbb::tick_count::now();
     RunOptions options = ParseCommandLine(argc, argv);
     SeismicVideo video(u, options.numberOfFrames, options.threads.last, options.parallel);
 
-    u.SetRuntimeForStress(options.stress_runtime);
-    u.SetRuntimeForVelocity(options.velocity_runtime);
+    std::vector<Universe::runtime> stress_runtime_distr;
+    std::vector<Universe::runtime> velocity_runtime_distr;
+
+    if (options.stress_runtime != "mix") {
+      u.SetRuntimeForStress(options.stress_runtime == "tbb" ? Universe::runtime::tbb : Universe::runtime::openmp);
+    } else {
+      stress_runtime_distr = generate_runtime_mix(options.numberOfFrames, options.stress_runtime_distribution, 42);
+    }
+
+    if (options.velocity_runtime != "mix") {
+      u.SetRuntimeForVelocity(options.velocity_runtime == "tbb" ? Universe::runtime::tbb : Universe::runtime::openmp);
+    } else {
+      velocity_runtime_distr = generate_runtime_mix(options.numberOfFrames, options.velocity_runtime_distribution, 24);
+    }
+
+    oneapi::tbb::tick_count mainStartTime = oneapi::tbb::tick_count::now();
 
     // video layer init
     if (video.init_window(u.UniverseWidth, u.UniverseHeight)) {
@@ -121,6 +160,12 @@ int main(int argc, char *argv[]) {
                 omp_set_num_threads(p);
 
                 for (int i = 0; i < numberOfFrames; ++i) {
+                    if (!stress_runtime_distr.empty()) {
+                      u.SetRuntimeForStress(stress_runtime_distr[i]);
+                    }
+                    if (!velocity_runtime_distr.empty()) {
+                      u.SetRuntimeForVelocity(velocity_runtime_distr[i]);
+                    }
                     u.ParallelUpdateUniverse();
                 }
             }

@@ -102,12 +102,12 @@ void Universe::InitializeUniverse(video const& colorizer) {
     drawingMemory = colorizer.get_drawing_memory();
 }
 
-void Universe::SetRuntimeForStress(std::string runtime) {
-    stress_runtime = runtime;
+void Universe::SetRuntimeForStress(runtime runtime_) {
+    stress_runtime = runtime_;
 }
 
-void Universe::SetRuntimeForVelocity(std::string runtime) {
-    velocity_runtime = runtime;
+void Universe::SetRuntimeForVelocity(runtime runtime_) {
+    velocity_runtime = runtime_;
 }
 
 void Universe::UpdatePulse() {
@@ -178,7 +178,7 @@ struct UpdateStressBody {
 };
 
 void Universe::ParallelUpdateStress(oneapi::tbb::affinity_partitioner& affinity) {
-    if (stress_runtime == "openmp") {
+    if (stress_runtime == runtime::openmp) {
         drawing_area drawing(0, 0, UniverseWidth - 1, UniverseHeight - 1, drawingMemory);
         #pragma omp parallel for firstprivate(drawing)
         for (int i = 0; i < UniverseHeight - 1; ++i) {
@@ -196,7 +196,7 @@ void Universe::ParallelUpdateStress(oneapi::tbb::affinity_partitioner& affinity)
                 drawing.put_pixel(c[index]);
             }
         }
-    } else if (velocity_runtime == "tbb") {
+    } else if (velocity_runtime == runtime::tbb) {
         oneapi::tbb::parallel_for(
             oneapi::tbb::blocked_range<int>(0, UniverseHeight - 1), // Index space for loop
             UpdateStressBody(*this), // Body of loop
@@ -226,7 +226,7 @@ struct UpdateVelocityBody {
 };
 
 void Universe::ParallelUpdateVelocity(oneapi::tbb::affinity_partitioner& affinity) {
-    if (velocity_runtime == "openmp") {
+    if (velocity_runtime == runtime::openmp) {
         #pragma omp parallel for
         for (int i = 1; i < UniverseHeight; ++i) {
             #pragma ivdep
@@ -234,7 +234,7 @@ void Universe::ParallelUpdateVelocity(oneapi::tbb::affinity_partitioner& affinit
                 V[i][j] = D[i][j] * (V[i][j] + L[i][j] * (S[i][j] - S[i][j - 1] + T[i][j] - T[i - 1][j]));
             }
         }
-    } else if (velocity_runtime == "tbb") {
+    } else if (velocity_runtime == runtime::tbb) {
         oneapi::tbb::parallel_for(
             oneapi::tbb::blocked_range<int>(1, UniverseHeight), // Index space for loop
             UpdateVelocityBody(*this), // Body of loop
