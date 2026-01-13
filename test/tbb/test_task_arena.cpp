@@ -2165,7 +2165,7 @@ TEST_CASE("Test that a thread calling wait_for completes tasks when workers are 
 
     // Occupy all worker threads with work
     for (std::size_t i = 0; i < num_threads-1; ++i) {
-        ta_busy.enqueue([&] {
+        ta_busy.enqueue([&, i] {
             barrier.wait();
             if (i % 2) {
                 ta.enqueue(body, tg);
