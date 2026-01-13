@@ -86,6 +86,10 @@ function(tbb_add_test)
 
     target_link_libraries(${_tbb_test_TARGET_NAME} PRIVATE ${_tbb_test_DEPENDENCIES} Threads::Threads ${TBB_COMMON_LINK_LIBS})
 
+    if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+        target_link_libraries(${_tbb_test_TARGET_NAME} PRIVATE util)
+    endif()
+
     if (COMMAND _tbb_run_memcheck)
         _tbb_run_memcheck(${_tbb_test_NAME} ${_tbb_test_SUBDIR})
     endif()
@@ -706,6 +710,10 @@ if (TARGET TBB::tbbmalloc)
                 target_link_libraries(test_malloc_whitebox PRIVATE ${TBB_COMMON_LINK_FLAGS})
             endif()
             target_link_libraries(test_malloc_whitebox PRIVATE Threads::Threads ${TBB_COMMON_LINK_LIBS})
+
+            if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+                target_link_libraries(test_malloc_whitebox PRIVATE util)
+            endif()
         endif()
         # ------------------------------------------------------------------------------------------
 
