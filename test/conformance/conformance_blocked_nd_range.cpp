@@ -217,7 +217,8 @@ void check_constructed_range(const oneapi::tbb::blocked_nd_range<T, N>& range,
                              EqPredicate pred)
 {
     for (unsigned int dim_index = 0; dim_index < N; ++dim_index) {
-        const auto& dim = range.dim(dim_index);
+        using dim_type = typename oneapi::tbb::blocked_nd_range<T, N>::dim_range_type;
+        const dim_type& dim = range.dim(dim_index);
         CHECK_MESSAGE(pred(dim.begin(), begins[dim_index]), "Incorrect begin of the constructed range");
         CHECK_MESSAGE(pred(dim.end(), ends[dim_index]), "Incorrect end of the constructed range");
         CHECK_MESSAGE(dim.grainsize() == grainsizes[dim_index], "Incorrect grainsize of the constructed range");
