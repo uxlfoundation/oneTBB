@@ -136,8 +136,7 @@ This [sub-proposal is supported](../../supported/numa_support/create-numa-arenas
 
 ### NUMA-aware allocation
 
-Define allocators or other features that simplify the process of allocating or placing data onto
-specific NUMA nodes.
+See [sub-RFC for constraining thread allocations](allocations-bound-to-constrained-arena.org)
 
 ### Simplified approaches to associate task distribution with data placement
 
