@@ -127,6 +127,10 @@ option(TBB_CONTROL_FLOW_GUARD "Enable Control Flow Guard (CFG) during the compil
 option(TBB_FUZZ_TESTING "Enable fuzz testing" OFF)
 option(TBB_INSTALL "Enable installation" ON)
 option(TBB_FILE_TRIM "Enable __FILE__ trim" ON)
+option(TBB_ENABLE_CPP_MODULES "Enable C++ Modules" OFF)
+if (TBB_ENABLE_CPP_MODULES)
+    cmake_minimum_required(VERSION 3.28)
+endif()
 if(LINUX)
 option(TBB_LINUX_SEPARATE_DBG "Enable separation of the debug symbols during the build" OFF)
 endif()
@@ -338,6 +342,22 @@ else()
                 COMPONENT devel)
         # -------------------------------------------------------------------
     endif()
+endif()
+
+if (TBB_ENABLE_CPP_MODULES)
+    target_sources(tbb
+        FILE_SET cxx_modules
+        TYPE CXX_MODULES
+        BASE_DIRS modules
+        FILES modules/tbb.ixx
+        )
+
+    add_library(tbb_module OBJECT modules/tbb.ixx)
+    set_target_properties(tbb_module PROPERTIES CXX_STANDARD 20)
+    target_link_libraries(tbb PRIVATE tbb_module)
+
+    set_source_files_properties(modules/tbb.ixx PROPERTIES
+        CXX_MODULE_HEADER_UNIT ON)
 endif()
 
 if (TBB_TEST)

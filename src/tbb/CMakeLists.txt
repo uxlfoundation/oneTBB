@@ -14,6 +14,7 @@
 # limitations under the License.
 
 add_library(tbb
+    $<TARGET_OBJECTS:tbb_module>
     address_waiter.cpp
     allocator.cpp
     arena.cpp
@@ -45,7 +46,8 @@ add_library(tbb
     thread_request_serializer.cpp
     threading_control.cpp
     version.cpp
-    queuing_rw_mutex.cpp)
+    queuing_rw_mutex.cpp
+    )
 
 add_library(TBB::tbb ALIAS tbb)
 
