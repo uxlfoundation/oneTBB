@@ -21,20 +21,12 @@ Many parallel workloads can execute efficiently on multiple core types that make
 
 Restricting to a single core type may leave available cores idle, reducing overall system throughput.
 
-#### 2. **Workload Classification Challenges**
+#### 2. **Avoiding Inappropriate Core Selection**
 
-Applications often have workloads that don't fit neatly into a single core type category:
-- **Moderate priority tasks**: Not critical enough to demand P-cores exclusively, but shouldn't use LP E-cores
-- **Adaptive workloads**: Performance requirements that vary based on input size or system state
-- **Mixed computation phases**: Algorithms that alternate between compute-intensive and throughput-oriented phases
-
-#### 3. **Avoiding Inappropriate Core Selection**
-
-Without the ability to specify "P-cores OR E-cores (but not LP E-cores)" or 
-"LP E-cores OR E-cores but not P-cores" applications face dilemmas.
-For example, without being able to specify "P-cores OR E-cores (but not LP E-cores)":
+Let's assume that a specific workload is known to perform well on both E-cores and P-cores, but very poorly on LP E-cores. 
+Without the ability to specify "P-cores OR E-cores (but not LP E-cores)", applications face dilemmas:
 - **No constraint**: Work might be scheduled on LP E-cores, causing significant performance degradation
-- **P-cores only**: Leaves E-cores idle, reducing parallelism
+- **P-cores only**: Unnecessarily leaves E-cores idle, reducing parallelism
 - **E-cores only**: Misses opportunities to use faster P-cores when available
 
 ### Current API Limitation
@@ -253,7 +245,7 @@ tbb::task_arena arena({
 - Requires creating multiple `constraints` objects for simple core type combinations
 - Vector of `constraints` instances vs. single integer field with bit-packing creates memory overhead
 
-**Future Extensibility Consideration:** This approach naturally extends to other constraint types—if `set_core_types`
+**Future Extensibility Consideration:** This approach naturally extends to other constraint typesÂ—if `set_core_types`
 is added, a corresponding `set_numa_ids` function would likely follow. The choice between a vector of `constraints`
 instances versus dedicated multi-value setters affects API consistency and usability: the former provides a unified
 pattern for combining any constraints, while the latter offers more intuitive, type-specific methods.
