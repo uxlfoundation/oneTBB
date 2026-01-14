@@ -245,12 +245,12 @@ tbb::task_arena arena({
 - Requires creating multiple `constraints` objects for simple core type combinations
 - Vector of `constraints` instances vs. single integer field with bit-packing creates memory overhead
 
-**Future Extensibility Consideration:** This approach naturally extends to other constraint typesif `set_core_types`
+**Future Extensibility Consideration:** This approach naturally extends to other constraint types—if `set_core_types`
 is added, a corresponding `set_numa_ids` function would likely follow. The choice between a vector of `constraints`
 instances versus dedicated multi-value setters affects API consistency and usability: the former provides a unified
 pattern for combining any constraints, while the latter offers more intuitive, type-specific methods.
 
-As proposed in the discussion of PR [#1926]{https://github.com/uxlfoundation/oneTBB/pull/1926}, this approach can be
+As proposed in the discussion of PR [#1926](https://github.com/uxlfoundation/oneTBB/pull/1926), this approach can be
 combined with the main proposal above; namely, a user-defined selector function could create and return a container
 of constraints.
 
