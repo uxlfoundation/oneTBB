@@ -345,19 +345,22 @@ else()
 endif()
 
 if (TBB_ENABLE_CPP_MODULES)
-    target_sources(tbb
-        FILE_SET cxx_modules
-        TYPE CXX_MODULES
-        BASE_DIRS modules
-        FILES modules/tbb.ixx
-        )
-
-    add_library(tbb_module OBJECT modules/tbb.ixx)
-    set_target_properties(tbb_module PROPERTIES CXX_STANDARD 20)
-    target_link_libraries(tbb PRIVATE tbb_module)
+    add_library(tbb_module)
+    target_sources(tbb_module
+        PUBLIC
+            FILE_SET cxx_modules
+            TYPE CXX_MODULES
+            # BASE_DIRS modules
+            FILES modules/tbb.ixx
+    )
 
     set_source_files_properties(modules/tbb.ixx PROPERTIES
         CXX_MODULE_HEADER_UNIT ON)
+
+    target_include_directories(tbb_module
+        PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    )
 endif()
 
 if (TBB_TEST)

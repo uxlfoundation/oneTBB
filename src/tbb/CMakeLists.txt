@@ -14,7 +14,7 @@
 # limitations under the License.
 
 add_library(tbb
-    $<TARGET_OBJECTS:tbb_module>
+    # $<TARGET_OBJECTS:tbb_module>
     address_waiter.cpp
     allocator.cpp
     arena.cpp

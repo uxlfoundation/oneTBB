@@ -4,210 +4,221 @@ module;
 
 export module tbb;
 
+export namespace oneapi {
+namespace tbb = ::tbb;
+} // export namespace oneapi
+
+export using ::TBB_runtime_interface_version;
+export using ::TBB_runtime_version;
+
 export namespace tbb {
-    inline namespace v1 {
-        using detail::d1::parallel_for;
-    }
-    // template <typename Index, typename Function>
-    // void parallel_for(Index, Index, const Function&);
-}
+    using tbb::split;
+    using tbb::proportional_split;
 
-// namespace tbb {
-// export using TBB_runtime_interface_version;
-// export using TBB_runtime_version;
-    
-// export using blocked_nd_range;
-// export using blocked_range;
-// export using blocked_range2d;
-// export using blocked_range3d;
+    using tbb::blocked_range;
+    using tbb::blocked_range2d;
+    using tbb::blocked_range3d;
+    using tbb::blocked_nd_range;
 
-// export using split;
-// export using proportional_split;
+    using tbb::parallel_for;
+    using tbb::parallel_for_each;
+    using tbb::feeder;
+    using tbb::parallel_invoke;
+    using tbb::parallel_pipeline;
+    using tbb::filter;
+    using tbb::make_filter;
+    using tbb::filter_mode;
+    using tbb::flow_control;
+    using tbb::parallel_reduce;
+    using tbb::parallel_deterministic_reduce;
+    using tbb::parallel_scan;
+    using tbb::pre_scan_tag;
+    using tbb::final_scan_tag;
+    using tbb::parallel_sort;
+    using tbb::auto_partitioner;
+    using tbb::simple_partitioner;
+    using tbb::static_partitioner;
+    using tbb::affinity_partitioner;
 
-// export using parallel_for;
-// export using parallel_for_each;
-// export using feeder;
-// export using parallel_invoke;
-// export using parallel_pipeline;
-// export using filter;
-// export using make_filter;
-// export using filter_mode;
-// export using flow_control;
-// export using parallel_reduce;
-// export using parallel_deterministic_reduce;
-// export using parallel_scan;
-// export using pre_scan_tag;
-// export using final_scan_tag;
-// export using parallel_sort;
-// export using auto_partitioner;
-// export using simple_partitioner;
-// export using static_partitioner;
-// export using affinity_partitioner;
+    using tbb::collaborative_call_once;
+    using tbb::collaborative_once_flag;
 
-// export using collaborative_call_once;
-// export using collaborative_once_flag;
+    using tbb::tbb_hash_compare;
+    using tbb::concurrent_hash_map;
 
-// export using tbb_hash_compare;
-// export using concurrent_hash_map;
-// // export using concurrent_lru_cache; // preview API
-// export using concurrent_map;
-// export using concurrent_multimap;
-// export using concurrent_set;
-// export using concurrent_multiset;
-// export using concurrent_unordered_map;
-// export using concurrent_unordered_multimap;
-// export using concurrent_unordered_set;
-// export using concurrent_unordered_multiset;
-// export using concurrent_vector;
-// export using concurrent_priority_queue;
-// export using concurrent_queue;
-// export using concurrent_bounded_queue;
+#if TBB_PREVIEW_CONCURRENT_LRU_CACHE
+    using tbb::concurrent_lru_cache;
+#endif
 
-// export using mutex;
-// export using rw_mutex;
-// export using null_mutex;
-// export using null_rw_mutex;
-// export using queuing_mutex;
-// export using queuing_rw_mutex;
-// export using spin_mutex;
-// export using spin_rw_mutex;
-// export using speculative_spin_mutex;
-// export using speculative_spin_rw_mutex;
+    using tbb::concurrent_map;
+    using tbb::concurrent_multimap;
+    using tbb::concurrent_set;
+    using tbb::concurrent_multiset;
+    using tbb::concurrent_unordered_map;
+    using tbb::concurrent_unordered_multimap;
+    using tbb::concurrent_unordered_set;
+    using tbb::concurrent_unordered_multiset;
+    using tbb::concurrent_vector;
+    using tbb::concurrent_priority_queue;
+    using tbb::concurrent_queue;
+    using tbb::concurrent_bounded_queue;
 
-// export using cache_aligned_allocator;
-// export using cache_aligned_resource;
-// export using scalable_allocator;
-// export using scalable_memory_resource;
-// export using tbb_allocator;
-// // preview APIs
-// // export using memory_pool_allocator;
-// // export using memory_pool;
-// // export using fixed_pool;
+    using tbb::mutex;
+    using tbb::rw_mutex;
+    using tbb::null_mutex;
+    using tbb::null_rw_mutex;
+    using tbb::queuing_mutex;
+    using tbb::queuing_rw_mutex;
+    using tbb::spin_mutex;
+    using tbb::spin_rw_mutex;
+    using tbb::speculative_spin_mutex;
+    using tbb::speculative_spin_rw_mutex;
 
-// export using combinable;
-// export using enumerable_thread_specific;
-// export using flattened2d;
-// export using flatten2d;
-// export using ets_key_usage_type;
-// export using ets_key_per_instance;
-// export using ets_no_key;
-// export using ets_suspend_aware;
+    using tbb::cache_aligned_allocator;
+    using tbb::cache_aligned_resource;
+    using tbb::scalable_allocator;
+    using tbb::scalable_memory_resource;
+    using tbb::tbb_allocator;
+#if TBB_PREVIEW_MEMORY_POOL
+    using tbb::memory_pool_allocator;
+    using tbb::memory_pool;
+    using tbb::fixed_pool;
+#endif
 
-// export using global_control;
-// export using attach;
-// export using finalize;
-// export using task_scheduler_handle;
-// export using assertion_handler_type;
-// export using set_assertion_handler;
-// export using get_assertion_handler;
+    using tbb::combinable;
+    using tbb::enumerable_thread_specific;
+    using tbb::flattened2d;
+    using tbb::flatten2d;
+    using tbb::ets_key_usage_type;
+    using tbb::ets_key_per_instance;
+    using tbb::ets_no_key;
+    using tbb::ets_suspend_aware;
 
-// export using suspend_point;
-// export using resume;
-// export using suspend;
-// export using current_context;
-// export using task_arena;
-// export using create_numa_task_arenas;
-// // export using is_inside_task; // preview API
+    using tbb::global_control;
+    using tbb::attach;
+    using tbb::finalize;
+    using tbb::task_scheduler_handle;
+#if !__TBB_DISABLE_SPEC_EXTENSIONS
+    namespace ext {
+        using tbb::ext::assertion_handler_type;
+        using tbb::ext::set_assertion_handler;
+        using tbb::ext::get_assertion_handler;
+    } // namespace ext
+#endif
 
-// namespace this_task_arena {
-// export using current_thread_index;
-// export using max_concurrency;
-// export using isolate;
-// export using enqueue;
-// // Preview APIs
-// // export using start_parallel_phase;
-// // export using end_parallel_phase;
-// } // namespace this_task_arena
+    namespace task {
+        using tbb::task::suspend_point;
+        using tbb::task::resume;
+        using tbb::task::suspend;
+        using tbb::task::current_context;
+    } // namespace task
 
-// export using task_group_context;
-// export using task_group;
-// // export using isolated_task_group; // preview API
-// export using task_group_status;
-// export using not_complete;
-// export using complete;
-// export using canceled;
-// export using is_current_task_group_canceling;
-// export using task_handle;
-// // export using task_completion_handle; // preview API
+    using tbb::task_arena;
+    using tbb::create_numa_task_arenas;
+#if TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    using tbb::is_inside_task;
+#endif
 
-// export using task_scheduler_observer;
+    namespace this_task_arena {
+        using tbb::this_task_arena::current_thread_index;
+        using tbb::this_task_arena::max_concurrency;
+        using tbb::this_task_arena::isolate;
+        using tbb::this_task_arena::enqueue;
+#if TBB_PREVIEW_PARALLEL_PHASE
+        using tbb::this_task_arena::start_parallel_phase;
+        using tbb::this_task_arena::end_parallel_phase;
+#endif
+    } // namespace this_task_arena
 
-// export using numa_node_id;
-// export using core_type_id;
+    using tbb::task_group_context;
+    using tbb::task_group;
+#if TBB_PREVIEW_ISOLATED_TASK_GROUP
+    using tbb::isolated_task_group;
+#endif
+    using tbb::task_group_status;
+    using tbb::not_complete;
+    using tbb::complete;
+    using tbb::canceled;
+    using tbb::is_current_task_group_canceling;
+    using tbb::task_handle;
+#if TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    using tbb::task_completion_handle;
+#endif
+    using tbb::task_scheduler_observer;
 
-// namespace info {
-// export using numa_nodes;
-// export using core_types;
-// export using default_concurrency;
-// } // namespace info
+    using tbb::numa_node_id;
+    using tbb::core_type_id;
 
-// export using user_bort;
-// export using bad_last_alloc;
-// export using unsafe_wait;
-// export using missing_wait;
+    namespace info {
+        using tbb::info::numa_nodes;
+        using tbb::info::core_types;
+        using tbb::info::default_concurrency;
+    } // namespace info
 
-// export using tick_count;
+    using tbb::user_abort;
+    using tbb::bad_last_alloc;
+    using tbb::unsafe_wait;
+    using tbb::missing_wait;
 
-// namespace flow {
-// export using receiver;
-// export using sender;
+    using tbb::tick_count;
 
-// export using serial;
-// export using unlimited;
+    namespace flow {
+        // TODO: should abstract APIs be part of module
+        using tbb::flow::receiver;
+        using tbb::flow::sender;
+        using tbb::flow::graph_node;
 
-// export using reset_flags;
-// export using rf_reset_protocol;
-// export using rf_reset_bodies;
-// export using ef_clear_edges;
+        using tbb::flow::reset_flags;
+        using tbb::flow::rf_reset_protocol;
+        using tbb::flow::rf_reset_bodies;
+        using tbb::flow::rf_clear_edges;
 
-// export using graph;
-// export using graph_node;
-// export using continue_msg;
+        using tbb::flow::continue_msg;
+        using tbb::flow::input_node;
+        using tbb::flow::multifunction_node;
+        using tbb::flow::split_node;
+        using tbb::flow::output_port;
+        using tbb::flow::indexer_node;
+        using tbb::flow::tagged_msg;
+        using tbb::flow::cast_to;
+        using tbb::flow::is_a;
+        using tbb::flow::continue_node;
+        using tbb::flow::overwrite_node;
+        using tbb::flow::write_once_node;
+        using tbb::flow::broadcast_node;
+        using tbb::flow::buffer_node;
+        using tbb::flow::queue_node;
+        using tbb::flow::sequencer_node;
+        using tbb::flow::priority_queue_node;
+        using tbb::flow::limiter_node;
+        using tbb::flow::join_node;
+        using tbb::flow::input_port;
+        using tbb::flow::copy_body;
+        using tbb::flow::make_edge;
+        using tbb::flow::remove_edge;
+        using tbb::flow::tag_value;
+        using tbb::flow::composite_node;
+        using tbb::flow::async_node;
+        using tbb::flow::node_priority_t;
+        using tbb::flow::no_priority;
+#if TBB_PREVIEW_FLOW_GRAPH_EXTENSIONS
+        using tbb::flow::follows;
+        using tbb::flow::precedes;
+        using tbb::flow::make_node_set;
+        using tbb::flow::make_edges;
+#endif
+        using tbb::flow::rejecting;
+        using tbb::flow::reserving;
+        using tbb::flow::queueing;
+        using tbb::flow::lightweight;
+        using tbb::flow::key_matching;
+        using tbb::flow::tag_matching;
+        using tbb::flow::queueing_lightweight;
+        using tbb::flow::rejecting_lightweight;
+    } // namespace flow
 
-// export using input_node;
-// export using function_node;
-// export using multifunction_node;
-// export using split_node;
-// export using output_port;
-// export using indexer_node;
-// export using tagged_msg;
-// export using cast_to;
-// export using is_a;
-// export using continue_node;
-// export using overwrite_node;
-// export using write_once_node;
-// export using broadcast_node;
-// export using buffer_node;
-// export using queue_node;
-// export using sequencer_node;
-// export using priority_queue_node;
-// export using limiter_node;
-// export using join_node;
-// export using input_port;
-// export using copy_body;
-// export using make_edge;
-// export using remove_edge;
-// export using tag_value;
-// export using composite_node;
-// export using async_node;
-// export using node_priority_t;
-// export using no_priority;
-// export using flow_control;
-
-// // Preview APIs
-// export using follows;
-// export using precedes;
-// export using make_node_set;
-// export using make_edges;
-
-// // TODO: find API names;
-// namespace graph_policy_namespace {
-
-// } // namespace graph_policy_namespace
-// } // namespace flow
-// namespace profiling {
-// export using set_name;
-// export using event;
-// } // namespace profiling
-
-// } // namespace tbb
+    namespace profiling {
+        using tbb::profiling::set_name;
+        using tbb::profiling::event;
+    } // namespace profiling
+} // export namespace tbb
