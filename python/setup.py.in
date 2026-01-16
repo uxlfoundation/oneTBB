@@ -37,7 +37,7 @@ if any(i in os.environ for i in ["CC", "CXX"]):
         os.environ['LDSHARED'] = os.environ['CXX'] + " -shared"
     print("Environment specifies CC=%s CXX=%s"%(os.environ['CC'], os.environ['CXX']))
 
-intel_compiler = os.getenv('CC', '') in ['icl', 'icpc', 'icc']
+intel_compiler = os.getenv('CC', '') in ['icl', 'icpc', 'icc', 'icx', 'icpx']
 try:
     tbb_root = os.environ['TBBROOT']
     print("Using TBBROOT=", tbb_root)
