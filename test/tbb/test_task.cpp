@@ -725,18 +725,34 @@ TEST_CASE("Enqueue with exception") {
 }
 
 struct resubmitting_task : public tbb::detail::d1::task {
+    static constexpr int max_task_count = 100000;
     tbb::task_arena& my_arena;
     tbb::task_group_context& my_ctx;
-    std::atomic<int> counter{100000};
+
+    struct task_pool_data {
+      std::vector<resubmitting_task> task_pool;
+      std::atomic<int> counter;
+
+      task_pool_data(const std::vector<resubmitting_task> &vec) : task_pool(vec), counter(0) {}
+    };
+
+    task_pool_data* my_tp_data { nullptr };
 
     resubmitting_task(tbb::task_arena& arena, tbb::task_group_context& ctx) : my_arena(arena), my_ctx(ctx)
     {}
 
+    resubmitting_task(const resubmitting_task& other) : my_arena(other.my_arena), my_ctx(other.my_ctx)
+    {}
+
     tbb::detail::d1::task* execute(tbb::detail::d1::execution_data& ) override {
-        if (counter-- > 0) {
-            submit(*this, my_arena, my_ctx, true);
-        }
-        return nullptr;
+      REQUIRE(my_tp_data);
+      int task_index = my_tp_data->counter++;
+      if (task_index < max_task_count) {
+        auto& new_task = my_tp_data->task_pool[task_index];
+        new_task.my_tp_data = my_tp_data;
+        submit(new_task, my_arena, my_ctx, true);
+      }
+      return nullptr;
     }
 
     tbb::detail::d1::task* cancel( tbb::detail::d1::execution_data& ) override {
@@ -768,7 +784,7 @@ TEST_CASE("Test with priority inversion") {
     };
 
     using suspend_task_type = CountingTask<decltype(critical_work)>;
-    suspend_task_type critical_task(critical_work, wait);
+    std::vector<suspend_task_type> critical_tasks(critical_task_counter, { critical_work, wait });
 
     auto high_priority_thread_func = [&] {
         // Increase external threads priority
@@ -776,21 +792,26 @@ TEST_CASE("Test with priority inversion") {
         utils::suppress_unused_warning(guard);
         // pin external threads
         test_arena.execute([]{});
-        while (task_counter++ < critical_task_counter) {
-            submit(critical_task, test_arena, test_context, true);
+        std::size_t index = task_counter++;
+        while (index < critical_task_counter) {
+            submit(critical_tasks[index], test_arena, test_context, true);
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            index = task_counter++;
         }
     };
 
-    resubmitting_task worker_task(test_arena, test_context);
+    resubmitting_task::task_pool_data tp_data {{resubmitting_task::max_task_count, {test_arena, test_context}}};
+    std::vector<resubmitting_task> initial_submitters(thread_number + 1, {test_arena, test_context});
+
     // warm up
     // take first core on execute
     utils::SpinBarrier barrier(thread_number + 1);
     test_arena.execute([&] {
-        tbb::parallel_for(std::uint32_t(0), thread_number + 1, [&] (std::uint32_t) {
+      tbb::parallel_for( std::uint32_t(0), thread_number + 1, [&](std::uint32_t index) {
+            initial_submitters[index].my_tp_data = &tp_data;
             barrier.wait();
-            submit(worker_task, test_arena, test_context, true);
-        });
+            submit(initial_submitters[index], test_arena, test_context, true);
+      });
     });
 
     std::vector<std::thread> high_priority_threads;
@@ -800,9 +821,11 @@ TEST_CASE("Test with priority inversion") {
 
     utils::increased_priority_guard guard{};
     utils::suppress_unused_warning(guard);
-    while (task_counter++ < critical_task_counter) {
-        submit(critical_task, test_arena, test_context, true);
+    std::size_t index = task_counter++;
+    while (index < critical_task_counter) {
+        submit(critical_tasks[index], test_arena, test_context, true);
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        index = task_counter++;
     }
 
     tbb::detail::d1::wait(wait, test_context);
