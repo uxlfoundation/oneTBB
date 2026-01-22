@@ -66,14 +66,14 @@ public:
 };
 
 //! Exception for impossible finalization of task_sheduler_handle
-#if __APPLE__
+#if __APPLE__ || __FreeBSD__
     #pragma GCC visibility push(default)
 #endif
 class TBB_EXPORT unsafe_wait : public std::runtime_error {
 public:
     unsafe_wait(const char* msg) : std::runtime_error(msg) {}
 };
-#if __APPLE__
+#if __APPLE__ || __FreeBSD__
     #pragma GCC visibility pop
 #endif
 
