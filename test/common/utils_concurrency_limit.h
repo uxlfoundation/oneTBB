@@ -377,6 +377,7 @@ int limit_number_of_threads( int max_threads ) {
 
     ASSERT(max_threads <= int(sizeof(mask_t) * CHAR_BIT), "The mask size is not enough to set the requested number of threads.");
     std::vector<int> cpuset_indices = get_cpuset_indices();
+    ASSERT(!cpuset_indices.empty(), "Empty cpuset returned.");
 
     for (int i = 0; i < max_threads; ++i) {
         CPU_SET(cpuset_indices[i], &new_mask);
