@@ -1032,7 +1032,7 @@ TEST_CASE("MAIN TEST") {
     // Check if we were called to test standard behavior
     // TODO: enable this mode
     // setSystemAllocs();
-#if __unix__
+#if __linux__
     /* According to man pthreads
        "NPTL threads do not share resource limits (fixed in kernel 2.6.10)".
        Use per-threads limits for affected systems.
