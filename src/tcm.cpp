@@ -2523,7 +2523,8 @@ __TCM_SUPPRESS_WARNING_POP
         pd.concurrency = new(pd.concurrency) concurrency_item_t[pd.size]{0};
         pd.state.store(state, std::memory_order_relaxed);
         pd.flags = req.flags;
-        pd.tcm_epoch_snapshot = tcm_state_epoch;
+        // tcm_epoch_snapshot will be properly set later under mutex during request for resources.
+        pd.tcm_epoch_snapshot = 0;
         pd.is_nested.store(false, std::memory_order_relaxed);
         pd.inherited_concurrency_idx.store(0, std::memory_order_relaxed);
 
