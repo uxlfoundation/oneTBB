@@ -91,16 +91,21 @@ static int get_max_procs() {
                 ++nproc;
         }
         maxProcs = nproc;
-#elif __linux__
-        cpu_set_t mask;
+#elif __linux__ || __FreeBSD__
         int result = 0;
+#if __linux__
+        cpu_set_t mask;
         sched_getaffinity(0, sizeof(cpu_set_t), &mask);
+#else /* __FreeBSD__ */
+        cpuset_t mask;
+        sched_getaffinity(0, sizeof(cpuset_t), &mask);
+#endif
         int nproc = sysconf(_SC_NPROCESSORS_ONLN);
         for (int i = 0; i < nproc; ++i) {
             if (CPU_ISSET(i, &mask)) ++result;
         }
         maxProcs = result;
-#else // FreeBSD
+#else
         maxProcs = sysconf(_SC_NPROCESSORS_ONLN);
 #endif
     }
@@ -328,9 +333,14 @@ private:
 
 std::vector<int> get_cpuset_indices() {
     std::vector<int> result;
+#if __linux__ || __FreeBSD__
 #if __linux__
     cpu_set_t mask;
     sched_getaffinity(0, sizeof(cpu_set_t), &mask);
+#else /* __FreeBSD__ */
+    cpuset_t mask;
+    sched_getaffinity(0, sizeof(cpuset_t), &mask);
+#endif
     int nproc = sysconf(_SC_NPROCESSORS_ONLN);
     for (int i = 0; i < nproc; ++i) {
         if (CPU_ISSET(i, &mask)) {
@@ -339,7 +349,7 @@ std::vector<int> get_cpuset_indices() {
     }
     ASSERT(!result.empty(), nullptr);
 #else
-    // TODO: add affinity support for Windows and FreeBSD
+    // TODO: add affinity support for Windows
 #endif
     return result;
 }
