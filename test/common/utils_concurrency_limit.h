@@ -335,13 +335,8 @@ private:
 std::vector<int> get_cpuset_indices() {
     std::vector<int> result;
 #if __linux__ || __FreeBSD__
-#if __linux__
-    cpu_set_t mask;
-    sched_getaffinity(0, sizeof(cpu_set_t), &mask);
-#else /* __FreeBSD__ */
-    cpuset_t mask;
-    sched_getaffinity(0, sizeof(cpuset_t), &mask);
-#endif
+cpu_set_type mask;
+sched_getaffinity(0, sizeof(cpu_set_type), &mask);
     int nproc = sysconf(_SC_NPROCESSORS_ONLN);
     for (int i = 0; i < nproc; ++i) {
         if (CPU_ISSET(i, &mask)) {
