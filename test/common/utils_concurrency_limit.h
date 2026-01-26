@@ -80,6 +80,12 @@ inline std::vector<thread_num_type> concurrency_range() {
 
 static int maxProcs = 0;
 
+#if __linux__
+using cpu_set_type = cpu_set_t;
+#elif __FreeBSD__
+using cpu_set_type = cpuset_t;
+#endif
+
 static int get_max_procs() {
     if (!maxProcs) {
 #if _WIN32||_WIN64
