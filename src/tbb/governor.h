@@ -20,6 +20,7 @@
 #include "rml_tbb.h"
 
 #include "misc.h" // for AvailableHwConcurrency
+#include "tcm.h"
 #include "tls.h"
 
 namespace tbb {
@@ -36,6 +37,8 @@ extern bool ITT_Present;
 #endif
 
 typedef std::size_t stack_size_type;
+
+tcm_cpu_mask_t constraints_affinity_mask(const d1::constraints& c);
 
 //------------------------------------------------------------------------
 // Class governor
