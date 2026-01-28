@@ -27,7 +27,7 @@
 bool silent = false;
 bool single = false;
 bool schedule_auto = false;
-int grain_size = 8;
+int grain_size = 1;
 
 std::string runtime = "tbb";
 
@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
     fractal_video video;
 
     // video layer init
-    if (video.init_window(1024, 512)) {
+    if (video.init_window(3840, 2160)) {
         video.calc_fps = false;
         video.threaded = threads.first > 0;
         // initialize fractal group

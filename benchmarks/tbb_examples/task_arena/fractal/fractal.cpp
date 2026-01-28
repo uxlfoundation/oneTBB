@@ -161,13 +161,14 @@ void fractal_runtime_omp::render() {
     // the provided context and partitioner chosen by schedule_auto.
     // Updates to fractal are not reflected in the render.
     fractal f_copy = f;
-    fractal_body body(f_copy);
 
-    #pragma omp parallel for num_threads(nthreads)
+    // Since per thread load depends on pixel coordinates, to keep each thread busy dynamic
+    // scheduling is chosen
+    #pragma omp parallel for num_threads(nthreads) collapse(2) schedule(dynamic, grain_size)
     for (int y = 0; y < f.get_size_y(); ++y) {
         for (int x = 0; x < f.get_size_x(); ++x) {
-            auto range = oneapi::tbb::blocked_range2d<int>(y, y + 1, x, x + 1);
-            body(range);
+            if (v->next_frame())
+                f_copy.render_rect(x, y, x+1, y+1);
         }
     }
 }
