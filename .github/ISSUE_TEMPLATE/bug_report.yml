@@ -1,0 +1,77 @@
+# Copyright (c) 2023 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Bug report
+labels: bug
+description: 'Description of a bug report'
+
+body:
+- type: dropdown
+  id: occurence
+  attributes:
+    label: 'How often bug is revealed:'
+    options: ['- Always', '- Often', '- Rare']
+  validations:
+    required: true
+
+- type: checkboxes
+  id: modules
+  attributes:
+    label: Which part is affected?
+    description: Select all parts affected by this bug.
+    options:
+      - label: tests
+      - label: infrastructure
+      - label: documentation
+      - label: allocator
+      - label: other
+
+- type: textarea
+  attributes:
+    label: Current Behavior
+    description: A concise description of what you're experiencing.
+  validations:
+    required: false
+
+- type: textarea
+  attributes:
+    label: Expected Behavior
+    description: A concise description of what you expected to happen.
+  validations:
+    required: false
+
+- type: textarea
+  attributes:
+    label: Steps To Reproduce
+    description: Steps to reproduce the behavior.
+    placeholder: |
+      1. In this environment...
+      2. With this config...
+      3. Run '...'
+      4. See error...
+  validations:
+    required: false
+
+- type: textarea
+  attributes:
+    label: Environment
+    description: |
+      examples:
+        - **OS**: Ubuntu 23.04
+        - **kernel**: Linux 6.1
+        - **oneTBB**: commit ae923e
+    value: |
+        - OS:
+        - kernel:
+        - oneTBB:
