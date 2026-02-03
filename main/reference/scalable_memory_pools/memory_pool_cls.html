@@ -1,0 +1,757 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>memory_pool &#8212; oneTBB  documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/sphinx-book-theme.css?v=3c74b3bc" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../_static/scripts/sphinx-book-theme.js?v=fab101a9"></script>
+    <script src="../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'main/reference/scalable_memory_pools/memory_pool_cls';</script>
+    <script src="../../../_static/custom.js?v=874f1a61"></script>
+    <link rel="icon" href="../../../_static/favicons.png"/>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="fixed_pool" href="fixed_pool_cls.html" />
+    <link rel="prev" title="Scalable Memory Pools" href="../scalable_memory_pools.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../_static/oneAPI-rgb-rev-100.png" class="logo__image only-light" alt=""/>
+    <img src="../../../_static/oneAPI-rgb-rev-100.png" class="logo__image only-dark pst-js-only" alt=""/>
+  
+  
+    <p class="title logo__title">oneTBB Documentation</p>
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../intro/help_support.html">Getting Help and Support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/notation.html">Notational Conventions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/intro_os.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/Benefits.html">oneTBB Benefits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/testing_approach.html">Testing Approach</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../intro/limitations.html">Known Limitations</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Get Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../GSG/get_started.html">Get Started with oneAPI Threading Building Blocks (oneTBB)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../GSG/system_requirements.html">System Requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../GSG/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../GSG/next_steps.html">Next Steps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../GSG/integrate.html">Integrate oneTBB</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../GSG/samples.html">oneTBB Samples</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../tbb_userguide/title.html">oneTBB Developer Guide</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../tbb_userguide/Package_Contents_os.html">Package Contents</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Debug_Versus_Release_Libraries.html">Debug Versus Release Libraries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Scalable_Memory_Allocator.html">Scalable Memory Allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Windows_OS_ug.html">Windows*</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Linux_OS.html">Linux*</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Mac_OS.html">macOS*</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../tbb_userguide/Parallelizing_Simple_Loops_os.html">Parallelizing Simple Loops</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Initializing_and_Terminating_the_Library.html">Initializing and Terminating the Library</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../tbb_userguide/parallel_for_os.html">parallel_for</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Lambda_Expressions.html">Lambda Expressions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Automatic_Chunking.html">Automatic Chunking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Controlling_Chunking_os.html">Controlling Chunking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Bandwidth_and_Cache_Affinity_os.html">Bandwidth and Cache Affinity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Partitioner_Summary.html">Partitioner Summary</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/parallel_reduce.html">parallel_reduce</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Advanced_Example.html">Advanced Example</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Advanced_Topic_Other_Kinds_of_Iteration_Spaces.html">Advanced Topic: Other Kinds of Iteration Spaces</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../tbb_userguide/Parallelizing_Complex_Loops.html">Parallelizing Complex Loops</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Cook_Until_Done_parallel_do.html">Cook Until Done: parallel_for_each</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../tbb_userguide/Working_on_the_Assembly_Line_pipeline.html">Working on the Assembly Line: parallel_pipeline</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Using_Circular_Buffers.html">Using Circular Buffers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Throughput_of_pipeline.html">Throughput of pipeline</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Non-Linear_Pipelines.html">Non-Linear Pipelines</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Summary_of_Loops_and_Pipelines.html">Summary of Loops and Pipelines</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../tbb_userguide/Parallelizing_with_Tasks.html">Parallelizing with Tasks</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/creating_tasks_with_parallel_invoke.html">Creating Tasks with parallel_invoke</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/creating_tasks_with_task_group.html">Creating Tasks with task_group</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/task_group_thread_safety.html">task_group Thread Safety</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../tbb_userguide/Flow_Graph.html">Parallelizing Data Flow and Dependence Graphs</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Parallelizing_Flow_Graph.html">Parallelizing Data Flow and Dependency Graphs</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../tbb_userguide/Basic_Flow_Graph_concepts.html">Basic Flow Graph Concepts</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Graph_Object.html">Flow Graph Basics: Graph Object</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Nodes.html">Flow Graph Basics: Nodes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Edges.html">Flow Graph Basics: Edges</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Mapping_Nodes2Tasks.html">Flow Graph Basics: Mapping Nodes to Tasks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Flow_Graph_Message_Passing_Protocol.html">Flow Graph Basics: Message Passing Protocol</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Flow_Graph_Single_Vs_Broadcast.html">Flow Graph Basics: Single-push vs. Broadcast-push</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Flow_Graph_Buffering_in_Nodes.html">Flow Graph Basics: Buffering and Forwarding</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Flow_Graph_Reservation.html">Flow Graph Basics: Reservation</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../tbb_userguide/Graph_Main_Categories.html">Graph Application Categories</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Data_Flow_Graph.html">Data Flow Graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Dependence_Graph.html">Dependence Graph</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Predefined_Node_Types.html">Predefined Node Types</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../tbb_userguide/Flow_Graph_Tips.html">Flow Graph Tips and Tricks</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Flow-Graph-waiting-tips.html">Flow Graph Tips for Waiting for and Destroying a Flow Graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Flow_Graph_making_edges_tips.html">Flow Graph Tips on Making Edges</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Flow_Graph_nested_parallelism_tips.html">Flow Graph Tips on Nested Parallelism</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Flow_Graph_resource_tips.html">Flow Graph Tips for Limiting Resource Consumption</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Flow-Graph-exception-tips.html">Flow Graph Tips for Exception Handling and Cancellation</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/estimate_flow_graph_performance.html">Estimating Flow Graph Performance</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tbb_userguide/work_isolation.html">Work Isolation</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../tbb_userguide/Exceptions_and_Cancellation.html">Exceptions and Cancellation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Cancellation_Without_An_Exception.html">Cancellation Without An Exception</a></li>
+
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Cancellation_and_Nested_Parallelism.html">Cancellation and Nested Parallelism</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tbb_userguide/Floating_Point_Settings.html">Floating-point Settings</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../tbb_userguide/Containers.html">Containers</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../tbb_userguide/concurrent_hash_map.html">concurrent_hash_map</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/More_on_HashCompare.html">More on HashCompare</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/concurrent_vector_ug.html">concurrent_vector</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../tbb_userguide/Concurrent_Queue_Classes.html">Concurrent Queue Classes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Iterating_Over_a_Concurrent_Queue_for_Debugging.html">Iterating Over a Concurrent Queue for Debugging</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/When_Not_to_Use_Queues.html">When Not to Use Queues</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Summary_of_Containers.html">Summary of Containers</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../tbb_userguide/Mutual_Exclusion.html">Mutual Exclusion</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Mutex_Flavors.html">Mutex Flavors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Reader_Writer_Mutexes.html">Reader Writer Mutexes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/UpgradeDowngrade.html">Upgrade/Downgrade</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Lock_Pathologies.html">Lock Pathologies</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tbb_userguide/Timing.html">Timing</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../tbb_userguide/Memory_Allocation.html">Memory Allocation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Which_Dynamic_Libraries_to_Use.html">Which Dynamic Libraries to Use</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Allocator_Configuration.html">Configuring the Memory Allocator</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../tbb_userguide/automatically-replacing-malloc.html">Automatically Replacing <code class="docutils literal notranslate"><span class="pre">malloc</span></code> and Other C/C++ Functions for Dynamic Memory Allocation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Windows_C_Dynamic_Memory_Interface_Replacement.html">Windows* OS C/C++ Dynamic Memory Interface Replacement</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../tbb_userguide/Linux_C_Dynamic_Memory_Interface_Replacement.html">Linux* OS C/C++ Dynamic Memory Interface Replacement</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../tbb_userguide/The_Task_Scheduler.html">The Task Scheduler</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Task-Based_Programming.html">Task-Based Programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/When_Task-Based_Programming_Is_Inappropriate.html">When Task-Based Programming Is Inappropriate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/How_Task_Scheduler_Works.html">How Task Scheduler Works</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Task_Scheduler_Bypass.html">Task Scheduler Bypass</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Guiding_Task_Scheduler_Execution.html">Guiding Task Scheduler Execution</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../tbb_userguide/design_patterns/Design_Patterns.html">Design Patterns</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/design_patterns/Agglomeration.html">Agglomeration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/design_patterns/Elementwise.html">Elementwise</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/design_patterns/Odd-Even_Communication.html">Odd-Even Communication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/design_patterns/Wavefront.html">Wavefront</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/design_patterns/Reduction.html">Reduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/design_patterns/Divide_and_Conquer.html">Divide and Conquer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/design_patterns/GUI_Thread.html">GUI Thread</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/design_patterns/Non-Preemptive_Priorities.html">Non-Preemptive Priorities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/design_patterns/Lazy_Initialization.html">Lazy Initialization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/design_patterns/Local_Serializer.html">Local Serializer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/design_patterns/Fenced_Data_Transfer.html">Fenced Data Transfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/design_patterns/Reference_Counting.html">Reference Counting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/design_patterns/General_References.html">General References</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../tbb_userguide/Migration_Guide.html">Migrating from Threading Building Blocks (TBB)</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Migration_Guide/Task_Scheduler_Init.html">Migrating from tbb::task_scheduler_init</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Migration_Guide/Task_API.html">Migrating from low-level task API</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../tbb_userguide/Migration_Guide/Mixing_Two_Runtimes.html">Mixing two runtimes</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tbb_userguide/Constraints.html">Constrained APIs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tbb_userguide/std_invoke.html">Invoke a Callable Object</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tbb_userguide/appendix_A.html">Appendix A Costs of Time Slicing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tbb_userguide/appendix_B.html">Appendix B Mixing With Other Threading Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tbb_userguide/References.html">References</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Developer Reference</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../reference.html">oneTBB API Reference</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="malloc_replacement_log.html">TBB_malloc_replacement_log Function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../rvalue_reduce.html">Parallel Reduction for rvalues</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../assertion_handler.html">Custom Assertion Handler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../type_specified_message_keys.html">Type-specified message keys for join_node</a></li>
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="../scalable_memory_pools.html">Scalable Memory Pools</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 current active"><a class="current reference internal" href="#">memory_pool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fixed_pool_cls.html">fixed_pool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="memory_pool_allocator_cls.html">memory_pool_allocator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../helpers_for_expressing_graphs.html">Helper Functions for Expressing Graphs</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../constructors_for_nodes.html">Constructors for Flow Graph nodes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../follows_and_precedes_functions.html"><code class="docutils literal notranslate"><span class="pre">follows</span></code> and <code class="docutils literal notranslate"><span class="pre">precedes</span></code> function templates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../make_node_set_function.html"><code class="docutils literal notranslate"><span class="pre">make_node_set</span></code> function template</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../make_edges_function.html"><code class="docutils literal notranslate"><span class="pre">make_edges</span></code> function template</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../concurrent_lru_cache_cls.html">concurrent_lru_cache</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../task_group_extensions.html">task_group extensions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../task_group_bypass_support.html">Task Bypass Support for <code class="docutils literal notranslate"><span class="pre">task_group</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../task_group_dynamic_dependencies.html"><code class="docutils literal notranslate"><span class="pre">task_group</span></code> Dynamic Dependencies</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../custom_mutex_chmap.html">The customizing mutex type for <code class="docutils literal notranslate"><span class="pre">concurrent_hash_map</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../try_put_and_wait.html">Waiting for Single Messages in Flow Graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../parallel_phase_for_task_arena.html"><code class="docutils literal notranslate"><span class="pre">parallel_phase</span></code> Interface for Task Arena</a></li>
+</ul>
+</details></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/uxlfoundation/oneTBB/edit/master/doc/main/reference/scalable_memory_pools/memory_pool_cls.rst" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/uxlfoundation/oneTBB/issues/new?title=Issue%20on%20page%20%2Fmain/reference/scalable_memory_pools/memory_pool_cls.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../../_sources/main/reference/scalable_memory_pools/memory_pool_cls.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button pst-navbar-icon"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button>
+
+
+<button class="btn btn-sm pst-navbar-icon search-button search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+</button>
+<button class="sidebar-toggle secondary-toggle btn btn-sm pst-navbar-icon" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>memory_pool</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#description">Description</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#api">API</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#header">Header</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#synopsis">Synopsis</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#member-functions">Member Functions</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv411memory_poolRK5Alloc"><code class="docutils literal notranslate"><span class="pre">memory_pool()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#examples">Examples</a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="memory-pool">
+<span id="memory-pool-cls"></span><h1>memory_pool<a class="headerlink" href="#memory-pool" title="Link to this heading">#</a></h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>To enable this feature, set the <code class="docutils literal notranslate"><span class="pre">TBB_PREVIEW_MEMORY_POOL</span></code> macro to 1.</p>
+</div>
+<p>A class template for scalable memory allocation from memory blocks provided by an underlying allocator.</p>
+<nav class="contents local" id="contents">
+<ul class="simple">
+<li><p><a class="reference internal" href="#description" id="id1">Description</a></p></li>
+<li><p><a class="reference internal" href="#api" id="id2">API</a></p></li>
+<li><p><a class="reference internal" href="#examples" id="id3">Examples</a></p></li>
+</ul>
+</nav>
+<section id="description">
+<h2><a class="toc-backref" href="#id1" role="doc-backlink">Description</a><a class="headerlink" href="#description" title="Link to this heading">#</a></h2>
+<p>A <code class="docutils literal notranslate"><span class="pre">memory_pool</span></code> allocates and frees memory in a way that scales with the number of processors.
+The memory is obtained as big chunks from an underlying allocator specified by the template
+argument. The latter must satisfy the subset of the allocator requirements from the [allocator.requirements]
+ISO C++ Standard section. A <code class="docutils literal notranslate"><span class="pre">memory_pool</span></code> meet the <a class="reference internal" href="../scalable_memory_pools.html"><span class="doc">Memory Pool named requirement</span></a>.</p>
+<div class="admonition caution">
+<p class="admonition-title">Caution</p>
+<p>If the underlying allocator refers to another scalable memory pool, the inner pool (or pools)
+must be destroyed before the outer pool is destroyed or recycled.</p>
+</div>
+</section>
+<section id="api">
+<h2><a class="toc-backref" href="#id2" role="doc-backlink">API</a><a class="headerlink" href="#api" title="Link to this heading">#</a></h2>
+<section id="header">
+<h3>Header<a class="headerlink" href="#header" title="Link to this heading">#</a></h3>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;oneapi/tbb/memory_pool.h&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="synopsis">
+<h3>Synopsis<a class="headerlink" href="#synopsis" title="Link to this heading">#</a></h3>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">namespace</span><span class="w"> </span><span class="nn">oneapi</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">namespace</span><span class="w"> </span><span class="nn">tbb</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">template</span><span class="w"> </span><span class="o">&lt;</span><span class="k">typename</span><span class="w"> </span><span class="nc">Alloc</span><span class="o">&gt;</span>
+<span class="w">        </span><span class="k">class</span><span class="w"> </span><span class="nc">memory_pool</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">public</span><span class="o">:</span>
+<span class="w">            </span><span class="k">explicit</span><span class="w"> </span><span class="n">memory_pool</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">Alloc</span><span class="w"> </span><span class="o">&amp;</span><span class="n">src</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Alloc</span><span class="p">());</span>
+<span class="w">            </span><span class="n">memory_pool</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">memory_pool</span><span class="o">&amp;</span><span class="w"> </span><span class="n">other</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">delete</span><span class="p">;</span>
+<span class="w">            </span><span class="n">memory_pool</span><span class="o">&amp;</span><span class="w"> </span><span class="k">operator</span><span class="o">=</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">memory_pool</span><span class="o">&amp;</span><span class="w"> </span><span class="n">other</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">delete</span><span class="p">;</span>
+<span class="w">            </span><span class="o">~</span><span class="n">memory_pool</span><span class="p">();</span>
+<span class="w">            </span><span class="kt">void</span><span class="w"> </span><span class="nf">recycle</span><span class="p">();</span>
+<span class="w">            </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">malloc</span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">size</span><span class="p">);</span>
+<span class="w">            </span><span class="kt">void</span><span class="w"> </span><span class="nf">free</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">ptr</span><span class="p">);</span>
+<span class="w">           </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">realloc</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">ptr</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">size</span><span class="p">);</span>
+<span class="w">        </span><span class="p">};</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="member-functions">
+<h3>Member Functions<a class="headerlink" href="#member-functions" title="Link to this heading">#</a></h3>
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv411memory_poolRK5Alloc">
+<span id="_CPPv311memory_poolRK5Alloc"></span><span id="_CPPv211memory_poolRK5Alloc"></span><span id="memory_pool__AllocCR"></span><span class="k"><span class="pre">explicit</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">memory_pool</span></span></span><span class="sig-paren">(</span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Alloc</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">src</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="n"><span class="pre">Alloc</span></span><span class="p"><span class="pre">(</span></span><span class="p"><span class="pre">)</span></span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv411memory_poolRK5Alloc" title="Link to this definition">#</a><br /></dt>
+<dd><p><strong>Effects</strong>: Constructs a memory pool with an instance of underlying memory allocator of type <code class="docutils literal notranslate"><span class="pre">Alloc</span></code> copied from <code class="docutils literal notranslate"><span class="pre">src</span></code>.
+Throws the <code class="docutils literal notranslate"><span class="pre">bad_alloc</span></code> exception if runtime fails to construct an instance of the class.</p>
+</dd></dl>
+
+</section>
+</section>
+<section id="examples">
+<h2><a class="toc-backref" href="#id3" role="doc-backlink">Examples</a><a class="headerlink" href="#examples" title="Link to this heading">#</a></h2>
+<p>The code below provides a simple example of allocation from an extensible memory pool.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#define TBB_PREVIEW_MEMORY_POOL 1</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;oneapi/tbb/memory_pool.h&quot;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">memory_pool</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">allocator</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">my_pool</span><span class="p">;</span>
+
+<span class="w">    </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">my_ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">my_pool</span><span class="p">.</span><span class="n">malloc</span><span class="p">(</span><span class="mi">10</span><span class="p">);</span>
+<span class="w">    </span><span class="n">my_pool</span><span class="p">.</span><span class="n">free</span><span class="p">(</span><span class="n">my_ptr</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="../scalable_memory_pools.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Scalable Memory Pools</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="fixed_pool_cls.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">fixed_pool</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item"><div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#description">Description</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#api">API</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#header">Header</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#synopsis">Synopsis</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#member-functions">Member Functions</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#_CPPv411memory_poolRK5Alloc"><code class="docutils literal notranslate"><span class="pre">memory_pool()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#examples">Examples</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright UXL Foundation Contributors.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
