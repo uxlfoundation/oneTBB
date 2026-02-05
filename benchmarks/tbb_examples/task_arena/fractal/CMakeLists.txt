@@ -1,4 +1,4 @@
-# Copyright (C) 2020-2025 Intel Corporation
+# Copyright (C) 2020-2026 Intel Corporation
 #
 # This software and the related documents are Intel copyrighted materials, and your use of them is
 # governed by the express license under which they were provided to you ("License"). Unless the
@@ -16,7 +16,7 @@ include(../../common/cmake/common.cmake)
 
 set_common_project_settings(tbb)
 
-add_executable(fractal fractal.cpp main.cpp ) 
+add_executable(fractal fractal.cpp main.cpp )
 
 add_subdirectory(../../common/gui gui)
 
@@ -37,6 +37,7 @@ if (TCM_CUSTOM_OPENMP_LIB_DIR AND NOT WIN32)
     )
 endif()
 
+target_compile_definitions(fractal PRIVATE $<$<CONFIG:Debug>:${TCM_DEBUG_FLAG}>)
 target_compile_options(fractal PRIVATE ${TBB_CXX_STD_FLAG} ${TCM_OPENMP_FLAG})
 
 set(EXECUTABLE "$<TARGET_FILE:fractal>")

@@ -29,6 +29,8 @@ target_link_libraries(cholesky
     TBB::tbb
     Threads::Threads
 )
+
+target_compile_definitions(cholesky PRIVATE $<$<CONFIG:Debug>:${TCM_DEBUG_FLAG}>)
 target_compile_options(cholesky PRIVATE ${TBB_CXX_STD_FLAG})
 
 set(EXECUTABLE "$<TARGET_FILE:cholesky>")

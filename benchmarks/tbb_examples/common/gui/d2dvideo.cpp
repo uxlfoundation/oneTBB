@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2005-2023 Intel Corporation
+    Copyright (C) 2005-2026 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -169,7 +169,9 @@ void video::terminate() {
 
 drawing_area::drawing_area(int x, int y, int sizex, int sizey)
         : base_index(y * g_sizex + x),
+#if TCM_DEBUG
           max_index(g_sizex * g_sizey),
+#endif
           index_stride(g_sizex),
           pixel_depth(24),
           ptr32(g_pImg),

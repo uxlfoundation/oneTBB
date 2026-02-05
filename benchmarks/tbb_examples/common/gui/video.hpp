@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2005-2024 Intel Corporation
+    Copyright (C) 2005-2026 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -119,7 +119,11 @@ public:
 
 //! Drawing class
 class drawing_area {
-    const std::size_t base_index, max_index, index_stride;
+    const std::size_t base_index,
+#if TCM_DEBUG
+    max_index,
+#endif
+    index_stride;
     const depth_t pixel_depth;
     unsigned int *const ptr32;
     std::size_t index;
@@ -189,7 +193,9 @@ inline color_t video::get_color(colorcomp_t red, colorcomp_t green, colorcomp_t 
 
 inline drawing_area::drawing_area(int x, int y, int sizex, int sizey, const drawing_memory &dmem)
         : base_index(y * dmem.sizex + x),
+#if TCM_DEBUG
           max_index(dmem.sizex * dmem.sizey),
+#endif
           index_stride(dmem.sizex),
           pixel_depth(dmem.pixel_depth),
           ptr32(reinterpret_cast<unsigned int *>(dmem.my_address)),

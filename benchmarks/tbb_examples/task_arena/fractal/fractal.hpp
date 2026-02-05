@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2005-2025 Intel Corporation
+    Copyright (C) 2005-2026 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -103,14 +103,15 @@ public:
 class fractal_runtime {
 public:
     fractal_runtime(fractal &_f, int& _num_frames, const char* _name)
-        : f(_f), num_frames(_num_frames), name(_name) {}
+        : num_frames(_num_frames), f(_f), name(_name) {}
+    virtual ~fractal_runtime() = default;
     void calc_fractal();
     virtual void render() {};
     virtual void run() {}
     virtual void wait() {}
     virtual void run_and_wait() {}
     virtual void cancel() {}
-    virtual void initialize(int num_threads) {}
+    virtual void initialize(int /*num_threads*/) {}
 protected:
     //! Number of frames to calculate
     int& num_frames;
@@ -124,6 +125,10 @@ class fractal_runtime_tbb : public fractal_runtime {
 public:
     fractal_runtime_tbb(fractal &_f, int& _num_frames, const char* name = "tbb")
         : fractal_runtime(_f, _num_frames, name) {}
+
+    // Exception specification is needed here since base class's destructor is not
+    // potentially-throwing, but the override cannot have laxer specification. See [except.spec].
+    ~fractal_runtime_tbb() noexcept override = default;
 
     void initialize(int num_threads) override {
         ta.initialize(num_threads);

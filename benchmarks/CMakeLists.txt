@@ -21,6 +21,8 @@ else()
   set(TCM_OPENMP_FLAG -qopenmp)
 endif()
 
+set(TCM_DEBUG_FLAG "TCM_DEBUG")
+
 if (NOT CMAKE_CXX_COMPILER_ID MATCHES "IntelLLVM")
   include(FindOpenMP)
   if (NOT OpenMP_FOUND)

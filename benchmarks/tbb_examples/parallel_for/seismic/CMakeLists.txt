@@ -37,6 +37,7 @@ if (TCM_CUSTOM_OPENMP_LIB_DIR AND NOT WIN32)
     )
 endif()
 
+target_compile_definitions(seismic PRIVATE $<$<CONFIG:Debug>:${TCM_DEBUG_FLAG}>)
 target_compile_options(seismic PRIVATE ${TBB_CXX_STD_FLAG} ${TCM_OPENMP_FLAG})
 
 if (EXAMPLES_UI_MODE STREQUAL "con")

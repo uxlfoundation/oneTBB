@@ -29,6 +29,8 @@ function(add_synthetic_bench)
         ${TCM_OPENMP_FLAG}
     )
 
+    target_compile_definitions(${_tcm_bench_NAME} PRIVATE $<$<CONFIG:Debug>:${TCM_DEBUG_FLAG}>)
+
     if (NOT TCM_OPENMP_MISSING_LINK_FLAG)
         target_link_options(${_tcm_bench_NAME}
             PRIVATE
