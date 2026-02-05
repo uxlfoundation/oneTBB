@@ -85,7 +85,7 @@ Example output:
     TCM: TCM_ENABLE         1
 
 
-When used with the OpenMP implementation of Intel(R) DPC++/C++ Compiler,
+When used with the OpenMP implementation of Intel(R) oneAPI DPC++/C++ Compiler,
 TCM allows to avoid simultaneous scheduling of excessive threads in the
 scenarios similar to the one above.
 

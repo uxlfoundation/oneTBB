@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -255,8 +255,8 @@ arena::arena(threading_control* control, unsigned num_slots, unsigned num_reserv
     my_limit = 1;
     // Two slots are mandatory: for the external thread, and for 1 worker (required to support starvation resistant tasks).
     my_num_slots = num_arena_slots(num_slots, num_reserved_slots);
-    my_num_reserved_slots = num_reserved_slots;
-    my_max_num_workers = num_slots-num_reserved_slots;
+    my_num_reserved_slots = min(num_reserved_slots, num_slots);
+    my_max_num_workers = num_slots-my_num_reserved_slots;
     my_priority_level = priority_level;
     my_references = ref_external; // accounts for the external thread
     my_observers.my_arena = this;
@@ -275,6 +275,7 @@ arena::arena(threading_control* control, unsigned num_slots, unsigned num_reserv
         my_slots[i].init_task_streams(i);
         my_slots[i].my_default_task_dispatcher = new(base_td_pointer + i) task_dispatcher(this);
         my_slots[i].my_is_occupied.store(false, std::memory_order_relaxed);
+        my_slots[i].accessed_by_owner.store(false, std::memory_order_relaxed);
     }
     my_fifo_task_stream.initialize(my_num_slots);
     my_resume_task_stream.initialize(my_num_slots);
@@ -373,7 +374,7 @@ bool arena::has_tasks() {
     std::size_t n = my_limit.load(std::memory_order_acquire);
     bool tasks_are_available = false;
     for (std::size_t k = 0; k < n && !tasks_are_available; ++k) {
-        tasks_are_available = !my_slots[k].is_empty();
+        tasks_are_available = my_slots[k].has_tasks();
     }
     tasks_are_available = tasks_are_available || has_enqueued_tasks() || !my_resume_task_stream.empty();
 #if __TBB_CRITICAL_TASKS
@@ -469,13 +470,13 @@ arena &arena::create(threading_control *control, unsigned num_slots,
 #endif
 ) {
     __TBB_ASSERT(num_slots > 0, NULL);
-    __TBB_ASSERT(num_reserved_slots <= num_slots, NULL);
     // Add public market reference for an external thread/task_arena (that adds an internal reference in exchange).
     arena& a = arena::allocate_arena(control, num_slots, num_reserved_slots, arena_priority_level
 #if __TBB_PREVIEW_PARALLEL_PHASE
                                      , lp
 #endif
     );
+    __TBB_ASSERT(a.my_num_reserved_slots <= a.my_num_slots, NULL);
     a.my_tc_client = control->create_client(a);
     // We should not publish arena until all fields are initialized
     control->publish_client(a.my_tc_client, constraints);
