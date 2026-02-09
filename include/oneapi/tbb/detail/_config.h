@@ -55,6 +55,12 @@
 #define __TBB_CPP17_PRESENT (__TBB_LANG >= 201703L)
 #define __TBB_CPP20_PRESENT (__TBB_LANG >= 202002L)
 
+#if __TBB_CPP17_PRESENT
+    #define __TBB_GLOBAL_VAR inline
+#else
+    #define __TBB_GLOBAL_VAR static
+#endif
+
 #if __INTEL_COMPILER || _MSC_VER
     #define __TBB_NOINLINE(decl) __declspec(noinline) decl
 #elif __GNUC__

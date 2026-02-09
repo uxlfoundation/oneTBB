@@ -221,7 +221,7 @@ bool operator<=( const vector_iterator<Vector, T>& i, const vector_iterator<Vect
     return !(j < i);
 }
 
-static constexpr std::size_t embedded_table_num_segments = 3;
+__TBB_GLOBAL_VAR constexpr std::size_t embedded_table_num_segments = 3;
 
 template <typename T, typename Allocator = tbb::cache_aligned_allocator<T>>
 class concurrent_vector
