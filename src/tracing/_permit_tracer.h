@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2024 Intel Corporation
+    Copyright (C) 2024-2026 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -28,6 +28,7 @@
 #include <numeric>
 #include <string>
 #include <vector>
+#include <thread>
 
 namespace tcm {
 namespace internal {
@@ -49,6 +50,8 @@ struct permits_info {
     tm_point time_point;
     const char* event = nullptr;
 
+    std::thread::id thread_id;
+
     // TODO: Consider re-using instead of repeating permit's data here
 
     // Permit snashot
@@ -66,26 +69,47 @@ struct permits_info {
 using table_t = std::vector<std::vector<std::string>>;
 
 /**
+ * Maps Thread ID to a consecutive number starting from one.
+ *
+ * @param tid Thread ID to map to a number.
+ *
+ * @param tid_to_num Map of Thread IDs to their corresponding ordinal numbers. Updated with the \c
+ * tid if it was not present in it before the function invocation.
+ *
+ * @return a number associated with the given \c tid.
+ */
+inline unsigned map_to_ordinal_number(const std::thread::id& tid,
+                                      std::map<std::thread::id, unsigned>& tid_to_num)
+{
+    const unsigned size = unsigned(tid_to_num.size());
+    const auto node = tid_to_num.try_emplace(tid, size + 1);
+    return node.first->second; // returns either inserted or existing associated number
+}
+
+/**
  * Makes a table of entries, where each table cell is represented as a string.
  *
  * @param data The data from which to make a table.
  *
  * @return A table represented as a two-dimensional array of strings.
  */
-inline table_t get_user_presentation(std::vector<permits_info const*> data) {
+inline table_t get_user_presentation(const std::vector<permits_info const*>& data) {
+    table_t result(data.size());
+    std::map<std::thread::id, unsigned> tid_to_num;
     extern const tm_point start_time;
     tm_point last_time_point = start_time;
-    table_t result(data.size());
     for (unsigned i = 0; i < data.size(); ++i) {
-        std::vector<std::string> row;
+        std::vector<std::string> row; row.reserve(14);
 
         permits_info const& info = *data[i];
 
+        row.emplace_back(info.event);
+
         auto const duration = info.time_point - last_time_point;
         last_time_point = info.time_point;
-
-        row.emplace_back(info.event);
         row.emplace_back("+" + std::to_string(duration.count()));
+
+        row.emplace_back(std::to_string(map_to_ordinal_number(info.thread_id, tid_to_num)));
         row.emplace_back(to_string(info.permit_handle));
         row.emplace_back(to_string(info.state));
         row.emplace_back(to_string(info.flags));
@@ -113,11 +137,11 @@ inline table_t get_user_presentation(std::vector<permits_info const*> data) {
  *
  * @param data The data to present.
  */
-inline void print(std::ostream& out, std::vector<permits_info const*> data) {
-     out << "\nPermits data in chronological order:\n";
+inline void print(std::ostream& out, const std::vector<permits_info const*>& data) {
+    out << "\nPermits data in chronological order:\n";
 
     std::vector<std::string> const table_header = {
-        "Event", "Time Diff (ns)", "Permit Handle", "State", "Flags", "Nested", "Grant",
+        "Event", "Time Diff (ns)", "Thr #", "Permit Handle", "State", "Flags", "Nested", "Grant",
         "Request", "Flags", "Constraints", "Size", "Priority", "Callback Arg"
     };
     auto columns_widths = determine_column_widths(table_header,
@@ -207,9 +231,9 @@ inline void dump_permit_data(tcm_permit_handle_t permit_handle, const char* even
     void* callback_arg = permit_handle->callback_arg;
     tcm_permit_request_t request = permit_handle->request; // Note shallow copy
 
-    g_permits_log.get_thread_logger().log(time_point, event, permit_handle, state,
-                                          flags, is_nested, concurrencies, request,
-                                          callback_arg);
+    g_permits_log.get_thread_logger().log(time_point, event, std::this_thread::get_id(),
+                                          permit_handle, state, flags, is_nested, concurrencies,
+                                          request, callback_arg);
 }
 
 #define __TCM_PROFILE_PERMIT(permit_handle, msg)                               \

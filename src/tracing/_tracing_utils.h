@@ -85,7 +85,8 @@ inline std::vector<unsigned> determine_column_widths(std::vector<std::string> co
  * @param cell_values Values to place in cells.
  */
 inline void print_table_row(std::ostream& out, std::vector<unsigned> const& cell_widths,
-                            std::string const& intercell_space, std::vector<std::string> cell_values)
+                            std::string const& intercell_space,
+                            std::vector<std::string> const& cell_values)
 {
     __TCM_ASSERT(cell_widths.size() == cell_values.size(), "Mismatched sizes");
     out << std::left;
