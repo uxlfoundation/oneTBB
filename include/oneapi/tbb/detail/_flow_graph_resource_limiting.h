@@ -183,7 +183,7 @@ public:
         }
     }
 
-    void release(consumer_type& consumer, request_id, optional_type&& handle) override {
+    void release(consumer_type&, request_id, optional_type&& handle) override {
         __TBB_ASSERT(handle.has_value(), nullptr);
         tbb::spin_mutex::scoped_lock lock(m_mutex);
 

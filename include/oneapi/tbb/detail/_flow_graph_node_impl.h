@@ -537,9 +537,9 @@ template<int N> struct clear_element {
 };
 
 template <> struct clear_element<0> {
-    template <typename P> static void clear_this(P& p) {}
+    template <typename P> static void clear_this(P&) {}
 #if TBB_USE_ASSERT
-    template <typename P> static bool this_empty(P& p) {}
+    template <typename P> static bool this_empty(P&) {}
 #endif
 };
 
