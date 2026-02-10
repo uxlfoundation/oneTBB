@@ -117,7 +117,13 @@ inline void add_stack_frame(callstack& calls, function_durations& durations,
                             const std::chrono::nanoseconds& duration)
 {
     __TCM_ASSERT(func_name, "Incorrect function name");
+
+    // Suppressing 'func_name' could be '0': this does not adhere to the specification for the
+    // function 'std::basic_string<char,std::char_traits<char>,std::allocator<char> >::{ctor}'
+    __TCM_SUPPRESS_WARNING_WITH_PUSH(6387)
     calls.function_names.push_back(std::string(func_name));
+    __TCM_SUPPRESS_WARNING_POP
+
     calls.nesting_levels.push_back(nesting_level);
     durations.push_back(duration);
 }
