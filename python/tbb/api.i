@@ -40,18 +40,6 @@ __all__ = ["task_arena",
 #error SWIG version 3.0.6 or newer is required for correct functioning
 #endif
 
-/* Insert code after module initialization to declare NOGIL safety */
-%init %{
-    /* For Python 3.13+ free-threading support, we need to declare that
-     * this module is safe to use without the GIL. The actual declaration
-     * is done via module slots in the PyModuleDef structure.
-     * 
-     * Note: SWIG-generated code uses SWIG_PYTHON_THREAD_BEGIN_BLOCK and
-     * SWIG_PYTHON_THREAD_END_BLOCK macros around all Python API calls,
-     * which correctly acquire/release the GIL when needed.
-     */
-%}
-
 %{
 #include "tbb/task_arena.h"
 #include "tbb/task_group.h"
@@ -76,9 +64,23 @@ using namespace tbb;
  */
 class PyCaller : public swig::SwigPtr_PyObject {
 public:
-    // icpc 2013 does not support simple using SwigPtr_PyObject::SwigPtr_PyObject;
-    PyCaller(const PyCaller& s) : SwigPtr_PyObject(s) {}
+    // Copy constructor - must acquire GIL for Py_XINCREF in base class
+    PyCaller(const PyCaller& s) : SwigPtr_PyObject() {
+        SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+        _obj = s._obj;
+        Py_XINCREF(_obj);
+        SWIG_PYTHON_THREAD_END_BLOCK;
+    }
+    
     PyCaller(PyObject *p, bool initial = true) : SwigPtr_PyObject(p, initial) {}
+    
+    // Destructor - must acquire GIL for Py_XDECREF
+    ~PyCaller() {
+        SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+        Py_XDECREF(_obj);
+        _obj = nullptr;  // Prevent double-free in base destructor
+        SWIG_PYTHON_THREAD_END_BLOCK;
+    }
 
     void operator()() const {
         /* Acquire GIL before calling Python code - required for free-threading */
@@ -166,7 +168,7 @@ void _concurrency_barrier(int threads = tbb::task_arena::automatic) {
                 b.event.wait(lock);
         });
     std::unique_lock<std::mutex> lock(b.m);
-    b.event.wait(lock);
+    b.event.wait(lock, [&b]{ return b.worker_threads >= b.full_threads; });
     tg.wait();
 };
 
