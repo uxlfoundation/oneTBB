@@ -84,7 +84,12 @@ public:
         /* Acquire GIL before calling Python code - required for free-threading */
         SWIG_PYTHON_THREAD_BEGIN_BLOCK;
         PyObject* r = PyObject_CallFunctionObjArgs((PyObject*)*this, nullptr);
-        if(r) Py_DECREF(r);
+        if(r) {
+            Py_DECREF(r);
+        } else {
+            /* Log exception - cannot propagate from TBB worker thread */
+            PyErr_WriteUnraisable((PyObject*)*this);
+        }
         SWIG_PYTHON_THREAD_END_BLOCK;
     }
 };
