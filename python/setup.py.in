@@ -18,6 +18,7 @@
 import platform
 import os
 import sys
+import sysconfig
 
 try:
     from setuptools import setup, Extension
@@ -61,8 +62,8 @@ if platform.system() == 'Windows':
 else:
     tbb_flag = ['-tbb'] if use_compiler_tbb else []
     compile_flags = ['-std=c++11', '-Wno-unused-variable']
-    # Enable free-threading (NOGIL) support for Python 3.13+
-    if sys.version_info >= (3, 13):
+    # Enable free-threading (NOGIL) support when building with free-threaded Python
+    if sysconfig.get_config_var('Py_GIL_DISABLED'):
         compile_flags.append('-DSWIGPYTHON_NOGIL')
     tbb_lib_name = 'tbb'
 
@@ -105,8 +106,7 @@ class TBBBuild(build):
 setup(  name        ="TBB",
         description ="Python API for oneTBB",
         long_description="Python API to Intel(R) oneAPI Threading Building Blocks library (oneTBB) "
-                         "extended with standard Pool implementation and monkey-patching. "
-                         "Supports Python 3.13+ free-threading (NOGIL).",
+                         "extended with standard Pool implementation and monkey-patching",
         url         ="https://www.intel.com/content/www/us/en/developer/tools/oneapi/onetbb.html",
         author      ="Intel Corporation",
         author_email="inteltbbdevelopers@intel.com",
@@ -125,12 +125,11 @@ setup(  name        ="TBB",
             'Operating System :: POSIX :: Linux',
             'Programming Language :: Python',
             'Programming Language :: Python :: 3',
-            'Programming Language :: Python :: 3.13',
             'Programming Language :: C++',
             'Topic :: System :: Hardware :: Symmetric Multi-processing',
             'Topic :: Software Development :: Libraries',
           ],
-        keywords='TBB multiprocessing multithreading composable parallelism free-threading nogil',
+        keywords='TBB multiprocessing multithreading composable parallelism',
         ext_modules=[_tbb],
         packages=['tbb'],
         py_modules=['TBB'],
