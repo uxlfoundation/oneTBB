@@ -247,7 +247,7 @@ public:
     void notify(resource_provider_base<resource_handle_type>& provider, request_id id) override {
         __TBB_ASSERT(&provider == &m_resource_provider, "Provider-consumer mismatch");
         m_body_ptr->notify(id);
-        tbb::detail::supress_unused_warning(provider);
+        tbb::detail::suppress_unused_warning(provider);
     }
 
     ResourceProvider&            m_resource_provider;
