@@ -33,8 +33,6 @@ __all__ = ["task_arena",
  * acquire the GIL using SWIG_PYTHON_THREAD_BEGIN_BLOCK/END_BLOCK macros.
  */
 
-/* Enable free-threading support for Python 3.13+ */
-#define Py_BUILD_CORE_MODULE
 %}
 %module api
 
@@ -100,11 +98,30 @@ public:
 struct ArenaPyCaller {
     task_arena *my_arena;
     PyObject *my_callable;
+    
     ArenaPyCaller(task_arena *a, PyObject *c) : my_arena(a), my_callable(c) {
         SWIG_PYTHON_THREAD_BEGIN_BLOCK;
         Py_XINCREF(c);
         SWIG_PYTHON_THREAD_END_BLOCK;
     }
+    
+    // Copy constructor - needed because TBB may copy task functors
+    ArenaPyCaller(const ArenaPyCaller& other) : my_arena(other.my_arena), my_callable(other.my_callable) {
+        SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+        Py_XINCREF(my_callable);
+        SWIG_PYTHON_THREAD_END_BLOCK;
+    }
+    
+    // Destructor - release Python object reference
+    ~ArenaPyCaller() {
+        SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+        Py_XDECREF(my_callable);
+        SWIG_PYTHON_THREAD_END_BLOCK;
+    }
+    
+    // Assignment operator - prevent double-free issues
+    ArenaPyCaller& operator=(const ArenaPyCaller&) = delete;
+    
     void operator()() const {
         my_arena->execute(PyCaller(my_callable, false));
     }
