@@ -17,7 +17,6 @@
 # System imports
 import platform
 import os
-import sys
 import sysconfig
 
 try:
