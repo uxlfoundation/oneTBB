@@ -502,48 +502,50 @@ public:
                             std::tuple<ResourceProviders&...> resource_providers,
                             Body& body)
         : base_type(g, max_concurrency, no_priority, true) // TODO: fill noexcept correctly
-        , my_body(new resource_consumer_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body))
-        , my_init_body(new resource_consumer_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body))
-        , my_output_ports(init_output_ports<output_ports_type>::call(g, my_output_ports))
+        , m_body(new resource_consumer_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body))
+        , m_init_body(new resource_consumer_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body))
+        , m_output_ports(init_output_ports<output_ports_type>::call(g, m_output_ports))
     {}
 
     resource_consumer_input(const resource_consumer_input& other)
         : base_type(other)
-        , my_body(other.my_init_body->clone())
-        , my_init_body(other.my_init_body->clone())
-        , my_output_ports(init_output_ports<output_ports_type>::call(this->graph_reference(), my_output_ports))
+        , m_body(other.m_init_body->clone())
+        , m_init_body(other.m_init_body->clone())
+        , m_output_ports(init_output_ports<output_ports_type>::call(this->graph_reference(), m_output_ports))
     {}
 
     ~resource_consumer_input() {
-        delete my_body;
-        delete my_init_body;
+        delete m_body;
+        delete m_init_body;
     }
 
     graph_task* apply_body_impl_bypass(const input_type& i
                                        __TBB_FLOW_GRAPH_METAINFO_ARG(const message_metainfo&))
     {
-        (*my_body)(i, my_output_ports);
+        (*m_body)(i, m_output_ports);
         graph_task* ttask = nullptr;
         if (base_type::my_max_concurrency != 0) {
             ttask = base_type::try_get_postponed_task(i);
         }
         return ttask ? ttask : SUCCESSFULLY_ENQUEUED;
     }
+
+    output_ports_type& output_ports() { return m_output_ports; }
 protected:
     void reset(reset_flags f) {
         base_type::reset_function_input_base(f);
-        if (f & rf_clear_edges) clear_element<N>::clear_this(my_output_ports);
+        if (f & rf_clear_edges) clear_element<N>::clear_this(m_output_ports);
         if (f & rf_reset_bodies) {
-            resource_consumer_body_type* tmp = my_init_body->clone();
-            delete my_body;
-            my_body = tmp;
+            resource_consumer_body_type* tmp = m_init_body->clone();
+            delete m_body;
+            m_body = tmp;
         }
-        __TBB_ASSERT(!(f & rf_clear_edges) || clear_element<N>::this_empty(my_output_ports), "resource_limited_node reset failed");
+        __TBB_ASSERT(!(f & rf_clear_edges) || clear_element<N>::this_empty(m_output_ports), "resource_limited_node reset failed");
     }
 private:
-    resource_consumer_body_type* my_body;
-    resource_consumer_body_type* my_init_body;
-    output_ports_type            my_output_ports;
+    resource_consumer_body_type* m_body;
+    resource_consumer_body_type* m_init_body;
+    output_ports_type            m_output_ports;
 };
 
 template <typename Input, typename OutputTuple>
@@ -568,7 +570,7 @@ public:
     {}
 
     resource_consumer_node(const resource_consumer_node& other)
-        : graph_node(other.my_graph)
+        : graph_node(other.m_graph)
         , input_impl_type(other)
     {}
 protected:
