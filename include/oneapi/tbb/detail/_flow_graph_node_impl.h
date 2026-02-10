@@ -535,14 +535,10 @@ template<int N> struct clear_element {
 #endif
 };
 
-template<> struct clear_element<1> {
-    template<typename P> static void clear_this(P &p) {
-        (void)std::get<0>(p).successors().clear();
-    }
+template <> struct clear_element<0> {
+    template <typename P> static void clear_this(P& p) {}
 #if TBB_USE_ASSERT
-    template<typename P> static bool this_empty(P &p) {
-        return std::get<0>(p).successors().empty();
-    }
+    template <typename P> static bool this_empty(P& p) {}
 #endif
 };
 
