@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2024-2025 Intel Corporation
+    Copyright (C) 2024-2026 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -13,8 +13,8 @@
 #ifndef __TCM_UTILS_HEADER
 #define __TCM_UTILS_HEADER
 
-#include <climits>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -33,28 +33,15 @@ inline std::string to_string(void* ptr) {
 }
 
 inline std::string to_string(tcm_permit_flags_t f) {
-    const unsigned max_bits = 128;
-    const unsigned num_bytes = sizeof(tcm_permit_flags_t);
-    const unsigned num_chars = num_bytes / sizeof(char);
-    __TCM_ASSERT(num_bytes % sizeof(char) == 0, "The function cannot be run on this platform");
-    const unsigned num_bits = CHAR_BIT * num_chars;
-    __TCM_ASSERT(num_bits <= max_bits, "Helper won't work. Increase the default number of bits");
-    const unsigned last_bit = 1;
-    char result[max_bits] = {}; for (auto& c : result) c = '0'; result[num_bits] = '\0';
-    unsigned last_non_zero = 0;
-    for (unsigned i = 0; i < num_chars; --i) {
-        char c = *(static_cast<char*>(static_cast<void*>(&f)) + i);
-        for (unsigned j = 0; j < CHAR_BIT; ++j) {
-            if (c & last_bit) {
-                unsigned const bit_index = i * CHAR_BIT + j;
-                result[bit_index] = '1';
-                last_non_zero = bit_index;
-            }
-            c >>= 1;
-        }
-    }
-    result[last_non_zero + 1] = '\0'; // Truncate last zeroes
-    return std::string(result);
+    constexpr unsigned num_bytes = sizeof(tcm_permit_flags_t);
+    static_assert(num_bytes == 4 && sizeof(uint32_t) == num_bytes,
+                  "The function assumes permit flags type has specific size.");
+    uint32_t v = 0;
+    std::memcpy(&v, &f, sizeof(v));
+    constexpr unsigned size = 2 * num_bytes + 1; // 2 HEX characters per byte + terminating null
+    char a[size] = {};
+    std::snprintf(a, size, "0x%X", v); // Note: Allocation of bit fields is implementation-defined
+    return std::string(a);
 }
 
 inline std::string to_string(uint32_t const* concurrencies, uint32_t const size) {
