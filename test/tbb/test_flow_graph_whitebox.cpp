@@ -30,6 +30,10 @@
 #include "tbb/task_arena.h"
 #include "tbb/task_group.h"
 
+// Hack to avoid redeclaration of internal chrono structures with different access
+// under define private public
+#include <chrono>
+
 #define private public
 #define protected public
 #include "tbb/flow_graph.h"
