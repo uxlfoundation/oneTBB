@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2016-2025 Intel Corporation
+# Copyright (c) 2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ def compute(task_id):
 
 def example_patch():
     """Global patch — all threading.Thread uses TBB pool."""
-    from tbb.threading_patch import patch_threading, unpatch_threading
+    from tbb import patch_threading, unpatch_threading
 
     patch_threading()
 
@@ -67,7 +67,7 @@ def example_patch():
 
 def example_context_manager():
     """Scoped patch — TBB threading only inside the block."""
-    from tbb.threading_patch import tbb_threading
+    from tbb import tbb_threading
 
     results = {}
     lock = threading.Lock()

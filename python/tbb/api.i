@@ -275,7 +275,7 @@ def tbb_run_and_wait(callables):
     """
     Run multiple callables on TBB threads and wait for completion.
     
-    This is the zero-overhead way to run parallel tasks.
+    Run callables in parallel using TBB task_group.
     
     Note: Exceptions raised in callables are not propagated. They are logged
     to stderr via PyErr_WriteUnraisable at the C++ level. If you need exception

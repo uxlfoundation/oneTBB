@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2023 Intel Corporation
+# Copyright (c) 2016-2025 Intel Corporation
 # Copyright (c) 2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,6 +19,7 @@ import atexit
 import sys
 import os
 import threading
+import _thread
 import warnings
 from typing import Optional, Callable, Tuple
 from contextlib import contextmanager
@@ -224,11 +225,11 @@ class TBBThread:
         with cls._pool_lock:
             if cls._pool is not None:
                 cls._pool.close()
+                cls._pool.join()
                 cls._pool = None
     
     def _run_wrapper(self) -> None:
         """Wrapper that runs target and captures result/exception."""
-        import _thread
         self._native_id = _thread.get_native_id()
         self._ident = _thread.get_ident()
         self._started.set()

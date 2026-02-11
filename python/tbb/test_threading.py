@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2025 Intel Corporation
+# Copyright (c) 2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,11 +27,11 @@ import threading
 import time
 import unittest
 
-from .threading_patch import (
+from . import (
     TBBThread,
     patch_threading,
     unpatch_threading,
-    is_patched,
+    is_threading_patched,
     tbb_threading,
     _OriginalThread,
 )
@@ -43,24 +43,24 @@ class TestPatchLifecycle(unittest.TestCase):
 
     def setUp(self):
         # Ensure clean state before each test
-        if is_patched():
+        if is_threading_patched():
             unpatch_threading()
 
     def tearDown(self):
-        if is_patched():
+        if is_threading_patched():
             unpatch_threading()
 
     def test_patch_replaces_thread(self):
         assert threading.Thread is _OriginalThread
         patch_threading()
         assert threading.Thread is TBBThread
-        assert is_patched()
+        assert is_threading_patched()
 
     def test_unpatch_restores_thread(self):
         patch_threading()
         unpatch_threading()
         assert threading.Thread is _OriginalThread
-        assert not is_patched()
+        assert not is_threading_patched()
 
     def test_double_patch_is_safe(self):
         patch_threading()
