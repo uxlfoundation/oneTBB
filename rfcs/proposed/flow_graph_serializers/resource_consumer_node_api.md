@@ -1,4 +1,4 @@
-# Resource-Limiting Node API for the Flow Graph
+# Resource-Limited Node API for the Flow Graph
 
 Note: This document is a sub-RFC for the [Resource-limited Nodes RFC](./README.md).
 
@@ -10,8 +10,8 @@ Note: This document is a sub-RFC for the [Resource-limited Nodes RFC](./README.m
   * 1.3 [API Details](#api-details)
   * 1.4 [API Specification](#api-specification)
     * 1.4.1 [`oneapi::tbb::flow::resource_provider` Class](#oneapitbbflowresource_provider-class)
-    * 1.4.2 [`ResourceConsumerBody` Named Requirements](#resourceconsumerbody-named-requirements)
-    * 1.4.3 [`oneapi::tbb::flow::resource_consumer_node` Class](#oneapitbbflowresource_consumer_node-class)
+    * 1.4.2 [`ResourceLimitedBody` Named Requirements](#resourcelimitedbody-named-requirements)
+    * 1.4.3 [`oneapi::tbb::flow::resource_limited_node` Class](#oneapitbbflowresource_limited_node-class)
 * 2 [API to Support Generic Providers](#api-to-support-generic-providers)
 * 3 [Exit Criteria and Open Questions](#exit-criteria-and-open-questions)
 * 4 [Usage Examples](#usage-examples)
@@ -54,21 +54,21 @@ class resource_provider {
 };
 
 template <typename Input, typename OutputTuple>
-class resource_consumer_node : public graph_node, public receiver<Input>
+class resource_limited_node : public graph_node, public receiver<Input>
 {
 public:
     using output_ports_type = /*undefined tuple of output ports*/
 
     template <typename Body, typename ResourceProvider, typename... ResourceProviders>
-    resource_consumer_node(graph& g, std::size_t concurrency,
-                           std::tuple<ResourceProvider&, ResourceProviders&...> resource_providers,
-                           Body body);
+    resource_limited_node(graph& g, std::size_t concurrency,
+                          std::tuple<ResourceProvider&, ResourceProviders&...> resource_providers,
+                          Body body);
 
-    resource_consumer_node(const resource_consumer_node& other);
-    ~resource_consumer_node();
+    resource_limited_node(const resource_limited_node& other);
+    ~resource_limited_node();
 
     bool try_put(const Input& input);
-}; // class resource_consumer_node
+}; // class resource_limited_node
 
 } // namespace flow
 } // namespace tbb
@@ -102,14 +102,14 @@ oneapi::tbb::flow::resource_provider<handle_type> provider(&resource);
 All the resource handles managed by the provider are considered equivalent, and the order in which the access to resources
 is granted is unspecified.
 
-`oneapi::tbb::flow::resource_consumer_node<Input, OutputTuple>` is similar to `multifunction_node<Input, Output>`, but 
+`oneapi::tbb::flow::resource_limited_node<Input, OutputTuple>` is similar to `multifunction_node<Input, Output>`, but 
 additionally represents a *Consumer* of resources, provided by one or several providers. The node takes a tuple of references to the providers
 of the required resources as an additional constructor argument.
 
-When the input message arrives at the consumer node, it acquires part of the node's concurrency limit. If the concurrency limit is exceeded,
+When the input message arrives at the node, it acquires part of the node's concurrency limit. If the concurrency limit is exceeded,
 the input is buffered in the internal queue, similar to how a `multifunction_node` with the `oneapi::tbb::flow::queueing` policy behaves.
 
-The necessity of providing a `rejecting` consumer node is an open question.
+The necessity of providing a `rejecting` `resource_limited_node` is an open question.
 
 If the concurrency limit is not exceeded, the node spawns a task that requests access to each resource needed to execute the body.
 Once all the accesses are granted, the user body is executed, and a reference to the handles representing the resources is passed to it:
@@ -129,7 +129,7 @@ auto node_body = [](int input,         // input message
         std::get<0>(ports).try_put(output);
     };
 
-oneapi::tbb::flow::resource_consumer_node<input, output> node(g, oneapi::tbb::flow::unlimited,
+oneapi::tbb::flow::resource_limited_node<input, output> node(g, oneapi::tbb::flow::unlimited,
     std::tie(int_provider, float_provider), // tuple of references to two resources needed by the node
     node_body);
 ```
@@ -168,9 +168,9 @@ resource_provider(Handle&& handle1, Handles&&... handles);
 Constructs a resource provider containing resources represented by the `handle` and the `handles`.
 `ResourceHandle` must be constructible from `std::forward<Handle>(handle)`, and from `std::forward<H>(h)` for each `H` in `Handles` and for each `h` in `handles`.
 
-#### `ResourceConsumerBody` Named Requirements
+#### `ResourceLimitedBody` Named Requirements
 
-The type `Body` satisfies `ResourceConsumerBody` if it
+The type `Body` satisfies `ResourceLimitedBody` if it
 
 * is `CopyConstructible`,
 * is `Destructible`
@@ -183,18 +183,18 @@ void Body::operator()(const Input& v, OutputPortsType& p,
 
 Requirements:
 
-* The `Input` type must be the same as the `Input` template type argument of the `resource_consumer_node` instance into which the `Body` object is passed during construction.
-* The `OutputPortsType` must be the same as the `output_ports_type` member type of the `resource_consumer_node` instance into which the `Body` object is passed during construction.
-* `ResourceHandle1`, ..., `ResourceHandleN` must be the same as `resource_provider::resource_handle_type` member type for each `ResourceProvider` used by the `resource_consumer_node`
+* The `Input` type must be the same as the `Input` template type argument of the `resource_limited_node` instance into which the `Body` object is passed during construction.
+* The `OutputPortsType` must be the same as the `output_ports_type` member type of the `resource_limited_node` instance into which the `Body` object is passed during construction.
+* `ResourceHandle1`, ..., `ResourceHandleN` must be the same as `resource_provider::resource_handle_type` member type for each `ResourceProvider` used by the `resource_limited_node`
 instance into which the `Body` object is passed during construction.
 
 Performs an operation on `v`. It may call `try_put` on zero or more of the output ports and may call `try_put` on any output port multiple times.
 
-#### `oneapi::tbb::flow::resource_consumer_node` Class
+#### `oneapi::tbb::flow::resource_limited_node` Class
 
 ```cpp
 template <typename Input, typename OutputTuple>
-class resource_consumer_node;
+class resource_limited_node;
 ```
 
 A node that receives messages at a single input port and requires access to resources provided by one or several `resource_provider` objects.
@@ -206,9 +206,9 @@ Type requirements:
 sections of the ISO C++ Standard.
 * The `OutputTuple` type must be a specialization of `std::tuple`.
 
-`resource_consumer_node` is a `graph_node` and a `receiver<Input>`, and it has a tuple of `sender<Output>` outputs, where `Output` is a type of element in `OutputTuple`.
+`resource_limited_node` is a `graph_node` and a `receiver<Input>`, and it has a tuple of `sender<Output>` outputs, where `Output` is a type of element in `OutputTuple`.
 
-`resource_consumer_node` has the *discarding* and *broadcast-push* [properties](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/flow_graph/forwarding_and_buffering).
+`resource_limited_node` has the *discarding* and *broadcast-push* [properties](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/flow_graph/forwarding_and_buffering).
 
 ```cpp
 using output_ports_type = ...;
@@ -218,12 +218,12 @@ An alias for a `std::tuple` of output ports.
 
 ```cpp
 template <typename Body, typename ResourceProvider, typename... ResourceProviders>
-resource_consumer_node(graph& g, std::size_t concurrency,
-                       std::tuple<ResourceProvider&, ResourceProviders&...> resource_providers,
-                       Body body);
+resource_limited_node(graph& g, std::size_t concurrency,
+                      std::tuple<ResourceProvider&, ResourceProviders&...> resource_providers,
+                      Body body);
 ```
 
-Constructs a `resource_consumer_node` that belongs to the graph `g`. 
+Constructs a `resource_limited_node` that belongs to the graph `g`. 
 
 The concurrency limit of the node is set to `concurrency`. It can be one of the
 [predefined values](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/flow_graph/predefined_concurrency_limits)
@@ -234,20 +234,20 @@ the node executes the user-provided body on the input messages. The body can cre
 
 If the concurrency limit is exceeded, the input message is queued in the internal buffer and is processed once the concurrency becomes available.
 
-The body object passed to a `resource_consumer_node` is copied. Updates to member variables do not affect the original object used to construct the node.
+The body object passed to a `resource_limited_node` is copied. Updates to member variables do not affect the original object used to construct the node.
 If the state held within a body object must be inspected from outside the node, the
 [`copy_body` function](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/flow_graph/copy_body_func) can be used to obtain an
 updated body.
 
 The type `ResourceProvider` and each type `RP` in `ResourceProviders` must be specifications of `oneapi::tbb::flow::resource_provider`.
 
-The type `Body` must meet the requirements of [`ResourceConsumerNodeBody`](#resourceconsumerbody-named-requirement).
+The type `Body` must meet the requirements of [`ResourceLimitedNodeBody`](#resourcelimitedbody-named-requirements).
 
 ```cpp
-resource_consumer_node(const resource_consumer_node& other);
+resource_limited_node(const resource_limited_node& other);
 ```
 
-Constructs a `resource_consumer_node` with the same initial state that `other` had when it was constructed:
+Constructs a `resource_limited_node` with the same initial state that `other` had when it was constructed:
 
 * It belongs to the same `graph` object as `other`
 * It has the same concurrency threshold as `other`
@@ -257,13 +257,13 @@ Constructs a `resource_consumer_node` with the same initial state that `other` h
 The predecessors and successors of `other` are not copied.
 
 The new body object is copy-constructed from a copy of the original body provided to `other` at its construction. Changes made to member variables in `other`'s body
-after the construction of `other` do not affect the body of the new `resource_consumer_node`.
+after the construction of `other` do not affect the body of the new `resource_limited_node`.
 
 ```cpp
-~resource_consumer_node();
+~resource_limited_node();
 ```
 
-Destroys the `resource_consumer_node` object.
+Destroys the `resource_limited_node` object.
 
 ```cpp
 bool try_put(const Input& v);
@@ -292,11 +292,11 @@ class provider_base {
 };
 ```
 
-In this case, the `resource_consumer_node` would be allowed to take objects of types derived from `provider_base` as arguments. Something like:
+In this case, the `resource_limited_node` would be allowed to take objects of types derived from `provider_base` as arguments. Something like:
 
 ```cpp
 template <typename Body>
-resource_consumer_node(graph& g, std::size_t concurrency, std::vector<provider_base&> resource_providers, Body body);
+resource_limited_node(graph& g, std::size_t concurrency, std::vector<provider_base&> resource_providers, Body body);
 ```
 
 In this case, the base class does not define the type of the resource handle used by the actual implementation, and therefore an object of the correct type cannot be passed to the node's body.
@@ -309,7 +309,7 @@ void construct_graph(provider_base& resource_provider1, provider_base& resource_
     graph g;
 
     // Some nodes
-    resource_consumer_node<input, output> node(g, unlimited,
+    resource_limited_node<input, output> node(g, unlimited,
         {resource_provider1, resource_provider2}, // Types of resource handles are unknown
         [](input i, auto& ports, /*???? arguments of which types to accept ????*/) {});
 }
@@ -328,16 +328,16 @@ auto node_body = [](input i, auto& ports, void* resource_handle_ptr1, void* reso
 
 ## Exit Criteria and Open Questions
 
-1. Is `resource_consumer_node` a suitable name for a Resource-Limiting Flow Graph node? Alternative names are:
+1. Is `resource_limited_node` a suitable name for a Resource-Limited Flow Graph node? Alternative names are:
+    * `resource_consumer_node`
     * `rl_multifunction_node`
     * `rc_multifunction_node`
-    * `resource_limiting_node`
-    * `resource_limiting_multifunction_node`
-    * `resource_consuming_multifunction_node`
-2. Should a Resource-Limiting alternative for `function_node` be provided?
-3. Should the experimental version of `resource_consumer_node` support node priorities?
-4. Should the `output_ports()` member function be provided by `resource_consumer_node`?
-5. Should the `rejecting` alternative be provided for `resource_consumer_node`?
+    * `resource_limited_multifunction_node`
+    * `resource_consumer_multifunction_node`
+2. Should a Resource-Limited alternative for `function_node` be provided?
+3. Should the experimental version of `resource_limited_node` support node priorities?
+4. Should the `output_ports()` member function be provided by `resource_limited_node`?
+5. Should the `rejecting` alternative be provided for `resource_limited_node`?
 6. A possibility to extend the API to support generic resource providers should be considered. Refer to the [separate section](#api-to-support-generic-providers) for more details.
 
 ## Usage Examples
@@ -369,7 +369,7 @@ resource_provider<DB_handle_type> db_provider{DB_handle1, DB_handle2};
 
 input_node<input_type> source(g, generate_input_body);
 
-resource_consumer_node<input_type, histogramming_output>
+resource_limited_node<input_type, histogramming_output>
     histogramming_node(g, unlimited
                        std::tie(root_provider),
                        [](input_type input, auto& output_ports,
@@ -378,7 +378,7 @@ resource_consumer_node<input_type, histogramming_output>
                            // Using output_ports to broadcast outputs
                        });
 
-resource_consumer_node<input_type, generating_output>
+resource_limited_node<input_type, generating_output>
     generating_node(g, unlimited,
                     std::tie(genie_provider),
                     [](input_type input, auto& output_ports,
@@ -386,7 +386,7 @@ resource_consumer_node<input_type, generating_output>
                         // ...
                     });
 
-resource_consumer_node<input_type, histogenerating_output>
+resource_limited_node<input_type, histogenerating_output>
     histogenerating_node(g, unlimited,
                          std::tie(root_provider, genie_provider),
                          [](input_type input, auto& output_ports,
@@ -400,7 +400,7 @@ function_node<input_type, input_type>
                         return input;
                      });
 
-resource_consumer_node<input_type, calibration_output>
+resource_limited_node<input_type, calibration_output>
     calibration_node_A(g, unlimited,
                        std::tie(db_provider),
                        [](input_type input, auto& output_ports,
@@ -408,10 +408,10 @@ resource_consumer_node<input_type, calibration_output>
                            // ...
                        });
 
-resource_consumer_node<input_type, calibration_output>
+resource_limited_node<input_type, calibration_output>
     calibration_node_B(/*same as calibration node A, except the body*/);
 
-resource_consumer_node<input_type, calibration_output>
+resource_limited_node<input_type, calibration_output>
     calibration_node_C(g, serial,
                        std::tie(db_provider),
                        [](input_type input, auto& output_ports,
@@ -443,7 +443,7 @@ std::size_t num_philosophers = 4;
 using namespace tbb::flow;
 
 using think_node_type = function_node<continue_msg, continue_msg>;
-using eat_node_type = resource_consumer_node<continue_msg, std::tuple<continue_msg>>;
+using eat_node_type = resource_limited_node<continue_msg, std::tuple<continue_msg>>;
 
 auto think_body = []() { think(); };
 auto eat_body = [](continue_msg, auto& output_ports, chopstick, chopstick) {
