@@ -22,7 +22,9 @@ __all__ = ["task_arena",
            "this_task_arena_max_concurrency",
            "this_task_arena_current_thread_index",
            "runtime_version",
-           "runtime_interface_version"]
+           "runtime_interface_version",
+           "tbb_run_and_wait",
+           "tbb_parallel_for"]
 %}
 %begin %{
 /* Defines Python wrappers for Intel(R) oneAPI Threading Building Blocks (oneTBB)
@@ -226,6 +228,59 @@ namespace tbb {
     inline int this_task_arena_max_concurrency() { return this_task_arena::max_concurrency();}
     inline int this_task_arena_current_thread_index() { return this_task_arena::current_thread_index();}
 };
+
+/*
+ * Direct TBB thread dispatch - minimal Python overhead
+ * 
+ * Provides tbb_run_and_wait() for batch execution of callables.
+ */
+
+// Python wrapper using existing task_group
+%pythoncode %{
+def tbb_run_and_wait(callables):
+    """
+    Run multiple callables on TBB threads and wait for completion.
+    
+    This is the zero-overhead way to run parallel tasks.
+    
+    Args:
+        callables: iterable of callable objects
+    
+    Example:
+        def work(x):
+            return x * 2
+        
+        funcs = [lambda i=i: work(i) for i in range(10)]
+        tbb_run_and_wait(funcs)
+    """
+    tg = task_group()
+    for c in callables:
+        tg.run(c)
+    tg.wait()
+
+def tbb_parallel_for(n, func):
+    """
+    Run func(i) for i in range(n) on TBB threads.
+    
+    Args:
+        n: number of iterations
+        func: callable that takes one int argument
+    
+    Example:
+        results = []
+        def work(i):
+            results.append(i * 2)
+        
+        tbb_parallel_for(10, work)
+    """
+    tg = task_group()
+    for i in range(n):
+        # Capture i by creating closure
+        def task(idx=i):
+            func(idx)
+        tg.run(task)
+    tg.wait()
+%}
 
 // Additional definitions for Python part of the module
 %pythoncode %{
