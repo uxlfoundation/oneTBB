@@ -150,6 +150,56 @@ class TBBProcessPool3(multiprocessing.pool.Pool):
             p.join()
 
 
+class TBBThread:
+    """
+    Fast TBB-based replacement for threading.Thread.
+    Uses task_group directly for minimal overhead.
+    
+    Each TBBThread has its own task_group for proper join() semantics.
+    """
+    
+    def __init__(self, group=None, target=None, name=None, args=(), kwargs=None, *, daemon=None):
+        self._target = target
+        self._args = args
+        self._kwargs = kwargs or {}
+        self._name = name
+        self._tg = None  # Created on start()
+        self._started = False
+        self._finished = False
+        self._exception = None
+    
+    def _run(self):
+        self._started = True
+        try:
+            if self._target:
+                self._target(*self._args, **self._kwargs)
+        except BaseException as e:
+            self._exception = e
+        finally:
+            self._finished = True
+    
+    def start(self):
+        if self._tg is not None:
+            raise RuntimeError("threads can only be started once")
+        self._tg = task_group()
+        self._tg.run(self._run)
+    
+    def join(self, timeout=None):
+        if self._tg is None:
+            raise RuntimeError("cannot join thread before it is started")
+        # Wait for task_group to complete
+        self._tg.wait()
+        if self._exception:
+            raise self._exception
+    
+    def is_alive(self):
+        return self._started and not self._finished
+    
+    @property
+    def name(self):
+        return self._name
+
+
 class Monkey:
     """
     Context manager which replaces standard multiprocessing.pool
@@ -166,7 +216,11 @@ class Monkey:
     _items   = {}
     _modules = {}
 
-    def __init__(self, max_num_threads=None, benchmark=False):
+    def __init__(self, max_num_threads=None, benchmark=False, threads=False):
+        """
+        :param threads: if True, replace threading.Thread with TBB-based version
+        """
+        self._patch_threads = threads
         """
         Create context manager for running under TBB scheduler.
         :param max_num_threads: if specified, limits maximal number of threads
@@ -207,6 +261,10 @@ class Monkey:
             elif sys.version_info.major == 3 and sys.version_info.minor >= 5:
                 self._patch("Pool", "multiprocessing.pool", TBBProcessPool3)
         self._patch("ThreadPool", "multiprocessing.pool", Pool)
+        
+        # Patch threading.Thread with TBB-based implementation
+        if self._patch_threads:
+            self._patch("Thread", "threading", TBBThread)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -277,6 +335,8 @@ def _main():
                         help="Request verbose and version information")
     parser.add_argument('-m', action='store_true', dest='module',
                         help="Executes following as a module")
+    parser.add_argument('-t', '--threads', action='store_true',
+                        help="Replace threading.Thread with TBB-based implementation (uses fast C++ task_group)")
     parser.add_argument('name', help="Script or module name")
     parser.add_argument('args', nargs=argparse.REMAINDER,
                         help="Command line arguments")
@@ -327,5 +387,5 @@ def _main():
     else:
         import runpy
         runf = runpy.run_module if args.module else runpy.run_path
-        with Monkey(max_num_threads=args.max_num_threads, benchmark=args.benchmark):
+        with Monkey(max_num_threads=args.max_num_threads, benchmark=args.benchmark, threads=args.threads):
             runf(args.name, run_name='__main__')
