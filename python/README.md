@@ -33,9 +33,63 @@ For more information and examples, please refer to [forum discussion](https://co
  - `pydoc tbb` - Read built-in documentation for Python interfaces.
  - `python3 -m tbb your_script.py` - Run your_script.py in context of `with tbb.Monkey():` when oneTBB is enabled. By default only multi-threading will be covered.
  - `python3 -m tbb --ipc your_script.py` - Run your_script.py in context of `with tbb.Monkey():` when oneTBB enabled in both multi-threading and multi-processing modes.
+ - `python3 -m tbb --patch-threading your_script.py` - Replace `threading.Thread` with TBB-based implementation for faster thread creation (see below).
  - `TBB_INCLUDEDIRS=<path_to_tbb_includes> TBB_LIBDIRS=<path_to_prebuilt_libraries> python3 -m pip install --no-build-isolation --prefix <output_directory_path>` - Build and install oneTBB module for Python. (Prerequisites: built oneTBB and IRML libraries)
  - `python3 -m TBB test` - run test for oneTBB module for Python.
  - `python3 -m tbb test` - run test for oneTBB module for Python.
+
+## Threading Patch (`--patch-threading`)
+
+The `--patch-threading` flag (or `-T`) replaces Python's `threading.Thread` with a TBB-based implementation that reuses threads from the TBB pool instead of creating new OS threads.
+
+### When to use
+
+This optimization is most effective for workloads that create many short-lived threads, where thread creation overhead dominates:
+
+| Work Size | Threads | System | TBB | Improvement |
+|-----------|---------|--------|-----|-------------|
+| 1,000 ops | 50 | 9.0ms | 3.9ms | **57% faster** |
+| 10,000 ops | 50 | 21.7ms | 15.1ms | **30% faster** |
+| 50,000 ops | 50 | 71.0ms | 62.6ms | 12% faster |
+
+*Benchmarks on Intel 4-core CPU*
+
+### Combining with other flags
+
+| Command | Effect |
+|---------|--------|
+| `python -m tbb script.py` | TBB pools for ThreadPool/Pool |
+| `python -m tbb --ipc script.py` | + Inter-process TBB coordination |
+| `python -m tbb --patch-threading script.py` | + TBB-based threading.Thread |
+| `python -m tbb --ipc --patch-threading script.py` | All optimizations enabled |
+
+### Programmatic usage
+
+```python
+from tbb.threading_patch import patch_threading, tbb_threading
+
+# Option 1: Global patch
+patch_threading()
+# Now all threading.Thread uses TBB
+
+# Option 2: Context manager
+with tbb_threading():
+    threads = [threading.Thread(target=work) for _ in range(100)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+```
+
+### Limitations
+
+- `daemon` property has no effect (TBB manages thread lifecycle)
+- `native_id` may be reused across TBBThread instances
+- Best for CPU-bound work; I/O-bound threads see less benefit
+
+## Free-threading Python 3.13+ (NOGIL)
+
+When built with Python 3.13t (free-threaded build), the module automatically enables `Py_MOD_GIL_NOT_USED` via SWIG's built-in NOGIL support. All callbacks properly acquire GIL when needed using `SWIG_PYTHON_THREAD_BEGIN_BLOCK/END_BLOCK` macros.
 
 ## System Requirements
  - The Python module was not tested on older versions of Python thus we require at least Python and 3.5 or higher.
