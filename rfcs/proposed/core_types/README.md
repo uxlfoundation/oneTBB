@@ -214,11 +214,16 @@ patterns from 1 to 2<sup>n</sup>-1, and mapping each pattern to a core type comb
 2. What happens if all scores are negative? Options: return an error (exception), switch the parameter
    to `automatic`, or leave the arena uninitialized.
    - In SYCL, class constructors with a device selector must throw an exception if no device is selected.
-3. If selectors take a vector, what happens if the returned vector is smaller or greater than the input one?
-4. For a hypothetical platform having both a few NUMA nodes and different core types, would we allow
+3. Should a score of zero mean "use only if multi-core-type constraints are not supported"? When there are multiple
+   positive scores and the rest are zero, zero could signal an older-runtime fallback to no constraint (rather than the
+   best-scored single type). For example, `{0, 1, 2}` would exclude LP E-cores on a newer runtime but impose no
+   constraint on an older one.
+   - See also the previous question for all-negative scores.
+4. If selectors take a vector, what happens if the returned vector is smaller or greater than the input one?
+5. For a hypothetical platform having both a few NUMA nodes and different core types, would we allow
    to select both at the same time, and if yes - how would that work?
-5. Which other usability names would be useful? For example, a named negative score constant?
-6. How should `max_concurrency` interact with scoring? Users might think that scoring also indicates scheduling
+6. Which other usability names would be useful? For example, a named negative score constant?
+7. How should `max_concurrency` interact with scoring? Users might think that scoring also indicates scheduling
    preference, for example if `max_concurrency` is less than the HW concurrency for selected core types.
 
 ## Alternative 1: Accept Multiple Constraints Instances
