@@ -78,6 +78,7 @@ class TBBThread:
         
         self._started = threading.Event()
         self._stopped = threading.Event()
+        self._start_lock = threading.Lock()
         self._start_called = False
         self._result_queue: queue.Queue = queue.Queue()
         self._exception: Optional[BaseException] = None
@@ -118,11 +119,11 @@ class TBBThread:
     
     def start(self) -> None:
         """Start the thread (submit to TBB pool)."""
-        if self._started.is_set():
-            raise RuntimeError("threads can only be started once")
-        
-        # Mark as starting (not yet running, but start() was called)
-        self._start_called = True
+        with self._start_lock:
+            if self._start_called:
+                raise RuntimeError("threads can only be started once")
+            # Mark as starting (not yet running, but start() was called)
+            self._start_called = True
         
         pool = self._get_pool()
         pool.apply_async(self._run_wrapper)

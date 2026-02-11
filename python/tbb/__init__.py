@@ -152,10 +152,14 @@ class TBBProcessPool3(multiprocessing.pool.Pool):
 
 class TBBThread:
     """
-    Fast TBB-based replacement for threading.Thread.
+    Lightweight TBB-based replacement for threading.Thread.
     Uses task_group directly for minimal overhead.
     
     Each TBBThread has its own task_group for proper join() semantics.
+    
+    Note: This is a minimal implementation for use with Monkey context manager.
+    For full threading.Thread compatibility (ident, native_id, daemon, etc.),
+    use tbb.threading_patch.TBBThread instead.
     """
     
     def __init__(self, group=None, target=None, name=None, args=(), kwargs=None, *, daemon=None):
@@ -218,14 +222,13 @@ class Monkey:
 
     def __init__(self, max_num_threads=None, benchmark=False, threads=False):
         """
+        Create context manager for running under TBB scheduler.
+        
+        :param max_num_threads: if specified, limits maximal number of threads
+        :param benchmark: if specified, blocks in initialization until requested number of threads are ready
         :param threads: if True, replace threading.Thread with TBB-based version
         """
         self._patch_threads = threads
-        """
-        Create context manager for running under TBB scheduler.
-        :param max_num_threads: if specified, limits maximal number of threads
-        :param benchmark: if specified, blocks in initialization until requested number of threads are ready
-        """
         if max_num_threads:
             self.ctl = global_control(global_control.max_allowed_parallelism, int(max_num_threads))
         if benchmark:
