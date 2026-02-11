@@ -224,8 +224,8 @@ namespace tbb {
         void terminate();
         bool is_active();
         %extend {
-        void enqueue( PyObject *c ) { $self->enqueue(PyCaller(c)); }
-        void execute( PyObject *c ) { $self->execute(PyCaller(c)); }
+        void enqueue( PyObject *c ) { $self->enqueue(PyCaller(c, false)); }
+        void execute( PyObject *c ) { $self->execute(PyCaller(c, false)); }
         };
     };
 
@@ -236,7 +236,7 @@ namespace tbb {
         void wait();
         void cancel();
         %extend {
-        void run( PyObject *c ) { $self->run(PyCaller(c)); }
+        void run( PyObject *c ) { $self->run(PyCaller(c, false)); }
         void run( PyObject *c, task_arena *a ) { $self->run(ArenaPyCaller(a, c)); }
         };
     };
@@ -276,6 +276,10 @@ def tbb_run_and_wait(callables):
     
     This is the zero-overhead way to run parallel tasks.
     
+    Note: Exceptions raised in callables are not propagated. They are logged
+    to stderr via PyErr_WriteUnraisable at the C++ level. If you need exception
+    propagation, use TBBThread (via patch_threading) which re-raises in join().
+    
     Args:
         callables: iterable of callable objects
     
@@ -294,6 +298,9 @@ def tbb_run_and_wait(callables):
 def tbb_parallel_for(n, func):
     """
     Run func(i) for i in range(n) on TBB threads.
+    
+    Note: Exceptions raised in func are not propagated. They are logged
+    to stderr via PyErr_WriteUnraisable at the C++ level.
     
     Args:
         n: number of iterations
