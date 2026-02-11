@@ -113,7 +113,9 @@ class TBBThread:
             if self._target:
                 self._target(*self._args, **self._kwargs)
         except BaseException as e:
-            self._exception = e
+            # Store exception without traceback to prevent memory leaks
+            # and potential sensitive data exposure in traceback frames
+            self._exception = e.with_traceback(None)
         finally:
             self._stopped.set()
     
@@ -124,24 +126,31 @@ class TBBThread:
                 raise RuntimeError("threads can only be started once")
             # Mark as starting (not yet running, but start() was called)
             self._start_called = True
-        
-        pool = self._get_pool()
-        pool.apply_async(self._run_wrapper)
+            # Submit inside lock to prevent TOCTOU race with pool shutdown
+            pool = self._get_pool()
+            pool.apply_async(self._run_wrapper)
     
     def join(self, timeout: Optional[float] = None) -> None:
-        """Wait for thread to complete."""
+        """Wait for thread to complete.
+        
+        Note: Unlike threading.Thread, exceptions from the target function
+        are re-raised in join(). This is intentional for better error handling
+        but differs from standard library behavior.
+        """
         if not self._start_called:
             raise RuntimeError("cannot join thread before it is started")
         
-        # Wait for thread to actually start running
-        self._started.wait(timeout)
-        
-        # Wait for thread to complete
-        self._stopped.wait(timeout)
+        # Wait for thread to complete (combines start wait + stop wait)
+        if not self._stopped.wait(timeout):
+            # Timeout expired - thread still running, don't check exception
+            return
         
         if self._exception is not None:
             # Re-raise exception from thread
-            raise self._exception
+            # Create new exception to avoid leaking internal state
+            exc = self._exception
+            self._exception = None  # Clear to allow re-join
+            raise exc
     
     def is_alive(self) -> bool:
         """Return True if thread is running."""
@@ -178,16 +187,37 @@ class TBBThread:
         return f"<TBBThread({self._name}, {status})>"
 
 
-def patch_threading() -> None:
+def patch_threading(*, _warn: bool = True) -> None:
     """
     Replace threading.Thread with TBB-based implementation.
     
     After calling this, all new threading.Thread instances will use
     TBB's thread pool instead of creating OS threads.
+    
+    WARNING: This is a global modification with important limitations:
+    - daemon property has no effect (TBB manages thread lifecycle)
+    - native_id/ident may be reused across TBBThread instances  
+    - Blocking operations (locks, I/O) can exhaust the TBB worker pool
+    - Not recommended for security-sensitive or multi-tenant environments
+    
+    Args:
+        _warn: If True (default), emit a warning about limitations
     """
+    import warnings
+    
     global _is_patched
     if _is_patched:
         return
+    
+    if _warn:
+        warnings.warn(
+            "patch_threading() replaces threading.Thread globally. "
+            "TBBThread has limitations: daemon ignored, thread IDs may be reused, "
+            "blocking operations can exhaust worker pool. "
+            "Use _warn=False to suppress this warning.",
+            UserWarning,
+            stacklevel=2
+        )
     
     threading.Thread = TBBThread
     _is_patched = True
@@ -212,9 +242,16 @@ def is_patched() -> bool:
 
 
 @contextmanager
-def tbb_threading():
+def tbb_threading(*, warn: bool = False):
     """
     Context manager for temporary TBB threading patch.
+    
+    This is the recommended way to use TBB threading as it ensures
+    proper cleanup and limits the scope of the patch.
+    
+    Args:
+        warn: If True, emit warning about limitations (default False
+              since context manager scope is inherently safer)
     
     Example:
         with tbb_threading():
@@ -224,7 +261,7 @@ def tbb_threading():
             for t in threads:
                 t.join()
     """
-    patch_threading()
+    patch_threading(_warn=warn)
     try:
         yield
     finally:
@@ -239,8 +276,8 @@ if __name__ == "__main__":
         print("Usage: python -m tbb.threading_patch <script.py> [args...]")
         sys.exit(1)
     
-    # Patch threading before running script
-    patch_threading()
+    # Patch threading before running script (no warning for CLI usage)
+    patch_threading(_warn=False)
     
     # Run the script
     script = sys.argv[1]

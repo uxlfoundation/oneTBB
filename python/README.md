@@ -83,9 +83,23 @@ with tbb_threading():
 
 ### Limitations
 
+**Thread behavior:**
 - `daemon` property has no effect (TBB manages thread lifecycle)
-- `native_id` may be reused across TBBThread instances
+- `native_id` and `ident` may be reused across TBBThread instances (TBB worker reuse)
 - Best for CPU-bound work; I/O-bound threads see less benefit
+
+**Worker pool considerations:**
+- TBBThread uses a shared worker pool; blocking operations (locks, I/O, `time.sleep()`) can exhaust workers
+- Mixing TBBThread with OS-level synchronization primitives may cause unexpected blocking
+- For I/O-bound workloads, consider using `concurrent.futures.ThreadPoolExecutor` instead
+
+**Exception handling:**
+- Unlike standard `threading.Thread`, exceptions in TBBThread are re-raised in `join()`
+- Tracebacks are stripped to prevent memory leaks and potential data exposure
+
+**Security considerations:**
+- `patch_threading()` modifies a global module; not recommended for multi-tenant environments
+- Use `tbb_threading()` context manager for scoped patching when possible
 
 ## Free-threading Python 3.13+ (NOGIL)
 

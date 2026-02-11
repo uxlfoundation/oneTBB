@@ -66,7 +66,7 @@ using namespace tbb;
  */
 class PyCaller : public swig::SwigPtr_PyObject {
 public:
-    // Copy constructor - must acquire GIL for Py_XINCREF in base class
+    // Copy constructor - must acquire GIL for Py_XINCREF
     PyCaller(const PyCaller& s) : SwigPtr_PyObject() {
         SWIG_PYTHON_THREAD_BEGIN_BLOCK;
         _obj = s._obj;
@@ -76,12 +76,26 @@ public:
     
     PyCaller(PyObject *p, bool initial = true) : SwigPtr_PyObject(p, initial) {}
     
+    // Move constructor - transfer ownership without refcount change
+    PyCaller(PyCaller&& s) noexcept : SwigPtr_PyObject() {
+        _obj = s._obj;
+        s._obj = nullptr;  // Prevent source destructor from decref
+    }
+    
+    // Move assignment - prevent accidental use
+    PyCaller& operator=(PyCaller&&) = delete;
+    
+    // Copy assignment - prevent accidental use  
+    PyCaller& operator=(const PyCaller&) = delete;
+    
     // Destructor - must acquire GIL for Py_XDECREF
     ~PyCaller() {
-        SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-        Py_XDECREF(_obj);
-        _obj = nullptr;  // Prevent double-free in base destructor
-        SWIG_PYTHON_THREAD_END_BLOCK;
+        if (_obj) {  // Only decref if we still own the object
+            SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+            Py_XDECREF(_obj);
+            _obj = nullptr;  // Prevent double-free in base destructor
+            SWIG_PYTHON_THREAD_END_BLOCK;
+        }
     }
 
     void operator()() const {
@@ -91,7 +105,10 @@ public:
         if(r) {
             Py_DECREF(r);
         } else {
-            /* Log exception - cannot propagate from TBB worker thread */
+            /* Log exception - cannot propagate from TBB worker thread.
+             * Note: This logs to stderr. In production, consider capturing
+             * exceptions via a thread-safe queue for proper handling.
+             */
             PyErr_WriteUnraisable((PyObject*)*this);
         }
         SWIG_PYTHON_THREAD_END_BLOCK;
@@ -121,15 +138,24 @@ struct ArenaPyCaller {
         SWIG_PYTHON_THREAD_END_BLOCK;
     }
     
-    // Destructor - release Python object reference
-    ~ArenaPyCaller() {
-        SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-        Py_XDECREF(my_callable);
-        SWIG_PYTHON_THREAD_END_BLOCK;
+    // Move constructor - transfer ownership without refcount change
+    ArenaPyCaller(ArenaPyCaller&& other) noexcept 
+        : my_arena(other.my_arena), my_callable(other.my_callable) {
+        other.my_callable = nullptr;  // Prevent source destructor from decref
     }
     
-    // Assignment operator - prevent double-free issues
+    // Destructor - release Python object reference
+    ~ArenaPyCaller() {
+        if (my_callable) {  // Only decref if we still own the object
+            SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+            Py_XDECREF(my_callable);
+            SWIG_PYTHON_THREAD_END_BLOCK;
+        }
+    }
+    
+    // Assignment operators - prevent double-free issues
     ArenaPyCaller& operator=(const ArenaPyCaller&) = delete;
+    ArenaPyCaller& operator=(ArenaPyCaller&&) = delete;
     
     void operator()() const {
         my_arena->execute(PyCaller(my_callable, false));
