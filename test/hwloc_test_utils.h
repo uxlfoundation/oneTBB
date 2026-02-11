@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2024 Intel Corporation
+    Copyright (C) 2023-2026 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -27,7 +27,7 @@
 #endif
 #include <hwloc.h>
 #if _WIN32 || _WIN64
-#include <winbase.h>
+#include <WinBase.h>
 #include <hwloc/windows.h>      // for hwloc_windows_get_nr_processor_groups
 #endif
 #if _MSC_VER && !__INTEL_COMPILER && !__clang__
@@ -341,7 +341,9 @@ public:
         _core_types_indexes_list = core_types_indexes_list.data();
     }
 
-    void fill_constraints_affinity_mask(affinity_mask input_mask, int numa_node_index, int core_type_index, int max_threads_per_core) {
+    void fill_constraints_affinity_mask(affinity_mask input_mask, int numa_node_index,
+                                        int core_type_index, int max_threads_per_core)
+    {
         __TCM_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized system_topology");
         __TCM_ASSERT(numa_node_index < (int)numa_affinity_masks_list.size(), "Wrong NUMA node id");
         __TCM_ASSERT(core_type_index < (int)core_types_affinity_masks_list.size(), "Wrong core type id");

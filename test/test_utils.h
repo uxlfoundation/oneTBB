@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2025 Intel Corporation
+    Copyright (C) 2023-2026 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -22,12 +22,13 @@
 #include "tcm/detail/_tcm_assert.h"
 #include "tcm.h"
 
+#include <algorithm>
 #include <cstdio>
-#include <vector>
+#include <initializer_list>
 #include <set>
 #include <string>
-#include <initializer_list>
 #include <utility>
+#include <vector>
 
 /***************************************************************************************************
  * Helpers for work with CPU masks
@@ -36,9 +37,9 @@ using tcm_const_cpu_mask_t = hwloc_const_bitmap_t; // TODO: Consider introducing
 
 inline std::string to_string(const tcm_const_cpu_mask_t mask) {
   const unsigned max_size = 1024;
-  char buf[max_size] = {0};
-  __TCM_ASSERT(mask, "CPU mask should not be nullptr");
-  hwloc_bitmap_snprintf(buf, max_size, mask);
+  char buf[max_size] = "nullptr";
+  if (mask)
+      hwloc_bitmap_snprintf(buf, max_size, mask);
   return std::string(buf);
 }
 
@@ -102,7 +103,8 @@ inline tcm_const_cpu_mask_t process_affinity_mask = []() {
     return tp.process_affinity_mask();
 }();
 
-//! Returns available concurrency on the platform, taking into account the mask of the process.
+//! Returns available concurrency on the platform, taking into account the mask of the process and
+//! CPU constraints.
 inline int32_t platform_hardware_concurrency() {
   static int32_t c = [] () -> int32_t { 
       int process_concurrency = hardware_concurrency(process_affinity_mask);
@@ -177,27 +179,70 @@ inline bool check_permit_size(const tcm_permit_t& expected, const tcm_permit_t& 
   return report ? check(result, report_str, num_indents) : result;
 }
 
+struct concurrency_comparator_base {
+  concurrency_comparator_base(unsigned num_indents = 0, bool report = true)
+    : m_num_indents(num_indents), m_report(report)
+  {}
 
+protected:
+  unsigned m_num_indents;
+  bool m_report;
+};
+
+/**
+ * Checks precise distribution of concurrency. Should be used when there is no uncertainty with
+ * regard to what TCM recommends.
+ */
+struct precise_concurrency_distribution_checker : concurrency_comparator_base {
+  precise_concurrency_distribution_checker(unsigned num_indents = 0, bool report = true)
+    : concurrency_comparator_base(num_indents, report) {}
+
+  bool operator()(const uint32_t* expected, const uint32_t* actual, uint32_t size) {
+    auto const& expected_concurrencies = to_string(expected, size);
+    auto const& actual_concurrencies = to_string(actual, size);
+    std::string report_str = "Check concurrencies precisely, expected " + expected_concurrencies +
+                             " equals to actual " + actual_concurrencies;
+    const bool result = std::equal(expected, expected + size, actual);
+    return m_report ? check(result, report_str, m_num_indents) : result;
+  }
+};
+
+/**
+ * Checks the overall concurrency rather than its distribution. Useful when the concurrency
+ * distribution depends on the resource distribution strategy.
+ */
+struct distribution_agnostic_concurrency_checker : concurrency_comparator_base {
+  distribution_agnostic_concurrency_checker(unsigned num_indents = 0, bool report = true)
+    : concurrency_comparator_base(num_indents, report) {}
+
+  bool operator()(const uint32_t* expected, const uint32_t* actual, uint32_t size) {
+    std::string report_str{};
+
+    auto const& expected_concurrencies = to_string(expected, size);
+    auto const& actual_concurrencies = to_string(actual, size);
+
+    report_str = "Check concurrencies in distribution-agnostic way, expected "
+                 + expected_concurrencies + " actual " + actual_concurrencies;
+
+    uint32_t expected_sum = 0, actual_sum = 0;
+    for (uint32_t i = 0; i < size; ++i) {
+      expected_sum += expected[i];
+      actual_sum   += actual[i];
+    }
+
+    const bool result = (expected_sum == actual_sum);
+
+    return m_report ? check(result, report_str, m_num_indents) : result;
+  }
+};
+
+template <typename ConcurrencyComparator = precise_concurrency_distribution_checker>
 inline bool check_permit_concurrency(const tcm_permit_t& expected, const tcm_permit_t& actual,
                                      const unsigned num_indents = 0, const bool report = true)
 {
-  bool result = false;
-  std::string report_str{};
-
-  auto const& expected_concurrencies = to_string(expected.concurrencies, expected.size);
-  auto const& actual_concurrencies = to_string(actual.concurrencies, actual.size);
-
-  report_str = "Check concurrencies, expected " + expected_concurrencies + " equals to actual "
-               + actual_concurrencies;
-
-  for (unsigned i = 0; i < expected.size; ++i) {
-    const auto& e = expected.concurrencies[i]; const auto& a = actual.concurrencies[i];
-    result = (e == a);
-    if (!result)
-      break;
-  }
-
-  return report ? check(result, report_str, num_indents) : result;
+  check(expected.size == actual.size, "Size of concurrency arrays matches", num_indents);
+  ConcurrencyComparator compare_concurrencies(num_indents, report);
+  return compare_concurrencies(expected.concurrencies, actual.concurrencies, expected.size);
 }
 
 inline uint32_t get_permit_concurrency(const tcm_permit_t& permit) {
@@ -282,6 +327,13 @@ struct skip_checks_t {
   bool mask = false;
 };
 
+static constexpr skip_checks_t skip_concurrency_check = []() {
+    skip_checks_t skip{};
+    skip.concurrency = true;
+    return skip;
+}();
+
+
 inline skip_checks_t operator|(const skip_checks_t& lhs, const skip_checks_t& rhs) {
   return {
     lhs.size || rhs.size,
@@ -294,21 +346,24 @@ inline skip_checks_t operator|(const skip_checks_t& lhs, const skip_checks_t& rh
 
 // Compares two permits' data. Returns true if the data is equal, false -
 // otherwise. Function allows skipping check of specific permit data fields.
+template <typename ConcurrencyComparator = precise_concurrency_distribution_checker>
 inline bool check_permit(const tcm_permit_t& expected, const tcm_permit_t& actual,
                          const skip_checks_t skip = {}, unsigned num_indents = 1,
                          const bool report = true)
 {
   bool result = true;
-  result &= skip.size         || check_permit_size(expected, actual, num_indents, report);
-  result &= skip.concurrency  || check_permit_concurrency(expected, actual, num_indents, report);
-  result &= skip.mask         || check_permit_mask(expected, actual, num_indents, report);
-  result &= skip.state        || check_permit_state(expected, actual, num_indents, report);
-  result &= skip.flags        || check_permit_flags(expected, actual, num_indents, report);
+  result &= skip.size        || check_permit_size(expected, actual, num_indents, report);
+  result &= skip.concurrency || check_permit_concurrency<ConcurrencyComparator>
+                                    (expected, actual, num_indents, report);
+  result &= skip.mask        || check_permit_mask(expected, actual, num_indents, report);
+  result &= skip.state       || check_permit_state(expected, actual, num_indents, report);
+  result &= skip.flags       || check_permit_flags(expected, actual, num_indents, report);
   return result;
 }
 
 //! Checks the expected permit data with the data obtained by reading passed
 //! permit handle. Returns true if the data is equal, and false - otherwise.
+template <typename ConcurrencyComparator = precise_concurrency_distribution_checker>
 inline bool check_permit(const tcm_permit_t& expected, tcm_permit_handle_t ph,
                          const skip_checks_t skip = {}, const unsigned num_indents = 1,
                          const bool report = true)
@@ -333,7 +388,7 @@ inline bool check_permit(const tcm_permit_t& expected, tcm_permit_handle_t ph,
   check(reading_result == TCM_RESULT_SUCCESS, "Reading data from ph=" + to_string(ph), num_indents,
         "tcmGetPermitData() returns status " + std::to_string(reading_result));
 
-  bool result = check_permit(expected, actual, skip, num_indents, report);
+  bool result = check_permit<ConcurrencyComparator>(expected, actual, skip, num_indents, report);
   return result;
 }
 
@@ -437,7 +492,21 @@ request_permit(tcm_client_id_t client, const tcm_permit_request_t& req, void* ca
           ph_type_msg = "existing";
       }
       actual_log_message = std::string("tcmRequestPermit on ") + ph_type_msg + " permit_handle for "
-                           + num_resources_msg + " resources";
+                           + num_resources_msg + " software threads";
+      if (req.constraints_size > 0) {
+          actual_log_message += ", with " + std::to_string(req.constraints_size) + " constraints: ";
+          for (uint32_t i = 0; i < req.constraints_size; ++i) {
+              actual_log_message += "\n\t" + std::to_string(i) + ": {";
+              tcm_cpu_constraints_t c = req.cpu_constraints[i];
+              actual_log_message += "min_concurrency=" + std::to_string(c.min_concurrency)
+                                    + ", max_concurrency=" + std::to_string(c.max_concurrency)
+                                    + ", mask=" + to_string(c.mask)
+                                    + ", numa_id=" + std::to_string(c.numa_id)
+                                    + ", core_type_id=" + std::to_string(c.core_type_id)
+                                    + ", threads_per_core=" + std::to_string(c.threads_per_core);
+              actual_log_message += "} ";
+          }
+      }
   }
 
   auto r = tcmRequestPermit(client, req, callback_arg, &permit_handle, /*permit*/nullptr);

@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2024-2025 Intel Corporation
+    Copyright (C) 2024-2026 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -213,9 +213,9 @@ bool check(bool b, const std::string& msg, unsigned num_indents = 0,
   const std::string indent(2 * num_indents, ' '); // Multiplied by two for clearer line distinction
 
   if (!b) {
-    logger.log_error("***************** " + indent + msg + "\n" +
-                     "*     ERROR     * " + indent + msg + "\n" +
-                     "***************** " + indent + msg + "\n" + report_msg);
+    logger.log_error("***************** \n"
+                     "*     ERROR     * " + indent + msg + "\n"
+                     "***************** \n" + report_msg);
     tcm_tests.mark_this_test_failed();
   } else if (!msg.empty()) {
     logger.log("SUCCESS: " + indent + msg);

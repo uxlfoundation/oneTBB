@@ -1039,9 +1039,13 @@ public:
       c.max_concurrency = infer_constraint_max_concurrency(c.max_concurrency,
                                                            /*fallback_value*/process_concurrency,
                                                            c.mask);
+
+      // Assert states that if max_concurrency of a constraint is not explicitly specified, then
+      // there is enough data in the constraint (mask or high-level interface is used) to infer the
+      // value for max_concurrency later
       __TCM_ASSERT(c.max_concurrency != tcm_automatic ||
-                   (c.mask || tcm_any == c.numa_id || tcm_any == c.core_type_id ||
-                    tcm_any == c.threads_per_core), "Incorrect invariant");
+                   (c.mask || tcm_automatic != c.numa_id || tcm_automatic != c.core_type_id ||
+                    tcm_automatic != c.threads_per_core), "Incorrect invariant");
 
       // If at least one constraint has automatic setting for its desired concurrency, then the
       // desired resources amount is inferred automatically while satisfying the request

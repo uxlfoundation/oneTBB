@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2025 Intel Corporation
+    Copyright (C) 2023-2026 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -27,7 +27,7 @@
 #if __linux__
 #include <dlfcn.h>              // for dlopen, dlsym
 #elif _WIN32
-#include <windows.h>
+#include <Windows.h>
 #else
 #error Implementation of the test is not provided for this kind of OS.
 #endif

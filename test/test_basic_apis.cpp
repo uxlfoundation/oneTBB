@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2025 Intel Corporation
+    Copyright (C) 2023-2026 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -950,7 +950,6 @@ TEST("test_request_initialized_by_default") {
             /*concurrencies*/nullptr, /*constraints*/nullptr, /*size*/1, TCM_PERMIT_STATE_ACTIVE,
             tcm_permit_flags_t{}
         };
-        skip_checks_t skip_concurrency_check; skip_concurrency_check.concurrency = true;
         check_permit(expected_permit, actual_permit, skip_concurrency_check);
 
         // Check that the permit was given some concurrency
@@ -1166,9 +1165,7 @@ TEST("Release of client permits when it disconnects") {
 
   uint32_t concurrency = platform_tcm_concurrency();
   auto expected = make_active_permit(&concurrency);
-  skip_checks_t skip_concurrency_check{
-    /*size*/false, /*concurrency*/true, /*state*/false, /*flags*/false, /*mask*/false
-  };
+
   for (auto i = 0u; i < num_requests; ++i) {
     auto ph = request_permit(client_id, req);
 

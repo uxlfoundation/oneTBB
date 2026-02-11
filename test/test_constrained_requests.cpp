@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2025 Intel Corporation
+    Copyright (C) 2023-2026 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -690,6 +690,85 @@ TEST("Non-negotiable requests for any NUMA node until all nodes are distributed 
     }
     disconnect_client(client_ids[i]);
   }
+}
+
+TEST("Single request with many low-level constraints single resource each") {
+    tcm_test::system_topology& topology = tcm_test::system_topology::instance();
+    tcm_cpu_mask_t process_cpu_mask = topology.allocate_process_affinity_mask();
+    std::unique_ptr<tcm_cpu_mask_t, mask_deleter> process_mask_guard(&process_cpu_mask);
+
+    tcm_client_id_t client_id = connect_new_client();
+
+    // One constraint per each PU
+    const unsigned process_concurrency = unsigned(hardware_concurrency(process_cpu_mask));
+    const unsigned constraints_size = process_concurrency;
+    auto constraints_guard = std::make_unique<tcm_cpu_constraints_t[]>(constraints_size);
+    tcm_cpu_constraints_t* constraints = constraints_guard.get();
+
+    const unsigned num_masks = constraints_size;
+    auto masks_guard = std::make_unique<tcm_cpu_mask_t[]>(num_masks);
+    tcm_cpu_mask_t* expected_masks = masks_guard.get();
+
+    int bit_index = -1; unsigned i = 0;
+    while ((bit_index = hwloc_bitmap_next(process_cpu_mask, bit_index)) != -1) {
+        constraints[i] = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+        tcm_cpu_mask_t mask = expected_masks[i] = constraints[i].mask = allocate_cpu_mask();
+        hwloc_bitmap_set(mask, bit_index);
+        ++i;
+    }
+    check(num_masks == i, "All process PUs enumerated");
+
+    tcm_permit_request_t req = make_request(/*min_sw_threads*/tcm_automatic,
+                                            /*max_sw_threads*/tcm_automatic,
+                                            constraints, constraints_size);
+    tcm_permit_handle_t ph = request_permit(client_id, req);
+
+    std::vector<uint32_t> concurrencies(constraints_size);
+    // Not all hardware resources may be available to the process
+    std::fill(concurrencies.begin(), concurrencies.begin() + platform_tcm_concurrency(), 1);
+    tcm_permit_t expected_permit = make_active_permit(concurrencies.data(), expected_masks,
+                                                      constraints_size);
+    check_permit<distribution_agnostic_concurrency_checker>(expected_permit, ph);
+
+    // Test the union of masks from permit constitutes the process mask
+    tcm_cpu_mask_t united_mask = allocate_cpu_mask();
+    std::unique_ptr<tcm_cpu_mask_t, mask_deleter> united_mask_ptr(&united_mask);
+    tcm_permit_t actual_permit = expected_permit;
+    get_permit_data(ph, actual_permit);
+    tcm_cpu_mask_t* cpu_masks = actual_permit.cpu_masks;
+    int err = 0;
+    for (uint32_t j = 0; j < actual_permit.size; ++j)
+        err += hwloc_bitmap_or(united_mask, united_mask, cpu_masks[j]);
+    check(0 == err, "Union of masks was made successfully");
+    check(process_concurrency == unsigned(hardware_concurrency(united_mask)),
+          "Masks from permit form the mask of the process");
+
+    release_permit(ph);
+    disconnect_client(client_id);
+}
+
+TEST("Request with NUMA and core type within single constraint") {
+    tcm_client_id_t client_id = connect_new_client();
+
+    tcm_cpu_constraints_t c = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+    c.numa_id = 0;
+    c.core_type_id = 0;
+    tcm_permit_request_t req = make_request(/*min_sw_threads*/tcm_automatic,
+                                            /*max_sw_threads*/tcm_automatic, &c, /*size*/1);
+    tcm_permit_handle_t ph = request_permit(client_id, req);
+
+    tcm_cpu_mask_t expected_mask = allocate_cpu_mask();
+    std::unique_ptr<tcm_cpu_mask_t, mask_deleter> expected_mask_guard (&expected_mask);
+    tcm_test::system_topology& topology = tcm_test::system_topology::instance();
+    topology.fill_constraints_affinity_mask(expected_mask, /*numa_id*/ 0, /*core_type_id*/ 0,
+                                            /*max_threads_per_core*/tcm_automatic);
+    uint32_t expected_concurrency = std::min(platform_tcm_concurrency(),
+                                             hardware_concurrency(expected_mask));
+    tcm_permit_t expected_permit = make_active_permit(&expected_concurrency, &expected_mask);
+    check_permit(expected_permit, ph);
+
+    release_permit(ph);
+    disconnect_client(client_id);
 }
 
 void test_unconstrained_then_constrained(bool as_nested) {
