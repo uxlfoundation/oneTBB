@@ -66,13 +66,13 @@ This optimization is most effective for workloads that create many short-lived t
 ### Programmatic usage
 
 ```python
-from tbb.threading_patch import patch_threading, tbb_threading
+from tbb import patch_threading, tbb_threading
 
 # Option 1: Global patch
 patch_threading()
 # Now all threading.Thread uses TBB
 
-# Option 2: Context manager
+# Option 2: Context manager (recommended)
 with tbb_threading():
     threads = [threading.Thread(target=work) for _ in range(100)]
     for t in threads:

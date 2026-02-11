@@ -17,6 +17,11 @@ import ctypes
 import atexit
 import sys
 import os
+import threading
+import queue
+import warnings
+from typing import Optional, Callable, Tuple
+from contextlib import contextmanager
 
 import platform
 
@@ -34,7 +39,8 @@ from .api import __all__ as api__all
 from .pool import *
 from .pool import __all__ as pool__all
 
-__all__ = ["Monkey", "is_active"] + api__all + pool__all
+__all__ = ["Monkey", "is_active", "TBBThread", "patch_threading", "unpatch_threading", 
+           "is_threading_patched", "tbb_threading"] + api__all + pool__all
 
 __doc__ = """
 Python API for Intel(R) oneAPI Threading Building Blocks (oneTBB)
@@ -47,6 +53,10 @@ Runs your_script.py in context of tbb.Monkey
 
 is_active = False
 """ Indicates whether oneTBB context is activated """
+
+# Threading patch state
+_OriginalThread = threading.Thread
+_is_threading_patched = False
 
 ipc_enabled = False
 """ Indicates whether IPC mode is enabled """
@@ -152,56 +162,144 @@ class TBBProcessPool3(multiprocessing.pool.Pool):
 
 class TBBThread:
     """
-    Lightweight TBB-based replacement for threading.Thread.
-    Uses task_group directly for minimal overhead.
+    A threading.Thread-compatible class that executes work on TBB thread pool.
     
-    Each TBBThread has its own task_group for proper join() semantics.
+    Key differences from threading.Thread:
+    - Does not create a new OS thread for each instance
+    - Uses TBB's work-stealing thread pool
+    - More efficient for many short-lived threads
+    - Exceptions are re-raised in join() (unlike stdlib)
     
-    Note: This is a minimal implementation for use with Monkey context manager.
-    For full threading.Thread compatibility (ident, native_id, daemon, etc.),
-    use tbb.threading_patch.TBBThread instead.
+    Limitations:
+    - native_id returns TBB worker thread ID, may be reused
+    - daemon property has no effect (TBB manages thread lifecycle)
+    - Blocking operations can exhaust TBB worker pool
     """
     
-    def __init__(self, group=None, target=None, name=None, args=(), kwargs=None, *, daemon=None):
+    # Shared TBB pool for all TBBThread instances
+    _pool: Optional[Pool] = None
+    _pool_lock = threading.Lock()
+    
+    def __init__(
+        self,
+        group=None,
+        target: Optional[Callable] = None,
+        name: Optional[str] = None,
+        args: Tuple = (),
+        kwargs: Optional[dict] = None,
+        *,
+        daemon: Optional[bool] = None
+    ):
+        if group is not None:
+            raise ValueError("group argument must be None for TBBThread")
+        
         self._target = target
+        self._name = name or f"TBBThread-{id(self)}"
         self._args = args
         self._kwargs = kwargs or {}
-        self._name = name
-        self._tg = None  # Created on start()
-        self._started = False
-        self._finished = False
-        self._exception = None
+        self._daemon = daemon
+        
+        self._started = threading.Event()
+        self._stopped = threading.Event()
+        self._start_lock = threading.Lock()
+        self._start_called = False
+        self._exception: Optional[BaseException] = None
+        self._native_id: Optional[int] = None
+        self._ident: Optional[int] = None
+        
+    @classmethod
+    def _get_pool(cls) -> Pool:
+        """Get or create shared TBB pool."""
+        if cls._pool is None:
+            with cls._pool_lock:
+                if cls._pool is None:
+                    cls._pool = Pool()
+        return cls._pool
     
-    def _run(self):
-        self._started = True
+    @classmethod
+    def _shutdown_pool(cls):
+        """Shutdown shared pool (called on unpatch)."""
+        with cls._pool_lock:
+            if cls._pool is not None:
+                cls._pool.close()
+                cls._pool = None
+    
+    def _run_wrapper(self) -> None:
+        """Wrapper that runs target and captures result/exception."""
+        import _thread
+        self._native_id = _thread.get_native_id()
+        self._ident = _thread.get_ident()
+        self._started.set()
+        
         try:
             if self._target:
                 self._target(*self._args, **self._kwargs)
         except BaseException as e:
-            self._exception = e
+            # Store exception without traceback to prevent memory leaks
+            self._exception = e.with_traceback(None)
         finally:
-            self._finished = True
+            self._stopped.set()
     
-    def start(self):
-        if self._tg is not None:
-            raise RuntimeError("threads can only be started once")
-        self._tg = task_group()
-        self._tg.run(self._run)
+    def start(self) -> None:
+        """Start the thread (submit to TBB pool)."""
+        with self._start_lock:
+            if self._start_called:
+                raise RuntimeError("threads can only be started once")
+            self._start_called = True
+            # Submit inside lock to prevent TOCTOU race
+            pool = self._get_pool()
+            pool.apply_async(self._run_wrapper)
     
-    def join(self, timeout=None):
-        if self._tg is None:
+    def join(self, timeout: Optional[float] = None) -> None:
+        """Wait for thread to complete.
+        
+        Note: Unlike threading.Thread, exceptions from the target function
+        are re-raised in join().
+        """
+        if not self._start_called:
             raise RuntimeError("cannot join thread before it is started")
-        # Wait for task_group to complete
-        self._tg.wait()
-        if self._exception:
-            raise self._exception
+        
+        if not self._stopped.wait(timeout):
+            return  # Timeout expired
+        
+        if self._exception is not None:
+            exc = self._exception
+            self._exception = None
+            raise exc
     
-    def is_alive(self):
-        return self._started and not self._finished
+    def is_alive(self) -> bool:
+        """Return True if thread is running."""
+        return self._started.is_set() and not self._stopped.is_set()
     
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
+    
+    @name.setter
+    def name(self, value: str) -> None:
+        self._name = value
+    
+    @property
+    def ident(self) -> Optional[int]:
+        return self._ident
+    
+    @property
+    def native_id(self) -> Optional[int]:
+        return self._native_id
+    
+    @property
+    def daemon(self) -> bool:
+        return self._daemon or False
+    
+    @daemon.setter
+    def daemon(self, value: bool) -> None:
+        self._daemon = value
+    
+    def __repr__(self) -> str:
+        status = "initial"
+        if self._started.is_set():
+            status = "stopped" if self._stopped.is_set() else "started"
+        return f"<TBBThread({self._name}, {status})>"
 
 
 class Monkey:
@@ -284,6 +382,81 @@ class Monkey:
             os.environ['NUMBA_THREADING_LAYER'] = self.env_numba
         for name in self._items.keys():
             setattr(self._modules[name], name, self._items[name])
+
+
+def patch_threading(*, _warn: bool = True) -> None:
+    """
+    Replace threading.Thread with TBB-based implementation.
+    
+    After calling this, all new threading.Thread instances will use
+    TBB's thread pool instead of creating OS threads.
+    
+    WARNING: This is a global modification with important limitations:
+    - daemon property has no effect (TBB manages thread lifecycle)
+    - native_id/ident may be reused across TBBThread instances  
+    - Blocking operations (locks, I/O) can exhaust the TBB worker pool
+    
+    Args:
+        _warn: If True (default), emit a warning about limitations
+    """
+    global _is_threading_patched
+    if _is_threading_patched:
+        return
+    
+    if _warn:
+        warnings.warn(
+            "patch_threading() replaces threading.Thread globally. "
+            "TBBThread has limitations: daemon ignored, thread IDs may be reused, "
+            "blocking operations can exhaust worker pool. "
+            "Use _warn=False to suppress this warning.",
+            UserWarning,
+            stacklevel=2
+        )
+    
+    threading.Thread = TBBThread
+    _is_threading_patched = True
+
+
+def unpatch_threading() -> None:
+    """Restore original threading.Thread implementation."""
+    global _is_threading_patched
+    if not _is_threading_patched:
+        return
+    
+    TBBThread._shutdown_pool()
+    threading.Thread = _OriginalThread
+    _is_threading_patched = False
+
+
+def is_threading_patched() -> bool:
+    """Return True if threading is currently patched."""
+    return _is_threading_patched
+
+
+@contextmanager
+def tbb_threading(*, warn: bool = False):
+    """
+    Context manager for temporary TBB threading patch.
+    
+    This is the recommended way to use TBB threading as it ensures
+    proper cleanup and limits the scope of the patch.
+    
+    Args:
+        warn: If True, emit warning about limitations (default False)
+    
+    Example:
+        with tbb_threading():
+            threads = [threading.Thread(target=work) for _ in range(100)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+    """
+    patch_threading(_warn=warn)
+    try:
+        yield
+    finally:
+        unpatch_threading()
 
 
 def init_sem_name():
