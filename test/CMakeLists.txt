@@ -1,4 +1,5 @@
 # Copyright (c) 2020-2025 Intel Corporation
+# Copyright (c) 2025-2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -84,6 +85,10 @@ function(tbb_add_test)
         $<$<BOOL:${TBB_TCM_TESTING}>:__TBB_TCM_TESTING_ENABLED=1>)
 
     target_link_libraries(${_tbb_test_TARGET_NAME} PRIVATE ${_tbb_test_DEPENDENCIES} Threads::Threads ${TBB_COMMON_LINK_LIBS})
+
+    if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+        target_link_libraries(${_tbb_test_TARGET_NAME} PRIVATE util)
+    endif()
 
     if (COMMAND _tbb_run_memcheck)
         _tbb_run_memcheck(${_tbb_test_NAME} ${_tbb_test_SUBDIR})
@@ -270,7 +275,7 @@ function(tbb_add_tbbbind_test)
     set_property(TEST ${_tbbbind_test_NAME} PROPERTY ENVIRONMENT TBB_VERSION=1 APPEND)
 
     # Handle the case when HWLOC was found using pkg-config
-    if (NOT DEFINED HWLOC_TARGET_EXPLICITLY_DEFINED AND TARGET PkgConfig::HWLOC)
+    if (NOT DEFINED HWLOC_TARGET_EXPLICITLY_DEFINED AND TARGET PkgConfig::HWLOC AND TARGET TBB::${TBBBIND_LIBRARY_NAME})
         set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
             PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*${TBBBIND_LIBRARY_NAME}"
             FAIL_REGULAR_EXPRESSION "Status: FAILURE!"
@@ -420,7 +425,18 @@ if (TARGET TBB::tbb)
     if (NOT TBB_TCM_TESTING)
         tbb_add_test(SUBDIR tbb NAME test_arena_priorities DEPENDENCIES TBB::tbb)
     endif()
-    tbb_add_test(SUBDIR tbb NAME test_dynamic_link DEPENDENCIES TBB::tbb)
+
+    tbb_add_test(SUBDIR tbb NAME test_dynamic_link)
+    add_dependencies(test_dynamic_link TBB::tbb)
+    target_include_directories(test_dynamic_link PRIVATE
+        $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>)
+    set_property(TARGET test_dynamic_link PROPERTY BUILD_RPATH_USE_ORIGIN TRUE)
+    set_property(TARGET test_dynamic_link PROPERTY BUILD_RPATH "$ORIGIN")
+    target_compile_definitions(test_dynamic_link PRIVATE "TBBLIB_NAME=\"$<TARGET_FILE_NAME:TBB::tbb>\"")
+    # Making unsigned library which the test fails loading
+    add_library(stub_unsigned SHARED ${CMAKE_CURRENT_SOURCE_DIR}/tbb/stub_unsigned_lib.cpp)
+    add_dependencies(test_dynamic_link stub_unsigned)
+
     if (LINKER_HAS_NO_AS_NEEDED)
         # The linker may not detect a dependency on pthread in static variable constructors.
         target_link_libraries(test_dynamic_link PRIVATE "-Wl,--no-as-needed")
@@ -491,6 +507,7 @@ if (TARGET TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_environment_whitebox DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_hw_concurrency DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_eh_thread DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR tbb NAME test_tbb_version DEPENDENCIES TBB::tbb)
     if (NOT TBB_TCM_TESTING)
         tbb_add_test(SUBDIR tbb NAME test_global_control DEPENDENCIES TBB::tbb)
     endif()
@@ -531,6 +548,7 @@ if (TARGET TBB::tbb)
     # HWLOC related test
     if (NOT TBB_EMSCRIPTEN)
         tbb_add_tbbbind_test(SUBDIR tbb NAME test_arena_constraints)
+        tbb_add_tbbbind_test(SUBDIR tbb NAME test_tbbbind)
     endif()
 
     if ((NOT "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "mips") AND (NOT TBB_EMSCRIPTEN))
@@ -692,6 +710,10 @@ if (TARGET TBB::tbbmalloc)
                 target_link_libraries(test_malloc_whitebox PRIVATE ${TBB_COMMON_LINK_FLAGS})
             endif()
             target_link_libraries(test_malloc_whitebox PRIVATE Threads::Threads ${TBB_COMMON_LINK_LIBS})
+
+            if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+                target_link_libraries(test_malloc_whitebox PRIVATE util)
+            endif()
         endif()
         # ------------------------------------------------------------------------------------------
 

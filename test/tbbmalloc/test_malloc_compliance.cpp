@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2023 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -1032,7 +1033,7 @@ TEST_CASE("MAIN TEST") {
     // Check if we were called to test standard behavior
     // TODO: enable this mode
     // setSystemAllocs();
-#if __unix__
+#if __linux__
     /* According to man pthreads
        "NPTL threads do not share resource limits (fixed in kernel 2.6.10)".
        Use per-threads limits for affected systems.

@@ -1,4 +1,5 @@
 # Copyright (c) 2021-2025 Intel Corporation
+# Copyright (c) 2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,12 +33,21 @@ env:
   MACOS_BUILD_CONCURRENCY: 3
   TEST_TIMEOUT: 180
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ !contains(github.ref, 'refs/heads/master') }}
+
 jobs:
   codespell:
     runs-on: [ubuntu-22.04]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run scan
         run: |
           sudo apt update && sudo apt install -y codespell
@@ -47,7 +57,12 @@ jobs:
     runs-on: [ubuntu-22.04]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run scan
         run: |
           command -v clang-format
@@ -62,7 +77,12 @@ jobs:
     runs-on: [ubuntu-latest]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install prerequisites
         run: |
           pip3 install -U Jinja2
@@ -75,7 +95,7 @@ jobs:
           export BUILD_TYPE=${BUILD_TYPE} && sphinx-build doc html
           tar -czvf html.tar.gz html/
       - name: Save docs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: oneTBB-html-docs-${{ env.GITHUB_SHA_SHORT }}
           path: html.tar.gz
@@ -89,15 +109,20 @@ jobs:
     runs-on: ubuntu-latest
     needs: [documentation]
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: audit
+
       - name: Checkout gh-pages
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: gh-pages
           path: gh-pages
       - name: Set env
         run: echo GITHUB_SHA_SHORT=${GITHUB_SHA::8} >> $GITHUB_ENV
       - name: Download documetation
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: oneTBB-html-docs-${{ env.GITHUB_SHA_SHORT }}
       - name: Publish to github pages
@@ -117,27 +142,61 @@ jobs:
     if: ${{ github.ref != 'refs/heads/master' }}
     runs-on: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
       - name: Run check
         run: |
-          sed -i \
-            -e "/Copyright (c) .* Intel Corporation/s/ \([0-9]\+\)[-0-9]*/ \\1-$(date +%Y)/" \
-            -e "/Copyright (c) .* Intel Corporation/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/" \
-            $(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
-          git checkout -- third-party-programs.txt
-          git diff > years.diff
-          if [[ -s years.diff ]]; then
-            echo "Wrong copyright years"
-            cat years.diff
-            exit 1
+          CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
+          UXL_COPYRIGHT="Copyright \(c\) [0-9]+(-[0-9]+)? UXL Foundation Contributors"
+          APACHE_COPYRIGHT_LINE="Licensed under the Apache License"
+          CURRENT_YEAR=$(date +%Y)
+
+          FILES_WITH_COPYRIGHT=$(grep -lF "$APACHE_COPYRIGHT_LINE" $CHANGED_FILES)
+          FILES_WITH_MISSING_UXL_COPYRIGHT=$(grep -LE "$UXL_COPYRIGHT" $FILES_WITH_COPYRIGHT)
+
+          # Update UXL Copyright years
+          if [ -n "$FILES_WITH_COPYRIGHT" ]; then
+            sed -E -i \
+              -e "/${UXL_COPYRIGHT}/s/ ([0-9]+)[-0-9]*/ \1-${CURRENT_YEAR}/" \
+              -e "/${UXL_COPYRIGHT}/s/${CURRENT_YEAR}-${CURRENT_YEAR}/${CURRENT_YEAR}/" \
+            $FILES_WITH_COPYRIGHT
+
+            git checkout -- third-party-programs.txt
+            git diff > years.diff
+
+            CHECK_FAILED=false
+
+            if [ -n "$FILES_WITH_MISSING_UXL_COPYRIGHT" ]; then
+              echo "ERROR: UXL Copyright is missed for the following files: ${FILES_WITH_MISSING_UXL_COPYRIGHT}"
+              CHECK_FAILED=true
+            fi
+
+            if [[ -s years.diff ]]; then
+              echo "ERROR: Wrong UXL copyright years"
+              cat years.diff
+              CHECK_FAILED=true
+            fi
+
+            if [ "$CHECK_FAILED" = true ]; then
+              exit 1
+            fi
           fi
   python_module_test_ubuntu_latest:
     runs-on: [ubuntu-latest]
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run testing
         run: |
           mkdir build && cd build
@@ -185,7 +244,16 @@ jobs:
             preview: 'ON'
             cmake_static: -DBUILD_SHARED_LIBS=OFF
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install dependencies
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y pkg-config libhwloc-dev hwloc
       - name: Run testing
         shell: bash
         run: |
@@ -216,7 +284,7 @@ jobs:
             std: 14
             build_type: relwithdebinfo
             preview: 'ON'
-          - os: macos-13
+          - os: macos-15-intel
             c_compiler: clang
             cxx_compiler: clang++
             std: 20
@@ -224,7 +292,12 @@ jobs:
             preview: 'ON'
             cmake_static: -DBUILD_SHARED_LIBS=OFF
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run testing
         shell: bash
         run: |
@@ -251,14 +324,14 @@ jobs:
             build_type: relwithdebinfo
             preview: 'ON'
             job_name: windows_cl2022_cxx14_relwithdebinfo_preview=ON
-          - os: windows-2019
-            generator: Visual Studio 16 2019
+          - os: windows-11-arm
+            generator: Visual Studio 17 2022
             c_compiler: cl
             cxx_compiler: cl
             std: 20
             build_type: release
             preview: 'ON'
-            job_name: windows_cl2019_cxx20_release_preview=ON-DBUILD_SHARED_LIBS=OFF
+            job_name: windows_11_arm_cl2022_cxx20_release_preview=ON-DBUILD_SHARED_LIBS=OFF
             cmake_static: -DBUILD_SHARED_LIBS=OFF
           - os: windows-2022
             generator: Visual Studio 17 2022
@@ -269,7 +342,12 @@ jobs:
             preview: 'OFF'
             job_name: windows_cl2022_cxx17_relwithdebinfo_preview=OFF
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run testing
         run: |
           mkdir build
@@ -307,7 +385,12 @@ jobs:
             build_type: debug
             preview: 'ON'
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run testing
         shell: bash
         run: |
@@ -333,7 +416,12 @@ jobs:
             build_type: relwithdebinfo
             preview: 'ON'
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run testing
         shell: bash
         run: |
@@ -352,14 +440,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-2019
-            generator: Visual Studio 16 2019
+          - os: windows-11-arm
+            generator: Visual Studio 17 2022
             c_compiler: cl
             cxx_compiler: cl
             std: 14
             build_type: relwithdebinfo
             preview: 'ON'
-            job_name: examples_windows_cl2019_cxx14_relwithdebinfo_preview=ON
+            job_name: examples_windows_11_arm_cl2022_cxx14_relwithdebinfo_preview=ON
           - os: windows-2022
             generator: Visual Studio 17 2022
             c_compiler: cl
@@ -369,7 +457,12 @@ jobs:
             preview: 'OFF'
             job_name: examples_windows_cl2022_cxx17_relwithdebinfo_preview=OFF
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run testing
         run: |
           mkdir build
@@ -393,7 +486,12 @@ jobs:
             std: 20
             build_type: relwithdebinfo
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Test doc examples
         run: |
           mkdir build && cd build
@@ -418,7 +516,12 @@ jobs:
             std: 20
             build_type: relwithdebinfo
     steps:
-      - uses: actions/checkout@v4
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e3f713f2d8f53843e71c69a996d56f51aa9adfb9 # v2.14.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Test doc examples
         run: |
           mkdir build

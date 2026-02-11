@@ -14,8 +14,8 @@ To integrate oneTBB, you need to:
 However, you can use CMake* and the pkg-config tool to simplify the process of integrating oneTBB into your project and handling its dependencies.
 See the instructions below to learn how to use the tools. 
 
-CMake*
-*******
+Integrate oneTBB with CMake*
+****************************
 
 CMake* is a cross-platform build tool that helps you manage dependencies and build systems. 
 Integrating oneTBB into your project using CMake*:
