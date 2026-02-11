@@ -1,5 +1,6 @@
 /*
-    Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -66,16 +67,16 @@ template <typename Input, typename Output>
 struct extract_body_types<Output Input::*> : body_types<Input, Output> {};
 
 template <typename Body>
-using input_type = typename extract_body_types<Body>::input_type;
+using input_type_of = typename extract_body_types<Body>::input_type;
 
 template <typename Body>
-using output_type = typename extract_body_types<Body>::output_type;
+using output_type_of = typename extract_body_types<Body>::output_type;
 
 // Deduction guides for Flow Graph nodes
 
 template <typename GraphOrSet, typename Body>
 input_node(GraphOrSet&&, Body)
-->input_node<output_type<Body>>;
+->input_node<output_type_of<Body>>;
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 
@@ -110,7 +111,7 @@ queue_node(const NodeSet&)
 
 template <typename GraphOrProxy, typename Sequencer>
 sequencer_node(GraphOrProxy&&, Sequencer)
-->sequencer_node<input_type<Sequencer>>;
+->sequencer_node<input_type_of<Sequencer>>;
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 template <typename NodeSet, typename Compare>
@@ -157,8 +158,8 @@ join_node(const node_set<order::preceding, Successor, Successors...>)
 
 template <typename GraphOrProxy, typename Body, typename... Bodies>
 join_node(GraphOrProxy&&, Body, Bodies...)
-->join_node<std::tuple<input_type<Body>, input_type<Bodies>...>,
-            key_matching<join_key_t<output_type<Body>>>>;
+->join_node<std::tuple<input_type_of<Body>, input_type_of<Bodies>...>,
+            key_matching<join_key_t<output_type_of<Body>>>>;
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 template <typename... Predecessors>
@@ -183,12 +184,12 @@ template <typename GraphOrSet, typename Body, typename Policy>
 function_node(GraphOrSet&&,
               size_t, Body,
               Policy, node_priority_t = no_priority)
-->function_node<input_type<Body>, output_type<Body>, Policy>;
+->function_node<input_type_of<Body>, output_type_of<Body>, Policy>;
 
 template <typename GraphOrSet, typename Body>
 function_node(GraphOrSet&&, size_t,
               Body, node_priority_t = no_priority)
-->function_node<input_type<Body>, output_type<Body>, queueing>;
+->function_node<input_type_of<Body>, output_type_of<Body>, queueing>;
 
 template <typename Output>
 struct continue_output {
