@@ -92,5 +92,6 @@ with tbb_threading():
 When built with Python 3.13t (free-threaded build), the module automatically enables `Py_MOD_GIL_NOT_USED` via SWIG's built-in NOGIL support. All callbacks properly acquire GIL when needed using `SWIG_PYTHON_THREAD_BEGIN_BLOCK/END_BLOCK` macros.
 
 ## System Requirements
- - The Python module was not tested on older versions of Python thus we require at least Python and 3.5 or higher.
- - SWIG must be of version 3.0.6 or higher.
+ - Python 3.5 or higher
+ - SWIG 3.0.6 or higher
+ - **For free-threading (NOGIL) support:** SWIG 4.4.0 or higher and Python 3.13t
