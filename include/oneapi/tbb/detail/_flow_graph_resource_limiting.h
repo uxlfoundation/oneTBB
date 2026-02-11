@@ -206,15 +206,15 @@ public:
 }; // class resource_provider
 
 template <typename Input, typename OutputPorts>
-class resource_consumer_body {
+class resource_limited_body {
     graph& m_graph;
 public:
     virtual void operator()(const Input& input, OutputPorts& ports) = 0;
     virtual void notify(request_id id) = 0;
-    virtual resource_consumer_body* clone() = 0;
-    virtual ~resource_consumer_body() = default;
+    virtual resource_limited_body* clone() = 0;
+    virtual ~resource_limited_body() = default;
 
-    resource_consumer_body(graph& g) : m_graph(g) {}
+    resource_limited_body(graph& g) : m_graph(g) {}
 
     graph& graph_reference() { return m_graph; }
 };
@@ -223,10 +223,10 @@ template <typename Input, typename OutputPorts, typename ResourceProvider>
 class resource_consumer : public resource_consumer_base<typename ResourceProvider::resource_handle_type> {
 public:
     using resource_handle_type = typename ResourceProvider::resource_handle_type;
-    using resource_consumer_body_type = resource_consumer_body<Input, OutputPorts>;
+    using resource_limited_body_type = resource_limited_body<Input, OutputPorts>;
     using optional_type = typename ResourceProvider::optional_type;
 
-    resource_consumer(ResourceProvider& provider, resource_consumer_body_type* body_ptr)
+    resource_consumer(ResourceProvider& provider, resource_limited_body_type* body_ptr)
         : m_resource_provider(provider)
         , m_body_ptr(body_ptr)
     {}
@@ -250,8 +250,8 @@ public:
         tbb::detail::suppress_unused_warning(provider);
     }
 
-    ResourceProvider&            m_resource_provider;
-    resource_consumer_body_type* m_body_ptr;
+    ResourceProvider&           m_resource_provider;
+    resource_limited_body_type* m_body_ptr;
 };
 
 template <typename Input, typename OutputPorts, typename HandlesTuple>
@@ -356,8 +356,8 @@ public:
 };
 
 template <typename Input, typename OutputPorts, typename Body, typename... ResourceProviders>
-class resource_consumer_body_leaf
-    : public resource_consumer_body<Input, OutputPorts>
+class resource_limited_body_leaf
+    : public resource_limited_body<Input, OutputPorts>
 {
     using handles_tuple_type = std::tuple<typename ResourceProviders::optional_type...>;
     using consumers_tuple_type = std::tuple<resource_consumer<Input, OutputPorts, ResourceProviders>...>;
@@ -371,15 +371,15 @@ class resource_consumer_body_leaf
     Body                 m_body;
 
     template <typename ConsumersTuple>
-    resource_consumer_body_leaf(graph& g, ConsumersTuple&& consumers_tuple, const Body& body)
-        : resource_consumer_body<Input, OutputPorts>(g)
+    resource_limited_body_leaf(graph& g, ConsumersTuple&& consumers_tuple, const Body& body)
+        : resource_limited_body<Input, OutputPorts>(g)
         , m_consumers(std::forward<ConsumersTuple>(consumers_tuple))
         , m_body(body)
     {}
 
 public:
-    resource_consumer_body_leaf(graph& g, std::tuple<ResourceProviders&...> resource_providers, const Body& body)
-        : resource_consumer_body_leaf(g, get_consumers_tuple(resource_providers), body)
+    resource_limited_body_leaf(graph& g, std::tuple<ResourceProviders&...> resource_providers, const Body& body)
+        : resource_limited_body_leaf(g, get_consumers_tuple(resource_providers), body)
     {}
 
     consumers_tuple_type get_consumers_tuple(std::tuple<ResourceProviders&...> resource_providers) {
@@ -472,49 +472,49 @@ public:
         if ((--data.notify_counter) == 0) {
             // Spawn acquire task
             d1::small_object_allocator allocator;
-            using task_type = try_acquire_resources_and_execute_task<resource_consumer_body_leaf, request_data_type>;
+            using task_type = try_acquire_resources_and_execute_task<resource_limited_body_leaf, request_data_type>;
             graph_task* t = allocator.new_object<task_type>(this->graph_reference(), allocator, this, id, data);
             spawn_in_graph_arena(this->graph_reference(), *t);
         }
     }
 
-    resource_consumer_body_leaf* clone() override {
-        return new resource_consumer_body_leaf(this->graph_reference(), m_consumers, m_body);
+    resource_limited_body_leaf* clone() override {
+        return new resource_limited_body_leaf(this->graph_reference(), m_consumers, m_body);
     }
 };
 
 template <typename Input, typename OutputPorts>
-class resource_consumer_input
+class resource_limited_input
     : public function_input_base<Input, queueing, cache_aligned_allocator<Input>,
-                                 resource_consumer_input<Input, OutputPorts>>
+                                 resource_limited_input<Input, OutputPorts>>
 {
 public:
     static constexpr int N = std::tuple_size<OutputPorts>::value;
     using input_type = Input;
     using output_ports_type = OutputPorts;
-    using resource_consumer_body_type = resource_consumer_body<input_type, output_ports_type>;
-    using class_type = resource_consumer_input<input_type, output_ports_type>;
+    using resource_limited_body_type = resource_limited_body<input_type, output_ports_type>;
+    using class_type = resource_limited_input<input_type, output_ports_type>;
     using base_type = function_input_base<input_type, queueing, cache_aligned_allocator<input_type>, class_type>;
     using input_queue_type = function_input_queue<input_type, cache_aligned_allocator<input_type>>;
 
     template <typename Body, typename... ResourceProviders>
-    resource_consumer_input(graph& g, std::size_t max_concurrency,
-                            std::tuple<ResourceProviders&...> resource_providers,
-                            Body& body)
+    resource_limited_input(graph& g, std::size_t max_concurrency,
+                           std::tuple<ResourceProviders&...> resource_providers,
+                           Body& body)
         : base_type(g, max_concurrency, no_priority, true) // TODO: fill noexcept correctly
-        , m_body(new resource_consumer_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body))
-        , m_init_body(new resource_consumer_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body))
+        , m_body(new resource_limited_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body))
+        , m_init_body(new resource_limited_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body))
         , m_output_ports(init_output_ports<output_ports_type>::call(g, m_output_ports))
     {}
 
-    resource_consumer_input(const resource_consumer_input& other)
+    resource_limited_input(const resource_limited_input& other)
         : base_type(other)
         , m_body(other.m_init_body->clone())
         , m_init_body(other.m_init_body->clone())
         , m_output_ports(init_output_ports<output_ports_type>::call(this->graph_reference(), m_output_ports))
     {}
 
-    ~resource_consumer_input() {
+    ~resource_limited_input() {
         delete m_body;
         delete m_init_body;
     }
@@ -536,46 +536,46 @@ protected:
         base_type::reset_function_input_base(f);
         if (f & rf_clear_edges) clear_element<N>::clear_this(m_output_ports);
         if (f & rf_reset_bodies) {
-            resource_consumer_body_type* tmp = m_init_body->clone();
+            resource_limited_body_type* tmp = m_init_body->clone();
             delete m_body;
             m_body = tmp;
         }
         __TBB_ASSERT(!(f & rf_clear_edges) || clear_element<N>::this_empty(m_output_ports), "resource_limited_node reset failed");
     }
 private:
-    resource_consumer_body_type* m_body;
-    resource_consumer_body_type* m_init_body;
-    output_ports_type            m_output_ports;
+    resource_limited_body_type* m_body;
+    resource_limited_body_type* m_init_body;
+    output_ports_type           m_output_ports;
 };
 
 template <typename Input, typename OutputTuple>
-class resource_consumer_node
+class resource_limited_node
     : public graph_node
-    , public resource_consumer_input<Input, typename wrap_tuple_elements<multifunction_output, OutputTuple>::type>
+    , public resource_limited_input<Input, typename wrap_tuple_elements<multifunction_output, OutputTuple>::type>
 {
 public:
     using input_type = Input;
     using output_type = null_type;
     using output_ports_type = typename wrap_tuple_elements<multifunction_output, OutputTuple>::type;
 private:
-    using input_impl_type = resource_consumer_input<input_type, output_ports_type>;
+    using input_impl_type = resource_limited_input<input_type, output_ports_type>;
     using input_impl_type::my_predecessors;
 public:
     template <typename Body, typename ResourceProvider, typename... ResourceProviders>
-    resource_consumer_node(graph& g, std::size_t concurrency,
-                           std::tuple<ResourceProvider&, ResourceProviders&...> resource_providers,
-                           Body body)
+    resource_limited_node(graph& g, std::size_t concurrency,
+                          std::tuple<ResourceProvider&, ResourceProviders&...> resource_providers,
+                          Body body)
         : graph_node(g)
         , input_impl_type(g, concurrency, resource_providers, body)
     {}
 
-    resource_consumer_node(const resource_consumer_node& other)
+    resource_limited_node(const resource_limited_node& other)
         : graph_node(other.m_graph)
         , input_impl_type(other)
     {}
 protected:
     void reset_node(reset_flags f) override { input_impl_type::reset(f); }
-}; // class resource_consumer_node
+}; // class resource_limited_node
 
 } // namespace d2
 } // namespace detail
