@@ -185,6 +185,20 @@ class TestTBBThread(unittest.TestCase):
         t.join()
         assert "stopped" in repr(t)
 
+    def test_join_timeout(self):
+        event = threading.Event()
+
+        def worker():
+            event.wait(timeout=5)
+
+        t = TBBThread(target=worker)
+        t.start()
+        t.join(timeout=0.05)  # Should return without blocking
+        assert t.is_alive()
+        event.set()
+        t.join()
+        assert not t.is_alive()
+
 
 class TestTBBThreadingContextManager(unittest.TestCase):
     """Tests for tbb_threading context manager."""

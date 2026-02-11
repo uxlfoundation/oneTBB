@@ -176,11 +176,14 @@ class TBBThread:
     - native_id returns TBB worker thread ID, may be reused
     - daemon property has no effect (TBB manages thread lifecycle)
     - Blocking operations can exhaust TBB worker pool
+    - threading.local() data is per-worker, not per-TBBThread (workers are reused)
     """
     
     # Shared TBB pool for all TBBThread instances
     _pool: Optional[Pool] = None
     _pool_lock = threading.Lock()
+    _active_threads: set = set()
+    _active_lock = threading.Lock()
     
     def __init__(
         self,
@@ -234,6 +237,9 @@ class TBBThread:
         self._ident = _thread.get_ident()
         self._started.set()
         
+        with TBBThread._active_lock:
+            TBBThread._active_threads.add(self)
+        
         try:
             if self._target:
                 self._target(*self._args, **self._kwargs)
@@ -241,6 +247,8 @@ class TBBThread:
             # Store exception without traceback to prevent memory leaks
             self._exception = e.with_traceback(None)
         finally:
+            with TBBThread._active_lock:
+                TBBThread._active_threads.discard(self)
             self._stopped.set()
     
     def start(self) -> None:
@@ -304,6 +312,22 @@ class TBBThread:
         if self._started.is_set():
             status = "stopped" if self._stopped.is_set() else "started"
         return f"<TBBThread({self._name}, {status})>"
+
+
+# Register atexit handler to ensure TBB pool cleanup on shutdown
+def _tbb_thread_atexit():
+    """Join non-daemon TBBThreads and cleanup pool on interpreter shutdown."""
+    # Join non-daemon threads (mirrors threading._shutdown behavior)
+    with TBBThread._active_lock:
+        threads_to_join = [t for t in TBBThread._active_threads if not t.daemon]
+    for t in threads_to_join:
+        try:
+            t.join(timeout=5.0)
+        except Exception:
+            pass
+    TBBThread._shutdown_pool()
+
+atexit.register(_tbb_thread_atexit)
 
 
 class Monkey:
