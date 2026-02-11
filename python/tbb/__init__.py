@@ -18,7 +18,6 @@ import atexit
 import sys
 import os
 import threading
-import queue
 import warnings
 from typing import Optional, Callable, Tuple
 from contextlib import contextmanager
@@ -57,6 +56,7 @@ is_active = False
 # Threading patch state
 _OriginalThread = threading.Thread
 _is_threading_patched = False
+_patch_lock = threading.Lock()
 
 ipc_enabled = False
 """ Indicates whether IPC mode is enabled """
@@ -203,7 +203,8 @@ class TBBThread:
         self._stopped = threading.Event()
         self._start_lock = threading.Lock()
         self._start_called = False
-        self._exception: Optional[BaseException] = None
+        self._exception: Optional[Exception] = None
+        self._join_lock = threading.Lock()
         self._native_id: Optional[int] = None
         self._ident: Optional[int] = None
         
@@ -234,7 +235,7 @@ class TBBThread:
         try:
             if self._target:
                 self._target(*self._args, **self._kwargs)
-        except BaseException as e:
+        except Exception as e:
             # Store exception without traceback to prevent memory leaks
             self._exception = e.with_traceback(None)
         finally:
@@ -262,10 +263,11 @@ class TBBThread:
         if not self._stopped.wait(timeout):
             return  # Timeout expired
         
-        if self._exception is not None:
-            exc = self._exception
-            self._exception = None
-            raise exc
+        with self._join_lock:
+            if self._exception is not None:
+                exc = self._exception
+                self._exception = None
+                raise exc
     
     def is_alive(self) -> bool:
         """Return True if thread is running."""
@@ -400,32 +402,34 @@ def patch_threading(*, _warn: bool = True) -> None:
         _warn: If True (default), emit a warning about limitations
     """
     global _is_threading_patched
-    if _is_threading_patched:
-        return
-    
-    if _warn:
-        warnings.warn(
-            "patch_threading() replaces threading.Thread globally. "
-            "TBBThread has limitations: daemon ignored, thread IDs may be reused, "
-            "blocking operations can exhaust worker pool. "
-            "Use _warn=False to suppress this warning.",
-            UserWarning,
-            stacklevel=2
-        )
-    
-    threading.Thread = TBBThread
-    _is_threading_patched = True
+    with _patch_lock:
+        if _is_threading_patched:
+            return
+        
+        if _warn:
+            warnings.warn(
+                "patch_threading() replaces threading.Thread globally. "
+                "TBBThread has limitations: daemon ignored, thread IDs may be reused, "
+                "blocking operations can exhaust worker pool. "
+                "Use _warn=False to suppress this warning.",
+                UserWarning,
+                stacklevel=2
+            )
+        
+        threading.Thread = TBBThread
+        _is_threading_patched = True
 
 
 def unpatch_threading() -> None:
     """Restore original threading.Thread implementation."""
     global _is_threading_patched
-    if not _is_threading_patched:
-        return
-    
-    TBBThread._shutdown_pool()
-    threading.Thread = _OriginalThread
-    _is_threading_patched = False
+    with _patch_lock:
+        if not _is_threading_patched:
+            return
+        
+        TBBThread._shutdown_pool()
+        threading.Thread = _OriginalThread
+        _is_threading_patched = False
 
 
 def is_threading_patched() -> bool:

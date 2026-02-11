@@ -74,7 +74,14 @@ public:
         SWIG_PYTHON_THREAD_END_BLOCK;
     }
     
-    PyCaller(PyObject *p, bool initial = true) : SwigPtr_PyObject(p, initial) {}
+    PyCaller(PyObject *p, bool initial = true) : SwigPtr_PyObject() {
+        SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+        _obj = p;
+        if (!initial) {
+            Py_XINCREF(_obj);
+        }
+        SWIG_PYTHON_THREAD_END_BLOCK;
+    }
     
     // Move constructor - transfer ownership without refcount change
     PyCaller(PyCaller&& s) noexcept : SwigPtr_PyObject() {
