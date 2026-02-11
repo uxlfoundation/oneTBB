@@ -66,6 +66,7 @@ This optimization is most effective for workloads that create many short-lived t
 ### Programmatic usage
 
 ```python
+import threading
 from tbb import patch_threading, tbb_threading
 
 # Option 1: Global patch
