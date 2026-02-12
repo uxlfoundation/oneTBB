@@ -26,7 +26,7 @@ __all__ = ["task_arena",
            "runtime_interface_version"]
 %}
 %begin %{
-/* Defines Python wrappers for Intel(R) oneAPI Threading Building Blocks (oneTBB)
+/* Defines Python wrappers for oneAPI Threading Building Blocks (oneTBB)
  *
  * Free-threading (NOGIL) Python 3.13+ Support:
  * This module declares Py_MOD_GIL_NOT_USED to indicate it can run safely
@@ -64,23 +64,43 @@ using namespace tbb;
  * This ensures safe operation when called from TBB worker threads.
  */
 class PyCaller : public swig::SwigPtr_PyObject {
+private:
+    // Release the held Python object reference (GIL must NOT be held on entry)
+    void release_ref() {
+        if (_obj) {
+            SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+            Py_XDECREF(_obj);
+            SWIG_PYTHON_THREAD_END_BLOCK;
+            _obj = nullptr;
+        }
+    }
+
 public:
-    // Copy constructor - must acquire GIL for Py_XINCREF in base class
+    // Copy constructor - must acquire GIL for Py_XINCREF
     PyCaller(const PyCaller& s) : SwigPtr_PyObject() {
-        SWIG_PYTHON_THREAD_BEGIN_BLOCK;
         _obj = s._obj;
+        SWIG_PYTHON_THREAD_BEGIN_BLOCK;
         Py_XINCREF(_obj);
         SWIG_PYTHON_THREAD_END_BLOCK;
     }
     
     PyCaller(PyObject *p, bool initial = true) : SwigPtr_PyObject(p, initial) {}
     
-    // Destructor - must acquire GIL for Py_XDECREF
+    // Destructor - release Python object reference
     ~PyCaller() {
-        SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-        Py_XDECREF(_obj);
-        _obj = nullptr;  // Prevent double-free in base destructor
-        SWIG_PYTHON_THREAD_END_BLOCK;
+        release_ref();
+    }
+    
+    // Assignment operator
+    PyCaller& operator=(const PyCaller& s) {
+        if (this != &s) {
+            release_ref();
+            _obj = s._obj;
+            SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+            Py_XINCREF(_obj);
+            SWIG_PYTHON_THREAD_END_BLOCK;
+        }
+        return *this;
     }
 
     void operator()() const {
@@ -107,6 +127,18 @@ struct ArenaPyCaller {
     task_arena *my_arena;
     PyObject *my_callable;
     
+private:
+    // Release the held Python callable reference (GIL must NOT be held on entry)
+    void release_callable() {
+        if (my_callable) {
+            SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+            Py_XDECREF(my_callable);
+            SWIG_PYTHON_THREAD_END_BLOCK;
+            my_callable = nullptr;
+        }
+    }
+
+public:
     ArenaPyCaller(task_arena *a, PyObject *c) : my_arena(a), my_callable(c) {
         SWIG_PYTHON_THREAD_BEGIN_BLOCK;
         Py_XINCREF(c);
@@ -122,13 +154,21 @@ struct ArenaPyCaller {
     
     // Destructor - release Python object reference
     ~ArenaPyCaller() {
-        SWIG_PYTHON_THREAD_BEGIN_BLOCK;
-        Py_XDECREF(my_callable);
-        SWIG_PYTHON_THREAD_END_BLOCK;
+        release_callable();
     }
     
-    // Assignment operator - prevent double-free issues
-    ArenaPyCaller& operator=(const ArenaPyCaller&) = delete;
+    // Assignment operator
+    ArenaPyCaller& operator=(const ArenaPyCaller& other) {
+        if (this != &other) {
+            release_callable();
+            my_arena = other.my_arena;
+            my_callable = other.my_callable;
+            SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+            Py_XINCREF(my_callable);
+            SWIG_PYTHON_THREAD_END_BLOCK;
+        }
+        return *this;
+    }
     
     void operator()() const {
         my_arena->execute(PyCaller(my_callable, false));
