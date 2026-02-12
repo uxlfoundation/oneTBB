@@ -685,11 +685,7 @@ struct multi_core_type_helper {
     }
 
     int operator()(std::tuple<int, size_t, size_t> core_type) const {
-        auto it = std::find(ids.begin(), ids.end(), std::get<0>(core_type));
-        if (it == ids.end()) {
-            return -1;
-        }
-        return int(it - ids.begin());
+        return int(ids.end() - std::find(ids.begin(), ids.end(), std::get<0>(core_type))); // 0 (not found) or positive
     }
 };
 #endif // __TBB_test_common_arena_constraints_H_

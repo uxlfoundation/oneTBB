@@ -327,23 +327,37 @@ class task_arena : public task_arena_base {
             return;
         }
 
-        int max_score = -1;
-        std::vector<core_type_id> selected_core_types;
         auto ids = core_types();
         size_t total = ids.size();
+        if (total < 2) {
+            // Not enough core types to select from, so use the default
+            my_core_type = automatic;
+            return;
+        }
+
+        int max_score = 0, max_score_id = -1, num_zero_scores = 0;
+        std::vector<core_type_id> selected_core_types;
         for (size_t index = 0; index < total; ++index) {
             int score = selector(std::make_tuple(ids[index], index, total));
+            if (score > 0) {
+                selected_core_types.push_back(ids[index]);
+            } else if (score == 0) {
+                ++num_zero_scores;
+            }
 
-            if (TBB_runtime_interface_version() >= 12180) {
-                if (score >= 0) {
-                    selected_core_types.push_back(ids[index]);
-                }
-            } else {
-                // No runtime multi core type support, so use the one with the highest score
+            if (TBB_runtime_interface_version() < 12180) {
                 if (score > max_score) {
                     max_score = score;
-                    selected_core_types = {ids[index]};
+                    max_score_id = ids[index];
                 }
+            }
+        }
+        if (TBB_runtime_interface_version() < 12180) {
+            // No runtime multi core type support, so select all or one
+            if (selected_core_types.size() + num_zero_scores == total) {
+                selected_core_types.clear(); // all
+            } else if (!selected_core_types.empty()) {
+                selected_core_types = {max_score_id}; // the one with the highest score
             }
         }
         my_core_type = multi_core_type_codec::encode(selected_core_types);
