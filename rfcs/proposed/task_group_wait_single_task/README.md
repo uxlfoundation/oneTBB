@@ -135,6 +135,15 @@ if (!is_completed(ch)) {
 }
 ```
 
+or 
+
+```cpp
+task_completion_handle ch = task;
+while (!is_completed(ch)) {
+    do_some_other_work();
+}
+```
+
 To determine the status of a task represented by ``task_completion_handle``, it is proposed to add a new function ``task_group::get_status_of(const task_completion_handle&)``.
 This function returns:
 * ``task_group_status::not_complete`` - if the task has not yet been submitted, is being scheduled, or is currently executing.
