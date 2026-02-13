@@ -125,7 +125,8 @@ waiting function will return ``task_group_status::canceled``.
 
 ### Returning the Status of the Task
 
-It may be beneficial to execute the waiting function only if the awaited task has not yet completed.
+It may be beneficial to execute the waiting function only if the awaited task has not yet completed or
+to execute unrelated work in the main thread while periodically checking to see if the awaited task is complete.
 
 ```cpp
 task_completion_handle ch = task;
