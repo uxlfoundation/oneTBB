@@ -399,11 +399,17 @@ TEST("test_renegotiation_order") {
   // 1) Available resources
   // 2) Negotiation of the IDLE permits (including rigid concurrency ones)
   // 3) Negotiation of the ACTIVE permits
+  const int32_t num_resources = platform_tcm_concurrency();
+  if (num_resources < 3) {
+      logger.log("Less than three resources is available. Skipping the test...");
+      return;
+  }
+  logger.log("Number of available resources is " + std::to_string(num_resources));
 
   tcm_client_id_t clid = connect_new_client(renegotiation_function);
 
   tcm_permit_handle_t phA{nullptr};
-  uint32_t pA_concurrency{0}, eA_concurrency = uint32_t(platform_tcm_concurrency()/2);
+  uint32_t pA_concurrency{0}, eA_concurrency = uint32_t(num_resources / 2);
 
   tcm_permit_t pA = make_void_permit(&pA_concurrency),
                eA = make_active_permit(&eA_concurrency);
@@ -417,7 +423,7 @@ TEST("test_renegotiation_order") {
   // Request that shouldn't be renegotiated in active state
   tcm_permit_flags_t rigid_concurrency_flags{};
   rigid_concurrency_flags.rigid_concurrency = true;
-  uint32_t pS_concurrency = 0, eS_concurrency = platform_tcm_concurrency()/4;
+  uint32_t pS_concurrency = 0, eS_concurrency = (num_resources - eA_concurrency) / 2;
 
   tcm_permit_request_t rS = make_request(tcm_automatic, int(eS_concurrency), /*constraints*/nullptr,
                                          /*size*/0, TCM_REQUEST_PRIORITY_NORMAL,
@@ -446,7 +452,7 @@ TEST("test_renegotiation_order") {
                               "was not negotiated since no other requests for resources exist");
 
   tcm_permit_handle_t phC{nullptr};
-  uint32_t pC_concurrency = 0, eC_concurrency = platform_tcm_concurrency()/4;
+  uint32_t pC_concurrency = 0, eC_concurrency = (num_resources - eA_concurrency - eS_concurrency);
 
   tcm_permit_t pC = make_void_permit(&pC_concurrency);
   tcm_permit_t eC = make_active_permit(&eC_concurrency);
@@ -465,7 +471,7 @@ TEST("test_renegotiation_order") {
   check_permit(eA, phA);
   check(!is_callback_invoked, "Rigid concurrency permit in idle state was not negotiated.");
 
-  eC_concurrency = platform_tcm_concurrency() / 2;
+  eC_concurrency = (num_resources - eA_concurrency);
   rC.max_sw_threads = int32_t(eC_concurrency);
   phC = nullptr;                // make it a new request
   // The request going to negotiate IDLEd rigid concurrency permit
@@ -482,23 +488,30 @@ TEST("test_renegotiation_order") {
   allow_rigid_concurrency_permit_negotiation = false;
 
   // TODO: Request amount of resources independent of floating point arithmetic
-  eC_concurrency = 3 * platform_tcm_concurrency() / 4;
+  eC_concurrency = 3 * num_resources / 4;
   rC.min_sw_threads = rC.max_sw_threads = eC_concurrency;
-  eA_concurrency = platform_tcm_concurrency() - eC_concurrency;
+  bool expected_callback_invocation_state = false;
+  if (eA_concurrency != num_resources - eC_concurrency)
+      expected_callback_invocation_state = true;
+  eA_concurrency = num_resources - eC_concurrency;
   is_callback_invoked = false;
   r = tcmRequestPermit(clid, rC, &phC, &phC, &pC);
   check_success(r, "tcmRequestPermit phC regular, re-request for " + std::to_string(eC_concurrency));
   check_permit(eC, pC);
   check_permit(eA, phA);
   check_permit(eS, phS);
-  check(is_callback_invoked, "ACTIVE permit was negotiated.");
+  check(expected_callback_invocation_state == is_callback_invoked, "ACTIVE permit was negotiated.");
 
+  expected_callback_invocation_state = false;
+  if (eA_concurrency != uint32_t(rA.max_sw_threads))
+      expected_callback_invocation_state = true;
   eA_concurrency = rA.max_sw_threads;
   is_callback_invoked = false;
   r = tcmReleasePermit(phC);
   check_success(r, "tcmReleasePermit phC");
   check_permits({{eA, phA}, {eS, phS}});
-  check(is_callback_invoked, "ACTIVE permit phA has been negotiated");
+  check(expected_callback_invocation_state == is_callback_invoked,
+        "ACTIVE permit phA has been negotiated");
 
   is_callback_invoked = false;
   r = tcmReleasePermit(phA);
@@ -686,7 +699,7 @@ TEST("allow_request_as_inactive_for_deactivated") {
     renegotiating_permits = {ph}; allow_null_in_callback_arg = true;
     is_client_renegotiate_callback_invoked = false;
     tcm_permit_t& p = expected_permit;
-    p.concurrencies[0] = min_sw_threads;
+    p.concurrencies[0] = req.max_sw_threads - req2.min_sw_threads;
     auto ph2 = request_permit(client_id, req2);
     auto expected_permit2 = make_active_permit(platform_tcm_concurrency()/2);
     check_permit(expected_permit, ph);
@@ -776,24 +789,26 @@ TEST("allow_change_callback_arg_for_requested_as_inactive") {
     // permit request
     tcm_client_id_t client_id = connect_new_client(client_renegotiate);
 
+    const int32_t num_resources = platform_tcm_concurrency();
+
     // Request as inactive first
     auto expected_permit = make_inactive_permit(/*cpu_masks*/ nullptr, request_as_inactive_flag);
-    tcm_permit_request_t req = make_request(/*min_sw_threads*/platform_tcm_concurrency(),
-                                            /*max_sw_threads*/platform_tcm_concurrency());
+    tcm_permit_request_t req = make_request(/*min_sw_threads*/num_resources - 1,
+                                            /*max_sw_threads*/num_resources - 1);
     req.flags.request_as_inactive = true;
     tcm_permit_handle_t ph = request_permit(client_id, req, /*callback_arg*/nullptr);
     check_permit(expected_permit, ph);
 
     // Update permit request with different request parameters including callback argument
     tcm_permit_handle_t ph_prev = ph;
-    req.min_sw_threads = 1; req.max_sw_threads = platform_tcm_concurrency()/2;
+    req.min_sw_threads = 1; req.max_sw_threads = num_resources;
     tcm_result_t r = tcmRequestPermit(client_id, req, /*callback_arg*/&ph, &ph, /*permit*/nullptr);
     check_success(r, "Re-initializing permit_handle using different request and callback");
     check_permit(expected_permit, ph);
     check(ph == ph_prev, "Permit handle was not changed");
 
     tcm_permit_t& ep = expected_permit;
-    ep.concurrencies[0] = platform_tcm_concurrency()/2; ep.state = TCM_PERMIT_STATE_ACTIVE;
+    ep.concurrencies[0] = req.max_sw_threads; ep.state = TCM_PERMIT_STATE_ACTIVE;
     ep.flags.request_as_inactive = false;
     activate_permit(ph, "Error activating permit");
     check_permit(ep, ph);
@@ -801,9 +816,10 @@ TEST("allow_change_callback_arg_for_requested_as_inactive") {
     // Check updating callback argument works.
     is_client_renegotiate_callback_invoked = false;
     renegotiating_permits = {ph};
-    req = make_request(platform_tcm_concurrency() - 1, platform_tcm_concurrency());
+    ep.concurrencies[0] = req.min_sw_threads;
+    req = make_request(num_resources - 1, num_resources);
     auto ph2 = request_permit(client_id, req, /*callback_arg*/ nullptr);
-    ep.concurrencies[0] = 1; auto e2 = make_active_permit(platform_tcm_concurrency() - 1);
+    auto e2 = make_active_permit(req.min_sw_threads);
     check_permit(ep, ph);
     check_permit(e2, ph2);
     check(is_client_renegotiate_callback_invoked, "Client callback was invoked");
