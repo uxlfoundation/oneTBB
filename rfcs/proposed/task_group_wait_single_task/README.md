@@ -276,6 +276,7 @@ The following questions should be resolved before promoting the feature out of t
   [Work Isolation Issue section](#work-isolation-issue) for more details.
 * Should ``run_and_wait_for_task`` overload accepting the task body be added? Refer to the
   [``run_and_wait_for_task`` Accepting the Task Body](#run_and_wait_for_task-accepting-the-task-body) for more details.
+* Should an additional ``task_group_status`` be introduced to indicate that the task has been completed, but a cancellation of the group was detected?
 
 ## Implementation Details
 
