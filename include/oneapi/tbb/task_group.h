@@ -76,7 +76,7 @@ struct task_group_context_impl;
 namespace d2 {
 
 template<typename F>
-inline d1::task* task_ptr_or_nullptr(F&& f);
+d1::task* task_ptr_or_nullptr(F&& f);
 
 template<typename F>
 class function_task : public task_handle_task  {
@@ -130,7 +130,7 @@ public:
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
     template<typename F>
-    inline d1::task* task_ptr_or_nullptr_impl(std::false_type, F&& f){
+    d1::task* task_ptr_or_nullptr_impl(std::false_type, F&& f){
         task_handle th = std::forward<F>(f)();
         task_handle_task* task_ptr = task_handle_accessor::release(th);
         // If task has unresolved dependencies, it can't be bypassed
@@ -142,13 +142,13 @@ public:
     }
 
     template<typename F>
-    inline d1::task* task_ptr_or_nullptr_impl(std::true_type, F&& f){
+    d1::task* task_ptr_or_nullptr_impl(std::true_type, F&& f){
         std::forward<F>(f)();
         return nullptr;
     }
 
     template<typename F>
-    inline d1::task* task_ptr_or_nullptr(F&& f){
+    d1::task* task_ptr_or_nullptr(F&& f){
         using is_void_t = std::is_void<
             decltype(std::forward<F>(f)())
             >;
@@ -157,7 +157,7 @@ public:
     }
 #else
     template<typename F>
-    inline d1::task* task_ptr_or_nullptr(F&& f){
+    d1::task* task_ptr_or_nullptr(F&& f){
         std::forward<F>(f)();
         return nullptr;
     }

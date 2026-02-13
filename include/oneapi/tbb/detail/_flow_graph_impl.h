@@ -36,7 +36,7 @@ namespace d2 {
 class graph_task;
 __TBB_GLOBAL_VAR graph_task* const SUCCESSFULLY_ENQUEUED = (graph_task*)-1;
 typedef unsigned int node_priority_t;
-__TBB_GLOBAL_VAR const node_priority_t no_priority = node_priority_t(0);
+__TBB_GLOBAL_VAR constexpr node_priority_t no_priority = node_priority_t(0);
 
 class graph;
 class graph_node;
