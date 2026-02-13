@@ -352,7 +352,7 @@ using namespace tbb::flow;
 
 using input_type = ...;
 
-auto generate_input = [](tbb::flow_control& fc) -> input_type {
+auto generate_input_body = [](tbb::flow_control& fc) -> input_type {
     // generate input data
 };
 
