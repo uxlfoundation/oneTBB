@@ -192,8 +192,8 @@ struct counting_functor {
         return return_value;
     }
 
-    template<typename InputType>
-    void operator()( InputType, multifunc_ports_t<InputType, OutputType>& op ) {
+    template<typename InputType, typename... ResourceHandles> // for resource_limited_node
+    void operator()( InputType, multifunc_ports_t<InputType, OutputType>& op, ResourceHandles&&... ) {
         ++execute_count;
         std::get<0>(op).try_put(return_value);
     }
@@ -228,8 +228,9 @@ struct dummy_functor {
 #endif
     }
 
-    template<typename InputType>
-    void operator()( InputType, multifunc_ports_t<InputType, OutputType>& op ) {
+    template<typename InputType, typename... ResourceHandles> // for resource_limited_node
+    void operator()( InputType, multifunc_ports_t<InputType, OutputType>& op,
+                     ResourceHandles&&... ) {
         std::get<0>(op).try_put(OutputType(0));
     }
 
@@ -315,7 +316,8 @@ struct concurrency_peak_checker_body {
         return 1;
     }
 
-    void operator()( const int& argument, multifunc_ports_t<int>& op ) {
+    template <typename... Args> // for resource_limited_node
+    void operator()( const int& argument, multifunc_ports_t<int>& op, Args&&...) {
         utils::ConcurrencyTracker ct;
         utils::doDummyWork(1000);
         CHECK_MESSAGE((int)utils::ConcurrencyTracker::PeakParallelism() <= required_max_concurrency,
@@ -361,7 +363,8 @@ struct copy_counting_object {
         return OutputType(1);
     }
 
-    void operator()( InputType, multifunc_ports_t<InputType,OutputType>& op ) {
+    template <typename... Args> // for resource_limited_node
+    void operator()( InputType, multifunc_ports_t<InputType,OutputType>& op, Args&&... ) {
         std::get<0>(op).try_put(OutputType(1));
     }
 
@@ -546,16 +549,17 @@ void test_inheritance() {
     CHECK_MESSAGE((std::is_base_of<sender<OutputType>, Node>::value), "Node should be derived from sender<Output>");
 }
 
-template<typename Node>
-void test_copy_ctor() {
+template<typename Node, typename... AdditionalArgs> // for resource_limited_node
+void test_copy_ctor(AdditionalArgs&&... additional_ctor_args) {
+    tbb::global_control ctl(tbb::global_control::max_allowed_parallelism, 1);
     using namespace oneapi::tbb::flow;
     graph g;
 
     dummy_functor<int> fun1;
     conformance::copy_counting_object<int> fun2;
 
-    Node node0(g, unlimited, fun1);
-    Node node1(g, unlimited, fun2);
+    Node node0(g, unlimited, additional_ctor_args..., fun1);
+    Node node1(g, unlimited, additional_ctor_args..., fun2);
     test_push_receiver<int> suc_node1(g);
     test_push_receiver<int> suc_node2(g);
 
@@ -654,8 +658,8 @@ void test_priority(Args... node_args) {
     });
 }
 
-template<typename Node>
-void test_concurrency() {
+template<typename Node, typename... AdditionalArgs>
+void test_concurrency(AdditionalArgs&&... additional_ctor_args) {
     auto max_num_threads = oneapi::tbb::this_task_arena::max_concurrency();
 
     oneapi::tbb::global_control c(oneapi::tbb::global_control::max_allowed_parallelism,
@@ -678,7 +682,7 @@ void test_concurrency() {
         }
         oneapi::tbb::flow::graph g;
         concurrency_peak_checker_body counter(expected_threads);
-        Node fnode(g, num_threads, counter);
+        Node fnode(g, num_threads, additional_ctor_args...,  counter);
 
         test_push_receiver<int> suc_node(g);
 

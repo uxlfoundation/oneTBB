@@ -40,10 +40,16 @@ class request_id {
     using clock_type = std::chrono::high_resolution_clock;
     using time_point = clock_type::time_point;
 
-    time_point m_time_point;
+    time_point    m_time_point;
+    std::uint64_t m_unique_integer;
 public:
-    request_id()
-        : m_time_point(clock_type::now()) // TODO: use something else? Only time point is not sufficient. Should it be input address that is unique?
+    // request_id()
+    //     : m_time_point(clock_type::now())
+    // {}
+
+    request_id(const std::uint64_t& unique_integer)
+        : m_time_point(clock_type::now())
+        , m_unique_integer(unique_integer)
     {}
 
     struct hash {
@@ -55,10 +61,9 @@ public:
     };
 
     struct equal {
-        std::equal_to<time_point> m_equal;
-
         bool operator()(request_id lhs, request_id rhs) const {
-            return m_equal(lhs.m_time_point, rhs.m_time_point);
+            return lhs.m_time_point == rhs.m_time_point &&
+                   lhs.m_unique_integer == rhs.m_unique_integer;
         }
     };
 }; // class request_id
@@ -128,6 +133,7 @@ public:
     virtual void          request(consumer_type&, request_id) = 0;
     virtual optional_type acquire(consumer_type&, request_id) = 0;
     virtual void          release(consumer_type&, request_id, optional_type&&) = 0;
+    virtual ~resource_provider_base() = default;
 };
 
 template <typename ResourceHandle>
@@ -135,6 +141,7 @@ class resource_consumer_base {
 public:
     using provider_type = resource_provider_base<ResourceHandle>;
     virtual void notify(provider_type&, request_id) = 0;
+    virtual ~resource_consumer_base() = default;
 };
 
 // TODO: use actual fair implementation with starvation avoidance
@@ -209,9 +216,10 @@ template <typename Input, typename OutputPorts>
 class resource_limited_body {
     graph& m_graph;
 public:
-    virtual void operator()(const Input& input, OutputPorts& ports) = 0;
-    virtual void notify(request_id id) = 0;
+    virtual void                   operator()(const Input& input, OutputPorts& ports) = 0;
+    virtual void                   notify(request_id id) = 0;
     virtual resource_limited_body* clone() = 0;
+    virtual void*                  get_body_ptr() = 0;
     virtual ~resource_limited_body() = default;
 
     resource_limited_body(graph& g) : m_graph(g) {}
@@ -250,6 +258,11 @@ public:
         tbb::detail::suppress_unused_warning(provider);
     }
 
+    void set_body_ptr(resource_limited_body_type* body_ptr) {
+        m_body_ptr = body_ptr;
+    }
+
+private:
     ResourceProvider&           m_resource_provider;
     resource_limited_body_type* m_body_ptr;
 };
@@ -298,6 +311,21 @@ template <>
 struct release_resources_helper<0> {
     template <typename ConsumerTuple, typename RequestData>
     static void run(ConsumerTuple&, request_id, RequestData&) {}
+};
+
+template <std::size_t Index>
+struct set_body_ptr_helper {
+    template <typename ConsumerTuple, typename Body>
+    static void run(ConsumerTuple& consumers, Body* body_ptr) {
+        std::get<Index - 1>(consumers).set_body_ptr(body_ptr);
+        set_body_ptr_helper<Index - 1>::run(consumers, body_ptr);
+    }
+};
+
+template <>
+struct set_body_ptr_helper<0> {
+    template <typename ConsumerTuple, typename Body>
+    static void run(ConsumerTuple&, Body*) {}
 };
 
 template <std::size_t Index, std::size_t MaxIndex>
@@ -369,12 +397,14 @@ class resource_limited_body_leaf
     requests_map_type    m_requests;
     consumers_tuple_type m_consumers;
     Body                 m_body;
+    std::uint64_t        m_counter;
 
     template <typename ConsumersTuple>
     resource_limited_body_leaf(graph& g, ConsumersTuple&& consumers_tuple, const Body& body)
         : resource_limited_body<Input, OutputPorts>(g)
         , m_consumers(std::forward<ConsumersTuple>(consumers_tuple))
         , m_body(body)
+        , m_counter(0)
     {}
 
 public:
@@ -400,9 +430,8 @@ public:
     }
 
     typename requests_map_type::reference form_request(const Input& input, OutputPorts& ports) {
-        request_id id;
-        
         tbb::spin_mutex::scoped_lock lock(m_mutex);
+        request_id id{++m_counter};
         auto res = m_requests.emplace(std::piecewise_construct,
                                       std::forward_as_tuple(id),
                                       std::forward_as_tuple(input, ports));
@@ -449,20 +478,7 @@ public:
         tbb::detail::suppress_unused_warning(num_removed);
     }
 
-    template <typename ResourceHandlesTuple>
-    void call_body(const Input& input, OutputPorts& ports, ResourceHandlesTuple& tuple) {
-        call_body_impl(input, ports, tuple,
-                       tbb::detail::make_index_sequence<std::tuple_size<ResourceHandlesTuple>::value>());
-    }
-
-    template <typename ResourceHandlesTuple, std::size_t... Idx>
-    void call_body_impl(const Input& input, OutputPorts& ports, ResourceHandlesTuple& tuple,
-                        tbb::detail::index_sequence<Idx...>) {
-        tbb::detail::invoke(m_body, input, ports, std::get<Idx>(tuple).value()...);
-    }
-
     void notify(request_id id) {
-        
         tbb::spin_mutex::scoped_lock lock(m_mutex);
         auto res = m_requests.find(id);
         __TBB_ASSERT(res != m_requests.end(), "Cannot find request for notification");
@@ -479,7 +495,23 @@ public:
     }
 
     resource_limited_body_leaf* clone() override {
-        return new resource_limited_body_leaf(this->graph_reference(), m_consumers, m_body);
+        resource_limited_body_leaf* new_body = new resource_limited_body_leaf(this->graph_reference(), m_consumers, this->m_body);
+        set_body_ptr_helper<sizeof...(ResourceProviders)>::run(new_body->m_consumers, new_body);
+        return new_body;
+    }
+
+    void* get_body_ptr() override { return &m_body; }
+
+    template <typename ResourceHandlesTuple>
+    void call_body(const Input& input, OutputPorts& ports, ResourceHandlesTuple& tuple) {
+        call_body_impl(input, ports, tuple,
+                       tbb::detail::make_index_sequence<std::tuple_size<ResourceHandlesTuple>::value>());
+    }
+
+    template <typename ResourceHandlesTuple, std::size_t... Idx>
+    void call_body_impl(const Input& input, OutputPorts& ports, ResourceHandlesTuple& tuple,
+                        tbb::detail::index_sequence<Idx...>) {
+        tbb::detail::invoke(m_body, input, ports, std::get<Idx>(tuple).value()...);
     }
 };
 
@@ -531,6 +563,11 @@ public:
     }
 
     output_ports_type& output_ports() { return m_output_ports; }
+
+    template <typename Body>
+    Body copy_function_object() {
+        return *static_cast<Body*>(m_body->get_body_ptr());
+    }
 protected:
     void reset(reset_flags f) {
         base_type::reset_function_input_base(f);
@@ -570,7 +607,7 @@ public:
     {}
 
     resource_limited_node(const resource_limited_node& other)
-        : graph_node(other.m_graph)
+        : graph_node(other.graph_reference())
         , input_impl_type(other)
     {}
 protected:
