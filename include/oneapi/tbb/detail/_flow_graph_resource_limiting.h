@@ -478,7 +478,7 @@ public:
         tbb::detail::suppress_unused_warning(num_removed);
     }
 
-    void notify(request_id id) {
+    void notify(request_id id) override {
         tbb::spin_mutex::scoped_lock lock(m_mutex);
         auto res = m_requests.find(id);
         __TBB_ASSERT(res != m_requests.end(), "Cannot find request for notification");
