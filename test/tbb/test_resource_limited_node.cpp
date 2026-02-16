@@ -55,7 +55,7 @@ void test_single_resource() {
     nodes.reserve(num_nodes);
 
     int input_message = 0;
-    std::atomic<std::size_t> counter = 0;
+    std::atomic<std::size_t> counter(0);
     std::size_t num_body_runs = 0;
     auto node_body = [&](int input, ports_type&, int* resource_handle) {
         CHECK_MESSAGE(input == input_message, "Incorrect input");

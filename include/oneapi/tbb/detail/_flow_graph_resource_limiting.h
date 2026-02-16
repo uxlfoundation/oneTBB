@@ -607,7 +607,7 @@ public:
     {}
 
     resource_limited_node(const resource_limited_node& other)
-        : graph_node(other.graph_reference())
+        : graph_node(other.my_graph)
         , input_impl_type(other)
     {}
 protected:
