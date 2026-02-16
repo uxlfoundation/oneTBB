@@ -55,7 +55,7 @@ BEGIN
             VALUE "CompanyName", "Intel Corporation\0"
             VALUE "FileDescription", "oneAPI Threading Building Blocks (oneTBB) library\0"
             VALUE "FileVersion", TBB_VERSION "\0"
-            VALUE "LegalCopyright", "\251 2005-2025 Intel Corporation. \251 2026 UXL Foundation Contributors\0"
+            VALUE "LegalCopyright", L"\x00A9 2005-2025 Intel Corporation. \x00A9 2026 UXL Foundation Contributors\0"
             VALUE "LegalTrademarks", "\0"
 #ifndef TBB_USE_DEBUG
             VALUE "OriginalFilename", "tbbmalloc_proxy.dll\0"
