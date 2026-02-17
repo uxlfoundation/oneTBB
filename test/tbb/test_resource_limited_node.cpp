@@ -307,7 +307,7 @@ using provider_unique_ptr = std::unique_ptr<oneapi::tbb::flow::resource_provider
 
 template <std::size_t... Idx>
 provider_unique_ptr<int> get_provider_impl(tbb::detail::index_sequence<Idx...>) {
-    return std::make_unique<oneapi::tbb::flow::resource_provider<int>>(Idx...);
+    return provider_unique_ptr<int>(new oneapi::tbb::flow::resource_provider<int>(Idx...));
 }
 
 template <std::size_t NumResources>
