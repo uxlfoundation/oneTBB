@@ -302,29 +302,32 @@ TEST_CASE("test resource acquisition") {
     test_several_resources();
 }
 
+template <typename Handle>
+using provider_unique_ptr = std::unique_ptr<oneapi::tbb::flow::resource_provider<Handle>>;
+
 template <std::size_t... Idx>
-oneapi::tbb::flow::resource_provider<int> get_provider_impl(tbb::detail::index_sequence<Idx...>) {
-    return {Idx...};
+provider_unique_ptr<int> get_provider_impl(tbb::detail::index_sequence<Idx...>) {
+    return std::make_unique<oneapi::tbb::flow::resource_provider<int>>(Idx...);
 }
 
 template <std::size_t NumResources>
-oneapi::tbb::flow::resource_provider<int> get_provider() {
+provider_unique_ptr<int> get_provider() {
     return get_provider_impl(tbb::detail::make_index_sequence<NumResources>());
 }
 
 //! \brief \ref interface \ref requirement
 TEST_CASE("resource_limited_node concurrency") {
-    auto provider = get_provider<500>(); // Provider with more resources than available threads
+    auto provider_ptr = get_provider<500>(); // Provider with more resources than available threads
     CHECK(tbb::this_task_arena::max_concurrency() < 500);
-    conformance::test_concurrency<oneapi::tbb::flow::resource_limited_node<int, std::tuple<int>>>(std::tie(provider));
+    conformance::test_concurrency<oneapi::tbb::flow::resource_limited_node<int, std::tuple<int>>>(std::tie(*provider_ptr));
 }
 
 //! \brief \ref interface
 TEST_CASE("resource_limited_node copy_body") {
-    auto provider = get_provider<10>();
+    auto provider_ptr = get_provider<10>();
     using node_type = oneapi::tbb::flow::resource_limited_node<int, std::tuple<int>>;
     using body_type = conformance::copy_counting_object<int>;
-    conformance::test_copy_body_function<node_type, body_type>(oneapi::tbb::flow::unlimited, std::tie(provider));
+    conformance::test_copy_body_function<node_type, body_type>(oneapi::tbb::flow::unlimited, std::tie(*provider_ptr));
 }
 
 //! \brief \ref requirement
@@ -334,17 +337,17 @@ TEST_CASE("resource_provider and resource_limited_node with strict_resource_hand
 
 //! \brief \ref interface \ref requirement
 TEST_CASE("resource_limited_node copy constructor") {
-    auto provider = get_provider<10>();
+    auto provider_ptr = get_provider<10>();
     using node_type = oneapi::tbb::flow::resource_limited_node<int, std::tuple<int>>;
-    conformance::test_copy_ctor<node_type>(std::tie(provider));
+    conformance::test_copy_ctor<node_type>(std::tie(*provider_ptr));
 }
 
 //! \brief \ref requirement
 TEST_CASE("resource_limited_node broadcast") {
     conformance::counting_functor<int> fun(conformance::expected);
-    auto provider = get_provider<10>();
+    auto provider_ptr = get_provider<10>();
     using node_type = oneapi::tbb::flow::resource_limited_node<int, std::tuple<int>>;
-    conformance::test_forwarding<node_type, input_msg, int>(1, oneapi::tbb::flow::unlimited, std::tie(provider), fun);
+    conformance::test_forwarding<node_type, input_msg, int>(1, oneapi::tbb::flow::unlimited, std::tie(*provider_ptr), fun);
 }
 
 //! \brief \ref error_guessing
@@ -373,11 +376,11 @@ TEST_CASE("resource_limited_node and std::invoke") {
     auto first_body = &input_type::template send_id<first_ports_type, int&>;
     auto second_body = &output_type1::template send_id<second_ports_type, int&>;
 
-    auto provider = get_provider<10>();
+    auto provider_ptr = get_provider<10>();
 
-    first_rl_node_type rl1(g, unlimited, std::tie(provider), first_body);
-    second_rl_node_type rl21(g, unlimited, std::tie(provider), second_body);
-    second_rl_node_type rl22(g, unlimited, std::tie(provider), second_body);
+    first_rl_node_type rl1(g, unlimited, std::tie(*provider_ptr), first_body);
+    second_rl_node_type rl21(g, unlimited, std::tie(*provider_ptr), second_body);
+    second_rl_node_type rl22(g, unlimited, std::tie(*provider_ptr), second_body);
 
     buffer_node<std::size_t> buf(g);
 
