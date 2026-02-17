@@ -252,8 +252,8 @@ void test_root_genie() {
 
     std::unordered_multiset<int> inputs;
 
-    std::size_t num_inputs = 100;
-    for (std::size_t i = 0; i < num_inputs; ++i) {
+    int num_inputs = 100;
+    for (int i = 0; i < num_inputs; ++i) {
         for (std::size_t j = 0; j < 3; ++j) {
             inputs.emplace(i);
         }
@@ -263,7 +263,7 @@ void test_root_genie() {
 
     g.wait_for_all();
 
-    for (std::size_t i = 0; i < num_inputs; ++i) {
+    for (int i = 0; i < num_inputs; ++i) {
         int root_input = 0;
         int genie_input = 0;
         int root_genie_input = 0;
