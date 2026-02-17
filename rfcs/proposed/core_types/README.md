@@ -60,16 +60,19 @@ This proposal must maintain compatibility with previous oneTBB library versions:
 - **API and Backward Compatibility (Old Application + New Library)**: Existing code using the current
   `set_core_type(core_type_id)` API must compile and behave identically with newer oneTBB binaries.
 - **Binary Compatibility (ABI)**: The `task_arena::constraints` struct layout must remain unchanged.
-- **Forward Compatibility (New Application + Old Library)**: Applications compiled with the proposed new functionality
+- **Forward Compatibility (New Application + Old Library)**: In general, oneTBB does **NOT** support forward compatibility.  
+  However for limited use cases where only specific oneTBB functionality is required, it may be possible to compile using a subset of new headers and load an old binary library.
+ Considering this feature in isolation, applications compiled with the proposed new functionality
   must be able to handle execution against older oneTBB binaries gracefully, without crashes or undefined behavior.
   This requirement is mandated by the necessity for the key customer, OpenVINO, to support their users
   that might not be ready to upgrade to the latest version of oneTBB.
+  This goal does not imply any general form of forward compatibility.
 
 ## Proposal
 
 This proposal takes a different approach to the API, motivated by
 [SYCL device selectors](https://registry.khronos.org/SYCL/specs/sycl-2020/html/sycl-2020.html#sec:device-selection).
-In SYCL, "a device selector which is a ranking function that will give an integer ranking value to all the devices
+In SYCL, "a device selector ... is a ranking function that will give an integer ranking value to all the devices
 on the system". It takes a device as an argument and returns a score for that device, according to user's criteria.
 The SYCL implementation calls that function on each device, and then selects one with the highest score.
 
@@ -140,7 +143,7 @@ it should take the one with the biggest score.
 ### Implementation aspects
 
 The key implementation problem is how to pass the additional information about multiple core types (or NUMA nodes)
-to the TBB library functions for arena creation without violating the forward compatibility requirement.
+to the TBB library functions for arena creation without violating the forward compatibility requirement for this specific feature.
 
 This proposal encapsulates the implementation and can potentially utilize various ways to solve the problem, such as:
 - encoding the extra information into the existing types, e.g. in the way proposed in Alternative 2;
