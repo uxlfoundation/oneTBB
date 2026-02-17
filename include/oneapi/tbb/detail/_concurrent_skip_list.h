@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2019-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -65,11 +65,14 @@ public:
 
     void set_size(size_type size) { my_local_size.store(size, std::memory_order_relaxed); }
     void increment_size() {
+        // Not using my_local_size.fetch_add(1) to avoid exclusive locking of the cache line
+        // Since only one thread can write to this atomic, and no synchronization needed with readers
         my_local_size.store(local_size() + 1, std::memory_order_relaxed);
     }
 
 private:
     level_generator_type my_rng;
+    // Atomic to avoid formal data race between several readers and single writer
     std::atomic<size_type> my_local_size;
 };
 
@@ -299,7 +302,8 @@ protected:
 
     using random_level_generator_type = typename container_traits::random_level_generator_type;
     using thread_data_type = skip_list_thread_data<random_level_generator_type, size_type>;
-    using ets_type = tbb::enumerable_thread_specific<thread_data_type>;
+    using ets_type = tbb::enumerable_thread_specific<thread_data_type, cache_aligned_allocator<thread_data_type>,
+                                                     ets_suspend_aware>;
 
     using node_ptr = list_node_type*;
 
@@ -1245,7 +1249,7 @@ private:
     key_compare my_compare;
     atomic_node_ptr my_head_ptr;
     std::atomic<size_type> my_max_height;
-    mutable ets_type my_ets;
+    mutable ets_type my_ets; // mutable is needed since ets::combine_each is non-const
 
     template<typename OtherTraits>
     friend class concurrent_skip_list;
