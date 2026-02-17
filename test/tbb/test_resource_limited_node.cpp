@@ -317,9 +317,14 @@ provider_unique_ptr<int> get_provider() {
 
 //! \brief \ref interface \ref requirement
 TEST_CASE("resource_limited_node concurrency") {
-    auto provider_ptr = get_provider<500>(); // Provider with more resources than available threads
-    CHECK(tbb::this_task_arena::max_concurrency() < 500);
-    conformance::test_concurrency<oneapi::tbb::flow::resource_limited_node<int, std::tuple<int>>>(std::tie(*provider_ptr));
+    // For correct test behavior number of resources should be greater than number of threads in arena
+    constexpr std::size_t num_threads = 50;
+    auto provider_ptr = get_provider<num_threads + 1>();
+    oneapi::tbb::task_arena arena(num_threads);
+
+    arena.execute([&] {
+        conformance::test_concurrency<oneapi::tbb::flow::resource_limited_node<int, std::tuple<int>>>(std::tie(*provider_ptr));
+    });
 }
 
 //! \brief \ref interface
