@@ -132,6 +132,7 @@ public:
 
     virtual void          request(consumer_type&, request_id) = 0;
     virtual optional_type acquire(consumer_type&, request_id) = 0;
+    virtual void          report_pressure(consumer_type&, std::size_t) = 0;
     virtual void          release(consumer_type&, request_id, optional_type&&) = 0;
     virtual ~resource_provider_base() = default;
 };
@@ -205,6 +206,8 @@ public:
         }
     }
 
+    void report_pressure(consumer_type&, std::size_t) override {}
+
     using consumer_data = std::pair<request_id, resource_consumer_base<ResourceHandle>*>;
 
     tbb::spin_mutex m_mutex;
@@ -252,6 +255,10 @@ public:
         m_resource_provider.release(*this, id, std::move(handle));
     }
 
+    void report_pressure_to_provider(std::size_t pressure) {
+        m_resource_provider.report_pressure(*this, pressure);
+    }
+
     void notify(resource_provider_base<resource_handle_type>& provider, request_id id) override {
         __TBB_ASSERT(&provider == &m_resource_provider, "Provider-consumer mismatch");
         m_body_ptr->notify(id);
@@ -292,8 +299,8 @@ struct request_resources_helper {
     }
 };
 
-template <std::size_t Index>
-struct request_resources_helper<Index, Index> {
+template <std::size_t MaxIndex>
+struct request_resources_helper<MaxIndex, MaxIndex> {
     template <typename ConsumerTuple>
     static void run(ConsumerTuple&, request_id) {}
 };
@@ -346,12 +353,27 @@ struct acquire_resources_helper {
     }
 };
 
-template <std::size_t Index>
-struct acquire_resources_helper<Index, Index> {
+template <std::size_t MaxIndex>
+struct acquire_resources_helper<MaxIndex, MaxIndex> {
     template <typename Body, typename ConsumerTuple, typename RequestData>
     static void run(Body*, ConsumerTuple&, request_id, RequestData& req_data) {
         req_data.ready = true;
     }
+};
+
+template <std::size_t Index, std::size_t MaxIndex>
+struct report_pressure_helper {
+    template <typename ConsumerTuple>
+    static void run(ConsumerTuple& consumers, std::size_t pressure) {
+        std::get<Index>(consumers).report_pressure_to_provider(pressure);
+        report_pressure_helper<Index + 1, MaxIndex>::run(consumers, pressure);
+    }
+};
+
+template <std::size_t MaxIndex>
+struct report_pressure_helper<MaxIndex, MaxIndex> {
+    template <typename ConsumerTuple>
+    static void run(ConsumerTuple&, std::size_t) {}
 };
 
 template <typename BodyLeaf, typename RequestDataType>
@@ -425,6 +447,7 @@ public:
 
     void operator()(const Input& input, OutputPorts& ports) noexcept override {
         auto& res = form_request(input, ports);
+        report_pressure(0); // TODO: report real pressure
         request_resources(res.first);
         release_self_ref(res.first, res.second);
     }
@@ -468,6 +491,7 @@ public:
 
     void release_resources(request_id id, request_data_type& req_data) {
         release_resources_helper<sizeof...(ResourceProviders)>::run(m_consumers, id, req_data);
+        report_pressure(0); // TODO: report real pressure
     }
 
     void remove_request(request_id id) {
@@ -492,6 +516,10 @@ public:
             graph_task* t = allocator.new_object<task_type>(this->graph_reference(), allocator, this, id, data);
             spawn_in_graph_arena(this->graph_reference(), *t);
         }
+    }
+
+    void report_pressure(std::size_t pressure) {
+        report_pressure_helper<0, sizeof...(ResourceProviders)>::run(m_consumers, pressure);
     }
 
     resource_limited_body_leaf* clone() override {
