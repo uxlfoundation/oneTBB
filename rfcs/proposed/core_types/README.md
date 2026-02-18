@@ -4,7 +4,7 @@
 
 ### Motivation
 
-By default, oneTBB includes all available core types in a task arena unless explicitly constrained. 
+By default, oneTBB includes all available core types in a task arena unless explicitly constrained.
 The current oneTBB API allows users to constrain task execution to a single core type using
 `task_arena::constraints::set_core_type(core_type_id)`. While this provides control, it creates limitations for
 real-world applications running on processors with more than two core types (e.g., on a system with performance (P),
@@ -12,7 +12,7 @@ efficient (E), and low power efficient (LP E) cores):
 
 #### 1. **Flexibility and Resource Utilization**
 
-While it is often best to allow the OS to use all core types and flexibly schedule threads, some advanced users may find it necessary to constrain scheduling. 
+While it is often best to allow the OS to use all core types and flexibly schedule threads, some advanced users may find it necessary to constrain scheduling.
 When there are more than two core types, it may be desired to constrain execution to not just a single core type.
 Many parallel workloads can execute efficiently on multiple core types that make up a subset of the available core types. For example:
 - A parallel algorithm with good scalability works well on both P-cores and E-cores
@@ -23,7 +23,7 @@ Restricting to a single core type may leave available cores idle, reducing overa
 
 #### 2. **Avoiding Inappropriate Core Selection**
 
-Let's assume that a specific workload is known to perform well on both E-cores and P-cores, but very poorly on LP E-cores. 
+Let's assume that a specific workload is known to perform well on both E-cores and P-cores, but very poorly on LP E-cores.
 Without the ability to specify "P-cores OR E-cores (but not LP E-cores)", applications face dilemmas:
 - **No constraint**: Work might be scheduled on LP E-cores, causing significant performance degradation
 - **P-cores only**: Unnecessarily leaves E-cores idle, reducing parallelism
@@ -60,7 +60,7 @@ This proposal must maintain compatibility with previous oneTBB library versions:
 - **API and Backward Compatibility (Old Application + New Library)**: Existing code using the current
   `set_core_type(core_type_id)` API must compile and behave identically with newer oneTBB binaries.
 - **Binary Compatibility (ABI)**: The `task_arena::constraints` struct layout must remain unchanged.
-- **Forward Compatibility (New Application + Old Library)**: In general, oneTBB does **NOT** support forward compatibility.  
+- **Forward Compatibility (New Application + Old Library)**: In general, oneTBB does **NOT** support forward compatibility.
   However for limited use cases where only specific oneTBB functionality is required, it may be possible to compile using a subset of new headers and load an old binary library.
  Considering this feature in isolation, applications compiled with the proposed new functionality
   must be able to handle execution against older oneTBB binaries gracefully, without crashes or undefined behavior.
@@ -70,28 +70,22 @@ This proposal must maintain compatibility with previous oneTBB library versions:
 
 ## Proposal
 
-This proposal takes a different approach to the API, motivated by
+This proposal is motivated by
 [SYCL device selectors](https://registry.khronos.org/SYCL/specs/sycl-2020/html/sycl-2020.html#sec:device-selection).
 In SYCL, "a device selector ... is a ranking function that will give an integer ranking value to all the devices
 on the system". It takes a device as an argument and returns a score for that device, according to user's criteria.
 The SYCL implementation calls that function on each device, and then selects one with the highest score.
 
-Similarly, we can create/initialize an arena for core type(s) or NUMA node(s) selected by a user-provided function.
-
-This approach has several advantages over Alternative 2 ("Extend Constraints API In-Place") below:
-- It preserves the original design of `task_arena::constraints` as a simple `struct` with public fields
-  designed for direct use and C++20 designated initialization.
-- It does not expose implementation details through the `constraints::core_type` field.
-- It does not assume that `core_type_id` is a number, or that specific bits can be used for encoding.
-  While that's true for the current implementation, `core_type_id` is specified as an opaque type.
-- It provides an opportunity to simplify the API usage for both basic and advanced scenarios.
+Similarly, we can create/initialize an arena for core type(s) selected by a user-provided function.
 
 ### New API
 
 #### Header
 
 ```cpp
+#define TBB_PREVIEW_AFFINITY_SELECTOR 1
 #include <oneapi/tbb/task_arena.h>
+#include <oneapi/tbb/info.h>
 ```
 
 #### Synopsis
@@ -101,7 +95,7 @@ namespace oneapi {
 namespace tbb {
 class task_arena {
   public:
-    // (Possibly needed) New constant to indicate a selectable constraint
+    // New constant to indicate a selectable constraint
     static constexpr int selectable = /* unspecified */;
 
     // New constructor template
@@ -111,42 +105,51 @@ class task_arena {
 
     // New template for overloads of initialize
     template <typename Selector>
-    /*return type to be defined*/
-    initialize(constraints a_constraints, Selector a_selector, unsigned reserved_slots = 1,
-               priority a_priority = priority::normal);
+    void initialize(constraints a_constraints, Selector a_selector, unsigned reserved_slots = 1,
+                    priority a_priority = priority::normal);
 
 };
+
+namespace info {
+    // New template for concurrency level for the given selectable constraints
+    template <typename Selector>
+    int default_concurrency(task_arena::constraints c, Selector a_selector);
+}
 }}
 ```
 
 #### API description
 
 The new templates for construction and initialization of a `task_arena` accept, in addition to `constraints`,
-a *selection function*: a user-specified callable object that ranks core types or NUMA nodes available on the platform.
+a *selection function*: a user-specified callable object that ranks core types available on the platform.
 
-We can consider at least two variations of what the selection function accepts as its arguments:
-1. the whole vector of core types or NUMA nodes, as returned by `tbb::info` API calls, or
-2. a single `core_type_id` or `noma_node_id` value, packed into a tuple/struct with additional useful information,
-   specifically the number of entities to choose from (e.g., `tbb::info::core_types().size()`) and the position
-   (index) of the given ID value.
+The selection function accepts as its argument a single `core_type_id` value, packed into a tuple with additional
+useful information, specifically the number of entities to choose from (`tbb::info::core_types().size()`) and the
+position (index) of the given ID value.
 
-In principle, it could be possible for the implementation to support both variations, distinguished at compile time.
-For each ID value, the selection function should return a signed integral number as the score for that ID. In case (1),
-the function should therefore return a vector of scores, one for each element of its input vector.
+For each ID value, the selection function should return a signed integral number as the score for that ID.
 
-A negative score would indicate that the corresponding core type or NUMA node should be excluded from use
-by the task arena. A positive score would indicate that the corresponding core type or NUMA node is good to use
+A negative score would indicate that the corresponding core type should be excluded from use
+by the task arena. A positive score would indicate that the corresponding core type is good to use
 by the task arena, and the bigger the score the better the "resource" is from the user's viewpoint.
-If for whatever reason (some described below) the implementation can only use a single core type or NUMA node,
+If for whatever reason (some described below) the implementation can only use a single core type,
 it should take the one with the biggest score.
+
+A score of zero means "use only if multi-core-type constraints are not supported". When there are multiple
+positive scores and the rest are zero, zero signals an older-runtime fallback to no constraint (rather than the
+best-scored single type). For example, `{0, 1, 2}` would exclude LP E-cores on a newer runtime but impose no
+constraint on an older one.
+
+The new `default_concurrency` template returns the number of threads available for the given constraints and selector.
+This allows querying the effective concurrency without creating a task arena.
 
 ### Implementation aspects
 
-The key implementation problem is how to pass the additional information about multiple core types (or NUMA nodes)
+The key implementation problem is how to pass the additional information about multiple core types
 to the TBB library functions for arena creation without violating the forward compatibility requirement for this specific feature.
 
 This proposal encapsulates the implementation and can potentially utilize various ways to solve the problem, such as:
-- encoding the extra information into the existing types, e.g. in the way proposed in Alternative 2;
+- encoding the extra information into the existing types;
 - [ab]using other existing entry points / data structures with reserved parameters or space to pass information through;
   - for example, using `task_arena_base::my_arena` (which is currently `nullptr` until the arena is initialized),
     and indicating that it carries some information via arena's `version_and_traits`;
@@ -157,37 +160,23 @@ This proposal encapsulates the implementation and can potentially utilize variou
   weak symbols defined in the headers and replaced by identical ones in the new binaries, or callback functions
   defined in the headers, exported by an application and then discovered by the new binaries at runtime.
 
-Another question is how to distinguish whether the selector should be applied to core types or to NUMA nodes,
-if/when both are supported with the API. The problem here is that `core_type_id` and `numa_node_id` are currently
-defined as aliases to the same integral type, and therefore we cannot recognize at compile time which information
-to pass to call the selector.
-
-This can be addressed either by adding a special value (distinct from `automatic`) that would indicate which
-constraint parameter should be used with the selector, or by redefining these names to refer to distinct types.
-In the latter case, the types should be fully binary compatible (i.e., have the same layout and set of values)
-with the integral type used now. That looks doable but needs exploration of all compatibility aspects.
-
 ### Pros and cons
 
 This proposal does not change `constraints`, does not expose implementation details, and to a certain degree simplifies
 the creation of constrained arenas via a higher level, more descriptive API. It can be implemented in a few different
-ways. And it also has or may have the pros of Alternative 1 ("Accept Multiple Constraints Instances") below (which is
-likely also true in the opposite direction), but does not have its cons except for one.
+ways.
 
 Additionally, this API might have sensible semantics even if it has to operate with an older version
 of the runtime library. Such library can only use a single core type in the constraints, and the API
 implementation in the headers can adjust to that by using the core type with the highest score.
 If the API semantics is defined to allow such behavior, the API can do the oneTBB runtime version check
-internally (instead of users doing it in their code), which is an extra advantage over Alternative 2.
+internally (instead of users doing it in their code).
 
 One disadvantage of this approach is that neither single nor several instances of `constraints` represent
 the limitations of the created arena. It is still possible to create another arena with the same limitations,
 by reusing the same set of arguments including the selector. It is also possible to have a proper copy
 constructor for `task_arena`, though we need to ensure that the internal state stores all the information needed
-to create another instance. But other APIs, such as the `tbb::info::default_concurrency` function that takes
-a `constraints` argument, currently do not have access to the same information. A possible way to address
-that is to add a parameter for either the selector or the vector(s) of scores it created; however that needs
-additional exploration.
+to create another instance.
 
 ### Testing Strategy
 
@@ -203,7 +192,7 @@ Tests should cover:
 Tests should verify that selectors receive correct core type information. When running against an older oneTBB runtime,
 we need to validate that the highest-scored core type is selected and that version threshold detection works correctly.
 Tests should also cover selectors returning various score combinations, including positive, negative, zero, and
-all-negative scores (with behavior based on Open Question #2 resolution).
+all-negative scores.
 
 #### Core Type Combination Generation
 
@@ -213,21 +202,30 @@ patterns from 1 to 2<sup>n</sup>-1, and mapping each pattern to a core type comb
 
 ### Open questions
 
-1. Need to decide on the parameters and the return type of selectors
-2. What happens if all scores are negative? Options: return an error (exception), switch the parameter
-   to `automatic`, or leave the arena uninitialized.
-   - In SYCL, class constructors with a device selector must throw an exception if no device is selected.
-3. Should a score of zero mean "use only if multi-core-type constraints are not supported"? When there are multiple
-   positive scores and the rest are zero, zero could signal an older-runtime fallback to no constraint (rather than the
-   best-scored single type). For example, `{0, 1, 2}` would exclude LP E-cores on a newer runtime but impose no
-   constraint on an older one.
-   - See also the previous question for all-negative scores.
-4. If selectors take a vector, what happens if the returned vector is smaller or greater than the input one?
-5. For a hypothetical platform having both a few NUMA nodes and different core types, would we allow
-   to select both at the same time, and if yes - how would that work?
-6. Which other usability names would be useful? For example, a named negative score constant?
-7. How should `max_concurrency` interact with scoring? Users might think that scoring also indicates scheduling
+1. What happens if all scores are negative?
+   - Current proposal: switch the parameter to `automatic`
+   - Alternative: return an error (exception)
+   - Alternative: leave the arena uninitialized
+2. Should the selector API support NUMA node selection in addition to core types?
+   - Current proposal: no. The selector is applied only to core types; NUMA node constraints continue
+     to use the existing `constraints::numa_id` field.
+   - Alternative: allow the selector to also rank NUMA nodes. (This should become a sub-RFC of the existing
+     [umbrella RFC about improving NUMA support](https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/proposed/numa_support).)
+     - This raises the question of how to distinguish which constraint dimension the selector applies to, because
+       `core_type_id` and `numa_node_id` are currently defined as aliases to the same integral type and cannot be
+       differentiated at compile time. Possible solutions include adding a special value (distinct from `automatic`) to
+       indicate which constraint parameter should be used with the selector, or redefining `core_type_id` and
+       `numa_node_id` as distinct types that are fully binary compatible (same layout and set of values) with the
+       integral type used now.
+     - If both core type and NUMA node selection are supported simultaneously, the interaction semantics
+       (e.g., independent scoring, combined scoring, or nested selection) need to be defined.
+3. Which other usability names would be useful? For example, a named negative score constant?
+4. How should `max_concurrency` interact with scoring? Users might think that scoring also indicates scheduling
    preference, for example if `max_concurrency` is less than the HW concurrency for selected core types.
+   - Current proposal: create an affinity mask for all positively-scored core types, then schedule up to
+     `max_concurrency` threads within that mask
+   - Alternative: progressively expand the affinity mask from highest- to lowest-scored core type until the mask covers
+     enough cores for `max_concurrency`
 
 ## Alternative 1: Accept Multiple Constraints Instances
 
@@ -396,34 +394,6 @@ check indicates an older library version, applications can gracefully fall back 
 all available core types (no constraint) or constraining to a single core type using the existing `set_core_type()`
 API. This approach satisfies the forward compatibility requirement stated in the "Compatibility Requirements" section.
 
-### Open Questions
-
-1. **API Naming**: Is `set_core_types` (plural) sufficiently distinct from `set_core_type` (singular)?
-   - Alternative: overload the existing `set_core_type` to accept `vector<core_type_id>`
-   - Alternative: `set_acceptable_core_types` or `allow_core_types`
-
-2. **Empty Vector Semantics**: Should `set_core_types({})` mean "automatic" or throw an exception?
-   - Current proposal: treat as automatic (-1)
-   - Alternative: require at least one core type
-
-3. **Query API**: Should we add convenience methods?
-
-```cpp
-bool has_core_type(core_type_id id) const;
-size_t num_core_types() const;
-```
-
-4. **Builder Pattern Extensions**: Should we support incremental building?
-
-```cpp
-constraints& add_core_type(core_type_id id);
-constraints& remove_core_type(core_type_id id);
-void clear_core_types();
-```
-
-5. **Info API**: Should `info::core_types()` be augmented with a method to return a count instead of a vector, e.g.,
-   `info::num_core_types()`?
-
 ## Usage Examples
 
 Core type capabilities vary by hardware platform, and the benefits of constraining execution are highly
@@ -448,19 +418,6 @@ tbb::task_arena arena(
         // positions are ordered from the least to the most performant:
         // 0 = LP E-core, 1 = E-core, 2 = P-core
         return (total > 1 && index == 0)? -1 : index;
-    }
-);
-```
-
-Or we can call the selector once and get a vector of scores:
-```cpp
-tbb::task_arena arena(
-    tbb::task_arena::constraints{.core_type = tbb::task_arena::selectable},
-    [](auto /*std::vector*/ core_types) -> std::vector<int> {
-        assert(core_types.size() == 3);
-        // core_types is ordered from the least to the most performant:
-        // [0] = LP E-core, [1] = E-core, [2] = P-core
-        return {-1, 1, 2};
     }
 );
 ```
@@ -574,7 +531,7 @@ tbb::task_arena background_work(
 
 ### Example 3: Code that does not depend on oneTBB binary versions
 
-This example adjusts the code in Example 1 to illustrates how an application could be written so that
+This example adjusts the code in Example 1 to illustrate how an application could be written so that
 it uses the new arena capabilities when present, otherwise falls back to the old arena construction.
 
 #### Proposed API
@@ -588,26 +545,6 @@ tbb::task_arena arena(
     [](auto /*std::tuple*/ core_type) -> int {
         auto& [id, index, total] = core_type;
         return (total > 1 && index == 0)? -1 : index;
-    }
-);
-```
-
-In case selectors take the vector of core types, and without assuming there are exactly three types,
-the selector needs to deal with input of different sizes. It could be like this:
-
-```cpp
-tbb::task_arena arena(
-    tbb::task_arena::constraints{.core_type = tbb::task_arena::selectable},
-    [](auto /*std::vector*/ core_types) -> std::vector<int> {
-        std::size_t n_types = core_types.size();
-		if (n_types == 1)
-			return {1};
-        std::vector<int> scores(n_types);
-        scores[0] = -1; // avoid the least performant core type
-        for (int index = 1; index < n_types; ++index) {
-            scores[index] = index;
-	    }
-        return scores;
     }
 );
 ```
@@ -651,3 +588,10 @@ if (TBB_runtime_interface_version() < 12190 || n_types < 3) {
 
 tbb::task_arena arena(avoid_LPE_cores);
 ```
+
+## Exit Criteria
+
+The following conditions need to be met to move the feature from experimental to fully supported:
+- Open questions regarding the API should be resolved.
+- User feedback should confirm usability improvements in mentioned scenarios and that no unforeseen issues arise.
+- The feature must be added to the oneTBB specification and accepted.
