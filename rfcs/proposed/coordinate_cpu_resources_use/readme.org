@@ -1,0 +1,158 @@
+#+TITLE: Open source Thread Composability Manager as a subdirectory
+
+* Introduction
+Software consists of many components and it is run on modern multi-core processors. Each component
+in turn might want utilizing the available parallel power of the platform and can use its own means
+for this.
+
+In today's computing landscape, applications increasingly rely on multiple parallel computing
+libraries and frameworks simultaneously. A typical application might use oneTBB for task
+parallelism, OpenMP for loop parallelism, and additional threading libraries for I/O operations or
+specialized computations. Each of these components operates independently and attempts to utilize
+all available CPU cores, leading to oversubscription and suboptimal performance.
+
+The lack of coordination between parallel components results in several critical issues:
+- *Resource contention*: Multiple libraries compete for the same CPU cores, causing excessive
+  context switching and cache pollution.
+- *Oversubscription*: The total number of worker threads across all libraries often exceeds the
+  number of available cores.
+- *Load imbalance*: Some cores may be idle while others are overloaded due to poor resource
+  distribution.
+- *Performance degradation*: The overall application performance suffers despite individual
+  components being well-optimized.
+
+
+This problem becomes more pronounced in complex software stacks where the number of parallel
+components continues to grow, and manual coordination becomes impractical or impossible.
+
+** The core idea of the TCM
+The Thread Composability Manager (TCM) is a lightweight, runtime coordination layer that enables
+multiple parallel libraries and frameworks to cooperatively share CPU resources within a single
+application. The core concept revolves around providing a unified resource management interface that
+allows different parallel components to:
+1. *Register their resource requirements*: Components can declare their threading needs and
+   constraints.
+2. *Negotiate resource allocation*: TCM mediates between components to determine optimal thread
+   distribution.
+3. *Adapt dynamically*: Resource allocation can be adjusted at runtime based on changing workload
+   patterns.
+4. *Maintain isolation*: Components remain functionally independent while benefiting from
+   coordinated resource usage.
+
+The TCM operates on the principle of /cooperative oversubscription avoidance/ rather than strict
+resource partitioning. It tracks active parallel regions across different libraries, and provides
+recommendations to prevent destructive interference between components.
+
+*Key features include*:
+1. *Library-agnostic interface*: C-style interface simplifies integration with threading libraries.
+2. *Minimal overhead*: Designed to add negligible runtime cost to parallel operations.
+3. *Backward compatibility*: Existing applications can benefit without requiring extensive
+   modifications.
+4. *Permissive licensing*: Uses permissive open-source Apache 2.0 with LLVM exception, which allows
+   easy integration, broad adoption and accepting of community contributions.
+
+* Proposal
+Introduce Thread Composability Manager.
+** Placement
+TCM sources are to be placed in the =tcm= subdirectory of the oneTBB source root.
+#+begin_example
+  oneTBB/
+      ├── cmake
+      ├── doc
+      ├── examples
+      ├── <... other oneTBB top-level directories ...>
+      └── tcm    <-- new directory with TCM sources
+#+end_example
+Such placement is a trade-off between project visibility and its independence.
+** Independence
+Although, placed into the oneTBB source tree, TCM remains independent. The top =tcm= directory can
+literally be copied/moved into other place and used from there without any dependence on oneTBB
+project. This is necessary to avoid assumption about project tight coupling with oneTBB and simplify
+integration of TCM into other parallel libraries.
+** Integration with oneTBB building system
+The idea is to make an extension to the oneTBB building system by naturally interspersing its build
+and test rules with corresponding TCM rules if TCM dependencies are met, and TCM rules are not
+explicitly disabled by the user.
+
+Also, due to [[Independence][independent nature]] of the project, and to avoid repetition of building rules in the
+oneTBB configuration files, related to TCM rules will simply translate to the corresponding rules in
+the TCM building system.
+*** Building
+oneTBB configuration file is to be extended with an option to build and test the TCM. For example,
+CMake option can look like:
+#+begin_src cmake
+  option(TBB_BUILD_TCM "Build Thread Composability Manager (TCM)" ON)
+#+end_src
+
+**** Prerequisites
+Since the project depends on HWLOC for parsing hardware topology, TCM is built only if HWLOC is
+available in the environment. Also, TCM can be built with at least C++17 version of the C++
+standard. If there will be a request to build it with lower version of the C++ standard, such
+support can be added in the future.
+
+During configuration step of the oneTBB build, the diagnostic message about whether TCM is going to
+be built or not is shown.
+**** Note about building TCM as a static library
+TCM is meant to run as a singleton to share its state across its clients, threading libraries.
+Therefore, building static version of the TCM library breaks the whole point of the project, thus,
+does not make sense. So, such option won't be provided.
+*** Testing
+Similarly to the [[Building][Building section]], TCM tests are built and run only if TCM build is successful.
+
+In particular, oneTBB CI is to be extended with TCM build and test jobs, including integration tests
+of TCM into oneTBB. This will help to ensure maximum compatibility and testing coverage.
+** Versioning
+TCM will follow its own [[https://semver.org/][semantic versioning]] scheme, separately from the oneTBB, and is going to have
+three type of versions:
+1. /Interface/
+
+   Describes the semantical compatibility of the library interface. Change in this number means that
+   there was an update to the library interface. Depending on the nature of the changes it may be a
+   backward compatible change or a backward incompatible change. For backward compatible changes the
+   minor value is updated. Such changes include, for example, adding a new API or returning by an
+   existing public function more information without changing its layout compared to what the
+   function already provides. The backward incompatible changes require client code to reconsider
+   the usage of the API, which usually leads to changes in the source code and its recompilation.
+   Such changes update the major number.
+
+   The proposed formation of the interface version is $1000 * major\_number + 10 * minor\_number$.
+
+2. /Library/
+
+   This number reflects the version of the binary. It consists of three numbers: =major=, =minor=,
+   and =patch=, and usually follows the changes made to the interface version. However, there can be
+   internal only changes to the library that neither affect the programming nor the binary
+   interfaces. For such changes, only the =patch= number is increased, which is not reflected in the
+   interface version.
+
+3. /Package/
+
+   This type of version is used to communicate the version of the package in which certain TCM
+   binary is contained. Having it identical to the library version is convenient and should be
+   considered every time a TCM package is made. However, they can also be out-of-sync as there might
+   be situations when packages are remade to include additional or updated information that exists
+   besides TCM binary. In this case, the =patch= version of the package can be changed to
+   distinguish between various packages with identical TCM library version inside.
+** Distribution
+The TCM binary packages are to be distributed separately from oneTBB packages, but available for
+download along with them through the same distribution channels.
+
+TCM sources are to be included into the oneTBB sources package archive.
+
+This helps to underline the independence of TCM project from oneTBB, and yet make it available as
+much as possible.
+*** Note about the TCM status
+Although TCM can be found and loaded by oneTBB and other libraries, when it is available in the
+environment, it does not mean it will be used. Since the TCM project is under development and may
+not improve the runtime scheduling situation in some cases, it is currently disabled by default. To
+enable its use, =TCM_ENABLE= environment variable should be set to =1=. Details can be found in the
+[[https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/appendix_B.html#avoid-cpu-overutilization][oneTBB documentation]].
+
+You are welcome to try the TCM out, submit issues and/or patches, and share your feedback.
+** Documentation
+TCM documentation will follow the repository merging and be available under the =doc= subdirectory
+inside the TCM source tree.
+* Open Questions
+1. Should oneTBB packages be provided in both variants: one that include TCM binaries, and the other
+   that don't?
+2. When distributing oneTBB source packages, should TCM sources be distributed separately as well?
