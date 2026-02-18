@@ -783,6 +783,8 @@ private:
         my_head_ptr.store(other.my_head_ptr.load(std::memory_order_relaxed), std::memory_order_relaxed);
         other.my_head_ptr.store(nullptr, std::memory_order_relaxed);
 
+        // TODO: investigate whether the performance gain from shrinking sizes to calling thread's size is justified
+        // Logic similar to enumerable_thread_specific::internal_move can be used instead
         my_ets.clear();
         my_ets.local().set_size(other.size());
         other.my_ets.clear();
@@ -1091,6 +1093,9 @@ private:
                 prev_nodes[level]->set_next(level, erase_node->next(level));
                 erase_node->set_next(level, nullptr);
             }
+
+            // Shrink all thread-local sizes into the calling thread's size and decrement
+            // TODO: investigate if performance gain of such and optimization is justified
             size_type total_size = size();
             my_ets.clear();
             my_ets.local().set_size(total_size - 1);
@@ -1229,6 +1234,8 @@ private:
         swap_atomics_relaxed(my_head_ptr, other.my_head_ptr);
         swap_atomics_relaxed(my_max_height, other.my_max_height);
 
+        // TODO: investigate whether the performance gain from shrinking sizes to calling thread's size is justified
+        // Logic similar to enumerable_thread_specific::internal_swap can be used instead
         size_type total_size = size();
         my_ets.clear();
         my_ets.local().set_size(other.size());
