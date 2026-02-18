@@ -499,6 +499,7 @@ public:
         // TODO: report real pressure, investigate if it should be done before or after the release
         report_pressure(0);
         release_resources_helper<sizeof...(ResourceProviders)>::run(m_consumers, id, req_data);
+        report_pressure(0); // TODO: report real pressure
     }
 
     void remove_request(request_id id) {
