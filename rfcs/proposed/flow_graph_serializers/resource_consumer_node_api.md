@@ -339,6 +339,8 @@ auto node_body = [](input i, auto& ports, void* resource_handle_ptr1, void* reso
 4. Should the `output_ports()` member function be provided by `resource_limited_node`?
 5. Should the `rejecting` alternative be provided for `resource_limited_node`?
 6. A possibility to extend the API to support generic resource providers should be considered. Refer to the [separate section](#api-to-support-generic-providers) for more details.
+7.  The protocol used by consumers and providers must be defined and part of the public interface before moving to production. This protocol should support consumers beyond flow graph nodes.
+8.  There should be at least one concrete provider type that provides some level of starvation avoidance before moving to production.
 
 ## Usage Examples
 
