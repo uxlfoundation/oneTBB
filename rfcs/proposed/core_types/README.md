@@ -147,7 +147,7 @@ This allows querying the effective concurrency without creating a task arena.
 ### Implementation aspects
 
 The key implementation problem is how to pass the additional information about multiple core types
-to the TBB library functions for arena creation without violating the forward compatibility requirement for this specific feature.
+to the TBB library functions for arena creation while meeting compatibility requirements.
 
 This proposal encapsulates the implementation and can potentially utilize various ways to solve the problem, such as:
 - encoding the extra information into the existing types;
@@ -185,7 +185,7 @@ Tests should cover:
 
 - **Correctness**: Verify that core type combinations are accurately stored and retrieved
 - **Backward compatibility**: Ensure existing single core type constraints work identically
-- **Forward compatibility**: Verify highest-scored core type fallback with older runtimes
+- **Forward compatibility**: Testing is constrained to the limited scenarios required by specific customers
 - **Comprehensive combination testing**: Test all possible core type combinations on the target hardware
 
 #### Selector Testing
