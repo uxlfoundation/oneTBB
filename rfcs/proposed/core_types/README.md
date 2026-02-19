@@ -44,13 +44,6 @@ tbb::task_arena arena(
 This may force an application to choose a suboptimal strategy that
 uses a single core type when multiple core types would be better.
 
-| Strategy | Pros | Cons |
-|----------|------|------|
-| **P-cores only** | Maximum single-threaded performance | Leaves E-cores idle; limited parallelism; higher power |
-| **E-cores only** | Good for parallel workloads | Doesn't utilize P-core performance; excludes LP E-cores |
-| **LP E-cores only** | Minimal power consumption | Severe performance impact for some workloads that require large, shared caches. |
-| **No constraint** | Maximum flexibility | May schedule on inappropriate cores (e.g., LP E-cores for compute) |
-
 None of these options provide the desired behavior: **"Use P-cores or E-cores, but avoid LP E-cores"** or **"Use any
 efficiency cores (E-core or LP E-core)"**.
 
