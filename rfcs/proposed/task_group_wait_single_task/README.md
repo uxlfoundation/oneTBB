@@ -361,6 +361,7 @@ The following questions should be resolved before promoting the feature out of t
 * Proper API and naming for functions returning the task status should be defined. Refer to the
   [``Returning the status of the task``] section for more details.
 * Name and the value for the feature test macro should be defined. Refer to the [``Feature Test Macro``](#feature-test-macro) for more details.
+* Should an additional ``task_group_status`` be introduced to indicate that the task has been completed, but a cancellation of the group was detected?
 
 ## Implementation Details
 
