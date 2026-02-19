@@ -44,9 +44,6 @@ tbb::task_arena arena(
 This may force an application to choose a suboptimal strategy that
 uses a single core type when multiple core types would be better.
 
-None of these options provide the desired behavior: **"Use P-cores or E-cores, but avoid LP E-cores"** or **"Use any
-efficiency cores (E-core or LP E-core)"**.
-
 ### Compatibility Requirements
 
 This proposal must maintain compatibility with previous oneTBB library versions:
