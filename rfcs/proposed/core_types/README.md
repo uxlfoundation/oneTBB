@@ -15,7 +15,7 @@ efficient (E), and low power efficient (LP E) cores):
 While it is often best to allow the OS to use all core types and flexibly schedule threads, some advanced users may find it necessary to constrain scheduling.
 When there are more than two core types, it may be desired to constrain execution to not just a single core type.
 Many parallel workloads can execute efficiently on multiple core types that make up a subset of the available core types. For example:
-- A parallel algorithm with good scalability works well on both P-cores and E-cores
+- A parallel algorithm with good scalability or with a mix of requirements works well on both P-cores and E-cores
 - Background processing can run on E-cores or LP E-cores depending on availability
 - Mixed workloads benefit from utilizing any available performance-class cores (P or E)
 
@@ -42,7 +42,8 @@ tbb::task_arena arena(
 );
 ```
 
-This forces applications to choose one of these suboptimal strategies:
+This may force an application to choose a suboptimal strategy that
+uses a single core type when multiple core types would be better.
 
 | Strategy | Pros | Cons |
 |----------|------|------|
@@ -189,8 +190,9 @@ Tests should cover:
 
 #### Selector Testing
 
-Tests should verify that selectors receive correct core type information. When running against an older oneTBB runtime,
-we need to validate that the highest-scored core type is selected and that version threshold detection works correctly.
+Tests should verify that selectors receive correct core type information. When running against an older oneTBB
+runtime, we need to validate that appropriate core type(s) are selected and that the version threshold detection works
+correctly.
 Tests should also cover selectors returning various score combinations, including positive, negative, zero, and
 all-negative scores.
 
@@ -384,7 +386,7 @@ logical OR operation across the hardware affinity masks of all specified core ty
 intersected with other constraint masks (NUMA node, threads-per-core) to produce the final thread affinity constraint,
 ensuring threads can be scheduled on any of the specified core types while respecting all other constraints.
 
-### Backward and Forward Compatibility
+### Compatibility
 
 With the `constraints` API being header-only, the unmodified ABI, and no new library entry points, applications
 compiled with the proposed new functionality can handle execution against older oneTBB binaries through runtime
@@ -392,7 +394,8 @@ detection and fallback mechanisms. Runtime detection is achieved using `TBB_runt
 applications to verify that the loaded oneTBB binary supports the new API before attempting to use it. When the runtime
 check indicates an older library version, applications can gracefully fall back to alternative strategies: either using
 all available core types (no constraint) or constraining to a single core type using the existing `set_core_type()`
-API. This approach satisfies the forward compatibility requirement stated in the "Compatibility Requirements" section.
+API. This approach satisfies forward compatibility for this feature in isolation, but does not ensure that oneTBB in general
+supports forward compatibility. General forward compatibility is never guaranteed.
 
 ## Usage Examples
 
