@@ -136,8 +136,10 @@ public:
     //! Get a task from the local pool.
     /** Called only by the pool owner.
         Returns the pointer to the task or nullptr if a suitable task is not found.
-        Resets the pool if it is empty. **/
-    d1::task* get_task(execution_data_ext&, isolation_type);
+        Resets the pool if it is empty.
+        The last parameter is used to differentiate overloads with vs. without task isolation. **/
+    d1::task* get_task(execution_data_ext&, isolation_type, std::false_type);
+    d1::task* get_task(execution_data_ext&, isolation_type, std::true_type);
 
     //! Steal task from slot's ready pool
     d1::task* steal_task(arena&, isolation_type, std::size_t);
