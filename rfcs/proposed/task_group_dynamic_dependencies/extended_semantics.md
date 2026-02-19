@@ -546,6 +546,47 @@ is unknown, the current proposal treats it as undefined behavior.
 
 Moving this feature to `supported` requires defining the semantic for this case.
 
+### Preservation of submit arena
+
+Introducing task dynamic dependencies postpones actual task execution until dependencies are satisfied.
+In the current design, once the last dependency is released, the task is spawned in the arena of the thread that
+completed the final predecessor - not necessarily the arena from which the task was originally submitted:
+
+```cpp
+tbb::task_arena arena1;
+tbb::task_arena arena2;
+tbb::task_group tg;
+
+tbb::task_handle pred = tg.defer(...);
+tbb::task_handle succ1 = tg.defer(...);
+tbb::task_handle succ2 = tg.defer(...);
+
+tbb::task_group::set_task_order(pred, succ1);
+tbb::task_group::set_task_order(pred, succ2);
+
+arena1.execute([&] {
+    tg.run(std::move(succ1));
+    tg.run(std::move(succ2));
+});
+
+arena2.execute([&] {
+    tg.run_and_wait(std::move(pred));
+});
+```
+
+Once the `pred` task is completed by the thread in `arena2`, `succ1` and `succ2` become ready for execution. One of them is bypassed and the second
+is spawned, which results in execution of these tasks in `arena2`, even though they were submitted from `arena1`. This can result in performance issues,
+especially if arena constraints are used.
+
+The issue above takes place even if the successor task was submitted using `task_arena::enqueue`. Once all of the dependent tasks are completed,
+the successor will be spawned in the arena where the last predecessor task is executed.
+
+Preserving the submission method (running vs enqueueing) may be important for maintaining expected scheduling semantics, such as mandatory concurrency
+guarantees for `enqueue`.
+
+From the [implementation perspective](#implementation-details), preserving the submission method and arena will require extending the `task_dynamic_state`
+with the pointer to the implicit or explicit arena where the task was submitted for execution and the submit method flag.
+
 ### ``empty_task`` API
 
 Since successors can only be transferred to a single task, some use cases (see [N-body example](#n-bodies-problem)) 
@@ -724,6 +765,7 @@ Implementation details for the API added by this RFC are described as part of th
 * API improvements and enhancements should be considered (these may be criteria for promoting the feature to `supported`):
   * Do the current API names clearly reflect the purpose of their corresponding methods?
   * The semantic for partial destruction of the task tree should be defined. See [separate section](#semantics-for-partial-task-tree-destruction) for more details.
+  * Preservation of submit function and arena in case of dependencies should be considered. See [separate section](#preservation-of-submit-arena) for more details.
   * Should comparison functions between ``task_completion_handle`` and ``task_handle`` be defined?
   * Should a ``task_completion_handle`` referring to a task in the `created` or `submitted` state (but not always) be allowed as a
     successor in ``set_task_order``? See [separate section](#using-a-task_completion_handle-as-a-successor) for more details.
