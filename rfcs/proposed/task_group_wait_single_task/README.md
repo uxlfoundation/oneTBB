@@ -7,8 +7,11 @@ individual tasks.
 
 * 1 [Introduction](#introduction)
 * 2 [Proposal](#proposal)
-* 2.1 [Member functions of ``task_group`` class](#member-functions-of-task_group-class)
-* 2.2 [Member functions of ``task_arena`` class](#member-functions-of-task_arena-class)
+* 2.1 [Returning the Status of the Task](#returning-the-status-of-the-task)
+* 2.2 [Feature Test Macro](#feature-test-macro)
+* 2.3 [Summary](#summary)
+* 2.3.1 [Member functions of ``task_group`` class](#member-functions-of-task_group-class)
+* 2.3.2 [Member functions of ``task_arena`` class](#member-functions-of-task_arena-class)
 * 3 [Future Enhancements](#future-enhancements)
 * 3.1 [Run-and-wait methods for ``task_arena``](#run-and-wait-methods-for-task_arena)
 * 3.2 [Work Isolation Issue](#work-isolation-issue)
@@ -120,11 +123,77 @@ It is unknown either the ``task_group`` is cancelled or not, since the task can 
 If the task group execution is canceled and the originally executed task has transferred its completion to another task that was canceled, the
 waiting function will return ``task_group_status::canceled``.
 
+### Returning the Status of the Task
 
-The proposed API is summarized below:
+It may be beneficial to execute the waiting function only if the awaited task has not yet completed or
+to execute unrelated work in the main thread while periodically checking to see if the awaited task is complete.
+
+```cpp
+task_completion_handle ch = task;
+if (!is_completed(ch)) {
+    tg.wait_for_task(ch);
+}
+```
+
+or 
+
+```cpp
+task_completion_handle ch = task;
+while (!is_completed(ch)) {
+    do_some_other_work();
+}
+```
+
+To determine the status of a task represented by ``task_completion_handle``, it is proposed to add a new function ``task_group::get_status_of(const task_completion_handle&)``.
+This function returns:
+* ``task_group_status::not_complete`` - if the task has not yet been submitted, is being scheduled, or is currently executing.
+* ``task_group_status::task_complete`` - if the task has finished executing successfully.
+* ``task_group_status::canceled`` - if the task was not executed due to task group cancellation.
+
+If the completion of the task originally represented by the ``task_completion_handle`` argument has been transferred to another task, the function returns the status of the task that
+received the completion.
+
+The ``get_status_of`` function can also be implemented as a member function of the ``task_completion_handle`` class.
+
+An alternative is having two separate functions: ``is_completed`` and ``is_canceled``. The advantage of this approach is that ``task_group_status`` does not need to be used. However,
+the example above would require two function calls:
+
+```cpp
+task_completion_handle ch = task;
+if (!is_completed(ch) && !is_canceled(ch)) {
+    tg.wait_for_task(ch);
+}
+```
+
+Both ``is_completed`` and ``is_canceled`` can also be implemented as member functions of the ``task_completion_handle`` class.
+
+### Feature Test Macro
+
+It is proposed to add an explicit feature-test macro to determine the presence of the feature:
+
+```cpp
+#define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
+#include <oneapi/tbb/task_group.h>
+
+#if TBB_TASK_GROUP_WAIT_INDIVIDUAL_TASKS >= 202xxx // Some documented value
+group.wait_for_task(comp_handle);
+#else
+// Usage of other APIs or self-written workarounds
+#endif
+```
+
+An alternative is to use ``TBB_VERSION`` macro for this purpose:
+
+```cpp
+#if TBB_VERSION >= VER // VER is the first TBB version where waiting for individual tasks was released
+```
+
+### Summary
 
 ```cpp
 // Defined in <oneapi/tbb/task_group.h>
+#define TBB_TASK_GROUP_WAIT_FOR_INDIVIDUAL_TASKS 202xxx
+
 namespace oneapi {
 namespace tbb {
 
@@ -138,6 +207,8 @@ enum task_group_status { // Existing API
 class task_group {
     task_group_status wait_for_task(task_completion_handle& comp_handle);
     task_group_status run_and_wait_for_task(task_handle&& handle);
+
+    task_group_status get_status_of(const task_completion_handle& comp_handle);
 };
 
 // Defined in <oneapi/tbb/task_arena.h>
@@ -149,7 +220,7 @@ class task_arena {
 } // namespace oneapi
 ```
 
-### Member functions of ``task_group`` class
+#### Member functions of ``task_group`` class
 
 ```cpp
 task_status wait_for_task(task_completion_handle& comp_handle);
@@ -170,7 +241,18 @@ This is semantically equivalent to: ``task_completion_handle comp_handle = handl
 
 Returns ``task_status::completed`` if the task was executed, or ``task_status::canceled`` if it was not.
 
-### Member functions of ``task_arena`` class
+```cpp
+task_group_status get_status_of(const task_completion_handle& comp_handle);
+```
+
+Returns the status of the task represented by ``comp_handle``:
+* ``task_group_status::not_complete`` - if the task has not been submitted for execution, or has not finished execution.
+* ``task_group_status::complete`` - if the task has finished execution.
+* ``task_group_status::canceled`` - if the task execution was cancelled.
+
+If the completion was transferred to another task using ``tbb::task_group::transfer_this_task_completion_to``, the function returns the status of that task.
+
+#### Member functions of ``task_arena`` class
 
 ```cpp
 task_status wait_for(task_completion_handle& comp_handle);
@@ -276,6 +358,9 @@ The following questions should be resolved before promoting the feature out of t
   [Work Isolation Issue section](#work-isolation-issue) for more details.
 * Should ``run_and_wait_for_task`` overload accepting the task body be added? Refer to the
   [``run_and_wait_for_task`` Accepting the Task Body](#run_and_wait_for_task-accepting-the-task-body) for more details.
+* Proper API and naming for functions returning the task status should be defined. Refer to the
+  [``Returning the status of the task``] section for more details.
+* Name and the value for the feature test macro should be defined. Refer to the [``Feature Test Macro``](#feature-test-macro) for more details.
 * Should an additional ``task_group_status`` be introduced to indicate that the task has been completed, but a cancellation of the group was detected?
 
 ## Implementation Details
