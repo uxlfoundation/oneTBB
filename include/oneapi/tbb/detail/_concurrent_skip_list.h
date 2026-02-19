@@ -1095,7 +1095,7 @@ private:
             }
 
             // Shrink all thread-local sizes into the calling thread's size and decrement
-            // TODO: investigate if performance gain of such and optimization is justified
+            // TODO: investigate if performance gain of this optimization is justified
             size_type total_size = size();
             my_ets.clear();
             my_ets.local().set_size(total_size - 1);
