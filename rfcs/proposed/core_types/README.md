@@ -17,7 +17,6 @@ When there are more than two core types, it may be desired to constrain executio
 Many parallel workloads can execute efficiently on multiple core types that make up a subset of the available core types. For example:
 - A parallel algorithm with good scalability or with a mix of requirements works well on both P-cores and E-cores
 - Background processing can run on E-cores or LP E-cores depending on availability
-- Mixed workloads benefit from utilizing any available performance-class cores (P or E)
 
 Restricting to a single core type may leave available cores idle, reducing overall system throughput.
 
