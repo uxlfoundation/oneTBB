@@ -67,7 +67,7 @@ TBB uses M:N scheduling — M tasks mapped onto N worker threads:
 than creating OS threads. This is conceptually similar to a thread pool executor
 but with TBB's work-stealing scheduler.
 
-```
+```text
 threading.Thread (patched) → TBBThread
     └── Pool.apply_async(self._run_wrapper)
         └── TBB task_group.run(callable)

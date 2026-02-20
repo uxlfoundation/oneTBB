@@ -19,7 +19,7 @@ Example: Using TBB-based threading.Thread replacement.
 Shows three ways to use TBB threading:
 1. patch_threading() — global replacement
 2. tbb_threading() — scoped context manager
-3. python -m tbb -t — command-line flag
+3. python -m tbb -T — command-line flag
 """
 
 import threading
