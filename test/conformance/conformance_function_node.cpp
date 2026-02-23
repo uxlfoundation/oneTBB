@@ -32,83 +32,67 @@ using output_msg = conformance::message</*default_ctor*/false, /*copy_ctor*/true
     Test node deduction guides
 */
 #if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
+template <typename Input, typename Output, typename Body>
+struct test_deduction_guides_common {
+    static void run(Body body) {
+        using namespace tbb::flow;
+        graph g;
 
-template <typename... T>
-struct print;
+        function_node f1(g, unlimited, body);
+        static_assert(std::is_same_v<decltype(f1), function_node<Input, Output>>);
 
-template <typename Body>
-void test_deduction_guides_common(Body body) {
-    using input_type = deduction_guides_testing::input_type<Body>;
-    using output_type = deduction_guides_testing::output_type<Body>;
+        function_node f2(g, unlimited, body, rejecting{});
+        static_assert(std::is_same_v<decltype(f2), function_node<Input, Output, rejecting>>);
 
-    using namespace tbb::flow;
-    graph g;
+        function_node f3(g, unlimited, body, node_priority_t{5});
+        static_assert(std::is_same_v<decltype(f3), function_node<Input, Output>>);
 
-    function_node f1(g, unlimited, body);
-    static_assert(std::is_same_v<decltype(f1), function_node<input_type, output_type>>);
-
-    function_node f2(g, unlimited, body, rejecting{});
-    static_assert(std::is_same_v<decltype(f2), function_node<input_type, output_type, rejecting>>);
-
-    function_node f3(g, unlimited, body, node_priority_t{5});
-    static_assert(std::is_same_v<decltype(f3), function_node<input_type, output_type>>);
-
-    function_node f4(g, unlimited, body, rejecting{}, node_priority_t{5});
-    static_assert(std::is_same_v<decltype(f4), function_node<input_type, output_type, rejecting>>);
+        function_node f4(g, unlimited, body, rejecting{}, node_priority_t{5});
+        static_assert(std::is_same_v<decltype(f4), function_node<Input, Output, rejecting>>);
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
-    function_node<int, std::decay_t<input_type>> pred_f(g, unlimited, [](int) {
-        return std::decay_t<input_type>{};
-    });
+        function_node<int, std::decay_t<Input>> pred_f(g, unlimited, [](int) {
+            return std::decay_t<Input>{};
+        });
 
-    function_node<output_type, int> succ_f(g, unlimited, [](const output_type&) {
-        return 1;
-    });
+        function_node<Output, int> succ_f(g, unlimited, [](const Output&) {
+            return 1;
+        });
 
-    function_node f5(follows(pred_f), unlimited, body);
-    static_assert(std::is_same_v<decltype(f5), function_node<input_type, output_type>>);
+        function_node f5(follows(pred_f), unlimited, body);
+        static_assert(std::is_same_v<decltype(f5), function_node<Input, Output>>);
 
-    function_node f6(follows(pred_f), unlimited, body, rejecting{});
-    static_assert(std::is_same_v<decltype(f6), function_node<input_type, output_type, rejecting>>);
-    
-    function_node f7(follows(pred_f), unlimited, body, node_priority_t{5});
-    static_assert(std::is_same_v<decltype(f7), function_node<input_type, output_type>>);
+        function_node f6(follows(pred_f), unlimited, body, rejecting{});
+        static_assert(std::is_same_v<decltype(f6), function_node<Input, Output, rejecting>>);
+        
+        function_node f7(follows(pred_f), unlimited, body, node_priority_t{5});
+        static_assert(std::is_same_v<decltype(f7), function_node<Input, Output>>);
 
-    function_node f8(follows(pred_f), unlimited, body, rejecting{}, node_priority_t{5});
-    static_assert(std::is_same_v<decltype(f8), function_node<input_type, output_type, rejecting>>);
+        function_node f8(follows(pred_f), unlimited, body, rejecting{}, node_priority_t{5});
+        static_assert(std::is_same_v<decltype(f8), function_node<Input, Output, rejecting>>);
 
-    function_node f9(precedes(succ_f), unlimited, body);
-    static_assert(std::is_same_v<decltype(f9), function_node<input_type, output_type>>);
+        function_node f9(precedes(succ_f), unlimited, body);
+        static_assert(std::is_same_v<decltype(f9), function_node<Input, Output>>);
 
-    function_node f10(precedes(succ_f), unlimited, body, rejecting{});
-    static_assert(std::is_same_v<decltype(f10), function_node<input_type, output_type, rejecting>>);
+        function_node f10(precedes(succ_f), unlimited, body, rejecting{});
+        static_assert(std::is_same_v<decltype(f10), function_node<Input, Output, rejecting>>);
 
-    function_node f11(precedes(succ_f), unlimited, body, node_priority_t{5});
-    static_assert(std::is_same_v<decltype(f11), function_node<input_type, output_type>>);
+        function_node f11(precedes(succ_f), unlimited, body, node_priority_t{5});
+        static_assert(std::is_same_v<decltype(f11), function_node<Input, Output>>);
 
-    function_node f12(precedes(succ_f), unlimited, body, rejecting{}, node_priority_t{5});
-    static_assert(std::is_same_v<decltype(f12), function_node<input_type, output_type, rejecting>>);
+        function_node f12(precedes(succ_f), unlimited, body, rejecting{}, node_priority_t{5});
+        static_assert(std::is_same_v<decltype(f12), function_node<Input, Output, rejecting>>);
 #endif
 
-    function_node f13(f1);
-    static_assert(std::is_same_v<decltype(f13), decltype(f1)>);
-    g.wait_for_all();
-}
+        function_node f13(f1);
+        static_assert(std::is_same_v<decltype(f13), decltype(f1)>);
+        g.wait_for_all();
+    }
+};
 
 template <typename Input, typename Output>
 void test_deduction_guides_body_types() {
-    using namespace deduction_guides_testing;
-
-    using mutable_callable_type = callable_object_body<Input, Output, false>;
-    using const_callable_type = callable_object_body<Input, Output, true>;
-    test_deduction_guides_common(mutable_callable_type{});
-    test_deduction_guides_common(const_callable_type{});
-    test_deduction_guides_common(function_body<Input, Output>);
-#if __TBB_CPP17_INVOKE_PRESENT
-    using pure_input_type = std::decay_t<Input>;
-    test_deduction_guides_common(&pure_input_type::member_object_body);
-    test_deduction_guides_common(&pure_input_type::member_function_body);
-#endif
+    deduction_guides_testing::test_all_body_types<Input, Output, test_deduction_guides_common>();
 }
 
 void test_deduction_guides() {
@@ -221,13 +205,23 @@ TEST_CASE("function_node broadcast"){
     conformance::test_forwarding<oneapi::tbb::flow::function_node<input_msg, int>, input_msg, int>(1, oneapi::tbb::flow::unlimited, fun);
 }
 
+struct two_overloads {
+    int operator()(int) const { return 0; }
+    float operator()(int, int, int) const { return 0; }
+};
+
+struct bad_overload {
+    int operator()(int, int) const { return 0; }
+};
+
+#if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
+
 //! Test deduction guides
 //! \brief \ref interface \ref requirement
 TEST_CASE("Deduction guides"){
-#if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
     test_deduction_guides();
-#endif
 }
+#endif
 
 //! Test priorities work in single-threaded configuration
 //! \brief \ref requirement

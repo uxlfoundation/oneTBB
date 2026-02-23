@@ -25,53 +25,41 @@
 //! \brief Test for [flow_graph.join_node] specification
 
 #if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
-template <typename Body>
-void test_deduction_guides_common(Body port_body) {
-    using input_type = deduction_guides_testing::input_type<Body>;
-    using key_type = deduction_guides_testing::output_type<Body>;
+template <typename Input, typename Key, typename Body>
+struct test_deduction_guides_common {
+    static void run(Body port_body) {
+        using namespace tbb::flow;
+        graph g;
 
-    using namespace tbb::flow;
-    graph g;
+        using pure_input_type = std::decay_t<Input>;
+        using tuple_type = std::tuple<pure_input_type, pure_input_type>;
+        using policy_type = key_matching<Key>;
 
-    using pure_input_type = std::decay_t<input_type>;
-    using tuple_type = std::tuple<pure_input_type, pure_input_type>;
-    using policy_type = key_matching<key_type>;
-
-    join_node j1(g, port_body, port_body);
-    static_assert(std::is_same_v<decltype(j1), join_node<tuple_type, policy_type>>);
+        join_node j1(g, port_body, port_body);
+        static_assert(std::is_same_v<decltype(j1), join_node<tuple_type, policy_type>>);
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
-    broadcast_node<pure_input_type> pred1(g);
-    broadcast_node<pure_input_type> pred2(g);
+        broadcast_node<pure_input_type> pred1(g);
+        broadcast_node<pure_input_type> pred2(g);
 
-    broadcast_node<tuple_type> succ(g);
+        broadcast_node<tuple_type> succ(g);
 
-    join_node j2(follows(pred1, pred2), port_body, port_body);
-    static_assert(std::is_same_v<decltype(j2), join_node<tuple_type, policy_type>>);
+        join_node j2(follows(pred1, pred2), port_body, port_body);
+        static_assert(std::is_same_v<decltype(j2), join_node<tuple_type, policy_type>>);
 
-    join_node j3(precedes(succ), port_body, port_body);
-    static_assert(std::is_same_v<decltype(j3), join_node<tuple_type, policy_type>>);
+        join_node j3(precedes(succ), port_body, port_body);
+        static_assert(std::is_same_v<decltype(j3), join_node<tuple_type, policy_type>>);
 #endif
 
-    join_node j4(j1);
-    static_assert(std::is_same_v<decltype(j4), decltype(j1)>);
-    g.wait_for_all();
-}
+        join_node j4(j1);
+        static_assert(std::is_same_v<decltype(j4), decltype(j1)>);
+        g.wait_for_all();
+    }
+};
 
 template <typename Input, typename Key>
 void test_deduction_guides_body_types() {
-    using namespace deduction_guides_testing;
-
-    using mutable_callable_type = callable_object_body<Input, Key, false>;
-    using const_callable_type = callable_object_body<Input, Key, true>;
-    test_deduction_guides_common(mutable_callable_type{});
-    test_deduction_guides_common(const_callable_type{});
-    test_deduction_guides_common(function_body<Input, Key>);
-#if __TBB_CPP17_INVOKE_PRESENT
-    using pure_input_type = std::decay_t<Input>;
-    test_deduction_guides_common(&pure_input_type::member_object_body);
-    test_deduction_guides_common(&pure_input_type::member_function_body);
-#endif
+    deduction_guides_testing::test_all_body_types<Input, Key, test_deduction_guides_common>();
 }
 
 void test_deduction_guides() {

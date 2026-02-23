@@ -29,55 +29,44 @@
 
 
 #if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
-template <typename Body>
-void test_deduction_guides_common(Body body) {
-    using input_type = deduction_guides_testing::input_type<Body>;
-    static_assert(std::is_same_v<deduction_guides_testing::output_type<Body>, std::size_t>,
-                  "incorrect test setup");
+template <typename Input, typename Output, typename Body>
+struct test_deduction_guides_common {
+    static void run(Body body) {
+        static_assert(std::is_same_v<Output, std::size_t>, "Incorrect test setup");
 
-    using namespace tbb::flow;
-    graph g;
+        using namespace tbb::flow;
+        graph g;
 
-    sequencer_node s1(g, body);
-    static_assert(std::is_same_v<decltype(s1), sequencer_node<input_type>>);
+        sequencer_node s1(g, body);
+        static_assert(std::is_same_v<decltype(s1), sequencer_node<Input>>);
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
-    using pure_input_type = std::decay_t<input_type>;
-    function_node<int, pure_input_type> pred_f(g, unlimited, [](int) {
-        return pure_input_type{};
-    });
+        using pure_input_type = std::decay_t<Input>;
+        function_node<int, pure_input_type> pred_f(g, unlimited, [](int) {
+            return pure_input_type{};
+        });
 
-    function_node<pure_input_type, int> succ_f(g, unlimited, [](const pure_input_type&) {
-        return 1;
-    });
+        function_node<pure_input_type, int> succ_f(g, unlimited, [](const pure_input_type&) {
+            return 1;
+        });
 
-    sequencer_node s2(follows(pred_f), body);
-    static_assert(std::is_same_v<decltype(s2), sequencer_node<input_type>>);
+        sequencer_node s2(follows(pred_f), body);
+        static_assert(std::is_same_v<decltype(s2), sequencer_node<Input>>);
 
-    sequencer_node s3(precedes(succ_f), body);
-    static_assert(std::is_same_v<decltype(s3), sequencer_node<input_type>>);
+        sequencer_node s3(precedes(succ_f), body);
+        static_assert(std::is_same_v<decltype(s3), sequencer_node<Input>>);
 #endif
 
-    sequencer_node s4(s1);
-    static_assert(std::is_same_v<decltype(s4), decltype(s1)>);
+        sequencer_node s4(s1);
+        static_assert(std::is_same_v<decltype(s4), decltype(s1)>);
 
-    g.wait_for_all();
-}
+        g.wait_for_all();
+    }
+};
 
 template <typename Input>
 void test_deduction_guides_body_types() {
-    using namespace deduction_guides_testing;
-
-    using mutable_callable_type = callable_object_body<Input, std::size_t, false>;
-    using const_callable_type = callable_object_body<Input, std::size_t, true>;
-    test_deduction_guides_common(mutable_callable_type{});
-    test_deduction_guides_common(const_callable_type{});
-    test_deduction_guides_common(function_body<Input, std::size_t>);
-#if __TBB_CPP17_INVOKE_PRESENT
-    using pure_input_type = std::decay_t<Input>;
-    test_deduction_guides_common(&pure_input_type::member_object_body);
-    test_deduction_guides_common(&pure_input_type::member_function_body);
-#endif
+    deduction_guides_testing::test_all_body_types<Input, std::size_t, test_deduction_guides_common>();
 }
 
 void test_deduction_guides() {
@@ -87,13 +76,13 @@ void test_deduction_guides() {
 }
 #endif
 
+#if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
 //! Test deduction guides
 //! \brief \ref interface \ref requirement
 TEST_CASE("Deduction guides"){
-#if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
     test_deduction_guides();
-#endif
 }
+#endif
 
 //! Test sequencer_node single_push
 //! \brief \ref requirement

@@ -37,40 +37,115 @@ struct body_types : declare_input_type<Input> {
     using output_type = std::decay_t<Output>;
 };
 
-template <typename P>
-struct extract_callable_object_types;
-
-template <typename Body, typename Input, typename Output>
-struct extract_callable_object_types<Output (Body::*)(Input)> : body_types<Input, Output> {};
-
-template <typename Body, typename Input, typename Output>
-struct extract_callable_object_types<Output (Body::*)(Input) const> : body_types<Input, Output> {};
-
 template <typename Body, typename = void>
-struct extract_body_types;
+struct body_traits;
 
-// Body is represented as a callable object - extract types from the pointer to operator()
-template <typename Body>
-struct extract_body_types<Body, tbb::detail::void_t<decltype(&Body::operator())>>
-    : extract_callable_object_types<decltype(&Body::operator())> {};
-
-// Body is represented as a pointer to function
+// Body is a free function pointer
 template <typename Input, typename Output>
-struct extract_body_types<Output (*)(Input)> : body_types<Input, Output> {};
+struct body_traits<Output (*)(Input)> : body_types<Input, Output> {};
 
-// Body is represented as a pointer to member function
+// Body is a noexcept free function pointer
 template <typename Input, typename Output>
-struct extract_body_types<Output (Input::*)() const> : body_types<Input, Output> {};
+struct body_traits<Output (*)(Input) noexcept> : body_types<Input, Output> {};
 
-// Body is represented as a pointer to member object
+// Body is a member object pointer
 template <typename Input, typename Output>
-struct extract_body_types<Output Input::*> : body_types<Input, Output> {};
+struct body_traits<Output Input::*> : body_types<Input, Output> {};
+
+// Body is a member function pointer
+template <typename Input, typename Output>
+struct body_traits<Output (Input::*)() const> : body_types<Input, Output> {};
+
+template <typename Input, typename Output>
+struct body_traits<Output (Input::*)() const noexcept> : body_types<Input, Output> {};
+
+// Body is a callable/lambda
+// Helper class to parse operator() input and output types
+template <typename>
+struct callable_traits;
+
+// Template specializations for const, noexcept and & qualified operator() with all possible combinations
+template <typename Body, typename Input, typename Output>
+struct callable_traits<Output (Body::*)(Input)> : body_types<Input, Output> {};
+
+template <typename Body, typename Input, typename Output>
+struct callable_traits<Output (Body::*)(Input) noexcept> : body_types<Input, Output> {};
+
+template <typename Body, typename Input, typename Output>
+struct callable_traits<Output (Body::*)(Input) const> : body_types<Input, Output> {};
+
+template <typename Body, typename Input, typename Output>
+struct callable_traits<Output (Body::*)(Input) &> : body_types<Input, Output> {};
+
+template <typename Body, typename Input, typename Output>
+struct callable_traits<Output (Body::*)(Input) const noexcept> : body_types<Input, Output> {};
+
+template <typename Body, typename Input, typename Output>
+struct callable_traits<Output (Body::*)(Input) const &> : body_types<Input, Output> {};
+
+template <typename Body, typename Input, typename Output>
+struct callable_traits<Output (Body::*)(Input) & noexcept> : body_types<Input, Output> {};
+
+template <typename Body, typename Input, typename Output>
+struct callable_traits<Output (Body::*)(Input) const & noexcept> : body_types<Input, Output> {};
+
+// Helper class for extracting an operator() overload with single argument
+// Needed to support Body with multiple operator() overloads, but with a single matching overload
+// TODO: comment wording
+template <typename Body, typename = void>
+struct unary_operator_overload_extractor;
+
+// is_class constraint is needed to force another overload of body_traits to be chosen for free function pointers
+// TODO: comment wording
+template <typename Body>
+struct unary_operator_overload_extractor<Body, std::enable_if_t<std::is_class_v<Body>>> {
+    // Overloads for const, noexcept and & qualified operator() with all possible combinations
+    template <typename B, typename Input, typename Output>
+    static auto check_args(Output (B::*name)(Input)) -> tbb::detail::type_identity<decltype(name)>;
+
+    template <typename B, typename Input, typename Output>
+    static auto check_args(Output (B::*name)(Input) noexcept) -> tbb::detail::type_identity<decltype(name)>;
+
+    template <typename B, typename Input, typename Output>
+    static auto check_args(Output (B::*name)(Input) const) -> tbb::detail::type_identity<decltype(name)>;
+
+    template <typename B, typename Input, typename Output>
+    static auto check_args(Output (B::*name)(Input) &) -> tbb::detail::type_identity<decltype(name)>;
+
+    template <typename B, typename Input, typename Output>
+    static auto check_args(Output (B::*name)(Input) const noexcept) -> tbb::detail::type_identity<decltype(name)>;
+
+    template <typename B, typename Input, typename Output>
+    static auto check_args(Output (B::*name)(Input) const &) -> tbb::detail::type_identity<decltype(name)>;
+
+    template <typename B, typename Input, typename Output>
+    static auto check_args(Output (B::*name)(Input) & noexcept) -> tbb::detail::type_identity<decltype(name)>;
+
+    template <typename B, typename Input, typename Output>
+    static auto check_args(Output (B::*name)(Input) const & noexcept) -> tbb::detail::type_identity<decltype(name)>;
+
+    // Fallback if no overload found
+    static void check_args(...);
+
+    // Not reading identity::type here to make body_traits lambdas specialization inappropriate
+    // For bodies with operator(), but without unary overload
+    using operator_identity_type = decltype(check_args(&Body::operator()));
+};
 
 template <typename Body>
-using input_type_of = typename extract_body_types<Body>::input_type;
+struct body_traits<Body, std::void_t<typename unary_operator_overload_extractor<Body>::operator_identity_type::type>> {
+    using operator_type = typename unary_operator_overload_extractor<Body>::operator_identity_type::type;
+    using operator_traits = callable_traits<operator_type>;
+
+    using input_type = typename operator_traits::input_type;
+    using output_type = typename operator_traits::output_type;
+};
 
 template <typename Body>
-using output_type_of = typename extract_body_types<Body>::output_type;
+using input_type_of = typename body_traits<Body>::input_type;
+
+template <typename Body>
+using output_type_of = typename body_traits<Body>::output_type;
 
 // Deduction guides for Flow Graph nodes
 
