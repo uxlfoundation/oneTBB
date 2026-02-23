@@ -89,14 +89,12 @@ struct callable_traits<Output (Body::*)(Input) & noexcept> : body_types<Input, O
 template <typename Body, typename Input, typename Output>
 struct callable_traits<Output (Body::*)(Input) const & noexcept> : body_types<Input, Output> {};
 
-// Helper class for extracting an operator() overload with single argument
-// Needed to support Body with multiple operator() overloads, but with a single matching overload
-// TODO: comment wording
+// Helper to select an operator() overload taking a single argument
+// Supports Body defining multiple operator() overloads but only one matches
 template <typename Body, typename = void>
 struct unary_operator_overload_extractor;
 
-// is_class constraint is needed to force another overload of body_traits to be chosen for free function pointers
-// TODO: comment wording
+// is_classis required to make this specialization inapplicable to function pointers
 template <typename Body>
 struct unary_operator_overload_extractor<Body, std::enable_if_t<std::is_class_v<Body>>> {
     // Overloads for const, noexcept and & qualified operator() with all possible combinations
@@ -127,9 +125,16 @@ struct unary_operator_overload_extractor<Body, std::enable_if_t<std::is_class_v<
     // Fallback if no overload found
     static void check_args(...);
 
-    // Not reading identity::type here to make body_traits lambdas specialization inappropriate
+    // Checking layer to force absence of operator() to be a SFINAE error
+    template <typename B>
+    static auto check_call_operator_presence(int) -> decltype(check_args(&B::operator()));
+
+    template <typename B>
+    static void check_call_operator_presence(...);
+
+    // Not reading type_identity::type here to make body_traits lambdas specialization inappropriate
     // For bodies with operator(), but without unary overload
-    using operator_identity_type = decltype(check_args(&Body::operator()));
+    using operator_identity_type = decltype(check_call_operator_presence<Body>(0));
 };
 
 template <typename Body>
