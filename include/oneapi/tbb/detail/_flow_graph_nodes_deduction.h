@@ -61,13 +61,9 @@ struct body_traits<Output (Input::*)() const noexcept> : body_types<Input, Outpu
 
 // Body is a callable/lambda
 // Helper to read input/output types of operator() with single argument
-// Supports Body defining multiple operator() overloads but only one matches
-template <typename Body, typename = void>
-struct unary_operator_types_extractor;
-
-// is_classis required to make this specialization inapplicable to function pointers
+// Supports Body defining multiple operator() overloads, but should have single unary overload
 template <typename Body>
-struct unary_operator_types_extractor<Body, std::enable_if_t<std::is_class_v<Body>>> {
+struct unary_operator_types_extractor {
     // Overloads for const, noexcept and & qualified operator() with all possible combinations
     template <typename B, typename Input, typename Output>
     static auto check_args(Output (B::*name)(Input)) -> body_types<Input, Output>;
