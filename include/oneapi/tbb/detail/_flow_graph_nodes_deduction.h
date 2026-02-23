@@ -103,12 +103,9 @@ struct unary_operator_types_extractor {
 };
 
 template <typename Body>
-struct body_traits<Body, std::void_t<typename unary_operator_types_extractor<Body>::operator_types::input_type>> {
-    using operator_types = typename unary_operator_types_extractor<Body>::operator_types;
-
-    using input_type = typename operator_types::input_type;
-    using output_type = typename operator_types::output_type;
-};
+struct body_traits<Body, std::void_t<typename unary_operator_types_extractor<Body>::operator_types::input_type>>
+    : unary_operator_types_extractor<Body>::operator_types
+{};
 
 template <typename Body>
 using input_type_of = typename body_traits<Body>::input_type;
