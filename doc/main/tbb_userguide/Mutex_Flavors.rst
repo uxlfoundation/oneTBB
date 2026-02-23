@@ -133,7 +133,7 @@ The following is a summary of mutex behaviors:
         -     no     
         -     yields     
         -     1 word     
-      * -     \ ``spin_rw_mutex``     
+      * -     \ ``rw_mutex``     
         -     ✓     
         -     no     
         -     no     
