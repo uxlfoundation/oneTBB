@@ -60,67 +60,38 @@ template <typename Input, typename Output>
 struct body_traits<Output (Input::*)() const noexcept> : body_types<Input, Output> {};
 
 // Body is a callable/lambda
-// Helper class to parse operator() input and output types
-template <typename>
-struct callable_traits;
-
-// Template specializations for const, noexcept and & qualified operator() with all possible combinations
-template <typename Body, typename Input, typename Output>
-struct callable_traits<Output (Body::*)(Input)> : body_types<Input, Output> {};
-
-template <typename Body, typename Input, typename Output>
-struct callable_traits<Output (Body::*)(Input) noexcept> : body_types<Input, Output> {};
-
-template <typename Body, typename Input, typename Output>
-struct callable_traits<Output (Body::*)(Input) const> : body_types<Input, Output> {};
-
-template <typename Body, typename Input, typename Output>
-struct callable_traits<Output (Body::*)(Input) &> : body_types<Input, Output> {};
-
-template <typename Body, typename Input, typename Output>
-struct callable_traits<Output (Body::*)(Input) const noexcept> : body_types<Input, Output> {};
-
-template <typename Body, typename Input, typename Output>
-struct callable_traits<Output (Body::*)(Input) const &> : body_types<Input, Output> {};
-
-template <typename Body, typename Input, typename Output>
-struct callable_traits<Output (Body::*)(Input) & noexcept> : body_types<Input, Output> {};
-
-template <typename Body, typename Input, typename Output>
-struct callable_traits<Output (Body::*)(Input) const & noexcept> : body_types<Input, Output> {};
-
-// Helper to select an operator() overload taking a single argument
+// Helper to read input/output types of operator() with single argument
 // Supports Body defining multiple operator() overloads but only one matches
 template <typename Body, typename = void>
-struct unary_operator_overload_extractor;
+struct unary_operator_types_extractor;
 
 // is_classis required to make this specialization inapplicable to function pointers
 template <typename Body>
-struct unary_operator_overload_extractor<Body, std::enable_if_t<std::is_class_v<Body>>> {
+struct unary_operator_types_extractor<Body, std::enable_if_t<std::is_class_v<Body>>> {
     // Overloads for const, noexcept and & qualified operator() with all possible combinations
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input)) -> tbb::detail::type_identity<decltype(name)>;
+    static auto check_args(Output (B::*name)(Input)) -> body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input) noexcept) -> tbb::detail::type_identity<decltype(name)>;
+    static auto check_args(Output (B::*name)(Input) noexcept) -> body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input) const) -> tbb::detail::type_identity<decltype(name)>;
+    static auto check_args(Output (B::*name)(Input) const) -> body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input) &) -> tbb::detail::type_identity<decltype(name)>;
+    static auto check_args(Output (B::*name)(Input) &) -> body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input) const noexcept) -> tbb::detail::type_identity<decltype(name)>;
+    static auto check_args(Output (B::*name)(Input) const noexcept) -> body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input) const &) -> tbb::detail::type_identity<decltype(name)>;
+    static auto check_args(Output (B::*name)(Input) const &) -> body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input) & noexcept) -> tbb::detail::type_identity<decltype(name)>;
+    static auto check_args(Output (B::*name)(Input) & noexcept) -> body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input) const & noexcept) -> tbb::detail::type_identity<decltype(name)>;
+    static auto check_args(Output (B::*name)(Input) const & noexcept) -> body_types<Input, Output>;
 
     // Fallback if no overload found
     static void check_args(...);
@@ -132,18 +103,15 @@ struct unary_operator_overload_extractor<Body, std::enable_if_t<std::is_class_v<
     template <typename B>
     static void check_call_operator_presence(...);
 
-    // Not reading type_identity::type here to make body_traits lambdas specialization inappropriate
-    // For bodies with operator(), but without unary overload
-    using operator_identity_type = decltype(check_call_operator_presence<Body>(0));
+    using operator_types = decltype(check_call_operator_presence<Body>(0));
 };
 
 template <typename Body>
-struct body_traits<Body, std::void_t<typename unary_operator_overload_extractor<Body>::operator_identity_type::type>> {
-    using operator_type = typename unary_operator_overload_extractor<Body>::operator_identity_type::type;
-    using operator_traits = callable_traits<operator_type>;
+struct body_traits<Body, std::void_t<typename unary_operator_types_extractor<Body>::operator_types::input_type>> {
+    using operator_types = typename unary_operator_types_extractor<Body>::operator_types;
 
-    using input_type = typename operator_traits::input_type;
-    using output_type = typename operator_traits::output_type;
+    using input_type = typename operator_types::input_type;
+    using output_type = typename operator_types::output_type;
 };
 
 template <typename Body>
