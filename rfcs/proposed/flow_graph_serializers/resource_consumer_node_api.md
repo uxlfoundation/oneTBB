@@ -155,7 +155,7 @@ A provider of one or several resources represented by the `ResourceHandle` type.
 sections of the ISO C++ Standard.
 
 ```cpp
-using resource_handle_type = ResourceHandleType;
+using resource_handle_type = ResourceHandle;
 ```
 
 An alias to the resource handle type used by the provider.
