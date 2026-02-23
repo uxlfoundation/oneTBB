@@ -372,7 +372,7 @@ resource_provider<DB_handle_type> db_provider{DB_handle1, DB_handle2};
 input_node<input_type> source(g, generate_input_body);
 
 resource_limited_node<input_type, histogramming_output>
-    histogramming_node(g, unlimited
+    histogramming_node(g, unlimited,
                        std::tie(root_provider),
                        [](input_type input, auto& output_ports,
                           ROOT_handle_type& root_resource_handle) {
