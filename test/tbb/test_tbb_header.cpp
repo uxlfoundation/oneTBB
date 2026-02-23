@@ -25,6 +25,8 @@
     Most of the checks happen at the compilation or link phases.
 **/
 
+#if !__TBB_TEST_MODULE_EXPORT
+
 #if __INTEL_COMPILER && _MSC_VER
 #pragma warning(disable : 2586) // decorated name length exceeded, name was truncated
 #endif
@@ -92,8 +94,13 @@
 #include "common/test.h"
 #endif
 
-static volatile size_t g_sink;
+#endif /* !__TBB_TEST_MODULE_EXPORT */
 
+#if __TBB_TEST_MODULE_EXPORT
+inline volatile size_t g_sink;
+#else
+static volatile size_t g_sink;
+#endif /* __TBB_TEST_MODULE_EXPORT */
 #define TestTypeDefinitionPresence( Type ) g_sink = sizeof(tbb::Type);
 #define TestTypeDefinitionPresence2(TypeStart, TypeEnd) g_sink = sizeof(tbb::TypeStart,TypeEnd);
 #define TestTypeDefinitionPresence3(TypeStart, TypeMid, TypeEnd) g_sink = sizeof(tbb::TypeStart,TypeMid,TypeEnd);
@@ -138,7 +145,9 @@ struct Msg {};
 
 // Test if all the necessary symbols are exported for the exceptions thrown by TBB.
 // Missing exports result either in link error or in runtime assertion failure.
+#if !__TBB_TEST_MODULE_EXPORT
 #include <stdexcept>
+#endif
 
 template <typename E>
 void TestExceptionClassExports ( const E& exc, tbb::detail::exception_id eid ) {
@@ -163,7 +172,11 @@ void TestExceptionClassExports ( const E& exc, tbb::detail::exception_id eid ) {
 #endif /* TBB_USE_EXCEPTIONS */
 }
 
+#if __TBB_TEST_MODULE_EXPORT
+inline void TestExceptionClassesExports () {
+#else
 static void TestExceptionClassesExports () {
+#endif
     TestExceptionClassExports( std::bad_alloc(), tbb::detail::exception_id::bad_alloc );
     TestExceptionClassExports( tbb::bad_last_alloc(), tbb::detail::exception_id::bad_last_alloc );
     TestExceptionClassExports( std::invalid_argument("test"), tbb::detail::exception_id::nonpositive_step );
@@ -180,7 +193,11 @@ static void TestExceptionClassesExports () {
 #if __TBB_CPF_BUILD
 // These names are only tested in "preview" configuration
 // When a feature becomes fully supported, its names should be moved to the main test
+#if __TBB_TEST_MODULE_EXPORT
+inline void TestPreviewNames() {
+#else
 static void TestPreviewNames() {
+#endif
     TestTypeDefinitionPresence2( concurrent_lru_cache<int, int> );
     TestTypeDefinitionPresence( isolated_task_group );
 #if TBB_PREVIEW_MEMORY_POOL
@@ -191,7 +208,11 @@ static void TestPreviewNames() {
 }
 #endif
 
+#if __TBB_TEST_MODULE_EXPORT
+export inline void DefinitionPresence() {
+#else
 static void DefinitionPresence() {
+#endif
     TestTypeDefinitionPresence( ext::assertion_handler_type );
     TestTypeDefinitionPresence( cache_aligned_allocator<int> );
     TestTypeDefinitionPresence( tbb_hash_compare<int> );
@@ -309,6 +330,7 @@ static void DefinitionPresence() {
     TestExceptionClassesExports();
 }
 
+#if !__TBB_TEST_MODULE_EXPORT
 #if __TBB_TEST_SECONDARY
 /* This mode is used to produce a secondary object file that is linked with
    the main one in order to detect "multiple definition" linker error.
@@ -330,3 +352,4 @@ TEST_CASE("Test for multiple definition linker error") {
     Secondary();
 }
 #endif
+#endif /* !__TBB_TEST_MODULE_EXPORT */
