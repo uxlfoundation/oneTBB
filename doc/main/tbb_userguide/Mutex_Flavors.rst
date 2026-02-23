@@ -63,7 +63,7 @@ The following is a summary of mutex behaviors:
 
 
 -  ``spin_rw_mutex`` and ``queuing_rw_mutex`` are similar to
-   ``spin_mutex`` and ``queuing_mutex``, but additionally supports
+   ``spin_mutex`` and ``queuing_mutex``, but additionally support
    *reader* locks.
 
 
