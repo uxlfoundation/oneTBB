@@ -471,7 +471,7 @@ for (std::size_t i = 0; i < num_philosophers; ++i) {
     think_nodes.emplace_back(new think_node_type(g, unlimited, think_body));
     eat_nodes.emplace_back(
         new eat_node_type(g, unlimited,
-                          std::tie(chopstick_providers[i], chopstick_providers[i + 1 % num_philosophers]),
+                          std::tie(chopstick_providers[i], chopstick_providers[(i + 1) % num_philosophers]),
                           eat_body));
 
     make_edge(eat_nodes[i], think_nodes[i]);
