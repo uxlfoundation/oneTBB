@@ -447,7 +447,7 @@ using namespace tbb::flow;
 using think_node_type = function_node<continue_msg, continue_msg>;
 using eat_node_type = resource_limited_node<continue_msg, std::tuple<continue_msg>>;
 
-auto think_body = []() { think(); };
+auto think_body = [](continue_msg) { think(); };
 auto eat_body = [](continue_msg, auto& output_ports, chopstick, chopstick) {
     eat();
     if (keep_thinking) {
