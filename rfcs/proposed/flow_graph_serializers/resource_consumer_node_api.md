@@ -123,7 +123,7 @@ using output = std::tuple<double>;
 auto node_body = [](int input,         // input message
                     auto& ports,       // output ports tuple, similar to multifunction_node
                     int& i_resource,   // reference to integral resource from int_provider
-                    float& f_resource, // reference to float resource from float_provider
+                    float& f_resource // reference to float resource from float_provider
                     )
     {
         std::get<0>(ports).try_put(output);
