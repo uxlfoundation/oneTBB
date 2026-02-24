@@ -17,6 +17,7 @@
 # System imports
 import platform
 import os
+import sysconfig
 
 try:
     from setuptools import setup, Extension
@@ -61,6 +62,10 @@ else:
     tbb_flag = ['-tbb'] if use_compiler_tbb else []
     compile_flags = ['-std=c++11', '-Wno-unused-variable']
     tbb_lib_name = 'tbb'
+
+# Enable free-threading (NOGIL) support when building with free-threaded Python
+if sysconfig.get_config_var('Py_GIL_DISABLED'):
+    compile_flags.append('-DSWIGPYTHON_NOGIL')
 
 tbb_includedirs = os.getenv("TBB_INCLUDEDIRS", "")
 tbb_libdirs = os.getenv("TBB_LIBDIRS", "")
