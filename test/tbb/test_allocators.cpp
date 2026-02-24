@@ -21,11 +21,6 @@
 // inside Standard Library while using STL PMR containers since std::polymorphic_allocator::destroy is deprecated since C++20
 #define TEST_LLVM_COMPILER_PMR_DESTROY_DEPRECATED_BROKEN __INTEL_LLVM_COMPILER >= 20250000 && __INTEL_LLVM_COMPILER <= 20260111 && __TBB_GLIBCXX_VERSION == 110000 && __TBB_CPP20_PRESENT
 
-#define STR_HELPER(x) #x
-#define STR(x) STR_HELPER(x)
-
-#pragma message "VERSION " STR(__INTEL_LLVM_COMPILER)
-
 #if TEST_LLVM_COMPILER_PMR_DESTROY_DEPRECATED_BROKEN
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
