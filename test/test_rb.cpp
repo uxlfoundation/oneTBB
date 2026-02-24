@@ -153,9 +153,7 @@ TEST("test_nested_clients") {
       /*log_message*/"[client A] Requesting outer non-negotiable permit as [" +
       std::to_string(outer_num_thr) + ", " + std::to_string(outer_num_thr) + "]");
     eA_concurrency = outer_num_thr;
-    if (!check_permit(eA, phA)) {
-      throw tcm_exception{nullptr};
-    }
+    check_permit(eA, phA);
 
     register_thread(phA);
     uint32_t resources_left = platform_tcm_concurrency() - outer_num_thr;
@@ -174,7 +172,6 @@ TEST("test_nested_clients") {
           auto inner_permit = get_permit_data(phB);
           check(false, "Outer permit concurrency: " + std::to_string(outer_permit.concurrency()) +
                        ", Inner permit concurrency: " + std::to_string(inner_permit.concurrency()));
-          throw tcm_exception{nullptr};
         }
 
         register_thread(phB);
