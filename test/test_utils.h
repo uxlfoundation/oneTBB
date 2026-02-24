@@ -692,25 +692,37 @@ inline bool can_find(tcm_client_id_t client_id, uint32_t num_resources) {
 }
 
 /**
- * Asserts TCM can find at most given number of resources. Throws an exception otherwise.
+ * Asserts TCM can find at most given number of resources.
  */
-inline
-void assert_can_find_at_most(uint32_t num_resources, std::string&& log_message = "") {
-  std::string num_str = std::to_string(num_resources);
-  if (log_message.empty())
-      log_message = "asserting at most " + num_str + " resources are available";
-
-  test_log("Begin " + log_message);
+inline bool can_find_at_most(const uint32_t num_resources) {
+  const int num_to_fully_subscribe = int(num_resources);
+  tcm_permit_request_t req = make_request(/*min_sw_threads*/num_to_fully_subscribe,
+                                          /*max_sw_threads*/num_to_fully_subscribe);
 
   tcm_client_id_t client_id = connect_new_client();
-  if (!can_find(client_id, num_resources))
-      throw tcm_exception{num_str + " resources are unavailable"};
-  else if (can_find(client_id, num_resources + 1))
-      throw tcm_exception{"Unexpectedly found more than " + num_str + " resources"};
+  tcm_permit_handle_t ph = request_permit(client_id, req);
+  permit_t<1> expected = make_active_permit(/*expected_concurrency*/uint32_t(num_to_fully_subscribe));
+  bool result = check_permit(expected, ph, skip_checks_t{}, /*num_indents*/ 1, /*report*/ false);
+
+  // Making the second request while holding the first for one more resource. Forcing a nested
+  // request to overcome the lack of information if the first request was a nested one already.
+  check_success(tcmRegisterThread(ph));
+
+  const int32_t num_exceeding = 1 + /*inherited*/1;
+  tcm_permit_handle_t ph2 = request_permit(client_id, make_request(/*min_sw_threads*/num_exceeding,
+                                                                   /*max_sw_threads*/num_exceeding));
+  uint32_t expected_concurrency = 0;
+  result &= check_permit(make_pending_permit(&expected_concurrency), ph2, skip_checks_t{},
+                        /*num_indents*/1, /*report*/false);
+
+  check_success(tcmUnregisterThread());
+
+  release_permit(ph2);
+  release_permit(ph);
 
   disconnect_client(client_id);
 
-  test_log("End " + log_message);
+  return result;
 }
 
 /**
