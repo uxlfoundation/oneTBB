@@ -121,6 +121,9 @@ struct Body1b { // binary operator for reduction
 struct Body1bc { // binary operator for comparison
     bool operator() (const int, const int) const { return false; }
 };
+struct Body1c { // body for function_node<int, int>
+    int operator() ( int ) const { return 0; }
+};
 struct Body2 {
     Body2 () {}
     Body2 ( const Body2&, tbb::split ) {}
@@ -282,7 +285,7 @@ static void DefinitionPresence() {
     TestTypeDefinitionPresence( flow::reset_flags );
     TestTypeDefinitionPresence( flow::tag_value );
     TestTypeDefinitionPresence( flow::node_priority_t );
-    TestFuncDefinitionPresence( flow::copy_body<Body1>, (tbb::flow::function_node<int, int>&), Body1 );
+    TestFuncDefinitionPresence( flow::copy_body<Body1c>, (tbb::flow::function_node<int, int>&), Body1c );
     TestFuncDefinitionPresence( flow::cast_to<int>, (tbb::flow::tagged_msg<int, int> const&), const int& );
     /* Mutex names */
     TestTypeDefinitionPresence( null_mutex );

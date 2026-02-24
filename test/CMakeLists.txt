@@ -556,7 +556,7 @@ if (TARGET TBB::tbb)
         tbb_add_test(SUBDIR tbb NAME test_tbb_fork DEPENDENCIES TBB::tbb)
     endif()
 
-    tbb_add_test(SUBDIR tbb NAME test_tbb_header DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR tbb NAME test_tbb_header DEPENDENCIES TBB::tbb TBB::tbbmalloc)
     target_sources(test_tbb_header PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_secondary.cpp)
 
     if (TBB_TEST_CXX20_MODULES)
@@ -565,7 +565,7 @@ if (TARGET TBB::tbb)
         elseif (NOT CMAKE_CXX_STANDARD OR CMAKE_CXX_STANDARD LESS 20)
             message(WARNING "C++ standard 20 or higher is required, skipping module test")
         else()
-            tbb_add_test(SUBDIR tbb NAME test_tbb_header_module_consumer DEPENDENCIES TBB::tbb)
+                tbb_add_test(SUBDIR tbb NAME test_tbb_header_module_consumer DEPENDENCIES TBB::tbb TBB::tbbmalloc)
             target_sources(test_tbb_header_module_consumer
                 PUBLIC FILE_SET CXX_MODULES FILES
                 ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_module.cppm)
