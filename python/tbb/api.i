@@ -1,6 +1,7 @@
 %pythonbegin %{
 #
 # Copyright (c) 2016-2025 Intel Corporation
+# Copyright (c) 2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,10 +23,19 @@ __all__ = ["task_arena",
            "this_task_arena_max_concurrency",
            "this_task_arena_current_thread_index",
            "runtime_version",
-           "runtime_interface_version"]
+           "runtime_interface_version",
+           "tbb_run_and_wait",
+           "tbb_parallel_for"]
 %}
 %begin %{
-/* Defines Python wrappers for Intel(R) oneAPI Threading Building Blocks (oneTBB) */
+/* Defines Python wrappers for Intel(R) oneAPI Threading Building Blocks (oneTBB)
+ *
+ * Free-threading (NOGIL) Python 3.13+ Support:
+ * This module declares Py_MOD_GIL_NOT_USED to indicate it can run safely
+ * without the Global Interpreter Lock. All callbacks to Python code properly
+ * acquire the GIL using SWIG_PYTHON_THREAD_BEGIN_BLOCK/END_BLOCK macros.
+ */
+
 %}
 %module api
 
@@ -45,28 +55,116 @@ __all__ = ["task_arena",
 
 using namespace tbb;
 
+/*
+ * PyCaller - Wrapper for Python callable objects
+ * 
+ * Thread-safety for free-threading Python:
+ * - Uses SWIG_PYTHON_THREAD_BEGIN_BLOCK to acquire GIL before Python API calls
+ * - Uses SWIG_PYTHON_THREAD_END_BLOCK to release GIL after Python API calls
+ * - Reference counting (Py_INCREF/DECREF) is protected by GIL acquisition
+ * 
+ * This ensures safe operation when called from TBB worker threads.
+ */
 class PyCaller : public swig::SwigPtr_PyObject {
 public:
-    // icpc 2013 does not support simple using SwigPtr_PyObject::SwigPtr_PyObject;
-    PyCaller(const PyCaller& s) : SwigPtr_PyObject(s) {}
-    PyCaller(PyObject *p, bool initial = true) : SwigPtr_PyObject(p, initial) {}
+    // Copy constructor - must acquire GIL for Py_XINCREF
+    PyCaller(const PyCaller& s) : SwigPtr_PyObject() {
+        SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+        _obj = s._obj;
+        Py_XINCREF(_obj);
+        SWIG_PYTHON_THREAD_END_BLOCK;
+    }
+    
+    PyCaller(PyObject *p, bool initial = true) : SwigPtr_PyObject() {
+        SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+        _obj = p;
+        if (!initial) {
+            Py_XINCREF(_obj);
+        }
+        SWIG_PYTHON_THREAD_END_BLOCK;
+    }
+    
+    // Move constructor - transfer ownership without refcount change
+    PyCaller(PyCaller&& s) noexcept : SwigPtr_PyObject() {
+        _obj = s._obj;
+        s._obj = nullptr;  // Prevent source destructor from decref
+    }
+    
+    // Move assignment - prevent accidental use
+    PyCaller& operator=(PyCaller&&) = delete;
+    
+    // Copy assignment - prevent accidental use  
+    PyCaller& operator=(const PyCaller&) = delete;
+    
+    // Destructor - must acquire GIL for Py_XDECREF
+    ~PyCaller() {
+        if (_obj) {  // Only decref if we still own the object
+            SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+            Py_XDECREF(_obj);
+            _obj = nullptr;  // Prevent double-free in base destructor
+            SWIG_PYTHON_THREAD_END_BLOCK;
+        }
+    }
 
     void operator()() const {
+        /* Acquire GIL before calling Python code - required for free-threading */
         SWIG_PYTHON_THREAD_BEGIN_BLOCK;
         PyObject* r = PyObject_CallFunctionObjArgs((PyObject*)*this, nullptr);
-        if(r) Py_DECREF(r);
+        if(r) {
+            Py_DECREF(r);
+        } else {
+            /* Log exception - cannot propagate from TBB worker thread.
+             * Note: This logs to stderr. In production, consider capturing
+             * exceptions via a thread-safe queue for proper handling.
+             */
+            PyErr_WriteUnraisable((PyObject*)*this);
+        }
         SWIG_PYTHON_THREAD_END_BLOCK;
     }
 };
 
+/*
+ * ArenaPyCaller - Wrapper for Python callable with task_arena binding
+ * 
+ * Thread-safety: GIL is acquired for Py_XINCREF in constructor and
+ * the actual Python call is delegated to PyCaller which handles GIL.
+ */
 struct ArenaPyCaller {
     task_arena *my_arena;
     PyObject *my_callable;
+    
     ArenaPyCaller(task_arena *a, PyObject *c) : my_arena(a), my_callable(c) {
         SWIG_PYTHON_THREAD_BEGIN_BLOCK;
         Py_XINCREF(c);
         SWIG_PYTHON_THREAD_END_BLOCK;
     }
+    
+    // Copy constructor - needed because TBB may copy task functors
+    ArenaPyCaller(const ArenaPyCaller& other) : my_arena(other.my_arena), my_callable(other.my_callable) {
+        SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+        Py_XINCREF(my_callable);
+        SWIG_PYTHON_THREAD_END_BLOCK;
+    }
+    
+    // Move constructor - transfer ownership without refcount change
+    ArenaPyCaller(ArenaPyCaller&& other) noexcept 
+        : my_arena(other.my_arena), my_callable(other.my_callable) {
+        other.my_callable = nullptr;  // Prevent source destructor from decref
+    }
+    
+    // Destructor - release Python object reference
+    ~ArenaPyCaller() {
+        if (my_callable) {  // Only decref if we still own the object
+            SWIG_PYTHON_THREAD_BEGIN_BLOCK;
+            Py_XDECREF(my_callable);
+            SWIG_PYTHON_THREAD_END_BLOCK;
+        }
+    }
+    
+    // Assignment operators - prevent double-free issues
+    ArenaPyCaller& operator=(const ArenaPyCaller&) = delete;
+    ArenaPyCaller& operator=(ArenaPyCaller&&) = delete;
+    
     void operator()() const {
         my_arena->execute(PyCaller(my_callable, false));
     }
@@ -78,6 +176,12 @@ struct barrier_data {
     int worker_threads, full_threads;
 };
 
+/*
+ * _concurrency_barrier - Wait for all TBB worker threads to be ready
+ * 
+ * This function is thread-safe and does not require GIL as it only
+ * uses C++ synchronization primitives (mutex, condition_variable).
+ */
 void _concurrency_barrier(int threads = tbb::task_arena::automatic) {
     if(threads == tbb::task_arena::automatic)
         threads = tbb::this_task_arena::max_concurrency();
@@ -100,7 +204,7 @@ void _concurrency_barrier(int threads = tbb::task_arena::automatic) {
                 b.event.wait(lock);
         });
     std::unique_lock<std::mutex> lock(b.m);
-    b.event.wait(lock);
+    b.event.wait(lock, [&b]{ return b.worker_threads >= b.full_threads; });
     tg.wait();
 };
 
@@ -121,8 +225,8 @@ namespace tbb {
         void terminate();
         bool is_active();
         %extend {
-        void enqueue( PyObject *c ) { $self->enqueue(PyCaller(c)); }
-        void execute( PyObject *c ) { $self->execute(PyCaller(c)); }
+        void enqueue( PyObject *c ) { $self->enqueue(PyCaller(c, false)); }
+        void execute( PyObject *c ) { $self->execute(PyCaller(c, false)); }
         };
     };
 
@@ -133,7 +237,7 @@ namespace tbb {
         void wait();
         void cancel();
         %extend {
-        void run( PyObject *c ) { $self->run(PyCaller(c)); }
+        void run( PyObject *c ) { $self->run(PyCaller(c, false)); }
         void run( PyObject *c, task_arena *a ) { $self->run(ArenaPyCaller(a, c)); }
         };
     };
@@ -158,6 +262,66 @@ namespace tbb {
     inline int this_task_arena_max_concurrency() { return this_task_arena::max_concurrency();}
     inline int this_task_arena_current_thread_index() { return this_task_arena::current_thread_index();}
 };
+
+/*
+ * Direct TBB thread dispatch - minimal Python overhead
+ * 
+ * Provides tbb_run_and_wait() for batch execution of callables.
+ */
+
+// Python wrapper using existing task_group
+%pythoncode %{
+def tbb_run_and_wait(callables):
+    """
+    Run multiple callables on TBB threads and wait for completion.
+    
+    Run callables in parallel using TBB task_group.
+    
+    Note: Exceptions raised in callables are not propagated. They are logged
+    to stderr via PyErr_WriteUnraisable at the C++ level. If you need exception
+    propagation, use TBBThread (via patch_threading) which re-raises in join().
+    
+    Args:
+        callables: iterable of callable objects
+    
+    Example:
+        def work(x):
+            return x * 2
+        
+        funcs = [lambda i=i: work(i) for i in range(10)]
+        tbb_run_and_wait(funcs)
+    """
+    tg = task_group()
+    for c in callables:
+        tg.run(c)
+    tg.wait()
+
+def tbb_parallel_for(n, func):
+    """
+    Run func(i) for i in range(n) on TBB threads.
+    
+    Note: Exceptions raised in func are not propagated. They are logged
+    to stderr via PyErr_WriteUnraisable at the C++ level.
+    
+    Args:
+        n: number of iterations
+        func: callable that takes one int argument
+    
+    Example:
+        results = []
+        def work(i):
+            results.append(i * 2)
+        
+        tbb_parallel_for(10, work)
+    """
+    tg = task_group()
+    for i in range(n):
+        # Capture i by creating closure
+        def task(idx=i):
+            func(idx)
+        tg.run(task)
+    tg.wait()
+%}
 
 // Additional definitions for Python part of the module
 %pythoncode %{
