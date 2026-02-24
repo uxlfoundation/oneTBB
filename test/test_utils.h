@@ -480,7 +480,8 @@ inline void disconnect_client(const tcm_client_id_t& client_id,
 
 inline tcm_permit_handle_t
 request_permit(tcm_client_id_t client, const tcm_permit_request_t& req, void* callback_arg = nullptr,
-               tcm_permit_handle_t permit_handle = nullptr, const std::string& error_message = "",
+               tcm_permit_handle_t permit_handle = nullptr,
+               const std::string& error_message = "tcmRequestPermit failed",
                const std::string& log_message = "")
 {
   std::string actual_log_message = log_message;
@@ -549,7 +550,7 @@ inline void release_permit(tcm_permit_handle_t ph,
                            const std::string& error_message = "tcmReleasePermit failed",
                            const std::string& log_message = "")
 {
-  auto r = tcmReleasePermit(ph);
+  tcm_result_t r = tcmReleasePermit(ph);
 
   if (!check_success(r, log_message)) {
     throw tcm_release_permit_error(error_message);
@@ -557,11 +558,14 @@ inline void release_permit(tcm_permit_handle_t ph,
 }
 
 inline void register_thread(tcm_permit_handle_t ph, const std::string& error_message = "",
-                            const std::string& log_message = "tcmRegisterThread")
+                            const std::string& log_message = "")
 {
   auto r = tcmRegisterThread(ph);
 
-  if (!check_success(r, log_message)) {
+  std::string msg = log_message;
+  if (log_message.empty())
+      msg = "tcmRegisterThread for " + to_string(ph);
+  if (!check_success(r, msg)) {
     throw tcm_register_thread_error(error_message);
   }
 }
