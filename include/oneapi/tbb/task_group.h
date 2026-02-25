@@ -548,7 +548,7 @@ protected:
     }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    task_group_status internal_run_and_wait_task(d2::task_handle&& h) {
+    task_group_status internal_run_and_wait_for_task(d2::task_handle&& h) {
         __TBB_ASSERT(h != nullptr, "Attempt to schedule empty task_handle");
         __TBB_ASSERT(&d2::task_handle_accessor::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
         
@@ -627,7 +627,7 @@ public:
     }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    task_group_status wait_task(task_completion_handle& comp_handle) {
+    task_group_status wait_for_task(task_completion_handle& comp_handle) {
         __TBB_ASSERT(comp_handle, "Attempt to wait for completion of empty handle");
         task_dynamic_state* state = task_completion_handle_accessor::get_task_dynamic_state(comp_handle);
         bool was_canceled = state->wait_for_completion(context());
@@ -682,8 +682,8 @@ public:
     }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    task_group_status run_and_wait_task(d2::task_handle&& h) {
-        return internal_run_and_wait_task(std::move(h));
+    task_group_status run_and_wait_for_task(d2::task_handle&& h) {
+        return internal_run_and_wait_for_task(std::move(h));
     }
 
     static void set_task_order(d2::task_handle& pred, d2::task_handle& succ) {

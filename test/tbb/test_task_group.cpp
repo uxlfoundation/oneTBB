@@ -2149,7 +2149,7 @@ enum class wait_for_function_tag {
 tbb::task_group_status wait_for(tbb::task_completion_handle& task, tbb::task_group& tg, tbb::task_arena& arena, wait_for_function_tag tag) {
     tbb::task_group_status status = tbb::task_group_status::not_complete;
     if (tag == wait_for_function_tag::group_wait_task) {
-        status = tg.wait_task(task);
+        status = tg.wait_for_task(task);
     } else {
         CHECK_MESSAGE(tag != wait_for_function_tag::group_run_and_wait_task, "Unsupported wait_for_function_tag");
         if (tag == wait_for_function_tag::arena_wait_for) {
@@ -2162,7 +2162,7 @@ tbb::task_group_status wait_for(tbb::task_completion_handle& task, tbb::task_gro
 tbb::task_group_status run_and_wait_for(tbb::task_handle&& task, tbb::task_group& tg, tbb::task_arena& arena, wait_for_function_tag tag) {
     auto body = [&] {
         if (tag == wait_for_function_tag::group_run_and_wait_task) {
-            return tg.run_and_wait_task(std::move(task));
+            return tg.run_and_wait_for_task(std::move(task));
         } else {
             tbb::task_completion_handle comp_handle = task;
             arena.enqueue(std::move(task));
