@@ -33,6 +33,15 @@ namespace d2 {
 
 class task_handle;
 
+enum task_group_status {
+    not_complete,
+    complete,
+    canceled
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    , task_complete
+#endif
+};
+
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
 class task_handle_task;
@@ -171,6 +180,23 @@ public:
         m_new_completion_point.store(new_completion_point, std::memory_order_relaxed);
         notify_list_node* notify_list = fetch_notify_list(TRANSFERRED_FLAG);
         new_completion_point->add_notify_list(notify_list);
+    }
+
+    task_group_status get_task_status() {
+        notify_list_node* current_list_head = m_notify_list_head.load(std::memory_order_acquire);
+        task_group_status status = task_group_status::not_complete;
+
+        if (represents_transferred_completion(current_list_head)) {
+            task_dynamic_state* new_completion_point = m_new_completion_point.load(std::memory_order_relaxed);
+            __TBB_ASSERT(new_completion_point != nullptr, nullptr);
+            status = new_completion_point->get_task_status();
+        } else if (represents_completed_task(current_list_head)) {
+            status = task_group_status::task_complete;
+        } else if (represents_canceled_task(current_list_head)) {
+            status = task_group_status::canceled;
+        }
+
+        return status;
     }
 
     task_handle_task* get_task() { return m_task; }
