@@ -305,7 +305,7 @@ its predecessor. However, multiple predecessors may have different tags.
 This would require changes to the current isolation mechanism to support multiple isolation tags, allowing a thread waiting for a successor
 to execute tasks with any of its predecessor's tags. 
 
-As an initial step, it makes sense to isolate the waiting thread so that it only executes tasks related to the same ``task_group`` as the awaited task - similar to the improvement described in the [RFC for another overload of ``task_arena::wait_for``](../task_arena_waiting/task_group_interop.md).
+As an initial step, it makes sense to isolate the waiting thread so that it only executes tasks related to the same ``task_group`` as the awaited task - similar to the improvement described in the [RFC for another overload of ``task_arena::wait_for``](../../supported/task_arena_waiting/task_group_interop.md).
 
 ### ``run_and_wait_for_task`` Accepting the Task Body
 
