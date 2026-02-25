@@ -144,7 +144,7 @@ while (!is_completed(ch)) {
 }
 ```
 
-To determine the status of a task represented by ``task_completion_handle``, it is proposed to add a new function ``task_group::get_status_of(const task_completion_handle&)``.
+To determine the status of a task represented by ``task_completion_handle``, it is proposed to add a new function ``task_group::get_status_of(task_completion_handle&)``.
 This function returns:
 * ``task_group_status::not_complete`` - if the task has not yet been submitted, is being scheduled, or is currently executing.
 * ``task_group_status::task_complete`` - if the task has finished executing successfully.
@@ -208,7 +208,7 @@ class task_group {
     task_group_status wait_for_task(task_completion_handle& comp_handle);
     task_group_status run_and_wait_for_task(task_handle&& handle);
 
-    task_group_status get_status_of(const task_completion_handle& comp_handle);
+    task_group_status get_status_of(task_completion_handle& comp_handle);
 };
 
 // Defined in <oneapi/tbb/task_arena.h>
@@ -242,12 +242,12 @@ This is semantically equivalent to: ``task_completion_handle comp_handle = handl
 Returns ``task_status::completed`` if the task was executed, or ``task_status::canceled`` if it was not.
 
 ```cpp
-task_group_status get_status_of(const task_completion_handle& comp_handle);
+task_group_status get_status_of(task_completion_handle& comp_handle);
 ```
 
 Returns the status of the task represented by ``comp_handle``:
 * ``task_group_status::not_complete`` - if the task has not been submitted for execution, or has not finished execution.
-* ``task_group_status::complete`` - if the task has finished execution.
+* ``task_group_status::task_complete`` - if the task has finished execution.
 * ``task_group_status::canceled`` - if the task execution was cancelled.
 
 If the completion was transferred to another task using ``tbb::task_group::transfer_this_task_completion_to``, the function returns the status of that task.
