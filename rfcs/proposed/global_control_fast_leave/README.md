@@ -38,7 +38,7 @@ providing a global override mechanism.
 
 ## Proposal
 
-This proposal introduces a new `global_control` parameter called `fast_leave` that, when active,
+This proposal introduces a new `global_control` parameter called `leave_policy` that, when set to "fast",
 would override the delayed leave behavior and cause workers to leave arenas immediately after
 completing work. However, active parallel phases would always retain workers regardless of the
 global setting, meaning the global parameter itself could be overridden by parallel phase control.
@@ -66,8 +66,8 @@ public:
         thread_stack_size,
         terminate_on_exception,
         scheduler_handle,  // not a public parameter
-#if  TBB_PREVIEW_PARALLEL_PHASE
-        fast_leave,        // NEW: Controls worker fast leave behavior
+#if TBB_PREVIEW_PARALLEL_PHASE
+        leave_policy,      // NEW: Controls worker fast leave behavior
 #endif
         parameter_max
     };
@@ -83,25 +83,25 @@ public:
 
 #### Semantics
 
-The `fast_leave` parameter would control whether worker threads leave arenas immediately after
+The `leave_policy` parameter would control whether worker threads leave arenas immediately after
 completing work:
 
 | Value | Behavior |
 |-------|----------|
-| `0` (default) | Workers follow the default system-specific policy (may spin before leaving) |
-| `1` | Workers leave immediately (fast leave enabled) |
+| `task_arena::leave_policy::automatic` (default) | Workers follow the default system-specific policy (may spin before leaving) |
+| `task_arena::leave_policy::fast` | Workers leave immediately (fast leave enabled) |
 
-When multiple `global_control` objects exist for `fast_leave`, their logical disjunction would be
+When multiple `global_control` objects exist for `leave_policy`, their logical disjunction would be
 used (consistent with the `terminate_on_exception` parameter). This means if any
-`global_control(fast_leave, 1)` is active, fast leave would be enabled globally.
+`global_control(leave_policy, task_arena::leave_policy::fast)` is active, fast leave would be enabled globally.
 
 ### Proposed Implementation Strategy
 
 The proposed implementation would modify the `thread_leave_manager` to check the
-`global_control::fast_leave` parameter. When a worker thread queries whether it should remain in an
+`global_control::leave_policy` parameter. When a worker thread queries whether it should remain in an
 arena, the method would first read the current state as usual. If the current state indicates
-delayed leave behavior and the global `fast_leave` control is set to enabled, the method would
-treat the state as if it were fast leave instead, causing the worker to exit immediately.
+the default behavior and the global control changes it, the method would treat `global_control::leave_policy`
+as if it were the specified per-arena setting, causing the worker to behave accordingly.
 
 ```mermaid
 %%{init: {"layout": "elk"}}%%
@@ -119,7 +119,7 @@ flowchart TD
     subgraph PROPOSED ["🆕 **PROPOSED: global_control integration**"]
         direction TB
         CheckDelayed{{"🔍 state = DELAYED_LEAVE?"}}
-        CheckGlobal{{"🌐 global_control::<br/>active_value&lpar;fast_leave&rpar; = 1?"}}
+        CheckGlobal{{"🌐 global_control::<br/>active_value&lpar;leave_policy&rpar; = task_arena::leave_policy::fast?"}}
     end
 
     CheckGlobal -->|"✅ Yes"| LeaveImmediately
@@ -152,20 +152,20 @@ This approach would:
 
 ### Interaction with Parallel Phase API
 
-The proposed `fast_leave` parameter would interact with the `parallel_phase` API as follows:
+The proposed `leave_policy` parameter would interact with the `parallel_phase` API as follows:
 
-| Arena State | `fast_leave` Value | Effective Behavior |
+| Arena State | `leave_policy` Value | Effective Behavior |
 |-------------|-------------------|-------------------|
-| `DELAYED_LEAVE` | 0 | Workers spin before leaving |
-| `DELAYED_LEAVE` | 1 | **Workers leave immediately** |
-| `FAST_LEAVE` | 0 or 1 | Workers leave immediately |
-| `PARALLEL_PHASE` | 0 or 1 | Workers spin before leaving |
-| `ONE_TIME_FAST_LEAVE` | 0 or 1 | Workers leave immediately |
+| `DELAYED_LEAVE` | `task_arena::leave_policy::automatic` | Workers spin before leaving |
+| `DELAYED_LEAVE` | `task_arena::leave_policy::fast` | **Workers leave immediately** |
+| `FAST_LEAVE` | any | Workers leave immediately |
+| `PARALLEL_PHASE` | any | Workers spin before leaving |
+| `ONE_TIME_FAST_LEAVE` | any | Workers leave immediately |
 
 This design ensures that:
 1. Explicit per-arena `leave_policy::fast` always results in fast leave
 2. Active parallel phases always retain workers regardless of global setting
-3. The global `fast_leave` parameter only overrides the default `DELAYED_LEAVE` behavior
+3. The global `leave_policy` parameter only overrides the default `DELAYED_LEAVE` behavior
 
 ### Specification Extension
 
@@ -176,14 +176,14 @@ related parallel phase feature.
 
 While the feature is in preview state, the
 [parallel phase API reference](https://github.com/uxlfoundation/oneTBB/blob/master/doc/main/reference/parallel_phase_for_task_arena.rst)
-would need to be extended with documentation for the `global_control::fast_leave` parameter:
-- Add a new section "Global Control Integration" describing the `fast_leave` parameter
-- Update the Synopsis to include the `global_control` header and `fast_leave` parameter
+would need to be extended with documentation for the `global_control::leave_policy` parameter:
+- Add a new section "Global Control Integration" describing the `leave_policy` parameter
+- Update the Synopsis to include the `global_control` header and `leave_policy` parameter
 - Add a description of the parameter semantics and selection rule (logical disjunction)
-- Document the interaction between `global_control::fast_leave` and per-arena `leave_policy`
+- Document the interaction between `global_control::leave_policy` and per-arena `leave_policy`
 - Add usage examples showing how to combine global fast leave with parallel phases
-- Include a note explaining that `global_control::fast_leave` provides application-wide control
-  while `leave_policy` and `parallel_phase` provide per-arena control
+- Include a note explaining that `global_control::leave_policy` provides application-wide control
+  while `task_arena::leave_policy` and `parallel_phase` provide per-arena control
 
 #### oneAPI Specification Update
 
@@ -226,7 +226,7 @@ common case for arenas with `leave_policy::automatic` on non-hybrid CPUs.
 - **API Compatibility**: No existing APIs would be modified; a new enum value would be added
 - **ABI Compatibility**: The internal `control_storage` object array size would change, requiring
   library rebuild but no changes to existing binaries
-- **Behavioral Compatibility**: Default behavior (fast_leave=0) would match current behavior
+- **Behavioral Compatibility**: Default behavior (leave_policy=automatic) would match current behavior
 
 ### Usage Examples
 
@@ -239,7 +239,7 @@ common case for arenas with `leave_policy::automatic` on non-hybrid CPUs.
 
 int main() {
     // Enable fast leave globally for the duration of this scope
-    tbb::global_control gc(tbb::global_control::fast_leave, 1);
+    tbb::global_control gc(tbb::global_control::leave_policy, tbb::task_arena::leave_policy::fast);
 
     for (int i = 0; i < 1000; ++i) {
         // Single-threaded work benefits from reduced CPU load
@@ -258,7 +258,7 @@ int main() {
 ```cpp
 void process_interactive_workload() {
     // Enable fast leave only during interactive phase
-    tbb::global_control gc(tbb::global_control::fast_leave, 1);
+    tbb::global_control gc(tbb::global_control::leave_policy, tbb::task_arena::leave_policy::fast);
 
     while (user_is_interacting()) {
         render_frame();  // Mix of serial and parallel work
@@ -276,9 +276,9 @@ void process_batch_workload() {
 
 ```cpp
 tbb::task_arena arena;
-tbb::global_control gc(tbb::global_control::fast_leave, 1);
+tbb::global_control gc(tbb::global_control::leave_policy, tbb::task_arena::leave_policy::fast);
 
-// Global fast_leave is active, but parallel_phase overrides it
+// Global leave_policy is active, but parallel_phase overrides it
 arena.start_parallel_phase();
 
 arena.execute([&] {
@@ -293,7 +293,7 @@ arena.execute([&] {
 });
 
 arena.end_parallel_phase();
-// After parallel_phase ends, workers leave immediately due to global fast_leave
+// After parallel_phase ends, workers leave immediately due to global leave_policy
 ```
 
 ### Testing Strategy
@@ -301,9 +301,9 @@ arena.end_parallel_phase();
 The following test scenarios would be required:
 
 1. **Functional tests**:
-   - Verify `active_value(fast_leave)` returns correct values
-   - Verify workers leave immediately when fast_leave=1
-   - Verify default behavior preserved when fast_leave=0
+   - Verify `active_value(leave_policy)` returns correct values
+   - Verify workers leave immediately when leave_policy=fast
+   - Verify default behavior preserved when leave_policy=automatic
 
 2. **Interaction tests**:
    - Test interaction with `leave_policy::fast` arenas
@@ -312,14 +312,14 @@ The following test scenarios would be required:
    - Test with multiple concurrent arenas
 
 3. **Performance tests**:
-   - Benchmark workloads similar to the one in issue #1876
-   - Verify no regression with fast_leave=0
+   - Benchmark workloads similar to the one in issue https://github.com/uxlfoundation/oneTBB/issues/1876
+   - Verify no regression with leave_policy=automatic
 
 ## Alternatives Considered
 
 ### Alternative 1: Environment Variable
 
-An environment variable (e.g., `TBB_FAST_LEAVE=1`) could control the behavior at startup.
+An environment variable (e.g., `TBB_LEAVE_POLICY=FAST`) could control the behavior at startup.
 
 **Pros:**
 - No code changes required
@@ -344,15 +344,12 @@ The default behavior could be changed to fast leave, making delayed leave opt-in
 
 ## Open Questions
 
-1. **Naming**: Should the parameter be named `fast_leave`, `worker_fast_leave`, or something else
-   like `disable_delayed_leave`?
-
-2. **Selection Rule**: Should the active value be the logical disjunction (as proposed) or
-   conjunction of all active controls? Disjunction means "any fast_leave enables it globally" while
+1. **Selection Rule**: Should the active value be the logical disjunction (as proposed) or
+   conjunction of all active controls? Disjunction means "any leave_policy enables it globally" while
    conjunction means "all must agree."
 
-3. **Interaction Priority**: Should explicit `leave_policy::automatic` arenas respect the global
+2. **Interaction Priority**: Should explicit `leave_policy::automatic` arenas respect the global
    setting, or should only truly "default" arenas be affected?
 
-4. **Feature Macro Dependency**: Should this feature require `TBB_PREVIEW_PARALLEL_PHASE` or have
+3. **Feature Macro Dependency**: Should this feature require `TBB_PREVIEW_PARALLEL_PHASE` or have
    its own independent macro?
