@@ -14,6 +14,48 @@
 * limitations under the License.
 *******************************************************************************/-->
 
+
+# oneTBB 2022.3 Release Notes
+
+## :rocket: Preview Features
+- Introduced API for setting dynamic task dependencies in task_group. This allows successor tasks to execute only after all their predecessors have completed.
+
+
+## :tada: New Features
+- Extended task_arena with API support for enqueuing functions into a task_group and waiting for the task_group to complete.
+- Introduced API for setting and getting the assertion handler. This allows applications to set their own assertion handling functions.
+
+
+## :rotating_light: Known Limitations
+- The ``oneapi::tbb::info`` namespace interfaces might unexpectedly change the process affinity mask on Windows* OS systems (see https://github.com/open-mpi/hwloc/issues/366 for details) when using hwloc version lower than 2.5.
+- Using a hwloc version other than 1.11, 2.0, or 2.5 may cause an undefined behavior on Windows OS. See https://github.com/open-mpi/hwloc/issues/477 for details.
+- The NUMA topology may be detected incorrectly on Windows* OS machines where the number of NUMA node threads exceeds the size of 1 processor group.
+- On Windows OS on ARM64*, when compiling an application using oneTBB with the Microsoft* Compiler, the compiler issues a warning C4324 that a structure was padded due to the alignment specifier. Consider suppressing the warning by specifying /wd4324 to the compiler command line.
+- C++ exception handling mechanism on Windows* OS on ARM64* might corrupt memory if an exception is thrown from any oneTBB parallel algorithm (see Windows* OS on ARM64* compiler issue: https://developercommunity.visualstudio.com/t/ARM64-incorrect-stack-unwinding-for-alig/1544293.
+- When CPU resource coordination is enabled by setting the TCM_ENABLE environment variable to 1, tasks from a lower-priority ``task_arena`` might be executed before tasks from a higher-priority ``task_arena``.
+- When CPU resource coordination is enabled, cgroups CPU quota and period limitations settings are ignored.
+- Using oneTBB on WASM* may cause applications to run in a single thread. See [Limitations of WASM Support](https://github.com/uxlfoundation/oneTBB/blob/master/WASM_Support.md#limitations).
+
+> **_NOTE:_**  To see known limitations that impact all versions of oneTBB, refer to [oneTBB Documentation](https://uxlfoundation.github.io/oneTBB/main/intro/limitations.html).
+
+
+## :hammer: Issues Fixed
+- Fixed overwrite_node and write_once_node to prevent premature trigger of continue_node successors.
+- Fixed keys duplication in concurrent_hash_map when the container is initialized using a pair of iterators, or std::initializer_list (https://github.com/uxlfoundation/oneTBB/issues/1764).
+- Improved support for profiling tools by allowing the oneTBB notifications to be ignored by tools and by better timing of task completion notifications.
+- Fixed incorrect deallocation of tasks in task_group (https://github.com/uxlfoundation/oneTBB/issues/1834).
+- Improved performance scalability of spin_mutex::lock, spin_mutex::try_lock and queuing_mutex::scoped_lock::try_acquire.
+- Fixed potential oversubscription issue by respecting CPU quota and period limitations provided via cgroups settings on Linux* (https://github.com/uxlfoundation/oneTBB/issues/190, https://github.com/uxlfoundation/oneTBB/issues/1760).
+
+## :octocat: Open-Source Contributions Integrated
+- Fixed CMake build issue on some architectures. Contributed by lmarz (https://github.com/uxlfoundation/oneTBB/pull/1768).
+- Fixed stack size assertion failure when running with ASAN. Contributed by omegacoleman (https://github.com/uxlfoundation/oneTBB/pull/1782).
+- Improved Bazel support on non-x86 architectures. Contributed by Caleb Zulawski (https://github.com/uxlfoundation/oneTBB/pull/1790).
+- Fixed potential crash caused by nullptr dereference for the tag_matching join_node. Contributed by Federico Ficarelli (https://github.com/uxlfoundation/oneTBB/pull/1800).
+- Fixed false positive GCC* warnings. Contributed by Zizheng Guo  (https://github.com/uxlfoundation/oneTBB/pull/1752).
+- Fixed ASAN detection for Clang*. Contributed by Federico Ficarelli (https://github.com/uxlfoundation/oneTBB/pull/1842).
+
+
 # oneTBB 2022.2 Release Notes
 
 ## :tada: New Features
