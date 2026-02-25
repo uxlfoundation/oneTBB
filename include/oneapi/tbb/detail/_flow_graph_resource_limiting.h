@@ -43,10 +43,6 @@ class request_id {
     time_point    m_time_point;
     std::uint64_t m_unique_integer;
 public:
-    // request_id()
-    //     : m_time_point(clock_type::now())
-    // {}
-
     request_id(const std::uint64_t& unique_integer)
         : m_time_point(clock_type::now())
         , m_unique_integer(unique_integer)
@@ -445,7 +441,7 @@ public:
         return consumers_tuple_type({std::get<Idx>(resource_providers), this}...);
     }
 
-    void operator()(const Input& input, OutputPorts& ports) noexcept override {
+    void operator()(const Input& input, OutputPorts& ports) override {
         auto& res = form_request(input, ports);
         report_pressure(0); // TODO: report real pressure
         request_resources(res.first);
@@ -497,7 +493,7 @@ public:
     void remove_request(request_id id) {
         tbb::spin_mutex::scoped_lock lock(m_mutex);
         std::size_t num_removed = m_requests.erase(id);
-        this->graph_reference().release_wait(); // TODO: is it needed
+        this->graph_reference().release_wait(); // TODO: is it needed?
         __TBB_ASSERT(num_removed == 1, "Removing unregistered request");
         tbb::detail::suppress_unused_warning(num_removed);
     }
