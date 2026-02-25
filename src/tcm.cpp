@@ -441,9 +441,9 @@ void invoke_callbacks(const update_callbacks_t& callbacks) {
         const callback_args_t& args = n.second;
 
         __TCM_ASSERT(callback, "Incorrect invariant: missing callback is in the invocation list.");
-        auto result = callback(args.ph, args.callback_arg, args.reason);
+        callback(args.ph, args.callback_arg, args.reason);
 
-        __TCM_ASSERT_EX(result == TCM_RESULT_SUCCESS, "Unsuccessful callback invocation.");
+        // Consider implementing special handling for various return codes from callback function.
     }
 }
 
