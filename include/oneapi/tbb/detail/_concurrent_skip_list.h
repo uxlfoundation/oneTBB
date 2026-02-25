@@ -302,8 +302,12 @@ protected:
 
     using random_level_generator_type = typename container_traits::random_level_generator_type;
     using thread_data_type = skip_list_thread_data<random_level_generator_type, size_type>;
+#if __TBB_RESUMABLE_TASKS
     using ets_type = tbb::enumerable_thread_specific<thread_data_type, cache_aligned_allocator<thread_data_type>,
                                                      ets_suspend_aware>;
+#else
+    using ets_type = tbb::enumerable_thread_specific<thread_data_type>;
+#endif
 
     using node_ptr = list_node_type*;
 
