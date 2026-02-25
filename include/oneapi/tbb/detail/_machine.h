@@ -60,13 +60,13 @@ inline namespace d0 {
 //--------------------------------------------------------------------------------------------------
 
 #if __TBB_GLIBCXX_THIS_THREAD_YIELD_BROKEN
-static inline void yield() {
+inline void yield() {
     int err = sched_yield();
     __TBB_ASSERT_EX(err == 0, "sched_yield has failed");
 }
 #elif __TBBMALLOC_BUILD && _WIN32
 // Use Windows API for yield in tbbmalloc to avoid dependency on C++ runtime with some implementations.
-static inline void yield() {
+inline void yield() {
     SwitchToThread();
 }
 #else
@@ -77,7 +77,7 @@ using std::this_thread::yield;
 // atomic_fence_seq_cst implementation
 //--------------------------------------------------------------------------------------------------
 
-static inline void atomic_fence_seq_cst() {
+inline void atomic_fence_seq_cst() {
 #if (__TBB_x86_64 || __TBB_x86_32) && defined(__GNUC__) && __GNUC__ < 11
     unsigned char dummy = 0u;
     __asm__ __volatile__ ("lock; notb %0" : "+m" (dummy) :: "memory");
@@ -90,7 +90,7 @@ static inline void atomic_fence_seq_cst() {
 // Pause implementation
 //--------------------------------------------------------------------------------------------------
 
-static inline void machine_pause(int32_t delay) {
+inline void machine_pause(int32_t delay) {
 #if __TBB_x86_64 || __TBB_x86_32
     while (delay-- > 0) { _mm_pause(); }
 #elif __ARM_ARCH_7A__ || __aarch64__
@@ -115,7 +115,7 @@ namespace gnu_builtins {
 #elif defined(_MSC_VER)
 #pragma intrinsic(__TBB_W(_BitScanReverse))
 namespace msvc_intrinsics {
-    static inline uintptr_t bit_scan_reverse(uintptr_t i) {
+    inline uintptr_t bit_scan_reverse(uintptr_t i) {
         unsigned long j;
         __TBB_W(_BitScanReverse)( &j, i );
         return j;
@@ -129,7 +129,7 @@ constexpr std::uintptr_t number_of_bits() {
 }
 
 // logarithm is the index of the most significant non-zero bit
-static inline uintptr_t machine_log2(uintptr_t x) {
+inline uintptr_t machine_log2(uintptr_t x) {
 #if defined(__GNUC__) || defined(__clang__)
     // If P is a power of 2 and x<P, then (P-1)-x == (P-1) XOR x
     return (number_of_bits<decltype(x)>() - 1) ^ gnu_builtins::clz(x);

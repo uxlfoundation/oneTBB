@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -112,9 +112,9 @@ private:
 
 //! Finalization options.
 //! Outside of the class to avoid extensive friendship.
-static constexpr std::intptr_t release_nothrowing = 0;
-static constexpr std::intptr_t finalize_nothrowing = 1;
-static constexpr std::intptr_t finalize_throwing = 2;
+__TBB_GLOBAL_VAR constexpr std::intptr_t release_nothrowing = 0;
+__TBB_GLOBAL_VAR constexpr std::intptr_t finalize_nothrowing = 1;
+__TBB_GLOBAL_VAR constexpr std::intptr_t finalize_throwing = 2;
 
 //! User side wrapper for a task scheduler lifetime control object
 class task_scheduler_handle {
