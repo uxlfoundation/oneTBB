@@ -344,12 +344,20 @@ The default behavior could be changed to fast leave, making delayed leave opt-in
 
 ## Open Questions
 
-1. **Selection Rule**: Should the active value be the logical disjunction (as proposed) or
-   conjunction of all active controls? Disjunction means "any leave_policy enables it globally" while
-   conjunction means "all must agree."
+1. **Naming**: Should it convey "default override" semantics?
 
-2. **Interaction Priority**: Should explicit `leave_policy::automatic` arenas respect the global
+2. **Selection Rule**
+
+   | | **Logical Disjunction** (current proposal) | **Last-Set Wins** | **Default at Arena Creation** | **First-Registered Wins** | **Min / Max** |
+   |---|---|---|---|---|---|
+   | **Description** | Any active `fast` instance enables globally | Most recently created instance decides | Sets default for newly created arenas; no mid-flight change for running arenas | First registered instance controls; later instances ignored | Min or max ordering across all instances |
+   | **Precedent** | `terminate_on_exception` | None | `thread_stack_size` | None | `max_allowed_parallelism` (uses minimum) |
+   | **Dynamically affects existing arenas?** | Yes | Yes | No | Yes | Yes |
+   | **Behavior when `global_control` is destroyed** | Effect removed | Effect removed | "Sticks" to arena | Reverts to default; later instances have no retroactive effect | Effect removed |
+   | **Concurrent multi-instance behavior** | Predictable | Unpredictable | Predictable | Predictable | Predictable |
+
+3. **Interaction Priority**: Should explicit `leave_policy::automatic` arenas respect the global
    setting, or should only truly "default" arenas be affected?
 
-3. **Feature Macro Dependency**: Should this feature require `TBB_PREVIEW_PARALLEL_PHASE` or have
+4. **Feature Macro Dependency**: Should this feature require `TBB_PREVIEW_PARALLEL_PHASE` or have
    its own independent macro?
