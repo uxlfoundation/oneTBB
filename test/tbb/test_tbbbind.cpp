@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 //! \brief Test for TBBbind library, covers [configuration.debug_features]
 
 #define TEST_CUSTOM_ASSERTION_HANDLER_ENABLED 1
-#if _WIN32 || _WIN64
+#if !defined(_CRT_SECURE_NO_WARNINGS) && (_WIN32 || _WIN64)
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 

@@ -5,6 +5,7 @@ The project uses CMake* build configuration.
 The following controls are available during the configure stage:
 ```
 TBB_TEST:BOOL - Enable testing (ON by default)
+TBB_EXAMPLES:BOOL - Enable build of TBB examples (OFF by default)
 TBB_STRICT:BOOL - Treat compiler warnings as errors (ON by default)
 TBB_SANITIZE:STRING - Sanitizer parameter, passed to compiler/linker
 TBB_SIGNTOOL:FILEPATH - Tool for digital signing, used in post-install step for libraries if provided.
@@ -25,6 +26,7 @@ TBB_BUILD_APPLE_FRAMEWORKS - Enable the Apple* frameworks instead of dylibs, onl
 TBB_FILE_TRIM - Enable __FILE__ trim, replace a build-time full path with a relative path in the debug info and macro __FILE__; use it to make
            reproducible location-independent builds (ON by default)
 TBB_VERIFY_DEPENDENCY_SIGNATURE - On Windows* enable verification of signatures for dependencies linked at run-time. (ON by default)
+TBB_FUZZ_TESTING:BOOL - Enable fuzz testing (OFF by default)
 ```
 
 ## Configure, Build, and Test
@@ -154,8 +156,8 @@ cmake -DTBB_WINDOWS_DRIVER=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded ..
 #### Example
 
 ```bash
-cmake -DCMAKE_CXX_COMPILER=icpc -DCMAKE_C_COMPILER=icc -DTBB_TEST=off -DCMAKE_HWLOC_1_11_LIBRARY_PATH=<path_to_hwloc_library_file>/libhwloc.so.15
--DCMAKE_HWLOC_1_11_INCLUDE_PATH=<path_to_hwloc_header_directory> -DCMAKE_INSTALL_PREFIX=<path_to_install_oneTBB>/oneTBB_install ..
+cmake -DCMAKE_CXX_COMPILER=icpx -DCMAKE_C_COMPILER=icx -DTBB_TEST=off -DCMAKE_HWLOC_2_5_LIBRARY_PATH=<path_to_hwloc_library_file>/libhwloc.so.15
+-DCMAKE_HWLOC_2_5_INCLUDE_PATH=<path_to_hwloc_header_directory> -DCMAKE_INSTALL_PREFIX=<path_to_install_oneTBB>/oneTBB_install ..
 make -j8 && make install
 ```
 

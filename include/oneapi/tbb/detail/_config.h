@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -540,10 +540,6 @@
 
 #if TBB_PREVIEW_PARALLEL_PHASE || __TBB_BUILD
 #define __TBB_PREVIEW_PARALLEL_PHASE 1
-#endif
-
-#if TBB_PREVIEW_BLOCKED_ND_RANGE_DEDUCTION_GUIDES
-#define __TBB_PREVIEW_BLOCKED_ND_RANGE_DEDUCTION_GUIDES 1
 #endif
 
 #if !__TBB_DISABLE_SPEC_EXTENSIONS
