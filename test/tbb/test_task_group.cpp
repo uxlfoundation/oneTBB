@@ -2467,6 +2467,7 @@ void test_get_status_of() {
             tbb::task_group::transfer_this_task_completion_to(receiver);
             CHECK_MESSAGE(tg.get_status_of(sender_comp_handle) == tbb::task_group_status::not_complete,
                         "Incorrect sender task_group_status returned");
+            tg.run(std::move(receiver));
         });
 
         sender_comp_handle = sender;
@@ -2476,8 +2477,7 @@ void test_get_status_of() {
         CHECK_MESSAGE(tg.get_status_of(comp_handle) == tbb::task_group_status::not_complete,
                     "Incorrect receiver task_group_status returned");
 
-        tg.run(std::move(sender));
-        tg.run_and_wait(std::move(receiver));
+        tg.run_and_wait(std::move(sender));
 
         CHECK_MESSAGE(tg.get_status_of(sender_comp_handle) == tbb::task_group_status::task_complete,
                     "Incorrect sender task_group_status returned");
