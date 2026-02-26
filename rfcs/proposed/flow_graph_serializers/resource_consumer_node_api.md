@@ -83,8 +83,8 @@ or several resource handle instances.
 For some resource types, the `ResourceHandle` is the resource itself, e.g. for the resource and a handle of type `int` or `float`:
 
 ```cpp
-oneapi::tbb::flow::resource_bag<int> int_bag(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
-oneapi::tbb::flow::resource_bag<float> float_bag(11.f);
+oneapi::tbb::flow::resource_bag<int> int_bag{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+oneapi::tbb::flow::resource_bag<float> float_bag{11.f};
 ```
 
 The `int_bag` object contains 10 resources of type `int`, and `float_bag` contains a single resource of type `float`.
@@ -246,7 +246,7 @@ Destroys the `resource_limited_node` object.
 bool try_put(const Input& v);
 ```
 
-Provides the node with the incoming message `v`. Once the concurrency limit allows and the access to all required resources is granted,
+Passes the incoming message `v` to the node. Once the concurrency limit allows and the access to all required resources is granted,
 the node executes the user-provided body on `v`.
 
 *Returns*: `true`.
@@ -464,7 +464,8 @@ think_nodes.reserve(num_philosophers);
 eat_nodes.reserve(num_philosophers);
 
 for (std::size_t i = 0; i < num_philosophers; ++i) {
-    chopsticks.emplace_back(chopstick{});
+    auto init = {chopstick{}};
+    chopsticks.emplace_back(init);
 }
 
 for (std::size_t i = 0; i < num_philosophers; ++i) {
