@@ -2483,6 +2483,7 @@ void test_get_status_of() {
                     "Incorrect sender task_group_status returned");
         CHECK_MESSAGE(tg.get_status_of(comp_handle) == tbb::task_group_status::task_complete,
                     "Incorrect receiver task_group_status returned");
+        CHECK_MESSAGE(placeholder == 3, "Required task bodies did not run");
     }
 }
 
