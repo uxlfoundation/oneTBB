@@ -27,9 +27,12 @@ module;
 #endif
 
 #define __TBB_NO_IMPLICIT_LINKAGE 1
+#define __TBB_TEST_MODULE_EXPORT 1
+
+#define CHECK(x) do { if (!(x)) { std::terminate(); } } while (false)
+#define CHECK_MESSAGE(x, y) CHECK(x);
 
 #include "common/config.h"
-#include "common/test.h"
 #include "oneapi/tbb/detail/_config.h"
 #include "tbb/tbb.h"
 
@@ -41,5 +44,4 @@ module;
 
 export module tbb_header_test;
 
-#define __TBB_TEST_MODULE_EXPORT 1
 #include "test_tbb_header.cpp"
