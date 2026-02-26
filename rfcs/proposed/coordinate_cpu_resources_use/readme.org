@@ -99,37 +99,29 @@ Similarly to the [[Building][Building section]], TCM tests are built and run onl
 In particular, oneTBB CI is to be extended with TCM build and test jobs, including integration tests
 of TCM into oneTBB. This will help to ensure maximum compatibility and testing coverage.
 ** Versioning
-TCM will follow its own [[https://semver.org/][semantic versioning]] scheme, separately from the oneTBB, and is going to have
-three types of version:
-1. /Interface/
+TCM will have its own version separately from the oneTBB.
 
-   Describes the semantical compatibility of the library interface. Change in this number means that
-   there was an update to the library interface. Depending on the nature of the changes it may be a
-   backward compatible change or a backward incompatible change. For backward compatible changes the
-   minor value is updated. Such changes include, for example, adding a new API or returning by an
-   existing public function more information without changing its layout compared to what the
-   function already provides. The backward incompatible changes require client code to reconsider
-   the usage of the API, which usually leads to changes in the source code and its recompilation.
-   Such changes update the major number.
+The TCM version would consist out of three numbers: =MAJOR=, =MINOR=, and =PATCH=. These numbers are
+changed in accordance with the rules outlined in [[https://semver.org/spec/v2.0.0.html][semantic versioning]] scheme.
 
-   The proposed formation of the interface version is $1000 * major\_number + 10 * minor\_number$.
+In particular:
+- =MAJOR= version number is increased if there were backward incompatible changes made. Such changes
+  include: renaming of a public function, changing layout of a public data structure, requiring more
+  or providing less information by a public function.
 
-2. /Library/
+- =MINOR= version number is increased if the changes were made only in a backward compatible manner.
+  Examples are: adding a new public function, appending new field to the existing public data
+  structure, requiring less or providing more information by a public function.
 
-   This number reflects the version of the library. It consists of three numbers: =major=, =minor=,
-   and =patch=, and usually follows the changes made to the interface version. However, there can be
-   internal only changes to the library that neither affect the programming nor the binary
-   interfaces. For such changes, only the =patch= number is increased, which is not reflected in the
-   interface version.
+- =PATCH= version number is increased if there were changes that alter only internal functionality
+  of the library that do not break compatibility of the code compiled with the previous version of
+  TCM. Examples are: a bug fix done in a backward compatible manner.
 
-3. /Package/
-
-   This type of version is used to communicate the version of the package in which certain TCM
-   binary is contained. Having it identical to the library version is convenient and should be
-   considered every time a TCM package is made. However, they can also be out-of-sync as there might
-   be situations when packages are remade to include additional or updated information that exists
-   besides TCM binary. In this case, the =patch= version of the package can be changed to
-   distinguish between various packages with identical TCM library version inside.
+As a single number, the TCM version would be built using the formula: $10000 * major + 100 * minor +
+patch$, and made available via public =tcmGetVersion= function for the client code to determine what
+version of TCM library is being used in runtime. Additionally, the same single TCM version number
+would be defined as the =TCM_VERSION= macro in TCM header files (a.k.a. TCM SDK) for the client code
+to determine with what version of TCM it was compiled.
 ** Distribution
 The TCM binary packages are to be distributed separately from oneTBB packages, but available for
 download along with them through the same distribution channels.
@@ -150,7 +142,7 @@ You are welcome to try the TCM out, submit issues and/or patches, and share your
 TCM documentation will follow the repository merging and be available under the =doc= subdirectory
 inside the TCM source tree.
 * Open Questions
-1. Should oneTBB packages be provided in both variants: one that include TCM binaries, and the other
-   that don't?
+1. Should oneTBB assets listed in the [[https://github.com/uxlfoundation/oneTBB/releases][releases GitHub section]] be provided in both variants: one that
+   include TCM binaries, and the other that don't?
 2. When distributing oneTBB source packages, should TCM sources be distributed separately as well?
 3. Should build of TCM be ON or OFF by default?
