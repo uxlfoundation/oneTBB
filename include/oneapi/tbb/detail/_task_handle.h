@@ -229,7 +229,7 @@ public:
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 inline task_dynamic_state* dynamic_state_task::get_dynamic_state() {
-#if __TBB_USE_OPTIONAL_RTTI && TBB_USE_DEBUG
+#if __TBB_USE_OPTIONAL_RTTI
     __TBB_ASSERT(dynamic_cast<task_handle_task*>(this) != nullptr, "get_dynamic_state was called for a stack task");
 #endif
     task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_acquire);
