@@ -2404,10 +2404,118 @@ void test_single_task_wait(bool cancellation) {
     test_single_task_wait_base(cancellation, wait_for_function_tag::arena_wait_for);
 }
 
+void test_get_status_of_with_transferring(bool cancellation) {
+    tbb::task_group tg;
+
+    std::size_t placeholder = 0;
+
+    tbb::task_completion_handle sender_comp_handle;
+    tbb::task_completion_handle receiver_comp_handle;
+
+    tbb::task_handle receiver = tg.defer([&] {
+        CHECK_MESSAGE(!cancellation, "Receiver task should not be called when task_group is cancelled");
+        ++placeholder;
+        CHECK_MESSAGE(tg.get_status_of(sender_comp_handle) == tbb::task_group_status::not_complete,
+                      "Incorrect status of sender completion handle");
+        CHECK_MESSAGE(tg.get_status_of(receiver_comp_handle) == tbb::task_group_status::not_complete,
+                      "Incorrect status of receiver completion handle");
+    });
+    receiver_comp_handle = receiver;
+
+    tbb::task_handle sender = tg.defer([&] {
+        ++placeholder;
+        CHECK_MESSAGE(tg.get_status_of(sender_comp_handle) == tbb::task_group_status::not_complete,
+                      "Incorrect status of sender completion handle");
+        CHECK_MESSAGE(tg.get_status_of(receiver_comp_handle) == tbb::task_group_status::not_complete,
+                      "Incorrect status of receiver completion handle");
+
+        tbb::task_group::transfer_this_task_completion_to(receiver);
+
+        CHECK_MESSAGE(tg.get_status_of(sender_comp_handle) == tbb::task_group_status::not_complete,
+                      "Incorrect status of sender completion handle");
+        CHECK_MESSAGE(tg.get_status_of(receiver_comp_handle) == tbb::task_group_status::not_complete,
+                      "Incorrect status of receiver completion handle");
+
+        if (cancellation) tg.cancel();
+        tg.run(std::move(receiver));
+    });
+    
+    sender_comp_handle = sender;
+
+    CHECK_MESSAGE(tg.get_status_of(sender_comp_handle) == tbb::task_group_status::not_complete,
+                      "Incorrect status of sender completion handle");
+    CHECK_MESSAGE(tg.get_status_of(receiver_comp_handle) == tbb::task_group_status::not_complete,
+                    "Incorrect status of receiver completion handle");
+
+    tg.run_and_wait(std::move(sender));
+
+    tbb::task_group_status expected_status = cancellation ? tbb::task_group_status::canceled
+                                                          : tbb::task_group_status::task_complete;
+    std::size_t expected_executed_tasks_count = cancellation ? 1 : 2;
+
+    CHECK_MESSAGE(tg.get_status_of(sender_comp_handle) == expected_status,
+                      "Incorrect status of sender completion handle");
+    CHECK_MESSAGE(tg.get_status_of(receiver_comp_handle) == expected_status,
+                    "Incorrect status of receiver completion handle");
+    CHECK_MESSAGE(placeholder == expected_executed_tasks_count, "Required task bodies did not run");
+}
+
+void test_get_status_of() {
+    std::size_t placeholder = 0;
+    tbb::task_group* tg_ptr = nullptr;
+
+    tbb::task_completion_handle comp_handle;
+    auto task_body = [&] {
+        CHECK(tg_ptr != nullptr);
+        CHECK_MESSAGE(tg_ptr->get_status_of(comp_handle) == tbb::task_group_status::not_complete,
+                    "Incorrect task_group_status returned");
+        ++placeholder;
+    };
+
+    {
+        tbb::task_group tg;
+        tg_ptr = &tg;
+
+        tbb::task_handle task = tg.defer(task_body);
+
+        comp_handle = task;
+        
+        CHECK_MESSAGE(tg.get_status_of(comp_handle) == tbb::task_group_status::not_complete,
+                    "Incorrect task_group_status returned");
+        tg.run_and_wait(std::move(task));
+
+        CHECK_MESSAGE(tg.get_status_of(comp_handle) == tbb::task_group_status::task_complete,
+                    "Incorrect task_group_status returned");
+        CHECK_MESSAGE(placeholder == 1, "Task body was not executed");
+    }
+    {
+        tbb::task_group tg;
+        tg_ptr = &tg;
+        
+        tbb::task_handle task = tg.defer(task_body);
+        comp_handle = task;
+        tg.cancel();
+
+        CHECK_MESSAGE(tg.get_status_of(comp_handle) == tbb::task_group_status::not_complete,
+                      "Incorrect task_group_status returned");
+        tg.run_and_wait(std::move(task));
+
+        CHECK_MESSAGE(tg.get_status_of(comp_handle) == tbb::task_group_status::canceled,
+                     "Incorrect task_group_status returned");
+        CHECK_MESSAGE(placeholder == 1, "Canceled task body was executed");
+    }
+    test_get_status_of_with_transferring(/*cancellation = */false);
+    test_get_status_of_with_transferring(/*cancellation = */true);
+}
+
 //! \brief \ref error_guessing
 TEST_CASE("test single task wait") {
     test_single_task_wait(/*cancel = */false);
     test_single_task_wait(/*cancel = */true);
+}
+
+TEST_CASE("test task_group::get_status_of") {
+    test_get_status_of();
 }
 #endif
 

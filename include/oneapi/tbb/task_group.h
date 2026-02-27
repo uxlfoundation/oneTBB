@@ -463,15 +463,6 @@ inline bool is_current_task_group_canceling() {
 
 namespace d2 {
 
-enum task_group_status {
-    not_complete,
-    complete,
-    canceled
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    , task_complete
-#endif
-};
-
 class task_group;
 class structured_task_group;
 #if TBB_PREVIEW_ISOLATED_TASK_GROUP
@@ -684,6 +675,12 @@ public:
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
     task_group_status run_and_wait_for_task(d2::task_handle&& h) {
         return internal_run_and_wait_for_task(std::move(h));
+    }
+
+    task_group_status get_status_of(task_completion_handle& comp_handle) {
+        __TBB_ASSERT(comp_handle, "Cannot get status of an empty task_completion_handle");
+        task_dynamic_state* state = task_completion_handle_accessor::get_task_dynamic_state(comp_handle);
+        return state->get_task_status();
     }
 
     static void set_task_order(d2::task_handle& pred, d2::task_handle& succ) {
