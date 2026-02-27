@@ -9,7 +9,7 @@ Note: This document is a sub-RFC for the [Resource-limited Nodes RFC](./README.m
   * 1.2 [Proposed Design](#proposed-design)
   * 1.3 [API Details](#api-details)
   * 1.4 [API Specification](#api-specification)
-    * 1.4.1 [`oneapi::tbb::flow::resource_bag` Class](#oneapitbbflowresource_bag-class)
+    * 1.4.1 [`oneapi::tbb::flow::resource_limiter` Class](#oneapitbbflowresource_limiter-class)
     * 1.4.2 [`ResourceLimitedBody` Named Requirements](#resourcelimitedbody-named-requirements)
     * 1.4.3 [`oneapi::tbb::flow::resource_limited_node` Class](#oneapitbbflowresource_limited_node-class)
 * 2 [API to Support Polymorphic Providers](#api-to-support-polymorphic-providers)
@@ -46,10 +46,10 @@ namespace tbb {
 namespace flow {
 
 template <typename ResourceHandle>
-class resource_bag {
+class resource_limiter {
     using resource_handle_type = ResourceHandle;
 
-    resource_bag(std::initializer_list<ResourceHandle> instances);
+    resource_limiter(std::initializer_list<ResourceHandle> instances);
 };
 
 template <typename Input, typename OutputTuple>
@@ -76,18 +76,18 @@ public:
 
 ### API Details
 
-The class `oneapi::tbb::flow::resource_bag<ResourceHandle>` is a *Provider* of the *Resource* represented by
+The class `oneapi::tbb::flow::resource_limiter<ResourceHandle>` is a *Provider* of the *Resource* represented by
 the `ResourceHandle` template argument. It can be viewed an unspecified container type holding one
 or several resource handle instances.
 
 For some resource types, the `ResourceHandle` is the resource itself, e.g. for the resource and a handle of type `int` or `float`:
 
 ```cpp
-oneapi::tbb::flow::resource_bag<int> int_bag{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-oneapi::tbb::flow::resource_bag<float> float_bag{11.f};
+oneapi::tbb::flow::resource_limiter<int> int_holder{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+oneapi::tbb::flow::resource_limiter<float> float_holder{11.f};
 ```
 
-The `int_bag` object contains 10 resources of type `int`, and `float_bag` contains a single resource of type `float`.
+The `int_holder` object contains 10 resources of type `int`, and `float_holder` contains a single resource of type `float`.
 
 For other resource types, the `ResourceHandle` may represent a lightweight entity used to access the resource. For example:
 
@@ -95,7 +95,7 @@ For other resource types, the `ResourceHandle` may represent a lightweight entit
 HeavyResourceOutsideGraphScope resource;
 
 using handle_type = HeavyResourceOutsideGraphScope*;
-oneapi::tbb::flow::resource_bag<handle_type> provider(&resource);
+oneapi::tbb::flow::resource_limiter<handle_type> provider(&resource);
 ```
 
 All the resource handles managed by the provider are considered equivalent, and the order in which the access to resources
@@ -121,19 +121,19 @@ using output = std::tuple<double>;
 
 auto node_body = [](int input,         // input message
                     auto& ports,       // output ports tuple, similar to multifunction_node
-                    int& i_resource,   // reference to integral resource from int_bag
-                    float& f_resource // reference to float resource from float_bag
+                    int& i_resource,   // reference to integral resource from int_holder
+                    float& f_resource // reference to float resource from float_holder
                     )
     {
         std::get<0>(ports).try_put(output);
     };
 
 oneapi::tbb::flow::resource_limited_node<input, output> node(g, oneapi::tbb::flow::unlimited,
-    std::tie(int_bag, float_bag), // tuple of references to two resources needed by the node
+    std::tie(int_holder, float_holder), // tuple of references to two resources needed by the node
     node_body);
 ```
 
-When the resource is used by one of the nodes in the Flow Graph, the `resource_bag` would not grant access to it to any other node.
+When the resource is used by one of the nodes in the Flow Graph, the `resource_limiter` would not grant access to it to any other node.
 
 If access to one or several resources cannot be granted immediately, the node and the provider utilize the unspecified *Protocol*, which defines
 how and when access will be granted to each node that requests it. The concurrency held by the currently processed input message is not 
@@ -141,11 +141,11 @@ released until all necessary resource accesses are granted and the body is execu
 
 ### API Specification
 
-#### `oneapi::tbb::flow::resource_bag` Class
+#### `oneapi::tbb::flow::resource_limiter` Class
 
 ```cpp
 template <typename ResourceHandle>
-class resource_bag;
+class resource_limiter;
 ```
 
 A provider of one or several resources represented by the `ResourceHandle` type.
@@ -160,7 +160,7 @@ using resource_handle_type = ResourceHandle;
 An alias to the resource handle type used by the provider.
 
 ```cpp
-resource_bag(std::initializer_list<ResourceHandle> instances);
+resource_limiter(std::initializer_list<ResourceHandle> instances);
 ```
 
 Constructs a resource provider containing resources represented by `instances`.
@@ -216,7 +216,7 @@ If the state held within a body object must be inspected from outside the node, 
 [`copy_body` function](https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/flow_graph/copy_body_func) can be used to obtain an
 updated body.
 
-The type `ResourceProvider` and each type `RP` in `ResourceProviders` must be specializations of `oneapi::tbb::flow::resource_bag`.
+The type `ResourceProvider` and each type `RP` in `ResourceProviders` must be specializations of `oneapi::tbb::flow::resource_limiter`.
 
 The type `Body` must meet the requirements of [`ResourceLimitedNodeBody`](#resourcelimitedbody-named-requirements).
 
@@ -268,14 +268,14 @@ Requirements:
 
 * The `Input` type must be the same as the `Input` template type argument of the `resource_limited_node` instance into which the `Body` object is passed during construction.
 * The `OutputPortsType` must be the same as the `output_ports_type` member type of the `resource_limited_node` instance into which the `Body` object is passed during construction.
-* `ResourceHandle1`, ..., `ResourceHandleN` must be the same as `resource_bag::resource_handle_type` member type for each `ResourceProvider` used by the `resource_limited_node`
+* `ResourceHandle1`, ..., `ResourceHandleN` must be the same as `resource_limiter::resource_handle_type` member type for each `ResourceProvider` used by the `resource_limited_node`
 instance into which the `Body` object is passed during construction.
 
 Performs an operation on `v`. It may call `try_put` on zero or more of the output ports and may call `try_put` on any output port multiple times.
 
 ## API to Support Polymorphic Providers
 
-The API proposed in this document assumes that the protocol between the *Provider* and the *Consumer* (the node) is undefined and that only the `oneapi::tbb::flow::resource_bag`
+The API proposed in this document assumes that the protocol between the *Provider* and the *Consumer* (the node) is undefined and that only the `oneapi::tbb::flow::resource_limiter`
 object may be used to construct the node. Hence, the types of the resource handles needed to execute the body are known at the time of the node's construction.
 
 Therefore, the references to the exact resource handles are provided as arguments to the node body.
@@ -365,9 +365,9 @@ using calibration_output = std::tuple<...>;     // Output types for calibration 
 
 graph g;
 
-resource_bag<ROOT_handle_type> root_provider{ROOT_handle};
-resource_bag<GENIE_handle_type> genie_provider{GENIE_handle};
-resource_bag<DB_handle_type> db_provider{DB_handle1, DB_handle2};
+resource_limiter<ROOT_handle_type> root_provider{ROOT_handle};
+resource_limiter<GENIE_handle_type> genie_provider{GENIE_handle};
+resource_limiter<DB_handle_type> db_provider{DB_handle1, DB_handle2};
 
 input_node<input_type> source(g, generate_input_body);
 
@@ -455,7 +455,7 @@ auto eat_body = [](continue_msg, auto& output_ports, chopstick, chopstick) {
     }
 };
 
-std::vector<resource_bag<chopstick>> chopsticks;
+std::vector<resource_limiter<chopstick>> chopsticks;
 std::vector<think_node_type*> think_nodes;
 std::vector<eat_node_type*> eat_nodes;
 
