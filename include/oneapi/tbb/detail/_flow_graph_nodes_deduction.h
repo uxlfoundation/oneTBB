@@ -89,8 +89,6 @@ struct unary_operator_types_extractor {
     template <typename B, typename Input, typename Output>
     static auto check_args(Output (B::*name)(Input) const & noexcept) -> body_types<Input, Output>;
 
-    // Fallback if no overload found
-    static void check_args(...);
 
     // Checking layer to force absence of operator() to be a SFINAE error
     template <typename B>
