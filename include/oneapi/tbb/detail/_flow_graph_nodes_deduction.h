@@ -42,7 +42,7 @@ private:
 };
 
 template <typename Body, typename = void>
-struct body_traits {.
+struct body_traits {
     // !std::is_same_v<Body, Body> is needed to create a dependent context for static_assert(false)
     static_assert(!std::is_same_v<Body, Body>, "Body signature does not match the named requirements");
 };
