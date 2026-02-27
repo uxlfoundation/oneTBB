@@ -40,7 +40,7 @@ struct body_types : declare_input_type<Input> {
 template <typename Body, typename = void>
 struct body_traits;
 
-// Body is a free function pointer
+// Body is a pointer to function
 template <typename Input, typename Output>
 struct body_traits<Output (*)(Input)> : body_types<Input, Output> {};
 
