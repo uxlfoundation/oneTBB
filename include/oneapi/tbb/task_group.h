@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -118,7 +118,7 @@ private:
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
         // TODO: complete_and_try_get_successor returns one ready successor task, others are spawned and cancelled by the scheduler
         // Should cancel() be called directly instead?
-        task_ptr = this->complete_and_try_get_successor();
+        task_ptr = this->cancel_and_try_get_successor();
 #endif
         this->destroy(&ed);
         return task_ptr;
@@ -463,12 +463,6 @@ inline bool is_current_task_group_canceling() {
 
 namespace d2 {
 
-enum task_group_status {
-    not_complete,
-    complete,
-    canceled
-};
-
 class task_group;
 class structured_task_group;
 #if TBB_PREVIEW_ISOLATED_TASK_GROUP
@@ -544,6 +538,24 @@ protected:
         return cancellation_status ? canceled : complete;
     }
 
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    task_group_status internal_run_and_wait_for_task(d2::task_handle&& h) {
+        __TBB_ASSERT(h != nullptr, "Attempt to schedule empty task_handle");
+        __TBB_ASSERT(&d2::task_handle_accessor::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
+        
+        task_handle_task* task_ptr = task_handle_accessor::release(h);
+        task_dynamic_state* state = task_ptr->get_dynamic_state();
+        bool was_canceled = false;
+
+        if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
+            was_canceled = state->wait_for_completion(context());
+        } else {
+            was_canceled = state->run_self_and_wait_for_completion(context());
+        }
+        return was_canceled ? task_group_status::canceled : task_group_status::task_complete;
+    }
+#endif
+
     template<typename F>
     d1::task* prepare_task(F&& f) {
         d1::small_object_allocator alloc{};
@@ -605,6 +617,15 @@ public:
         return cancellation_status ? canceled : complete;
     }
 
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    task_group_status wait_for_task(task_completion_handle& comp_handle) {
+        __TBB_ASSERT(comp_handle, "Attempt to wait for completion of empty handle");
+        task_dynamic_state* state = task_completion_handle_accessor::get_task_dynamic_state(comp_handle);
+        bool was_canceled = state->wait_for_completion(context());
+        return was_canceled ? task_group_status::canceled : task_group_status::task_complete;
+    }
+#endif
+
     void cancel() {
         context().cancel_group_execution();
     }
@@ -652,6 +673,16 @@ public:
     }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    task_group_status run_and_wait_for_task(d2::task_handle&& h) {
+        return internal_run_and_wait_for_task(std::move(h));
+    }
+
+    task_group_status get_status_of(task_completion_handle& comp_handle) {
+        __TBB_ASSERT(comp_handle, "Cannot get status of an empty task_completion_handle");
+        task_dynamic_state* state = task_completion_handle_accessor::get_task_dynamic_state(comp_handle);
+        return state->get_task_status();
+    }
+
     static void set_task_order(d2::task_handle& pred, d2::task_handle& succ) {
         __TBB_ASSERT(pred != nullptr, "empty predecessor handle is not allowed for set_task_order");
         __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for set_task_order");
@@ -690,6 +721,23 @@ public:
     wait_delegate(task_group& a_group, task_group_status& tgs)
         : tg(a_group), status(tgs) {}
 };
+
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+class wait_completion_delegate : public d1::delegate_base {
+    bool operator()() const override {
+        task_dynamic_state* state = task_completion_handle_accessor::get_task_dynamic_state(comp_handle);
+        d1::task_group_context& ctx = state->get_task()->ctx();
+        status = state->wait_for_completion(ctx) ? task_group_status::canceled : task_group_status::task_complete;
+        return true;
+    }
+protected:
+    task_completion_handle& comp_handle;
+    task_group_status& status;
+public:
+    wait_completion_delegate(task_completion_handle& handle, task_group_status& ts)
+        : comp_handle(handle), status(ts) {}
+};
+#endif
 
 #if TBB_PREVIEW_ISOLATED_TASK_GROUP
 class spawn_delegate : public d1::delegate_base {
@@ -781,6 +829,7 @@ using detail::r1::missing_wait;
 using detail::d2::task_handle;
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 using detail::d2::task_completion_handle;
+using detail::d2::task_complete;
 #endif
 }
 
