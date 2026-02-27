@@ -24,17 +24,21 @@ namespace tbb {
 namespace detail {
 namespace d2 {
 
-template <typename Input>
-struct declare_input_type {
+template <typename Input, typename Output>
+struct body_types {
     using input_type = std::decay_t<Input>;
+    using output_type = std::decay_t<Output>;
 };
 
-template <>
-struct declare_input_type<d1::flow_control> {};
-
 template <typename Input, typename Output>
-struct body_types : declare_input_type<Input> {
-    using output_type = std::decay_t<Output>;
+struct checked_body_types : body_types<Input, Output> {
+private:
+    using base_type = body_types<Input, Output>;
+    using const_lvalue_ref_input_type = std::add_lvalue_reference_t<std::add_const_t<typename base_type::input_type>>;
+
+    static_assert(std::is_same_v<Input, typename base_type::input_type> ||
+                  std::is_same_v<Input, const_lvalue_ref_input_type>,
+                  "The node body can only accept input by value or by const lvalue reference");
 };
 
 template <typename Body, typename = void>
@@ -66,31 +70,30 @@ template <typename Body>
 struct unary_operator_types_extractor {
     // Overloads for const, noexcept and & qualified operator() with all possible combinations
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input)) -> body_types<Input, Output>;
+    static auto check_args(Output (B::*)(Input)) -> checked_body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*)(Input) noexcept) -> body_types<Input, Output>;
+    static auto check_args(Output (B::*)(Input) noexcept) -> checked_body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input) const) -> body_types<Input, Output>;
+    static auto check_args(Output (B::*)(Input) const) -> checked_body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input) &) -> body_types<Input, Output>;
+    static auto check_args(Output (B::*)(Input) &) -> checked_body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input) const noexcept) -> body_types<Input, Output>;
+    static auto check_args(Output (B::*)(Input) const noexcept) -> checked_body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input) const &) -> body_types<Input, Output>;
+    static auto check_args(Output (B::*)(Input) const &) -> checked_body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input) & noexcept) -> body_types<Input, Output>;
+    static auto check_args(Output (B::*)(Input) & noexcept) -> checked_body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input) const & noexcept) -> body_types<Input, Output>;
+    static auto check_args(Output (B::*)(Input) const & noexcept) -> checked_body_types<Input, Output>;
 
-
-    // Checking layer to force absence of operator() to be a SFINAE error
+    // Checking layer to force SFINAE in case of operator() absence
     template <typename B>
     static auto check_call_operator_presence(int) -> decltype(check_args(&B::operator()));
 
@@ -115,7 +118,7 @@ using output_type_of = typename body_traits<Body>::output_type;
 
 template <typename GraphOrSet, typename Body>
 input_node(GraphOrSet&&, Body)
-->input_node<output_type_of<Body>>;
+->input_node<std::invoke_result_t<Body, d1::flow_control&>>;
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 
@@ -176,12 +179,11 @@ template <typename Key>
 using join_key_t = typename join_key<Key>::type;
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
-template <typename Policy, typename... Predecessors>
+template <typename... Predecessors, typename Policy>
 join_node(const node_set<order::following, Predecessors...>&, Policy)
-->join_node<std::tuple<typename Predecessors::output_type...>,
-            Policy>;
+->join_node<std::tuple<typename Predecessors::output_type...>, Policy>;
 
-template <typename Policy, typename Successor, typename... Successors>
+template <typename Successor, typename... Successors, typename Policy>
 join_node(const node_set<order::preceding, Successor, Successors...>&, Policy)
 ->join_node<typename Successor::input_type, Policy>;
 
