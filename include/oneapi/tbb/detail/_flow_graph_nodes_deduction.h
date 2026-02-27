@@ -52,7 +52,7 @@ struct body_traits<Output (*)(Input) noexcept> : body_types<Input, Output> {};
 template <typename Input, typename Output>
 struct body_traits<Output Input::*> : body_types<Input, Output> {};
 
-// Body is a member function pointer
+// Body is a pointer to non-static member function
 template <typename Input, typename Output>
 struct body_traits<Output (Input::*)() const> : body_types<Input, Output> {};
 
