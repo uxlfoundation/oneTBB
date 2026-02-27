@@ -1,0 +1,918 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Working on the Assembly Line: parallel_pipeline &#8212; oneTBB  documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/sphinx-book-theme.css?v=3c74b3bc" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/scripts/sphinx-book-theme.js?v=fab101a9"></script>
+    <script src="../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'main/tbb_userguide/Working_on_the_Assembly_Line_pipeline';</script>
+    <script src="../../_static/custom.js?v=874f1a61"></script>
+    <link rel="icon" href="../../_static/favicons.png"/>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Using Circular Buffers" href="Using_Circular_Buffers.html" />
+    <link rel="prev" title="Cook Until Done: parallel_for_each" href="Cook_Until_Done_parallel_do.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../_static/oneAPI-rgb-rev-100.png" class="logo__image only-light" alt=""/>
+    <img src="../../_static/oneAPI-rgb-rev-100.png" class="logo__image only-dark pst-js-only" alt=""/>
+  
+  
+    <p class="title logo__title">oneTBB Documentation</p>
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../intro/help_support.html">Getting Help and Support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/notation.html">Notational Conventions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/intro_os.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/Benefits.html">oneTBB Benefits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/testing_approach.html">Testing Approach</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/limitations.html">Known Limitations</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Get Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../GSG/get_started.html">Get Started with oneAPI Threading Building Blocks (oneTBB)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../GSG/system_requirements.html">System Requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../GSG/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../GSG/next_steps.html">Next Steps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../GSG/integrate.html">Integrate oneTBB</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../GSG/samples.html">oneTBB Samples</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="title.html">oneTBB Developer Guide</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 has-children"><a class="reference internal" href="Package_Contents_os.html">Package Contents</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Debug_Versus_Release_Libraries.html">Debug Versus Release Libraries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Scalable_Memory_Allocator.html">Scalable Memory Allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Windows_OS_ug.html">Windows*</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Linux_OS.html">Linux*</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Mac_OS.html">macOS*</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Parallelizing_Simple_Loops_os.html">Parallelizing Simple Loops</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Initializing_and_Terminating_the_Library.html">Initializing and Terminating the Library</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="parallel_for_os.html">parallel_for</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="Lambda_Expressions.html">Lambda Expressions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Automatic_Chunking.html">Automatic Chunking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Controlling_Chunking_os.html">Controlling Chunking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Bandwidth_and_Cache_Affinity_os.html">Bandwidth and Cache Affinity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Partitioner_Summary.html">Partitioner Summary</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="parallel_reduce.html">parallel_reduce</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Advanced_Example.html">Advanced Example</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Advanced_Topic_Other_Kinds_of_Iteration_Spaces.html">Advanced Topic: Other Kinds of Iteration Spaces</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="Parallelizing_Complex_Loops.html">Parallelizing Complex Loops</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="Cook_Until_Done_parallel_do.html">Cook Until Done: parallel_for_each</a></li>
+<li class="toctree-l3 current active has-children"><a class="current reference internal" href="#">Working on the Assembly Line: parallel_pipeline</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="Using_Circular_Buffers.html">Using Circular Buffers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Throughput_of_pipeline.html">Throughput of pipeline</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Non-Linear_Pipelines.html">Non-Linear Pipelines</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="Summary_of_Loops_and_Pipelines.html">Summary of Loops and Pipelines</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Parallelizing_with_Tasks.html">Parallelizing with Tasks</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="creating_tasks_with_parallel_invoke.html">Creating Tasks with parallel_invoke</a></li>
+<li class="toctree-l3"><a class="reference internal" href="creating_tasks_with_task_group.html">Creating Tasks with task_group</a></li>
+<li class="toctree-l3"><a class="reference internal" href="task_group_thread_safety.html">task_group Thread Safety</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Flow_Graph.html">Parallelizing Data Flow and Dependence Graphs</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Parallelizing_Flow_Graph.html">Parallelizing Data Flow and Dependency Graphs</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="Basic_Flow_Graph_concepts.html">Basic Flow Graph Concepts</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="Graph_Object.html">Flow Graph Basics: Graph Object</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Nodes.html">Flow Graph Basics: Nodes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Edges.html">Flow Graph Basics: Edges</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Mapping_Nodes2Tasks.html">Flow Graph Basics: Mapping Nodes to Tasks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow_Graph_Message_Passing_Protocol.html">Flow Graph Basics: Message Passing Protocol</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow_Graph_Single_Vs_Broadcast.html">Flow Graph Basics: Single-push vs. Broadcast-push</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow_Graph_Buffering_in_Nodes.html">Flow Graph Basics: Buffering and Forwarding</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow_Graph_Reservation.html">Flow Graph Basics: Reservation</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="Graph_Main_Categories.html">Graph Application Categories</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="Data_Flow_Graph.html">Data Flow Graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Dependence_Graph.html">Dependence Graph</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="Predefined_Node_Types.html">Predefined Node Types</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="Flow_Graph_Tips.html">Flow Graph Tips and Tricks</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="Flow-Graph-waiting-tips.html">Flow Graph Tips for Waiting for and Destroying a Flow Graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow_Graph_making_edges_tips.html">Flow Graph Tips on Making Edges</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow_Graph_nested_parallelism_tips.html">Flow Graph Tips on Nested Parallelism</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow_Graph_resource_tips.html">Flow Graph Tips for Limiting Resource Consumption</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow-Graph-exception-tips.html">Flow Graph Tips for Exception Handling and Cancellation</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="estimate_flow_graph_performance.html">Estimating Flow Graph Performance</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="work_isolation.html">Work Isolation</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Exceptions_and_Cancellation.html">Exceptions and Cancellation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Cancellation_Without_An_Exception.html">Cancellation Without An Exception</a></li>
+
+<li class="toctree-l3"><a class="reference internal" href="Cancellation_and_Nested_Parallelism.html">Cancellation and Nested Parallelism</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="Floating_Point_Settings.html">Floating-point Settings</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Containers.html">Containers</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="concurrent_hash_map.html">concurrent_hash_map</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="More_on_HashCompare.html">More on HashCompare</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="concurrent_vector_ug.html">concurrent_vector</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="Concurrent_Queue_Classes.html">Concurrent Queue Classes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="Iterating_Over_a_Concurrent_Queue_for_Debugging.html">Iterating Over a Concurrent Queue for Debugging</a></li>
+<li class="toctree-l4"><a class="reference internal" href="When_Not_to_Use_Queues.html">When Not to Use Queues</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="Summary_of_Containers.html">Summary of Containers</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Mutual_Exclusion.html">Mutual Exclusion</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Mutex_Flavors.html">Mutex Flavors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Reader_Writer_Mutexes.html">Reader Writer Mutexes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="UpgradeDowngrade.html">Upgrade/Downgrade</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Lock_Pathologies.html">Lock Pathologies</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="Timing.html">Timing</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Memory_Allocation.html">Memory Allocation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Which_Dynamic_Libraries_to_Use.html">Which Dynamic Libraries to Use</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Allocator_Configuration.html">Configuring the Memory Allocator</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="automatically-replacing-malloc.html">Automatically Replacing <code class="docutils literal notranslate"><span class="pre">malloc</span></code> and Other C/C++ Functions for Dynamic Memory Allocation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="Windows_C_Dynamic_Memory_Interface_Replacement.html">Windows* OS C/C++ Dynamic Memory Interface Replacement</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Linux_C_Dynamic_Memory_Interface_Replacement.html">Linux* OS C/C++ Dynamic Memory Interface Replacement</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="The_Task_Scheduler.html">The Task Scheduler</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Task-Based_Programming.html">Task-Based Programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="When_Task-Based_Programming_Is_Inappropriate.html">When Task-Based Programming Is Inappropriate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="How_Task_Scheduler_Works.html">How Task Scheduler Works</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Task_Scheduler_Bypass.html">Task Scheduler Bypass</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Guiding_Task_Scheduler_Execution.html">Guiding Task Scheduler Execution</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="design_patterns/Design_Patterns.html">Design Patterns</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Agglomeration.html">Agglomeration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Elementwise.html">Elementwise</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Odd-Even_Communication.html">Odd-Even Communication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Wavefront.html">Wavefront</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Reduction.html">Reduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Divide_and_Conquer.html">Divide and Conquer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/GUI_Thread.html">GUI Thread</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Non-Preemptive_Priorities.html">Non-Preemptive Priorities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Lazy_Initialization.html">Lazy Initialization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Local_Serializer.html">Local Serializer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Fenced_Data_Transfer.html">Fenced Data Transfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Reference_Counting.html">Reference Counting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/General_References.html">General References</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Migration_Guide.html">Migrating from Threading Building Blocks (TBB)</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Migration_Guide/Task_Scheduler_Init.html">Migrating from tbb::task_scheduler_init</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Migration_Guide/Task_API.html">Migrating from low-level task API</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Migration_Guide/Mixing_Two_Runtimes.html">Mixing two runtimes</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="Constraints.html">Constrained APIs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="std_invoke.html">Invoke a Callable Object</a></li>
+<li class="toctree-l2"><a class="reference internal" href="appendix_A.html">Appendix A Costs of Time Slicing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="appendix_B.html">Appendix B Mixing With Other Threading Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="References.html">References</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Developer Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../reference/reference.html">oneTBB API Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/scalable_memory_pools/malloc_replacement_log.html">TBB_malloc_replacement_log Function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/rvalue_reduce.html">Parallel Reduction for rvalues</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/assertion_handler.html">Custom Assertion Handler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/type_specified_message_keys.html">Type-specified message keys for join_node</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../reference/scalable_memory_pools.html">Scalable Memory Pools</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/scalable_memory_pools/memory_pool_cls.html">memory_pool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/scalable_memory_pools/fixed_pool_cls.html">fixed_pool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/scalable_memory_pools/memory_pool_allocator_cls.html">memory_pool_allocator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../reference/helpers_for_expressing_graphs.html">Helper Functions for Expressing Graphs</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/constructors_for_nodes.html">Constructors for Flow Graph nodes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/follows_and_precedes_functions.html"><code class="docutils literal notranslate"><span class="pre">follows</span></code> and <code class="docutils literal notranslate"><span class="pre">precedes</span></code> function templates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/make_node_set_function.html"><code class="docutils literal notranslate"><span class="pre">make_node_set</span></code> function template</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/make_edges_function.html"><code class="docutils literal notranslate"><span class="pre">make_edges</span></code> function template</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/concurrent_lru_cache_cls.html">concurrent_lru_cache</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../reference/task_group_extensions.html">task_group extensions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/task_group_bypass_support.html">Task Bypass Support for <code class="docutils literal notranslate"><span class="pre">task_group</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/task_group_dynamic_dependencies.html"><code class="docutils literal notranslate"><span class="pre">task_group</span></code> Dynamic Dependencies</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/custom_mutex_chmap.html">The customizing mutex type for <code class="docutils literal notranslate"><span class="pre">concurrent_hash_map</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/try_put_and_wait.html">Waiting for Single Messages in Flow Graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/parallel_phase_for_task_arena.html"><code class="docutils literal notranslate"><span class="pre">parallel_phase</span></code> Interface for Task Arena</a></li>
+</ul>
+</details></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/uxlfoundation/oneTBB/edit/master/doc/main/tbb_userguide/Working_on_the_Assembly_Line_pipeline.rst" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/uxlfoundation/oneTBB/issues/new?title=Issue%20on%20page%20%2Fmain/tbb_userguide/Working_on_the_Assembly_Line_pipeline.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../_sources/main/tbb_userguide/Working_on_the_Assembly_Line_pipeline.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button pst-navbar-icon"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button>
+
+
+<button class="btn btn-sm pst-navbar-icon search-button search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+</button>
+
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Working on the Assembly Line: parallel_pipeline</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="working-on-the-assembly-line-parallel-pipeline">
+<span id="working-on-the-assembly-line-pipeline"></span><h1>Working on the Assembly Line: parallel_pipeline<a class="headerlink" href="#working-on-the-assembly-line-parallel-pipeline" title="Link to this heading">#</a></h1>
+<p><em>Pipelining</em> is a common parallel pattern that mimics a traditional
+manufacturing assembly line. Data flows through a series of pipeline
+filters and each filter processes the data in some way. Given an
+incoming stream of data, some of these filters can operate in parallel,
+and others cannot. For example, in video processing, some operations on
+frames do not depend on other frames, and so can be done on multiple
+frames at the same time. On the other hand, some operations on frames
+require processing prior frames first.</p>
+<p>The oneAPI Threading Building Blocks (oneTBB) classes
+<code class="docutils literal notranslate"><span class="pre">parallel_pipeline</span></code> and filter implement the pipeline pattern. A
+simple text processing example will be used to demonstrate the usage of
+<code class="docutils literal notranslate"><span class="pre">parallel_pipeline</span></code> and filter to perform parallel formatting. The
+example reads a text file, squares each decimal numeral in the text, and
+writes the modified text to a new file. Below is a picture of the
+pipeline.</p>
+<div class="admonition caution">
+<p class="admonition-title">Caution</p>
+<p>Since the body object provided to the filters of the
+<code class="docutils literal notranslate"><span class="pre">parallel_pipeline</span></code> might be copied, its <code class="docutils literal notranslate"><span class="pre">operator()</span></code> should not
+modify the body. Otherwise the modification might or might not become
+visible to the thread that invoked <code class="docutils literal notranslate"><span class="pre">parallel_pipeline</span></code>, depending
+upon whether <code class="docutils literal notranslate"><span class="pre">operator()</span></code> is acting on the original or a copy. As a
+reminder of this nuance, <code class="docutils literal notranslate"><span class="pre">parallel_pipeline</span></code> requires that the body
+object’s <code class="docutils literal notranslate"><span class="pre">operator()</span></code> be declared <code class="docutils literal notranslate"><span class="pre">const</span></code>.</p>
+</div>
+<div class="tablenoborder docutils container">
+<div class="pst-scrollable-table-container"><table class="table">
+<tbody>
+<tr class="row-odd"><td><p>Read chunk from input file</p></td>
+<td><p><a class="reference internal" href="../../_images/image010.jpg"><img alt="image0" src="../../_images/image010.jpg" style="width: 31px; height: 26px;" /></a></p></td>
+<td><p>Square numerals in chunk</p></td>
+<td><p><a class="reference internal" href="../../_images/image010.jpg"><img alt="image1" src="../../_images/image010.jpg" style="width: 31px; height: 26px;" /></a></p></td>
+<td><p>Write chunk to output file</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>Assume that the raw file I/O is sequential. The squaring filter can be
+done in parallel. That is, if you can serially read <code class="docutils literal notranslate"><span class="pre">n</span></code> chunks very
+quickly, you can transform each of the <code class="docutils literal notranslate"><span class="pre">n</span></code> chunks in parallel, as long
+as they are written in the proper order to the output file. Though the
+raw I/O is sequential, the formatting of input and output can be moved
+to the middle filter, and thus be parallel.</p>
+<p>To amortize parallel scheduling overheads, the filters operate on chunks
+of text. Each input chunk is approximately 4000 characters. Each chunk
+is represented by an instance of class <code class="docutils literal notranslate"><span class="pre">TextSlice</span></code>:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Holds a slice of text.</span>
+<span class="cm">/** Instances *must* be allocated/freed using methods herein, because the C++ declaration</span>
+<span class="cm">   represents only the header of a much larger object in memory. */</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TextSlice</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Pointer to one past last character in sequence</span>
+<span class="w">    </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">logical_end</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// Pointer to one past last available byte in sequence.</span>
+<span class="w">    </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">physical_end</span><span class="p">;</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="c1">// Allocate a TextSlice object that can hold up to max_size characters.</span>
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="n">TextSlice</span><span class="o">*</span><span class="w"> </span><span class="n">allocate</span><span class="p">(</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">max_size</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// +1 leaves room for a terminating null character.</span>
+<span class="w">        </span><span class="n">TextSlice</span><span class="o">*</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">TextSlice</span><span class="o">*</span><span class="p">)</span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">tbb_allocator</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span><span class="p">().</span><span class="n">allocate</span><span class="p">(</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">TextSlice</span><span class="p">)</span><span class="o">+</span><span class="n">max_size</span><span class="o">+</span><span class="mi">1</span><span class="w"> </span><span class="p">);</span>
+<span class="w">        </span><span class="n">t</span><span class="o">-&gt;</span><span class="n">logical_end</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">t</span><span class="o">-&gt;</span><span class="n">begin</span><span class="p">();</span>
+<span class="w">        </span><span class="n">t</span><span class="o">-&gt;</span><span class="n">physical_end</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">t</span><span class="o">-&gt;</span><span class="n">begin</span><span class="p">()</span><span class="o">+</span><span class="n">max_size</span><span class="p">;</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">t</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="c1">// Free this TextSlice object</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">free</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">tbb_allocator</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span><span class="p">().</span><span class="n">deallocate</span><span class="p">((</span><span class="kt">char</span><span class="o">*</span><span class="p">)</span><span class="k">this</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">TextSlice</span><span class="p">)</span><span class="o">+</span><span class="p">(</span><span class="n">physical_end</span><span class="o">-</span><span class="n">begin</span><span class="p">())</span><span class="o">+</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="c1">// Pointer to beginning of sequence</span>
+<span class="w">    </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">begin</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="k">return</span><span class="w"> </span><span class="p">(</span><span class="kt">char</span><span class="o">*</span><span class="p">)(</span><span class="k">this</span><span class="o">+</span><span class="mi">1</span><span class="p">);}</span>
+<span class="w">    </span><span class="c1">// Pointer to one past last character in sequence</span>
+<span class="w">    </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">end</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="k">return</span><span class="w"> </span><span class="n">logical_end</span><span class="p">;}</span>
+<span class="w">    </span><span class="c1">// Length of sequence</span>
+<span class="w">    </span><span class="kt">size_t</span><span class="w"> </span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span><span class="k">return</span><span class="w"> </span><span class="n">logical_end</span><span class="o">-</span><span class="p">(</span><span class="kt">char</span><span class="o">*</span><span class="p">)(</span><span class="k">this</span><span class="o">+</span><span class="mi">1</span><span class="p">);}</span>
+<span class="w">    </span><span class="c1">// Maximum number of characters that can be appended to sequence</span>
+<span class="w">    </span><span class="kt">size_t</span><span class="w"> </span><span class="n">avail</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span><span class="k">return</span><span class="w"> </span><span class="n">physical_end</span><span class="o">-</span><span class="n">logical_end</span><span class="p">;}</span>
+<span class="w">    </span><span class="c1">// Append sequence [first,last) to this sequence.</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">append</span><span class="p">(</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">first</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">last</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">memcpy</span><span class="p">(</span><span class="w"> </span><span class="n">logical_end</span><span class="p">,</span><span class="w"> </span><span class="n">first</span><span class="p">,</span><span class="w"> </span><span class="n">last</span><span class="o">-</span><span class="n">first</span><span class="w"> </span><span class="p">);</span>
+<span class="w">        </span><span class="n">logical_end</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">last</span><span class="o">-</span><span class="n">first</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="c1">// Set end() to given value.</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="n">set_end</span><span class="p">(</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="n">logical_end</span><span class="o">=</span><span class="n">p</span><span class="p">;}</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+<p>Below is the top-level code for building and running the pipeline.
+<code class="docutils literal notranslate"><span class="pre">TextSlice</span></code> objects are passed between filters using pointers to avoid
+the overhead of copying a <code class="docutils literal notranslate"><span class="pre">TextSlice</span></code>.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">RunPipeline</span><span class="p">(</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">ntoken</span><span class="p">,</span><span class="w"> </span><span class="kt">FILE</span><span class="o">*</span><span class="w"> </span><span class="n">input_file</span><span class="p">,</span><span class="w"> </span><span class="kt">FILE</span><span class="o">*</span><span class="w"> </span><span class="n">output_file</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">parallel_pipeline</span><span class="p">(</span>
+<span class="w">        </span><span class="n">ntoken</span><span class="p">,</span>
+<span class="w">        </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">make_filter</span><span class="o">&lt;</span><span class="kt">void</span><span class="p">,</span><span class="n">TextSlice</span><span class="o">*&gt;</span><span class="p">(</span>
+<span class="w">            </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">filter_mode</span><span class="o">::</span><span class="n">serial_in_order</span><span class="p">,</span><span class="w"> </span><span class="n">MyInputFunc</span><span class="p">(</span><span class="n">input_file</span><span class="p">)</span><span class="w"> </span><span class="p">)</span>
+<span class="w">    </span><span class="o">&amp;</span>
+<span class="w">        </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">make_filter</span><span class="o">&lt;</span><span class="n">TextSlice</span><span class="o">*</span><span class="p">,</span><span class="n">TextSlice</span><span class="o">*&gt;</span><span class="p">(</span>
+<span class="w">            </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">filter_mode</span><span class="o">::</span><span class="n">parallel</span><span class="p">,</span><span class="w"> </span><span class="n">MyTransformFunc</span><span class="p">()</span><span class="w"> </span><span class="p">)</span>
+<span class="w">    </span><span class="o">&amp;</span>
+<span class="w">        </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">make_filter</span><span class="o">&lt;</span><span class="n">TextSlice</span><span class="o">*</span><span class="p">,</span><span class="kt">void</span><span class="o">&gt;</span><span class="p">(</span>
+<span class="w">            </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">filter_mode</span><span class="o">::</span><span class="n">serial_in_order</span><span class="p">,</span><span class="w"> </span><span class="n">MyOutputFunc</span><span class="p">(</span><span class="n">output_file</span><span class="p">)</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The parameter <code class="docutils literal notranslate"><span class="pre">ntoken</span></code> to method <code class="docutils literal notranslate"><span class="pre">parallel_pipeline</span></code> controls the
+level of parallelism. Conceptually, tokens flow through the pipeline. In
+a serial in-order filter, each token must be processed serially in
+order. In a parallel filter, multiple tokens can by processed in
+parallel by the filter. If the number of tokens were unlimited, there
+might be a problem where the unordered filter in the middle keeps
+gaining tokens because the output filter cannot keep up. This situation
+typically leads to undesirable resource consumption by the middle
+filter. The parameter to method <code class="docutils literal notranslate"><span class="pre">parallel_pipeline</span></code> specifies the
+maximum number of tokens that can be in flight. Once this limit is
+reached, the pipeline never creates a new token at the input filter
+until another token is destroyed at the output filter.</p>
+<p>The second parameter specifies the sequence of filters. Each filter is
+constructed by function <code class="docutils literal notranslate"><span class="pre">make_filter&lt;inputType,</span> <span class="pre">outputType&gt;(mode,functor)</span></code>.</p>
+<ul class="simple">
+<li><p>The <em>inputType</em> specifies the type of values input by a filter. For
+the input filter, the type is <code class="docutils literal notranslate"><span class="pre">void</span></code>.</p></li>
+<li><p>The <em>outputType</em> specifies the type of values output by a filter. For
+the output filter, the type is <code class="docutils literal notranslate"><span class="pre">void</span></code>.</p></li>
+<li><p>The <em>mode</em> specifies whether the filter processes items in parallel,
+serial in-order, or serial out-of-order.</p></li>
+<li><p>The <em>functor</em> specifies how to produce an output value from an input
+value.</p></li>
+</ul>
+<p>The filters are concatenated with <code class="docutils literal notranslate"><span class="pre">operator&amp;</span></code>. When concatenating two
+filters, the <em>outputType</em> of the first filter must match the <em>inputType</em>
+of the second filter.</p>
+<p>The filters can be constructed and concatenated ahead of time. An
+equivalent version of the previous example that does this follows:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">RunPipeline</span><span class="p">(</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">ntoken</span><span class="p">,</span><span class="w"> </span><span class="kt">FILE</span><span class="o">*</span><span class="w"> </span><span class="n">input_file</span><span class="p">,</span><span class="w"> </span><span class="kt">FILE</span><span class="o">*</span><span class="w"> </span><span class="n">output_file</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">filter</span><span class="o">&lt;</span><span class="kt">void</span><span class="p">,</span><span class="n">TextSlice</span><span class="o">*&gt;</span><span class="w"> </span><span class="n">f1</span><span class="p">(</span><span class="w"> </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">filter_mode</span><span class="o">::</span><span class="n">serial_in_order</span><span class="p">,</span>
+<span class="w">                                       </span><span class="n">MyInputFunc</span><span class="p">(</span><span class="n">input_file</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
+<span class="w">    </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">filter</span><span class="o">&lt;</span><span class="n">TextSlice</span><span class="o">*</span><span class="p">,</span><span class="n">TextSlice</span><span class="o">*&gt;</span><span class="w"> </span><span class="n">f2</span><span class="p">(</span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">filter_mode</span><span class="o">::</span><span class="n">parallel</span><span class="p">,</span>
+<span class="w">                                            </span><span class="n">MyTransformFunc</span><span class="p">()</span><span class="w"> </span><span class="p">);</span>
+<span class="w">    </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">filter</span><span class="o">&lt;</span><span class="n">TextSlice</span><span class="o">*</span><span class="p">,</span><span class="kt">void</span><span class="o">&gt;</span><span class="w"> </span><span class="n">f3</span><span class="p">(</span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">filter_mode</span><span class="o">::</span><span class="n">serial_in_order</span><span class="p">,</span>
+<span class="w">                                      </span><span class="n">MyOutputFunc</span><span class="p">(</span><span class="n">output_file</span><span class="p">)</span><span class="w"> </span><span class="p">);</span>
+<span class="w">    </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">filter</span><span class="o">&lt;</span><span class="kt">void</span><span class="p">,</span><span class="kt">void</span><span class="o">&gt;</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">f1</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">f2</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">f3</span><span class="p">;</span>
+<span class="w">    </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">parallel_pipeline</span><span class="p">(</span><span class="n">ntoken</span><span class="p">,</span><span class="n">f</span><span class="p">);</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The input filter must be <code class="docutils literal notranslate"><span class="pre">serial_in_order</span></code> in this example because the
+filter reads chunks from a sequential file and the output filter must
+write the chunks in the same order. All <code class="docutils literal notranslate"><span class="pre">serial_in_order</span></code> filters
+process items in the same order. Thus if an item arrives at
+<code class="docutils literal notranslate"><span class="pre">MyOutputFunc</span></code> out of the order established by <code class="docutils literal notranslate"><span class="pre">MyInputFunc</span></code>, the
+pipeline automatically delays invoking <code class="docutils literal notranslate"><span class="pre">MyOutputFunc::operator()</span></code> on
+the item until its predecessors are processed. There is another kind of
+serial filter, <code class="docutils literal notranslate"><span class="pre">serial_out_of_order</span></code>, that does not preserve order.</p>
+<p>The middle filter operates on purely local data. Thus any number of
+invocations of its functor can run concurrently. Hence it is specified
+as a parallel filter.</p>
+<p>The functors for each filter are explained in detail now. The output
+functor is the simplest. All it has to do is write a <code class="docutils literal notranslate"><span class="pre">TextSlice</span></code> to a
+file and free the <code class="docutils literal notranslate"><span class="pre">TextSlice</span></code>.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Functor that writes a TextSlice to a file.</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MyOutputFunc</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">FILE</span><span class="o">*</span><span class="w"> </span><span class="n">my_output_file</span><span class="p">;</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">MyOutputFunc</span><span class="p">(</span><span class="w"> </span><span class="kt">FILE</span><span class="o">*</span><span class="w"> </span><span class="n">output_file</span><span class="w"> </span><span class="p">);</span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="nf">operator</span><span class="p">()(</span><span class="w"> </span><span class="n">TextSlice</span><span class="o">*</span><span class="w"> </span><span class="n">item</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="p">;</span>
+<span class="p">};</span>
+
+
+<span class="n">MyOutputFunc</span><span class="o">::</span><span class="n">MyOutputFunc</span><span class="p">(</span><span class="w"> </span><span class="kt">FILE</span><span class="o">*</span><span class="w"> </span><span class="n">output_file</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="o">:</span>
+<span class="w">    </span><span class="n">my_output_file</span><span class="p">(</span><span class="n">output_file</span><span class="p">)</span>
+<span class="p">{</span>
+<span class="p">}</span>
+
+
+<span class="kt">void</span><span class="w"> </span><span class="n">MyOutputFunc</span><span class="o">::</span><span class="k">operator</span><span class="p">()(</span><span class="w"> </span><span class="n">TextSlice</span><span class="o">*</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">size_t</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fwrite</span><span class="p">(</span><span class="w"> </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">begin</span><span class="p">(),</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">(),</span><span class="w"> </span><span class="n">my_output_file</span><span class="w"> </span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="w"> </span><span class="n">n</span><span class="o">!=</span><span class="n">out</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stderr</span><span class="p">,</span><span class="s">&quot;Can&#39;t write into file &#39;%s&#39;</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">OutputFileName</span><span class="p">);</span>
+<span class="w">        </span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">free</span><span class="p">();</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Method <code class="docutils literal notranslate"><span class="pre">operator()</span></code> processes a <code class="docutils literal notranslate"><span class="pre">TextSlice</span></code>. The parameter <code class="docutils literal notranslate"><span class="pre">out</span></code>
+points to the <code class="docutils literal notranslate"><span class="pre">TextSlice</span></code> to be processed. Since it is used for the
+last filter of the pipeline, it returns <code class="docutils literal notranslate"><span class="pre">void</span></code>.</p>
+<p>The functor for the middle filter is similar, but a bit more complex. It
+returns a pointer to the <code class="docutils literal notranslate"><span class="pre">TextSlice</span></code> that it produces.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Functor that changes each decimal number to its square.</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MyTransformFunc</span><span class="w"> </span><span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">TextSlice</span><span class="o">*</span><span class="w"> </span><span class="k">operator</span><span class="p">()(</span><span class="w"> </span><span class="n">TextSlice</span><span class="o">*</span><span class="w"> </span><span class="n">input</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="p">;</span>
+<span class="p">};</span>
+
+
+<span class="n">TextSlice</span><span class="o">*</span><span class="w"> </span><span class="nf">MyTransformFunc::operator</span><span class="p">()(</span><span class="w"> </span><span class="n">TextSlice</span><span class="o">*</span><span class="w"> </span><span class="n">input</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Add terminating null so that strtol works right even if number is at end of the input.</span>
+<span class="w">    </span><span class="o">*</span><span class="n">input</span><span class="o">-&gt;</span><span class="n">end</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="sc">&#39;\0&#39;</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">input</span><span class="o">-&gt;</span><span class="n">begin</span><span class="p">();</span>
+<span class="w">    </span><span class="n">TextSlice</span><span class="o">*</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TextSlice</span><span class="o">::</span><span class="n">allocate</span><span class="p">(</span><span class="w"> </span><span class="mi">2</span><span class="o">*</span><span class="n">MAX_CHAR_PER_INPUT_SLICE</span><span class="w"> </span><span class="p">);</span>
+<span class="w">    </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">begin</span><span class="p">();</span>
+<span class="w">    </span><span class="k">for</span><span class="p">(;;)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">while</span><span class="p">(</span><span class="w"> </span><span class="n">p</span><span class="o">&lt;</span><span class="n">input</span><span class="o">-&gt;</span><span class="n">end</span><span class="p">()</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="o">!</span><span class="n">isdigit</span><span class="p">(</span><span class="o">*</span><span class="n">p</span><span class="p">)</span><span class="w"> </span><span class="p">)</span>
+<span class="w">            </span><span class="o">*</span><span class="n">q</span><span class="o">++</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">*</span><span class="n">p</span><span class="o">++</span><span class="p">;</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="w"> </span><span class="n">p</span><span class="o">==</span><span class="n">input</span><span class="o">-&gt;</span><span class="n">end</span><span class="p">()</span><span class="w"> </span><span class="p">)</span>
+<span class="w">            </span><span class="k">break</span><span class="p">;</span>
+<span class="w">        </span><span class="kt">long</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">strtol</span><span class="p">(</span><span class="w"> </span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="w"> </span><span class="p">);</span>
+<span class="w">        </span><span class="c1">// Note: no overflow checking is needed here, as we have twice the</span>
+<span class="w">        </span><span class="c1">// input string length, but the square of a non-negative integer n</span>
+<span class="w">        </span><span class="c1">// cannot have more than twice as many digits as n.</span>
+<span class="w">        </span><span class="kt">long</span><span class="w"> </span><span class="n">y</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">x</span><span class="o">*</span><span class="n">x</span><span class="p">;</span>
+<span class="w">        </span><span class="n">sprintf</span><span class="p">(</span><span class="n">q</span><span class="p">,</span><span class="s">&quot;%ld&quot;</span><span class="p">,</span><span class="n">y</span><span class="p">);</span>
+<span class="w">        </span><span class="n">q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">strchr</span><span class="p">(</span><span class="n">q</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">out</span><span class="o">-&gt;</span><span class="n">set_end</span><span class="p">(</span><span class="n">q</span><span class="p">);</span>
+<span class="w">    </span><span class="n">input</span><span class="o">-&gt;</span><span class="n">free</span><span class="p">();</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">out</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The input functor is the most complicated, because it has to ensure that
+no numeral crosses a boundary. When it finds what could be a numeral
+crossing into the next slice, it copies the partial numeral to the next
+slice. Furthermore, it has to indicate when the end of input is reached.
+It does this by invoking method <code class="docutils literal notranslate"><span class="pre">stop()</span></code> on a special argument of type
+<code class="docutils literal notranslate"><span class="pre">flow_control</span></code>. This idiom is required for any functor used for the
+first filter of a pipeline.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">TextSlice</span><span class="o">*</span><span class="w"> </span><span class="n">next_slice</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">MyInputFunc</span><span class="w"> </span><span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">MyInputFunc</span><span class="p">(</span><span class="w"> </span><span class="kt">FILE</span><span class="o">*</span><span class="w"> </span><span class="n">input_file_</span><span class="w"> </span><span class="p">);</span>
+<span class="w">    </span><span class="n">MyInputFunc</span><span class="p">(</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">MyInputFunc</span><span class="o">&amp;</span><span class="w"> </span><span class="n">f</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">input_file</span><span class="p">(</span><span class="n">f</span><span class="p">.</span><span class="n">input_file</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">}</span>
+<span class="w">    </span><span class="o">~</span><span class="n">MyInputFunc</span><span class="p">();</span>
+<span class="w">    </span><span class="n">TextSlice</span><span class="o">*</span><span class="w"> </span><span class="nf">operator</span><span class="p">()(</span><span class="w"> </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">flow_control</span><span class="o">&amp;</span><span class="w"> </span><span class="n">fc</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="p">;</span>
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="kt">FILE</span><span class="o">*</span><span class="w"> </span><span class="n">input_file</span><span class="p">;</span>
+<span class="p">};</span>
+
+
+<span class="n">MyInputFunc</span><span class="o">::</span><span class="n">MyInputFunc</span><span class="p">(</span><span class="w"> </span><span class="kt">FILE</span><span class="o">*</span><span class="w"> </span><span class="n">input_file_</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="o">:</span>
+<span class="w">    </span><span class="n">input_file</span><span class="p">(</span><span class="n">input_file_</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">}</span>
+
+
+<span class="n">MyInputFunc</span><span class="o">::~</span><span class="n">MyInputFunc</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="p">}</span>
+
+
+<span class="n">TextSlice</span><span class="o">*</span><span class="w"> </span><span class="n">MyInputFunc</span><span class="o">::</span><span class="k">operator</span><span class="p">()(</span><span class="w"> </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">flow_control</span><span class="o">&amp;</span><span class="w"> </span><span class="n">fc</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Read characters into space that is available in the next slice.</span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="w"> </span><span class="o">!</span><span class="n">next_slice</span><span class="w"> </span><span class="p">)</span>
+<span class="w">        </span><span class="n">next_slice</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TextSlice</span><span class="o">::</span><span class="n">allocate</span><span class="p">(</span><span class="w"> </span><span class="n">MAX_CHAR_PER_INPUT_SLICE</span><span class="w"> </span><span class="p">);</span>
+<span class="w">    </span><span class="kt">size_t</span><span class="w"> </span><span class="n">m</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">next_slice</span><span class="o">-&gt;</span><span class="n">avail</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">size_t</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">fread</span><span class="p">(</span><span class="w"> </span><span class="n">next_slice</span><span class="o">-&gt;</span><span class="n">end</span><span class="p">(),</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">m</span><span class="p">,</span><span class="w"> </span><span class="n">input_file</span><span class="w"> </span><span class="p">);</span>
+<span class="w">    </span><span class="k">if</span><span class="p">(</span><span class="w"> </span><span class="o">!</span><span class="n">n</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">next_slice</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">()</span><span class="o">==</span><span class="mi">0</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// No more characters to process</span>
+<span class="w">        </span><span class="n">fc</span><span class="p">.</span><span class="n">stop</span><span class="p">();</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Have more characters to process.</span>
+<span class="w">        </span><span class="n">TextSlice</span><span class="o">*</span><span class="w"> </span><span class="n">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">next_slice</span><span class="p">;</span>
+<span class="w">        </span><span class="n">next_slice</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TextSlice</span><span class="o">::</span><span class="n">allocate</span><span class="p">(</span><span class="w"> </span><span class="n">MAX_CHAR_PER_INPUT_SLICE</span><span class="w"> </span><span class="p">);</span>
+<span class="w">        </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">t</span><span class="o">-&gt;</span><span class="n">end</span><span class="p">()</span><span class="o">+</span><span class="n">n</span><span class="p">;</span>
+<span class="w">        </span><span class="k">if</span><span class="p">(</span><span class="w"> </span><span class="n">n</span><span class="o">==</span><span class="n">m</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="c1">// Might have read partial number.</span>
+<span class="w">            </span><span class="c1">// If so, transfer characters of partial number to next slice.</span>
+<span class="w">            </span><span class="k">while</span><span class="p">(</span><span class="w"> </span><span class="n">p</span><span class="o">&gt;</span><span class="n">t</span><span class="o">-&gt;</span><span class="n">begin</span><span class="p">()</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">isdigit</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="mi">-1</span><span class="p">])</span><span class="w"> </span><span class="p">)</span>
+<span class="w">                </span><span class="o">--</span><span class="n">p</span><span class="p">;</span>
+<span class="w">            </span><span class="n">assert</span><span class="p">(</span><span class="n">p</span><span class="o">&gt;</span><span class="n">t</span><span class="o">-&gt;</span><span class="n">begin</span><span class="p">(),</span><span class="s">&quot;Number too large to fit in buffer.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">            </span><span class="n">next_slice</span><span class="o">-&gt;</span><span class="n">append</span><span class="p">(</span><span class="w"> </span><span class="n">p</span><span class="p">,</span><span class="w"> </span><span class="n">t</span><span class="o">-&gt;</span><span class="n">end</span><span class="p">()</span><span class="o">+</span><span class="n">n</span><span class="w"> </span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="n">t</span><span class="o">-&gt;</span><span class="n">set_end</span><span class="p">(</span><span class="n">p</span><span class="p">);</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="n">t</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The copy constructor must be defined because the functor is copied when
+the underlying <code class="docutils literal notranslate"><span class="pre">oneapi::tbb::filter_t</span></code> is built from the functor, and again when the pipeline runs.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="Using_Circular_Buffers.html">Using Circular Buffers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Throughput_of_pipeline.html">Throughput of pipeline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Non-Linear_Pipelines.html">Non-Linear Pipelines</a></li>
+</ul>
+</div>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="Cook_Until_Done_parallel_do.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Cook Until Done: parallel_for_each</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="Using_Circular_Buffers.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Using Circular Buffers</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright UXL Foundation Contributors.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

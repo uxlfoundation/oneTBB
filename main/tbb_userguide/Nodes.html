@@ -1,0 +1,741 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Flow Graph Basics: Nodes &#8212; oneTBB  documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/sphinx-book-theme.css?v=3c74b3bc" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../_static/scripts/sphinx-book-theme.js?v=fab101a9"></script>
+    <script src="../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'main/tbb_userguide/Nodes';</script>
+    <script src="../../_static/custom.js?v=874f1a61"></script>
+    <link rel="icon" href="../../_static/favicons.png"/>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Flow Graph Basics: Edges" href="Edges.html" />
+    <link rel="prev" title="Flow Graph Basics: Graph Object" href="Graph_Object.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../_static/oneAPI-rgb-rev-100.png" class="logo__image only-light" alt=""/>
+    <img src="../../_static/oneAPI-rgb-rev-100.png" class="logo__image only-dark pst-js-only" alt=""/>
+  
+  
+    <p class="title logo__title">oneTBB Documentation</p>
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../intro/help_support.html">Getting Help and Support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/notation.html">Notational Conventions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/intro_os.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/Benefits.html">oneTBB Benefits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/testing_approach.html">Testing Approach</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../intro/limitations.html">Known Limitations</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Get Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../GSG/get_started.html">Get Started with oneAPI Threading Building Blocks (oneTBB)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../GSG/system_requirements.html">System Requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../GSG/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../GSG/next_steps.html">Next Steps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../GSG/integrate.html">Integrate oneTBB</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../GSG/samples.html">oneTBB Samples</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="title.html">oneTBB Developer Guide</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 has-children"><a class="reference internal" href="Package_Contents_os.html">Package Contents</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Debug_Versus_Release_Libraries.html">Debug Versus Release Libraries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Scalable_Memory_Allocator.html">Scalable Memory Allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Windows_OS_ug.html">Windows*</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Linux_OS.html">Linux*</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Mac_OS.html">macOS*</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Parallelizing_Simple_Loops_os.html">Parallelizing Simple Loops</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Initializing_and_Terminating_the_Library.html">Initializing and Terminating the Library</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="parallel_for_os.html">parallel_for</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="Lambda_Expressions.html">Lambda Expressions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Automatic_Chunking.html">Automatic Chunking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Controlling_Chunking_os.html">Controlling Chunking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Bandwidth_and_Cache_Affinity_os.html">Bandwidth and Cache Affinity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Partitioner_Summary.html">Partitioner Summary</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="parallel_reduce.html">parallel_reduce</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Advanced_Example.html">Advanced Example</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Advanced_Topic_Other_Kinds_of_Iteration_Spaces.html">Advanced Topic: Other Kinds of Iteration Spaces</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Parallelizing_Complex_Loops.html">Parallelizing Complex Loops</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Cook_Until_Done_parallel_do.html">Cook Until Done: parallel_for_each</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="Working_on_the_Assembly_Line_pipeline.html">Working on the Assembly Line: parallel_pipeline</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="Using_Circular_Buffers.html">Using Circular Buffers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Throughput_of_pipeline.html">Throughput of pipeline</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Non-Linear_Pipelines.html">Non-Linear Pipelines</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="Summary_of_Loops_and_Pipelines.html">Summary of Loops and Pipelines</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Parallelizing_with_Tasks.html">Parallelizing with Tasks</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="creating_tasks_with_parallel_invoke.html">Creating Tasks with parallel_invoke</a></li>
+<li class="toctree-l3"><a class="reference internal" href="creating_tasks_with_task_group.html">Creating Tasks with task_group</a></li>
+<li class="toctree-l3"><a class="reference internal" href="task_group_thread_safety.html">task_group Thread Safety</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="Flow_Graph.html">Parallelizing Data Flow and Dependence Graphs</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="Parallelizing_Flow_Graph.html">Parallelizing Data Flow and Dependency Graphs</a></li>
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="Basic_Flow_Graph_concepts.html">Basic Flow Graph Concepts</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="Graph_Object.html">Flow Graph Basics: Graph Object</a></li>
+<li class="toctree-l4 current active"><a class="current reference internal" href="#">Flow Graph Basics: Nodes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Edges.html">Flow Graph Basics: Edges</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Mapping_Nodes2Tasks.html">Flow Graph Basics: Mapping Nodes to Tasks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow_Graph_Message_Passing_Protocol.html">Flow Graph Basics: Message Passing Protocol</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow_Graph_Single_Vs_Broadcast.html">Flow Graph Basics: Single-push vs. Broadcast-push</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow_Graph_Buffering_in_Nodes.html">Flow Graph Basics: Buffering and Forwarding</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow_Graph_Reservation.html">Flow Graph Basics: Reservation</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="Graph_Main_Categories.html">Graph Application Categories</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="Data_Flow_Graph.html">Data Flow Graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Dependence_Graph.html">Dependence Graph</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="Predefined_Node_Types.html">Predefined Node Types</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="Flow_Graph_Tips.html">Flow Graph Tips and Tricks</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="Flow-Graph-waiting-tips.html">Flow Graph Tips for Waiting for and Destroying a Flow Graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow_Graph_making_edges_tips.html">Flow Graph Tips on Making Edges</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow_Graph_nested_parallelism_tips.html">Flow Graph Tips on Nested Parallelism</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow_Graph_resource_tips.html">Flow Graph Tips for Limiting Resource Consumption</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Flow-Graph-exception-tips.html">Flow Graph Tips for Exception Handling and Cancellation</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="estimate_flow_graph_performance.html">Estimating Flow Graph Performance</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="work_isolation.html">Work Isolation</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Exceptions_and_Cancellation.html">Exceptions and Cancellation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Cancellation_Without_An_Exception.html">Cancellation Without An Exception</a></li>
+
+<li class="toctree-l3"><a class="reference internal" href="Cancellation_and_Nested_Parallelism.html">Cancellation and Nested Parallelism</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="Floating_Point_Settings.html">Floating-point Settings</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Containers.html">Containers</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="concurrent_hash_map.html">concurrent_hash_map</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="More_on_HashCompare.html">More on HashCompare</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="concurrent_vector_ug.html">concurrent_vector</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="Concurrent_Queue_Classes.html">Concurrent Queue Classes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="Iterating_Over_a_Concurrent_Queue_for_Debugging.html">Iterating Over a Concurrent Queue for Debugging</a></li>
+<li class="toctree-l4"><a class="reference internal" href="When_Not_to_Use_Queues.html">When Not to Use Queues</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="Summary_of_Containers.html">Summary of Containers</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Mutual_Exclusion.html">Mutual Exclusion</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Mutex_Flavors.html">Mutex Flavors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Reader_Writer_Mutexes.html">Reader Writer Mutexes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="UpgradeDowngrade.html">Upgrade/Downgrade</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Lock_Pathologies.html">Lock Pathologies</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="Timing.html">Timing</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Memory_Allocation.html">Memory Allocation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Which_Dynamic_Libraries_to_Use.html">Which Dynamic Libraries to Use</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Allocator_Configuration.html">Configuring the Memory Allocator</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="automatically-replacing-malloc.html">Automatically Replacing <code class="docutils literal notranslate"><span class="pre">malloc</span></code> and Other C/C++ Functions for Dynamic Memory Allocation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="Windows_C_Dynamic_Memory_Interface_Replacement.html">Windows* OS C/C++ Dynamic Memory Interface Replacement</a></li>
+<li class="toctree-l4"><a class="reference internal" href="Linux_C_Dynamic_Memory_Interface_Replacement.html">Linux* OS C/C++ Dynamic Memory Interface Replacement</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="The_Task_Scheduler.html">The Task Scheduler</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Task-Based_Programming.html">Task-Based Programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="When_Task-Based_Programming_Is_Inappropriate.html">When Task-Based Programming Is Inappropriate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="How_Task_Scheduler_Works.html">How Task Scheduler Works</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Task_Scheduler_Bypass.html">Task Scheduler Bypass</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Guiding_Task_Scheduler_Execution.html">Guiding Task Scheduler Execution</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="design_patterns/Design_Patterns.html">Design Patterns</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Agglomeration.html">Agglomeration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Elementwise.html">Elementwise</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Odd-Even_Communication.html">Odd-Even Communication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Wavefront.html">Wavefront</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Reduction.html">Reduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Divide_and_Conquer.html">Divide and Conquer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/GUI_Thread.html">GUI Thread</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Non-Preemptive_Priorities.html">Non-Preemptive Priorities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Lazy_Initialization.html">Lazy Initialization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Local_Serializer.html">Local Serializer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Fenced_Data_Transfer.html">Fenced Data Transfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/Reference_Counting.html">Reference Counting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="design_patterns/General_References.html">General References</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="Migration_Guide.html">Migrating from Threading Building Blocks (TBB)</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="Migration_Guide/Task_Scheduler_Init.html">Migrating from tbb::task_scheduler_init</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Migration_Guide/Task_API.html">Migrating from low-level task API</a></li>
+<li class="toctree-l3"><a class="reference internal" href="Migration_Guide/Mixing_Two_Runtimes.html">Mixing two runtimes</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="Constraints.html">Constrained APIs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="std_invoke.html">Invoke a Callable Object</a></li>
+<li class="toctree-l2"><a class="reference internal" href="appendix_A.html">Appendix A Costs of Time Slicing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="appendix_B.html">Appendix B Mixing With Other Threading Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="References.html">References</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Developer Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../reference/reference.html">oneTBB API Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../reference/scalable_memory_pools/malloc_replacement_log.html">TBB_malloc_replacement_log Function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/rvalue_reduce.html">Parallel Reduction for rvalues</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/assertion_handler.html">Custom Assertion Handler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/type_specified_message_keys.html">Type-specified message keys for join_node</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../reference/scalable_memory_pools.html">Scalable Memory Pools</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/scalable_memory_pools/memory_pool_cls.html">memory_pool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/scalable_memory_pools/fixed_pool_cls.html">fixed_pool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/scalable_memory_pools/memory_pool_allocator_cls.html">memory_pool_allocator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../reference/helpers_for_expressing_graphs.html">Helper Functions for Expressing Graphs</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/constructors_for_nodes.html">Constructors for Flow Graph nodes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/follows_and_precedes_functions.html"><code class="docutils literal notranslate"><span class="pre">follows</span></code> and <code class="docutils literal notranslate"><span class="pre">precedes</span></code> function templates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/make_node_set_function.html"><code class="docutils literal notranslate"><span class="pre">make_node_set</span></code> function template</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/make_edges_function.html"><code class="docutils literal notranslate"><span class="pre">make_edges</span></code> function template</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/concurrent_lru_cache_cls.html">concurrent_lru_cache</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../reference/task_group_extensions.html">task_group extensions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../reference/task_group_bypass_support.html">Task Bypass Support for <code class="docutils literal notranslate"><span class="pre">task_group</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../reference/task_group_dynamic_dependencies.html"><code class="docutils literal notranslate"><span class="pre">task_group</span></code> Dynamic Dependencies</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/custom_mutex_chmap.html">The customizing mutex type for <code class="docutils literal notranslate"><span class="pre">concurrent_hash_map</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/try_put_and_wait.html">Waiting for Single Messages in Flow Graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../reference/parallel_phase_for_task_arena.html"><code class="docutils literal notranslate"><span class="pre">parallel_phase</span></code> Interface for Task Arena</a></li>
+</ul>
+</details></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/uxlfoundation/oneTBB/edit/master/doc/main/tbb_userguide/Nodes.rst" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/uxlfoundation/oneTBB/issues/new?title=Issue%20on%20page%20%2Fmain/tbb_userguide/Nodes.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../_sources/main/tbb_userguide/Nodes.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button pst-navbar-icon"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button>
+
+
+<button class="btn btn-sm pst-navbar-icon search-button search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+</button>
+
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Flow Graph Basics: Nodes</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="flow-graph-basics-nodes">
+<span id="nodes"></span><h1>Flow Graph Basics: Nodes<a class="headerlink" href="#flow-graph-basics-nodes" title="Link to this heading">#</a></h1>
+<p>A node is a class that inherits from <code class="docutils literal notranslate"><span class="pre">oneapi::tbb::flow::graph_node</span></code> and also
+typically inherits from <code class="docutils literal notranslate"><span class="pre">oneapi::tbb::flow::sender&lt;T&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">oneapi::tbb::flow::receiver&lt;T&gt;</span></code>, or
+both. A node performs some operation, usually on an incoming message and
+may generate zero or more output messages. Some nodes require more than
+one input message or generate more than one output message.</p>
+<p>While it is possible to define your own node types by inheriting from
+graph_node, sender and receiver, it is more typical that predefined node
+types are used to construct a graph.</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">function_node</span></code> is a predefined type available in <code class="docutils literal notranslate"><span class="pre">flow_graph.h</span></code> and
+represents a simple function with one input and one output. The
+constructor for a <code class="docutils literal notranslate"><span class="pre">function_node</span></code> takes three arguments:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">template</span><span class="o">&lt;</span><span class="w"> </span><span class="k">typename</span><span class="w"> </span><span class="nc">Body</span><span class="o">&gt;</span><span class="w"> </span><span class="n">function_node</span><span class="p">(</span><span class="n">graph</span><span class="w"> </span><span class="o">&amp;</span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">concurrency</span><span class="p">,</span><span class="w"> </span><span class="n">Body</span><span class="w"> </span><span class="n">body</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="tablenoborder docutils container">
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Body</p></td>
+<td><p>Type of the body object.</p></td>
+</tr>
+<tr class="row-odd"><td><p>g</p></td>
+<td><p>The graph the node belongs to.</p></td>
+</tr>
+<tr class="row-even"><td><p>concurrency</p></td>
+<td><p>The concurrency limit for the node. You can use the    concurrency limit to control how many invocations of the node are   allowed to proceed concurrently, from 1 (serial) to an unlimited   number.</p></td>
+</tr>
+<tr class="row-odd"><td><p>body</p></td>
+<td><p>User defined function object, or lambda expression, that    is applied to the incoming message to generate the outgoing message.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>Below is code for creating a simple graph that contains a single
+function_node. In this example, a node n is constructed that belongs to
+graph g, and has a second argument of 1, which allows at most 1
+invocation of the node to occur concurrently. The body is a lambda
+expression that prints each value v that it receives, spins for v
+seconds, prints the value again, and then returns v unmodified. The code
+for the function spin_for is not provided.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">graph</span><span class="w"> </span><span class="n">g</span><span class="p">;</span>
+<span class="n">function_node</span><span class="o">&lt;</span><span class="w"> </span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">n</span><span class="p">(</span><span class="w"> </span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="p">[](</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">v</span><span class="p">;</span>
+<span class="w">    </span><span class="n">spin_for</span><span class="p">(</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="p">);</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">v</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">v</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="p">);</span>
+</pre></div>
+</div>
+<p>After the node is constructed in the example above, you can pass
+messages to it, either by connecting it to other nodes using edges or by
+invoking its function try_put. Using edges is described in the next
+section.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">n</span><span class="p">.</span><span class="n">try_put</span><span class="p">(</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">);</span>
+<span class="n">n</span><span class="p">.</span><span class="n">try_put</span><span class="p">(</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">);</span>
+<span class="n">n</span><span class="p">.</span><span class="n">try_put</span><span class="p">(</span><span class="w"> </span><span class="mi">3</span><span class="w"> </span><span class="p">);</span>
+</pre></div>
+</div>
+<p>You can then wait for the messages to be processed by calling
+<code class="docutils literal notranslate"><span class="pre">wait_for_all</span></code> on the graph object:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">g</span><span class="p">.</span><span class="n">wait_for_all</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>In the above example code, the function_node n was created with a
+concurrency limit of 1. When it receives the message sequence 1, 2 and
+3, the node n will spawn a task to apply the body to the first input, 1.
+When that task is complete, it will then spawn another task to apply the
+body to 2. And likewise, the node will wait for that task to complete
+before spawning a third task to apply the body to 3. The calls to
+try_put do not block until a task is spawned; if a node cannot
+immediately spawn a task to process the message, the message will be
+buffered in the node. When it is legal, based on concurrency limits, a
+task will be spawned to process the next buffered message.</p>
+<p>In the above graph, each message is processed sequentially. If however,
+you construct the node with a different concurrency limit, parallelism
+can be achieved:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">function_node</span><span class="o">&lt;</span><span class="w"> </span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">n</span><span class="p">(</span><span class="w"> </span><span class="n">g</span><span class="p">,</span><span class="w"> </span><span class="n">oneapi</span><span class="o">::</span><span class="n">tbb</span><span class="o">::</span><span class="n">flow</span><span class="o">::</span><span class="n">unlimited</span><span class="p">,</span><span class="w"> </span><span class="p">[](</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">v</span><span class="p">;</span>
+<span class="w">    </span><span class="n">spin_for</span><span class="p">(</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="p">);</span>
+<span class="w">    </span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">v</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">v</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="p">);</span>
+</pre></div>
+</div>
+<p>You can use unlimited as the concurrency limit to instruct the library
+to spawn a task as soon as a message arrives, regardless of how many
+other tasks have been spawned. You can also use any specific value, such
+as 4 or 8, to limit concurrency to at most 4 or 8, respectively. It is
+important to remember that spawning a task does not mean creating a
+thread. So while a graph may spawn many tasks, only the number of
+threads available in the library’s thread pool will be used to execute
+these tasks.</p>
+<p>Suppose you use unlimited in the function_node constructor instead and
+call try_put on the node:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">n</span><span class="p">.</span><span class="n">try_put</span><span class="p">(</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">);</span>
+<span class="n">n</span><span class="p">.</span><span class="n">try_put</span><span class="p">(</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">);</span>
+<span class="n">n</span><span class="p">.</span><span class="n">try_put</span><span class="p">(</span><span class="w"> </span><span class="mi">3</span><span class="w"> </span><span class="p">);</span>
+<span class="n">g</span><span class="p">.</span><span class="n">wait_for_all</span><span class="p">();</span>
+</pre></div>
+</div>
+<p>The library spawns three tasks, each one applying n’s lambda expression
+to one of the messages. If you have a sufficient number of threads
+available on your system, then all three invocations of the body will
+occur in parallel. If however, you have only one thread in the system,
+they execute sequentially.</p>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="Graph_Object.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Flow Graph Basics: Graph Object</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="Edges.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Flow Graph Basics: Edges</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright UXL Foundation Contributors.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
