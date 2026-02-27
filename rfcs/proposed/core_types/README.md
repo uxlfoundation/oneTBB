@@ -163,7 +163,7 @@ If the API semantics is defined to allow such behavior, the API can do the oneTB
 internally (instead of users doing it in their code).
 
 One disadvantage of this approach is that neither single nor several instances of `constraints` represent
-the limitations of the created arena. It is still possible to create another arena with the same limitations,
+the limitations of the created arena. Although, it is still possible to create another arena with the same limitations,
 by reusing the same set of arguments including the selector. It is also possible to have a proper copy
 constructor for `task_arena`, though we need to ensure that the internal state stores all the information needed
 to create another instance.
