@@ -44,7 +44,7 @@ struct body_traits;
 template <typename Input, typename Output>
 struct body_traits<Output (*)(Input)> : body_types<Input, Output> {};
 
-// Body is a noexcept free function pointer
+// Body is a pointer to noexcept function 
 template <typename Input, typename Output>
 struct body_traits<Output (*)(Input) noexcept> : body_types<Input, Output> {};
 
