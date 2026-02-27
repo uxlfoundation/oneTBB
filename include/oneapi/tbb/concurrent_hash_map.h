@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -59,9 +59,9 @@ struct hash_map_node_base : no_copy {
 };
 
 // Incompleteness flag value
-static void* const rehash_req_flag = reinterpret_cast<void*>(std::size_t(3));
+__TBB_GLOBAL_VAR void* const rehash_req_flag = reinterpret_cast<void*>(std::size_t(3));
 // Rehashed empty bucket flag
-static void* const empty_rehashed_flag = reinterpret_cast<void*>(std::size_t(0));
+__TBB_GLOBAL_VAR void* const empty_rehashed_flag = reinterpret_cast<void*>(std::size_t(0));
 
 template <typename MutexType>
 bool rehash_required( hash_map_node_base<MutexType>* node_ptr ) {

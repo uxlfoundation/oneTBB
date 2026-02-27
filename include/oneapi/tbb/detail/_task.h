@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2020-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -37,8 +37,8 @@ namespace detail {
 
 namespace d1 {
 using slot_id = unsigned short;
-constexpr slot_id no_slot = slot_id(~0);
-constexpr slot_id any_slot = slot_id(~1);
+__TBB_GLOBAL_VAR constexpr slot_id no_slot = slot_id(~0);
+__TBB_GLOBAL_VAR constexpr slot_id any_slot = slot_id(~1);
 
 class task;
 class wait_context;
@@ -87,7 +87,7 @@ using suspend_point = r1::suspend_point_type*;
 
 #if __TBB_RESUMABLE_TASKS
 template <typename F>
-static void suspend_callback(void* user_callback, suspend_point sp) {
+inline void suspend_callback(void* user_callback, suspend_point sp) {
     // Copy user function to a new stack after the context switch to avoid a race when the previous
     // suspend point is resumed while the user_callback is being called.
     F user_callback_copy = *static_cast<F*>(user_callback);
@@ -252,7 +252,7 @@ class task_traits {
 };
 
 //! Alignment for a task object
-static constexpr std::size_t task_alignment = 64;
+__TBB_GLOBAL_VAR constexpr std::size_t task_alignment = 64;
 
 //! Base class for user-defined tasks.
 /** @ingroup task_scheduling */
