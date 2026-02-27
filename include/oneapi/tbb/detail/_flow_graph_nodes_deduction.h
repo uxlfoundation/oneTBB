@@ -69,7 +69,7 @@ struct unary_operator_types_extractor {
     static auto check_args(Output (B::*name)(Input)) -> body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*name)(Input) noexcept) -> body_types<Input, Output>;
+    static auto check_args(Output (B::*)(Input) noexcept) -> body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
     static auto check_args(Output (B::*name)(Input) const) -> body_types<Input, Output>;
