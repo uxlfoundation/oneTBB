@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -3302,10 +3302,14 @@ inline void set_name(const async_node<Input, Output, Policy>& node, const char *
 {
     fgt_multioutput_node_desc(&node, name);
 }
+
 } // d2
 } // detail
 } // tbb
 
+#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITED_NODE
+#include "detail/_flow_graph_resource_limiting.h"
+#endif
 
 // Include deduction guides for node classes
 #include "detail/_flow_graph_nodes_deduction.h"
@@ -3365,6 +3369,10 @@ inline namespace v1 {
     using detail::d2::make_edges;
 #endif
 
+#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITED_NODE
+    using detail::d2::resource_provider;
+    using detail::d2::resource_limited_node;
+#endif
 } // v1
 } // flow
 
