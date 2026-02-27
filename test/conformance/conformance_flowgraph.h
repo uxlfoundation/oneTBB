@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2020-2025 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -811,4 +812,128 @@ void test_with_reserving_join_node_class() {
         if at least one successor accepts the tuple must consume messages");
 }
 }
+
+#if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
+namespace deduction_guides_testing {
+
+template <typename Input, typename Output>
+struct unqualified_callable_object {
+    Output operator()(Input) { return Output{}; }
+};
+
+template <typename Input, typename Output>
+struct const_callable_object {
+    Output operator()(Input) const { return Output{}; }
+};
+
+template <typename Input, typename Output>
+struct noexcept_callable_object {
+    Output operator()(Input) noexcept { return Output{}; }
+};
+
+template <typename Input, typename Output>
+struct lvalue_qualified_callable_object {
+    Output operator()(Input) & { return Output{}; }
+};
+
+template <typename Input, typename Output>
+struct const_noexcept_callable_object {
+    Output operator()(Input) const noexcept { return Output{}; }
+};
+
+template <typename Input, typename Output>
+struct const_lvalue_qualified_callable_object {
+    Output operator()(Input) const & { return Output{}; }
+};
+
+template <typename Input, typename Output>
+struct noexcept_lvalue_qualified_callable_object {
+    Output operator()(Input) & noexcept { return Output{}; }
+};
+
+template <typename Input, typename Output>
+struct const_noexcept_lvalue_qualified_callable_object {
+    Output operator()(Input) const & noexcept { return Output{}; }
+};
+
+template <typename Input, typename Output>
+struct several_overloads_callable_object {
+    Output operator()(Input) { return Output{}; } // Primary
+    void operator()(Input, Input, Input) {} // Should not prevent deduction guides from working
+};
+
+template <typename Input, typename Output>
+Output function_body(Input) { return Output{}; }
+
+template <typename Input, typename Output>
+Output noexcept_function_body(Input) noexcept { return Output{}; }
+
+template <typename Output>
+struct Input {
+    Input() {}
+    Input(const Input&) {}
+    Input& operator=(const Input&) { return *this; }
+
+    Output member_object = Output{};
+    const Output const_member_object = Output{};
+    mutable Output mutable_member_object = Output{};
+
+    Output const_member_function() const { return Output{}; }
+    Output const_noexcept_member_function() const noexcept { return Output{}; }
+};
+
+template <typename Input, typename Output,
+          template <class, class> typename Body,
+          template <class, class, class> typename Test>
+void run_test_substitute_body() {
+    using decayed_input_type = std::decay_t<Input>;
+    using decayed_output_type = std::decay_t<Output>;
+    Test<decayed_input_type, decayed_output_type, Body<Input, Output>>::run(Body<Input, Output>{});
+}
+
+template <typename Input, typename Output,
+          template <class, class, class> typename Test,
+          typename Body>
+void run_test_deduce_body(Body body) {
+    using decayed_input_type = std::decay_t<Input>;
+    using decayed_output_type = std::decay_t<Output>;
+    Test<decayed_input_type, decayed_output_type, Body>::run(body);
+}
+
+template <typename Input, typename Output,
+          template <class, class, class> typename Test>
+void test_all_body_types() {
+    // Test callable objects
+    run_test_substitute_body<Input, Output, unqualified_callable_object, Test>();
+    run_test_substitute_body<Input, Output, const_callable_object, Test>();
+    run_test_substitute_body<Input, Output, noexcept_callable_object, Test>();
+    run_test_substitute_body<Input, Output, lvalue_qualified_callable_object, Test>();
+    run_test_substitute_body<Input, Output, const_noexcept_callable_object, Test>();
+    run_test_substitute_body<Input, Output, const_lvalue_qualified_callable_object, Test>();
+    run_test_substitute_body<Input, Output, noexcept_lvalue_qualified_callable_object, Test>();
+    run_test_substitute_body<Input, Output, const_noexcept_lvalue_qualified_callable_object, Test>();
+    
+    // Callable object with several operator() overloads
+    run_test_substitute_body<Input, Output, several_overloads_callable_object, Test>();
+
+    // Test free function pointers
+    run_test_deduce_body<Input, Output, Test>(function_body<Input, Output>);
+    run_test_deduce_body<Input, Output, Test>(noexcept_function_body<Input, Output>);
+
+#if __TBB_CPP17_INVOKE_PRESENT
+    // Test Member function pointers
+    using decayed_input_type = std::decay_t<Input>;
+
+    run_test_deduce_body<Input, Output, Test>(&decayed_input_type::const_member_function);
+    run_test_deduce_body<Input, Output, Test>(&decayed_input_type::const_noexcept_member_function);
+
+    // Test member object pointers
+    run_test_deduce_body<Input, Output, Test>(&decayed_input_type::member_object);
+    run_test_deduce_body<Input, Output, Test>(&decayed_input_type::const_member_object);
+    run_test_deduce_body<Input, Output, Test>(&decayed_input_type::mutable_member_object);
+#endif
+}
+
+} // namespace deduction_guides_testing
+#endif
 #endif // __TBB_test_conformance_conformance_flowgraph_H
