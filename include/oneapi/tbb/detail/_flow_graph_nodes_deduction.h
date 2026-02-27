@@ -42,7 +42,10 @@ private:
 };
 
 template <typename Body, typename = void>
-struct body_traits;
+struct body_traits {.
+    // !std::is_same_v<Body, Body> is needed to create a dependent context for static_assert(false)
+    static_assert(!std::is_same_v<Body, Body>, "Body signature does not match the named requirements");
+};
 
 // Body is a pointer to function
 template <typename Input, typename Output>
@@ -165,6 +168,16 @@ priority_queue_node(const NodeSet&)
 ->priority_queue_node<decide_on_set_t<NodeSet>, std::less<decide_on_set_t<NodeSet>>>;
 #endif // __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 
+template <typename T>
+struct is_queueing_or_rejecting_tag
+    : std::disjunction<std::is_same<T, queueing>, std::is_same<T, reserving>>
+{};
+
+template <typename... Args>
+struct is_queueing_or_rejecting_tags
+    : std::conjunction<is_queueing_or_rejecting_tag<Args>...>
+{};
+
 template <typename Key>
 struct join_key {
     using type = Key;
@@ -179,11 +192,14 @@ template <typename Key>
 using join_key_t = typename join_key<Key>::type;
 
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
-template <typename... Predecessors, typename Policy>
+
+template <typename... Predecessors, typename Policy,
+          typename = std::enable_if_t<is_queueing_or_rejecting_tag<Policy>::value>>
 join_node(const node_set<order::following, Predecessors...>&, Policy)
 ->join_node<std::tuple<typename Predecessors::output_type...>, Policy>;
 
-template <typename Successor, typename... Successors, typename Policy>
+template <typename Successor, typename... Successors, typename Policy,
+          typename = std::enable_if_t<is_queueing_or_rejecting_tag<Policy>::value>>
 join_node(const node_set<order::preceding, Successor, Successors...>&, Policy)
 ->join_node<typename Successor::input_type, Policy>;
 
@@ -197,7 +213,8 @@ join_node(const node_set<order::preceding, Successor, Successors...>)
 ->join_node<typename Successor::input_type, queueing>;
 #endif
 
-template <typename GraphOrProxy, typename Body, typename... Bodies>
+template <typename GraphOrProxy, typename Body, typename... Bodies,
+          typename = std::enable_if_t<!is_queueing_or_rejecting_tags<Body, Bodies...>::value>>
 join_node(GraphOrProxy&&, Body, Bodies...)
 ->join_node<std::tuple<input_type_of<Body>, input_type_of<Bodies>...>,
             key_matching<join_key_t<output_type_of<Body>>>>;
@@ -218,7 +235,6 @@ split_node(const node_set<order::following, Predecessor, Predecessors...>&)
 template <typename... Successors>
 split_node(const node_set<order::preceding, Successors...>&)
 ->split_node<std::tuple<typename Successors::input_type...>>;
-
 #endif
 
 template <typename GraphOrSet, typename Body, typename Policy>
