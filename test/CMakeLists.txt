@@ -556,8 +556,25 @@ if (TARGET TBB::tbb)
         tbb_add_test(SUBDIR tbb NAME test_tbb_fork DEPENDENCIES TBB::tbb)
     endif()
 
-    tbb_add_test(SUBDIR tbb NAME test_tbb_header DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR tbb NAME test_tbb_header DEPENDENCIES TBB::tbb TBB::tbbmalloc)
     target_sources(test_tbb_header PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_secondary.cpp)
+
+    if (TBB_TEST_CXX20_MODULES)
+        if (CMAKE_VERSION VERSION_LESS 3.28)
+            message(WARNING "CMake 3.28 or higher is required to use C++20 modules, skipping module test")
+        elseif (NOT CMAKE_CXX_STANDARD OR CMAKE_CXX_STANDARD LESS 20)
+            message(WARNING "C++ standard 20 or higher is required, skipping module test")
+        else()
+                tbb_add_test(SUBDIR tbb NAME test_tbb_header_module_consumer DEPENDENCIES TBB::tbb TBB::tbbmalloc)
+            target_sources(test_tbb_header_module_consumer
+                PUBLIC FILE_SET CXX_MODULES FILES
+                ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_module.cppm)
+            set_target_properties(test_tbb_header_module_consumer PROPERTIES
+                CXX_STANDARD 20
+                CXX_STANDARD_REQUIRED ON)
+        endif()
+    endif()
+
     if (NOT MINGW AND TBB_OPENMP_FLAG AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(mips)")
         tbb_add_test(SUBDIR tbb NAME test_openmp DEPENDENCIES TBB::tbb)
 
