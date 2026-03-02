@@ -95,7 +95,7 @@ For other resource types, the `ResourceHandle` may represent a lightweight entit
 HeavyResourceOutsideGraphScope resource;
 
 using handle_type = HeavyResourceOutsideGraphScope*;
-oneapi::tbb::flow::resource_limiter<handle_type> provider(&resource);
+oneapi::tbb::flow::resource_limiter<handle_type> provider{&resource};
 ```
 
 All the resource handles managed by the provider are considered equivalent, and the order in which the access to resources
