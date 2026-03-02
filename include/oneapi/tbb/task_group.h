@@ -545,14 +545,14 @@ protected:
         
         task_handle_task* task_ptr = task_handle_accessor::release(h);
         task_dynamic_state* state = task_ptr->get_dynamic_state();
-        bool was_canceled = false;
+        task_group_status status = task_group_status::not_complete;
 
         if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
-            was_canceled = state->wait_for_completion(context());
+            status = state->wait_for_completion(context());
         } else {
-            was_canceled = state->run_self_and_wait_for_completion(context());
+            status = state->run_self_and_wait_for_completion(context());
         }
-        return was_canceled ? task_group_status::canceled : task_group_status::task_complete;
+        return status;
     }
 #endif
 
@@ -621,8 +621,7 @@ public:
     task_group_status wait_for_task(task_completion_handle& comp_handle) {
         __TBB_ASSERT(comp_handle, "Attempt to wait for completion of empty handle");
         task_dynamic_state* state = task_completion_handle_accessor::get_task_dynamic_state(comp_handle);
-        bool was_canceled = state->wait_for_completion(context());
-        return was_canceled ? task_group_status::canceled : task_group_status::task_complete;
+        return state->wait_for_completion(context());
     }
 #endif
 
@@ -727,7 +726,7 @@ class wait_completion_delegate : public d1::delegate_base {
     bool operator()() const override {
         task_dynamic_state* state = task_completion_handle_accessor::get_task_dynamic_state(comp_handle);
         d1::task_group_context& ctx = state->get_task()->ctx();
-        status = state->wait_for_completion(ctx) ? task_group_status::canceled : task_group_status::task_complete;
+        status = state->wait_for_completion(ctx);
         return true;
     }
 protected:
