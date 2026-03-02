@@ -137,10 +137,9 @@ jobs:
           fetch-depth: 0
       - name: Run check
         run: |
-          CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }} \                     
+          CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }} \
                         | grep -v -x '.github/workflows/ci.yml' \
-                        || true
-                        )
+                        || true)
           UXL_COPYRIGHT="Copyright \(c\) [0-9]+(-[0-9]+)? UXL Foundation Contributors"
           APACHE_COPYRIGHT_LINE="Licensed under the Apache License"
           CURRENT_YEAR=$(date +%Y)
