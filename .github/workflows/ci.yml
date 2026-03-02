@@ -142,7 +142,7 @@ jobs:
           APACHE_COPYRIGHT_LINE="Licensed under the Apache License"
           CURRENT_YEAR=$(date +%Y)
 
-          FILES_WITH_COPYRIGHT=$(grep -lF "$APACHE_COPYRIGHT_LINE" $CHANGED_FILES)
+          FILES_WITH_COPYRIGHT=$(grep -lF "$APACHE_COPYRIGHT_LINE" $CHANGED_FILES || true)
           FILES_WITH_MISSING_UXL_COPYRIGHT=$(grep -LE "$UXL_COPYRIGHT" $FILES_WITH_COPYRIGHT)
 
           # Update UXL Copyright years
