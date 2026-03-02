@@ -192,11 +192,13 @@ An alternative is to use ``TBB_VERSION`` macro for this purpose:
 
 ```cpp
 // Defined in <oneapi/tbb/task_group.h>
+// Defined in <oneapi/tbb/version.h>
 #define TBB_TASK_GROUP_WAIT_FOR_INDIVIDUAL_TASKS 202xxx
 
 namespace oneapi {
 namespace tbb {
 
+// Defined in <oneapi/tbb/task_group.h>
 enum task_group_status { // Existing API
     not_complete,        // Existing API
     complete,            // Existing API
@@ -359,7 +361,7 @@ The following questions should be resolved before promoting the feature out of t
 * Should ``run_and_wait_for_task`` overload accepting the task body be added? Refer to the
   [``run_and_wait_for_task`` Accepting the Task Body](#run_and_wait_for_task-accepting-the-task-body) for more details.
 * Proper API and naming for functions returning the task status should be defined. Refer to the
-  [``Returning the status of the task``] section for more details.
+  [``Returning the status of the task``](#returning-the-status-of-the-task) section for more details.
 * Name and the value for the feature test macro should be defined. Refer to the [``Feature Test Macro``](#feature-test-macro) for more details.
 * Should an additional ``task_group_status`` be introduced to indicate that the task has been completed, but a cancellation of the group was detected?
 
