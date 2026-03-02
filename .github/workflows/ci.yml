@@ -137,7 +137,7 @@ jobs:
           fetch-depth: 0
       - name: Run check
         run: |
-          CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }}                          
+          CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }} \                     
                         | grep -v -x '.github/workflows/ci.yml' \
                         || true
                         )
