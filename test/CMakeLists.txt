@@ -1,5 +1,5 @@
 # Copyright (c) 2020-2025 Intel Corporation
-# Copyright (c) 2025 UXL Foundation Contributors
+# Copyright (c) 2025-2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -85,6 +85,10 @@ function(tbb_add_test)
         $<$<BOOL:${TBB_TCM_TESTING}>:__TBB_TCM_TESTING_ENABLED=1>)
 
     target_link_libraries(${_tbb_test_TARGET_NAME} PRIVATE ${_tbb_test_DEPENDENCIES} Threads::Threads ${TBB_COMMON_LINK_LIBS})
+
+    if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+        target_link_libraries(${_tbb_test_TARGET_NAME} PRIVATE util)
+    endif()
 
     if (COMMAND _tbb_run_memcheck)
         _tbb_run_memcheck(${_tbb_test_NAME} ${_tbb_test_SUBDIR})
@@ -706,6 +710,10 @@ if (TARGET TBB::tbbmalloc)
                 target_link_libraries(test_malloc_whitebox PRIVATE ${TBB_COMMON_LINK_FLAGS})
             endif()
             target_link_libraries(test_malloc_whitebox PRIVATE Threads::Threads ${TBB_COMMON_LINK_LIBS})
+
+            if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+                target_link_libraries(test_malloc_whitebox PRIVATE util)
+            endif()
         endif()
         # ------------------------------------------------------------------------------------------
 

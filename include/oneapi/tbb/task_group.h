@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -75,10 +75,8 @@ struct task_group_context_impl;
 
 namespace d2 {
 
-namespace {
 template<typename F>
 d1::task* task_ptr_or_nullptr(F&& f);
-}
 
 template<typename F>
 class function_task : public task_handle_task  {
@@ -131,7 +129,6 @@ public:
 };
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-namespace {
     template<typename F>
     d1::task* task_ptr_or_nullptr_impl(std::false_type, F&& f){
         task_handle th = std::forward<F>(f)();
@@ -158,15 +155,12 @@ namespace {
 
         return  task_ptr_or_nullptr_impl(is_void_t{}, std::forward<F>(f));
     }
-}
 #else
-namespace {
     template<typename F>
     d1::task* task_ptr_or_nullptr(F&& f){
         std::forward<F>(f)();
         return nullptr;
     }
-}  // namespace
 #endif // __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 } // namespace d2
 
@@ -476,7 +470,13 @@ class isolated_task_group;
 #endif
 
 template <typename F>
-class function_stack_task : public d1::task {
+class function_stack_task
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    : public d2::dynamic_state_task
+#else
+    : public d1::task
+#endif
+{
     const F& m_func;
     d1::wait_tree_vertex_interface* m_wait_tree_vertex;
 
@@ -668,12 +668,12 @@ public:
 
     static void transfer_this_task_completion_to(d2::task_handle& new_task) {
         d1::task* curr_task = d1::current_task_ptr();
-        __TBB_ASSERT(curr_task != nullptr, "this_task_completion_to was called outside of task body");
-        task_handle_task* curr_th_task = dynamic_cast<task_handle_task*>(curr_task);
-        // Not using __TBB_ASSERT(curr_th_task) to allow function_stack_task body to use this method
-        if (curr_th_task != nullptr) {
-            curr_th_task->transfer_completion_to(new_task);
-        }
+        __TBB_ASSERT(curr_task != nullptr, "transfer_this_task_completion_to was called outside of task body");
+#if __TBB_USE_OPTIONAL_RTTI && TBB_USE_DEBUG
+        __TBB_ASSERT(dynamic_cast<dynamic_state_task*>(curr_task) != nullptr,
+                     "transfer_this_task_completion_to was called from a task outside a task_group");
+#endif
+        static_cast<dynamic_state_task*>(curr_task)->transfer_completion_to(new_task);
     }
 #endif
 }; // class task_group

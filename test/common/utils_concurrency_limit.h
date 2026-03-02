@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2020-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Сontributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -80,6 +80,12 @@ inline std::vector<thread_num_type> concurrency_range() {
 
 static int maxProcs = 0;
 
+#if __linux__
+using cpu_set_type = cpu_set_t;
+#elif __FreeBSD__
+using cpu_set_type = cpuset_t;
+#endif
+
 static int get_max_procs() {
     if (!maxProcs) {
 #if _WIN32||_WIN64
@@ -91,16 +97,16 @@ static int get_max_procs() {
                 ++nproc;
         }
         maxProcs = nproc;
-#elif __linux__
-        cpu_set_t mask;
+#elif __linux__ || __FreeBSD__
         int result = 0;
-        sched_getaffinity(0, sizeof(cpu_set_t), &mask);
+        cpu_set_type mask;
+        sched_getaffinity(0, sizeof(cpu_set_type), &mask);
         int nproc = sysconf(_SC_NPROCESSORS_ONLN);
         for (int i = 0; i < nproc; ++i) {
             if (CPU_ISSET(i, &mask)) ++result;
         }
         maxProcs = result;
-#else // FreeBSD
+#else
         maxProcs = sysconf(_SC_NPROCESSORS_ONLN);
 #endif
     }
@@ -328,9 +334,9 @@ private:
 
 std::vector<int> get_cpuset_indices() {
     std::vector<int> result;
-#if __linux__
-    cpu_set_t mask;
-    sched_getaffinity(0, sizeof(cpu_set_t), &mask);
+#if __linux__ || __FreeBSD__
+    cpu_set_type mask;
+    sched_getaffinity(0, sizeof(cpu_set_type), &mask);
     int nproc = sysconf(_SC_NPROCESSORS_ONLN);
     for (int i = 0; i < nproc; ++i) {
         if (CPU_ISSET(i, &mask)) {
@@ -339,7 +345,7 @@ std::vector<int> get_cpuset_indices() {
     }
     ASSERT(!result.empty(), nullptr);
 #else
-    // TODO: add affinity support for Windows and FreeBSD
+    // TODO: add affinity support for Windows
 #endif
     return result;
 }
@@ -377,6 +383,7 @@ int limit_number_of_threads( int max_threads ) {
 
     ASSERT(max_threads <= int(sizeof(mask_t) * CHAR_BIT), "The mask size is not enough to set the requested number of threads.");
     std::vector<int> cpuset_indices = get_cpuset_indices();
+    ASSERT(!cpuset_indices.empty(), "Empty cpuset returned.");
 
     for (int i = 0; i < max_threads; ++i) {
         CPU_SET(cpuset_indices[i], &new_mask);
