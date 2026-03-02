@@ -129,8 +129,8 @@ inline void enqueue_impl(task_handle&& th, d1::task_arena_base* ta) {
 
 namespace d1 {
 
-static constexpr unsigned num_priority_levels = 3;
-static constexpr int priority_stride = INT_MAX / (num_priority_levels + 1);
+__TBB_GLOBAL_VAR constexpr unsigned num_priority_levels = 3;
+__TBB_GLOBAL_VAR constexpr int priority_stride = INT_MAX / (num_priority_levels + 1);
 
 class task_arena_base {
     friend struct r1::task_arena_impl;
