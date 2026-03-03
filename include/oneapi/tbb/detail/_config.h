@@ -557,4 +557,9 @@
 #define TBB_EXT_CUSTOM_ASSERTION_HANDLER 202510
 #endif
 
+// Feature-test macros
+#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITED_NODE
+#define TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITED_NODE 202603
+#endif
+
 #endif // __TBB_detail__config_H

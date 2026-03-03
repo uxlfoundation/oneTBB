@@ -290,6 +290,11 @@ void test_root_genie() {
 }
 
 //! \brief \ref interface
+TEST_CASE("Feature test macro") {
+    CHECK_MESSAGE(TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITED_NODE == 202603, "Incorrect feature test macro");
+}
+
+//! \brief \ref interface
 TEST_CASE("bases of resource_limited_node") {
     test_inheritance<int, std::tuple<>>();
     test_inheritance<int, std::tuple<int>>();
