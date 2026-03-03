@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2020-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -134,84 +134,21 @@ private:
     std::atomic<std::size_t> m_num_references;
     d1::small_object_allocator m_allocator;
 };
-#endif // __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
-class task_handle_task : public d1::task {
-    // Pointer to the instantiation of destroy_function_task with the concrete derived type,
-    // used for correct destruction and deallocation of the task
-    using destroy_func_type = void (*)(task_handle_task*, d1::small_object_allocator&, const d1::execution_data*);
-
-    // Reuses the first std::uint64_t field (previously m_version_and_traits) to maintain backward compatibility
-    // The type of the first field remains std::uint64_t to preserve alignment and offset of subsequent member variables.
-    static_assert(sizeof(destroy_func_type) <= sizeof(std::uint64_t), "Cannot fit destroy pointer into std::uint64_t");
-    std::uint64_t m_destroy_func;
-
-    d1::wait_tree_vertex_interface* m_wait_tree_vertex;
-    d1::task_group_context& m_ctx;
-    d1::small_object_allocator m_allocator;
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+class dynamic_state_task : public d1::task {
     std::atomic<task_dynamic_state*> m_dynamic_state;
-#endif
 public:
-    void destroy(const d1::execution_data* ed = nullptr) {
-        destroy_func_type destroy_func = reinterpret_cast<destroy_func_type>(m_destroy_func);
-        if (destroy_func != nullptr) {
-            // If the destroy function is set for the current instantiation - use it
-            (*destroy_func)(this, m_allocator, ed);
-        } else {
-            // Otherwise, the object was compiled with the old version of the library
-            // Destroy the object and let the memory leak since the derived type is unknown
-            // and the object cannot be deallocated properly
-            this->~task_handle_task();
-        }
-    }
+    dynamic_state_task() : m_dynamic_state(nullptr) {}
 
-    task_handle_task(d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx,
-                     d1::small_object_allocator& alloc, destroy_func_type destroy_func)
-        : m_destroy_func(reinterpret_cast<std::uint64_t>(destroy_func))
-        , m_wait_tree_vertex(vertex)
-        , m_ctx(ctx)
-        , m_allocator(alloc)
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-        , m_dynamic_state(nullptr)
-#endif
-    {
-        m_wait_tree_vertex->reserve();
-    }
-
-    ~task_handle_task() override {
-        m_wait_tree_vertex->release();
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    ~dynamic_state_task() {
         task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_relaxed);
         if (current_state != nullptr) {
             current_state->release();
         }
-#endif
     }
 
-    d1::task_group_context& ctx() const { return m_ctx; }
-
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
     // Returns the dynamic state associated with the task. If the state has not been initialized, initializes it.
-    task_dynamic_state* get_dynamic_state() {
-        task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_acquire);
-
-        if (current_state == nullptr) {
-            d1::small_object_allocator alloc;
-
-            task_dynamic_state* new_state = alloc.new_object<task_dynamic_state>(this, alloc);
-
-            if (m_dynamic_state.compare_exchange_strong(current_state, new_state)) {
-                current_state = new_state;
-            } else {
-                // CAS failed, current_state points to the dynamic state created by another thread
-                alloc.delete_object(new_state);
-            }
-        }
-
-        __TBB_ASSERT(current_state != nullptr, "Failed to create dynamic state");
-        return current_state;
-    }
+    task_dynamic_state* get_dynamic_state();
 
     task_handle_task* complete_and_try_get_successor() {
         task_handle_task* next_task = nullptr;
@@ -237,8 +174,83 @@ public:
     }
 
     void transfer_completion_to(task_handle& receiving_task);
-#endif
 };
+#endif
+
+class task_handle_task
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    : public dynamic_state_task
+#else
+    : public d1::task
+#endif
+{
+    // Pointer to the instantiation of destroy_function_task with the concrete derived type,
+    // used for correct destruction and deallocation of the task
+    using destroy_func_type = void (*)(task_handle_task*, d1::small_object_allocator&, const d1::execution_data*);
+
+    // Reuses the first std::uint64_t field (previously m_version_and_traits) to maintain backward compatibility
+    // The type of the first field remains std::uint64_t to preserve alignment and offset of subsequent member variables.
+    static_assert(sizeof(destroy_func_type) <= sizeof(std::uint64_t), "Cannot fit destroy pointer into std::uint64_t");
+    std::uint64_t m_destroy_func;
+
+    d1::wait_tree_vertex_interface* m_wait_tree_vertex;
+    d1::task_group_context& m_ctx;
+    d1::small_object_allocator m_allocator;
+public:
+    void destroy(const d1::execution_data* ed = nullptr) {
+        destroy_func_type destroy_func = reinterpret_cast<destroy_func_type>(m_destroy_func);
+        if (destroy_func != nullptr) {
+            // If the destroy function is set for the current instantiation - use it
+            (*destroy_func)(this, m_allocator, ed);
+        } else {
+            // Otherwise, the object was compiled with the old version of the library
+            // Destroy the object and let the memory leak since the derived type is unknown
+            // and the object cannot be deallocated properly
+            this->~task_handle_task();
+        }
+    }
+
+    task_handle_task(d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx,
+                     d1::small_object_allocator& alloc, destroy_func_type destroy_func)
+        : m_destroy_func(reinterpret_cast<std::uint64_t>(destroy_func))
+        , m_wait_tree_vertex(vertex)
+        , m_ctx(ctx)
+        , m_allocator(alloc)
+    {
+        m_wait_tree_vertex->reserve();
+    }
+
+    ~task_handle_task() override {
+        m_wait_tree_vertex->release();
+    }
+
+    d1::task_group_context& ctx() const { return m_ctx; }
+};
+
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+inline task_dynamic_state* dynamic_state_task::get_dynamic_state() {
+#if __TBB_USE_OPTIONAL_RTTI
+    __TBB_ASSERT(dynamic_cast<task_handle_task*>(this) != nullptr, "get_dynamic_state was called for a stack task");
+#endif
+    task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_acquire);
+
+    if (current_state == nullptr) {
+        d1::small_object_allocator alloc;
+
+        task_dynamic_state* new_state = alloc.new_object<task_dynamic_state>(static_cast<task_handle_task*>(this), alloc);
+
+        if (m_dynamic_state.compare_exchange_strong(current_state, new_state)) {
+            current_state = new_state;
+        } else {
+            // CAS failed, current_state points to the dynamic state created by another thread
+            alloc.delete_object(new_state);
+        }
+    }
+
+    __TBB_ASSERT(current_state != nullptr, "Failed to create dynamic state");
+    return current_state;
+}
+#endif
 
 class task_handle {
     struct task_handle_task_deleter {
@@ -402,7 +414,7 @@ inline task_handle_task* task_dynamic_state::complete_and_try_get_successor() {
     return next_task;
 }
 
-inline void task_handle_task::transfer_completion_to(task_handle& receiving_task) {
+inline void dynamic_state_task::transfer_completion_to(task_handle& receiving_task) {
     __TBB_ASSERT(receiving_task, nullptr);
     task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_relaxed);
     

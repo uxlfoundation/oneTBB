@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -1731,6 +1731,18 @@ void submit_and_wait(submit_function func, tbb::task_handle&& handle, tbb::task_
     }
 }
 
+template <typename Function>
+void submit_and_wait(submit_function func, const Function& function, tbb::task_group& group, tbb::task_arena& arena) {
+    if (func == submit_function::run_and_wait ) {
+        group.run_and_wait(function);
+    } else if (func == submit_function::run) {
+        group.run(function);
+        group.wait();
+    } else {
+        submit_and_wait(func, group.defer(function), group, arena);
+    }
+}
+
 struct leaf_task {
     void operator()() const {
         *placeholder = value;
@@ -1898,11 +1910,11 @@ void test_recursive_reduction(submit_function func) {
     int* result_placeholder = new int(0);
 
     for (auto n : {2, 5, 10, 100, 1000, 5000, 10000}) {
-        tbb::task_handle do_reduction = tg.defer([=, &tg, &arena] {
+        auto start_reduction = [=, &tg, &arena] {
             recursive_reduction(func, tg, arena, 0, n, result_placeholder, /*cutoff = */n < 100 ? 1 : 50);
-        });
+        };
 
-        submit_and_wait(func, std::move(do_reduction), tg, arena);
+        submit_and_wait(func, start_reduction, tg, arena);
         CHECK_MESSAGE(*result_placeholder == serial_reduction(0, n), "Incorrect final result for reduction");
         *result_placeholder = 0;
     }

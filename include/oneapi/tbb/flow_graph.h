@@ -167,14 +167,14 @@ namespace tbb {
 namespace detail {
 namespace d2 {
 
-static inline std::pair<graph_task*, graph_task*> order_tasks(graph_task* first, graph_task* second) {
+inline std::pair<graph_task*, graph_task*> order_tasks(graph_task* first, graph_task* second) {
     if (second->priority > first->priority)
         return std::make_pair(second, first);
     return std::make_pair(first, second);
 }
 
 // submit task if necessary. Returns the non-enqueued task if there is one.
-static inline graph_task* combine_tasks(graph& g, graph_task* left, graph_task* right) {
+inline graph_task* combine_tasks(graph& g, graph_task* left, graph_task* right) {
     // if no RHS task, don't change left.
     if (right == nullptr) return left;
     // right != nullptr
