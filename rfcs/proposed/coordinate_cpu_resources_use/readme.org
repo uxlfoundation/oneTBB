@@ -23,10 +23,10 @@ This problem becomes more pronounced in complex software stacks where the number
 components continues to grow, and manual coordination becomes impractical or impossible.
 
 ** The core idea of the TCM
-The Thread Composability Manager (TCM) is a lightweight, runtime coordination layer that enables
-multiple parallel libraries and frameworks to cooperatively share CPU resources within a single
-application. The core concept revolves around providing a unified resource management interface that
-allows different parallel components to:
+The Thread Composability Manager (TCM) is a runtime coordination layer that enables multiple
+parallel libraries and frameworks to cooperatively share CPU resources within a single application.
+The core concept revolves around providing a unified resource management interface that allows
+different parallel components to:
 1. *Register their resource requirements*: Components can declare their threading needs and
    constraints.
 2. *Negotiate resource allocation*: TCM mediates between components to determine optimal resource
@@ -48,8 +48,33 @@ recommendations to prevent destructive interference between components.
 4. *Permissive licensing*: Uses permissive open-source Apache 2.0 with LLVM exception, which allows
    easy integration, broad adoption and accepting of community contributions.
 
+** Project independence and availability
+Thread Composability Manager is distributed in oneAPI packages as a binary-only, hidden component.
+Its use is already integrated and supported by oneTBB and Intel's OpenMP runtime. The TCM is
+installed when either or both of these libraries are selected for installation. Yet, the TCM does
+not depend on the either of these parallel runtimes and can be used by other threading frameworks.
+
 * Proposal
-Introduce Thread Composability Manager.
+Since Thread Composability Manager provides a general interface to consult on CPU utilization and
+allows any threading framework to get recommendations on the use of CPU resources, the proposal is
+to make the TCM more available so that everyone interested can leverage its use and make their
+parallel runtime composable with oneTBB and Intel's OpenMP now, and with more and more threading
+runtimes in the future, allowing users to use those parallel runtimes in which they are fluent the
+most and/or which fit computations the best.
+
+At the same time, popularity of oneTBB project can help with accessibility and availability of TCM,
+allowing users to test the use of TCM and integration of their runtime with other parallel runtimes
+in a single application, providing feedback along the way and making patches to TCM code through the
+same repository infrastructure. Therefore, the proposal is to open-source the TCM project as a
+sub-project of oneTBB, yet keeping it independent from the core oneTBB library.
+
+Below are the details of TCM open sourcing.
+
+** Keeping project independence intact
+Although, placed into the oneTBB source tree, TCM remains independent. The top =tcm= directory can
+literally be copied/moved into other place and used from there without any dependence on oneTBB
+project. This is necessary to avoid assumption about project tight coupling with oneTBB and simplify
+integration of TCM into other parallel libraries.
 ** Placement
 TCM sources are to be placed in the =tcm= subdirectory of the oneTBB source root.
 #+begin_example
@@ -61,11 +86,6 @@ TCM sources are to be placed in the =tcm= subdirectory of the oneTBB source root
       └── tcm    <-- new directory with TCM sources
 #+end_example
 Such placement is a trade-off between project visibility and its independence.
-** Independence
-Although, placed into the oneTBB source tree, TCM remains independent. The top =tcm= directory can
-literally be copied/moved into other place and used from there without any dependence on oneTBB
-project. This is necessary to avoid assumption about project tight coupling with oneTBB and simplify
-integration of TCM into other parallel libraries.
 ** Integration with oneTBB build system
 The idea is to make an extension to the oneTBB build system by naturally interspersing its build and
 test rules with corresponding TCM rules if TCM dependencies are met, and TCM rules are not
