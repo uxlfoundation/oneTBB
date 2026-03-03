@@ -146,7 +146,8 @@ to determine with what version of TCM it was compiled.
 The TCM binary packages are to be distributed separately from oneTBB packages, but available for
 download along with them through the same distribution channels.
 
-TCM sources are to be included into the oneTBB sources package archive.
+In addition to providing as a separate source package archive, TCM sources are to be included into
+oneTBB sources package archive.
 
 This helps to underline the independence of TCM project from oneTBB, and yet make it available as
 much as possible.
