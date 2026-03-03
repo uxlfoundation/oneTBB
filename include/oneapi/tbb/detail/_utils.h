@@ -1,6 +1,5 @@
 /*
     Copyright (c) 2005-2023 Intel Corporation
-    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -38,8 +37,8 @@ template<typename... T> void suppress_unused_warning(T&&...) {}
 /** It should be used only in situations where having a compile-time upper
   bound is more useful than a run-time exact answer.
   @ingroup memory_allocation */
-__TBB_GLOBAL_VAR constexpr size_t max_nfs_size = 128;
-__TBB_GLOBAL_VAR constexpr std::size_t max_nfs_size_exp = 7;
+constexpr size_t max_nfs_size = 128;
+constexpr std::size_t max_nfs_size_exp = 7;
 static_assert(1 << max_nfs_size_exp == max_nfs_size, "max_nfs_size_exp must be a log2(max_nfs_size)");
 
 //! Class that implements exponential backoff.
@@ -189,7 +188,7 @@ constexpr bool is_aligned(T* pointer, std::uintptr_t alignment) {
 }
 
 #if TBB_USE_ASSERT
-__TBB_GLOBAL_VAR void* const poisoned_ptr = reinterpret_cast<void*>(-1);
+static void* const poisoned_ptr = reinterpret_cast<void*>(-1);
 
 //! Set p to invalid pointer value.
 template<typename T>
