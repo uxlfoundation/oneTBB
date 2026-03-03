@@ -194,7 +194,7 @@ using join_key_t = typename join_key<Key>::type;
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 
 template <typename... Predecessors, typename Policy,
-          typename = std::enable_if_t<is_queueing_or_rejecting_tag<Policy>::value>>
+          std::enable_if_t<is_queueing_or_rejecting_tag<Policy>::value, int> = 0>
 join_node(const node_set<order::following, Predecessors...>&, Policy)
 ->join_node<std::tuple<typename Predecessors::output_type...>, Policy>;
 
