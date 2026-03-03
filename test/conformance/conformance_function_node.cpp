@@ -205,17 +205,7 @@ TEST_CASE("function_node broadcast"){
     conformance::test_forwarding<oneapi::tbb::flow::function_node<input_msg, int>, input_msg, int>(1, oneapi::tbb::flow::unlimited, fun);
 }
 
-struct two_overloads {
-    int operator()(int) const { return 0; }
-    float operator()(int, int, int) const { return 0; }
-};
-
-struct bad_overload {
-    int operator()(int, int) const { return 0; }
-};
-
 #if __TBB_CPP17_DEDUCTION_GUIDES_PRESENT
-
 //! Test deduction guides
 //! \brief \ref interface \ref requirement
 TEST_CASE("Deduction guides"){
