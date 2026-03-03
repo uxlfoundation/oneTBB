@@ -150,8 +150,9 @@ public:
     using consumer_type = typename resource_provider_base<ResourceHandle>::consumer_type;
     using optional_type = typename resource_provider_base<ResourceHandle>::optional_type;
 
-    resource_limiter(std::initializer_list<ResourceHandle> init) {
-        m_resource_handles.insert_after(m_resource_handles.before_begin(), init);
+    template <typename Handle, typename... Handles>
+    resource_limiter(Handle&& handle, Handles&&... handles) {
+        emplace_handles(std::forward<Handle>(handle), std::forward<Handles>(handles)...);
     }
 
     void request(consumer_type& consumer, request_id id) override {
@@ -197,6 +198,15 @@ public:
     void report_pressure(consumer_type&, std::size_t) override {}
 
     using consumer_data = std::pair<request_id, resource_consumer_base<ResourceHandle>*>;
+
+private:
+    template <typename Handle, typename... Handles>
+    void emplace_handles(Handle&& handle, Handles&&... handles) {
+        m_resource_handles.emplace_front(std::forward<Handle>(handle));
+        emplace_handles(std::forward<Handles>(handles)...);
+    }
+
+    void emplace_handles();
 
     tbb::spin_mutex m_mutex;
     std::forward_list<ResourceHandle> m_resource_handles;
