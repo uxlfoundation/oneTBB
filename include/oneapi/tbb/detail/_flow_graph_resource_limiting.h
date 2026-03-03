@@ -206,7 +206,7 @@ private:
         emplace_handles(std::forward<Handles>(handles)...);
     }
 
-    void emplace_handles();
+    void emplace_handles() {}
 
     tbb::spin_mutex m_mutex;
     std::forward_list<ResourceHandle> m_resource_handles;
