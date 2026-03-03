@@ -175,7 +175,7 @@ It is proposed to add an explicit feature-test macro to determine the presence o
 #define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
 #include <oneapi/tbb/task_group.h>
 
-#if TBB_TASK_GROUP_WAIT_INDIVIDUAL_TASKS >= 202xxx // Some documented value
+#if TBB_HAS_TASK_GROUP_WAIT_FOR_TASK >= 202xxx // Some documented value
 group.wait_for_task(comp_handle);
 #else
 // Usage of other APIs or self-written workarounds
@@ -193,7 +193,7 @@ An alternative is to use ``TBB_VERSION`` macro for this purpose:
 ```cpp
 // Defined in <oneapi/tbb/task_group.h>
 // Defined in <oneapi/tbb/version.h>
-#define TBB_TASK_GROUP_WAIT_FOR_INDIVIDUAL_TASKS 202xxx
+#define TBB_TASK_GROUP_WAIT_FOR_TASK 202xxx
 
 namespace oneapi {
 namespace tbb {
@@ -362,7 +362,6 @@ The following questions should be resolved before promoting the feature out of t
   [``run_and_wait_for_task`` Accepting the Task Body](#run_and_wait_for_task-accepting-the-task-body) for more details.
 * Proper API and naming for functions returning the task status should be defined. Refer to the
   [``Returning the status of the task``](#returning-the-status-of-the-task) section for more details.
-* Name and the value for the feature test macro should be defined. Refer to the [``Feature Test Macro``](#feature-test-macro) for more details.
 * Should an additional ``task_group_status`` be introduced to indicate that the task has been completed, but a cancellation of the group was detected?
 
 ## Implementation Details
