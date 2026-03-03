@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -20,6 +21,7 @@
 #include "rml_tbb.h"
 
 #include "misc.h" // for AvailableHwConcurrency
+#include "tcm.h"
 #include "tls.h"
 
 namespace tbb {
@@ -36,6 +38,8 @@ extern bool ITT_Present;
 #endif
 
 typedef std::size_t stack_size_type;
+
+tcm_cpu_mask_t constraints_affinity_mask(const d1::constraints& c);
 
 //------------------------------------------------------------------------
 // Class governor
