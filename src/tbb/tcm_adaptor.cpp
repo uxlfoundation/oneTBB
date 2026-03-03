@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2023-2025 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -180,6 +181,9 @@ public:
         {
             my_permit_constraints.max_concurrency = constraints.max_concurrency;
             my_permit_constraints.min_concurrency = 0;
+            my_permit_constraints.mask = constraints_affinity_mask(constraints);
+
+            // High-level constraints are fallback when mask is not set (e.g., TBBBind unused).
             my_permit_constraints.core_type_id = constraints.core_type;
             my_permit_constraints.numa_id = constraints.numa_id;
             my_permit_constraints.threads_per_core = constraints.max_threads_per_core;
