@@ -34,10 +34,9 @@ template <typename Input, typename Output>
 struct checked_body_types : body_types<Input, Output> {
 private:
     using base_type = body_types<Input, Output>;
-    using const_lvalue_ref_input_type = std::add_lvalue_reference_t<std::add_const_t<typename base_type::input_type>>;
 
     static_assert(std::is_same_v<Input, typename base_type::input_type> ||
-                  std::is_same_v<Input, const_lvalue_ref_input_type>,
+                  std::is_same_v<Input, const typename base_type::input_type&>,
                   "The node body can only accept input by value or by const lvalue reference");
 };
 
@@ -76,16 +75,16 @@ struct unary_operator_types_extractor {
     static auto check_args(Output (B::*)(Input)) -> checked_body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*)(Input) noexcept) -> checked_body_types<Input, Output>;
-
-    template <typename B, typename Input, typename Output>
     static auto check_args(Output (B::*)(Input) const) -> checked_body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
-    static auto check_args(Output (B::*)(Input) &) -> checked_body_types<Input, Output>;
+    static auto check_args(Output (B::*)(Input) noexcept) -> checked_body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
     static auto check_args(Output (B::*)(Input) const noexcept) -> checked_body_types<Input, Output>;
+
+    template <typename B, typename Input, typename Output>
+    static auto check_args(Output (B::*)(Input) &) -> checked_body_types<Input, Output>;
 
     template <typename B, typename Input, typename Output>
     static auto check_args(Output (B::*)(Input) const &) -> checked_body_types<Input, Output>;
@@ -169,14 +168,11 @@ priority_queue_node(const NodeSet&)
 #endif // __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 
 template <typename T>
-struct is_queueing_or_rejecting_tag
-    : std::disjunction<std::is_same<T, queueing>, std::is_same<T, reserving>>
-{};
+using is_queueing_or_rejecting_tag_impl = std::disjunction<std::is_same<T, queueing>, std::is_same<T, reserving>>;
 
-template <typename... Args>
-struct is_queueing_or_rejecting_tags
-    : std::conjunction<is_queueing_or_rejecting_tag<Args>...>
-{};
+template <typename T, typename... Args>
+using is_queueing_or_rejecting_tags = std::conjunction<is_queueing_or_rejecting_tag_impl<T>,
+                                                       is_queueing_or_rejecting_tag_impl<Args>...>;
 
 template <typename Key>
 struct join_key {
@@ -194,12 +190,12 @@ using join_key_t = typename join_key<Key>::type;
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 
 template <typename... Predecessors, typename Policy,
-          std::enable_if_t<is_queueing_or_rejecting_tag<Policy>::value, int> = 0>
+          std::enable_if_t<is_queueing_or_rejecting_tags<Policy>::value, int> = 0>
 join_node(const node_set<order::following, Predecessors...>&, Policy)
 ->join_node<std::tuple<typename Predecessors::output_type...>, Policy>;
 
 template <typename Successor, typename... Successors, typename Policy,
-          typename = std::enable_if_t<is_queueing_or_rejecting_tag<Policy>::value>>
+          std::enable_if_t<is_queueing_or_rejecting_tags<Policy>::value, int> = 0>
 join_node(const node_set<order::preceding, Successor, Successors...>&, Policy)
 ->join_node<typename Successor::input_type, Policy>;
 
@@ -214,7 +210,7 @@ join_node(const node_set<order::preceding, Successor, Successors...>)
 #endif
 
 template <typename GraphOrProxy, typename Body, typename... Bodies,
-          typename = std::enable_if_t<!is_queueing_or_rejecting_tags<Body, Bodies...>::value>>
+          std::enable_if_t<!is_queueing_or_rejecting_tags<Body, Bodies...>::value, int> = 0> 
 join_node(GraphOrProxy&&, Body, Bodies...)
 ->join_node<std::tuple<input_type_of<Body>, input_type_of<Bodies>...>,
             key_matching<join_key_t<output_type_of<Body>>>>;

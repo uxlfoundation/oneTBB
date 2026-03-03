@@ -832,13 +832,13 @@ struct noexcept_callable_object {
 };
 
 template <typename Input, typename Output>
-struct lvalue_qualified_callable_object {
-    Output operator()(Input) & { return Output{}; }
+struct const_noexcept_callable_object {
+    Output operator()(Input) const noexcept { return Output{}; }
 };
 
 template <typename Input, typename Output>
-struct const_noexcept_callable_object {
-    Output operator()(Input) const noexcept { return Output{}; }
+struct lvalue_qualified_callable_object {
+    Output operator()(Input) & { return Output{}; }
 };
 
 template <typename Input, typename Output>
@@ -907,8 +907,8 @@ void test_all_body_types() {
     run_test_substitute_body<Input, Output, unqualified_callable_object, Test>();
     run_test_substitute_body<Input, Output, const_callable_object, Test>();
     run_test_substitute_body<Input, Output, noexcept_callable_object, Test>();
-    run_test_substitute_body<Input, Output, lvalue_qualified_callable_object, Test>();
     run_test_substitute_body<Input, Output, const_noexcept_callable_object, Test>();
+    run_test_substitute_body<Input, Output, lvalue_qualified_callable_object, Test>();
     run_test_substitute_body<Input, Output, const_lvalue_qualified_callable_object, Test>();
     run_test_substitute_body<Input, Output, noexcept_lvalue_qualified_callable_object, Test>();
     run_test_substitute_body<Input, Output, const_noexcept_lvalue_qualified_callable_object, Test>();
