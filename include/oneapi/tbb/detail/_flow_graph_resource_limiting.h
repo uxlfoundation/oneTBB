@@ -28,6 +28,7 @@
 #include <utility>
 #include <atomic>
 #include <tuple>
+#include <initializer_list>
 
 namespace tbb {
 namespace detail {
@@ -143,24 +144,15 @@ public:
 
 // TODO: use actual fair implementation with starvation avoidance
 template <typename ResourceHandle>
-class resource_provider : public resource_provider_base<ResourceHandle> {
+class resource_limiter : public resource_provider_base<ResourceHandle> {
 public:
     using resource_handle_type = ResourceHandle;
     using consumer_type = typename resource_provider_base<ResourceHandle>::consumer_type;
     using optional_type = typename resource_provider_base<ResourceHandle>::optional_type;
 
-    template <typename Handle, typename... Handles>
-    resource_provider(Handle&& handle, Handles&&... handles) {
-        emplace_handles(std::forward<Handle>(handle), std::forward<Handles>(handles)...);
+    resource_limiter(std::initializer_list<ResourceHandle> init) {
+        m_resource_handles.insert_after(m_resource_handles.before_begin(), init);
     }
-
-    template <typename Handle, typename... Handles>
-    void emplace_handles(Handle&& handle, Handles&&... handles) {
-        m_resource_handles.emplace_front(std::forward<Handle>(handle));
-        emplace_handles(std::forward<Handles>(handles)...);
-    }
-
-    void emplace_handles() {}
 
     void request(consumer_type& consumer, request_id id) override {
         tbb::spin_mutex::scoped_lock lock(m_mutex);
@@ -209,7 +201,7 @@ public:
     tbb::spin_mutex m_mutex;
     std::forward_list<ResourceHandle> m_resource_handles;
     std::forward_list<consumer_data>  m_consumers;
-}; // class resource_provider
+}; // class resource_limiter
 
 template <typename Input, typename OutputPorts>
 class resource_limited_body {
@@ -557,7 +549,7 @@ public:
     resource_limited_input(graph& g, std::size_t max_concurrency,
                            std::tuple<ResourceProviders&...> resource_providers,
                            Body& body)
-        : base_type(g, max_concurrency, no_priority, true) // TODO: fill noexcept correctly
+        : base_type(g, max_concurrency, no_priority, is_body_noexcept(body, resource_providers)) // TODO: fill noexcept correctly
         , m_body(new resource_limited_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body))
         , m_init_body(new resource_limited_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body))
         , m_output_ports(init_output_ports<output_ports_type>::call(g, m_output_ports))
@@ -604,6 +596,12 @@ protected:
         __TBB_ASSERT(!(f & rf_clear_edges) || clear_element<N>::this_empty(m_output_ports), "resource_limited_node reset failed");
     }
 private:
+    template <typename Body, typename... ResourceProviders>
+    bool is_body_noexcept(Body& body, std::tuple<ResourceProviders&...>) {
+        return noexcept(tbb::detail::invoke(body, std::declval<input_type>(), m_output_ports,
+                                            std::declval<typename ResourceProviders::resource_handle_type&>()...));
+    }
+
     resource_limited_body_type* m_body;
     resource_limited_body_type* m_init_body;
     output_ports_type           m_output_ports;

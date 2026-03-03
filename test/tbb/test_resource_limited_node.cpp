@@ -45,7 +45,7 @@ void test_single_resource() {
 
     int resource_value = 100;
     int resource = resource_value;
-    resource_provider<int*> provider(&resource);
+    resource_limiter<int*> limiter{&resource};
     
     graph g;
     broadcast_node<int> start(g);
@@ -69,7 +69,7 @@ void test_single_resource() {
     };
 
     for (std::size_t i = 0; i < num_nodes; ++i) {
-        nodes.emplace_back(g, unlimited, std::tie(provider), node_body);
+        nodes.emplace_back(g, unlimited, std::tie(limiter), node_body);
         make_edge(start, nodes.back());
     }
 
@@ -85,7 +85,7 @@ void test_single_resource() {
 void test_several_resources() {
     using namespace oneapi::tbb::flow;
 
-    resource_provider<int> provider(0, 1, 2, 3, 4, 5, 6, 7, 8, 9);
+    resource_limiter<int> limiter{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 
     using node_type = resource_limited_node<int, std::tuple<int>>;
     using ports_type = typename node_type::output_ports_type;
@@ -123,7 +123,7 @@ void test_several_resources() {
     };
 
     for (std::size_t i = 0; i < num_nodes; ++i) {
-        nodes.emplace_back(g, unlimited, std::tie(provider), node_body);
+        nodes.emplace_back(g, unlimited, std::tie(limiter), node_body);
         make_edge(start, nodes.back());
         make_edge(output_port<0>(nodes.back()), output);
     }
@@ -151,10 +151,11 @@ struct strict_resource_handle {
     friend struct strict_resource_handle_provider;
 public:
     strict_resource_handle(strict_resource_handle&&) = default;
+    strict_resource_handle(const strict_resource_handle&) = default;
+
     strict_resource_handle& operator=(strict_resource_handle&&) = default;
 
     strict_resource_handle() = delete;
-    strict_resource_handle(const strict_resource_handle&) = delete;
     strict_resource_handle& operator=(const strict_resource_handle&) = delete;
 
     int& get_underlying_resource() { return underlying_resource; }
@@ -170,7 +171,7 @@ void test_strict_resource_handle() {
     using namespace tbb::flow;
 
     int handle_value = 42;
-    resource_provider<strict_resource_handle> provider(strict_resource_handle_provider::construct(handle_value));
+    resource_limiter<strict_resource_handle> limiter{strict_resource_handle_provider::construct(handle_value)};
 
     using node_type = resource_limited_node<int, std::tuple<>>;
     using ports_type = typename node_type::output_ports_type;
@@ -178,7 +179,7 @@ void test_strict_resource_handle() {
     int input_message = 100;
 
     graph g;
-    node_type node(g, unlimited, std::tie(provider),
+    node_type node(g, unlimited, std::tie(limiter),
         [&](int input, ports_type&, strict_resource_handle& resource_handle) {
             CHECK_MESSAGE(input == input_message, "Incorrect input message");
             CHECK_MESSAGE(resource_handle.get_underlying_resource() == handle_value, "Incorrect resource value");
@@ -213,26 +214,26 @@ void test_root_genie() {
     using node_type = resource_limited_node<int, std::tuple<int>>;
     using ports_type = typename node_type::output_ports_type;
 
-    resource_provider<counting_resource*> root_provider(&root_resource);
-    resource_provider<counting_resource*> genie_provider(&genie_resource);
+    resource_limiter<counting_resource*> root_limiter{&root_resource};
+    resource_limiter<counting_resource*> genie_limiter{&genie_resource};
 
     graph g;
 
     broadcast_node<int> start(g);
 
-    node_type root_node(g, unlimited, std::tie(root_provider),
+    node_type root_node(g, unlimited, std::tie(root_limiter),
         [](int input, ports_type& ports, counting_resource* root) {
             root->use();
             std::get<0>(ports).try_put(input);
         });
 
-    node_type genie_node(g, unlimited, std::tie(genie_provider),
+    node_type genie_node(g, unlimited, std::tie(genie_limiter),
         [](int input, ports_type& ports, counting_resource* genie) {
             genie->use();
             std::get<0>(ports).try_put(input);
         });
 
-    node_type root_genie_node(g, unlimited, std::tie(root_provider, genie_provider),
+    node_type root_genie_node(g, unlimited, std::tie(root_limiter, genie_limiter),
         [](int input, ports_type& ports, counting_resource* root, counting_resource* genie) {
             root->use();
             genie->use();
@@ -303,56 +304,56 @@ TEST_CASE("test resource acquisition") {
 }
 
 template <typename Handle>
-using provider_unique_ptr = std::unique_ptr<oneapi::tbb::flow::resource_provider<Handle>>;
+using limiter_unique_ptr = std::unique_ptr<oneapi::tbb::flow::resource_limiter<Handle>>;
 
 template <std::size_t... Idx>
-provider_unique_ptr<int> get_provider_impl(tbb::detail::index_sequence<Idx...>) {
-    return provider_unique_ptr<int>(new oneapi::tbb::flow::resource_provider<int>(Idx...));
+limiter_unique_ptr<int> get_limiter_impl(tbb::detail::index_sequence<Idx...>) {
+    return limiter_unique_ptr<int>(new oneapi::tbb::flow::resource_limiter<int>({Idx...}));
 }
 
 template <std::size_t NumResources>
-provider_unique_ptr<int> get_provider() {
-    return get_provider_impl(tbb::detail::make_index_sequence<NumResources>());
+limiter_unique_ptr<int> get_limiter() {
+    return get_limiter_impl(tbb::detail::make_index_sequence<NumResources>());
 }
 
 //! \brief \ref interface \ref requirement
 TEST_CASE("resource_limited_node concurrency") {
     // For correct test behavior number of resources should be greater than number of threads in arena
     constexpr std::size_t num_threads = 50;
-    auto provider_ptr = get_provider<num_threads + 1>();
+    auto limiter_ptr = get_limiter<num_threads + 1>();
     oneapi::tbb::task_arena arena(num_threads);
 
     arena.execute([&] {
-        conformance::test_concurrency<oneapi::tbb::flow::resource_limited_node<int, std::tuple<int>>>(std::tie(*provider_ptr));
+        conformance::test_concurrency<oneapi::tbb::flow::resource_limited_node<int, std::tuple<int>>>(std::tie(*limiter_ptr));
     });
 }
 
 //! \brief \ref interface
 TEST_CASE("resource_limited_node copy_body") {
-    auto provider_ptr = get_provider<10>();
+    auto limiter_ptr = get_limiter<10>();
     using node_type = oneapi::tbb::flow::resource_limited_node<int, std::tuple<int>>;
     using body_type = conformance::copy_counting_object<int>;
-    conformance::test_copy_body_function<node_type, body_type>(oneapi::tbb::flow::unlimited, std::tie(*provider_ptr));
+    conformance::test_copy_body_function<node_type, body_type>(oneapi::tbb::flow::unlimited, std::tie(*limiter_ptr));
 }
 
 //! \brief \ref requirement
-TEST_CASE("resource_provider and resource_limited_node with strict_resource_handle") {
+TEST_CASE("resource_limiter and resource_limited_node with strict_resource_handle") {
     test_strict_resource_handle();
 }
 
 //! \brief \ref interface \ref requirement
 TEST_CASE("resource_limited_node copy constructor") {
-    auto provider_ptr = get_provider<10>();
+    auto limiter_ptr = get_limiter<10>();
     using node_type = oneapi::tbb::flow::resource_limited_node<int, std::tuple<int>>;
-    conformance::test_copy_ctor<node_type>(std::tie(*provider_ptr));
+    conformance::test_copy_ctor<node_type>(std::tie(*limiter_ptr));
 }
 
 //! \brief \ref requirement
 TEST_CASE("resource_limited_node broadcast") {
     conformance::counting_functor<int> fun(conformance::expected);
-    auto provider_ptr = get_provider<10>();
+    auto limiter_ptr = get_limiter<10>();
     using node_type = oneapi::tbb::flow::resource_limited_node<int, std::tuple<int>>;
-    conformance::test_forwarding<node_type, input_msg, int>(1, oneapi::tbb::flow::unlimited, std::tie(*provider_ptr), fun);
+    conformance::test_forwarding<node_type, input_msg, int>(1, oneapi::tbb::flow::unlimited, std::tie(*limiter_ptr), fun);
 }
 
 //! \brief \ref error_guessing
@@ -381,11 +382,11 @@ TEST_CASE("resource_limited_node and std::invoke") {
     auto first_body = &input_type::template send_id<first_ports_type, int&>;
     auto second_body = &output_type1::template send_id<second_ports_type, int&>;
 
-    auto provider_ptr = get_provider<10>();
+    auto limiter_ptr = get_limiter<10>();
 
-    first_rl_node_type rl1(g, unlimited, std::tie(*provider_ptr), first_body);
-    second_rl_node_type rl21(g, unlimited, std::tie(*provider_ptr), second_body);
-    second_rl_node_type rl22(g, unlimited, std::tie(*provider_ptr), second_body);
+    first_rl_node_type rl1(g, unlimited, std::tie(*limiter_ptr), first_body);
+    second_rl_node_type rl21(g, unlimited, std::tie(*limiter_ptr), second_body);
+    second_rl_node_type rl22(g, unlimited, std::tie(*limiter_ptr), second_body);
 
     buffer_node<std::size_t> buf(g);
 

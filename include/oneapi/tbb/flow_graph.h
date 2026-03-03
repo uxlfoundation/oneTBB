@@ -3370,7 +3370,7 @@ inline namespace v1 {
 #endif
 
 #if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITED_NODE
-    using detail::d2::resource_provider;
+    using detail::d2::resource_limiter;
     using detail::d2::resource_limited_node;
 #endif
 } // v1
