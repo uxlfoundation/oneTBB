@@ -70,7 +70,7 @@ void test_deduction_guides_body_types() {
 }
 
 void test_deduction_guides() {
-    using input_type = deduction_guides_testing::Input<std::size_t>;
+    using input_type = deduction_guides_testing::InputType<std::size_t>;
     test_deduction_guides_body_types<input_type>();
     test_deduction_guides_body_types<const input_type&>();
 }

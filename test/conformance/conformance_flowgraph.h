@@ -868,18 +868,18 @@ Output function_body(Input) { return Output{}; }
 template <typename Input, typename Output>
 Output noexcept_function_body(Input) noexcept { return Output{}; }
 
-template <typename Output>
-struct Input {
-    Input() {}
-    Input(const Input&) {}
-    Input& operator=(const Input&) { return *this; }
+template <typename OutputType>
+struct InputType {
+    InputType() {}
+    InputType(const InputType&) {}
+    InputType& operator=(const InputType&) { return *this; }
 
-    Output member_object = Output{};
-    const Output const_member_object = Output{};
-    mutable Output mutable_member_object = Output{};
+    OutputType member_object = OutputType{};
+    const OutputType const_member_object = OutputType{};
+    mutable OutputType mutable_member_object = OutputType{};
 
-    Output const_member_function() const { return Output{}; }
-    Output const_noexcept_member_function() const noexcept { return Output{}; }
+    OutputType const_member_function() const { return OutputType{}; }
+    OutputType const_noexcept_member_function() const noexcept { return OutputType{}; }
 };
 
 template <typename Input, typename Output,
@@ -903,6 +903,8 @@ void run_test_deduce_body(Body body) {
 template <typename Input, typename Output,
           template <class, class, class> typename Test>
 void test_all_body_types() {
+    static_assert(std::is_same_v<std::decay_t<Input>, InputType<std::decay_t<Output>>>,
+                  "Wrong test configuration");
     // Test callable objects
     run_test_substitute_body<Input, Output, unqualified_callable_object, Test>();
     run_test_substitute_body<Input, Output, const_callable_object, Test>();

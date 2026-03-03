@@ -97,7 +97,7 @@ void test_deduction_guides_body_types() {
 
 void test_deduction_guides() {
     using output_type = int;
-    using input_type = deduction_guides_testing::Input<output_type>;
+    using input_type = deduction_guides_testing::InputType<output_type>;
 
     test_deduction_guides_body_types<input_type, output_type>();
     test_deduction_guides_body_types<const input_type&, output_type>();
