@@ -195,7 +195,7 @@ join_node(const node_set<order::following, Predecessors...>&, Policy)
 ->join_node<std::tuple<typename Predecessors::output_type...>, Policy>;
 
 template <typename Successor, typename... Successors, typename Policy,
-          std::enable_if_t<is_queueing_or_rejecting_tags<Policy>::value, int> = 0>
+          std::enable_if_t<are_queueing_or_rejecting_tags<Policy>::value, int> = 0>
 join_node(const node_set<order::preceding, Successor, Successors...>&, Policy)
 ->join_node<typename Successor::input_type, Policy>;
 
