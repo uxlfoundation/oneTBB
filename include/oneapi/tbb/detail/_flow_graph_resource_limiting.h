@@ -398,6 +398,7 @@ public:
     }
 
     d1::task* cancel(d1::execution_data& ed) override {
+        m_body->remove_request(m_id);
         graph_task::template finalize<try_acquire_resources_and_execute_task>(ed);
         return nullptr;
     }
