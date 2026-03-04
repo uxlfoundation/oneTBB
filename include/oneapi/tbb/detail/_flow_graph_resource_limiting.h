@@ -155,6 +155,7 @@ public:
     }
 
     void request(consumer_type& consumer, request_id id) override {
+        // TODO: consider using an aggregator instead of mutex
         tbb::spin_mutex::scoped_lock lock(m_mutex);
 
         if (m_resource_handles.empty()) {
