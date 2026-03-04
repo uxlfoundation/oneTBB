@@ -39,9 +39,11 @@ providing a global override mechanism.
 ## Proposal
 
 This proposal introduces a new `global_control` parameter called `leave_policy` that, when set to "fast",
-would override the delayed leave behavior and cause workers to leave arenas immediately after
-completing work. However, active parallel phases would always retain workers regardless of the
-global setting, meaning the global parameter itself could be overridden by parallel phase control.
+would override the default behavior for arenas that are initialized with `leave_policy::automatic`.
+Setting the parameter would not affect arenas that are already initialized or initialized with an
+explicit `leave_policy`. After initialization, the parallel phase API can independently modify the
+arena's leave behavior at runtime, allowing workers to be retained during active parallel phases
+regardless of the initial state set by the global control.
 
 ### New Public API
 
@@ -83,8 +85,7 @@ public:
 
 #### Semantics
 
-The `leave_policy` parameter would control whether worker threads leave arenas immediately after
-completing work:
+The `leave_policy` parameter would control whether arenas are initialized with automatic or fast leave policy by default:
 
 | Value | Behavior |
 |-------|----------|
@@ -97,75 +98,56 @@ used (consistent with the `terminate_on_exception` parameter). This means if any
 
 ### Proposed Implementation Strategy
 
-The proposed implementation would modify the `thread_leave_manager` to check the
-`global_control::leave_policy` parameter. When a worker thread queries whether it should remain in an
-arena, the method would first read the current state as usual. If the current state indicates
-the default behavior and the global control changes it, the method would treat `global_control::leave_policy`
-as if it were the specified per-arena setting, causing the worker to behave accordingly.
+The proposed implementation would modify the `thread_leave_manager::set_initial_state` to include an additional check
+for the global `leave_policy` parameter when determining the initial state for worker retention. When the former is set
+to `fast`, the method would treat the arena as if it were initialized with `leave_policy::fast`.
 
 ```mermaid
-%%{init: {"layout": "elk"}}%%
 flowchart TD
-    Start([🚀 No work available in arena:<br/>worker needs to decide whether to leave])
-    Start --> ReadState[📖 Read current arena state]
-    ReadState --> CheckFastLeave{{"⚡ state = FAST_LEAVE or<br/>ONE_TIME_FAST_LEAVE?"}}
+    Start([🚀 Arena initialization:<br/><code>set_initial_state</code> called])
+    Start --> CheckExplicit{{"⚡ leave_policy = fast?"}}
 
-    CheckFastLeave -->|"✅ Yes"| LeaveImmediately([🚪 **Worker leaves**<br/>**arena immediately**])
-    CheckFastLeave -->|"❌ No"| CheckDelayed
+    CheckExplicit -->|"✅ Yes"| SetFastLeave([🚪 **Set state to**<br/>**FAST_LEAVE**])
+    CheckExplicit -->|"❌ No &lpar;automatic&rpar;"| CheckGlobal
 
-    CheckDelayed -->|"❌ No<br/>&lpar;PARALLEL_PHASE&rpar;"| SpinBeforeLeave([🔄 **Worker spins**<br/>**before leaving arena**])
-    CheckDelayed -->|"✅ Yes"| CheckGlobal
-
-    subgraph PROPOSED ["🆕 **PROPOSED: global_control integration**"]
-        direction TB
-        CheckDelayed{{"🔍 state = DELAYED_LEAVE?"}}
+    subgraph PROPOSED ["🆕 **PROPOSED:**"]
         CheckGlobal{{"🌐 global_control::<br/>active_value&lpar;leave_policy&rpar; = task_arena::leave_policy::fast?"}}
     end
 
-    CheckGlobal -->|"✅ Yes"| LeaveImmediately
-    CheckGlobal -->|"❌ No"| SpinBeforeLeave
+    CheckGlobal -->|"✅ Yes"| SetFastLeave
+    CheckGlobal -->|"❌ No"| PlatformPolicy([📋 **Set state based on**<br/>**platform policy**])
 
-    style Start            fill:whitesmoke,stroke:darkslategray,stroke-width:3px,color:darkslategray,font-weight:bold
-    style ReadState        fill:lavender,stroke:steelblue,stroke-width:2px,color:steelblue
-    style CheckFastLeave   fill:papayawhip,stroke:orangered,stroke-width:2px,color:firebrick
-    style LeaveImmediately fill:darkseagreen,stroke:forestgreen,stroke-width:3px,color:darkgreen,font-weight:bold
-    style SpinBeforeLeave  fill:lightcoral,stroke:firebrick,stroke-width:3px,color:darkred,font-weight:bold
-    style CheckDelayed     fill:lemonchiffon,stroke:goldenrod,stroke-width:2px,color:coral
-    style CheckGlobal      fill:peachpuff,stroke:darkorange,stroke-width:3px,color:orangered,font-weight:bold
-    style PROPOSED         fill:lightyellow,stroke:darkorange,stroke-width:4px,stroke-dasharray:5 5
+    style Start          fill:whitesmoke,stroke:darkslategray,stroke-width:3px,color:darkslategray,font-weight:bold
+    style CheckExplicit  fill:papayawhip,stroke:orangered,stroke-width:2px,color:firebrick
+    style SetFastLeave   fill:darkseagreen,stroke:forestgreen,stroke-width:3px,color:darkgreen,font-weight:bold
+    style PlatformPolicy fill:lavender,stroke:steelblue,stroke-width:2px,color:steelblue
+    style CheckGlobal    fill:peachpuff,stroke:darkorange,stroke-width:3px,color:orangered,font-weight:bold
+    style PROPOSED       fill:lightyellow,stroke:darkorange,stroke-width:4px,stroke-dasharray:5 5
 
-    linkStyle 0 stroke:steelblue,stroke-width:2px
-    linkStyle 1 stroke:orangered,stroke-width:2px
+    linkStyle 0 stroke:orangered,stroke-width:2px
+    linkStyle 1 stroke:darkorange,stroke-width:2px
     linkStyle 2 stroke:forestgreen,stroke-width:3px
-    linkStyle 3 stroke:goldenrod,stroke-width:2px
-    linkStyle 4 stroke:firebrick,stroke-width:3px
-    linkStyle 5 stroke:darkorange,stroke-width:3px
-    linkStyle 6 stroke:forestgreen,stroke-width:3px
-    linkStyle 7 stroke:firebrick,stroke-width:3px
+    linkStyle 3 stroke:steelblue,stroke-width:2px
 ```
-
-This approach would:
-1. Preserve the existing state machine logic for per-arena control
-2. Only affect arenas in `DELAYED_LEAVE` state
-3. Not interfere with explicit `FAST_LEAVE` or `PARALLEL_PHASE` states
-4. Allow the global setting to be overridden by per-arena parallel phase API
 
 ### Interaction with Parallel Phase API
 
-The proposed `leave_policy` parameter would interact with the `parallel_phase` API as follows:
+The `global_control::leave_policy` parameter affects the initial state set by `thread_leave_manager`. Once
+the initial state is determined, the parallel phase API independently modifies the state machine at runtime.
+The global control is not consulted again after initialization.
 
-| Arena State | `leave_policy` Value | Effective Behavior |
-|-------------|-------------------|-------------------|
-| `DELAYED_LEAVE` | `task_arena::leave_policy::automatic` | Workers spin before leaving |
-| `DELAYED_LEAVE` | `task_arena::leave_policy::fast` | **Workers leave immediately** |
-| `FAST_LEAVE` | any | Workers leave immediately |
-| `PARALLEL_PHASE` | any | Workers spin before leaving |
-| `ONE_TIME_FAST_LEAVE` | any | Workers leave immediately |
+| Arena `leave_policy` | Global `leave_policy` | Initial State |
+|----------------------|-----------------------|---------------|
+| `fast` | any | `FAST_LEAVE` |
+| `automatic` | `fast` | `FAST_LEAVE` |
+| `automatic` | `automatic` (default) | Platform policy |
 
 This design ensures that:
 1. Explicit per-arena `leave_policy::fast` always results in fast leave
-2. Active parallel phases always retain workers regardless of global setting
-3. The global `leave_policy` parameter only overrides the default `DELAYED_LEAVE` behavior
+2. Active parallel phases always retain workers, as `start_parallel_phase()` independently
+   transitions the state machine to `PARALLEL_PHASE`
+3. The global `leave_policy` parameter only affects the initial state of arenas initialized with
+   `leave_policy::automatic`
 
 ### Specification Extension
 
@@ -200,14 +182,6 @@ would need to be extended with
 The implementation would use the existing thread-safe `control_storage` infrastructure:
 - `global_control` construction/destruction would be thread-safe
 - `active_value()` queries would be thread-safe
-- The worker retention check in `thread_leave_manager` would use relaxed memory ordering consistent
-  with existing state machine operations
-
-To minimize overhead, the implementation should use `control_storage::active_value_unsafe()` which
-avoids locking. Aligned 64-bit operations are atomic on supported platforms, and while no ordering
-is guaranteed, a briefly stale value would only delay the global setting's effect without
-compromising correctness. This approach is consistent with how `max_allowed_parallelism`,
-`thread_stack_size`, and `scheduler_handle` are read by `threading_control`.
 
 ### Performance Impact
 
@@ -215,11 +189,10 @@ The proposed implementation would have minimal performance impact:
 
 | Scenario | Impact |
 |----------|--------|
-| Execution | One additional branch in the `thread_leave_manager` worker retention check |
+| Arena initialization | One additional branch in `thread_leave_manager::set_initial_state` |
 | Memory overhead | One additional `control_storage` object per process |
 
-The additional branch would only be taken when the arena is in `DELAYED_LEAVE` state, which is the
-common case for arenas with `leave_policy::automatic` on non-hybrid CPUs.
+The additional branch is only evaluated once per arena initialization (not on the worker leave hot path).
 
 ### Backward Compatibility
 
@@ -264,12 +237,8 @@ void process_interactive_workload() {
         render_frame();  // Mix of serial and parallel work
     }
 }
-// Fast leave automatically disabled when gc goes out of scope
-
-void process_batch_workload() {
-    // Default delayed leave behavior for batch processing
-    tbb::parallel_for(/* ... */);
-}
+// New arenas initialized after gc goes out of scope use the default policy;
+// already-initialized arenas retain their initial state
 ```
 
 #### Combining with Parallel Phase API
@@ -278,6 +247,7 @@ void process_batch_workload() {
 tbb::task_arena arena;
 tbb::global_control gc(tbb::global_control::leave_policy, tbb::task_arena::leave_policy::fast);
 
+// Before entering the parallel phase, the arena is initialized with FAST_LEAVE due to the active global control.
 // Global leave_policy is active, but parallel_phase overrides it
 arena.start_parallel_phase();
 
@@ -293,7 +263,7 @@ arena.execute([&] {
 });
 
 arena.end_parallel_phase();
-// After parallel_phase ends, workers leave immediately due to global leave_policy
+// After parallel_phase ends, workers leave immediately due to arena's initial FAST_LEAVE state
 ```
 
 ### Testing Strategy
@@ -302,7 +272,7 @@ The following test scenarios would be required:
 
 1. **Functional tests**:
    - Verify `active_value(leave_policy)` returns correct values
-   - Verify workers leave immediately when leave_policy=fast
+   - Verify arenas initialized when leave_policy=fast have workers leave immediately
    - Verify default behavior preserved when leave_policy=automatic
 
 2. **Interaction tests**:
@@ -345,19 +315,25 @@ The default behavior could be changed to fast leave, making delayed leave opt-in
 ## Open Questions
 
 1. **Naming**: Should it convey "default override" semantics?
+   - Current proposal: parameter name matches `task_arena::leave_policy` for consistency
+   - Alternative: e.g., `override_default_leave_policy` to clarify no effect on already initialized arenas
 
-2. **Selection Rule**
+2. **Scope and Granularity**
+   - Current proposal: only affect arenas initialized after the `global_control` is set
+   - Alternative: allow retroactive effect on existing arenas
+   - Alternative: allow per worker control (e.g., via observers) to enable/disable fast leave on a per-thread basis
 
-   | | **Logical Disjunction** (current proposal) | **Last-Set Wins** | **Default at Arena Creation** | **First-Registered Wins** | **Min / Max** |
-   |---|---|---|---|---|---|
-   | **Description** | Any active `fast` instance enables globally | Most recently created instance decides | Sets default for newly created arenas; no mid-flight change for running arenas | First registered instance controls; later instances ignored | Min or max ordering across all instances |
-   | **Precedent** | `terminate_on_exception` | None | `thread_stack_size` | None | `max_allowed_parallelism` (uses minimum) |
-   | **Dynamically affects existing arenas?** | Yes | Yes | No | Yes | Yes |
-   | **Behavior when `global_control` is destroyed** | Effect removed | Effect removed | "Sticks" to arena | Reverts to default; later instances have no retroactive effect | Effect removed |
-   | **Concurrent multi-instance behavior** | Predictable | Unpredictable | Predictable | Predictable | Predictable |
-
-3. **Interaction Priority**: Should explicit `leave_policy::automatic` arenas respect the global
-   setting, or should only truly "default" arenas be affected?
+3. **Composition**: Should the global control be a logical disjunction, first-registered wins, last-set wins, etc.?
+   - Current proposal: disjunction
 
 4. **Feature Macro Dependency**: Should this feature require `TBB_PREVIEW_PARALLEL_PHASE` or have
    its own independent macro?
+   - Current proposal: `TBB_PREVIEW_PARALLEL_PHASE` since it is closely related to the parallel phase API
+
+## Exit Criteria
+
+The following conditions need to be met to move the feature from experimental to fully supported:
+- Open questions regarding the API should be resolved.
+- User feedback should confirm usability and performance improvements in mentioned scenarios and that no unforeseen
+  issues arise.
+- The feature must be added to the oneTBB specification and accepted.
