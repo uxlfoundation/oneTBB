@@ -28,7 +28,6 @@
 #include <utility>
 #include <atomic>
 #include <tuple>
-#include <initializer_list>
 
 namespace tbb {
 namespace detail {
