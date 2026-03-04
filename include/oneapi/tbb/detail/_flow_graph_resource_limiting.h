@@ -49,10 +49,10 @@ public:
     {}
 
     struct hash {
-        std::hash<time_point::duration::rep> m_hash;
+        std::hash<std::uint64_t> m_hash;
 
         std::size_t operator()(request_id id) const {
-            return m_hash(id.m_time_point.time_since_epoch().count());
+            return m_hash(id.m_unique_integer);
         }
     };
 
