@@ -168,11 +168,11 @@ priority_queue_node(const NodeSet&)
 #endif // __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 
 template <typename T>
-using is_queueing_or_rejecting_tag_impl = std::disjunction<std::is_same<T, queueing>, std::is_same<T, reserving>>;
+using is_queueing_or_rejecting_tag = std::disjunction<std::is_same<T, queueing>, std::is_same<T, reserving>>;
 
 template <typename T, typename... Args>
-using is_queueing_or_rejecting_tags = std::conjunction<is_queueing_or_rejecting_tag_impl<T>,
-                                                       is_queueing_or_rejecting_tag_impl<Args>...>;
+using are_queueing_or_rejecting_tags = std::conjunction<is_queueing_or_rejecting_tag<T>,
+                                                       is_queueing_or_rejecting_tag<Args>...>;
 
 template <typename Key>
 struct join_key {
