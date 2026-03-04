@@ -210,7 +210,7 @@ join_node(const node_set<order::preceding, Successor, Successors...>)
 #endif
 
 template <typename GraphOrProxy, typename Body, typename... Bodies,
-          std::enable_if_t<!is_queueing_or_rejecting_tags<Body, Bodies...>::value, int> = 0> 
+          std::enable_if_t<!are_queueing_or_rejecting_tags<Body, Bodies...>::value, int> = 0> 
 join_node(GraphOrProxy&&, Body, Bodies...)
 ->join_node<std::tuple<input_type_of<Body>, input_type_of<Bodies>...>,
             key_matching<join_key_t<output_type_of<Body>>>>;
