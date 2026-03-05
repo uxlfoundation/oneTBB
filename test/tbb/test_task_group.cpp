@@ -2522,6 +2522,9 @@ void test_get_status_of() {
 
 //! \brief \ref error_guessing
 TEST_CASE("test single task wait") {
+    CHECK_MESSAGE(TBB_HAS_TASK_GROUP_WAIT_FOR_SINGLE_TASK == 202603,
+                  "Incorrect feature test macro for waiting a single task");
+
     test_single_task_wait(/*cancel = */false);
     test_single_task_wait(/*cancel = */true);
 }
