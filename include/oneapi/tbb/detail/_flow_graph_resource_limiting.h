@@ -89,12 +89,14 @@ public:
         construct(std::forward<Args>(args)...);
     }
 
+    resource_handle_optional(const resource_handle_optional&) = delete;
+    resource_handle_optional& operator=(const resource_handle_optional&) = delete;
+
     resource_handle_optional(resource_handle_optional&& other)
         : m_has_value(other.m_has_value)
     {
         if (m_has_value) {
             construct(std::move(other.m_resource_handle));
-            other.m_has_value = false;
         }
     }
 
@@ -102,9 +104,8 @@ public:
         if (this != &other) {
             if (m_has_value) m_resource_handle.~ResourceHandle();
             m_has_value = other.m_has_value;
-            if (m_has_value) {
-                ::new(&m_resource_handle) ResourceHandle(std::move(other.m_resource_handle));
-                other.m_has_value = false;
+            if (other.m_has_value) {
+                construct(std::move(other.m_resource_handle));
             }
         }
         return *this;
@@ -122,7 +123,7 @@ public:
         __TBB_ASSERT(has_value(), nullptr);
         return m_resource_handle;
     }
-};
+}; // class resource_handle_optional
 
 template <typename ResourceHandle>
 class resource_provider_base {
@@ -282,13 +283,11 @@ struct request_data {
     OutputPorts&             output_ports;
     std::atomic<std::size_t> notify_counter;
     HandlesTuple             handles;
-    bool                     ready;
 
     request_data(const Input& input, OutputPorts& ports)
         : input_message(input)
         , output_ports(ports)
         , notify_counter(std::tuple_size<HandlesTuple>::value + 1)
-        , ready(false)
     {}
 };
 
@@ -312,6 +311,7 @@ struct release_resources_helper {
     template <typename ConsumerTuple, typename RequestData>
     static void run(ConsumerTuple& consumers, request_id id, RequestData& req_data) {
         std::get<Index - 1>(consumers).release_to_provider(id, std::move(std::get<Index - 1>(req_data.handles)));
+        std::get<Index - 1>(req_data.handles) = {};
         release_resources_helper<Index - 1>::run(consumers, id, req_data);
     }
 };
@@ -340,7 +340,7 @@ struct set_body_ptr_helper<0> {
 template <std::size_t Index, std::size_t MaxIndex>
 struct acquire_resources_helper {
     template <typename Body, typename ConsumerTuple, typename RequestData>
-    static void run(Body* body_ptr, ConsumerTuple& consumers, request_id id, RequestData& req_data) {
+    static bool run(Body* body_ptr, ConsumerTuple& consumers, request_id id, RequestData& req_data) {
         __TBB_ASSERT(req_data.notify_counter == 1, "Incorrect notify counter");
         ++req_data.notify_counter; // Local counter in case the resource is denied
         auto handle_optional = std::get<Index>(consumers).acquire_from_provider(id);
@@ -348,12 +348,13 @@ struct acquire_resources_helper {
             // Successfully acquired resource - save the handle and proceed to the next resource
             --req_data.notify_counter;
             std::get<Index>(req_data.handles) = std::move(handle_optional);
-            acquire_resources_helper<Index + 1, MaxIndex>::run(body_ptr, consumers, id, req_data);
+            return acquire_resources_helper<Index + 1, MaxIndex>::run(body_ptr, consumers, id, req_data);
         } else {
             __TBB_ASSERT(req_data.notify_counter >= 1, "Incorrect notify counter");
             // One of the resources denied the request
             release_resources_helper<Index>::run(consumers, id, req_data);
             body_ptr->release_self_ref(id, req_data); // release the self-reference held at the beginning of resource acquisition
+            return false;
         }
     }
 };
@@ -361,9 +362,9 @@ struct acquire_resources_helper {
 template <std::size_t MaxIndex>
 struct acquire_resources_helper<MaxIndex, MaxIndex> {
     template <typename Body, typename ConsumerTuple, typename RequestData>
-    static void run(Body*, ConsumerTuple&, request_id, RequestData& req_data) {
-        req_data.ready = true;
+    static bool run(Body*, ConsumerTuple&, request_id, RequestData& req_data) {
         --req_data.notify_counter;
+        return true;
     }
 };
 
@@ -482,16 +483,15 @@ public:
         }
     }
 
-    void try_acquire_resources(request_id id, request_data_type& req_data) {
+    bool try_acquire_resources(request_id id, request_data_type& req_data) {
+        // Increment the counter to avoid another resource reacquisition by notify() while current 
         std::size_t prev_value = req_data.notify_counter++;
         __TBB_ASSERT(prev_value == 0, "Incorrect notify counter before acquisition");
-        acquire_resources_helper<0, sizeof...(ResourceProviders)>::run(this, m_consumers, id, req_data);
+        return acquire_resources_helper<0, sizeof...(ResourceProviders)>::run(this, m_consumers, id, req_data);
     }
 
     void try_acquire_resources_and_execute(request_id id, request_data_type& req_data) {
-        try_acquire_resources(id, req_data);
-
-        if (req_data.ready) {
+        if (try_acquire_resources(id, req_data)) {
             // Access to all resources is granted
             call_body(req_data.input_message, req_data.output_ports, req_data.handles);
             release_resources(id, req_data);
@@ -500,8 +500,9 @@ public:
     }
 
     void release_resources(request_id id, request_data_type& req_data) {
+        // TODO: report real pressure, investigate if it should be done before or after the release
+        report_pressure(0);
         release_resources_helper<sizeof...(ResourceProviders)>::run(m_consumers, id, req_data);
-        report_pressure(0); // TODO: report real pressure
     }
 
     void remove_request(request_id id) {

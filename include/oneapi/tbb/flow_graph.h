@@ -3307,7 +3307,7 @@ inline void set_name(const async_node<Input, Output, Policy>& node, const char *
 } // detail
 } // tbb
 
-#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITED_NODE
+#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
 #include "detail/_flow_graph_resource_limiting.h"
 #endif
 
@@ -3369,7 +3369,7 @@ inline namespace v1 {
     using detail::d2::make_edges;
 #endif
 
-#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITED_NODE
+#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
     using detail::d2::resource_limiter;
     using detail::d2::resource_limited_node;
 #endif

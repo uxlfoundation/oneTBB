@@ -14,7 +14,7 @@
     limitations under the License.
 */
 
-#define TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITED_NODE 1
+#define TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING 1
 #include "common/config.h"
 #include "common/test.h"
 #include "common/utils.h"
@@ -343,7 +343,7 @@ void test_cancellation_with_active_requests() {
 
 //! \brief \ref interface
 TEST_CASE("Feature test macro") {
-    CHECK_MESSAGE(TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITED_NODE == 202603, "Incorrect feature test macro");
+    CHECK_MESSAGE(TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING == 202603, "Incorrect feature test macro");
 }
 
 //! \brief \ref interface
