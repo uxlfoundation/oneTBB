@@ -168,11 +168,11 @@ priority_queue_node(const NodeSet&)
 #endif // __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 
 template <typename T>
-using is_queueing_or_rejecting_tag = std::disjunction<std::is_same<T, queueing>, std::is_same<T, reserving>>;
+using is_queueing_or_reserving_tag = std::disjunction<std::is_same<T, queueing>, std::is_same<T, reserving>>;
 
 template <typename T, typename... Args>
-using are_queueing_or_rejecting_tags = std::conjunction<is_queueing_or_rejecting_tag<T>,
-                                                       is_queueing_or_rejecting_tag<Args>...>;
+using are_queueing_or_reserving_tags = std::conjunction<is_queueing_or_reserving_tag<T>,
+                                                        is_queueing_or_reserving_tag<Args>...>;
 
 template <typename Key>
 struct join_key {
@@ -190,12 +190,12 @@ using join_key_t = typename join_key<Key>::type;
 #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
 
 template <typename... Predecessors, typename Policy,
-          std::enable_if_t<are_queueing_or_rejecting_tags<Policy>::value, int> = 0>
+          std::enable_if_t<are_queueing_or_reserving_tags<Policy>::value, int> = 0>
 join_node(const node_set<order::following, Predecessors...>&, Policy)
 ->join_node<std::tuple<typename Predecessors::output_type...>, Policy>;
 
 template <typename Successor, typename... Successors, typename Policy,
-          std::enable_if_t<are_queueing_or_rejecting_tags<Policy>::value, int> = 0>
+          std::enable_if_t<are_queueing_or_reserving_tags<Policy>::value, int> = 0>
 join_node(const node_set<order::preceding, Successor, Successors...>&, Policy)
 ->join_node<typename Successor::input_type, Policy>;
 
@@ -210,7 +210,7 @@ join_node(const node_set<order::preceding, Successor, Successors...>)
 #endif
 
 template <typename GraphOrProxy, typename Body, typename... Bodies,
-          std::enable_if_t<!are_queueing_or_rejecting_tags<Body, Bodies...>::value, int> = 0> 
+          std::enable_if_t<!are_queueing_or_reserving_tags<Body, Bodies...>::value, int> = 0> 
 join_node(GraphOrProxy&&, Body, Bodies...)
 ->join_node<std::tuple<input_type_of<Body>, input_type_of<Bodies>...>,
             key_matching<join_key_t<output_type_of<Body>>>>;
