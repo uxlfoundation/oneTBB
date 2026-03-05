@@ -199,7 +199,7 @@ struct counting_resource {
         CHECK_MESSAGE(value == 1, "Resource in use by someone else");
 
         for (std::size_t i = 0; i < 10000; ++i) {
-            CHECK_MESSAGE(counter == 1, "Resource in use by someone else");
+            CHECK_MESSAGE(counter.load() == 1, "Resource in use by someone else");
         }
 
         --counter;
@@ -207,34 +207,43 @@ struct counting_resource {
 };
 
 void test_root_genie() {
-    counting_resource root_resource;
-    counting_resource genie_resource;
+    // counting_resource root_resource;
+    // counting_resource genie_resource;
+
+    counting_resource* root_resource = new counting_resource();
+    counting_resource* genie_resource = new counting_resource();
 
     using namespace oneapi::tbb::flow;
     using node_type = resource_limited_node<int, std::tuple<int>>;
     using ports_type = typename node_type::output_ports_type;
 
-    resource_limiter<counting_resource*> root_limiter{&root_resource};
-    resource_limiter<counting_resource*> genie_limiter{&genie_resource};
+    using ptr_type = std::unique_ptr<counting_resource>;
+
+    resource_limiter<ptr_type> root_limiter{root_resource};
+    resource_limiter<ptr_type> genie_limiter{genie_resource};
 
     graph g;
 
     broadcast_node<int> start(g);
 
     node_type root_node(g, unlimited, std::tie(root_limiter),
-        [](int input, ports_type& ports, counting_resource* root) {
+        [&](int input, ports_type& ports, ptr_type& root) {
+            CHECK(root.get() == root_resource);
             root->use();
             std::get<0>(ports).try_put(input);
         });
 
     node_type genie_node(g, unlimited, std::tie(genie_limiter),
-        [](int input, ports_type& ports, counting_resource* genie) {
+        [&](int input, ports_type& ports, ptr_type& genie) {
+            CHECK(genie.get() == genie_resource);
             genie->use();
             std::get<0>(ports).try_put(input);
         });
 
     node_type root_genie_node(g, unlimited, std::tie(root_limiter, genie_limiter),
-        [](int input, ports_type& ports, counting_resource* root, counting_resource* genie) {
+        [&](int input, ports_type& ports, ptr_type& root, ptr_type& genie) {
+            CHECK(root.get() == root_resource);
+            CHECK(genie.get() == genie_resource);
             root->use();
             genie->use();
             std::get<0>(ports).try_put(input);

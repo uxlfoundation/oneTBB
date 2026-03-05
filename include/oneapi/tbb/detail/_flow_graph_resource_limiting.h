@@ -92,15 +92,19 @@ public:
     resource_handle_optional(resource_handle_optional&& other)
         : m_has_value(other.m_has_value)
     {
-        if (m_has_value) construct(std::move(other.m_resource_handle));
+        if (m_has_value) {
+            construct(std::move(other.m_resource_handle));
+            other.m_has_value = false;
+        }
     }
 
     resource_handle_optional& operator=(resource_handle_optional&& other) {
         if (this != &other) {
             if (m_has_value) m_resource_handle.~ResourceHandle();
             m_has_value = other.m_has_value;
-            if (other.m_has_value) {
+            if (m_has_value) {
                 ::new(&m_resource_handle) ResourceHandle(std::move(other.m_resource_handle));
+                other.m_has_value = false;
             }
         }
         return *this;
@@ -337,16 +341,19 @@ template <std::size_t Index, std::size_t MaxIndex>
 struct acquire_resources_helper {
     template <typename Body, typename ConsumerTuple, typename RequestData>
     static void run(Body* body_ptr, ConsumerTuple& consumers, request_id id, RequestData& req_data) {
+        __TBB_ASSERT(req_data.notify_counter == 1, "Incorrect notify counter");
+        ++req_data.notify_counter; // Local counter in case the resource is denied
         auto handle_optional = std::get<Index>(consumers).acquire_from_provider(id);
         if (handle_optional.has_value()) {
             // Successfully acquired resource - save the handle and proceed to the next resource
+            --req_data.notify_counter;
             std::get<Index>(req_data.handles) = std::move(handle_optional);
             acquire_resources_helper<Index + 1, MaxIndex>::run(body_ptr, consumers, id, req_data);
         } else {
+            __TBB_ASSERT(req_data.notify_counter >= 1, "Incorrect notify counter");
             // One of the resources denied the request
-            req_data.notify_counter += 2; // One reference for the denied resource and one self reference for resource releaser
             release_resources_helper<Index>::run(consumers, id, req_data);
-            body_ptr->release_self_ref(id, req_data);
+            body_ptr->release_self_ref(id, req_data); // release the self-reference held at the beginning of resource acquisition
         }
     }
 };
@@ -356,6 +363,7 @@ struct acquire_resources_helper<MaxIndex, MaxIndex> {
     template <typename Body, typename ConsumerTuple, typename RequestData>
     static void run(Body*, ConsumerTuple&, request_id, RequestData& req_data) {
         req_data.ready = true;
+        --req_data.notify_counter;
     }
 };
 
@@ -457,7 +465,7 @@ public:
         auto res = m_requests.emplace(std::piecewise_construct,
                                       std::forward_as_tuple(id),
                                       std::forward_as_tuple(input, ports));
-        this->graph_reference().reserve_wait(); // TODO: is it needed?
+        this->graph_reference().reserve_wait();
         __TBB_ASSERT(res.second, "Duplicated requests in the map");
         return *res.first;
     }
@@ -467,13 +475,16 @@ public:
     }
 
     void release_self_ref(request_id id, request_data_type& req_data) {
-        if (--req_data.notify_counter == 0) {
-            // Notifications from all resources received
+        std::size_t prev_value = req_data.notify_counter--;
+        __TBB_ASSERT(prev_value != 0, "Overflow detected");
+        if (prev_value == 1) {
             try_acquire_resources_and_execute(id, req_data);
         }
     }
 
     void try_acquire_resources(request_id id, request_data_type& req_data) {
+        std::size_t prev_value = req_data.notify_counter++;
+        __TBB_ASSERT(prev_value == 0, "Incorrect notify counter before acquisition");
         acquire_resources_helper<0, sizeof...(ResourceProviders)>::run(this, m_consumers, id, req_data);
     }
 
@@ -496,7 +507,7 @@ public:
     void remove_request(request_id id) {
         tbb::spin_mutex::scoped_lock lock(m_mutex);
         std::size_t num_removed = m_requests.erase(id);
-        this->graph_reference().release_wait(); // TODO: is it needed?
+        this->graph_reference().release_wait();
         __TBB_ASSERT(num_removed == 1, "Removing unregistered request");
         tbb::detail::suppress_unused_warning(num_removed);
     }
@@ -508,8 +519,9 @@ public:
         request_data_type& data = res->second;
         lock.release();
 
-        if ((--data.notify_counter) == 0) {
-            // Spawn acquire task
+        std::size_t prev_value = data.notify_counter--;
+        __TBB_ASSERT(prev_value != 0, "Overflow detected");
+        if (prev_value == 1) {
             d1::small_object_allocator allocator;
             using task_type = try_acquire_resources_and_execute_task<resource_limited_body_leaf, request_data_type>;
             graph_task* t = allocator.new_object<task_type>(this->graph_reference(), allocator, this, id, data);
@@ -560,7 +572,7 @@ public:
     resource_limited_input(graph& g, std::size_t max_concurrency,
                            std::tuple<ResourceProviders&...> resource_providers,
                            Body& body)
-        : base_type(g, max_concurrency, no_priority, is_body_noexcept(body, resource_providers)) // TODO: fill noexcept correctly
+        : base_type(g, max_concurrency, no_priority, is_body_noexcept(body, resource_providers))
         , m_body(new resource_limited_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body))
         , m_init_body(new resource_limited_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body))
         , m_output_ports(init_output_ports<output_ports_type>::call(g, m_output_ports))
