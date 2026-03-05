@@ -175,7 +175,7 @@ It is proposed to add an explicit feature-test macro to determine the presence o
 #define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
 #include <oneapi/tbb/task_group.h>
 
-#if TBB_HAS_TASK_GROUP_WAIT_FOR_TASK >= 202xxx // Some documented value
+#if TBB_HAS_TASK_GROUP_WAIT_FOR_SINGLE_TASK >= 202xxx // Some documented value
 group.wait_for_task(comp_handle);
 #else
 // Usage of other APIs or self-written workarounds
@@ -193,7 +193,7 @@ An alternative is to use ``TBB_VERSION`` macro for this purpose:
 ```cpp
 // Defined in <oneapi/tbb/task_group.h>
 // Defined in <oneapi/tbb/version.h>
-#define TBB_TASK_GROUP_WAIT_FOR_TASK 202xxx
+#define TBB_HAS_TASK_GROUP_WAIT_FOR_SINGLE_TASK 202xxx
 
 namespace oneapi {
 namespace tbb {
