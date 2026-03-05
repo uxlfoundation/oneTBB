@@ -2025,6 +2025,12 @@ void test_return_task_with_dependencies(submit_function submit_function_tag) {
     CHECK_MESSAGE(successor_placeholder == 1, "Successor task was not completed");
 }
 
+//! \brief \ref interface \ref requirement
+TEST_CASE("test task_group dynamic dependencies feature test macro") {
+    CHECK_MESSAGE(TBB_HAS_TASK_GROUP_DEPENDENCIES == 202603,
+                  "Incorrect feature test macro for dependencies");
+}
+
 //! \brief \ref interface \ref requirement \ref error_guessing
 TEST_CASE("test task_group dynamic dependencies") {
     for (unsigned p = MinThread; p <= MaxThread; ++p) {
