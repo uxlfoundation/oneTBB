@@ -49,7 +49,8 @@ template <typename ResourceHandle>
 class resource_limiter {
     using resource_handle_type = ResourceHandle;
 
-    resource_limiter(std::initializer_list<ResourceHandle> instances);
+    template <typename Handle, typename... Handles>
+    resource_limiter(Handle&& handle, Handles&&... handles);
 };
 
 template <typename Input, typename OutputTuple>
@@ -160,10 +161,14 @@ using resource_handle_type = ResourceHandle;
 An alias to the resource handle type used by the provider.
 
 ```cpp
-resource_limiter(std::initializer_list<ResourceHandle> instances);
+template <typename Handle, typename... Handles>
+resource_limiter(Handle&& handle, Handles&&... handles);
 ```
 
-Constructs a resource provider containing resources represented by `instances`.
+Constructs a resource provider containing resources represented by the ``handle`` and the ``handles``.
+
+``ResourceHandle`` must be constructible from ``std::forward<Handle>(handle)``,
+and from ``std::forward<H>(h)`` for each ``H`` in ``Handles`` and for each ``h`` in ``handles``.
 
 #### `oneapi::tbb::flow::resource_limited_node` Class
 
