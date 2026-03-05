@@ -71,13 +71,14 @@ endif()
 # Clang flags to prevent compiler from optimizing out security checks
 # Don't use -fPIC, -fstack-clash-protection, -fcf-protection on Windows (not supported by Clang with MSVC toolchain)
 # Also disable CRT security warnings on Windows (getenv, strncpy, etc. are deprecated but TBB uses them)
-set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} -Wformat -Wformat-security -Werror=format-security $<$<NOT:$<PLATFORM_ID:Windows>>:-fPIC> $<$<NOT:$<BOOL:${EMSCRIPTEN}>>:-fstack-protector-strong>)
-if(WIN32)
-    set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} -D_CRT_SECURE_NO_WARNINGS)
-endif()
+set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS}
+    -Wformat -Wformat-security -Werror=format-security
+    $<$<PLATFORM_ID:Windows>:-D_CRT_SECURE_NO_WARNINGS>
+    $<$<NOT:$<PLATFORM_ID:Windows>>:-fPIC>
+    $<$<NOT:$<PLATFORM_ID:Emscripten>>:-fstack-protector-strong>)
 
 if (NOT APPLE AND NOT ANDROID_PLATFORM AND CMAKE_SYSTEM_PROCESSOR MATCHES "(AMD64|amd64|i.86|x86)" AND NOT WIN32)
-    set(TBB_LIB_COMPILE_FLAGS ${TBB_LIB_COMPILE_FLAGS} -fstack-clash-protection $<$<NOT:$<BOOL:${EMSCRIPTEN}>>:-fcf-protection=full>)
+    set(TBB_LIB_COMPILE_FLAGS ${TBB_LIB_COMPILE_FLAGS} -fstack-clash-protection $<$<NOT:$<PLATFORM_ID:Emscripten>>:-fcf-protection=full>)
 endif()
 
 # -z switch is not supported on MacOS and Windows
