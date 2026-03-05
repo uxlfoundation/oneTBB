@@ -484,9 +484,11 @@ public:
     }
 
     bool try_acquire_resources(request_id id, request_data_type& req_data) {
-        // Increment the counter to avoid another resource reacquisition by notify() while current 
+        // Increment the counter to avoid another resource reacquisition by notify()
+        // while current acquisition is in progress
         std::size_t prev_value = req_data.notify_counter++;
         __TBB_ASSERT(prev_value == 0, "Incorrect notify counter before acquisition");
+        tbb::detail::suppress_unused_warning(prev_value);
         return acquire_resources_helper<0, sizeof...(ResourceProviders)>::run(this, m_consumers, id, req_data);
     }
 
