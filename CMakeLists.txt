@@ -258,7 +258,7 @@ if (TBB_ENABLE_IPO AND BUILD_SHARED_LIBS AND NOT ANDROID_PLATFORM AND NOT TBB_SA
         include(CheckIPOSupported)
         check_ipo_supported(RESULT TBB_IPO_PROPERTY)
         if (NOT TBB_IPO_PROPERTY)
-            message(WARNING "IPO was requested but is not supported.")
+            message(WARNING "IPO disabled: not supported by this compiler.")
         endif()
     else()
         set(TBB_IPO_FLAGS TRUE)
