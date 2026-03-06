@@ -19,7 +19,7 @@
 #pragma warning(disable : 4503)
 #endif
 
-#define TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITED_NODE 1
+#define TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING 1
 
 #include <iostream>
 #include <thread>
@@ -196,7 +196,7 @@ int main(int argc, char *argv[]) {
     using oneapi::tbb::flow::output_port;
     using oneapi::tbb::flow::function_node;
     using oneapi::tbb::flow::resource_limited_node;
-    using oneapi::tbb::flow::resource_provider;
+    using oneapi::tbb::flow::resource_limiter;
     using oneapi::tbb::flow::continue_msg;
     using oneapi::tbb::flow::unlimited;
 
@@ -228,10 +228,10 @@ int main(int argc, char *argv[]) {
 
         // Create chopsticks and resource providers
         std::vector<chopstick> chopsticks(num_philosophers);
-        std::vector<std::unique_ptr<resource_provider<chopstick*>>> providers;
+        std::vector<std::unique_ptr<resource_limiter<chopstick*>>> providers;
         providers.reserve(num_philosophers);
         for (int i = 0; i < num_philosophers; ++i) {
-            providers.push_back(std::make_unique<resource_provider<chopstick*>>(&chopsticks[i]));
+            providers.push_back(std::make_unique<resource_limiter<chopstick*>>(&chopsticks[i]));
         }
 
         // Create philosophers
