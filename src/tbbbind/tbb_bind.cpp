@@ -19,6 +19,7 @@
 #include <mutex>
 
 #include "../tbb/assert_impl.h" // Out-of-line TBB assertion handling routines are instantiated here.
+#include "../tbb/tcm.h"         // TCM types needed to export the constraints affinity mask.
 #include "oneapi/tbb/detail/_assert.h"
 #include "oneapi/tbb/detail/_config.h"
 #include "oneapi/tbb/detail/_utils.h"
@@ -449,12 +450,17 @@ public:
         }
     }
 
-    int get_default_concurrency(int numa_node_index, int core_type_index, int max_threads_per_core) {
+    affinity_mask get_constraints_affinity_mask(int numa_node_index, int core_type_index, int max_threads_per_core) {
         __TBB_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized system_topology");
 
         hwloc_cpuset_t constraints_mask = hwloc_bitmap_alloc();
         fill_constraints_affinity_mask(constraints_mask, numa_node_index, core_type_index, max_threads_per_core);
 
+        return constraints_mask;
+    }
+
+    int get_default_concurrency(int numa_node_index, int core_type_index, int max_threads_per_core) {
+        hwloc_cpuset_t constraints_mask = get_constraints_affinity_mask(numa_node_index, core_type_index, max_threads_per_core);
         int default_concurrency = hwloc_bitmap_weight(constraints_mask);
         hwloc_bitmap_free(constraints_mask);
         return default_concurrency;
@@ -608,6 +614,10 @@ TBBBIND_EXPORT void __TBB_internal_restore_affinity(binding_handler* handler_ptr
 
 TBBBIND_EXPORT int __TBB_internal_get_default_concurrency(int numa_id, int core_type_id, int max_threads_per_core) {
     return system_topology::instance().get_default_concurrency(numa_id, core_type_id, max_threads_per_core);
+}
+
+TBBBIND_EXPORT tcm_cpu_mask_t __TBB_internal_get_constraints_affinity_mask(int numa_id, int core_type_id, int max_threads_per_core) {
+    return system_topology::instance().get_constraints_affinity_mask(numa_id, core_type_id, max_threads_per_core);
 }
 
 TBBBIND_EXPORT void __TBB_internal_destroy_system_topology() {

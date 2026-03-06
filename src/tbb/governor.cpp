@@ -363,6 +363,7 @@ bool __TBB_EXPORTED_FUNC finalize(d1::task_scheduler_handle& handle, std::intptr
 #pragma weak __TBB_internal_apply_affinity
 #pragma weak __TBB_internal_restore_affinity
 #pragma weak __TBB_internal_get_default_concurrency
+#pragma weak __TBB_internal_get_constraints_affinity_mask
 #pragma weak __TBB_internal_set_tbbbind_assertion_handler
 
 extern "C" {
@@ -381,6 +382,7 @@ void __TBB_internal_apply_affinity( binding_handler* handler_ptr, int slot_num )
 void __TBB_internal_restore_affinity( binding_handler* handler_ptr, int slot_num );
 
 int __TBB_internal_get_default_concurrency( int numa_id, int core_type_id, int max_threads_per_core );
+tcm_cpu_mask_t __TBB_internal_get_constraints_affinity_mask( int numa_id, int core_type_id, int max_threads_per_core );
 
 void __TBB_internal_set_tbbbind_assertion_handler( assertion_handler_type handler );
 }
@@ -393,6 +395,7 @@ static void dummy_deallocate_binding_handler ( binding_handler* ) { }
 static void dummy_apply_affinity ( binding_handler*, int ) { }
 static void dummy_restore_affinity ( binding_handler*, int ) { }
 static int dummy_get_default_concurrency( int, int, int ) { return governor::default_num_threads(); }
+static tcm_cpu_mask_t dummy_get_constraints_affinity_mask( int, int, int ) { return nullptr; }
 static void dummy_set_assertion_handler( assertion_handler_type ) { }
 
 // Handlers for communication with TBBbind
@@ -413,6 +416,8 @@ static void (*restore_affinity_ptr)( binding_handler* handler_ptr, int slot_num 
     = dummy_restore_affinity;
 int (*get_default_concurrency_ptr)( int numa_id, int core_type_id, int max_threads_per_core )
     = dummy_get_default_concurrency;
+tcm_cpu_mask_t (*get_constraints_affinity_mask_ptr)( int numa_id, int core_type_id, int max_threads_per_core )
+    = dummy_get_constraints_affinity_mask;
 void (*set_assertion_handler_ptr)( assertion_handler_type handler )
     = dummy_set_assertion_handler;
 
@@ -428,7 +433,8 @@ static const dynamic_link_descriptor TbbBindLinkTable[] = {
     DLD(__TBB_internal_apply_affinity, apply_affinity_ptr),
     DLD(__TBB_internal_restore_affinity, restore_affinity_ptr),
 #endif
-    DLD(__TBB_internal_get_default_concurrency, get_default_concurrency_ptr)
+    DLD(__TBB_internal_get_default_concurrency, get_default_concurrency_ptr),
+    DLD(__TBB_internal_get_constraints_affinity_mask, get_constraints_affinity_mask_ptr)
 };
 
 static const unsigned LinkTableSize = sizeof(TbbBindLinkTable) / sizeof(dynamic_link_descriptor);
@@ -612,6 +618,15 @@ int __TBB_EXPORTED_FUNC constraints_default_concurrency(const d1::constraints& c
 
 int __TBB_EXPORTED_FUNC constraints_threads_per_core(const d1::constraints&, intptr_t /*reserved*/) {
     return system_topology::automatic;
+}
+
+tcm_cpu_mask_t constraints_affinity_mask(const d1::constraints& c) {
+    constraints_assertion(c);
+    if (c.numa_id >= 0 || c.core_type >= 0 || c.max_threads_per_core > 0) {
+        system_topology::initialize();
+        return get_constraints_affinity_mask_ptr(c.numa_id, c.core_type, c.max_threads_per_core);
+    }
+    return nullptr;
 }
 #endif /* __TBB_ARENA_BINDING */
 
