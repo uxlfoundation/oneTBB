@@ -161,19 +161,20 @@ T reverse_n_bits(T src, std::size_t n) {
 //! Encodes/decodes multiple core type IDs into/from a single integer value using bitmask
 struct multi_core_type_codec {
     using core_type_id = int;
+    static constexpr core_type_id automatic = -1;
 
     static core_type_id encode(const std::vector<core_type_id>& ids) {
         if (ids.empty()) {
-            return -1;
+            return automatic;
         }
         if (ids.size() == 1) {
             return ids[0];
         }
 
-        core_type_id result = (format << core_type_id_bits);
+        core_type_id result = (encoding_format << bitmask_width);
 
         for (core_type_id id : ids) {
-            __TBB_ASSERT((0 <= id) && (id < static_cast<core_type_id>(core_type_id_bits)), "Wrong core type id");
+            __TBB_ASSERT((0 <= id) && (id < static_cast<core_type_id>(bitmask_width)), "Wrong core type id");
             result |= (1 << id);
         }
 
@@ -185,7 +186,7 @@ struct multi_core_type_codec {
         }
 
         std::vector<core_type_id> core_type_ids;
-        for (size_t bit_pos = 0; bit_pos < core_type_id_bits; ++bit_pos) {
+        for (size_t bit_pos = 0; bit_pos < bitmask_width; ++bit_pos) {
             if (core_type & (1 << bit_pos)) {
                 core_type_ids.push_back(static_cast<core_type_id>(bit_pos));
             }
@@ -193,21 +194,21 @@ struct multi_core_type_codec {
         return core_type_ids;
     }
     static bool is_single(core_type_id id) {
-        return (id >> core_type_id_bits) == 0;
+        return (id >> bitmask_width) == 0;
     }
     static bool is_encoded(core_type_id id) {
-        return (static_cast<std::make_unsigned<core_type_id>::type>(id) >> core_type_id_bits) == format;
+        return (static_cast<std::make_unsigned<core_type_id>::type>(id) >> bitmask_width) == encoding_format;
     }
     static bool is_core_type(core_type_id id) {
         return is_single(id) || is_encoded(id);
     }
 
-    // Lower core_type_id_bits encode IDs
-    static constexpr size_t core_type_id_bits = sizeof(core_type_id) * CHAR_BIT - 4;
+    // Lower bitmask_width bits encode IDs
+    static constexpr size_t bitmask_width = sizeof(core_type_id) * CHAR_BIT - 4;
 
     // Upper 4 bits: MSb=1 (makes result negative; real core type IDs are non-negative) + 3-bit format version
     // (current: 0, max: 6; 1111 is excluded to avoid collision with plain negatives: -1, -2, ..., -268435456)
-    static constexpr size_t format = 0x8;
+    static constexpr size_t encoding_format = 0x8;
 };
 
 // A function to check if passed integer is a power of two

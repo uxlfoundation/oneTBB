@@ -255,7 +255,7 @@ public:
     static const int automatic = -1;
     //! Typedef for current thread index in an uninitialized arena.
     static const int not_initialized = -2;
-#if __TBB_PREVIEW_AFFINITY_SELECTOR
+#if __TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
     //! Typedef for core type(s) to be specified by the provided selector.
     static const int selectable = -2;
 #endif
@@ -358,7 +358,7 @@ public:
           )
     {}
 
-#if __TBB_PREVIEW_AFFINITY_SELECTOR
+#if __TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
     //! Creates task arena with a custom selector for core types
     template <typename Selector,
               typename = decltype(static_cast<int>(std::declval<Selector>()(std::declval<std::tuple<int, size_t, size_t>>())))>
@@ -374,7 +374,9 @@ public:
 #endif
           )
     {
-        apply_core_type_selector(selector_, my_core_type);
+        if (my_core_type == selectable) {
+            my_core_type = apply_core_type_selector(selector_);
+        }
     }
 #endif
 
@@ -478,7 +480,7 @@ public:
         }
     }
 
-#if __TBB_PREVIEW_AFFINITY_SELECTOR
+#if __TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
     //! Overrides constraints with a custom selector for core types and forces initialization of internal representation
     template<typename Selector,
              typename = decltype(static_cast<int>(std::declval<Selector>()(std::declval<std::tuple<int, size_t, size_t>>())))>
@@ -500,12 +502,14 @@ public:
 #if __TBB_PREVIEW_PARALLEL_PHASE
             set_leave_policy(lp);
 #endif
-            apply_core_type_selector(selector_, my_core_type);
+            if (my_core_type == selectable) {
+                my_core_type = apply_core_type_selector(selector_);
+            }
             r1::initialize(*this);
             mark_initialized();
         }
     }
-#endif /*__TBB_PREVIEW_AFFINITY_SELECTOR*/
+#endif /*__TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR*/
 #endif /*__TBB_ARENA_BINDING*/
 
     //! Attaches this instance to the current arena of the thread

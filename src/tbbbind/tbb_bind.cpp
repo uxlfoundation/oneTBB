@@ -357,10 +357,10 @@ public:
         __TBB_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized system_topology");
         __TBB_ASSERT(numa_node_index < (int)numa_affinity_masks_list.size(), "Wrong NUMA node id");
         __TBB_ASSERT(core_type_index == -1 ||
-            // In the multiple core type format, the MSb of the first core_type_id_bits bits represents the highest core type id
+            // In the multiple core type format, the MSb of the first bitmask_width bits represents the highest core type id
             (multi_core_type_codec::is_single(core_type_index)
                  ? (size_t)core_type_index
-                 : log2(core_type_index & ((1 << multi_core_type_codec::core_type_id_bits) - 1))) <
+                 : log2(core_type_index & ((1 << multi_core_type_codec::bitmask_width) - 1))) <
                 core_types_affinity_masks_list.size(),
             "Wrong core type id");
         __TBB_ASSERT(max_threads_per_core == -1 || max_threads_per_core > 0, "Wrong max_threads_per_core");

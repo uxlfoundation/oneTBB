@@ -18,7 +18,7 @@
 #ifndef __TBB_test_common_arena_constraints_H_
 #define __TBB_test_common_arena_constraints_H_
 
-#define TBB_PREVIEW_AFFINITY_SELECTOR 1
+#define TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR 1
 
 #if !defined(_CRT_SECURE_NO_WARNINGS) && (_WIN32 || _WIN64)
 #define _CRT_SECURE_NO_WARNINGS
@@ -442,7 +442,8 @@ system_info::affinity_mask prepare_reference_affinity_mask(const tbb::task_arena
             }
 
             index_info combination;
-            combination.index = (tbb::detail::multi_core_type_codec::format << tbb::detail::multi_core_type_codec::core_type_id_bits); // multiple core type format
+            combination.index = (tbb::detail::multi_core_type_codec::encoding_format <<
+                tbb::detail::multi_core_type_codec::bitmask_width); // multiple core type format
             combination.index |= mask;
             combination.concurrency = 0;
             combination.cpuset = hwloc_bitmap_alloc();

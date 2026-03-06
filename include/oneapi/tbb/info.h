@@ -107,24 +107,17 @@ inline int default_concurrency(constraints c) {
     return r1::constraints_default_concurrency(c);
 }
 
-#if __TBB_PREVIEW_AFFINITY_SELECTOR
+#if __TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
 // Call a custom selector on the available core type(s) and encode those selected
 template <typename Selector>
-inline void apply_core_type_selector(Selector selector, core_type_id& core_type) {
+inline core_type_id apply_core_type_selector(Selector selector) {
     constexpr core_type_id automatic = -1;
-    constexpr core_type_id selectable = -2;
-
-    if (core_type != selectable) {
-        // Core type is already specified, no need to use selector
-        return;
-    }
 
     auto ids = core_types();
     size_t total = ids.size();
     if (total < 2) {
         // Not enough core types to select from, so use the default
-        core_type = automatic;
-        return;
+        return automatic;
     }
 
     int max_score = 0, max_score_id = -1, num_zero_scores = 0;
@@ -154,12 +147,15 @@ inline void apply_core_type_selector(Selector selector, core_type_id& core_type)
             selected_core_types = { max_score_id }; // the one with the highest score
         }
     }
-    core_type = multi_core_type_codec::encode(selected_core_types);
+    return multi_core_type_codec::encode(selected_core_types);
 }
 
 template <typename Selector>
 inline int default_concurrency(constraints c, Selector selector) {
-    apply_core_type_selector(selector, c.core_type);
+    constexpr core_type_id selectable = -2;
+    if (c.core_type == selectable) {
+        c.core_type = apply_core_type_selector(selector);
+    }
     return default_concurrency(c);
 }
 #endif
