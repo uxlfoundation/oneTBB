@@ -305,17 +305,34 @@ void test_cancellation_with_active_requests(bool exception) {
 
     using node_type = resource_limited_node<int, std::tuple<>>;
     using ports_type = typename node_type::output_ports_type;
-
-    graph g;
-
+    
 #if TBB_USE_EXCEPTIONS
     struct body_exception {};
 #endif
+    
+    tbb::task_group_context g2_context(tbb::task_group_context::isolated);
+    graph g1;
+    graph g2(g2_context);
 
-    node_type cancel_node(g, unlimited, std::tie(limiter),
+    const std::size_t n_submissions = 100;
+    std::atomic<std::size_t> g2_node_body_counter{0};
+
+    node_type keep_using_node(g2, unlimited, std::tie(limiter),
         [&](int input, ports_type&, int resource) {
             CHECK_MESSAGE(input == input_value, "Incorrect input");
             CHECK_MESSAGE(resource == resource_value, "Incorrect resource");
+
+            ++g2_node_body_counter;
+        });
+
+    node_type cancel_node(g1, unlimited, std::tie(limiter),
+        [&](int input, ports_type&, int resource) {
+            CHECK_MESSAGE(input == input_value, "Incorrect input");
+            CHECK_MESSAGE(resource == resource_value, "Incorrect resource");
+
+            for (std::size_t i = 0; i < n_submissions; ++i) {
+                keep_using_node.try_put(input);
+            }
 
             if (exception) {
 #if TBB_USE_EXCEPTIONS
@@ -324,7 +341,11 @@ void test_cancellation_with_active_requests(bool exception) {
                 CHECK_MESSAGE(false, "exception test was called when exceptions are not supported");
 #endif
             } else {
-                g.cancel();
+                g1.cancel();
+            }
+
+            for (std::size_t i = 0; i < n_submissions; ++i) {
+                keep_using_node.try_put(input);
             }
         });
 
@@ -333,15 +354,20 @@ void test_cancellation_with_active_requests(bool exception) {
 #if TBB_USE_EXCEPTIONS
     bool caught_exception = false;
     try {
-        g.wait_for_all();
+        g1.wait_for_all();
     } catch (body_exception) {
         caught_exception = true;
     }
 
     CHECK_MESSAGE(exception == caught_exception, "Expected exception was not caught");
 #else
-    g.wait_for_all();
+    g1.wait_for_all();
 #endif
+
+    g2.wait_for_all();
+    std::size_t expected_g2_body_calls = exception ? n_submissions : 2 * n_submissions;
+    CHECK_MESSAGE(g2_node_body_counter == expected_g2_body_calls,
+                  "Incorrect number of g2 node body calls");
 }
 
 //! \brief \ref interface
