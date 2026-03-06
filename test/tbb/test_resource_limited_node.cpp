@@ -389,6 +389,88 @@ TEST_CASE("test resource acquisition") {
     test_several_resources();
 }
 
+//! \brief \ref error_guessing
+TEST_CASE("Test reservation fairness") {
+    using namespace oneapi::tbb::flow;
+
+    const int N = 100; // number of messages to be sent to each input
+    const int THRESHOLD = N/2; // max difference between the number of acquisitions and 2*inputs
+    graph g;
+
+    using big_object = int;
+    using big_msg_type = std::shared_ptr<big_object>;
+    using resource_type = int;
+
+    broadcast_node<big_msg_type> source(g);
+    queue_node<big_msg_type> b1(g), b2(g), b3(g);
+
+    // Create resource providers (replaces buffer_nodes)
+    resource_provider<resource_type> r1_provider(1);
+    resource_provider<resource_type> r2_provider(1);
+
+    std::atomic<int> r1_count{0}, r2_count{0};
+    bool threshold_exceeded1 = false, threshold_exceeded2 = false, threshold_exceeded3 = false;
+
+    // Path 1: Requires r1 only
+    using node_type_r1 = resource_limited_node<big_msg_type, std::tuple<>>;
+    node_type_r1 consumer1(g, serial, std::tie(r1_provider),
+        [&](const big_msg_type& msg, auto&, resource_type&) {
+            auto acquisition_number = ++r1_count;
+            if (acquisition_number - 2*(*msg) > THRESHOLD) {
+                threshold_exceeded1 = true;
+            }
+            utils::Sleep(1);
+        });
+
+    // Path 2: Requires r2 only
+    using node_type_r2 = resource_limited_node<big_msg_type, std::tuple<>>;
+    node_type_r2 path2_node(g, serial, std::tie(r2_provider),
+        [&](const big_msg_type& msg, auto&, resource_type&) {
+            auto acquisition_number = ++r2_count;
+            if (acquisition_number - 2*(*msg) > THRESHOLD) {
+                threshold_exceeded2 = true;
+            }
+            utils::Sleep(1);
+        });
+
+    // Path 3: Requires both r1 and r2
+    using node_type_both = resource_limited_node<big_msg_type, std::tuple<>>;
+    node_type_both path3_node(g, serial, std::tie(r1_provider, r2_provider),
+        [&](const big_msg_type& msg, auto&, resource_type&, resource_type&) {
+            auto r1_acquisition_number = ++r1_count;
+            auto r2_acquisition_number = ++r2_count;
+            if ((r1_acquisition_number - 2*(*msg) > THRESHOLD)
+                || (r2_acquisition_number - 2*(*msg) > THRESHOLD)) {
+                threshold_exceeded3 = true;
+            }
+            utils::Sleep(1);
+        });
+
+    r1_count = 0;
+    r2_count = 0;
+
+    // Simplified edges: direct connections from queue_nodes to resource_limited_nodes
+    make_edge(source, b1);
+    make_edge(source, b2);
+    make_edge(source, b3);
+
+    make_edge(b1, path1_node);
+    make_edge(b2, path2_node);
+    make_edge(b3, path3_node);
+
+    for (int i = 0; i < N; ++i) {
+        source.try_put(big_msg_type(new big_object{i}));
+        utils::Sleep(1);
+    }
+    g.wait_for_all();
+
+    CHECK_MESSAGE(r1_count.load() == 2 * N, "Incorrect number of acquisitions of r1");
+    CHECK_MESSAGE(r2_count.load() == 2 * N, "Incorrect number of acquisitions of r2");
+    CHECK_MESSAGE(!threshold_exceeded1, "Possible starvation of f1");
+    CHECK_MESSAGE(!threshold_exceeded2, "Possible starvation of f2");
+    CHECK_MESSAGE(!threshold_exceeded3, "Possible starvation of f3");
+}
+
 template <typename Handle>
 using limiter_unique_ptr = std::unique_ptr<oneapi::tbb::flow::resource_limiter<Handle>>;
 
