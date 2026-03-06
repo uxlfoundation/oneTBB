@@ -21,7 +21,6 @@
 #error Do not #include this internal file directly; use public TBB headers instead.
 #endif
 
-#include <chrono>
 #include <unordered_map>
 #include <forward_list>
 #include <functional>
@@ -37,29 +36,21 @@ template <typename ResourceHandle>
 class resource_consumer_base;
 
 class request_id {
-    using clock_type = std::chrono::high_resolution_clock;
-    using time_point = clock_type::time_point;
-
-    time_point    m_time_point;
     std::uint64_t m_unique_integer;
 public:
     request_id(const std::uint64_t& unique_integer)
-        : m_time_point(clock_type::now())
-        , m_unique_integer(unique_integer)
+        : m_unique_integer(unique_integer)
     {}
 
-    struct hash {
-        std::hash<std::uint64_t> m_hash;
-
+    struct hash : protected std::hash<std::uint64_t> {
         std::size_t operator()(request_id id) const {
-            return m_hash(id.m_unique_integer);
+            return std::hash<std::uint64_t>::operator()(id.m_unique_integer);
         }
     };
 
-    struct equal {
+    struct equal : protected std::equal_to<std::uint64_t> {
         bool operator()(request_id lhs, request_id rhs) const {
-            return lhs.m_time_point == rhs.m_time_point &&
-                   lhs.m_unique_integer == rhs.m_unique_integer;
+            return std::equal_to<std::uint64_t>::operator()(lhs.m_unique_integer, rhs.m_unique_integer);
         }
     };
 }; // class request_id
@@ -495,9 +486,12 @@ public:
     void try_acquire_resources_and_execute(request_id id, request_data_type& req_data) {
         if (try_acquire_resources(id, req_data)) {
             // Access to all resources is granted
-            call_body(req_data.input_message, req_data.output_ports, req_data.handles);
-            release_resources(id, req_data);
-            remove_request(id);
+            try_call([&] {
+                call_body(req_data.input_message, req_data.output_ports, req_data.handles);
+            }).on_completion([&] {
+                release_resources(id, req_data);
+                remove_request(id);
+            });
         }
     }
 

@@ -293,47 +293,52 @@ void test_root_genie() {
     // TODO: add fairness checks
 }
 
-void test_cancellation_with_active_requests() {
+void test_cancellation_with_active_requests(bool exception) {
     using namespace tbb::flow;
 
     int resource_value = 1;
     int input_value = 2;
     resource_limiter<int> limiter(resource_value);
 
-    using node_type = resource_limited_node<int, std::tuple<int>>;
+    using node_type = resource_limited_node<int, std::tuple<>>;
     using ports_type = typename node_type::output_ports_type;
 
     graph g;
 
+#if TBB_USE_EXCEPTIONS
+    struct body_exception {};
+#endif
+
     node_type cancel_node(g, unlimited, std::tie(limiter),
-        [&](int input, ports_type& ports, int resource) {
+        [&](int input, ports_type&, int resource) {
             CHECK_MESSAGE(input == input_value, "Incorrect input");
             CHECK_MESSAGE(resource == resource_value, "Incorrect resource");
 
-            for (int i = 0; i < 100; ++i) {
-                std::get<0>(ports).try_put(input);
-            }
-
-            g.cancel();
-
-            for (int i = 0; i < 100; ++i) {
-                std::get<0>(ports).try_put(input);
+            if (exception) {
+#if TBB_USE_EXCEPTIONS
+                throw body_exception{};
+#else
+                CHECK_MESSAGE(false, "exception test was called when exceptions are not supported");
+#endif
+            } else {
+                g.cancel();
             }
         });
-
-    std::atomic<std::size_t> num_bodies{0};
-
-    node_type successor_node(g, unlimited, std::tie(limiter),
-        [&](int, ports_type&, int) {
-            ++num_bodies;
-        });
-
-    make_edge(output_port<0>(cancel_node), successor_node);
 
     cancel_node.try_put(input_value);
+
+#if TBB_USE_EXCEPTIONS
+    bool caught_exception = false;
+    try {
+        g.wait_for_all();
+    } catch (body_exception) {
+        caught_exception = true;
+    }
+
+    CHECK_MESSAGE(exception == caught_exception, "Expected exception was not caught");
+#else
     g.wait_for_all();
-    CHECK_MESSAGE(num_bodies < tbb::this_task_arena::max_concurrency(),
-                  "Maximum number of node bodies exceeded");
+#endif
 }
 
 //! \brief \ref interface
@@ -463,6 +468,9 @@ TEST_CASE("resource_limited_node and std::invoke") {
 
 //! \brief \ref error_guessing
 TEST_CASE("resource_limited_node cancellation with active requests") {
-    test_cancellation_with_active_requests();
+    test_cancellation_with_active_requests(/*exception =*/false);
+#if TBB_USE_EXCEPTIONS
+    test_cancellation_with_active_requests(/*exception = */true);
+#endif
 }
 #endif
