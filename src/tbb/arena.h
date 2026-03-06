@@ -193,15 +193,14 @@ public:
     // This method is not thread-safe!
     // Required to be called after construction to set initial state of the state machine.
     void set_initial_state(tbb::task_arena::leave_policy lp) {
-        auto glp = tbb::task_arena::leave_policy(global_control::active_value(global_control::leave_policy));
-        if (lp == tbb::task_arena::leave_policy::automatic && glp == tbb::task_arena::leave_policy::automatic) {
-            std::uintptr_t platform_policy = governor::hybrid_cpu() ? FAST_LEAVE : DELAYED_LEAVE;
-            my_state.store(platform_policy, std::memory_order_relaxed);
-        } else {
-            __TBB_ASSERT(lp == tbb::task_arena::leave_policy::fast || glp == tbb::task_arena::leave_policy::fast,
-                         "Was the new value introduced for leave policy?");
-            my_state.store(FAST_LEAVE, std::memory_order_relaxed);
+        std::uintptr_t policy = FAST_LEAVE;
+        if (lp == tbb::task_arena::leave_policy::automatic) {
+            auto glp = tbb::task_arena::leave_policy(global_control::active_value(global_control::leave_policy));
+            if (glp == tbb::task_arena::leave_policy::automatic) {
+                policy = governor::hybrid_cpu() ? FAST_LEAVE : DELAYED_LEAVE;
+            }
         }
+        my_state.store(policy, std::memory_order_relaxed);
     }
 
     void reset_if_needed() {

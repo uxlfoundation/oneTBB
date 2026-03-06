@@ -89,6 +89,14 @@ public:
         r1::create(*this);
     }
 
+#if __TBB_PREVIEW_PARALLEL_PHASE
+    //! Overload the constructor for enum types to avoid forcing users to cast them to size_t
+    template<typename T, typename = std::enable_if_t<std::is_enum<T>::value>>
+    global_control(parameter p, T value)
+        : global_control(p, static_cast<std::size_t>(value))
+    {}
+#endif
+
     ~global_control() {
         __TBB_ASSERT(my_param < parameter_max, "Invalid parameter");
 #if __TBB_WIN8UI_SUPPORT && (_WIN32_WINNT < 0x0A00)

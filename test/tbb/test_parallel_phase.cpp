@@ -322,8 +322,7 @@ TEST_CASE("Check that workers leave faster with leave_policy::fast") {
         "Expected workers to start new work slower with fast leave policy");
 
     // Test that global_control::leave_policy makes automatic arenas behave like fast leave
-    tbb::global_control gc(tbb::global_control::leave_policy,
-                           std::size_t(tbb::task_arena::leave_policy::fast));
+    tbb::global_control gc(tbb::global_control::leave_policy, tbb::task_arena::leave_policy::fast);
     tbb::task_arena ta_global_fast {
         tbb::task_arena::automatic, 1,
         tbb::task_arena::priority::normal,
@@ -335,9 +334,22 @@ TEST_CASE("Check that workers leave faster with leave_policy::fast") {
 
     WARN_MESSAGE(median_automatic < median_global_fast,
         "Expected workers to start new work slower with global fast leave");
+
+    // Run inside a new calling thread with a new implicit arena
+    start_time_collection st_collector4{/*num_trials=*/5 };
+    std::vector<std::size_t> times_implicit;
+    utils::NativeParallelFor(1, [&](int) { times_implicit = st_collector4.measure(); });
+    auto median_implicit = utils::median(times_implicit.begin(), times_implicit.end());
+
+    WARN_MESSAGE(median_automatic < median_implicit,
+        "Expected workers to start new work slower with implicit arena under global fast leave");
 }
 
 void test_parallel_phase_retains_workers(tbb::task_arena::leave_policy lp) {
+    constexpr auto fast = tbb::task_arena::leave_policy::fast;
+    REQUIRE(((lp == fast) ||
+             (tbb::global_control::active_value(tbb::global_control::leave_policy) == size_t(fast))));
+
     tbb::task_arena ta_fast1{tbb::task_arena::automatic, 1, tbb::task_arena::priority::normal, lp};
     tbb::task_arena ta_fast2{tbb::task_arena::automatic, 1, tbb::task_arena::priority::normal, lp};
 
@@ -368,8 +380,7 @@ TEST_CASE("Parallel Phase retains workers in task_arena") {
     test_parallel_phase_retains_workers(tbb::task_arena::leave_policy::fast);
 
     // Test that parallel phase retains workers on automatic arenas with global fast leave
-    tbb::global_control gc(tbb::global_control::leave_policy,
-                           std::size_t(tbb::task_arena::leave_policy::fast));
+    tbb::global_control gc(tbb::global_control::leave_policy, tbb::task_arena::leave_policy::fast);
     test_parallel_phase_retains_workers(tbb::task_arena::leave_policy::automatic);
 }
 

@@ -146,7 +146,7 @@ class alignas(max_nfs_size) lifetime_control : public control_storage {
 #if __TBB_PREVIEW_PARALLEL_PHASE
 class alignas(max_nfs_size) leave_policy_control : public control_storage {
     std::size_t default_value() const override {
-        return 0;
+        return std::size_t(tbb::task_arena::leave_policy::automatic);
     }
 };
 
