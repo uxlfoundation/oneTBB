@@ -22,8 +22,6 @@
 #include "detail/_range_common.h"
 #include "detail/_namespace_injection.h"
 
-#include "version.h"
-
 namespace tbb {
 namespace detail {
 namespace d1 {
