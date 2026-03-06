@@ -91,7 +91,7 @@ public:
 
 #if __TBB_PREVIEW_PARALLEL_PHASE
     //! Overload the constructor for enum types to avoid forcing users to cast them to size_t
-    template<typename T, typename = std::enable_if_t<std::is_enum<T>::value>>
+    template<typename T, typename = std::enable_if<std::is_enum<T>::value>::type>
     global_control(parameter p, T value)
         : global_control(p, static_cast<std::size_t>(value))
     {}
