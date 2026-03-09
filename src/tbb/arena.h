@@ -196,8 +196,8 @@ public:
         std::uintptr_t policy = FAST_LEAVE;
         if (lp == tbb::task_arena::leave_policy::automatic) {
             auto glp = tbb::task_arena::leave_policy(global_control::active_value(global_control::leave_policy));
-            if (glp == tbb::task_arena::leave_policy::automatic) {
-                policy = governor::hybrid_cpu() ? FAST_LEAVE : DELAYED_LEAVE;
+            if (glp == tbb::task_arena::leave_policy::automatic && !governor::hybrid_cpu()) {
+                policy = DELAYED_LEAVE;
             }
         }
         my_state.store(policy, std::memory_order_relaxed);

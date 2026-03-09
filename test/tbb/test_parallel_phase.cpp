@@ -427,3 +427,8 @@ TEST_CASE("Test parallel phase with this_task_arena") {
     WARN_MESSAGE(median1 < median2,
         "Expected one-time fast leave setting to slow workers to start new work");
 }
+
+//! \brief \ref interface
+TEST_CASE("Feature test macro") {
+    CHECK_MESSAGE(TBB_HAS_PARALLEL_PHASE == 202603, "Incorrect feature test macro");
+}
