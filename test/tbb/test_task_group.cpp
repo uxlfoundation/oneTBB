@@ -2234,6 +2234,12 @@ void test_single_task_wait_with_no_dependencies(bool do_cancellation, wait_for_f
         CHECK_MESSAGE(items[i] == expected_item, "Incorrect item processing result");
     }
 
+    // Test that waiting on the completed task returns the same status
+    for (std::size_t i = 0; i < 10; ++i) {
+        CHECK_MESSAGE(task_status == expected_task_status, "Incorrect task status returned");
+    }
+
+
     tbb::task_group_status group_status = arena.wait_for(tg);
     CHECK_MESSAGE(group_status == expected_group_status, "Incorrect group status returned");
     
