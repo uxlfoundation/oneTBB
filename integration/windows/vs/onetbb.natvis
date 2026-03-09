@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Copyright (c) 2025 Intel Corporation
+	Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -82,25 +83,43 @@
 		</Expand>
 	</Type>
 
-	<Type Name="tbb::detail::d2::concurrent_map&lt;*,*,*,*&gt;">
-		<AlternativeType Name="tbb::detail::d2::concurrent_multimap&lt;*,*,*,*&gt;"/>
-		<AlternativeType Name="tbb::detail::d2::concurrent_set&lt;*,*,*&gt;"/>
-		<AlternativeType Name="tbb::detail::d2::concurrent_multiset&lt;*,*,*&gt;"/>
-		<DisplayString>{{ size = {my_size} }}</DisplayString>
+	<Type Name="tbb::detail::d3::concurrent_map&lt;*,*,*,*&gt;">
+		<AlternativeType Name="tbb::detail::d3::concurrent_multimap&lt;*,*,*,*&gt;"/>
+		<AlternativeType Name="tbb::detail::d3::concurrent_set&lt;*,*,*&gt;"/>
+		<AlternativeType Name="tbb::detail::d3::concurrent_multiset&lt;*,*,*&gt;"/>
 		<Expand>
+			<CustomListItems MaxItemsPerView="1">
+        <!--
+          The size of ordered associative containers is actually located in thread local storage.
+          So, in order to display the size of the container, we have to traverse and sum all elements of TLS.
+          Custom intrinsics do not support loops, only simple expressions, so [size] can not
+          be displayed in DisplayString section.
+        -->
+				<Variable Name="size" InitialValue="0"/>
+				<Variable Name="index" InitialValue="0"/>
+				<Variable Name="segment_index" InitialValue="-1"/>
+				<Loop>
+					<Break Condition="index == my_ets.my_locals.my_size._Storage._Value"/>
+					<Exec>segment_index = __log2(1 | index)</Exec>
+					<Exec>size += (*(thread_data_type*)(&amp;my_ets.my_locals.my_segment_table._Storage._Value[segment_index]._Storage._Value[index])).my_local_size._Storage._Value</Exec>
+					<Exec>index += 1</Exec>
+				</Loop>
+				<Item Name="[size]">size</Item>
+			</CustomListItems>
+
 			<Item Name="[comparator]">my_compare</Item>
 			<Item Name="[allocator]">my_node_allocator</Item>
 			
 			<CustomListItems MaxItemsPerView="50">
 				<!--
-				    concurrent ordered containers implement a concurrent skip list
-					where each node has multiple pointers to next nodes on each level
-					only the first level sub-list contains all nodes in the list
-					pointers to the next nodes are not stored in the node class directly
-					but are located in the memory following the node
-					next pointer on the first level can be obtained as (std::atomic<list_node_type*>)(node_address + 1)
-					
-					the first node in the list is always a dummy node so the first real item is located in the second node
+				    Concurrent ordered containers implement a concurrent skip list
+					where each node has multiple pointers to next nodes on each level.
+					Only the first level sub-list contains all nodes in the list.
+					Pointers to the next nodes are not stored in the node class directly
+					but are located in the memory following the node.
+					Next pointer on the first level can be obtained as (std::atomic<list_node_type*>)(node_address + 1)
+
+					The first node in the list is always a dummy node so the first real item is located in the second node.
 				-->
 				<Variable Name="node_ptr" InitialValue="(*(atomic_node_ptr*)(my_head_ptr._Storage._Value + 1))._Storage._Value"/>
 

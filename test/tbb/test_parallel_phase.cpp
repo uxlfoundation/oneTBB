@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2025 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -26,6 +27,7 @@
 #include "common/utils_concurrency_limit.h"
 #include "common/spin_barrier.h"
 
+#include "tbb/global_control.h"
 #include "tbb/task_arena.h"
 
 void active_wait_for(std::chrono::microseconds duration) {
@@ -250,6 +252,47 @@ public:
 };
 
 //! \brief \ref interface \ref requirement
+TEST_CASE("Test global_control leave_policy active_value") {
+    using tbb::global_control;
+    constexpr auto leave_policy = global_control::leave_policy;
+    constexpr auto automatic = size_t(tbb::task_arena::leave_policy::automatic);
+    constexpr auto fast      = size_t(tbb::task_arena::leave_policy::fast);
+
+    // Default active_value should be automatic
+    REQUIRE(global_control::active_value(leave_policy) == automatic);
+
+    {
+        // Single global_control with fast leave
+        global_control gc1(leave_policy, fast);
+        REQUIRE(global_control::active_value(leave_policy) == fast);
+
+        {
+            // Disjunction: any fast => fast
+            global_control gc2(leave_policy, automatic);
+            REQUIRE(global_control::active_value(leave_policy) == fast);
+        }
+        // gc2 destroyed, gc1 still active
+        REQUIRE(global_control::active_value(leave_policy) == fast);
+    }
+    // All global_control objects destroyed, should return to default
+    REQUIRE(global_control::active_value(leave_policy) == automatic);
+
+    {
+        // Only automatic: no effect
+        global_control gc1(leave_policy, automatic);
+        REQUIRE(global_control::active_value(leave_policy) == automatic);
+    }
+
+    {
+        // Multiple fast objects: disjunction still fast
+        global_control gc1(leave_policy, fast);
+        global_control gc2(leave_policy, fast);
+        REQUIRE(global_control::active_value(leave_policy) == fast);
+    }
+    REQUIRE(global_control::active_value(leave_policy) == automatic);
+}
+
+//! \brief \ref interface \ref requirement
 TEST_CASE("Check that workers leave faster with leave_policy::fast") {
     // Test measures workers start time, so no there is no point to
     // measure it with workerless arena
@@ -277,23 +320,39 @@ TEST_CASE("Check that workers leave faster with leave_policy::fast") {
 
     WARN_MESSAGE(median_automatic < median_fast,
         "Expected workers to start new work slower with fast leave policy");
+
+    // Test that global_control::leave_policy makes automatic arenas behave like fast leave
+    tbb::global_control gc(tbb::global_control::leave_policy, tbb::task_arena::leave_policy::fast);
+    tbb::task_arena ta_global_fast {
+        tbb::task_arena::automatic, 1,
+        tbb::task_arena::priority::normal,
+        tbb::task_arena::leave_policy::automatic
+    };
+    start_time_collection st_collector3{ta_global_fast, /*num_trials=*/5};
+    auto times_global_fast = st_collector3.measure();
+    auto median_global_fast = utils::median(times_global_fast.begin(), times_global_fast.end());
+
+    WARN_MESSAGE(median_automatic < median_global_fast,
+        "Expected workers to start new work slower with global fast leave");
+
+    // Run inside a new calling thread with a new implicit arena
+    start_time_collection st_collector4{/*num_trials=*/5 };
+    std::vector<std::size_t> times_implicit;
+    utils::NativeParallelFor(1, [&](int) { times_implicit = st_collector4.measure(); });
+    auto median_implicit = utils::median(times_implicit.begin(), times_implicit.end());
+
+    WARN_MESSAGE(median_automatic < median_implicit,
+        "Expected workers to start new work slower with implicit arena under global fast leave");
 }
 
-//! \brief \ref interface \ref requirement
-TEST_CASE("Parallel Phase retains workers in task_arena") {
-    if (utils::get_platform_max_threads() < 2) {
-        return;
-    }
-    tbb::task_arena ta_fast1 {
-        tbb::task_arena::automatic, 1,
-        tbb::task_arena::priority::normal,
-        tbb::task_arena::leave_policy::fast
-    };
-    tbb::task_arena ta_fast2 { 
-        tbb::task_arena::automatic, 1,
-        tbb::task_arena::priority::normal,
-        tbb::task_arena::leave_policy::fast
-    };
+void test_parallel_phase_retains_workers(tbb::task_arena::leave_policy lp) {
+    constexpr auto fast = tbb::task_arena::leave_policy::fast;
+    REQUIRE(((lp == fast) ||
+             (tbb::global_control::active_value(tbb::global_control::leave_policy) == size_t(fast))));
+
+    tbb::task_arena ta_fast1{tbb::task_arena::automatic, 1, tbb::task_arena::priority::normal, lp};
+    tbb::task_arena ta_fast2{tbb::task_arena::automatic, 1, tbb::task_arena::priority::normal, lp};
+
     start_time_collection_phase_wrapped st_collector1{ta_fast1, /*num_trials=*/5};
     start_time_collection_scoped_phase_wrapped st_collector_scoped{ta_fast1, /*num_trials=*/5};
     start_time_collection st_collector2{ta_fast2, /*num_trials=*/5};
@@ -311,6 +370,18 @@ TEST_CASE("Parallel Phase retains workers in task_arena") {
 
     WARN_MESSAGE(median_scoped < median2,
         "Expected workers start new work faster when using scoped parallel_phase");
+}
+
+//! \brief \ref interface \ref requirement
+TEST_CASE("Parallel Phase retains workers in task_arena") {
+    if (utils::get_platform_max_threads() < 2) {
+        return;
+    }
+    test_parallel_phase_retains_workers(tbb::task_arena::leave_policy::fast);
+
+    // Test that parallel phase retains workers on automatic arenas with global fast leave
+    tbb::global_control gc(tbb::global_control::leave_policy, tbb::task_arena::leave_policy::fast);
+    test_parallel_phase_retains_workers(tbb::task_arena::leave_policy::automatic);
 }
 
 //! \brief \ref interface \ref requirement

@@ -1,4 +1,5 @@
 # Copyright (c) 2020-2025 Intel Corporation
+# Copyright (c) 2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -256,6 +257,9 @@ if (TBB_ENABLE_IPO AND BUILD_SHARED_LIBS AND NOT ANDROID_PLATFORM AND NOT TBB_SA
         cmake_policy(SET CMP0069 NEW)
         include(CheckIPOSupported)
         check_ipo_supported(RESULT TBB_IPO_PROPERTY)
+        if (NOT TBB_IPO_PROPERTY)
+            message(WARNING "IPO disabled: not supported by this compiler.")
+        endif()
     else()
         set(TBB_IPO_FLAGS TRUE)
     endif()

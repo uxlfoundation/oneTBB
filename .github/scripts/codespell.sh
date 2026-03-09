@@ -35,6 +35,7 @@ IGNORE_COMMAND="sed -e /.*\\sOd\\s*=.*/d \
 -e /.*\\sFo\\s*=.*/d \
 -e /.*pipeline_filters.h.*nd\\s*=.*/d \
 -e /.*ittnotify.h.*unx\\s*=.*/d \
+-e /.*ittnotify.*.h.*hist\\s*=.*/d \
 -e /.*bzlib.cpp.*MSDOS\\s*=.*/d \
 -e /.*test_task.cpp.*tE\\s*=.*/d \
 -e /.*backend.cpp.*resSize\\s*=.*/d \

@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -66,6 +66,9 @@ public:
         thread_stack_size,
         terminate_on_exception,
         scheduler_handle, // not a public parameter
+#if __TBB_PREVIEW_PARALLEL_PHASE
+        leave_policy,
+#endif
         parameter_max // insert new parameters above this point
     };
 
@@ -85,6 +88,14 @@ public:
             __TBB_ASSERT_RELEASE(my_value>0, "max_allowed_parallelism cannot be 0.");
         r1::create(*this);
     }
+
+#if __TBB_PREVIEW_PARALLEL_PHASE
+    //! Overload the constructor for enum types to avoid forcing users to cast them to size_t
+    template<typename T, typename = typename std::enable_if<std::is_enum<T>::value>::type>
+    global_control(parameter p, T value)
+        : global_control(p, static_cast<std::size_t>(value))
+    {}
+#endif
 
     ~global_control() {
         __TBB_ASSERT(my_param < parameter_max, "Invalid parameter");
@@ -112,9 +123,9 @@ private:
 
 //! Finalization options.
 //! Outside of the class to avoid extensive friendship.
-static constexpr std::intptr_t release_nothrowing = 0;
-static constexpr std::intptr_t finalize_nothrowing = 1;
-static constexpr std::intptr_t finalize_throwing = 2;
+__TBB_GLOBAL_VAR constexpr std::intptr_t release_nothrowing = 0;
+__TBB_GLOBAL_VAR constexpr std::intptr_t finalize_nothrowing = 1;
+__TBB_GLOBAL_VAR constexpr std::intptr_t finalize_throwing = 2;
 
 //! User side wrapper for a task scheduler lifetime control object
 class task_scheduler_handle {

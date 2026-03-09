@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -2188,6 +2188,28 @@ TEST_CASE("Test that a thread calling wait_for completes tasks when workers are 
     REQUIRE(task_counter == num_threads);
     REQUIRE(utils::ConcurrencyTracker::PeakParallelism() == 1);
     barrier.wait();
+}
+
+//! \brief \ref error_guessing
+TEST_CASE("Test task_arena working correctly when number of reserved slots is greater then max concurrency") {
+    utils::ConcurrencyTracker::Reset();
+    auto max_num_threads = utils::get_platform_max_threads();
+    for (utils::thread_num_type num_threads = 1; num_threads <= max_num_threads; ++num_threads) {
+        tbb::task_arena ta{(int)num_threads, (unsigned)num_threads+1};
+        REQUIRE(ta.max_concurrency() == num_threads);
+        tbb::task_group tg{};
+
+        ta.execute([&tg, num_threads] {
+            for (std::uint32_t i = 0; i < 100*num_threads; ++i) {
+                tg.run([] {
+                    utils::ConcurrencyTracker ct;
+                });
+            }
+        });
+
+        ta.wait_for(tg);
+        REQUIRE_MESSAGE(utils::ConcurrencyTracker::PeakParallelism() == 1, "No worker should join the arena");
+    }
 }
 
 #if TBB_USE_EXCEPTIONS

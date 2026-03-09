@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -29,6 +30,10 @@
 #include "tbb/spin_rw_mutex.h"
 #include "tbb/task_arena.h"
 #include "tbb/task_group.h"
+
+// Hack to avoid redeclaration of internal chrono structures with different access
+// under define private public
+#include <chrono>
 
 #define private public
 #define protected public

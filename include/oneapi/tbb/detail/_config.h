@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -54,6 +54,12 @@
 #define __TBB_CPP14_PRESENT (__TBB_LANG >= 201402L)
 #define __TBB_CPP17_PRESENT (__TBB_LANG >= 201703L)
 #define __TBB_CPP20_PRESENT (__TBB_LANG >= 202002L)
+
+#if __TBB_CPP17_PRESENT
+    #define __TBB_GLOBAL_VAR inline
+#else
+    #define __TBB_GLOBAL_VAR static
+#endif
 
 #if __INTEL_COMPILER || _MSC_VER
     #define __TBB_NOINLINE(decl) __declspec(noinline) decl
@@ -530,6 +536,11 @@
                                                    || TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT)
 #endif
 
+#ifndef __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
+#define __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING (TBB_PREVIEW_FLOW_GRAPH_FEATURES \
+                                                        || TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING)
+#endif
+
 #if TBB_PREVIEW_CONCURRENT_HASH_MAP_EXTENSIONS
 #define __TBB_PREVIEW_CONCURRENT_HASH_MAP_EXTENSIONS 1
 #endif
@@ -542,12 +553,25 @@
 #define __TBB_PREVIEW_PARALLEL_PHASE 1
 #endif
 
-#if TBB_PREVIEW_BLOCKED_ND_RANGE_DEDUCTION_GUIDES
-#define __TBB_PREVIEW_BLOCKED_ND_RANGE_DEDUCTION_GUIDES 1
+#if TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR || __TBB_BUILD
+#define __TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR 1
 #endif
 
 #if !__TBB_DISABLE_SPEC_EXTENSIONS
 #define TBB_EXT_CUSTOM_ASSERTION_HANDLER 202510
+#endif
+
+// Feature-test macros
+#if __TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
+#define TBB_HAS_TASK_ARENA_CORE_TYPE_SELECTOR 202603
+#endif
+
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+#define TBB_HAS_TASK_GROUP_WAIT_FOR_SINGLE_TASK 202603
+#endif
+
+#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
+#define TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING 202603
 #endif
 
 #endif // __TBB_detail__config_H

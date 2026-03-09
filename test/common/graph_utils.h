@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -969,5 +970,46 @@ void test(unsigned N) {
 }
 
 } // namespace lightweight_testing
+
+template <std::size_t N>
+struct edge_maker {
+    template <typename Sender, typename NodeType>
+    static void make(Sender& sender, NodeType& node) {
+        oneapi::tbb::flow::make_edge(sender, oneapi::tbb::flow::input_port<N - 1>(node));
+        edge_maker<N - 1>::make(sender, node);
+    }
+
+    template <typename Sender, typename NodeType>
+    static void make(std::vector<Sender>& senders, NodeType& node) {
+        oneapi::tbb::flow::make_edge(senders[N - 1], oneapi::tbb::flow::input_port<N - 1>(node));
+        edge_maker<N - 1>::make(senders, node);
+    }
+};
+
+template <>
+struct edge_maker<0> {
+    template <typename Sender, typename NodeType>
+    static void make(Sender&, NodeType&) {}
+};
+
+template <std::size_t N>
+struct assert_all_items_equal_impl {
+    template <typename TupleLike, typename Message>
+    static void compare(const TupleLike& tuple_like, const Message& message) {
+        CHECK_MESSAGE(std::get<N - 1>(tuple_like) == message, "Unexpected element");
+        assert_all_items_equal_impl<N - 1>::compare(tuple_like, message);
+    }
+};
+
+template <>
+struct assert_all_items_equal_impl<0> {
+    template <typename TupleLike, typename Message>
+    static void compare(const TupleLike&, const Message&) {}
+};
+
+template <typename TupleLike, typename Message>
+void assert_all_items_equal_to(const TupleLike& tuple_like, const Message& message) {
+    assert_all_items_equal_impl<std::tuple_size<TupleLike>::value>::compare(tuple_like, message);
+}
 
 #endif  // __TBB_harness_graph_H

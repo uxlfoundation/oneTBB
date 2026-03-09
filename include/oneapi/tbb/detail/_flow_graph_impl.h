@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 #ifndef __TBB_flow_graph_impl_H
 #define __TBB_flow_graph_impl_H
 
-// #include "../config.h"
+#include "_config.h"
 #include "_task.h"
 #include "../task_group.h"
 #include "../task_arena.h"
@@ -34,9 +34,9 @@ namespace detail {
 namespace d2 {
 
 class graph_task;
-static graph_task* const SUCCESSFULLY_ENQUEUED = (graph_task*)-1;
+__TBB_GLOBAL_VAR graph_task* const SUCCESSFULLY_ENQUEUED = (graph_task*)-1;
 typedef unsigned int node_priority_t;
-static const node_priority_t no_priority = node_priority_t(0);
+__TBB_GLOBAL_VAR constexpr node_priority_t no_priority = node_priority_t(0);
 
 class graph;
 class graph_node;

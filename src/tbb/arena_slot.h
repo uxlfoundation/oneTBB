@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -45,14 +46,18 @@ static d1::task** const EmptyTaskPool  = nullptr;
 static d1::task** const LockedTaskPool = reinterpret_cast<d1::task**>(~std::intptr_t(0));
 
 struct alignas(max_nfs_size) arena_slot_shared_state {
-    //! Scheduler of the thread attached to the slot
-    /** Marks the slot as busy, and is used to iterate through the schedulers belonging to this arena **/
+    //! The flag indicates whether the slot is used by a thread.
+    /** Marks the slot as idle or busy, and is used when threads join and leave the arena **/
     std::atomic<bool> my_is_occupied;
 
-    // Synchronization of access to Task pool
+    //! The flag indicates that the task pool might temporarily exclude some valid tasks.
+    /** Set by the owning thread in get_task(), tested during exhaustive task search in has_tasks(). **/
+    std::atomic<bool> accessed_by_owner;
+
+    //! Synchronization of access to the task pool.
     /** Also is used to specify if the slot is empty or locked:
-         0 - empty
-        -1 - locked **/
+        EmptyTaskPool  === nullptr
+        LockedTaskPool === a "pointer" with all bits set to 1 **/
     std::atomic<d1::task**> task_pool;
 
     //! Index of the first ready task in the deque.
@@ -169,9 +174,28 @@ public:
         return task_pool.load(std::memory_order_relaxed) != EmptyTaskPool;
     }
 
-    bool is_empty() const {
-        return task_pool.load(std::memory_order_relaxed) == EmptyTaskPool ||
-               head.load(std::memory_order_relaxed) >= tail.load(std::memory_order_relaxed);
+    bool has_tasks() {
+        d1::task** the_task_pool = task_pool.load(std::memory_order_relaxed);
+        if ( the_task_pool == EmptyTaskPool ) {
+            return false;
+        }
+        std::size_t hd = head.load(std::memory_order_relaxed), tl = tail.load(std::memory_order_relaxed); 
+        if ( (std::intptr_t)hd >= (std::intptr_t)tl ) {
+            // Since some tasks might be temporary out of the visible pool bounds, lock the pool to examine closely
+            bool tail_stable = true;
+            the_task_pool = lock_task_pool(); // Synchronize with task thieves
+            if ( the_task_pool == EmptyTaskPool ) {
+                return false;
+            }
+            tail_stable = !accessed_by_owner.load(std::memory_order_acquire); // Synchronize with the pool owner
+            hd = head.load(std::memory_order_relaxed);
+            tl = tail.load(std::memory_order_relaxed);
+            unlock_task_pool(the_task_pool);
+            if ( (std::intptr_t)hd >= (std::intptr_t)tl && tail_stable ) {
+                return false;
+            }
+        }
+        return true;
     }
 
     bool is_occupied() const {
@@ -199,14 +223,6 @@ public:
     }
 #endif
 private:
-    //! Get a task from the local pool at specified location T.
-    /** Returns the pointer to the task or nullptr if the task cannot be executed,
-        e.g. proxy has been deallocated or isolation constraint is not met.
-        tasks_omitted tells if some tasks have been omitted.
-        Called only by the pool owner. The caller should guarantee that the
-        position T is not available for a thief. **/
-    d1::task* get_task_impl(size_t T, execution_data_ext& ed, bool& tasks_omitted, isolation_type isolation);
-
     //! Makes sure that the task pool can accommodate at least n more elements
     /** If necessary relocates existing task pointers or grows the ready task deque.
      *  Returns (possible updated) tail index (not accounting for n). **/
@@ -288,7 +304,6 @@ private:
         if (!is_task_pool_published()) {
             return; // we are not in arena - nothing to lock
         }
-        bool sync_prepare_done = false;
         for( atomic_backoff b;;b.pause() ) {
 #if TBB_USE_ASSERT
             // Local copy of the arena slot task pool pointer is necessary for the next
@@ -301,11 +316,8 @@ private:
                 task_pool.compare_exchange_strong(expected, LockedTaskPool ) ) {
                 // We acquired our own slot
                 break;
-            } else if( !sync_prepare_done ) {
-                // Start waiting
-                sync_prepare_done = true;
             }
-            // Someone else acquired a lock, so pause and do exponential backoff.
+            // Someone else acquired the lock, so pause and do exponential backoff.
         }
         __TBB_ASSERT( task_pool.load(std::memory_order_relaxed) == LockedTaskPool, "not really acquired task pool" );
     }
@@ -339,7 +351,7 @@ private:
                 // We've locked victim's task pool
                 break;
             } 
-            // Someone else acquired a lock, so pause and do exponential backoff.
+            // Someone else acquired the lock, so pause and do exponential backoff.
             backoff.pause();
         }
         __TBB_ASSERT(victim_task_pool == EmptyTaskPool ||
@@ -376,7 +388,6 @@ private:
     //! Leave the task pool
     /** Leaving task pool automatically releases the task pool if it is locked. **/
     void leave_task_pool() {
-        __TBB_ASSERT(is_task_pool_published(), "Not in arena");
         // Do not reset my_arena_index. It will be used to (attempt to) re-acquire the slot next time
         __TBB_ASSERT(task_pool.load(std::memory_order_relaxed) == LockedTaskPool, "Task pool must be locked when leaving arena");
         __TBB_ASSERT(is_quiescent_local_task_pool_empty(), "Cannot leave arena when the task pool is not empty");

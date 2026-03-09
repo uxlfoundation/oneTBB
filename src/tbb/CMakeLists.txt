@@ -1,4 +1,5 @@
 # Copyright (c) 2020-2025 Intel Corporation
+# Copyright (c) 2025 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -51,6 +52,11 @@ add_library(TBB::tbb ALIAS tbb)
 if (WIN32)
     target_sources(tbb PRIVATE tbb.rc)
     set_target_properties(tbb PROPERTIES OUTPUT_NAME "tbb${TBB_BINARY_VERSION}")
+endif()
+
+if (EMSCRIPTEN)
+    set(TBB_LIB_COMPILE_FLAGS ${TBB_LIB_COMPILE_FLAGS} -fexceptions)
+    set(TBB_LIB_LINK_FLAGS ${TBB_LIB_LINK_FLAGS} -fexceptions)
 endif()
 
 # TODO: Add statistics.cpp
