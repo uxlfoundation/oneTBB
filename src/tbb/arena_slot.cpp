@@ -27,10 +27,12 @@ namespace r1 {
 // Arena Slot
 //------------------------------------------------------------------------
 
-d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation, std::false_type) {
+d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation, /*use isolation*/ std::false_type) {
+    if ( !is_task_pool_published() )
+        return nullptr;
+
     suppress_unused_warning(isolation);
     __TBB_ASSERT(isolation == no_isolation, nullptr);
-    __TBB_ASSERT(is_task_pool_published(), nullptr);
     bool all_tasks_checked = false;
     // The current task position in the task pool.
     std::size_t T0 = tail.load(std::memory_order_relaxed);
@@ -81,7 +83,10 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation,
     return result;
 }
 
-d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation, std::true_type) {
+d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation, /*use isolation*/ std::true_type) {
+    if ( !is_task_pool_published() )
+        return nullptr;
+
     bool all_tasks_checked = false;
     bool tasks_skipped = false;
 
@@ -98,7 +103,6 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation,
         return nullptr;
     };
 
-    __TBB_ASSERT(is_task_pool_published(), nullptr);
     accessed_by_owner.store(true, std::memory_order_relaxed);
     // The current task position in the task pool.
     std::size_t T0 = tail.load(std::memory_order_relaxed);

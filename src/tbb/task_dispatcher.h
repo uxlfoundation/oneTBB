@@ -366,7 +366,7 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
                     break;
                 }
                 // Retrieve the task from local task pool
-                if (t || (slot.is_task_pool_published() && (t = slot.get_task(ed, isolation, use_isolation)))) {
+                if (t || (t = slot.get_task(ed, isolation, use_isolation))) {
                     __TBB_ASSERT(ed.original_slot == m_thread_data->my_arena_index, nullptr);
                     ed.context = task_accessor::context(*t);
                     ed.isolation = task_accessor::isolation(*t);
