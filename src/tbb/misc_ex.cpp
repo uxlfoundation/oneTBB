@@ -195,7 +195,7 @@ static void initialize_hardware_concurrency_info () {
     int num_procs = availableProcs > 0 ? availableProcs : 1; // Fail safety strap
 #if __linux__
     int cgroup_num_cpus = INT_MAX;
-    if (cgroup_info::is_cpu_constrained(cgroup_num_cpus)) {
+    if (cgroup_info<>::is_cpu_constrained(cgroup_num_cpus)) {
         // If cgroup is used, limit the number of processors to the constrained value.
         num_procs = std::min(num_procs, cgroup_num_cpus);
     }
