@@ -171,7 +171,7 @@ struct multi_core_type_codec {
             return ids[0];
         }
 
-        core_type_id result = (encoding_format << bitmask_width);
+        core_type_id result = core_type_id(encoding_format << bitmask_width);
 
         for (core_type_id id : ids) {
             __TBB_ASSERT((0 <= id) && (id < static_cast<core_type_id>(bitmask_width)), "Wrong core type id");
