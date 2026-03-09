@@ -122,8 +122,7 @@ TEST_CASE("Test constraints argument in create_numa_task_arenas") {
   system_info::initialize();
   auto numa_indices = tbb::info::numa_nodes();
   for (const auto& constraints : generate_constraints_variety()) {
-    multi_core_type_helper helper{constraints};
-    if (helper.selectable()) {
+    if (tbb::detail::multi_core_type_codec::is_encoded(constraints.core_type)) {
       continue; // skip constraints with custom core type selector, because create_numa_task_arenas doesn't support it
     }
     auto numa_task_arenas = tbb::create_numa_task_arenas(constraints);
@@ -132,7 +131,7 @@ TEST_CASE("Test constraints argument in create_numa_task_arenas") {
 
       expected_constraint.set_numa_id(numa_indices[i]);
       test_constraints_affinity_and_concurrency(expected_constraint,
-                                                helper,
+                                                multi_core_type_helper{expected_constraint},
                                                 get_arena_affinity(numa_task_arenas[i]));
     }
   }
