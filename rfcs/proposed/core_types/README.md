@@ -491,15 +491,15 @@ tbb::task_arena latency_driven(
     tbb::task_arena::constraints{.core_type = core_types[2]}
 );
 
-tbb::task_arena throughput_driven(
+tbb::task_arena throughput_driven({
     tbb::task_arena::constraints{.core_type = core_types[1]},
     tbb::task_arena::constraints{.core_type = core_types[2]}
-);
+});
 
-tbb::task_arena background_work(
+tbb::task_arena background_work(}
     tbb::task_arena::constraints{.core_type = core_types[0]},
     tbb::task_arena::constraints{.core_type = core_types[1]}
-);
+});
 ```
 
 #### Alternative 2
@@ -562,7 +562,7 @@ tbb::task_arena arena(avoid_LPE_cores);
 
 #### Alternative 2
 
-The new API cannot be used with the old binaries which do not recognized encoded constraints.
+The new API cannot be used with the old binaries which do not recognize encoded constraints.
 Checking `TBB_runtime_interface_version()` is therefore required.
 
 ```cpp
