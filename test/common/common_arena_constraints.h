@@ -442,7 +442,7 @@ system_info::affinity_mask prepare_reference_affinity_mask(const tbb::task_arena
             }
 
             index_info combination;
-            combination.index = (tbb::detail::multi_core_type_codec::encoding_format <<
+            combination.index = int(tbb::detail::multi_core_type_codec::encoding_format <<
                 tbb::detail::multi_core_type_codec::bitmask_width); // multiple core type format
             combination.index |= mask;
             combination.concurrency = 0;
