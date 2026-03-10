@@ -84,6 +84,7 @@ void test_single_resource() {
     CHECK_MESSAGE(resource == resource_value, "Incorrect resource value");
 }
 
+#if __TBB_RESUMABLE_TASKS
 // Test that ten resources are granted simultaneously to ten different nodes
 void test_several_resources() {
     using namespace oneapi::tbb::flow;
@@ -146,6 +147,7 @@ void test_several_resources() {
     }
     CHECK(validation_set.empty());
 }
+#endif // __TBB_RESUMABLE_TASKS
 
 struct strict_resource_handle {
     int underlying_resource;
@@ -386,7 +388,9 @@ TEST_CASE("bases of resource_limited_node") {
 //! \brief \ref requirement
 TEST_CASE("test resource acquisition") {
     test_single_resource();
+#if __TBB_RESUMABLE_TASKS
     test_several_resources();
+#endif
 }
 
 template <typename Handle>
