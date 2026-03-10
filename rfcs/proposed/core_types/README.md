@@ -73,7 +73,7 @@ Similarly, we can create/initialize an arena for core type(s) selected by a user
 #### Header
 
 ```cpp
-#define TBB_PREVIEW_AFFINITY_SELECTOR 1
+#define TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR 1
 #include <oneapi/tbb/task_arena.h>
 #include <oneapi/tbb/info.h>
 ```
@@ -199,7 +199,9 @@ patterns from 1 to 2<sup>n</sup>-1, and mapping each pattern to a core type comb
    - Alternative: leave the arena uninitialized
 2. Should the selector API support NUMA node selection in addition to core types?
    - Current proposal: no. The selector is applied only to core types; NUMA node constraints continue
-     to use the existing `constraints::numa_id` field.
+     to use the existing `constraints::numa_id` field. Core types have unique performance characteristics worth
+     ranking, whereas NUMA nodes typically have equivalent capabilities differing only by ID, making function-style
+     selection inconvenient without dynamic information (e.g., utilization).
    - Alternative: allow the selector to also rank NUMA nodes. (This should become a sub-RFC of the existing
      [umbrella RFC about improving NUMA support](https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/proposed/numa_support).)
      - This raises the question of how to distinguish which constraint dimension the selector applies to, because
@@ -496,7 +498,7 @@ tbb::task_arena throughput_driven({
     tbb::task_arena::constraints{.core_type = core_types[2]}
 });
 
-tbb::task_arena background_work(}
+tbb::task_arena background_work({
     tbb::task_arena::constraints{.core_type = core_types[0]},
     tbb::task_arena::constraints{.core_type = core_types[1]}
 });
