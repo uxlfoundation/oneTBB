@@ -52,12 +52,15 @@ The proposal adds a new enumeration value to the existing `global_control::param
 #### Header
 
 ```cpp
+#define TBB_PREVIEW_PARALLEL_PHASE 1
 #include <oneapi/tbb/global_control.h>
 ```
 
 #### Syntax
 
 ```cpp
+#define TBB_HAS_PARALLEL_PHASE 202xxx
+
 namespace oneapi {
 namespace tbb {
 
@@ -226,19 +229,33 @@ int main() {
 }
 ```
 
-#### Scoped Fast Leave
+#### Global Control Scope, Initialization Order, and Disjunction
 
 ```cpp
-void process_interactive_workload() {
-    // Enable fast leave only during interactive phase
-    tbb::global_control gc(tbb::global_control::leave_policy, tbb::task_arena::leave_policy::fast);
+// No global_control is active yet; this call lazily initializes the implicit arena with automatic (the default).
+// Once initialized, the implicit arena's leave policy is fixed and not affected by later global_control changes.
+tbb::parallel_for(0, 1000000, [](int i) { do_parallel_work(i); });
 
-    while (user_is_interacting()) {
-        render_frame();  // Mix of serial and parallel work
+{
+    tbb::global_control gc1(tbb::global_control::leave_policy, tbb::task_arena::leave_policy::fast);
+    tbb::task_arena arena1;
+    // arena1 is lazily initialized on first use; since gc1 is active, it is initialized with fast leave.
+    arena1.execute([&] { /* ... */ });
+
+    // The implicit arena was already initialized with automatic above; gc1 does not affect it retroactively.
+    tbb::parallel_for(0, 1000000, [](int i) { do_parallel_work(i); });
+
+    {
+        tbb::global_control gc2(tbb::global_control::leave_policy, tbb::task_arena::leave_policy::automatic);
+        tbb::task_arena arena2;
+        // Both gc1 (fast) and gc2 (automatic) are active. Disjunction rule: any fast value present => fast wins.
+        arena2.execute([&] { /* ... */ });
     }
 }
-// New arenas initialized after gc goes out of scope use the default policy;
-// already-initialized arenas retain their initial state
+
+tbb::task_arena arena3;
+// Both gc1 and gc2 are now destroyed, so arena3 is initialized with automatic (the default).
+arena3.execute([&] { /* ... */ });
 ```
 
 #### Combining with Parallel Phase API
@@ -309,8 +326,7 @@ The default behavior could be changed to fast leave, making delayed leave opt-in
 - Simpler mental model
 
 **Cons:**
-- Breaking change for users who benefit from delayed leave
-- Will cause performance regression for other workloads
+- Fixes performance regression for some customers while causing it for others
 
 ## Open Questions
 
@@ -325,10 +341,6 @@ The default behavior could be changed to fast leave, making delayed leave opt-in
 
 3. **Composition**: Should the global control be a logical disjunction, first-registered wins, last-set wins, etc.?
    - Current proposal: disjunction
-
-4. **Feature Macro Dependency**: Should this feature require `TBB_PREVIEW_PARALLEL_PHASE` or have
-   its own independent macro?
-   - Current proposal: `TBB_PREVIEW_PARALLEL_PHASE` since it is closely related to the parallel phase API
 
 ## Exit Criteria
 
