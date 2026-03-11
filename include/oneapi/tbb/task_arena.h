@@ -253,7 +253,12 @@ protected:
 public:
     //! Typedef for number of threads that is automatic.
     static const int automatic = -1;
+    //! Typedef for current thread index in an uninitialized arena.
     static const int not_initialized = -2;
+#if __TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
+    //! Typedef for core type(s) to be specified by the provided selector.
+    static const int selectable = -2;
+#endif
 };
 
 template<typename R, typename F>
@@ -318,6 +323,17 @@ class task_arena : public task_arena_base {
                 "unexpected premature exit from wait_for: task group status is still not complete");
         return status;
     }
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    d2::task_group_status wait_for_impl(d2::task_completion_handle& comp_handle) {
+        d2::task_group_status status = d2::task_group_status::not_complete;
+        d2::wait_completion_delegate wd{comp_handle, status};
+        r1::execute(*this, wd);
+        __TBB_ASSERT(status != d2::task_group_status::not_complete,
+                "unexpected premature exit from wait_for: task status is still not complete");
+        return status;
+    }
+#endif
+
 public:
     //! Creates task_arena with certain concurrency limits
     /** Sets up settings only, real construction is deferred till the first method invocation
@@ -352,6 +368,28 @@ public:
 #endif
           )
     {}
+
+#if __TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
+    //! Creates task arena with a custom selector for core types
+    template <typename Selector,
+              typename = decltype(static_cast<int>(std::declval<Selector>()(std::declval<std::tuple<int, size_t, size_t>>())))>
+    task_arena(const constraints& constraints_, Selector selector_,
+               unsigned reserved_for_masters = 1, priority a_priority = priority::normal
+#if __TBB_PREVIEW_PARALLEL_PHASE
+               , leave_policy lp = leave_policy::automatic
+#endif
+    )
+        : task_arena_base(constraints_, reserved_for_masters, a_priority
+#if __TBB_PREVIEW_PARALLEL_PHASE
+                         , lp
+#endif
+          )
+    {
+        if (my_core_type == selectable) {
+            my_core_type = apply_core_type_selector(selector_);
+        }
+    }
+#endif
 
     //! Copies settings from another task_arena
     task_arena(const task_arena &a) // copy settings but not the reference or instance
@@ -429,6 +467,7 @@ public:
     }
 
 #if __TBB_ARENA_BINDING
+    //! Overrides constraints and forces initialization of internal representation
     void initialize(constraints constraints_, unsigned reserved_slots = 1,
                     priority a_priority = priority::normal
 #if __TBB_PREVIEW_PARALLEL_PHASE
@@ -451,6 +490,37 @@ public:
             mark_initialized();
         }
     }
+
+#if __TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
+    //! Overrides constraints with a custom selector for core types and forces initialization of internal representation
+    template<typename Selector,
+             typename = decltype(static_cast<int>(std::declval<Selector>()(std::declval<std::tuple<int, size_t, size_t>>())))>
+    void initialize(constraints constraints_, Selector selector_,
+                    unsigned reserved_for_masters = 1, priority a_priority = priority::normal
+#if __TBB_PREVIEW_PARALLEL_PHASE
+                    , leave_policy lp = leave_policy::automatic
+#endif
+    )
+    {
+        __TBB_ASSERT(!my_arena.load(std::memory_order_relaxed), "Impossible to modify settings of an already initialized task_arena");
+        if( !is_active() ) {
+            my_numa_id = constraints_.numa_id;
+            my_max_concurrency = constraints_.max_concurrency;
+            my_core_type = constraints_.core_type;
+            my_max_threads_per_core = constraints_.max_threads_per_core;
+            my_num_reserved_slots = reserved_for_masters;
+            my_priority = a_priority;
+#if __TBB_PREVIEW_PARALLEL_PHASE
+            set_leave_policy(lp);
+#endif
+            if (my_core_type == selectable) {
+                my_core_type = apply_core_type_selector(selector_);
+            }
+            r1::initialize(*this);
+            mark_initialized();
+        }
+    }
+#endif /*__TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR*/
 #endif /*__TBB_ARENA_BINDING*/
 
     //! Attaches this instance to the current arena of the thread
@@ -522,6 +592,13 @@ public:
         initialize();
         return wait_for_impl(tg);
     }
+
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    d2::task_group_status wait_for(d2::task_completion_handle& comp_handle) {
+        initialize();
+        return wait_for_impl(comp_handle);
+    }
+#endif
 
     //! Joins the arena and executes a mutable functor, then returns
     //! If not possible to join, wraps the functor into a task, enqueues it and waits for task completion

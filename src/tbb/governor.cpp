@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -591,7 +591,7 @@ void constraints_assertion(d1::constraints c) {
     int* core_types_begin = system_topology::core_types_indexes;
     int* core_types_end = system_topology::core_types_indexes + system_topology::core_types_count;
     __TBB_ASSERT_RELEASE(c.core_type == system_topology::automatic ||
-        (is_topology_initialized && std::find(core_types_begin, core_types_end, c.core_type) != core_types_end),
+        (is_topology_initialized && (multi_core_type_codec::is_encoded(c.core_type) || std::find(core_types_begin, core_types_end, c.core_type) != core_types_end)),
         "The constraints::core_type value is not known to the library. Use tbb::info::core_types() to get the list of possible values.");
 }
 
@@ -600,7 +600,7 @@ int __TBB_EXPORTED_FUNC constraints_default_concurrency(const d1::constraints& c
 
     const int default_num_threads = int(governor::default_num_threads());
 
-    if (c.numa_id >= 0 || c.core_type >= 0 || c.max_threads_per_core > 0) {
+    if (c.numa_id >= 0 || multi_core_type_codec::is_core_type(c.core_type) || c.max_threads_per_core > 0) {
         system_topology::initialize();
         const int constrained_default_concurrency =
             get_default_concurrency_ptr(c.numa_id, c.core_type, c.max_threads_per_core);
