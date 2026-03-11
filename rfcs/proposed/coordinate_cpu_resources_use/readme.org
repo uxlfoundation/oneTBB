@@ -6,18 +6,10 @@ in turn might want to utilize the available parallel power of the platform and c
 for this.
 
 In today's computing landscape, applications increasingly rely on multiple parallel computing
-libraries and frameworks simultaneously. A typical application might use oneTBB for task
-parallelism, OpenMP for loop parallelism, and additional threading libraries for I/O operations or
-specialized computations. Each of these components operates independently and attempts to utilize
-all available CPU cores, leading to oversubscription and suboptimal performance.
-
-The lack of coordination between parallel components results in several critical issues:
-- *Resource contention*: Multiple libraries compete for the same CPU cores, causing excessive
-  context switching and cache pollution.
-- *Oversubscription*: The total number of worker threads across all libraries often exceeds the
-  number of available cores.
-- *Load imbalance*: Some cores may be idle while others are overloaded due to poor resource
-  distribution.
+libraries and frameworks simultaneously. An application might use oneTBB for task parallelism,
+OpenMP for loop parallelism, and additional threading libraries for I/O operations or specialized
+computations. Each of these components operates independently and may attempt to utilize all
+available CPU cores, leading to oversubscription and suboptimal performance.
 
 This problem becomes more pronounced in complex software stacks where the number of parallel
 components continues to grow, and manual coordination becomes impractical or impossible.
@@ -29,8 +21,8 @@ The core concept revolves around providing a unified resource management interfa
 different parallel components to:
 1. *Register their resource requirements*: Components can declare their threading needs and
    constraints.
-2. *Negotiate resource allocation*: TCM mediates between components to determine optimal resource
-   distribution.
+2. *Negotiate resource allocation*: TCM mediates between components allowing them to ask for and
+   release in demand resources.
 3. *Adapt dynamically*: Resource allocation can be adjusted at runtime based on changing workload
    patterns.
 4. *Maintain isolation*: Components remain functionally independent while benefiting from
@@ -41,26 +33,24 @@ resource partitioning. It tracks active parallel regions across different librar
 recommendations to prevent destructive interference between components.
 
 *Key features include*:
-1. *Library-agnostic interface*: C-style interface simplifies integration with threading libraries.
+1. *C-style interface*: C-style interface simplifies integration with other libraries.
 2. *Minimal overhead*: Designed to add negligible runtime cost to parallel operations.
-3. *Minimally Intrusive*: Existing applications can benefit without requiring extensive
-   modifications.
-4. *Permissive licensing*: Uses permissive open-source Apache 2.0 with LLVM exception, which allows
-   easy integration, broad adoption and accepting of community contributions.
 
 ** Project independence and availability
-Thread Composability Manager is distributed in oneAPI packages as a binary-only, hidden component.
-Its use is already integrated and supported by oneTBB and Intel's OpenMP runtime. The TCM is
-installed when either or both of these libraries are selected for installation. Yet, the TCM does
-not depend on the either of these parallel runtimes and can be used by other threading frameworks.
+Thread Composability Manager is distributed in oneAPI 2024.1 and later packages as a binary-only,
+hidden component. Its use is already integrated and supported by oneTBB and Intel's OpenMP runtime.
+The TCM is installed when either or both of these libraries are selected for installation. Yet, the
+TCM does not depend on the either of these parallel runtimes and can be used by other threading
+frameworks.
 
 * Proposal
 Since Thread Composability Manager provides a general interface to consult on CPU utilization and
 allows any threading framework to get recommendations on the use of CPU resources, the proposal is
 to make the TCM more available so that everyone interested can leverage its use and make their
 parallel runtime composable with oneTBB and Intel's OpenMP now, and with more and more threading
-runtimes in the future, allowing users to use those parallel runtimes in which they are fluent the
-most and/or which fit computations the best.
+runtimes in the future, allowing users to rely on automatic composition of resources and prefer
+using those parallel runtimes in which they are fluent the most and/or which suit computations the
+best.
 
 At the same time, popularity of oneTBB project can help with accessibility and availability of TCM,
 allowing users to test the use of TCM and integration of their runtime with other parallel runtimes
@@ -73,7 +63,7 @@ Below are the details of TCM open sourcing.
 ** Keeping project independence intact
 Although, placed into the oneTBB source tree, TCM remains independent. The top =tcm= directory can
 literally be copied/moved into other place and used from there without any dependence on oneTBB
-project. This is necessary to avoid assumption about project tight coupling with oneTBB and simplify
+project. This is necessary to avoid assumptions about tight coupling with oneTBB and simplifies
 integration of TCM into other parallel libraries.
 ** Placement
 TCM sources are to be placed in the =tcm= subdirectory of the oneTBB source root.
@@ -91,8 +81,8 @@ The idea is to make an extension to the oneTBB build system by naturally intersp
 test rules with corresponding TCM rules if TCM dependencies are met, and TCM rules are not
 explicitly disabled by the user.
 
-Also, due to [[Independence][independent nature]] of the project, and to avoid repetition of building rules in the
-oneTBB configuration files, related to TCM rules will simply translate to the corresponding rules in
+Also, due to the [[Independence][independent nature]] of the project, and to avoid repetition of building rules in the
+oneTBB configuration files, TCM-related rules will simply translate to the corresponding rules in
 the TCM build system.
 *** Building
 oneTBB configuration file is to be extended with an option to build and test the TCM. For example,
@@ -103,9 +93,9 @@ CMake option can look like:
 
 **** Prerequisites
 Since the project depends on HWLOC for parsing hardware topology, TCM is built only if HWLOC is
-available in the environment. Also, TCM can be built with at least C++17 version of the C++
-standard. If there will be a request to build it with lower version of the C++ standard, such
-support can be added in the future.
+available in the environment. TCM also requires a compiler that supports at least C++17. If there
+will be a request to build it with lower version of the C++ standard, such support can be added in
+the future.
 
 During configuration step of the oneTBB build, the diagnostic message about whether TCM is going to
 be built or not is shown.
@@ -159,6 +149,10 @@ enable its use, =TCM_ENABLE= environment variable should be set to =1=. Details 
 [[https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/appendix_B.html#avoid-cpu-overutilization][oneTBB documentation]].
 
 You are welcome to try the TCM out, submit issues and/or patches, and share your feedback.
+** Licensing
+The license for TCM is going to be changed onto a more permissive variant. TCM is going to be
+open-sourced under "Apache 2.0 with LLVM exception" license. This will help with easy integration,
+broad adoption and accepting of community contributions.
 ** Documentation
 TCM documentation will follow the repository merging and be available under the =doc= subdirectory
 inside the TCM source tree.
@@ -167,3 +161,5 @@ inside the TCM source tree.
    include TCM binaries, and the other that don't?
 2. When distributing oneTBB source packages, should TCM sources be distributed separately as well?
 3. Should build of TCM be ON or OFF by default?
+4. How will github issues, PRs, milestones, etc. be managed? Will they be mixed with oneTBB issues
+   and PRs, labeled with "TCM", or something else?
