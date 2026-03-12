@@ -397,12 +397,12 @@ template <typename Handle>
 using limiter_unique_ptr = std::unique_ptr<oneapi::tbb::flow::resource_limiter<Handle>>;
 
 template <std::size_t... Idx>
-limiter_unique_ptr<int> get_limiter_impl(tbb::detail::index_sequence<Idx...>) {
-    return limiter_unique_ptr<int>(new oneapi::tbb::flow::resource_limiter<int>(Idx...));
+limiter_unique_ptr<std::size_t> get_limiter_impl(tbb::detail::index_sequence<Idx...>) {
+    return limiter_unique_ptr<std::size_t>(new oneapi::tbb::flow::resource_limiter<std::size_t>(Idx...));
 }
 
 template <std::size_t NumResources>
-limiter_unique_ptr<int> get_limiter() {
+limiter_unique_ptr<std::size_t> get_limiter() {
     return get_limiter_impl(tbb::detail::make_index_sequence<NumResources>());
 }
 
