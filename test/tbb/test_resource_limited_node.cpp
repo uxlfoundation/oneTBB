@@ -136,7 +136,7 @@ void test_several_resources() {
     g.wait_for_all();
 
     std::unordered_set<int> validation_set;
-    for (std::size_t i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; ++i) {
         validation_set.emplace(100 + i);
     }
 
@@ -409,7 +409,7 @@ limiter_unique_ptr<std::size_t> get_limiter() {
 //! \brief \ref interface \ref requirement
 TEST_CASE("resource_limited_node concurrency") {
     // For correct test behavior number of resources should be greater than number of threads in arena
-    constexpr std::size_t num_threads = 50;
+    constexpr int num_threads = 50;
     auto limiter_ptr = get_limiter<num_threads + 1>();
     oneapi::tbb::task_arena arena(num_threads);
 
