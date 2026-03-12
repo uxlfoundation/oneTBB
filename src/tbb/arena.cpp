@@ -34,7 +34,6 @@ namespace tbb {
 namespace detail {
 namespace r1 {
 
-#if __TBB_ARENA_BINDING
 class numa_binding_observer : public tbb::task_scheduler_observer {
     binding_handler* my_binding_handler;
 public:
@@ -71,7 +70,6 @@ void destroy_binding_observer( numa_binding_observer* binding_observer ) {
     binding_observer->~numa_binding_observer();
     deallocate_memory(binding_observer);
 }
-#endif /*!__TBB_ARENA_BINDING*/
 
 void arena::on_thread_leaving(unsigned ref_param) {
     //
@@ -317,12 +315,10 @@ void arena::free_arena () {
     __TBB_ASSERT( !my_references.load(std::memory_order_relaxed), "There are threads in the dying arena" );
     __TBB_ASSERT( !my_total_num_workers_requested && !my_num_workers_allotted, "Dying arena requests workers" );
     __TBB_ASSERT( is_empty(), "Inconsistent state of a dying arena" );
-#if __TBB_ARENA_BINDING
     if (my_numa_binding_observer != nullptr) {
         destroy_binding_observer(my_numa_binding_observer);
         my_numa_binding_observer = nullptr;
     }
-#endif /*__TBB_ARENA_BINDING*/
     poison_value( my_guard );
     for ( unsigned i = 0; i < my_num_slots; ++i ) {
         // __TBB_ASSERT( !my_slots[i].my_scheduler, "arena slot is not empty" );
@@ -578,19 +574,13 @@ void task_arena_impl::initialize(d1::task_arena_base& ta) {
     (void)governor::get_thread_data();
     d1::constraints arena_constraints;
 
-#if __TBB_ARENA_BINDING
     arena_constraints = d1::constraints{}
         .set_core_type(ta.core_type())
         .set_max_threads_per_core(ta.max_threads_per_core())
         .set_numa_id(ta.my_numa_id);
-#endif /*__TBB_ARENA_BINDING*/
 
     if (ta.my_max_concurrency < 1) {
-#if __TBB_ARENA_BINDING
         ta.my_max_concurrency = (int)default_concurrency(arena_constraints);
-#else /*!__TBB_ARENA_BINDING*/
-        ta.my_max_concurrency = (int)governor::default_num_threads();
-#endif /*!__TBB_ARENA_BINDING*/
     }
 
 #if __TBB_CPUBIND_PRESENT
@@ -901,7 +891,6 @@ int task_arena_impl::max_concurrency(const d1::task_arena_base *ta) {
         return 1;
     }
 
-#if __TBB_ARENA_BINDING
     if (ta) {
         d1::constraints arena_constraints = d1::constraints{}
             .set_numa_id(ta->my_numa_id)
@@ -909,7 +898,6 @@ int task_arena_impl::max_concurrency(const d1::task_arena_base *ta) {
             .set_max_threads_per_core(ta->max_threads_per_core());
         return (int)default_concurrency(arena_constraints);
     }
-#endif /*!__TBB_ARENA_BINDING*/
 
     __TBB_ASSERT(!ta || ta->my_max_concurrency==d1::task_arena_base::automatic, nullptr);
     return int(governor::default_num_threads());

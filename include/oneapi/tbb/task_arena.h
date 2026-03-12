@@ -26,13 +26,8 @@
 #include "detail/_namespace_injection.h"
 #include "detail/_small_object_pool.h"
 #include "detail/_task.h"
-
 #include "detail/_task_handle.h"
-
-#if __TBB_ARENA_BINDING
 #include "info.h"
-#endif /*__TBB_ARENA_BINDING*/
-
 #include "task_group.h"
 
 #include <vector>
@@ -149,9 +144,7 @@ public:
     };
 #endif
 
-#if __TBB_ARENA_BINDING
     using constraints = tbb::detail::d1::constraints;
-#endif /*__TBB_ARENA_BINDING*/
 protected:
     //! Special settings
     intptr_t my_version_and_traits;
@@ -229,7 +222,6 @@ protected:
         , my_max_threads_per_core(automatic)
         {}
 
-#if __TBB_ARENA_BINDING
     task_arena_base(const constraints& constraints_, unsigned reserved_slots, priority a_priority
 #if __TBB_PREVIEW_PARALLEL_PHASE
                     , leave_policy lp
@@ -249,7 +241,7 @@ protected:
         , my_core_type(constraints_.core_type)
         , my_max_threads_per_core(constraints_.max_threads_per_core)
         {}
-#endif /*__TBB_ARENA_BINDING*/
+
 public:
     //! Typedef for number of threads that is automatic.
     static const int automatic = -1;
@@ -354,7 +346,6 @@ public:
           )
     {}
 
-#if __TBB_ARENA_BINDING
     //! Creates task arena pinned to certain NUMA node
     task_arena(const constraints& constraints_, unsigned reserved_slots = 1,
                priority a_priority = priority::normal
@@ -392,7 +383,7 @@ public:
 #endif
 
     //! Copies settings from another task_arena
-    task_arena(const task_arena &a) // copy settings but not the reference or instance
+    task_arena(const task_arena& a) // copy settings but not the reference or instance
         : task_arena_base(
             constraints{}
                 .set_numa_id(a.my_numa_id)
@@ -406,18 +397,6 @@ public:
         )
     
     {}
-#else
-    //! Copies settings from another task_arena
-    task_arena(const task_arena& a) // copy settings but not the reference or instance
-        : task_arena_base(a.my_max_concurrency,
-                          a.my_num_reserved_slots,
-                          a.my_priority,
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                          a.get_leave_policy()
-#endif
-          )
-    {}
-#endif /*__TBB_ARENA_BINDING*/
 
     //! Tag class used to indicate the "attaching" constructor
     struct attach {};
@@ -466,7 +445,6 @@ public:
         }
     }
 
-#if __TBB_ARENA_BINDING
     //! Overrides constraints and forces initialization of internal representation
     void initialize(constraints constraints_, unsigned reserved_slots = 1,
                     priority a_priority = priority::normal
@@ -521,7 +499,6 @@ public:
         }
     }
 #endif /*__TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR*/
-#endif /*__TBB_ARENA_BINDING*/
 
     //! Attaches this instance to the current arena of the thread
     void initialize(attach) {

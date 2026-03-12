@@ -353,8 +353,6 @@ bool __TBB_EXPORTED_FUNC finalize(d1::task_scheduler_handle& handle, std::intptr
     }
 }
 
-#if __TBB_ARENA_BINDING
-
 #if __TBB_WEAK_SYMBOLS_PRESENT
 #pragma weak __TBB_internal_initialize_system_topology
 #pragma weak __TBB_internal_destroy_system_topology
@@ -613,7 +611,6 @@ int __TBB_EXPORTED_FUNC constraints_default_concurrency(const d1::constraints& c
 int __TBB_EXPORTED_FUNC constraints_threads_per_core(const d1::constraints&, intptr_t /*reserved*/) {
     return system_topology::automatic;
 }
-#endif /* __TBB_ARENA_BINDING */
 
 } // namespace r1
 } // namespace detail
