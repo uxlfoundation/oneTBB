@@ -18,7 +18,11 @@ set(TCM_WARNING_LEVEL $<$<NOT:$<CXX_COMPILER_ID:Intel>>:/W4> $<$<BOOL:${TCM_STRI
 # suppress warning: Prefer 'enum class' over 'enum'
 set(TCM_WARNING_SUPPRESS /wd6011 /wd26812)
 
-set(TCM_LIB_COMPILE_FLAGS -D_CRT_SECURE_NO_WARNINGS /GS /Gy /GL /sdl /analyze)
+set(TCM_LIB_COMPILE_FLAGS -D_CRT_SECURE_NO_WARNINGS /GS /Gy /GL /sdl)
+if (NOT CMAKE_CXX_COMPILER_ID MATCHES "(Intel|IntelLLVM|Clang)")
+  set(TCM_LIB_COMPILE_FLAGS ${TCM_LIB_COMPILE_FLAGS} /analyze)
+endif()
+
 set(TCM_COMMON_COMPILE_FLAGS /volatile:iso /FS /EHsc)
 set(TCM_COMMON_LINK_LIBS Kernel32.lib)
 
