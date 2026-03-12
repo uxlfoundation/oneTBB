@@ -469,8 +469,8 @@ TEST_CASE("resource_limited_node and std::invoke") {
     using second_ports_type = typename second_rl_node_type::output_ports_type;
 
     graph g;
-    auto first_body = &input_type::template send_id<first_ports_type, int&>;
-    auto second_body = &output_type1::template send_id<second_ports_type, int&>;
+    auto first_body = &input_type::template send_id<first_ports_type, std::size_t&>;
+    auto second_body = &output_type1::template send_id<second_ports_type, std::size_t&>;
 
     auto limiter_ptr = get_limiter<10>();
 
