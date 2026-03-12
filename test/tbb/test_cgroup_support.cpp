@@ -48,8 +48,8 @@ TEST_CASE("CPU resource constraint equals to the one from reference implementati
     int expected_num_cpus = -1;
     const bool expected_result = reference_cgroup_info::is_cpu_constrained(expected_num_cpus);
 
-    check_cpu_constraints<tbb::detail::r1::default_cgroup_info_data>(expected_result,
-                                                                     expected_num_cpus);
+    check_cpu_constraints<tbb::detail::r1::default_cgroup_settings>(expected_result,
+                                                                    expected_num_cpus);
 }
 
 TEST_CASE("Non-existent /proc/self/cgroup file") {

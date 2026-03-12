@@ -33,18 +33,18 @@ namespace tbb {
 namespace detail {
 namespace r1 {
 
-struct default_cgroup_info_data {
+struct default_cgroup_settings {
     const char* proc_self_mounts_path  = "/proc/self/mounts";
     const char* proc_self_cgroup_path  = "/proc/self/cgroup";
     const char* sys_fs_cgroup_dir_path = "/sys/fs/cgroup";
 };
 
 // Linux control groups support
-template <typename cgroup_info_data_type = default_cgroup_info_data>
+template <typename cgroup_settings = default_cgroup_settings>
 class cgroup_info {
 public:
     static bool is_cpu_constrained(int& constrained_num_cpus) {
-        static const int num_cpus = parse_cpu_constraints(cgroup_info_data_type{});
+        static const int num_cpus = parse_cpu_constraints(cgroup_settings{});
         if (num_cpus == error_value || num_cpus == unlimited_num_cpus)
             return false;
 
@@ -274,27 +274,25 @@ private:
     }
 
     static int try_common_cgroup_mount_path(const process_cgroup_data& pcd,
-                                            const cgroup_info_data_type& cg_data) {
+                                            const cgroup_settings& cg_cfg) {
         int num_cpus = error_value;
         char dir[PATH_MAX] = {0};
         __TBB_ASSERT(*pcd.relative_path, nullptr);
-        if (0 <= std::snprintf(dir, PATH_MAX, "%s/%s", cg_data.sys_fs_cgroup_dir_path,
+        if (0 <= std::snprintf(dir, PATH_MAX, "%s/%s", cg_cfg.sys_fs_cgroup_dir_path,
                                pcd.relative_path))
-        {
             try_read_cgroup_num_cpus_from(dir, num_cpus, pcd.version);
-        }
 
-        if (num_cpus == error_value && pcd.version == process_cgroup_data::cgroup_version::v2) {
-            if (std::snprintf(dir, PATH_MAX, "%s/%s", "/sys/fs/cgroup/unified", pcd.relative_path) >= 0) {
+        if (error_value == num_cpus && pcd.version == process_cgroup_data::cgroup_version::v2) {
+            if (0 <= std::snprintf(dir, PATH_MAX, "%s/%s", "/sys/fs/cgroup/unified",
+                                   pcd.relative_path))
                 try_read_cgroup_v2_num_cpus_from(dir, num_cpus);
-            }
         }
         return num_cpus;
     }
 
-    static int parse_cpu_constraints(const cgroup_info_data_type& cg_data) {
+    static int parse_cpu_constraints(const cgroup_settings& cg_cfg) {
         // Reading /proc/self/cgroup anyway, so open it right away
-        unique_file_t cgroup_file_ptr(std::fopen(cg_data.proc_self_cgroup_path, "r"), &close_file);
+        unique_file_t cgroup_file_ptr(std::fopen(cg_cfg.proc_self_cgroup_path, "r"), &close_file);
         if (!cgroup_file_ptr)
             return error_value; // Failed to open cgroup file
 
@@ -308,14 +306,14 @@ private:
         __TBB_ASSERT(pcd.version != process_cgroup_data::cgroup_version::unknown, nullptr);
 
         int found_num_cpus = error_value; // Initialize to an impossible value
-        found_num_cpus = try_common_cgroup_mount_path(pcd, cg_data);
+        found_num_cpus = try_common_cgroup_mount_path(pcd, cg_cfg);
         if (found_num_cpus != error_value) {
             return found_num_cpus;
         }
 
         auto close_mounts_file = [](std::FILE* file) { endmntent(file); };
         using unique_mounts_file_t = std::unique_ptr<std::FILE, decltype(close_mounts_file)>;
-        unique_mounts_file_t mounts_file_ptr(setmntent(cg_data.proc_self_mounts_path, "r"),
+        unique_mounts_file_t mounts_file_ptr(setmntent(cg_cfg.proc_self_mounts_path, "r"),
                                              close_mounts_file);
         if (!mounts_file_ptr)
             return error_value;
