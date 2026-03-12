@@ -65,15 +65,19 @@ Although, placed into the oneTBB source tree, TCM remains independent. The top =
 literally be copied/moved into other place and used from there without any dependence on oneTBB
 project. This is necessary to avoid assumptions about tight coupling with oneTBB and simplifies
 integration of TCM into other parallel libraries.
+
+# TODO: clarify wrt *project* governance, separating of things related to TCM and oneTBB with e.g.
+# '[TCM]' prefix.
 ** Placement
-TCM sources are to be placed in the =tcm= subdirectory of the oneTBB source root.
+TCM sources are to be placed in the =thread_composability_manager= subdirectory of the oneTBB source
+root.
 #+begin_example
   oneTBB/
       ├── cmake
       ├── doc
       ├── examples
       ├── <... other oneTBB top-level directories ...>
-      └── tcm    <-- new directory with TCM sources
+      └── thread_composability_manager    <-- new directory with TCM sources
 #+end_example
 Such placement is a trade-off between project visibility and its independence.
 ** Integration with oneTBB build system
@@ -91,6 +95,8 @@ CMake option can look like:
   option(TBB_BUILD_TCM "Build Thread Composability Manager (TCM)" ON)
 #+end_src
 
+# TODO: add more examples how various parts of sources can be built.
+
 **** Prerequisites
 Since the project depends on HWLOC for parsing hardware topology, TCM is built only if HWLOC is
 available in the environment. TCM also requires a compiler that supports at least C++17. If there
@@ -100,6 +106,7 @@ the future.
 During configuration step of the oneTBB build, the diagnostic message about whether TCM is going to
 be built or not is shown.
 **** Note about building TCM as a static library
+# TODO: clarify or remove? Consider various options: executable + runtimes.
 TCM is meant to run as a singleton to share its state across its clients, threading libraries.
 Therefore, building static version of the TCM library breaks the whole point of the project, thus,
 does not make sense.
@@ -108,36 +115,18 @@ Similarly to the [[Building][Building section]], TCM tests are built and run onl
 
 In particular, oneTBB CI is to be extended with TCM build and test jobs, including integration tests
 of TCM into oneTBB. This will help to ensure maximum compatibility and testing coverage.
+
+# TODO: add more separate building and testing intentions for oneTBB and TCM + integration testing.
 ** Versioning
 TCM will have its own version separately from the oneTBB.
 
 The TCM version would consist out of three numbers: =MAJOR=, =MINOR=, and =PATCH=. These numbers are
 changed in accordance with the rules outlined in [[https://semver.org/spec/v2.0.0.html][semantic versioning]] scheme.
-
-In particular:
-- =MAJOR= version number is increased if there were backward incompatible changes made. Such changes
-  include: renaming of a public function, changing layout of a public data structure, requiring more
-  or providing less information by a public function.
-
-- =MINOR= version number is increased if the changes were made only in a backward compatible manner.
-  Examples are: adding a new public function, appending new field to the existing public data
-  structure, requiring less or providing more information by a public function.
-
-- =PATCH= version number is increased if there were changes that alter only internal functionality
-  of the library that do not break compatibility of the code compiled with the previous version of
-  TCM. Examples are: a bug fix done in a backward compatible manner.
-
-As a single number, the TCM version would be built using the formula: $10000 * major + 100 * minor +
-patch$, and made available via public =tcmGetVersion= function for the client code to determine what
-version of TCM library is being used in runtime. Additionally, the same single TCM version number
-would be defined as the =TCM_VERSION= macro in TCM header files (a.k.a. TCM SDK) for the client code
-to determine with what version of TCM it was compiled.
 ** Distribution
 The TCM binary packages are to be distributed separately from oneTBB packages, but available for
 download along with them through the same distribution channels.
 
-In addition to providing as a separate source package archive, TCM sources are to be included into
-oneTBB sources package archive.
+TCM sources are to be included into oneTBB sources package archive.
 
 This helps to underline the independence of TCM project from oneTBB, and yet make it available as
 much as possible.
@@ -159,7 +148,6 @@ inside the TCM source tree.
 * Open Questions
 1. Should oneTBB assets listed in the [[https://github.com/uxlfoundation/oneTBB/releases][releases GitHub section]] be provided in both variants: one that
    include TCM binaries, and the other that don't?
-2. When distributing oneTBB source packages, should TCM sources be distributed separately as well?
-3. Should build of TCM be ON or OFF by default?
-4. How will github issues, PRs, milestones, etc. be managed? Will they be mixed with oneTBB issues
+   # TODO: Subrfc.
+2. How will github issues, PRs, milestones, etc. be managed? Will they be mixed with oneTBB issues
    and PRs, labeled with "TCM", or something else?
