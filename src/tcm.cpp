@@ -527,7 +527,7 @@ struct ThreadComposabilityManagerData {
 
 #if __linux__
     int cfs_constrained_cpus;
-    if (cgroup_info::is_cpu_constrained(cfs_constrained_cpus)) {
+    if (cgroup_info<>::is_cpu_constrained(cfs_constrained_cpus)) {
         process_concurrency = std::min((int)process_concurrency, cfs_constrained_cpus);
     }
 #endif

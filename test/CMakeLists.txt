@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2025 Intel Corporation
+# Copyright (C) 2023-2026 Intel Corporation
 #
 # This software and the related documents are Intel copyrighted materials, and your use of them is
 # governed by the express license under which they were provided to you ("License"). Unless the
@@ -149,3 +149,11 @@ target_include_directories(${TCM_TEST_PREMATURE_EXIT} PRIVATE ${CMAKE_CURRENT_SO
 target_link_libraries(${TCM_TEST_PREMATURE_EXIT} PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
 add_test(NAME ${TCM_TEST_PREMATURE_EXIT} COMMAND ${TCM_TEST_PREMATURE_EXIT})
 set_tests_properties(${TCM_TEST_PREMATURE_EXIT} PROPERTIES ENVIRONMENT "TCM_ENABLE=1")
+
+if (UNIX)
+  set(TCM_TEST_CGROUP_INFO test_cgroup_support)
+  add_executable(${TCM_TEST_CGROUP_INFO} test_cgroup_support.cpp)
+  target_include_directories(${TCM_TEST_CGROUP_INFO} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+  add_test(NAME ${TCM_TEST_CGROUP_INFO} COMMAND ${TCM_TEST_CGROUP_INFO})
+endif (UNIX)

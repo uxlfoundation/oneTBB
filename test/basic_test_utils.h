@@ -279,6 +279,7 @@ inline bool tcm_tests_data::cleanup_test_state() {
         tcm_clients.clear();
     }
 
+#if !TCM_TEST_SKIPS_TCM_USE
     for (unsigned i = 0; i < clients_dump.size(); ++i) {
         const auto c = clients_dump[i];
         const tcm_result_t r = tcmDisconnect(c);
@@ -287,6 +288,7 @@ inline bool tcm_tests_data::cleanup_test_state() {
             mark_this_test_failed();
         }
     }
+#endif
 
     const bool succeed = is_clean_run;
     is_clean_run = true;
