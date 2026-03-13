@@ -800,7 +800,7 @@ TEST_CASE("Test with priority inversion") {
         }
     };
 
-    resubmitting_task::task_pool_data tp_data {{resubmitting_task::max_task_count, {test_arena, test_context}}};
+    resubmitting_task::task_pool_data tp_data {{(std::size_t)resubmitting_task::max_task_count, {test_arena, test_context}}};
     std::vector<resubmitting_task> initial_submitters(thread_number + 1, {test_arena, test_context});
 
     // warm up
