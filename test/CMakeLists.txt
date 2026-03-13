@@ -155,5 +155,6 @@ if (UNIX)
   add_executable(${TCM_TEST_CGROUP_INFO} test_cgroup_support.cpp)
   target_include_directories(${TCM_TEST_CGROUP_INFO} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../src ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+  target_link_libraries(${TCM_TEST_CGROUP_INFO} PRIVATE Threads::Threads)
   add_test(NAME ${TCM_TEST_CGROUP_INFO} COMMAND ${TCM_TEST_CGROUP_INFO})
 endif (UNIX)
