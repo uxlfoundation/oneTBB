@@ -25,8 +25,6 @@
 #include "tcm.h"
 #include "tcm_adaptor.h"
 
-#include <iostream>
-
 namespace tbb {
 namespace detail {
 namespace r1 {
