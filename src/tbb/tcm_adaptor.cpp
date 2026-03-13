@@ -181,15 +181,15 @@ public:
         {
             my_permit_constraints.max_concurrency = constraints.max_concurrency;
             my_permit_constraints.min_concurrency = 0;
-            my_permit_constraints.mask = constraints_affinity_mask(constraints);
+            my_permit_constraints.mask = my_arena.get_affinity_mask();
 
-            // High-level constraints are fallback when mask is not set (e.g., TBBBind unused).
-            my_permit_constraints.core_type_id = constraints.core_type;
-            my_permit_constraints.numa_id = constraints.numa_id;
-            my_permit_constraints.threads_per_core = constraints.max_threads_per_core;
-
-            my_permit_request.cpu_constraints = &my_permit_constraints;
-            my_permit_request.constraints_size = 1;
+            // The affinity mask is resolved by TBBBind from arena constraints.
+            // If TBBBind is not loaded, the mask will be null and TCM will only
+            // enforce concurrency limits without CPU placement constraints.
+            if (my_permit_constraints.mask) {
+                my_permit_request.cpu_constraints = &my_permit_constraints;
+                my_permit_request.constraints_size = 1;
+            }
         }
 
         my_permit_request.min_sw_threads = 0;

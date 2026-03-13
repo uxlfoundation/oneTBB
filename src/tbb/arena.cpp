@@ -50,6 +50,10 @@ public:
         restore_affinity_mask(my_binding_handler, this_task_arena::current_thread_index());
     }
 
+    hwloc_bitmap_t get_affinity_mask() const {
+        return r1::get_affinity_mask(my_binding_handler);
+    }
+
     ~numa_binding_observer() override{
         destroy_binding_handler(my_binding_handler);
     }
@@ -446,6 +450,13 @@ std::pair<int, int> arena::update_request(int mandatory_delta, int workers_delta
     return { min_workers_request, max_workers_request };
 }
 
+hwloc_bitmap_t arena::get_affinity_mask() const {
+    if (my_numa_binding_observer) {
+        return my_numa_binding_observer->get_affinity_mask();
+    }
+    return nullptr;
+}
+
 thread_control_monitor& arena::get_waiting_threads_monitor() {
     return my_threading_control->get_waiting_threads_monitor();
 }
@@ -460,7 +471,7 @@ void arena::enqueue_task(d1::task& t, d1::task_group_context& ctx, thread_data& 
 
 arena &arena::create(threading_control *control, unsigned num_slots,
                      unsigned num_reserved_slots, unsigned arena_priority_level,
-                     d1::constraints constraints
+                     d1::constraints constraints, numa_binding_observer* observer
 #if __TBB_PREVIEW_PARALLEL_PHASE
                      , tbb::task_arena::leave_policy lp 
 #endif
@@ -473,6 +484,7 @@ arena &arena::create(threading_control *control, unsigned num_slots,
 #endif
     );
     __TBB_ASSERT(a.my_num_reserved_slots <= a.my_num_slots, NULL);
+    a.my_numa_binding_observer = observer;
     a.my_tc_client = control->create_client(a);
     // We should not publish arena until all fields are initialized
     control->publish_client(a.my_tc_client, constraints);
@@ -583,8 +595,9 @@ void task_arena_impl::initialize(d1::task_arena_base& ta) {
         ta.my_max_concurrency = (int)default_concurrency(arena_constraints);
     }
 
+    numa_binding_observer* observer = nullptr;
 #if __TBB_CPUBIND_PRESENT
-    numa_binding_observer* observer = construct_binding_observer(
+    observer = construct_binding_observer(
         static_cast<d1::task_arena*>(&ta), arena::num_arena_slots(ta.my_max_concurrency, ta.my_num_reserved_slots),
         ta.my_numa_id, ta.core_type(), ta.max_threads_per_core());
     if (observer) {
@@ -598,7 +611,7 @@ void task_arena_impl::initialize(d1::task_arena_base& ta) {
     unsigned priority_level = arena_priority_level(ta.my_priority);
     threading_control* thr_control = threading_control::register_public_reference();
     arena& a = arena::create(thr_control, unsigned(ta.my_max_concurrency), ta.my_num_reserved_slots,
-                             priority_level, arena_constraints
+                             priority_level, arena_constraints, observer
 #if __TBB_PREVIEW_PARALLEL_PHASE
                              , ta.get_leave_policy()
 #endif
@@ -606,7 +619,6 @@ void task_arena_impl::initialize(d1::task_arena_base& ta) {
 
     ta.my_arena.store(&a, std::memory_order_release);
 #if __TBB_CPUBIND_PRESENT
-    a.my_numa_binding_observer = observer;
     if (observer) {
         observer->on_scheduler_exit(true);
         observer->observe(true);

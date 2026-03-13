@@ -22,6 +22,7 @@
 #include "oneapi/tbb/detail/_assert.h"
 #include "oneapi/tbb/detail/_utils.h"
 #include "oneapi/tbb/info.h"
+#include "tcm.h"
 
 #if __unix__
 #include <sys/param.h>  // __FreeBSD_version
@@ -218,6 +219,7 @@ binding_handler* construct_binding_handler(int slot_num, int numa_id, int core_t
 void destroy_binding_handler(binding_handler* handler_ptr);
 void apply_affinity_mask(binding_handler* handler_ptr, int slot_num);
 void restore_affinity_mask(binding_handler* handler_ptr, int slot_num);
+hwloc_bitmap_t get_affinity_mask(binding_handler* handler_ptr);
 
 // RTM specific section
 // abort code for mutexes that detect a conflict with another thread.
