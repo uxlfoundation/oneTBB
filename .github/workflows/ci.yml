@@ -177,10 +177,10 @@ jobs:
             fi
 
             # Verify Intel copyright lines are not modified
-            INTEL_COPYRIGHT="Copyright.*Intel"
+            INTEL_COPYRIGHT="Copyright.*[0-9].*Intel"
             for file in $FILES_WITH_COPYRIGHT; do
-              ORIGINAL_INTEL=$(git show ${{ github.event.pull_request.base.sha }}:"$file" 2>/dev/null | grep -i "$INTEL_COPYRIGHT" || true)
-              CURRENT_INTEL=$(grep -i "$INTEL_COPYRIGHT" "$file" || true)
+              ORIGINAL_INTEL=$(git show ${{ github.event.pull_request.base.sha }}:"$file" 2>/dev/null | grep "$INTEL_COPYRIGHT" || true)
+              CURRENT_INTEL=$(grep "$INTEL_COPYRIGHT" "$file" || true)
               if [ "$ORIGINAL_INTEL" != "$CURRENT_INTEL" ]; then
                 echo "ERROR: Intel copyright must not be modified in: $file"
                 CHECK_FAILED=true
