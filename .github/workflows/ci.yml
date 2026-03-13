@@ -152,44 +152,66 @@ jobs:
           fetch-depth: 0
       - name: Run check
         run: |
-          CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
-          UXL_COPYRIGHT="Copyright \(c\) [0-9]+ UXL Foundation Contributors"
-          APACHE_COPYRIGHT_LINE="Licensed under the Apache License"
+          base_sha=${{ github.event.pull_request.base.sha }}
+          current_year=$(date +%Y)
+          apache_copyright_line="Licensed under the Apache License"
+          uxl_copyright_re="Copyright \(c\) [0-9]+ UXL Foundation Contributors"
+          intel_copyright_re="Copyright.*[0-9]\{4\}.*Intel"
+          check_failed=false
 
-          FILES_WITH_COPYRIGHT=$(grep -lF "$APACHE_COPYRIGHT_LINE" $CHANGED_FILES || true)
-          FILES_WITH_MISSING_UXL_COPYRIGHT=$(grep -LE "$UXL_COPYRIGHT" $FILES_WITH_COPYRIGHT || true)
+          new_files=$(git diff --diff-filter=A --name-only "$base_sha" || true)
+          modified_files=$(git diff --diff-filter=dA --name-only "$base_sha" || true)
 
-          # Verify UXL Copyright uses only the first year (no year ranges)
-          if [ -n "$FILES_WITH_COPYRIGHT" ]; then
-            UXL_COPYRIGHT_WITH_RANGE="Copyright \(c\) [0-9]+-[0-9]+ UXL Foundation Contributors"
-            FILES_WITH_YEAR_RANGE=$(grep -lE "$UXL_COPYRIGHT_WITH_RANGE" $FILES_WITH_COPYRIGHT || true)
-
-            CHECK_FAILED=false
-
-            if [ -n "$FILES_WITH_MISSING_UXL_COPYRIGHT" ]; then
-              echo "ERROR: UXL Copyright is missed for the following files: ${FILES_WITH_MISSING_UXL_COPYRIGHT}"
-              CHECK_FAILED=true
-            fi
-
-            if [ -n "$FILES_WITH_YEAR_RANGE" ]; then
-              echo "ERROR: UXL Copyright should use only the first year (no year ranges) in the following files: ${FILES_WITH_YEAR_RANGE}"
-              CHECK_FAILED=true
-            fi
-
-            # Verify Intel copyright lines are not modified
-            INTEL_COPYRIGHT="Copyright.*[0-9].*Intel"
-            for file in $FILES_WITH_COPYRIGHT; do
-              ORIGINAL_INTEL=$(git show ${{ github.event.pull_request.base.sha }}:"$file" 2>/dev/null | grep "$INTEL_COPYRIGHT" || true)
-              CURRENT_INTEL=$(grep "$INTEL_COPYRIGHT" "$file" || true)
-              if [ "$ORIGINAL_INTEL" != "$CURRENT_INTEL" ]; then
-                echo "ERROR: Intel copyright must not be modified in: $file"
-                CHECK_FAILED=true
+          if [ -n "$new_files" ]; then
+            new_with_apache=$(grep -lF "$apache_copyright_line" $new_files || true)
+            for file in $new_with_apache; do
+              uxl_match=$(grep -cE "$uxl_copyright_re" "$file" || true)
+              if [ "$uxl_match" -eq 0 ]; then
+                echo "ERROR: New file is missing UXL copyright: $file"
+                check_failed=true
+              else
+                year_match=$(grep -cE "Copyright \(c\) ${current_year} UXL Foundation Contributors" "$file" || true)
+                if [ "$year_match" -eq 0 ]; then
+                  echo "ERROR: New file must have current year (${current_year}) in UXL copyright: $file"
+                  check_failed=true
+                fi
               fi
             done
+          fi
 
-            if [ "$CHECK_FAILED" = true ]; then
-              exit 1
-            fi
+          if [ -n "$modified_files" ]; then
+            modified_with_apache=$(grep -lF "$apache_copyright_line" $modified_files || true)
+            for file in $modified_with_apache; do
+              uxl_match=$(grep -cE "$uxl_copyright_re" "$file" || true)
+              if [ "$uxl_match" -eq 0 ]; then
+                echo "ERROR: Modified file is missing UXL copyright: $file"
+                check_failed=true
+                continue
+              fi
+              original_uxl=$(git show "${base_sha}:${file}" 2>/dev/null | grep -oE "$uxl_copyright_re" || true)
+              current_uxl=$(grep -oE "$uxl_copyright_re" "$file" || true)
+              if [ -n "$original_uxl" ] && [ "$original_uxl" != "$current_uxl" ]; then
+                echo "ERROR: UXL copyright year must not be changed in: $file"
+                check_failed=true
+              fi
+            done
+          fi
+
+          all_changed_files=$(git diff --diff-filter=d --name-only "$base_sha" || true)
+          if [ -n "$all_changed_files" ]; then
+            all_with_apache=$(grep -lF "$apache_copyright_line" $all_changed_files || true)
+            for file in $all_with_apache; do
+              original_intel=$(git show "${base_sha}:${file}" 2>/dev/null | grep "$intel_copyright_re" || true)
+              current_intel=$(grep "$intel_copyright_re" "$file" || true)
+              if [ -n "$original_intel" ] && [ "$original_intel" != "$current_intel" ]; then
+                echo "ERROR: Intel copyright must not be modified in: $file"
+                check_failed=true
+              fi
+            done
+          fi
+
+          if [ "$check_failed" = true ]; then
+            exit 1
           fi
   python_module_test_ubuntu_latest:
     runs-on: [ubuntu-latest]
