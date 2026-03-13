@@ -348,6 +348,8 @@ struct queuing_rw_mutex_impl {
                     // Failed to acquire the lock on predecessor. The predecessor either unlinks or upgrades.
                     // In the second case, it could or could not know my "in use" flag - need to check
                     // Responsibility transition, the one who reads uncorrupted my_prev will do release.
+                    // Publish the restored predecessor with release, acquire ensures synchronization
+                    // with predecessor if they cleared the flag and wait for us to release the lock.
                     tmp = tricky_pointer::compare_exchange_strong(s.my_prev, tricky_pointer(predecessor) | FLAG, predecessor, std::memory_order_acq_rel);
                     if( !(tricky_pointer(tmp) & FLAG) ) {
                         __TBB_ASSERT(tricky_pointer::load(s.my_prev, std::memory_order_relaxed) != (tricky_pointer(predecessor) | FLAG), nullptr);
@@ -399,6 +401,8 @@ struct queuing_rw_mutex_impl {
                 }
                 next->my_going.store(2U, std::memory_order_relaxed);
                 // Responsibility transition, the one who reads uncorrupted my_prev will do release.
+                // Clear my_prev with release, acquire to synchronize successor's memory accesses to
+                // us before the release of the lock.
                 tmp = tricky_pointer::exchange(next->my_prev, nullptr, std::memory_order_acq_rel);
                 next->my_going.store(1U, std::memory_order_release);
             }
@@ -406,6 +410,7 @@ struct queuing_rw_mutex_impl {
             unblock_or_wait_on_internal_lock(s, get_flag(tmp));
         }
     done:
+        // Ensure that predecessor's writes are visible before node destruction.
         spin_wait_while_eq( s.my_going, 2U, std::memory_order_acquire );
 
         s.initialize();
@@ -538,6 +543,8 @@ struct queuing_rw_mutex_impl {
             }
             if( !success ) {
                 // Responsibility transition, the one who reads uncorrupted my_prev will do release.
+                // Publish the restored predecessor with release, acquire ensures synchronization
+                // with predecessor if they cleared the flag and wait for us to release the lock.
                 tmp = tricky_pointer::compare_exchange_strong(s.my_prev, tricky_pointer(predecessor)|FLAG, predecessor, std::memory_order_acq_rel);
                 if( tricky_pointer(tmp) & FLAG ) {
                     tricky_pointer::spin_wait_while_eq(s.my_prev, predecessor);
