@@ -580,6 +580,7 @@ if (TARGET TBB::tbb)
       target_include_directories(test_cgroup_support PRIVATE
         $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>
       )
+      target_link_libraries(test_cgroup_support PRIVATE Threads::Threads)
     endif()
 
     # Define the conformance tests
