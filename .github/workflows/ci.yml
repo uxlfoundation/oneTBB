@@ -153,22 +153,16 @@ jobs:
       - name: Run check
         run: |
           CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
-          UXL_COPYRIGHT="Copyright \(c\) [0-9]+(-[0-9]+)? UXL Foundation Contributors"
+          UXL_COPYRIGHT="Copyright \(c\) [0-9]+ UXL Foundation Contributors"
           APACHE_COPYRIGHT_LINE="Licensed under the Apache License"
-          CURRENT_YEAR=$(date +%Y)
 
           FILES_WITH_COPYRIGHT=$(grep -lF "$APACHE_COPYRIGHT_LINE" $CHANGED_FILES || true)
           FILES_WITH_MISSING_UXL_COPYRIGHT=$(grep -LE "$UXL_COPYRIGHT" $FILES_WITH_COPYRIGHT || true)
 
-          # Update UXL Copyright years
+          # Verify UXL Copyright uses only the first year (no year ranges)
           if [ -n "$FILES_WITH_COPYRIGHT" ]; then
-            sed -E -i \
-              -e "/${UXL_COPYRIGHT}/s/ ([0-9]+)[-0-9]*/ \1-${CURRENT_YEAR}/" \
-              -e "/${UXL_COPYRIGHT}/s/${CURRENT_YEAR}-${CURRENT_YEAR}/${CURRENT_YEAR}/" \
-            $FILES_WITH_COPYRIGHT
-
-            git checkout -- third-party-programs.txt
-            git diff > years.diff
+            UXL_COPYRIGHT_WITH_RANGE="Copyright \(c\) [0-9]+-[0-9]+ UXL Foundation Contributors"
+            FILES_WITH_YEAR_RANGE=$(grep -lE "$UXL_COPYRIGHT_WITH_RANGE" $FILES_WITH_COPYRIGHT || true)
 
             CHECK_FAILED=false
 
@@ -177,11 +171,21 @@ jobs:
               CHECK_FAILED=true
             fi
 
-            if [[ -s years.diff ]]; then
-              echo "ERROR: Wrong UXL copyright years"
-              cat years.diff
+            if [ -n "$FILES_WITH_YEAR_RANGE" ]; then
+              echo "ERROR: UXL Copyright should use only the first year (no year ranges) in the following files: ${FILES_WITH_YEAR_RANGE}"
               CHECK_FAILED=true
             fi
+
+            # Verify Intel copyright lines are not modified
+            INTEL_COPYRIGHT="Copyright.*Intel"
+            for file in $FILES_WITH_COPYRIGHT; do
+              ORIGINAL_INTEL=$(git show ${{ github.event.pull_request.base.sha }}:"$file" 2>/dev/null | grep -i "$INTEL_COPYRIGHT" || true)
+              CURRENT_INTEL=$(grep -i "$INTEL_COPYRIGHT" "$file" || true)
+              if [ "$ORIGINAL_INTEL" != "$CURRENT_INTEL" ]; then
+                echo "ERROR: Intel copyright must not be modified in: $file"
+                CHECK_FAILED=true
+              fi
+            done
 
             if [ "$CHECK_FAILED" = true ]; then
               exit 1
