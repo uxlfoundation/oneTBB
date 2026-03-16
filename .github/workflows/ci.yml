@@ -149,10 +149,11 @@ jobs:
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - name: Run check
         run: |
-          base_sha=$(git merge-base ${{ github.event.pull_request.base.sha }} HEAD)
+          base_sha=${{ github.event.pull_request.base.sha }}
           current_year=$(date +%Y)
           apache_copyright_line="Licensed under the Apache License"
           uxl_copyright_re="Copyright \(c\) [0-9]+ UXL Foundation Contributors"
