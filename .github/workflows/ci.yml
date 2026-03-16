@@ -161,7 +161,7 @@ jobs:
           check_failed=false
 
           new_files=$(git diff --find-renames --diff-filter=A --name-only "$base_sha" || true)
-          modified_files=$(git diff --find-renames --diff-filter=MR --name-only "$base_sha" || true)
+          modified_files=$(git diff --find-renames --diff-filter=M --name-only "$base_sha" || true)
 
           if [ -n "$new_files" ]; then
             new_with_apache=$(grep -lF "$apache_copyright_line" $new_files || true)
@@ -198,7 +198,7 @@ jobs:
             done
           fi
 
-          all_changed_files=$(git diff --find-renames --diff-filter=AMR --name-only "$base_sha" || true)
+          all_changed_files=$(git diff --find-renames --diff-filter=AM --name-only "$base_sha" || true)
           if [ -n "$all_changed_files" ]; then
             all_with_apache=$(grep -lF "$apache_copyright_line" $all_changed_files || true)
             for file in $all_with_apache; do
