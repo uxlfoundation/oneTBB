@@ -570,6 +570,9 @@ public:
         topology.set_affinity_mask(affinity_backup[slot_num]);
     };
 
+    system_topology::affinity_mask get_affinity_mask() {
+        return handler_affinity_mask;
+    }
 };
 
 extern "C" { // exported to TBB interfaces
@@ -604,6 +607,11 @@ TBBBIND_EXPORT void __TBB_internal_apply_affinity(binding_handler* handler_ptr, 
 TBBBIND_EXPORT void __TBB_internal_restore_affinity(binding_handler* handler_ptr, int slot_num) {
     __TBB_ASSERT(handler_ptr != nullptr, "Trying to get access to uninitialized metadata.");
     handler_ptr->restore_previous_affinity_mask(slot_num);
+}
+
+TBBBIND_EXPORT hwloc_bitmap_t __TBB_internal_get_affinity_mask(binding_handler* handler_ptr) {
+    __TBB_ASSERT(handler_ptr != nullptr, "Trying to get access to uninitialized metadata.");
+    return handler_ptr->get_affinity_mask();
 }
 
 TBBBIND_EXPORT int __TBB_internal_get_default_concurrency(int numa_id, int core_type_id, int max_threads_per_core) {

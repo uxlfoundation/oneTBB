@@ -23,7 +23,6 @@
 #include "detail/_utils.h"
 #include "version.h"
 
-#if __TBB_ARENA_BINDING
 #include <tuple>
 #include <vector>
 #include <cstdint>
@@ -176,7 +175,5 @@ using detail::d1::default_concurrency;
 } // namespace v1
 
 } // namespace tbb
-
-#endif /*__TBB_ARENA_BINDING*/
 
 #endif /*__TBB_info_H*/

@@ -47,9 +47,7 @@ class task_group_context;
 class threading_control;
 class allocate_root_with_context_proxy;
 
-#if __TBB_ARENA_BINDING
 class numa_binding_observer;
-#endif /*__TBB_ARENA_BINDING*/
 
 //! Bounded coroutines cache LIFO ring buffer
 class arena_co_cache {
@@ -300,10 +298,8 @@ struct arena_base : padded<intrusive_list_node> {
     //! The list of local observers attached to this arena.
     observer_list my_observers;
 
-#if __TBB_ARENA_BINDING
     //! Pointer to internal observer that allows to bind threads in arena to certain NUMA node.
     numa_binding_observer* my_numa_binding_observer{nullptr};
-#endif /*__TBB_ARENA_BINDING*/
 
     // Below are rarely modified members
 
@@ -372,7 +368,8 @@ public:
 
     static arena& create(threading_control* control, unsigned num_slots, unsigned num_reserved_slots,
                          unsigned arena_priority_level,
-                         d1::constraints constraints = d1::constraints{}
+                         d1::constraints constraints = d1::constraints{},
+                         numa_binding_observer* observer = nullptr
 #if __TBB_PREVIEW_PARALLEL_PHASE
                          , tbb::task_arena::leave_policy lp = tbb::task_arena::leave_policy::automatic
 #endif
@@ -485,6 +482,8 @@ public:
     int update_concurrency(unsigned concurrency);
 
     std::pair</*min workers = */ int, /*max workers = */ int> update_request(int mandatory_delta, int workers_delta);
+
+    hwloc_bitmap_t get_affinity_mask() const;
 
     /** Must be the last data field */
     arena_slot my_slots[1];

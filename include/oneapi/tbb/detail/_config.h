@@ -385,12 +385,8 @@
     #define __TBB_ARENA_OBSERVER __TBB_SCHEDULER_OBSERVER
 #endif /* __TBB_ARENA_OBSERVER */
 
-#ifndef __TBB_ARENA_BINDING
-    #define __TBB_ARENA_BINDING 1
-#endif
-
 // Thread pinning is not available on macOS*
-#define __TBB_CPUBIND_PRESENT (__TBB_ARENA_BINDING && !__APPLE__)
+#define __TBB_CPUBIND_PRESENT (!__APPLE__)
 
 #ifndef __TBB_ENQUEUE_ENFORCED_CONCURRENCY
     #define __TBB_ENQUEUE_ENFORCED_CONCURRENCY 1

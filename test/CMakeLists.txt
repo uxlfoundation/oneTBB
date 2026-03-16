@@ -575,6 +575,14 @@ if (TARGET TBB::tbb)
         endif()
     endif()
 
+    if (UNIX)
+      tbb_add_test(SUBDIR tbb NAME test_cgroup_support)
+      target_include_directories(test_cgroup_support PRIVATE
+        $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>
+      )
+      target_link_libraries(test_cgroup_support PRIVATE Threads::Threads)
+    endif()
+
     # Define the conformance tests
     tbb_add_test(SUBDIR conformance NAME conformance_tick_count DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR conformance NAME conformance_allocators DEPENDENCIES TBB::tbb)

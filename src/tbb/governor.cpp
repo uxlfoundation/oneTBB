@@ -353,8 +353,6 @@ bool __TBB_EXPORTED_FUNC finalize(d1::task_scheduler_handle& handle, std::intptr
     }
 }
 
-#if __TBB_ARENA_BINDING
-
 #if __TBB_WEAK_SYMBOLS_PRESENT
 #pragma weak __TBB_internal_initialize_system_topology
 #pragma weak __TBB_internal_destroy_system_topology
@@ -362,6 +360,7 @@ bool __TBB_EXPORTED_FUNC finalize(d1::task_scheduler_handle& handle, std::intptr
 #pragma weak __TBB_internal_deallocate_binding_handler
 #pragma weak __TBB_internal_apply_affinity
 #pragma weak __TBB_internal_restore_affinity
+#pragma weak __TBB_internal_get_affinity_mask
 #pragma weak __TBB_internal_get_default_concurrency
 #pragma weak __TBB_internal_set_tbbbind_assertion_handler
 
@@ -379,6 +378,7 @@ void __TBB_internal_deallocate_binding_handler( binding_handler* handler_ptr );
 
 void __TBB_internal_apply_affinity( binding_handler* handler_ptr, int slot_num );
 void __TBB_internal_restore_affinity( binding_handler* handler_ptr, int slot_num );
+hwloc_bitmap_t __TBB_internal_get_affinity_mask( binding_handler* handler_ptr );
 
 int __TBB_internal_get_default_concurrency( int numa_id, int core_type_id, int max_threads_per_core );
 
@@ -392,6 +392,7 @@ static binding_handler* dummy_allocate_binding_handler ( int, int, int, int ) { 
 static void dummy_deallocate_binding_handler ( binding_handler* ) { }
 static void dummy_apply_affinity ( binding_handler*, int ) { }
 static void dummy_restore_affinity ( binding_handler*, int ) { }
+static hwloc_bitmap_t dummy_get_affinity_mask( binding_handler* ) { return nullptr; }
 static int dummy_get_default_concurrency( int, int, int ) { return governor::default_num_threads(); }
 static void dummy_set_assertion_handler( assertion_handler_type ) { }
 
@@ -411,6 +412,8 @@ static void (*apply_affinity_ptr)( binding_handler* handler_ptr, int slot_num )
     = dummy_apply_affinity;
 static void (*restore_affinity_ptr)( binding_handler* handler_ptr, int slot_num )
     = dummy_restore_affinity;
+static hwloc_bitmap_t (*get_affinity_mask_ptr)( binding_handler* handler_ptr )
+    = dummy_get_affinity_mask;
 int (*get_default_concurrency_ptr)( int numa_id, int core_type_id, int max_threads_per_core )
     = dummy_get_default_concurrency;
 void (*set_assertion_handler_ptr)( assertion_handler_type handler )
@@ -427,6 +430,7 @@ static const dynamic_link_descriptor TbbBindLinkTable[] = {
     DLD(__TBB_internal_deallocate_binding_handler, deallocate_binding_handler_ptr),
     DLD(__TBB_internal_apply_affinity, apply_affinity_ptr),
     DLD(__TBB_internal_restore_affinity, restore_affinity_ptr),
+    DLD(__TBB_internal_get_affinity_mask, get_affinity_mask_ptr),
 #endif
     DLD(__TBB_internal_get_default_concurrency, get_default_concurrency_ptr)
 };
@@ -543,6 +547,11 @@ void restore_affinity_mask(binding_handler* handler_ptr, int slot_index) {
     restore_affinity_ptr(handler_ptr, slot_index);
 }
 
+hwloc_bitmap_t get_affinity_mask(binding_handler* handler_ptr) {
+    __TBB_ASSERT(get_affinity_mask_ptr, "tbbbind loading was not performed");
+    return get_affinity_mask_ptr(handler_ptr);
+}
+
 unsigned __TBB_EXPORTED_FUNC numa_node_count() {
     system_topology::initialize();
     return system_topology::numa_nodes_count;
@@ -613,7 +622,6 @@ int __TBB_EXPORTED_FUNC constraints_default_concurrency(const d1::constraints& c
 int __TBB_EXPORTED_FUNC constraints_threads_per_core(const d1::constraints&, intptr_t /*reserved*/) {
     return system_topology::automatic;
 }
-#endif /* __TBB_ARENA_BINDING */
 
 } // namespace r1
 } // namespace detail
