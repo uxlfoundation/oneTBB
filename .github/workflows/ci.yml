@@ -152,7 +152,7 @@ jobs:
           fetch-depth: 0
       - name: Run check
         run: |
-          base_sha=${{ github.event.pull_request.base.sha }}
+          base_sha=$(git merge-base ${{ github.event.pull_request.base.sha }} HEAD)
           current_year=$(date +%Y)
           apache_copyright_line="Licensed under the Apache License"
           uxl_copyright_re="Copyright \(c\) [0-9]+ UXL Foundation Contributors"
@@ -184,7 +184,7 @@ jobs:
             for file in $modified_with_apache; do
               uxl_match=$(grep -cE "$uxl_copyright_re" "$file" || true)
               if [ "$uxl_match" -eq 0 ]; then
-                echo "ERROR: Modified file is missing UXL copyright: $file"
+                echo "ERROR: Modified file is missing single year UXL copyright: $file"
                 check_failed=true
                 continue
               fi
