@@ -378,7 +378,7 @@ void __TBB_internal_deallocate_binding_handler( binding_handler* handler_ptr );
 
 void __TBB_internal_apply_affinity( binding_handler* handler_ptr, int slot_num );
 void __TBB_internal_restore_affinity( binding_handler* handler_ptr, int slot_num );
-hwloc_bitmap_t __TBB_internal_get_affinity_mask( binding_handler* handler_ptr );
+tcm_cpu_mask_t __TBB_internal_get_affinity_mask( binding_handler* handler_ptr );
 
 int __TBB_internal_get_default_concurrency( int numa_id, int core_type_id, int max_threads_per_core );
 
@@ -392,7 +392,7 @@ static binding_handler* dummy_allocate_binding_handler ( int, int, int, int ) { 
 static void dummy_deallocate_binding_handler ( binding_handler* ) { }
 static void dummy_apply_affinity ( binding_handler*, int ) { }
 static void dummy_restore_affinity ( binding_handler*, int ) { }
-static hwloc_bitmap_t dummy_get_affinity_mask( binding_handler* ) { return nullptr; }
+static tcm_cpu_mask_t dummy_get_affinity_mask( binding_handler* ) { return nullptr; }
 static int dummy_get_default_concurrency( int, int, int ) { return governor::default_num_threads(); }
 static void dummy_set_assertion_handler( assertion_handler_type ) { }
 
@@ -412,7 +412,7 @@ static void (*apply_affinity_ptr)( binding_handler* handler_ptr, int slot_num )
     = dummy_apply_affinity;
 static void (*restore_affinity_ptr)( binding_handler* handler_ptr, int slot_num )
     = dummy_restore_affinity;
-static hwloc_bitmap_t (*get_affinity_mask_ptr)( binding_handler* handler_ptr )
+static tcm_cpu_mask_t (*get_affinity_mask_ptr)( binding_handler* handler_ptr )
     = dummy_get_affinity_mask;
 int (*get_default_concurrency_ptr)( int numa_id, int core_type_id, int max_threads_per_core )
     = dummy_get_default_concurrency;
@@ -547,7 +547,7 @@ void restore_affinity_mask(binding_handler* handler_ptr, int slot_index) {
     restore_affinity_ptr(handler_ptr, slot_index);
 }
 
-hwloc_bitmap_t get_affinity_mask(binding_handler* handler_ptr) {
+tcm_cpu_mask_t get_affinity_mask(binding_handler* handler_ptr) {
     __TBB_ASSERT(get_affinity_mask_ptr, "tbbbind loading was not performed");
     return get_affinity_mask_ptr(handler_ptr);
 }

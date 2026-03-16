@@ -483,7 +483,7 @@ public:
 
     std::pair</*min workers = */ int, /*max workers = */ int> update_request(int mandatory_delta, int workers_delta);
 
-    hwloc_bitmap_t get_affinity_mask() const;
+    tcm_cpu_mask_t get_affinity_mask() const;
 
     /** Must be the last data field */
     arena_slot my_slots[1];

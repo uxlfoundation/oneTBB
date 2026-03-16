@@ -50,7 +50,7 @@ public:
         restore_affinity_mask(my_binding_handler, this_task_arena::current_thread_index());
     }
 
-    hwloc_bitmap_t get_affinity_mask() const {
+    tcm_cpu_mask_t get_affinity_mask() const {
         return r1::get_affinity_mask(my_binding_handler);
     }
 
@@ -450,7 +450,7 @@ std::pair<int, int> arena::update_request(int mandatory_delta, int workers_delta
     return { min_workers_request, max_workers_request };
 }
 
-hwloc_bitmap_t arena::get_affinity_mask() const {
+tcm_cpu_mask_t arena::get_affinity_mask() const {
     if (my_numa_binding_observer) {
         return my_numa_binding_observer->get_affinity_mask();
     }
