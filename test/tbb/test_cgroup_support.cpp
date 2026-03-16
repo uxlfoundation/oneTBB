@@ -15,7 +15,7 @@
 */
 
 //! \file test_cgroup_support.cpp
-//! \brief Test for internal functionality of respecting CPU limitations set via Linux cgroup
+//! \brief Test for [internal] functionality of respecting CPU limitations set via Linux cgroup
 
 #if __linux__
 
@@ -44,6 +44,7 @@ void check_cpu_constraints(const bool expected_result, const int expected_num_cp
     REQUIRE_MESSAGE(expected_num_cpus == actual_num_cpus, "Determined number of CPUs is expected");
 }
 
+//! \brief \ref requirement
 TEST_CASE("CPU resource constraint equals to the one from reference implementation") {
     int expected_num_cpus = -1;
     const bool expected_result = reference_cgroup_info::is_cpu_constrained(expected_num_cpus);
@@ -52,6 +53,7 @@ TEST_CASE("CPU resource constraint equals to the one from reference implementati
                                                                     expected_num_cpus);
 }
 
+//! \brief \ref negative
 TEST_CASE("Non-existent /proc/self/cgroup file") {
     struct non_existent_cgroup_file {
         const char* proc_self_cgroup_path = "non-existent_cgroup_file_path";
@@ -104,6 +106,7 @@ struct cgroup_test_data {
     const char* proc_self_mounts_path = "/proc/self/mounts";
 };
 
+//! \brief \ref requirement
 TEST_CASE("cgroup v2 path finds correct CPU limitation") {
     struct test_data : cgroup_test_data {
         const char* cpu_quota = "300000";
@@ -117,6 +120,7 @@ TEST_CASE("cgroup v2 path finds correct CPU limitation") {
     check_cpu_constraints<test_data>(/*expected_result*/true, /*expected_num_cpus*/3);
 }
 
+//! \brief \ref requirement
 TEST_CASE("'max' string as CPU quota means no CPU limitation for cgroup v2 path") {
     struct test_data : cgroup_test_data {
         const char* cpu_quota = "max";
@@ -130,6 +134,7 @@ TEST_CASE("'max' string as CPU quota means no CPU limitation for cgroup v2 path"
     check_cpu_constraints<test_data>(/*expected_result*/false, /*expected_num_cpus*/-1);
 }
 
+//! \brief \ref negative
 TEST_CASE("Wrong CPU quota for cgroup v2 path") {
     struct test_data : cgroup_test_data {
         const char* proc_self_mounts_path = "imaginary-mounts-file-path"; // Hiding base path
@@ -145,6 +150,7 @@ TEST_CASE("Wrong CPU quota for cgroup v2 path") {
     check_cpu_constraints<test_data>(/*expected_result*/false, /*expected_num_cpus*/-1);
 }
 
+//! \brief \ref negative
 TEST_CASE("Zero CPU period in cpu.max avoids division by zero problem") {
     struct test_data : cgroup_test_data {
         const char* proc_self_mounts_path = "imaginary-mounts-file-path"; // Hiding base path
@@ -160,6 +166,7 @@ TEST_CASE("Zero CPU period in cpu.max avoids division by zero problem") {
     check_cpu_constraints<test_data>(/*expected_result*/false, /*expected_num_cpus*/-1);
 }
 
+//! \brief \ref negative
 TEST_CASE("Negative CPU quota in cpu.max results in single resource") {
     struct test_data : cgroup_test_data {
         const char* cpu_quota = "-100000";
@@ -173,6 +180,7 @@ TEST_CASE("Negative CPU quota in cpu.max results in single resource") {
     check_cpu_constraints<test_data>(/*expected_result*/true, /*expected_num_cpus*/1);
 }
 
+//! \brief \ref negative
 TEST_CASE("Wrong lines for CPU controller and CPU quota in cgroup v1") {
     struct test_data : cgroup_test_data {
         const char* cpu_quota = "abcd";
@@ -192,6 +200,7 @@ TEST_CASE("Wrong lines for CPU controller and CPU quota in cgroup v1") {
     check_cpu_constraints<test_data>(/*expected_result*/false, /*expected_num_cpus*/-1);
 }
 
+//! \brief \ref negative
 TEST_CASE("No cpu.cfs_quota file for cgroup v1") {
     struct test_data : cgroup_test_data {} data;
 
@@ -202,6 +211,7 @@ TEST_CASE("No cpu.cfs_quota file for cgroup v1") {
     check_cpu_constraints<test_data>(/*expected_result*/false, /*expected_num_cpus*/-1);
 }
 
+//! \brief \ref negative
 TEST_CASE("No cpu.cfs_period file for cgroup v1") {
     struct test_data : cgroup_test_data {} data;
 
@@ -214,6 +224,7 @@ TEST_CASE("No cpu.cfs_period file for cgroup v1") {
     check_cpu_constraints<test_data>(/*expected_result*/false, /*expected_num_cpus*/-1);
 }
 
+//! \brief \ref negative
 TEST_CASE("Wrong cpu.cfs_period content for cgroup v1") {
     struct test_data : cgroup_test_data {} data;
 
@@ -224,6 +235,8 @@ TEST_CASE("Wrong cpu.cfs_period content for cgroup v1") {
     check_cpu_constraints<test_data>(/*expected_result*/false, /*expected_num_cpus*/-1);
 }
 
+
+//! \brief \ref requirement
 TEST_CASE("Unrestricted CPU limits in cgroup v1") {
     struct test_data : cgroup_test_data {
         const char* cpu_quota = "-1";
@@ -239,6 +252,7 @@ TEST_CASE("Unrestricted CPU limits in cgroup v1") {
     check_cpu_constraints<test_data>(/*expected_result*/false, /*expected_num_cpus*/-1);
 }
 
+//! \brief \ref requirement
 TEST_CASE("cgroup v1 path finds correct CPU limitation") {
     struct test_data : cgroup_test_data {
         const char* cpu_quota = "200000";
