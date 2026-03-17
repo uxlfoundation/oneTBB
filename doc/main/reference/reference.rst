@@ -3,14 +3,13 @@
 |short_name| API Reference
 ==========================
 
-For oneTBB API Reference, refer to `oneAPI Specification <https://github.com/uxlfoundation/oneAPI-spec>`_. The current supported
-version of oneAPI Specification is 1.0.
+For oneTBB API Reference, refer to the :doc:`oneTBB Specification </main/specification/source/index>`.
+The current supported version of the oneTBB specification is |tbb_version|.
 
 Specification extensions
 ************************
 
-|full_name| implements the `oneTBB specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/nested-index>`_.
-This document provides additional details or restrictions where necessary.
+|full_name| implements the oneTBB specification. This document provides additional details or restrictions beyond the specification.
 It also describes features that are not included in the oneTBB specification.
 
 .. toctree::

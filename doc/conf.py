@@ -83,7 +83,13 @@ language = 'en'
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = []
+exclude_patterns = [
+    'main/specification/source/nested-*.rst',
+    'main/specification/source/uncategorized.rst',
+    'main/specification/source/uncategorized/**',
+    'main/specification/source/low_level_task_api.rst',
+    'main/specification/source/low_level_tasking/**',
+]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = None
@@ -96,6 +102,8 @@ if BUILD_TYPE == 'oneapi' or BUILD_TYPE == 'dita':
 .. |full_name| replace:: Intel\ |reg|\  oneAPI Threading Building Blocks (oneTBB)
 .. |short_name| replace:: oneTBB
 .. |product| replace:: oneTBB
+.. |tbb_full_name| replace:: Intel\ |reg|\  oneAPI Threading Building Blocks (oneTBB)
+.. |tbb_version| replace:: 1.5
 .. |reg| unicode:: U+000AE
 .. |copy| unicode:: U+000A9
 .. |base_tk| replace:: Intel\ |reg|\  oneAPI Base Toolkit
@@ -106,6 +114,8 @@ else:
 .. |full_name| replace:: oneAPI Threading Building Blocks (oneTBB)
 .. |short_name| replace:: oneTBB
 .. |product| replace:: oneTBB
+.. |tbb_full_name| replace:: oneAPI Threading Building Blocks (oneTBB)
+.. |tbb_version| replace:: 1.5
 .. |reg| unicode:: U+000AE
 .. |copy| unicode:: U+000A9
 .. |base_tk| replace:: Intel\ |reg|\  oneAPI Base Toolkit
