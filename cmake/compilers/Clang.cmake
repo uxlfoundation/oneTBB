@@ -85,7 +85,7 @@ if (NOT APPLE AND NOT ANDROID_PLATFORM AND CMAKE_SYSTEM_PROCESSOR MATCHES "(AMD6
         include(CheckCXXSourceCompiles)
         set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
         set(CMAKE_REQUIRED_FLAGS "-fcf-protection=full")
-        check_cxx_source_compiles("int main(int, char*[]) { return 0; }" FC_PROTECTION_FULL_SUPPORTED)
+        check_cxx_source_compiles("int main(int, char*[]) { return 0; }" CF_PROTECTION_FULL_SUPPORTED)
         unset(CMAKE_TRY_COMPILE_TARGET_TYPE)
         unset(CMAKE_REQUIRED_FLAGS)
 
