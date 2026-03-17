@@ -89,7 +89,7 @@ if (NOT APPLE AND NOT ANDROID_PLATFORM AND CMAKE_SYSTEM_PROCESSOR MATCHES "(AMD6
         unset(CMAKE_TRY_COMPILE_TARGET_TYPE)
         unset(CMAKE_REQUIRED_FLAGS)
 
-        if (FC_PROTECTION_FULL_SUPPORTED)
+        if (CF_PROTECTION_FULL_SUPPORTED)
             set(TBB_LIB_COMPILE_FLAGS ${TBB_LIB_COMPILE_FLAGS} -fcf-protection=full)
         else()
             message(WARNING "Compiler does not support -fcf-protection=full.")
