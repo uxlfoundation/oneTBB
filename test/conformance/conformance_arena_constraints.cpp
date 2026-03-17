@@ -165,7 +165,12 @@ TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
         // concurrnecy of the single NUMA - 1. This means that for task_arena with reserved_slots=0
         // worker threads won't be able to fully saturate the arena.
         // This flag is set to adjust test expectations accordingly.
-        bool workers_cannot_fully_occupy_arena = numa_nodes_info.size() == 1 && reserved_slots == 0;
+        bool cpu_constrained = false;
+#if __TBB_USE_CGROUPS
+        int cgroup_num_cpus = 0;
+        cpu_constrained = utils::cgroup_info::is_cpu_constrained(cgroup_num_cpus);
+#endif
+        bool workers_cannot_fully_occupy_arena = (numa_nodes_info.size() == 1 || cpu_constrained) && reserved_slots == 0;
         for (auto& ta : numa_task_arenas) {
             // For the case when task_arena is created with both max_concurrency and reserved_slots
             // equal to 1 oneTBB creates a special additional worker to execute an "enqueue" task.
