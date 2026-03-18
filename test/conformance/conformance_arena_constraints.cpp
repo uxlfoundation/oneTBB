@@ -157,8 +157,8 @@ TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
             [](const index_info &lhs, const index_info &rhs) {
                 return lhs.concurrency < rhs.concurrency;
             })->concurrency;
-        const int max_threads = int(utils::get_platform_max_threads()); // respects cgroup
-        const int max_tbb_workers = max_threads - 1;
+    const int max_threads = int(utils::get_platform_max_threads()); // respects cgroup
+    const int max_tbb_workers = max_threads - 1;
     for (int reserved_slots = 0; reserved_slots <= expected_numa_concurrency; ++reserved_slots) {
         auto numa_task_arenas = tbb::create_numa_task_arenas({}, reserved_slots);
         tbb::task_group tg{};
