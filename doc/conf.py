@@ -102,7 +102,6 @@ if BUILD_TYPE == 'oneapi' or BUILD_TYPE == 'dita':
 .. |full_name| replace:: Intel\ |reg|\  oneAPI Threading Building Blocks (oneTBB)
 .. |short_name| replace:: oneTBB
 .. |product| replace:: oneTBB
-.. |tbb_full_name| replace:: Intel\ |reg|\  oneAPI Threading Building Blocks (oneTBB)
 .. |tbb_version| replace:: 1.5
 .. |reg| unicode:: U+000AE
 .. |copy| unicode:: U+000A9
@@ -114,7 +113,6 @@ else:
 .. |full_name| replace:: oneAPI Threading Building Blocks (oneTBB)
 .. |short_name| replace:: oneTBB
 .. |product| replace:: oneTBB
-.. |tbb_full_name| replace:: oneAPI Threading Building Blocks (oneTBB)
 .. |tbb_version| replace:: 1.5
 .. |reg| unicode:: U+000AE
 .. |copy| unicode:: U+000A9
