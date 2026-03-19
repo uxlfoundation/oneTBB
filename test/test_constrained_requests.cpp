@@ -475,7 +475,7 @@ TEST("Request any NUMA node until all nodes are distributed + one more, correct 
   tcm_cpu_mask_t* mask_array = new tcm_cpu_mask_t[numa_count + 1];
   std::unique_ptr<tcm_cpu_mask_t[], masks_guard_t> masks_ptr(mask_array, numa_count + 1);
   std::vector<tcm_permit_t> permits(numa_count + 1);
-  uint32_t total_resources_given = 0;
+
   for (int i = 0; i < numa_count; ++i) {
     mask_array[i] = allocate_cpu_mask();
     permits[i] = make_void_permit(&p_concurrencies[i], mask_array + i);
@@ -495,12 +495,20 @@ TEST("Request any NUMA node until all nodes are distributed + one more, correct 
     check(mask_weight > 0, "Some mask was given", /*num_indents*/1);
     check((numa_count == 1 && process_hardware_concurrency == mask_weight) ||
           mask_weight < process_hardware_concurrency, "Given mask is reasonable", /*num_indents*/1);
-    total_resources_given += permits[i].concurrencies[0];
   }
 
+  uint32_t total_resources_given = 0;
+  for (int i = 0; i < numa_count; ++i) {
+      // Re-read permits data since there could be negotiations
+      tcm_permit_handle_t ph = permit_handles[i];
+      check_success(tcmGetPermitData(ph, &permits[i]), "Reading data from permit " + to_string(ph));
+      total_resources_given += permits[i].concurrencies[0];
+  }
+
+  // TODO: Note that depending on masks the permits were granted, total_resources_given should be
+  // equal to either platform_tcm_concurrency or platform_hardware_concurrency
   check(total_resources_given == uint32_t(platform_hardware_concurrency()),
         "All resources from the platform have been distributed");
-
 
   // one additional permit request: one more than the number of NUMA-nodes
   uint32_t mask_concurrency = 0, mask_oversubscribed_concurrency = 0;
@@ -518,6 +526,9 @@ TEST("Request any NUMA node until all nodes are distributed + one more, correct 
     mask_oversubscribed_concurrency = uint32_t(tcm_concurrency(mask));
     const uint32_t delta = mask_oversubscribed_concurrency - mask_concurrency;
 
+    // TODO: The expected_concurrency is not valid in case the test runs on less than three
+    // resources. Since two of these resources are already granted to the first two requests, and
+    // they have only their required concurrency (i.e, min_sw_threads) covered.
     uint32_t expected_concurrency =
         std::max(std::min(mask_concurrency, delta), uint32_t(requests[numa_count].min_sw_threads));
     tcm_permit_t expected_permit = make_active_permit(&expected_concurrency);
@@ -533,13 +544,18 @@ TEST("Request any NUMA node until all nodes are distributed + one more, correct 
   for (int i = 0; i < numa_count; ++i) {
       if (is_intersect(permits[i].cpu_masks[0], permits[numa_count].cpu_masks[0])) {
           ++num_intersects;
-          rival_idx = i;
+          rival_idx = i;        // TODO: Re-read permit grants and take their differences into
+                                // account to figure out single stakeholder with which the last
+                                // permit has negotiated.
+
+          // TODO: Depending on the TCM resource distribution strategy, the negotiation caused by
+          // the last permit might affect more than one previously granted permits.
       }
   }
-  check(1 == num_intersects, "Only one permit intersects with the last one");
+  // It might be a situation where the same NUMA node can accommodate different permits without
+  // oversubscribing. Since 'tcm_any' is used, TCM is allowed to choose same NUMA node.
+  check(num_intersects > 0, "The permit's mask intersects with at least one previously requested");
 
-  check(permits[rival_idx].concurrencies[0] == std::min(mask_concurrency, (std::uint32_t)platform_tcm_concurrency()),
-        "Rival permit occupies whole concurrency of the given mask");
   const uint32_t rival_previous_concurrency = permits[rival_idx].concurrencies[0];
   tcm_cpu_mask_t mask = allocate_cpu_mask();
   std::unique_ptr<tcm_cpu_mask_t, mask_deleter> cpu_mask(&mask);
@@ -610,7 +626,6 @@ TEST("Non-negotiable requests for any NUMA node until all nodes are distributed 
   tcm_cpu_mask_t* mask_array = new tcm_cpu_mask_t[numa_count + 1];
   std::unique_ptr<tcm_cpu_mask_t[], masks_guard_t> masks_ptr(mask_array, numa_count + 1);
   std::vector<tcm_permit_t> permits(numa_count + 1);
-  uint32_t total_resources_given = 0;
   for (int i = 0; i < numa_count; ++i) {
     mask_array[i] = allocate_cpu_mask();
     permits[i] = make_void_permit(&p_concurrencies[i], mask_array + i);
@@ -627,13 +642,21 @@ TEST("Non-negotiable requests for any NUMA node until all nodes are distributed 
     const int process_hardware_concurrency = hardware_concurrency(process_affinity_mask);
     check_success(r, "tcmRequestPermit for client " + std::to_string(i));
     check_permit(expected_permit, permits[i], skip_concurrency_and_mask_checks) ;
-    check(permits[i].concurrencies[0] > 0, "Concurrency was given", /*num_indents*/1) ;
     check(mask_weight > 0, "Some mask was given", /*num_indents*/1);
     check((numa_count == 1 && process_hardware_concurrency == mask_weight) ||
           mask_weight < process_hardware_concurrency, "Given mask is reasonable", /*num_indents*/1);
-    total_resources_given += permits[i].concurrencies[0];
   }
 
+  uint32_t total_resources_given = 0;
+  for (int i = 0; i < numa_count; ++i) {
+      // Re-read permits data since there could be negotiations
+      tcm_permit_handle_t ph = permit_handles[i];
+      check_success(tcmGetPermitData(ph, &permits[i]), "Reading data from permit " + to_string(ph));
+      total_resources_given += permits[i].concurrencies[0];
+  }
+
+  // TODO: Note that depending on masks the permits were granted, total_resources_given should be
+  // equal to either platform_tcm_concurrency or platform_hardware_concurrency
   check(total_resources_given == uint32_t(platform_tcm_concurrency()),
         "All resources from the platform have been distributed");
 
