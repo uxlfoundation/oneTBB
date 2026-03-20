@@ -540,7 +540,10 @@ template<typename MF_TYPE>
 struct mf_body {
     std::atomic<int>& my_flag;
     mf_body(std::atomic<int>& flag) : my_flag(flag) { }
-    void operator()(const int& in, typename MF_TYPE::output_ports_type& outports) {
+    template <typename... Resources>
+    void operator()(const int& in, typename MF_TYPE::output_ports_type& outports,
+                    Resources&...)
+    {
         if(my_flag == 0) {
             my_flag = 1;
 
@@ -569,25 +572,30 @@ struct test_reversal<tbb::flow::rejecting, T> {
     bool operator()(T& node) const { return !node.my_predecessors.empty(); }
 };
 
-template<typename P>
-void TestMultifunctionNode() {
-    typedef tbb::flow::multifunction_node<int, std::tuple<int, int>, P> multinode_type;
-    INFO("Testing multifunction_node");
-    test_reversal<P,multinode_type> my_test;
+template <typename MultiNodeType, typename Policy, typename... CtorArgs>
+void TestMultiNode(const char* testing_message, CtorArgs&&... ctor_args) {
+    INFO(testing_message);
+    test_reversal<Policy, MultiNodeType> my_test;
     INFO(":");
+
     tbb::flow::graph g;
-    multinode_type mf(g, tbb::flow::serial, mf_body<multinode_type>(serial_fn_state0));
+    MultiNodeType mnode(g, tbb::flow::serial, std::forward<CtorArgs>(ctor_args)...,
+        mf_body<MultiNodeType>(serial_fn_state0));
+
     tbb::flow::queue_node<int> qin(g);
     tbb::flow::queue_node<int> qodd_out(g);
     tbb::flow::queue_node<int> qeven_out(g);
-    tbb::flow::make_edge(qin,mf);
-    tbb::flow::make_edge(tbb::flow::output_port<0>(mf), qeven_out);
-    tbb::flow::make_edge(tbb::flow::output_port<1>(mf), qodd_out);
+
+    tbb::flow::make_edge(qin, mnode);
+    tbb::flow::make_edge(tbb::flow::output_port<0>(mnode), qeven_out);
+    tbb::flow::make_edge(tbb::flow::output_port<1>(mnode), qodd_out);
+
     g.wait_for_all();
-    for (int ii = 0; ii < 2 ; ++ii) {
+
+    for (int ii = 0; ii < 2; ++ii) {
         std::atomic<bool> submitted{ false };
         serial_fn_state0 = 0;
-        /* if(ii == 0) REMARK(" reset preds"); else REMARK(" 2nd");*/
+
         std::thread t([&] {
             g.reset(); // attach to the current arena
             qin.try_put(0);
@@ -595,32 +603,50 @@ void TestMultifunctionNode() {
             submitted = true;
             g.wait_for_all();
         });
+
         // wait for node to be active
         utils::SpinWaitWhileEq(serial_fn_state0, 0);
         utils::SpinWaitWhileEq(submitted, false);
         g.my_context->cancel_group_execution();
+
         // release node
         serial_fn_state0 = 2;
         t.join();
+
         // The rejection test cannot guarantee the state of predecessors cache.
-        if (!std::is_same<P, tbb::flow::rejecting>::value) {
-            CHECK_MESSAGE((my_test(mf)), "fail cancel group test");
+        if (!std::is_same<Policy, tbb::flow::rejecting>::value) {
+            CHECK_MESSAGE((my_test(mnode)), "fail cancel group test");
         }
-        if( ii == 1) {
-            INFO(" rf_clear_edges");
+
+        if (ii == 1) {
+            INFO("rf_clear_edges");
             g.reset(tbb::flow::rf_clear_edges);
-            CHECK_MESSAGE( (tbb::flow::output_port<0>(mf).my_successors.empty()), "output_port<0> not reset (rf_clear_edges)");
-            CHECK_MESSAGE( (tbb::flow::output_port<1>(mf).my_successors.empty()), "output_port<1> not reset (rf_clear_edges)");
-        }
-        else
-        {
+            CHECK_MESSAGE( (tbb::flow::output_port<0>(mnode).my_successors.empty()), "output_port<0> not reset (rf_clear_edges)");
+            CHECK_MESSAGE( (tbb::flow::output_port<1>(mnode).my_successors.empty()), "output_port<1> not reset (rf_clear_edges)");
+        } else {
             g.reset();
         }
-        CHECK_MESSAGE( (mf.my_predecessors.empty()), "edge didn't reset");
+        CHECK_MESSAGE( (mnode.my_predecessors.empty()), "edge didn't reset");
         CHECK_MESSAGE( ((ii == 0 && !qin.my_successors.empty()) || (ii == 1 && qin.my_successors.empty())), "edge didn't reset");
     }
     INFO(" done\n");
 }
+
+template<typename P>
+void TestMultifunctionNode() {
+    using multinode_type = tbb::flow::multifunction_node<int, std::tuple<int, int>, P>;
+    TestMultiNode<multinode_type, P>("Testing multifunction_node");
+}
+
+#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
+void TestResourceLimitedNode() {
+    using policy_type = tbb::flow::queueing;
+    using multinode_type = tbb::flow::resource_limited_node<int, std::tuple<int, int>>;
+
+    tbb::flow::resource_limiter<int> limiter(1);
+    TestMultiNode<multinode_type, policy_type>("Testing resource_limited_node", std::tie(limiter));
+}
+#endif
 
 // indexer_node is like a broadcast_node, in that none of its inputs reverse, and it
 // never allows a successor to reverse its edge, so we only need test the successors.
@@ -791,6 +817,13 @@ TEST_SUITE("Test multifunction node") {
         TestMultifunctionNode<tbb::flow::queueing>();
     }
 }
+
+#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
+//! \brief \ref error_guessing
+TEST_CASE("Test resource_limited_node") {
+    TestResourceLimitedNode();
+}
+#endif
 
 //! Test input_node
 //! \brief \ref error_guessing
