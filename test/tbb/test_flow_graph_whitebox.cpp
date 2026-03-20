@@ -632,10 +632,10 @@ void TestMultiNode(const char* testing_message, CtorArgs&&... ctor_args) {
     INFO(" done\n");
 }
 
-template<typename P>
+template<typename Policy>
 void TestMultifunctionNode() {
-    using multinode_type = tbb::flow::multifunction_node<int, std::tuple<int, int>, P>;
-    TestMultiNode<multinode_type, P>("Testing multifunction_node");
+    using multinode_type = tbb::flow::multifunction_node<int, std::tuple<int, int>, Policy>;
+    TestMultiNode<multinode_type, Policy>("Testing multifunction_node");
 }
 
 #if TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING
