@@ -338,8 +338,6 @@ void test_cancellation_with_active_requests(bool same_graph, bool exception) {
                 keep_using_node.try_put(input);
             }
 
-            utils::Sleep(50);
-
             if (exception) {
 #if TBB_USE_EXCEPTIONS
                 throw body_exception{};
