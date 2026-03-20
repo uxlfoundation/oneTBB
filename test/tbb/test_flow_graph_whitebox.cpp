@@ -621,8 +621,10 @@ void TestMultiNode(const char* testing_message, CtorArgs&&... ctor_args) {
         if (ii == 1) {
             INFO("rf_clear_edges");
             g.reset(tbb::flow::rf_clear_edges);
-            CHECK_MESSAGE( (tbb::flow::output_port<0>(mnode).my_successors.empty()), "output_port<0> not reset (rf_clear_edges)");
-            CHECK_MESSAGE( (tbb::flow::output_port<1>(mnode).my_successors.empty()), "output_port<1> not reset (rf_clear_edges)");
+            CHECK_MESSAGE( (tbb::flow::output_port<0>(mnode).my_successors.empty()),
+                           "output_port<0> not reset (rf_clear_edges)" );
+            CHECK_MESSAGE( (tbb::flow::output_port<1>(mnode).my_successors.empty()),
+                           "output_port<1> not reset (rf_clear_edges)" );
         } else {
             g.reset();
         }
