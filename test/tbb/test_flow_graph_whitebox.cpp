@@ -837,7 +837,7 @@ void test_optional() {
         OptionalType opt(InPlaceTag{}, value2);
         opt = std::move(source_opt);
         CHECK_MESSAGE(source_opt.has_value(), "Moved-from optional is empty");
-        CHECK_MESSAGE(opt.has_value(), "Move-assigned optional is empty while source is non-emtpy");
+        CHECK_MESSAGE(opt.has_value(), "Move-assigned optional is empty while source is non-empty");
         CHECK_MESSAGE(opt.value() == value1, "Move-assigned optional has incorrect value");
     }
 }
