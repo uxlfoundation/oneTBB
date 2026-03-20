@@ -638,7 +638,7 @@ void TestMultifunctionNode() {
     TestMultiNode<multinode_type, P>("Testing multifunction_node");
 }
 
-#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
+#if TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING
 void TestResourceLimitedNode() {
     using policy_type = tbb::flow::queueing;
     using multinode_type = tbb::flow::resource_limited_node<int, std::tuple<int, int>>;
@@ -782,6 +782,65 @@ void TestInputNode() {
     INFO(" done\n");
 }
 
+#if TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING
+template <typename OptionalType, typename InPlaceTag>
+void test_optional() {
+    int value1 = 123;
+    int value2 = 456;
+    {
+        // Test default constructor
+        OptionalType opt;
+        CHECK_MESSAGE(!opt.has_value(), "Default constructed optional is non-empty");
+    }
+    {
+        // Test in-place construction
+        OptionalType opt(InPlaceTag{}, value1);
+        CHECK_MESSAGE(opt.has_value(), "In-place constructed optional is empty");
+        CHECK_MESSAGE(opt.value() == value1, "In-place constructed optional has incorrect value");
+    }
+    {
+        // Test move construction from empty source
+        OptionalType source_opt;
+        OptionalType opt(std::move(source_opt));
+        CHECK_MESSAGE(!opt.has_value(), "Move-constructed optional is non-empty while source is empty");
+    }
+    {
+        // Test move construction from non-empty source
+        OptionalType source_opt(InPlaceTag{}, value1);
+        OptionalType opt(std::move(source_opt));
+        CHECK_MESSAGE(opt.has_value(), "Move-constructed optional is empty while source is non-empty");
+        CHECK_MESSAGE(source_opt.has_value(), "Moved-from optional is empty");
+        CHECK_MESSAGE(opt.value() == value1, "Move-constructed optional has incorrect value");
+    }
+    {
+        // Test move assignment from empty source to non-empty target
+        OptionalType source_opt;
+        OptionalType opt(InPlaceTag{}, value1);
+        opt = std::move(source_opt);
+        CHECK_MESSAGE(!source_opt.has_value(), "Source optional became non-empty after move assignment");
+        CHECK_MESSAGE(!opt.has_value(), "Move-assigned optional is non-empty while source is empty");
+    }
+    {
+        // Test move assignment from non-empty source to empty target
+        OptionalType source_opt(InPlaceTag{}, value1);
+        OptionalType opt;
+        opt = std::move(source_opt);
+        CHECK_MESSAGE(source_opt.has_value(), "Moved-from optional is empty");
+        CHECK_MESSAGE(opt.has_value(), "Move-assigned optional is empty while source is non-empty");
+        CHECK_MESSAGE(opt.value() == value1, "Move-assigned optional has incorrect value");
+    }
+    {
+        // Test move assignment from non-empty source to non-empty target
+        OptionalType source_opt(InPlaceTag{}, value1);
+        OptionalType opt(InPlaceTag{}, value2);
+        opt = std::move(source_opt);
+        CHECK_MESSAGE(source_opt.has_value(), "Moved-from optional is empty");
+        CHECK_MESSAGE(opt.has_value(), "Move-assigned optional is empty while source is non-emtpy");
+        CHECK_MESSAGE(opt.value() == value1, "Move-assigned optional has incorrect value");
+    }
+}
+#endif
+
 //! Test buffering nodes
 //! \brief \ref error_guessing
 TEST_CASE("Test buffering nodes"){
@@ -818,7 +877,7 @@ TEST_SUITE("Test multifunction node") {
     }
 }
 
-#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
+#if TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING
 //! \brief \ref error_guessing
 TEST_CASE("Test resource_limited_node") {
     TestResourceLimitedNode();
@@ -1007,3 +1066,12 @@ TEST_CASE("Bypass of a successor's message in a node with lightweight policy") {
     CHECK_MESSAGE((b.try_get(tmp) == true), "Functional nodes can work in succession");
     CHECK_MESSAGE((tmp == 1), "Value should not be altered");
 }
+
+#if TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING
+//! \brief \ref error_guessing
+TEST_CASE("Test resource_handle_optional") {
+    using optional_type = oneapi::tbb::detail::d2::resource_handle_optional<int>;
+    using in_place_tag_type = typename optional_type::in_place_t;
+    test_optional<optional_type, in_place_tag_type>();
+}
+#endif
