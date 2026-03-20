@@ -101,55 +101,70 @@ TEST_CASE("Test create_numa_task_arenas conformance correctness") {
     }
 }
 
-struct join_arena_observer : tbb::task_scheduler_observer {
-    join_arena_observer(tbb::task_arena &ta, int max_workers, int max_external_threads)
-        : tbb::task_scheduler_observer(ta)
-        , max_num_workers(max_workers), max_num_external_threads(max_external_threads)
-    {
-        observe(true);
-    }
-
-    void on_scheduler_entry(bool is_worker) override {
-        int current;
-        int expected_peak;
-        if (is_worker) {
-            // TODO: Adapt utils::ConcurrencyTracker for its reuse here and in the else branch below
-            current = num_workers.fetch_add(1, std::memory_order_relaxed) + 1;
-            expected_peak = current - 1;
-            while (current > expected_peak &&
-                   !peak_workers.compare_exchange_strong(
-                       expected_peak, current, std::memory_order_relaxed)) {}
-
-            REQUIRE_MESSAGE(current <= max_num_workers, "More than expected worker threads has joined arena");
-        } else {
-            current = num_external_threads.fetch_add(1, std::memory_order_relaxed) + 1;
-            expected_peak = current - 1;
-            while (current > expected_peak &&
-                   !peak_external_threads.compare_exchange_strong(
-                       expected_peak, current, std::memory_order_relaxed)) {}
-            REQUIRE_MESSAGE(current <= max_num_external_threads, "More than expected external threads has joined arena");
-        }
-    }
-
-    void on_scheduler_exit(bool is_worker) override {
-      if (is_worker) {
-        num_workers.fetch_sub(1, std::memory_order_relaxed);
-      } else {
-        num_external_threads.fetch_sub(1, std::memory_order_relaxed);
-      }
-    }
-
-    const int max_num_workers;
-    const int max_num_external_threads;
-    std::atomic_int num_workers{};
-    std::atomic_int num_external_threads{};
-    std::atomic_int peak_workers{};
-    std::atomic_int peak_external_threads{};
-};
-
 //! Test that reserved slots parameter makes expected effect on task_arena objects
 //! \brief \ref interface \ref error_guessing
 TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
+    // The testing approach can be described as:
+    // - For every created NUMA-bound arena there are tasks enqueued into it, which wait on the
+    //   barrier.
+    // - The barrier waits for a number of comers equal to arena concurrency + 1.
+    // - Among the comers there are worker and external threads whose numbers are adjusted in
+    //   accordance to the test setup, which includes process affinity mask, NUMA node concurrency,
+    //   cgroup's CPU limits set, number of reserved slots.
+    // - Test waits for worker threads to join first. Giving them an opportunity to take even the
+    //   reserved slots.
+    // - Remaining slots are taken by external threads started in a separate thread, which is joined
+    //   once the main external thread checks itself on the barrier without joining the arena.
+    // - After execution, the expected number of participated worker and external threads is checked.
+
+    struct join_arena_observer : tbb::task_scheduler_observer {
+        join_arena_observer(tbb::task_arena &ta, int max_workers, int max_external_threads)
+            : tbb::task_scheduler_observer(ta)
+              , max_num_workers(max_workers), max_num_external_threads(max_external_threads)
+        {
+            observe(true);
+        }
+
+        void on_scheduler_entry(bool is_worker) override {
+            int current;
+            int expected_peak;
+            if (is_worker) {
+                // TODO: Adapt utils::ConcurrencyTracker for its reuse here and in the else branch below
+                current = num_workers.fetch_add(1, std::memory_order_relaxed) + 1;
+                expected_peak = current - 1;
+                while (current > expected_peak &&
+                       !peak_workers.compare_exchange_strong(
+                           expected_peak, current, std::memory_order_relaxed)) {}
+
+                REQUIRE_MESSAGE(current <= max_num_workers,
+                                "More than expected worker threads has joined arena");
+            } else {
+                current = num_external_threads.fetch_add(1, std::memory_order_relaxed) + 1;
+                expected_peak = current - 1;
+                while (current > expected_peak &&
+                       !peak_external_threads.compare_exchange_strong(
+                           expected_peak, current, std::memory_order_relaxed)) {}
+                REQUIRE_MESSAGE(current <= max_num_external_threads,
+                                "More than expected external threads has joined arena");
+            }
+        }
+
+        void on_scheduler_exit(bool is_worker) override {
+            if (is_worker) {
+                num_workers.fetch_sub(1, std::memory_order_relaxed);
+            } else {
+                num_external_threads.fetch_sub(1, std::memory_order_relaxed);
+            }
+        }
+
+        const int max_num_workers;
+        const int max_num_external_threads;
+        std::atomic_int num_workers{};
+        std::atomic_int num_external_threads{};
+        std::atomic_int peak_workers{};
+        std::atomic_int peak_external_threads{};
+    };
+
     system_info::initialize();
     std::vector<index_info> numa_nodes_info = system_info::get_numa_nodes_info();
     int expected_numa_concurrency =
