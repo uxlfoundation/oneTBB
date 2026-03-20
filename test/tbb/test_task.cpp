@@ -866,14 +866,14 @@ TEST_CASE("Check correct arena destruction with enqueue") {
 }
 
 //! \brief \ref regression
-TEST_CASE("Try to force Leaked proxy observers warning" *
+TEST_CASE("Try to force Leaked proxy observers warning"
 #if __TBB_USE_ADDRESS_SANITIZER
 // The test enforces memory leak of observers, expecting that by the time when scheduler releases 
 // and the resources cleanup starts, the observers will be destroyed. Otherwise, the memory will be
 // cleared during process shutdown, but this is seen as a leak by ASAN; hence skipping the test.
-          doctest::skip())
+          * doctest::skip()
 #endif
-{
+) {
     int num_threads = std::thread::hardware_concurrency() * 2;
     tbb::global_control gc(tbb::global_control::max_allowed_parallelism, num_threads);
     tbb::task_arena arena(num_threads, 0);
