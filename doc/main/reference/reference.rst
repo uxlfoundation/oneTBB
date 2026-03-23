@@ -3,8 +3,15 @@
 |short_name| API Reference
 ==========================
 
-For oneTBB API Reference, refer to the :doc:`oneTBB Specification </main/specification/source/index>`.
-The current supported version of the oneTBB specification is |tbb_version|.
+.. only:: oss
+
+   For oneTBB API Reference, refer to the :doc:`oneTBB Specification </main/specification/source/index>`.
+   The current supported version of the oneTBB specification is 1.5.
+
+.. only:: not oss
+
+   For oneTBB API Reference, refer to the `oneTBB Specification <https://uxlfoundation.github.io/oneTBB/main/specification/source/index.html>`_.
+   The current supported version of the oneTBB specification is 1.5.
 
 Specification extensions
 ************************
