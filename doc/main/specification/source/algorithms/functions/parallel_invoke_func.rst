@@ -5,7 +5,7 @@
 ===============
 parallel_invoke
 ===============
-**[algortihms.parallel_invoke]**
+**[algorithms.parallel_invoke]**
 
 Function template that evaluates several functions in parallel.
 

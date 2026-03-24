@@ -127,7 +127,7 @@ members of this class.
 
   **Supported until C++11.**
   Enables a ``handle`` object to be constructed and assigned from 
-  a ``handle_move_t`` object. Together with convertors to
+  a ``handle_move_t`` object. Together with converters to
   ``handle_move_t`` described below, these methods allow
   transferring references to ``concurrent_lru_cache`` items
   between ``handle`` instances in absence of C++11 move semantics.

@@ -19,7 +19,7 @@ int main() {
     });
 
     oneapi::tbb::flow::function_node< Message > writer(g, oneapi::tbb::flow::serial, [] (const Message& msg) {
-        printf("Message recieved with id: %d\n", msg.id);
+        printf("Message received with id: %d\n", msg.id);
     });
 
     oneapi::tbb::flow::make_edge(process, ordering);
