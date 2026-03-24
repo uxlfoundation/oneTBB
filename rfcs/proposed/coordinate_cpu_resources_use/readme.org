@@ -61,13 +61,14 @@ sub-project of oneTBB, yet keeping it independent from the core oneTBB library.
 Below are the details of TCM open sourcing.
 
 ** Keeping project independence intact
-Although, placed into the oneTBB source tree, TCM remains independent. The top =tcm= directory can
-literally be copied/moved into other place and used from there without any dependence on oneTBB
-project. This is necessary to avoid assumptions about tight coupling with oneTBB and simplifies
-integration of TCM into other parallel libraries.
+Although placed into the oneTBB source tree, TCM remains independent. The top directory with TCM
+sources can literally be copied/moved into other place and used from there without any dependence on
+oneTBB project. This is necessary to avoid assumptions about tight coupling with oneTBB and
+simplifies integration of TCM into other parallel libraries.
 
-# TODO: clarify wrt *project* governance, separating of things related to TCM and oneTBB with e.g.
-# '[TCM]' prefix.
+To avoid confusion about whether a particular patch, issue or any other repository activity is
+related to oneTBB or TCM project it is suggested to mark TCM activities with '[TCM]' prefix.
+
 ** Placement
 TCM sources are to be placed in the =thread_composability_manager= subdirectory of the oneTBB source
 root.
@@ -80,48 +81,102 @@ root.
       └── thread_composability_manager    <-- new directory with TCM sources
 #+end_example
 Such placement is a trade-off between project visibility and its independence.
+
 ** Integration with oneTBB build system
 The idea is to make an extension to the oneTBB build system by naturally interspersing its build and
 test rules with corresponding TCM rules if TCM dependencies are met, and TCM rules are not
 explicitly disabled by the user.
 
-Also, due to the [[Independence][independent nature]] of the project, and to avoid repetition of building rules in the
+Also, due to the [[Keeping project independence intact][independent nature]] of the project, and to avoid repetition of building rules in the
 oneTBB configuration files, TCM-related rules will simply translate to the corresponding rules in
 the TCM build system.
+
 *** Building
-oneTBB configuration file is to be extended with an option to build and test the TCM. For example,
-CMake option can look like:
+oneTBB configuration file is to be extended with an option to build and test TCM. For example, CMake
+option can look like:
 #+begin_src cmake
-  option(TBB_BUILD_TCM "Build Thread Composability Manager (TCM)" ON)
+  option(TCM_BUILD "Build Thread Composability Manager (TCM)" ON)
 #+end_src
 
-# TODO: add more examples how various parts of sources can be built.
+The use cases to support are:
+1. User does not specify anything explicit about build of TCM:
+   - TCM dependencies are met: TCM is built.
+   - TCM dependencies are not met: A message about not able to build TCM appears on the screen,
+     futher configuration and building of other targets continues.
+2. User enables build of TCM explicitly:
+   - TCM dependencies are met: TCM is built.
+   - TCM dependencies are not met: A message about not able to build TCM appears on the screen,
+     configuration step stops.
+3. User disables build of TCM explicitly: A message about explicit switch of TCM build off appears
+   on the screen.
 
 **** Prerequisites
 Since the project depends on HWLOC for parsing hardware topology, TCM is built only if HWLOC is
-available in the environment. TCM also requires a compiler that supports at least C++17. If there
-will be a request to build it with lower version of the C++ standard, such support can be added in
-the future.
+available in the environment. TCM also requires a compiler that supports at least C++17.
 
-During configuration step of the oneTBB build, the diagnostic message about whether TCM is going to
-be built or not is shown.
 **** Note about building TCM as a static library
 # TODO: clarify or remove? Consider various options: executable + runtimes.
 TCM is meant to run as a singleton to share its state across its clients, threading libraries.
 Therefore, building static version of the TCM library breaks the whole point of the project, thus,
 does not make sense.
+
 *** Testing
-Similarly to the [[Building][Building section]], TCM tests are built and run only if TCM build is successful.
+Similarly to the [[Building][Building section]], TCM tests are built and run only if TCM build is successful. This
+set of tests includes those that check the work of TCM itself and integration tests that check how
+oneTBB works if it uses TCM.
 
-In particular, oneTBB CI is to be extended with TCM build and test jobs, including integration tests
-of TCM into oneTBB. This will help to ensure maximum compatibility and testing coverage.
+The =TCM_TEST= build system option will control building of TCM tests. It is enabled by default
+unless TCM itself does not build.
+#+begin_src cmake
+  option(TCM_TEST "Enable testing of Thread Composability Manager (TCM)" ON)
+#+end_src
 
-# TODO: add more separate building and testing intentions for oneTBB and TCM + integration testing.
+oneTBB CI is to be extended with TCM build and test jobs, including integration tests of TCM into
+oneTBB. This will help to ensure maximum compatibility and testing coverage.
+
+*** Examples of building and testing options
+Below are the examples how various parts of oneTBB and TCM can be built, assuming repository root
+directory is one level above. The =[]= part of the invocation represents the default value used if
+the option within the brackets is omitted on the command line.
+
+- Building of TCM and its tests along with the build of oneTBB with tests, and integration tests of
+  oneTBB with TCM. TCM, its tests, and integration tests are only built if TCM dependencies are
+  satisfied:
+  #+begin_src bash
+    cmake .. [-DTBB_BUILD=ON -DTBB_TEST=ON -DTCM_BUILD=ON -DTCM_TEST=ON]
+  #+end_src
+
+- Building only TCM and its tests and it is only built if its dependencies are satisfied. oneTBB +
+  TCM integration tests do not build:
+  #+begin_src bash
+    cmake .. -DTBB_BUILD=OFF -DTBB_TEST=OFF [-DTCM_BUILD=ON -DTCM_TEST=ON]
+  #+end_src
+
+- Similar to the above but the configuration step reports an error if TCM dependencies are not
+  satisfied since request for build of TCM and its tests is explicit:
+  #+begin_src bash
+    cmake .. -DTBB_BUILD=OFF -DTBB_TEST=OFF -DTCM_BUILD=ON -DTCM_TEST=ON
+  #+end_src
+
+- Building of oneTBB without tests, but TCM with tests. oneTBB + TCM integration tests do not build:
+  #+begin_src bash
+    cmake .. [-DTBB_BUILD=ON] -DTBB_TEST=OFF -DTCM_BUILD=ON [-DTCM_TEST=ON]
+  #+end_src
+
+- Building of TCM without tests. oneTBB + TCM integration tests do not build:
+  #+begin_src bash
+    cmake .. -DTBB_BUILD=OFF -DTBB_TEST=OFF [-DTCM_BUILD=ON] -DTCM_TEST=OFF
+  #+end_src
+
+Regardless of the options specified, during the configuration step diagnostic message about whether
+TCM is going to be built or not is shown.
+
 ** Versioning
 TCM will have its own version separately from the oneTBB.
 
 The TCM version would consist out of three numbers: =MAJOR=, =MINOR=, and =PATCH=. These numbers are
 changed in accordance with the rules outlined in [[https://semver.org/spec/v2.0.0.html][semantic versioning]] scheme.
+
 ** Distribution
 The TCM binary packages are to be distributed separately from oneTBB packages, but available for
 download along with them through the same distribution channels.
@@ -130,6 +185,7 @@ TCM sources are to be included into oneTBB sources package archive.
 
 This helps to underline the independence of TCM project from oneTBB, and yet make it available as
 much as possible.
+
 *** Note about the TCM status
 Although TCM can be found and loaded by oneTBB and other libraries, when it is available in the
 environment, it does not mean it will be used. Since the TCM project is under development and may
@@ -138,16 +194,18 @@ enable its use, =TCM_ENABLE= environment variable should be set to =1=. Details 
 [[https://uxlfoundation.github.io/oneTBB/main/tbb_userguide/appendix_B.html#avoid-cpu-overutilization][oneTBB documentation]].
 
 You are welcome to try the TCM out, submit issues and/or patches, and share your feedback.
+
 ** Licensing
 The license for TCM is going to be changed onto a more permissive variant. TCM is going to be
 open-sourced under "Apache 2.0 with LLVM exception" license. This will help with easy integration,
 broad adoption and accepting of community contributions.
+
 ** Documentation
 TCM documentation will follow the repository merging and be available under the =doc= subdirectory
 inside the TCM source tree.
+
 * Open Questions
 1. Should oneTBB assets listed in the [[https://github.com/uxlfoundation/oneTBB/releases][releases GitHub section]] be provided in both variants: one that
    include TCM binaries, and the other that don't?
-   # TODO: Subrfc.
 2. How will github issues, PRs, milestones, etc. be managed? Will they be mixed with oneTBB issues
    and PRs, labeled with "TCM", or something else?
