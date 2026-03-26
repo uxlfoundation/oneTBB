@@ -60,8 +60,9 @@ subdirectory can literally be copied/moved into another place and used from ther
 dependence on oneTBB. This is necessary to avoid assumptions about tight coupling and to simplify
 integration of TCM into other parallel libraries.
 
-To avoid confusion about whether a particular patch, issue or any other repository activity is
-related to oneTBB or TCM project, '[TCM]' prefix will be used to mark TCM activities.
+It also means that it is strongly recommended to have separate pull requests for oneTBB and TCM
+source files. To avoid confusion about whether a particular patch, issue or any other repository
+activity is related to oneTBB or TCM project, '[TCM]' prefix will be used to mark TCM activities.
 
 ** Placement
 TCM sources are to be placed in the =thread_composability_manager= subdirectory of the oneTBB source
