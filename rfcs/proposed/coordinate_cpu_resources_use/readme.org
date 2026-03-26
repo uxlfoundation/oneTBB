@@ -103,7 +103,7 @@ The use cases to support are:
 
 **** Prerequisites
 Since the project depends on HWLOC for parsing hardware topology, TCM is built only if HWLOC is
-available in the environment. TCM also requires a compiler that supports at least C++17.
+available in the environment. As of now, TCM also requires a compiler that supports at least C++17.
 
 **** Note about building TCM as a static library
 TCM is meant to run as a singleton to share its state across its clients, threading libraries. A
@@ -182,9 +182,9 @@ broader adoption and accepting of community contributions.
 TCM documentation will follow the repository merging and be available under the =doc= subdirectory
 inside the TCM source tree.
 
-oneTBB documentation will be extended with a dedicated to TCM sections. "Developer Guide" section is
-to be extended with "TCM Developer Guide", "Developer Reference" - with "TCM API Reference". It will
-be decided later whether to extend "Get Started" section with TCM-related topics.
+oneTBB documentation will be extended to also cover TCM. "Developer Guide" section is to be extended
+with "TCM Developer Guide", "Developer Reference" - with "TCM API Reference". It will be decided
+later whether to extend "Get Started" section with TCM-related topics.
 
 * Open Questions
 1. Should oneTBB assets listed in the [[https://github.com/uxlfoundation/oneTBB/releases][releases GitHub section]] be provided in both variants: one that
