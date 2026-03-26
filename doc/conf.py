@@ -23,6 +23,11 @@ TITLE_PAGE_FILE = os.path.join(LATEX_DIR, 'title_page.tex')
 
 BUILD_TYPE = os.getenv("BUILD_TYPE")
 
+# Set up tags for conditional content
+# Tags allow using .. only:: directives in RST files
+if BUILD_TYPE == 'oss' or BUILD_TYPE is None:
+    tags.add('oss')
+
 # -- Project information -----------------------------------------------------
 
 if BUILD_TYPE == 'oneapi' or BUILD_TYPE == 'dita':
@@ -83,7 +88,19 @@ language = 'en'
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = []
+# Base exclude patterns - specification files that should never be built
+exclude_patterns = [
+    'main/specification/source/nested-*.rst',
+    'main/specification/source/uncategorized.rst',
+    'main/specification/source/uncategorized/**',
+    'main/specification/source/low_level_task_api.rst',
+    'main/specification/source/low_level_tasking/**',
+]
+
+# Specification is only included in OSS builds (GitHub Pages)
+# Intel builds (oneapi/dita) automatically exclude the entire specification directory
+if BUILD_TYPE == 'oneapi' or BUILD_TYPE == 'dita':
+    exclude_patterns.append('main/specification/**')
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = None
@@ -96,6 +113,7 @@ if BUILD_TYPE == 'oneapi' or BUILD_TYPE == 'dita':
 .. |full_name| replace:: Intel\ |reg|\  oneAPI Threading Building Blocks (oneTBB)
 .. |short_name| replace:: oneTBB
 .. |product| replace:: oneTBB
+.. |tbb_version| replace:: 1.5
 .. |reg| unicode:: U+000AE
 .. |copy| unicode:: U+000A9
 .. |base_tk| replace:: Intel\ |reg|\  oneAPI Base Toolkit
@@ -106,6 +124,7 @@ else:
 .. |full_name| replace:: oneAPI Threading Building Blocks (oneTBB)
 .. |short_name| replace:: oneTBB
 .. |product| replace:: oneTBB
+.. |tbb_version| replace:: 1.5
 .. |reg| unicode:: U+000AE
 .. |copy| unicode:: U+000A9
 .. |base_tk| replace:: Intel\ |reg|\  oneAPI Base Toolkit
