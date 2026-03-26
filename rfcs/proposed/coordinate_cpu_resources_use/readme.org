@@ -169,7 +169,7 @@ changed in accordance with the rules outlined in [[https://semver.org/spec/v2.0.
 
 ** Distribution
 The TCM binary packages are to be distributed separately from oneTBB packages, but available for
-download along with them through the same distribution channels.
+download along with them from GitHub Releases page.
 
 TCM sources are to be included into oneTBB sources package archive.
 
