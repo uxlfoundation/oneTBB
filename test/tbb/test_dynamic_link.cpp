@@ -165,15 +165,15 @@ TEST_CASE("Test dynamic_link with existing library") {
 //! symbols (on Linux)
 // \brief \ref requirement
 TEST_CASE("Test dynamic_link with bad library") {
-    const int size = PATH_MAX + 1;
     const char* lib_name = TEST_LIBRARY_NAME("stub_unsigned");
-    char path[size] = {0};
-    const int msg_size = size + 128; // Path to the file + message
-    char msg[msg_size] = {0};
+    const std::size_t size = tbb::detail::r1::abs_path(lib_name, NULL, 1) + 1;
+    char *path = (char*)calloc(size, 1);
+    const std::size_t msg_size = size + 128; // Path to the file + message
+    char *msg = (char*)calloc(msg_size, 1);
 
 #if !__TBB_WIN8UI_SUPPORT
-    const std::size_t len = tbb::detail::r1::abs_path(lib_name, path, sizeof(path));
-    REQUIRE_MESSAGE((0 < len && len <= PATH_MAX), "The path to the library is not built");
+    const std::size_t len = tbb::detail::r1::abs_path(lib_name, path, size);
+    REQUIRE_MESSAGE((0 < len && len < size), "The path to the library is not built");
     std::snprintf(msg, msg_size, "Test prerequisite is not held - the path \"%s\" must exist", path);
     REQUIRE_MESSAGE(tbb::detail::r1::file_exists(path), msg);
 #endif
@@ -202,6 +202,10 @@ TEST_CASE("Test dynamic_link with bad library") {
     REQUIRE_MESSAGE(nullptr == handler, "The symbol should not be changed.");
     // TODO: Verify the warning message contains "TBB dynamic link warning: The module
     // \".*stub_unsigned.*.dll\" is unsigned or has invalid signature."
+    free(msg);
+    msg = NULL;
+    free(path);
+    path = NULL;
 }
 
 #endif // __TBB_DYNAMIC_LOAD_ENABLED
