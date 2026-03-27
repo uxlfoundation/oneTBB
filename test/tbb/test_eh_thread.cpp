@@ -80,6 +80,11 @@ static void* thread_routine(void*)
     return nullptr;
 }
 
+// GNU Hurd do not have a minimum stack size
+#ifndef PTHREAD_STACK_MIN
+#define	PTHREAD_STACK_MIN (128*1024)
+#endif // !PTHREAD_STACK_MIN
+
 class Thread {
     pthread_t mHandle{};
     bool mValid{};
