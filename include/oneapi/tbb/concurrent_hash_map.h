@@ -89,11 +89,12 @@ public:
         using mutex_type = MutexType;
         using scoped_type = typename mutex_type::scoped_lock;
 
-        bucket() : node_list(nullptr) {}
-        bucket( node_base* ptr ) : node_list(ptr) {}
+        bucket() : node_list(nullptr), num_elements(0) {}
+        bucket( node_base* ptr ) : node_list(ptr), num_elements(0) {}
 
         mutex_type mutex;
         std::atomic<node_base*> node_list;
+        std::size_t num_elements;
     };
 
     using allocator_type = Allocator;
@@ -114,7 +115,7 @@ public:
     using atomic_segment_type = std::atomic<segment_ptr_type>;
     using segments_table_type = atomic_segment_type[pointers_per_table];
 
-    hash_map_base( const allocator_type& alloc ) : my_allocator(alloc), my_mask(embedded_buckets - 1), my_size(0) {
+    hash_map_base( const allocator_type& alloc ) : my_allocator(alloc), my_mask(embedded_buckets - 1) {
         for (size_type i = 0; i != embedded_buckets; ++i) {
             my_embedded_segment[i].node_list.store(nullptr, std::memory_order_relaxed);
         }
@@ -285,12 +286,18 @@ public:
         return false;
     }
 
+    bool check_load_factor_probability(std::size_t bucket_size, hashcode_type mask) {
+        hashcode_type log2 = tbb::detail::log2(mask);
+        hashcode_type sqrt = 1 << (log2 / 2);
+        return bucket_size >= 1 + 0.84 * sqrt;
+    }
+
     // Insert a node and check for load factor. @return segment index to enable.
     segment_index_type insert_new_node( bucket *b, node_base *n, hashcode_type mask ) {
-        size_type sz = ++my_size; // prefix form is to enforce allocation after the first item inserted
+        // size_type sz = ++my_size; // prefix form is to enforce allocation after the first item inserted
+        size_type sz = ++b->num_elements;
         add_to_bucket( b, n );
-        // check load factor
-        if( sz >= mask ) { // TODO: add custom load_factor
+        if (check_load_factor_probability(sz, mask)) { // TODO: add custom load_factor
             segment_index_type new_seg = tbb::detail::log2( mask+1 ); //optimized segment_index_of
             __TBB_ASSERT( is_valid(my_table[new_seg-1].load(std::memory_order_relaxed)), "new allocations must not publish new mask until segment has allocated");
             static const segment_ptr_type is_allocating = segment_ptr_type(2);
@@ -305,7 +312,8 @@ public:
     // Prepare enough segments for number of buckets
     void reserve(size_type buckets) {
         if( !buckets-- ) return;
-        bool is_initial = !my_size.load(std::memory_order_relaxed);
+        bool is_initial = !this->internal_size();
+        // bool is_initial = !my_size.load(std::memory_order_relaxed);
         for (size_type m = my_mask.load(std::memory_order_relaxed); buckets > m;
             m = my_mask.load(std::memory_order_relaxed))
         {
@@ -317,13 +325,15 @@ public:
     void internal_swap_content(hash_map_base &table) {
         using std::swap;
         swap_atomics_relaxed(my_mask, table.my_mask);
-        swap_atomics_relaxed(my_size, table.my_size);
+        // swap_atomics_relaxed(my_size, table.my_size);
 
         for(size_type i = 0; i < embedded_buckets; i++) {
             auto temp = my_embedded_segment[i].node_list.load(std::memory_order_relaxed);
             my_embedded_segment[i].node_list.store(table.my_embedded_segment[i].node_list.load(std::memory_order_relaxed),
                 std::memory_order_relaxed);
             table.my_embedded_segment[i].node_list.store(temp, std::memory_order_relaxed);
+
+            swap(my_embedded_segment[i].num_elements, table.my_embedded_segment[i].num_elements);
         }
         for(size_type i = embedded_block; i < pointers_per_table; i++) {
             auto temp = my_table[i].load(std::memory_order_relaxed);
@@ -337,12 +347,15 @@ public:
         my_mask.store(other.my_mask.load(std::memory_order_relaxed), std::memory_order_relaxed);
         other.my_mask.store(embedded_buckets - 1, std::memory_order_relaxed);
 
-        my_size.store(other.my_size.load(std::memory_order_relaxed), std::memory_order_relaxed);
-        other.my_size.store(0, std::memory_order_relaxed);
+        // my_size.store(other.my_size.load(std::memory_order_relaxed), std::memory_order_relaxed);
+        // other.my_size.store(0, std::memory_order_relaxed);
 
         for (size_type i = 0; i < embedded_buckets; ++i) {
             my_embedded_segment[i].node_list.store(other.my_embedded_segment[i].node_list, std::memory_order_relaxed);
             other.my_embedded_segment[i].node_list.store(nullptr, std::memory_order_relaxed);
+
+            my_embedded_segment[i].num_elements = other.my_embedded_segment[i].num_elements;
+            other.my_embedded_segment[i].num_elements = 0;
         }
 
         for (size_type i = embedded_block; i < pointers_per_table; ++i) {
@@ -352,12 +365,32 @@ public:
         }
     }
 
+    std::size_t internal_size() {
+        std::size_t total_size = 0;
+
+        hashcode_type m = this->my_mask.load(std::memory_order_relaxed);
+        segment_index_type s = this->segment_index_of(m) + 1;
+
+        while (s != 0) {
+            --s;
+
+            segment_ptr_type buckets_ptr = this->my_table[s].load(std::memory_order_relaxed);
+            size_type sz = this->segment_size(s ? s : 1);
+            for (segment_index_type i = 0; i < sz; ++i) {
+                typename bucket::scoped_type lock(buckets_ptr[i].mutex, /*write = */false);
+                total_size += buckets_ptr[i].num_elements;
+            }
+        }
+
+        return total_size;
+    }
+
 protected:
     bucket_allocator_type my_allocator;
     // Hash mask = sum of allocated segment sizes - 1
     std::atomic<hashcode_type> my_mask;
     // Size of container in stored items
-    std::atomic<size_type> my_size; // It must be in separate cache line from my_mask due to performance effects
+    // std::atomic<size_type> my_size; // It must be in separate cache line from my_mask due to performance effects
     // Zero segment
     bucket my_embedded_segment[embedded_buckets];
     // Segment pointers table. Also prevents false sharing between my_mask and my_size
@@ -755,6 +788,8 @@ protected:
                     prev->next = curr->next;
                 }
                 this->add_to_bucket(b_new, curr);
+                ++b_new->num_elements;
+                --b_old()->num_elements;
                 curr = next;
             } else {
                 prev = curr;
@@ -1010,7 +1045,7 @@ public:
     void clear() {
         hashcode_type m = this->my_mask.load(std::memory_order_relaxed);
         __TBB_ASSERT((m&(m+1))==0, "data structure is invalid");
-        this->my_size.store(0, std::memory_order_relaxed);
+        // this->my_size.store(0, std::memory_order_relaxed);
         segment_index_type s = this->segment_index_of( m ) + 1;
         __TBB_ASSERT( s == this->pointers_per_table || !this->my_table[s].load(std::memory_order_relaxed), "wrong mask or concurrent grow" );
         while(s != 0) {
@@ -1018,13 +1053,16 @@ public:
             __TBB_ASSERT(this->is_valid(this->my_table[s].load(std::memory_order_relaxed)), "wrong mask or concurrent grow" );
             segment_ptr_type buckets_ptr = this->my_table[s].load(std::memory_order_relaxed);
             size_type sz = this->segment_size( s ? s : 1 );
-            for( segment_index_type i = 0; i < sz; i++ )
+            for( segment_index_type i = 0; i < sz; i++ ) {
+                buckets_ptr[i].num_elements = 0;
+
                 for( node_base *n = buckets_ptr[i].node_list.load(std::memory_order_relaxed);
                     this->is_valid(n); n = buckets_ptr[i].node_list.load(std::memory_order_relaxed) )
                 {
                     buckets_ptr[i].node_list.store(n->next, std::memory_order_relaxed);
                     delete_node( n );
                 }
+            }
             this->delete_segment(s);
         }
         this->my_mask.store(this->embedded_buckets - 1, std::memory_order_relaxed);
@@ -1068,7 +1106,7 @@ public:
     }
 
     // Number of items in table.
-    size_type size() const { return this->my_size.load(std::memory_order_acquire); }
+    size_type size() const { return const_cast<concurrent_hash_map*>(this)->internal_size(); }
 
     // True if size()==0.
     __TBB_nodiscard bool empty() const { return size() == 0; }
@@ -1411,7 +1449,8 @@ protected:
                 prev->next = curr->next;
             }
 
-            this->my_size--;
+            // this->my_size--;
+            b()->num_elements--;
             break;
         } while(true);
         if (!item_accessor.is_writer()) { // need to get exclusive lock
@@ -1456,7 +1495,8 @@ protected:
             } else {
                 prev->next = erase_node->next;
             }
-            this->my_size--;
+            // this->my_size--;
+            b()->num_elements--;
         }
         {
             typename node::scoped_type item_locker( erase_node->mutex, /*write=*/true );
@@ -1488,8 +1528,9 @@ protected:
     // Copy "source" to *this, where *this must start out empty.
     void internal_copy( const concurrent_hash_map& source ) {
         hashcode_type mask = source.my_mask.load(std::memory_order_relaxed);
+        std::size_t source_size = source.size();
         if( this->my_mask.load(std::memory_order_relaxed) == mask ) { // optimized version
-            this->reserve(source.my_size.load(std::memory_order_relaxed)); // TODO: load_factor?
+            this->reserve(source_size); // TODO: load_factor?
             bucket *dst = nullptr, *src = nullptr;
             bool rehashing_required = false;
             for( hashcode_type k = 0; k <= mask; k++ ) {
@@ -1503,11 +1544,12 @@ protected:
                 } else for(; n; n = static_cast<node*>( n->next ) ) {
                     node* node_ptr = create_node(base_type::get_allocator(), n->value().first, n->value().second);
                     this->add_to_bucket( dst, node_ptr);
-                    this->my_size.fetch_add(1, std::memory_order_relaxed);
+                    dst->num_elements++;
+                    // this->my_size.fetch_add(1, std::memory_order_relaxed);
                 }
             }
             if( rehashing_required ) rehash();
-        } else internal_copy(source.begin(), source.end(), source.my_size.load(std::memory_order_relaxed));
+        } else internal_copy(source.begin(), source.end(), source_size);
     }
 
     template <typename I>
@@ -1523,7 +1565,8 @@ protected:
             if (search_bucket(key, b) == nullptr) {
                 node* node_ptr = create_node(base_type::get_allocator(), *first);
                 this->add_to_bucket( b, node_ptr );
-                ++this->my_size; // TODO: replace by non-atomic op
+                ++b->num_elements;
+                // ++this->my_size; // TODO: replace by non-atomic op
             }
         }
     }
