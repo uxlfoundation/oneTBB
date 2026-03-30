@@ -6,9 +6,6 @@
 ==============================================
 oneAPI Threading Building Blocks Specification
 ==============================================
-**[spec.version]**
-
-**Version**: |tbb_version|.
 
 .. toctree::
    :maxdepth: 2

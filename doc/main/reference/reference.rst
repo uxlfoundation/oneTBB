@@ -6,7 +6,6 @@
 .. only:: oss
 
    For oneTBB API Reference, refer to the :doc:`oneTBB Specification </main/specification/source/index>`.
-   The current supported version of the oneTBB specification is 1.5.
 
 .. only:: not oss
 
