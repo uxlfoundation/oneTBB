@@ -107,7 +107,7 @@
 #define __TBB_IS_MACRO_EMPTY(A,IGNORED) __TBB_CONCAT_AUX(__TBB_MACRO_EMPTY,A)
 #define __TBB_MACRO_EMPTY 1
 
-#if _M_X64 || _M_ARM64
+#if _M_X64 || _M_ARM64 || _M_ARM64EC
     #define __TBB_W(name) name##64
 #else
     #define __TBB_W(name) name
@@ -162,7 +162,7 @@
 /** Preprocessor symbols to determine HW architecture **/
 
 #if _WIN32 || _WIN64
-    #if defined(_M_X64) || defined(__x86_64__)  // the latter for MinGW support
+    #if (defined(_M_X64) || defined(__x86_64__)) && !defined(_M_ARM64EC)  // the latter for MinGW support
         #define __TBB_x86_64 1
     #elif defined(_M_IA64)
         #define __TBB_ipf 1
