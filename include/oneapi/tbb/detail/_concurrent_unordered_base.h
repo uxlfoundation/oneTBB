@@ -243,8 +243,7 @@ public:
 
     explicit concurrent_unordered_base( size_type bucket_count, const hasher& hash = hasher(),
                                         const key_equal& equal = key_equal(), const allocator_type& alloc = allocator_type() )
-        : my_size(0),
-          my_bucket_count(round_up_to_power_of_two(bucket_count)),
+        : my_bucket_count(round_up_to_power_of_two(bucket_count)),
           my_max_load_factor(float(initial_max_load_factor)),
           my_hash_compare(hash, equal),
           my_head(sokey_type(0)),
@@ -281,8 +280,7 @@ public:
         : concurrent_unordered_base(first, last, bucket_count, hash, key_equal(), alloc) {}
 
     concurrent_unordered_base( const concurrent_unordered_base& other )
-        : my_size(other.my_size.load(std::memory_order_relaxed)),
-          my_bucket_count(other.my_bucket_count.load(std::memory_order_relaxed)),
+        : my_bucket_count(other.my_bucket_count.load(std::memory_order_relaxed)),
           my_max_load_factor(other.my_max_load_factor),
           my_hash_compare(other.my_hash_compare),
           my_head(other.my_head.order_key()),
@@ -296,8 +294,7 @@ public:
     }
 
     concurrent_unordered_base( const concurrent_unordered_base& other, const allocator_type& alloc )
-        : my_size(other.my_size.load(std::memory_order_relaxed)),
-          my_bucket_count(other.my_bucket_count.load(std::memory_order_relaxed)),
+        : my_bucket_count(other.my_bucket_count.load(std::memory_order_relaxed)),
           my_max_load_factor(other.my_max_load_factor),
           my_hash_compare(other.my_hash_compare),
           my_head(other.my_head.order_key()),
@@ -311,24 +308,31 @@ public:
     }
 
     concurrent_unordered_base( concurrent_unordered_base&& other )
-        : my_size(other.my_size.load(std::memory_order_relaxed)),
-          my_bucket_count(other.my_bucket_count.load(std::memory_order_relaxed)),
+        : my_bucket_count(other.my_bucket_count.load(std::memory_order_relaxed)),
           my_max_load_factor(std::move(other.my_max_load_factor)),
           my_hash_compare(std::move(other.my_hash_compare)),
           my_head(other.my_head.order_key()),
           my_segments(std::move(other.my_segments))
     {
+        for (size_type shard_index = 0; shard_index < num_size_shards; ++shard_index) {
+            my_size_shards[shard_index].store(other.my_size_shards[shard_index].get());
+            other.my_size_shards[shard_index].store(0);
+        }
         move_content(std::move(other));
     }
 
     concurrent_unordered_base( concurrent_unordered_base&& other, const allocator_type& alloc )
-        : my_size(other.my_size.load(std::memory_order_relaxed)),
-          my_bucket_count(other.my_bucket_count.load(std::memory_order_relaxed)),
+        : my_bucket_count(other.my_bucket_count.load(std::memory_order_relaxed)),
           my_max_load_factor(std::move(other.my_max_load_factor)),
           my_hash_compare(std::move(other.my_hash_compare)),
           my_head(other.my_head.order_key()),
           my_segments(std::move(other.my_segments), alloc)
     {
+        for (size_type shard_index = 0; shard_index < num_size_shards; ++shard_index) {
+            my_size_shards[shard_index].store(other.my_size_shards[shard_index].get());
+            other.my_size_shards[shard_index].store(0);
+        }
+
         using is_always_equal = typename allocator_traits_type::is_always_equal;
         internal_move_construct_with_allocator(std::move(other), alloc, is_always_equal());
     }
@@ -354,7 +358,11 @@ public:
     concurrent_unordered_base& operator=( const concurrent_unordered_base& other ) {
         if (this != &other) {
             clear();
-            my_size.store(other.my_size.load(std::memory_order_relaxed), std::memory_order_relaxed);
+
+            for (size_type shard_index = 0; shard_index < num_size_shards; ++shard_index) {
+                my_size_shards[shard_index].store(other.my_size_shards[shard_index].get());
+            }
+
             my_bucket_count.store(other.my_bucket_count.load(std::memory_order_relaxed), std::memory_order_relaxed);
             my_max_load_factor = other.my_max_load_factor;
             my_hash_compare = other.my_hash_compare;
@@ -367,7 +375,12 @@ public:
     concurrent_unordered_base& operator=( concurrent_unordered_base&& other ) noexcept(unordered_segment_table::is_noexcept_assignment) {
         if (this != &other) {
             clear();
-            my_size.store(other.my_size.load(std::memory_order_relaxed), std::memory_order_relaxed);
+
+            for (size_type shard_index = 0; shard_index < num_size_shards; ++shard_index) {
+                my_size_shards[shard_index].store(other.my_size_shards[shard_index].get());
+                other.my_size_shards[shard_index].store(0);
+            }
+
             my_bucket_count.store(other.my_bucket_count.load(std::memory_order_relaxed), std::memory_order_relaxed);
             my_max_load_factor = std::move(other.my_max_load_factor);
             my_hash_compare = std::move(other.my_hash_compare);
@@ -405,7 +418,7 @@ public:
     const_iterator cend() const noexcept { return const_iterator(nullptr); }
 
     __TBB_nodiscard bool empty() const noexcept { return size() == 0; }
-    size_type size() const noexcept { return my_size.load(std::memory_order_relaxed); }
+    size_type size() const noexcept { return internal_size(); }
     size_type max_size() const noexcept { return allocator_traits_type::max_size(get_allocator()); }
 
     void clear() noexcept {
@@ -910,7 +923,10 @@ private:
             curr = next;
         }
 
-        my_size.store(0, std::memory_order_relaxed);
+        for (size_type shard_index = 0; shard_index < num_size_shards; ++shard_index) {
+            my_size_shards[shard_index].store(0);
+        }
+
         my_segments.clear();
     }
 
@@ -1011,8 +1027,9 @@ private:
             curr = search_result.first;
         }
 
-        auto sz = my_size.fetch_add(1);
-        adjust_table_size(sz + 1, my_bucket_count.load(std::memory_order_acquire));
+        auto local_size = my_size_shards[size_shard_index(hash_key)].add(1);
+
+        adjust_table_size(local_size, my_bucket_count.load(std::memory_order_acquire));
         return internal_insert_return_type{ nullptr, static_cast<value_node_ptr>(new_node), true };
     }
 
@@ -1038,11 +1055,13 @@ private:
         return { static_cast<value_node_ptr>(curr), false };
     }
 
-    void adjust_table_size( size_type total_elements, size_type current_size ) {
-        // Grow the table by a factor of 2 if possible and needed
-        if ( (float(total_elements) / float(current_size)) > my_max_load_factor ) {
-            // Double the size of the hash only if size hash not changed in between loads
-            my_bucket_count.compare_exchange_strong(current_size, 2u * current_size);
+    void adjust_table_size( size_type local_num_elements, size_type current_bucket_count ) {
+        if (local_num_elements * num_size_shards > current_bucket_count * my_max_load_factor) {
+            // Local shard estimate suggests growth - verify with full count
+            size_type total = size();
+            if (float(total) > float(current_bucket_count) * my_max_load_factor) {
+                my_bucket_count.compare_exchange_strong(current_bucket_count, 2u * current_bucket_count);
+            }
         }
     }
 
@@ -1186,7 +1205,7 @@ private:
         for (node_ptr node = prev_node->next(); node != nullptr; prev_node = node, node = node->next()) {
             if (node == node_to_extract) {
                 unlink_node(prev_node, node, node_to_extract->next());
-                my_size.store(my_size.load(std::memory_order_relaxed) - 1, std::memory_order_relaxed);
+                my_size_shards[size_shard_index(hash_key)].add(-1);
                 return;
             }
             __TBB_ASSERT(node->order_key() <= node_to_extract->order_key(),
@@ -1234,7 +1253,8 @@ protected:
                         source_prev = curr;
                         d1::node_handle_accessor::deactivate(curr_node);
                     } else {
-                        source.my_size.fetch_sub(1, std::memory_order_relaxed);
+                        sokey_type source_hash = sokey_type(source.my_hash_compare(traits_type::get_key(curr->value())));
+                        source.my_size_shards[size_shard_index(source_hash)].add(-1);
                     }
                 } else {
                     source_prev = curr;
@@ -1322,6 +1342,10 @@ private:
         node_ptr last_node = &my_head;
         my_segments[0].store(&my_head, std::memory_order_relaxed);
 
+        for (std::size_t shard_index = 0; shard_index < num_size_shards; ++shard_index) {
+            my_size_shards[shard_index].store(other.my_size_shards[shard_index].get());
+        }
+
         for (node_ptr node = other.my_head.next(); node != nullptr; node = node->next()) {
             node_ptr new_node;
             if (!node->is_dummy()) {
@@ -1367,7 +1391,6 @@ private:
 
         other.my_bucket_count.store(initial_bucket_count, std::memory_order_relaxed);
         other.my_max_load_factor = initial_max_load_factor;
-        other.my_size.store(0, std::memory_order_relaxed);
     }
 
     void internal_move_construct_with_allocator( concurrent_unordered_base&& other, const allocator_type&,
@@ -1422,9 +1445,9 @@ private:
         my_head.set_next(other.my_head.next());
         other.my_head.set_next(first_node);
 
-        size_type current_size = my_size.load(std::memory_order_relaxed);
-        my_size.store(other.my_size.load(std::memory_order_relaxed), std::memory_order_relaxed);
-        other.my_size.store(current_size, std::memory_order_relaxed);
+        for (size_type shard_index = 0; shard_index < num_size_shards; ++shard_index) {
+            my_size_shards[shard_index].swap(other.my_size_shards[shard_index]);
+        }
 
         size_type bucket_count = my_bucket_count.load(std::memory_order_relaxed);
         my_bucket_count.store(other.my_bucket_count.load(std::memory_order_relaxed), std::memory_order_relaxed);
@@ -1465,13 +1488,54 @@ private:
         return reverse_n_bits(reversed_next, bits);
     }
 
-    std::atomic<size_type> my_size;
+    class alignas(max_nfs_size) size_shard {
+        std::atomic<size_type> count;
+    public:
+        size_shard() : count(0) {}
+
+        size_type get() const {
+            return count.load(std::memory_order_relaxed);
+        }
+
+        void store(size_type value) {
+            count.store(value, std::memory_order_relaxed);
+        }
+
+        size_type add(difference_type delta) {
+            size_type value = count.fetch_add(delta, std::memory_order_relaxed);
+            return value + delta;
+        }
+
+        void swap(size_shard& other) {
+            swap_atomics_relaxed(count, other.count);
+        }
+    };
+
+    static constexpr size_type num_size_shards = 16;
+    static constexpr size_type size_shard_mask = num_size_shards - 1;
+    static constexpr unsigned size_shard_shift = sizeof(sokey_type) * 8 - 4;
+
+    static size_type size_shard_index(sokey_type hash) {
+        return static_cast<size_type>((hash *0x9E3779B97F4A7C15ULL) >> size_shard_shift) & size_shard_mask;
+        // return (hash >> size_shard_shift) & size_shard_mask;
+    }
+
+    size_type internal_size() const noexcept {
+        size_type total = 0;
+        for (size_type i = 0; i < num_size_shards; ++i) {
+            total += my_size_shards[i].get();
+        }
+        return total;
+    }
+
     std::atomic<size_type> my_bucket_count;
     float my_max_load_factor;
     hash_compare_type my_hash_compare;
 
     list_node_type my_head; // Head node for split ordered list
     unordered_segment_table my_segments; // Segment table of pointers to nodes
+
+    size_shard my_size_shards[num_size_shards];
 
     template <typename Container, typename Value>
     friend class solist_iterator;
