@@ -36,6 +36,8 @@
 #include <utility>      // Need std::pair
 #include <cstring>      // Need std::memset
 
+#include <iostream> // Debug
+
 namespace tbb {
 namespace detail {
 namespace d2 {
@@ -286,18 +288,40 @@ public:
         return false;
     }
 
-    bool check_load_factor_probability(std::size_t bucket_size, hashcode_type mask) {
-        hashcode_type log2 = tbb::detail::log2(mask);
-        hashcode_type sqrt = 1 << (log2 / 2);
-        return bucket_size >= 1 + 0.84 * sqrt;
+    // Check if bucket load indicates the table should grow.
+    // With per-bucket counters we observe a single Poisson(alpha) sample.
+    // Threshold k is chosen so that the expected maximum across N = mask+1
+    // buckets reaches k when total_elements ~= N (load factor 1):
+    //   N * P(Poisson(1) >= k) ~= 1
+    // Integer approximation: k = log2(N) * 5 / 12 + 2
+    bool check_load_factor( size_type bucket_size, hashcode_type mask, hashcode_type hash ) const {
+        hashcode_type num_buckets = mask + 1;
+        hashcode_type bucket_index = hash & mask;
+
+        // Guard against lazy-rehash inflation: after the table doubled from
+        // N/2 to N, old buckets (index < N/2) still carry elements that belong
+        // in their unrehashed child bucket. Reading the child's node_list is
+        // race-free because we hold the parent bucket's lock, which blocks
+        // the child's rehash_bucket (it acquires the parent first).
+        hashcode_type half = num_buckets >> 1;
+        if (bucket_index < half) {
+            bucket* child = get_bucket(bucket_index + half);
+            if (rehash_required(child->node_list.load(std::memory_order_relaxed))) {
+                bucket_size >>= 1; // approximate post-split count
+            }
+        }
+
+        hashcode_type log2_N = tbb::detail::log2(num_buckets);
+        size_type threshold = static_cast<size_type>(log2_N * 5 / 12) + 2;
+        return bucket_size >= threshold;
     }
 
     // Insert a node and check for load factor. @return segment index to enable.
-    segment_index_type insert_new_node( bucket *b, node_base *n, hashcode_type mask ) {
+    segment_index_type insert_new_node( bucket *b, node_base *n, hashcode_type mask, hashcode_type hash ) {
         // size_type sz = ++my_size; // prefix form is to enforce allocation after the first item inserted
-        size_type sz = ++b->num_elements;
+        size_type bucket_size = ++b->num_elements;
         add_to_bucket( b, n );
-        if (check_load_factor_probability(sz, mask)) { // TODO: add custom load_factor
+        if (check_load_factor(bucket_size, mask, hash)) { // TODO: add custom load_factor
             segment_index_type new_seg = tbb::detail::log2( mask+1 ); //optimized segment_index_of
             __TBB_ASSERT( is_valid(my_table[new_seg-1].load(std::memory_order_relaxed)), "new allocations must not publish new mask until segment has allocated");
             static const segment_ptr_type is_allocating = segment_ptr_type(2);
@@ -1355,7 +1379,7 @@ protected:
                     if( this->check_mask_race(h, m) )
                         goto restart; // b.release() is done in ~b().
                     // insert and set flag to grow the container
-                    grow_segment = this->insert_new_node( b(), n = tmp_n, m );
+                    grow_segment = this->insert_new_node( b(), n = tmp_n, m, h );
                     tmp_n = nullptr;
                     return_value = true;
                 }
