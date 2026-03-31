@@ -94,7 +94,7 @@ The use cases to support are:
 1. User does not specify anything explicit about build of TCM:
    - TCM dependencies are met: TCM is built.
    - TCM dependencies are not met: A message about not able to build TCM appears on the screen,
-     futher configuration and building of other targets continues.
+     further configuration and building of other targets continues.
 2. User enables build of TCM explicitly:
    - TCM dependencies are met: TCM is built.
    - TCM dependencies are not met: A message about not able to build TCM appears on the screen,
