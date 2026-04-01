@@ -278,7 +278,7 @@ function(tbb_add_tbbbind_test)
     if (NOT DEFINED HWLOC_TARGET_EXPLICITLY_DEFINED AND TARGET PkgConfig::HWLOC AND TARGET TBB::${TBBBIND_LIBRARY_NAME})
         set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
             PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*${TBBBIND_LIBRARY_NAME}"
-            FAIL_REGULAR_EXPRESSION "Status: FAILURE!"
+            FAIL_REGULAR_EXPRESSION "Status:.*FAILURE!"
         )
         target_link_libraries(${_tbbbind_test_NAME} PRIVATE PkgConfig::HWLOC)
         target_compile_definitions(${_tbbbind_test_NAME} PRIVATE __TBB_HWLOC_VALID_ENVIRONMENT)
