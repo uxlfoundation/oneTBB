@@ -85,7 +85,7 @@ jobs:
           del cov-win64-tool.zip
           move cov-analysis-win64* cov-win64-tool
       - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2.0.0
+        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3.0.0
       - name: Build with cov-build
         shell: bash
         run: |
