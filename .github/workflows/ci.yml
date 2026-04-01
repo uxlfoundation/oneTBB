@@ -1,4 +1,5 @@
 # Copyright (c) 2021-2025 Intel Corporation
+# Copyright (c) 2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,11 +43,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run scan
         run: |
           sudo apt update && sudo apt install -y codespell
@@ -57,11 +58,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run scan
         run: |
           command -v clang-format
@@ -77,11 +78,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Install prerequisites
         run: |
           pip3 install -U Jinja2
@@ -94,7 +95,7 @@ jobs:
           export BUILD_TYPE=${BUILD_TYPE} && sphinx-build doc html
           tar -czvf html.tar.gz html/
       - name: Save docs
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: oneTBB-html-docs-${{ env.GITHUB_SHA_SHORT }}
           path: html.tar.gz
@@ -109,19 +110,19 @@ jobs:
     needs: [documentation]
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           egress-policy: audit
 
       - name: Checkout gh-pages
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: gh-pages
           path: gh-pages
       - name: Set env
         run: echo GITHUB_SHA_SHORT=${GITHUB_SHA::8} >> $GITHUB_ENV
       - name: Download documetation
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           name: oneTBB-html-docs-${{ env.GITHUB_SHA_SHORT }}
       - name: Publish to github pages
@@ -142,24 +143,75 @@ jobs:
     runs-on: [ubuntu-latest]
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - name: Run check
         run: |
-          sed -i \
-            -e "/Copyright (c) .* Intel Corporation/s/ \([0-9]\+\)[-0-9]*/ \\1-$(date +%Y)/" \
-            -e "/Copyright (c) .* Intel Corporation/s/$(date +%Y)-$(date +%Y)/$(date +%Y)/" \
-            $(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
-          git checkout -- third-party-programs.txt
-          git diff > years.diff
-          if [[ -s years.diff ]]; then
-            echo "Wrong copyright years"
-            cat years.diff
+          base_sha=${{ github.event.pull_request.base.sha }}
+          current_year=$(date +%Y)
+          apache_copyright_line="Licensed under the Apache License"
+          uxl_copyright_re="Copyright \(c\) [0-9]+ UXL Foundation Contributors"
+          intel_copyright_re="Copyright.*[0-9]\{4\}.*Intel"
+          check_failed=false
+
+          new_files=$(git diff --find-renames --diff-filter=A --name-only "$base_sha" || true)
+          modified_files=$(git diff --find-renames --diff-filter=M --name-only "$base_sha" || true)
+
+          if [ -n "$new_files" ]; then
+            new_with_apache=$(grep -lF "$apache_copyright_line" $new_files || true)
+            for file in $new_with_apache; do
+              uxl_match=$(grep -cE "$uxl_copyright_re" "$file" || true)
+              if [ "$uxl_match" -eq 0 ]; then
+                echo "ERROR: New file is missing UXL copyright: $file"
+                check_failed=true
+              else
+                year_match=$(grep -cE "Copyright \(c\) ${current_year} UXL Foundation Contributors" "$file" || true)
+                if [ "$year_match" -eq 0 ]; then
+                  echo "ERROR: New file must have current year (${current_year}) in UXL copyright: $file"
+                  check_failed=true
+                fi
+              fi
+            done
+          fi
+
+          if [ -n "$modified_files" ]; then
+            modified_with_apache=$(grep -lF "$apache_copyright_line" $modified_files || true)
+            for file in $modified_with_apache; do
+              uxl_match=$(grep -cE "$uxl_copyright_re" "$file" || true)
+              if [ "$uxl_match" -eq 0 ]; then
+                echo "ERROR: Modified file is missing single year UXL copyright: $file"
+                check_failed=true
+                continue
+              fi
+              original_uxl=$(git show "${base_sha}:${file}" 2>/dev/null | grep -oE "$uxl_copyright_re" || true)
+              current_uxl=$(grep -oE "$uxl_copyright_re" "$file" || true)
+              if [ -n "$original_uxl" ] && [ "$original_uxl" != "$current_uxl" ]; then
+                echo "ERROR: UXL copyright year must not be changed in: $file"
+                check_failed=true
+              fi
+            done
+          fi
+
+          all_changed_files=$(git diff --find-renames --diff-filter=AM --name-only "$base_sha" || true)
+          if [ -n "$all_changed_files" ]; then
+            all_with_apache=$(grep -lF "$apache_copyright_line" $all_changed_files || true)
+            for file in $all_with_apache; do
+              original_intel=$(git show "${base_sha}:${file}" 2>/dev/null | grep "$intel_copyright_re" || true)
+              current_intel=$(grep "$intel_copyright_re" "$file" || true)
+              if [ -n "$original_intel" ] && [ "$original_intel" != "$current_intel" ]; then
+                echo "ERROR: Intel copyright must not be modified in: $file"
+                check_failed=true
+              fi
+            done
+          fi
+
+          if [ "$check_failed" = true ]; then
             exit 1
           fi
   python_module_test_ubuntu_latest:
@@ -167,11 +219,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run testing
         run: |
           mkdir build && cd build
@@ -220,11 +272,15 @@ jobs:
             cmake_static: -DBUILD_SHARED_LIBS=OFF
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install dependencies
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y pkg-config libhwloc-dev hwloc
       - name: Run testing
         shell: bash
         run: |
@@ -255,7 +311,7 @@ jobs:
             std: 14
             build_type: relwithdebinfo
             preview: 'ON'
-          - os: macos-13
+          - os: macos-15-intel
             c_compiler: clang
             cxx_compiler: clang++
             std: 20
@@ -264,11 +320,11 @@ jobs:
             cmake_static: -DBUILD_SHARED_LIBS=OFF
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run testing
         shell: bash
         run: |
@@ -314,11 +370,11 @@ jobs:
             job_name: windows_cl2022_cxx17_relwithdebinfo_preview=OFF
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run testing
         run: |
           mkdir build
@@ -357,11 +413,11 @@ jobs:
             preview: 'ON'
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run testing
         shell: bash
         run: |
@@ -388,11 +444,11 @@ jobs:
             preview: 'ON'
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run testing
         shell: bash
         run: |
@@ -429,11 +485,11 @@ jobs:
             job_name: examples_windows_cl2022_cxx17_relwithdebinfo_preview=OFF
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Run testing
         run: |
           mkdir build
@@ -458,11 +514,11 @@ jobs:
             build_type: relwithdebinfo
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Test doc examples
         run: |
           mkdir build && cd build
@@ -488,11 +544,11 @@ jobs:
             build_type: relwithdebinfo
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Test doc examples
         run: |
           mkdir build

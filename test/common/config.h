@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Сontributors
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -42,6 +42,9 @@
 #endif
 #ifndef TBB_PREVIEW_MEMORY_POOL
 #define TBB_PREVIEW_MEMORY_POOL 1
+#endif
+#ifndef TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
+#define TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR 1
 #endif
 #endif
 

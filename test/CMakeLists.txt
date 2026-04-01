@@ -86,6 +86,10 @@ function(tbb_add_test)
 
     target_link_libraries(${_tbb_test_TARGET_NAME} PRIVATE ${_tbb_test_DEPENDENCIES} Threads::Threads ${TBB_COMMON_LINK_LIBS})
 
+    if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+        target_link_libraries(${_tbb_test_TARGET_NAME} PRIVATE util)
+    endif()
+
     if (COMMAND _tbb_run_memcheck)
         _tbb_run_memcheck(${_tbb_test_NAME} ${_tbb_test_SUBDIR})
     endif()
@@ -271,7 +275,7 @@ function(tbb_add_tbbbind_test)
     set_property(TEST ${_tbbbind_test_NAME} PROPERTY ENVIRONMENT TBB_VERSION=1 APPEND)
 
     # Handle the case when HWLOC was found using pkg-config
-    if (NOT DEFINED HWLOC_TARGET_EXPLICITLY_DEFINED AND TARGET PkgConfig::HWLOC)
+    if (NOT DEFINED HWLOC_TARGET_EXPLICITLY_DEFINED AND TARGET PkgConfig::HWLOC AND TARGET TBB::${TBBBIND_LIBRARY_NAME})
         set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
             PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*${TBBBIND_LIBRARY_NAME}"
             FAIL_REGULAR_EXPRESSION "Status: FAILURE!"
@@ -496,6 +500,7 @@ if (TARGET TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_write_once_node DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_async_node DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_input_node DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR tbb NAME test_resource_limited_node DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_profiling DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_concurrent_queue_whitebox DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_intrusive_list DEPENDENCIES TBB::tbb)
@@ -568,6 +573,14 @@ if (TARGET TBB::tbb)
         if (NOT TBB_OPENMP_NO_LINK_FLAG)
             set_target_properties(test_openmp PROPERTIES LINK_FLAGS ${TBB_OPENMP_FLAG})
         endif()
+    endif()
+
+    if (UNIX)
+      tbb_add_test(SUBDIR tbb NAME test_cgroup_support)
+      target_include_directories(test_cgroup_support PRIVATE
+        $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>
+      )
+      target_link_libraries(test_cgroup_support PRIVATE Threads::Threads)
     endif()
 
     # Define the conformance tests
@@ -706,6 +719,10 @@ if (TARGET TBB::tbbmalloc)
                 target_link_libraries(test_malloc_whitebox PRIVATE ${TBB_COMMON_LINK_FLAGS})
             endif()
             target_link_libraries(test_malloc_whitebox PRIVATE Threads::Threads ${TBB_COMMON_LINK_LIBS})
+
+            if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+                target_link_libraries(test_malloc_whitebox PRIVATE util)
+            endif()
         endif()
         # ------------------------------------------------------------------------------------------
 
