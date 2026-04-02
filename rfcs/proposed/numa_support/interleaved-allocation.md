@@ -31,7 +31,7 @@ not defined, we can't use it to construct e.g., a bit mask. Allocation that is u
 between NUMA nodes doesn't seem to have useful applications, so repeated elements in `list
 of nodes` is an error.
 
-One use case for `list of nodes` argument is desire to run parallel activity on subset of
+One use case for `list of nodes` argument is the desire to run parallel activity on subset of
 nodes and so get memory only from those nodes.
 
 Most common usage of the allocation function is expected only with `size` parameter.
