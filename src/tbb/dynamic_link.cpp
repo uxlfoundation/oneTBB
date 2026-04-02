@@ -690,22 +690,18 @@ namespace r1 {
      *         occurs, in which case the error is optionally reported.
      */
     bool has_valid_signature(const char* filepath, const std::size_t length) {
-        std::size_t pathlen = strlen(filepath)+1;
-        wchar_t *wfilepath = (wchar_t*)calloc(pathlen, sizeof(wchar_t));
+        std::unique_ptr<wchar_t[]> wfilepath(new wchar_t[length+1]);
         {
             std::mbstate_t state{};
             const char* ansi_filepath = filepath; // mbsrtowcs moves original pointer
-            const size_t num_converted = mbsrtowcs(wfilepath, &ansi_filepath, length, &state);
-            if (num_converted == std::size_t(-1)) {
-                free (wfilepath);
-                wfilepath = NULL;
+            const size_t num_converted = mbsrtowcs(wfilepath.get(), &ansi_filepath, length, &state);
+            if (num_converted == std::size_t(-1))
                 return false;
-            }
         }
         WINTRUST_FILE_INFO fdata;
         std::memset(&fdata, 0, sizeof(fdata));
         fdata.cbStruct       = sizeof(WINTRUST_FILE_INFO);
-        fdata.pcwszFilePath  = wfilepath;
+        fdata.pcwszFilePath  = wfilepath.get();
 
         // Check that the certificate used to sign the specified file chains up to a root
         // certificate located in the trusted root certificate store, implying that the identity of
@@ -730,8 +726,6 @@ namespace r1 {
         pWVTData.dwStateAction = WTD_STATEACTION_CLOSE;       // Release WVT state data
         (void)WinVerifyTrust(NULL, &pgActionID, &pWVTData);
 
-        free (wfilepath);
-        wfilepath = NULL;
         return ERROR_SUCCESS == rc;
     }
 #endif  // _WIN32 && !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION
@@ -744,49 +738,38 @@ namespace r1 {
 #if __TBB_DYNAMIC_LOAD_ENABLED
         const char* path = library;
         std::size_t len = abs_path(library, NULL, 1);
-        char *absolute_path = (char*)calloc(len, 1);
+        std::unique_ptr<char[]> absolute_path(new char[len]);
         std::size_t length = 0;
         const bool build_absolute_path = flags & DYNAMIC_LINK_BUILD_ABSOLUTE_PATH;
         if (build_absolute_path) {
-            length = abs_path( library, absolute_path, len );
+            length = abs_path( library, absolute_path.get(), len );
             if (length == 0) {
                 // length == 0 means failing of init_ap_data so the warning has already been issued.
-                free(absolute_path);
-                absolute_path = NULL;
                 return nullptr;
-            } else if (!file_exists(absolute_path)) {
+            } else if (!file_exists(absolute_path.get())) {
                 // Path to a file has been built manually. It is not proven to exist however.
-                DYNAMIC_LINK_WARNING( dl_lib_not_found, absolute_path, dlerror() );
-                free(absolute_path);
-                absolute_path = NULL;
+                DYNAMIC_LINK_WARNING( dl_lib_not_found, absolute_path.get(), dlerror() );
                 return nullptr;
             }
-            path = absolute_path;
+            path = absolute_path.get();
         }
 #if _WIN32
 #if !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION
         if (!build_absolute_path) { // Get the path if it is not yet built
-            length = get_module_path(absolute_path, (unsigned)len, library);
+            length = get_module_path(absolute_path.get(), (unsigned)len, library);
             if (length == 0) {
                 DYNAMIC_LINK_WARNING( dl_lib_not_found, path, dlerror() );
-                free(absolute_path);
-                absolute_path = NULL;
                 return library_handle;
             } else if (length >= len) { // The buffer length was insufficient
                 DYNAMIC_LINK_WARNING( dl_buff_too_small );
-                free(absolute_path);
-                absolute_path = NULL;
                 return library_handle;
             }
             length += 1;   // Count terminating NULL character as part of string length
-            path = absolute_path;
+            path = absolute_path.get();
         }
 
-        if (!has_valid_signature(path, length)) {
-            free(absolute_path);
-            absolute_path = NULL;
+        if (!has_valid_signature(path, length))
             return library_handle; // Warning (if any) has already been reported
-        }
 #endif /* !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION */
         // Prevent Windows from displaying silly message boxes if it fails to load library
         // (e.g. because of MS runtime problems - one of those crazy manifest related ones)
@@ -805,8 +788,6 @@ namespace r1 {
             }
         } else
             DYNAMIC_LINK_WARNING( dl_lib_not_found, path, dlerror() );
-        free(absolute_path);
-        absolute_path = NULL;
 #endif /* __TBB_DYNAMIC_LOAD_ENABLED */
         return library_handle;
     }

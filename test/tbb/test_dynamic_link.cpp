@@ -167,15 +167,15 @@ TEST_CASE("Test dynamic_link with existing library") {
 TEST_CASE("Test dynamic_link with bad library") {
     const char* lib_name = TEST_LIBRARY_NAME("stub_unsigned");
     const std::size_t size = tbb::detail::r1::abs_path(lib_name, NULL, 1) + 1;
-    char *path = (char*)calloc(size, 1);
+    std::unique_ptr<char[]> path(new char[size]);
     const std::size_t msg_size = size + 128; // Path to the file + message
-    char *msg = (char*)calloc(msg_size, 1);
+    std::unique_ptr<char[]> msg(new char[msg_size]);
 
 #if !__TBB_WIN8UI_SUPPORT
-    const std::size_t len = tbb::detail::r1::abs_path(lib_name, path, size);
+    const std::size_t len = tbb::detail::r1::abs_path(lib_name, path.get(), size);
     REQUIRE_MESSAGE((0 < len && len < size), "The path to the library is not built");
-    std::snprintf(msg, msg_size, "Test prerequisite is not held - the path \"%s\" must exist", path);
-    REQUIRE_MESSAGE(tbb::detail::r1::file_exists(path), msg);
+    std::snprintf(msg.get(), msg_size, "Test prerequisite is not held - the path \"%s\" must exist", path.get());
+    REQUIRE_MESSAGE(tbb::detail::r1::file_exists(path.get()), msg.get());
 #endif
 
     // The library exists, check that it will not be loaded.
@@ -191,21 +191,17 @@ TEST_CASE("Test dynamic_link with bad library") {
     const bool link_result = tbb::detail::r1::dynamic_link(lib_name, table,
                                                            sizeof(table) / sizeof(table[0]),
                                                            /*handle*/nullptr, load_flags);
-    std::snprintf(msg, msg_size, "The library \"%s\" was loaded but should not have been.", path);
+    std::snprintf(msg.get(), msg_size, "The library \"%s\" was loaded but should not have been.", path.get());
 
     // Expectation is that the library will not be loaded because:
     // a) On Windows the library is unsigned
     // b) On Linux the library does not have exported symbols
     const bool expected_link_result = false;
 
-    REQUIRE_MESSAGE(expected_link_result == link_result, msg);
+    REQUIRE_MESSAGE(expected_link_result == link_result, msg.get());
     REQUIRE_MESSAGE(nullptr == handler, "The symbol should not be changed.");
     // TODO: Verify the warning message contains "TBB dynamic link warning: The module
     // \".*stub_unsigned.*.dll\" is unsigned or has invalid signature."
-    free(msg);
-    msg = NULL;
-    free(path);
-    path = NULL;
 }
 
 #endif // __TBB_DYNAMIC_LOAD_ENABLED
