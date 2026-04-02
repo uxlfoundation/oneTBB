@@ -21,8 +21,8 @@ provider of memory blocks with at least page granularity and will not employ int
 caching. If high-performance, smaller and repetitive allocations are needed, then `std::pmr` or
 other solutions should be used.
 
-`interleaving step` has page granularity. Currently there are no clear use cases for
-granularity more than page size.
+`interleaving step` is the size of the distributed blocks and has page granularity. Currently there are 
+no clear use cases for granularity more than page size.
 
 `list of nodes for allocation` is conceptually a set of `tbb::numa_node_id`. However,
 because `tbb::numa_nodes()` returns `std::vector` and creating a `std::set` from it
