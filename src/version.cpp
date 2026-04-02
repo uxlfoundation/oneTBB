@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2025 Intel Corporation
+    Copyright (C) 2023 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -12,14 +12,6 @@
 
 #include "tcm/detail/_environment.h"
 #include "tcm/version.h"
-
-#ifndef __TCM_BUILD_TIME
-    #define __TCM_BUILD_TIME "unknown"
-#endif
-
-#ifndef __TCM_COMMIT_ID
-    #define __TCM_COMMIT_ID "unknown"
-#endif
 
 #if _WIN32
     #ifndef WIN32_LEAN_AND_MEAN
@@ -38,6 +30,32 @@
 #else
     extern "C" unsigned hwloc_get_api_version();
 #endif
+
+#ifndef __TCM_BUILD_TIME
+    #define __TCM_BUILD_TIME "unknown"
+#endif
+
+#ifndef __TCM_COMMIT_ID
+    #define __TCM_COMMIT_ID "unknown"
+#endif
+
+#ifndef TCM_DEBUG
+    #define __TCM_DEBUG_STRING "undefined"
+#else
+    #define __TCM_DEBUG_STRING "set"
+#endif
+
+#define __TCM_TO_STR_IMPL(str) #str
+#define __TCM_TO_STR(str) __TCM_TO_STR_IMPL(str)
+
+#define TCM_VERSION_STRING __TCM_TO_STR(TCM_VERSION_MAJOR) "." \
+                           __TCM_TO_STR(TCM_VERSION_MINOR) "." \
+                           __TCM_TO_STR(TCM_VERSION_PATCH)     \
+
+#define __TCM_VERSION_NUMBER \
+    "TCM: VERSION            " TCM_VERSION_STRING "\n"
+
+#define TCM_PRINT_VERSION __TCM_VERSION_NUMBER
 
 namespace tcm {
 namespace internal {
@@ -87,32 +105,44 @@ int environment::get_version_string(const environment& env_info, char* buffer, u
         char tcm_variables_info[default_buffer_sz]{};
 
         tcm_meta_info(const environment& env_info) {
-            // The leading "\0" is needed to provide a clean result when applying "strings" command to binary
+            // The leading "\0" is needed to get clean result when invoking "strings" on a binary
             static const char tcm_version_string[] = "\0" TCM_PRINT_VERSION;
             std::snprintf(version_info, default_buffer_sz, "%s" , tcm_version_string+1);
-            
+
             unsigned hwloc_version = hwloc_get_api_version();
 
             int printed = 0;
             if (env_info.tcm_version > 0) {
                 // -18 format is needed because the length "HWLOC LIBRARY PATH"
                 // string is 18 symbols long so this amount of symbols must be reserved
-                print_extra_info(hwloc_info, default_buffer_sz, "%-18s %d.%d.%d", "HWLOC API VERSION", (hwloc_version >> 16),
-                            (hwloc_version >> 8) & 0xff, hwloc_version & 0xff);
-                printed = print_extra_info(internal_info, default_buffer_sz, "%-18s %s", "HWLOC LIBRARY PATH", get_hwloc_path());
-                printed += print_extra_info(internal_info+printed, default_buffer_sz-printed, "%-18s %s", "BUILD TIME", __TCM_BUILD_TIME);
-                printed += print_extra_info(internal_info+printed, default_buffer_sz-printed, "%-18s %s", "COMMIT ID", __TCM_COMMIT_ID);
-                printed += print_extra_info(internal_info+printed, default_buffer_sz-printed, "%-18s %s", "TCM_DEBUG", __TCM_DEBUG_STRING);
-                print_extra_info(internal_info+printed, default_buffer_sz-printed, "%-18s %d", "TCM_ENABLE", env_info.tcm_enable);
+                print_extra_info(
+                    hwloc_info, default_buffer_sz, "%-18s %d.%d.%d", "HWLOC API VERSION",
+                    (hwloc_version >> 16), (hwloc_version >> 8) & 0xff, (hwloc_version >> 0) & 0xff
+                );
+                printed  = print_extra_info(internal_info, default_buffer_sz,
+                                            "%-18s %s", "HWLOC LIBRARY PATH", get_hwloc_path());
+                printed += print_extra_info(internal_info + printed, default_buffer_sz-printed,
+                                            "%-18s %s", "BUILD TIME", __TCM_BUILD_TIME);
+                printed += print_extra_info(internal_info + printed, default_buffer_sz-printed,
+                                            "%-18s %s", "COMMIT ID", __TCM_COMMIT_ID);
+                printed += print_extra_info(internal_info + printed, default_buffer_sz-printed,
+                                            "%-18s %s", "TCM_DEBUG", __TCM_DEBUG_STRING);
+                print_extra_info(internal_info + printed, default_buffer_sz-printed,
+                                 "%-18s %d", "TCM_ENABLE", env_info.tcm_enable);
             } else if (env_info.tcm_enable < 1) {
-                print_extra_info(tcm_variables_info, default_buffer_sz, "%-18s %s", "TCM", "disabled");
+                print_extra_info(tcm_variables_info, default_buffer_sz,
+                                 "%-18s %s", "TCM", "disabled");
             }
 
         }
     } print_info{env_info};
 
     return std::snprintf(buffer, buffer_size, "%s%s%s%s",
-        print_info.version_info, print_info.hwloc_info, print_info.internal_info, print_info.tcm_variables_info);
+        print_info.version_info,
+        print_info.hwloc_info,
+        print_info.internal_info,
+        print_info.tcm_variables_info
+    );
 }
 
 void environment::print_version(const environment& env_info) {
@@ -130,12 +160,16 @@ void environment::print_version(const environment& env_info) {
 } // namespace tcm
 
 extern "C" {
+unsigned tcmGetVersion() {
+    return TCM_VERSION;
+}
+
 const char* tcmRuntimeVersion() {
-    static const char tcm_version_string[] = TCM_VERSION;
+    static const char tcm_version_string[] = TCM_VERSION_STRING;
     return tcm_version_string;
 }
 
 unsigned tcmRuntimeInterfaceVersion() {
-    return TCM_INTERFACE_VERSION;
+    return 1000 * TCM_VERSION_MAJOR + 10 * TCM_VERSION_MINOR;
 }
 }

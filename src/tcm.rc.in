@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2023-2024 Intel Corporation
+    Copyright (C) 2023 Intel Corporation
 
     This software and the related documents are Intel copyrighted materials, and your use of them is
     governed by the express license under which they were provided to you ("License"). Unless the
@@ -27,6 +27,12 @@ LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
 //
 #define TCM_VERNUMBERS TCM_VERSION_MAJOR,TCM_VERSION_MINOR,TCM_VERSION_PATCH
 
+#define __TCM_STRINGIFY_HELPER(x) #x
+#define __TCM_STRINGIFY(x) __TCM_STRINGIFY_HELPER(x)
+#define TCM_VERSION_FULL __TCM_STRINGIFY(TCM_VERSION_MAJOR) "." \
+                         __TCM_STRINGIFY(TCM_VERSION_MINOR) "." \
+                         __TCM_STRINGIFY(TCM_VERSION_PATCH)
+
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION TCM_VERNUMBERS
  PRODUCTVERSION TCM_VERNUMBERS
@@ -46,7 +52,7 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Intel Corporation\0"
             VALUE "FileDescription", "Thread Composability Manager\0"
-            VALUE "FileVersion", TCM_VERSION "\0"
+            VALUE "FileVersion", TCM_VERSION_FULL "\0"
             VALUE "LegalCopyright", "Copyright 2023-${tcm_build_year} Intel Corporation.  All Rights Reserved.\0"
             VALUE "LegalTrademarks", "\0"
 #ifndef TCM_DEBUG
@@ -55,7 +61,7 @@ BEGIN
             VALUE "OriginalFilename", "tcm_debug.dll\0"
 #endif
             VALUE "ProductName", "Thread Composability Manager\0"
-            VALUE "ProductVersion", TCM_VERSION "\0"
+            VALUE "ProductVersion", TCM_VERSION_FULL "\0"
             VALUE "PrivateBuild", "\0"
             VALUE "SpecialBuild", "\0"
         END

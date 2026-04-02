@@ -1,4 +1,4 @@
-# Copyright (C) 2023-2026 Intel Corporation
+# Copyright (C) 2023 Intel Corporation
 #
 # This software and the related documents are Intel copyrighted materials, and your use of them is
 # governed by the express license under which they were provided to you ("License"). Unless the
@@ -137,7 +137,8 @@ endforeach()
 # Test no crash occurs if the app exits while still using TCM
 set(TCM_TEST_PREMATURE_EXIT test_premature_exit)
 add_executable(${TCM_TEST_PREMATURE_EXIT} test_premature_exit.cpp)
-target_compile_options(${TCM_TEST_PREMATURE_EXIT} PRIVATE ${TCM_WARNING_LEVEL})
+target_compile_options(
+  ${TCM_TEST_PREMATURE_EXIT} PRIVATE ${TCM_WARNING_LEVEL} ${TCM_COMMON_COMPILE_FLAGS})
 target_compile_definitions(${TCM_TEST_PREMATURE_EXIT}
   PRIVATE ${TCM_COMPILE_DEFINITIONS}
   PRIVATE TCM_LIB_NAME="$<TARGET_FILE_NAME:TCM::tcm>"
