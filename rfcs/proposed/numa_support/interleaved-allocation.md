@@ -14,11 +14,11 @@ API. Generally, the latter requires less overhead.
 
 ## Requirements to public API
 
-To perform allocation of large blocks of special kind of memory there is no need to keep
-state, so malloc-like function fits well. There are two possible parameters: `interleaving
-step` and `list of NUMA nodes to perform allocations on`. The function serves as a
-provider of memory blocks with at least page granularity and doesn't employ internal
-caching. So, to support high-performance, smaller and repetitive allocations `std::pmr` or
+Free, stateless functions, similar to malloc, are sufficient for the allocation of large blocks of memory. 
+To guide the spreading of blocks across NUMA nodes, two additional parameters are proposed: `interleaving
+step` and `list of NUMA nodes to perform allocations on`. This single function then serves as a
+provider of memory blocks with at least page granularity and will not employ internal
+caching. If high-performance, smaller and repetitive allocations are needed, then `std::pmr` or
 other solutions should be used.
 
 `interleaving step` has page granularity. Currently there are no clear use cases for
