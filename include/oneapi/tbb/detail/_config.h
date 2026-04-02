@@ -162,7 +162,7 @@
 /** Preprocessor symbols to determine HW architecture **/
 
 #if _WIN32 || _WIN64
-    #if (defined(_M_X64) || defined(__x86_64__)) && !defined(_M_ARM64EC)  // the latter for MinGW support
+    #if (defined(_M_X64) || defined(__x86_64__)) && !defined(_M_ARM64EC)  // Targeting x64 architecture (MSVC & MinGW), excluding ARM64EC builds
         #define __TBB_x86_64 1
     #elif defined(_M_IA64)
         #define __TBB_ipf 1
