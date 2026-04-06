@@ -24,9 +24,13 @@ with the following API:
   and the ``this_task_arena`` namespace. These interfaces work as hints to the scheduler to mark the start and end
   of parallel work submission into the arena, enabling different worker thread retention policies.
 * Adds the Resource Acquisition is Initialization (RAII) class ``scoped_parallel_phase`` to ``task_arena``.
+* Adds the ``leave_policy`` parameter to the ``global_control`` class, providing application-wide
+  control over the default worker thread leave behavior for arenas initialized with
+  ``leave_policy::automatic``.
 
 More details about motivation, semantics and conditions for becoming fully supported functionality can be found in the corresponding
-`Request For Comments document for parallel_phase <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/experimental/parallel_phase_for_task_arena>`_.
+`Request For Comments document for parallel_phase <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/experimental/parallel_phase_for_task_arena>`_
+and the `Request For Comments document for global_control::leave_policy <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/experimental/global_control_fast_leave>`_.
 
 API
 ***
@@ -38,6 +42,7 @@ Header
 
     #define TBB_PREVIEW_PARALLEL_PHASE 1
     #include <oneapi/tbb/task_arena.h>
+    #include <oneapi/tbb/global_control.h>
 
 Synopsis
 --------
@@ -84,6 +89,15 @@ Synopsis
                 void start_parallel_phase();
                 void end_parallel_phase(bool with_fast_leave = false);
             } // namespace this_task_arena
+
+            class global_control {
+            public:
+                enum parameter {
+                    // ...
+                    leave_policy,
+                    // ...
+                };
+            }; // class global_control
 
         } // namespace tbb
     } // namespace oneapi
@@ -156,6 +170,41 @@ Indicates the start of the parallel phase in the current ``task_arena``.
 Indicates the end of the parallel phase in the current ``task_arena``.
 If ``with_fast_leave`` is ``true``, worker threads leave policy is temporarily set to ``fast``.
 
+Global Control Integration
+--------------------------
+
+.. cpp:enum:: global_control::leave_policy
+
+**Selection rule**: logical disjunction
+
+When the ``leave_policy`` parameter is active on a ``global_control`` object with
+the value ``task_arena::leave_policy::fast``, arenas that are initialized with
+``task_arena::leave_policy::automatic`` behave as if they were initialized with
+``task_arena::leave_policy::fast``. Arenas already initialized are not affected.
+
+When multiple ``global_control`` objects exist for the ``leave_policy`` parameter,
+their values are combined using logical disjunction: if any active object has the
+value ``task_arena::leave_policy::fast``, fast leave is enabled globally.
+
+The following table summarizes the interaction between the per-arena and global leave policies:
+
+.. table::
+
+    +------------------------+-------------------------+------------------------+
+    | Arena ``leave_policy`` | Global ``leave_policy`` | Initial State          |
+    +========================+=========================+========================+
+    | ``fast``               | any                     | Fast leave             |
+    +------------------------+-------------------------+------------------------+
+    | ``automatic``          | ``fast``                | Fast leave             |
+    +------------------------+-------------------------+------------------------+
+    | ``automatic``          | ``automatic`` (default) | System-specific policy |
+    +------------------------+-------------------------+------------------------+
+.. note::
+   The ``global_control::leave_policy`` parameter provides application-wide control,
+   while ``task_arena::leave_policy`` and ``parallel_phase`` provide per-arena control.
+   After initialization, the parallel phase API can independently modify the arena's
+   leave behavior at runtime, regardless of the initial state set by the global control.
+
 Example
 *******
 
@@ -164,7 +213,8 @@ Example
    :start-after: /*begin_parallel_phase_example*/
    :end-before: /*end_parallel_phase_example*/
 
-In this example, ``task_arena`` is created with ``leave_policy::fast``. It means that
+In this example, ``global_control::leave_policy`` is set to ``task_arena::leave_policy::fast``, enabling fast
+leave behavior for the ``task_arena``, which is initialized with ``leave_policy::automatic``. This means that
 worker threads are not expected to remain in ``task_arena`` once parallel work is completed.
 
 However, the workflow includes a sequence of parallel work (initializing and sorting data) interceded by serial work (prefix sum).
