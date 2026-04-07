@@ -6,7 +6,7 @@
 Description
 ***********
 
-The class ``tbb::flow::resource_limiter<ResourceHandle>`` represents a *Provider* that manages one or more
+The class ``resource_limiter<ResourceHandle>`` represents a *Provider* that manages one or more
 resource handles of type ``ResourceHandle``.
 
 It provides exclusive access to managed resources to the consumers -- ``resource_limited_node`` instances.

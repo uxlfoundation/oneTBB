@@ -37,7 +37,7 @@ is passed during construction, and ``rl_node_type`` is its type.
 * The ``Input`` type must be the same as the ``Input`` template argument of ``rl_node_type``.
 * The ``OutputPortsType`` must be the same as ``rl_node_type::output_ports_type`` member type.
 * ``ResourceHandle1``, ..., ``ResourceHandleN`` must be the same as ``resource_limiter::resource_handle_type``
-member type of the corresponding ``resource_limiter`` passed to ``rl_node`` during construction.
+  member type of the corresponding ``resource_limiter`` passed to ``rl_node`` during construction.
 
 Processes the input message.
 May call ``try_put`` on any of the output ports, possibly multiple times per port.
