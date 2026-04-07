@@ -7,22 +7,24 @@ support](README.md).
 
 There are two kinds of NUMA-related performance bottlenecks: latency increasing due to
 access to a remote node and bandwidth-limited simultaneous access from different CPUs to
-a single NUMA memory node. A well-known method to mitigate both is random distribution of
-memory objects that are accessed from different CPUs. This can be achieved either by
-employing a first-touch policy of NUMA memory allocation or via special platform-dependent
+a single NUMA memory node. A well-known method to mitigate both is a distribution of
+memory objects that are accessed from different CPUs to different NUMA nodes in such a way
+that matches an access pattern. If the access pattern is complex enough, a simple
+round-robin distribution can be good enough. The distribution can be achieved either by employing a first-touch policy of NUMA memory allocation or via special platform-dependent
 API. Generally, the latter requires less overhead.
 
 ## Requirements to public API
 
-Free, stateless functions, similar to malloc, are sufficient for the allocation of large blocks of memory. 
-To guide the spreading of blocks across NUMA nodes, two additional parameters are proposed: `interleaving
-step` and `list of NUMA nodes to perform allocations on`. This single function then serves as a
-provider of memory blocks with at least page granularity and will not employ internal
-caching. If high-performance, smaller and repetitive allocations are needed, then `std::pmr` or
-other solutions should be used.
+Free, stateless functions, similar to malloc, are sufficient for the allocation of large
+blocks of memory. To guide the spreading of blocks across NUMA nodes, two additional
+parameters are proposed: `interleaving step` and `list of NUMA nodes to perform
+allocations on`. This single function then serves as a provider of memory blocks with at
+least page granularity and will not employ internal caching. If high-performance, smaller
+and repetitive allocations are needed, then `std::pmr` or other solutions should be used.
 
-`interleaving step` is the size of the distributed blocks and has page granularity. Currently there are 
-no clear use cases for granularity more than page size.
+`interleaving step` is the size of the contiguous memory block from a particular NUMA
+node, it has page granularity. Currently there are no clear use cases for granularity more
+than page size.
 
 `list of nodes for allocation` is conceptually a set of `tbb::numa_node_id`. However,
 because `tbb::numa_nodes()` returns `std::vector` and creating a `std::set` from it
@@ -35,6 +37,8 @@ One use case for `list of nodes` argument is the desire to run parallel activity
 nodes and so get memory only from those nodes.
 
 Most common usage of the allocation function is expected only with `size` parameter.
+In this case, `interleaving_step` defaults to the page size and memory is allocated on all
+NUMA nodes.
 
 ```c++
 void *tbb::numa::alloc_interleaved(size_t size, size_t interleaving_step = 0,
