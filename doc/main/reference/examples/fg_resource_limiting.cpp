@@ -14,6 +14,8 @@
     limitations under the License.
 */
 
+#include <initializer_list>
+
 struct DB_handle {
     void read() {}
     void write() {}
