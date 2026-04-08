@@ -16,6 +16,7 @@ It also describes features that are not included in the oneTBB specification.
 .. toctree::
     :titlesonly:
 
+    feature_test_macros
     scalable_memory_pools/malloc_replacement_log
     rvalue_reduce
     assertion_handler
