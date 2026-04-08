@@ -55,3 +55,4 @@ The key properties of a preview feature are:
     try_put_and_wait
     parallel_phase_for_task_arena
     fg_resource_limiting
+    core_type_selector
