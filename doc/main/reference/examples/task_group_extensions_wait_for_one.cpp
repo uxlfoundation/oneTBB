@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -68,7 +68,7 @@ struct calculate_result {
     calculate_result(int i, int& r)
         : input(i), result(r) {}
 
-    void operator()() {
+    void operator()() const {
         result = input * input;
     }
 };
@@ -80,7 +80,7 @@ struct cache_result {
     cache_result(int i, int r)
         : input(i), result(r) {}
 
-    void operator()() {
+    void operator()() const {
         add_to_cache(input, result);
     }
 };
