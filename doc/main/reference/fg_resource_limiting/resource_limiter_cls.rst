@@ -93,7 +93,7 @@ and from ``std::forward<H>(h)`` for each ``H`` in ``Handles`` and for each ``h``
 
 Constructs a ``resource_limiter`` that manages at least one resource.
 
-Each resource is constructed from the corresponding argument in ``handle`` and ``handles``.
+Each resource is constructed from the corresponding argument in ``handle`` or ``handles``.
 
 ------------------------------------------------------
 
