@@ -23,8 +23,8 @@ the node executes the user-provided body on the input message.
 
 After execution of the user-provided body, all the resources are returned to their respective ``resource_limiter`` objects.
 
-If the concurrency threshold is exceeded, or the access to one or more required resources is not granted, the input message is queued in
-the internal buffer and is processed once the concurrency or resource becomes available.
+If the concurrency threshold is exceeded, or  access to one or more required resources is not granted, the input message is queued in
+the internal buffer and is processed once concurrency allows and access to all resources is granted.
 
 ``resource_limited_node`` is a ``graph_node`` and a ``receiver<Input>``.
 
