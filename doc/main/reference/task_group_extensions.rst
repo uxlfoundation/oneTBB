@@ -11,8 +11,10 @@ This section documents ``task_group`` API extensions for advanced use cases.
 .. toctree::
     :titlesonly:
 
-    task_group_bypass_support
-    task_group_dynamic_dependencies
+    task_group_ext/task_bypass_support.rst
+    task_group_ext/task_completion_handle_cls.rst
+    task_group_ext/dynamic_dependencies.rst
+    task_group_ext/wait_single_task.rst
 
 .. rubric:: See also
 

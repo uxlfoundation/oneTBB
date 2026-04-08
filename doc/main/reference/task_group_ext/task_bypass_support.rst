@@ -1,4 +1,4 @@
-.. _task_group_bypass_support:
+.. _task_bypass_support:
 
 Task Bypass Support for ``task_group``
 ======================================
@@ -94,7 +94,7 @@ Example
 
 The example below demonstrates how to process a sequence in parallel using ``task_group`` and the divide-and-conquer pattern.
 
-.. literalinclude:: ./examples/task_group_extensions_bypassing.cpp
+.. literalinclude:: ../examples/task_group_extensions_bypassing.cpp
     :language: c++
     :start-after: /*begin_task_group_extensions_bypassing_example*/
     :end-before: /*end_task_group_extensions_bypassing_example*/

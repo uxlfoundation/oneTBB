@@ -1,4 +1,4 @@
-.. _task_group_dynamic_dependencies:
+.. _dynamic_dependencies:
 
 ``task_group`` Dynamic Dependencies
 ===================================
@@ -25,21 +25,6 @@ A **submitted** task is one that has been submitted for execution, such as by pa
 A non-empty ``task_handle`` object represents an unsubmitted task, while a ``task_completion_handle`` can represent any task.
 
 Both submitted and unsubmitted tasks can serve as predecessors. However, only unsubmitted tasks may be used as successors.
-
-.. code:: cpp
-
-    tbb::task_handle task = tg.defer(task_body);
-    // task is unsubmitted
-
-    tbb::task_completion_handle comp_handle = task;
-    // task is unsubmitted
-    // both task_handle and task_completion_handle represent the task
-
-    tg.run(std::move(task));
-    // task is submitted
-    // task_handle is empty, task_completion_handle represents the task
-
-    // At any stage, comp_handle may be used to add successors to the task
 
 The ``tbb::task_group::set_task_order(pred, succ)`` function establishes a dependency such that ``succ`` cannot begin execution until ``pred`` has completed.
 
@@ -93,34 +78,6 @@ Synopsis
                 ~task_handle();
             };
 
-            class task_completion_handle {
-            public:
-                task_completion_handle();
-
-                task_completion_handle(const task_handle& handle);
-                task_completion_handle(const task_completion_handle& other);
-                task_completion_handle(task_completion_handle&& other);
-
-                ~task_completion_handle();
-
-                task_completion_handle& operator=(const task_handle& handle);
-                task_completion_handle& operator=(const task_completion_handle& other);
-                task_completion_handle& operator=(task_completion_handle&& other);
-   
-                explicit operator bool() const noexcept;
-
-                friend bool operator==(const task_completion_handle& lhs,
-                                       const task_completion_handle& rhs) noexcept;
-                friend bool operator!=(const task_completion_handle& lhs,
-                                       const task_completion_handle& rhs) noexcept;
-
-                friend bool operator==(const task_completion_handle& t, std::nullptr_t) noexcept;
-                friend bool operator!=(const task_completion_handle& t, std::nullptr_t) noexcept;
-
-                friend bool operator==(std::nullptr_t, const task_completion_handle& t) noexcept;
-                friend bool operator!=(std::nullptr_t, const task_completion_handle& t) noexcept;
-            }; // class task_completion_handle
-
             class task_group {
                 // Only the behavior in case of dependent tasks is changed
                 void run(task_handle&& handle);
@@ -149,112 +106,6 @@ Synopsis
             } // namespace this_task_arena
         } // namespace tbb
     } // namespace oneapi
-
-``task_completion_handle`` Class
---------------------------------
-
-Constructors
-~~~~~~~~~~~~
-
-.. code:: cpp
-
-    task_completion_handle();
-
-Constructs an empty ``task_completion_handle`` that does not refer to any task.
-
-.. code:: cpp
-
-    task_completion_handle(const task_handle& handle);
-
-Constructs a ``task_completion_handle`` that refers to the task associated with ``handle``.
-If ``handle`` is empty, the behavior is undefined.
-
-.. code:: cpp
-
-    task_completion_handle(const task_completion_handle& other);
-
-Copies ``other`` into ``*this``. After the copy, both ``*this`` and ``other`` refer to the same task.
-
-.. code:: cpp
-
-    task_completion_handle(task_completion_handle&& other);
-
-Moves ``other`` into ``*this``. After the move, ``*this`` refers to the task previously referenced by ``other``, which is left empty.
-
-Destructors
-~~~~~~~~~~~
-
-.. code:: cpp
-
-    ~task_completion_handle();
-
-Destroys the ``task_completion_handle``.
-
-Assignment
-~~~~~~~~~~
-
-.. code:: cpp
-
-    task_completion_handle& operator=(const task_handle& handle);
-
-Replaces the task referenced by ``*this`` with the task associated with ``handle``.
-If ``handle`` is empty, the behavior is undefined.
-
-*Returns*: a reference to ``*this``.
-
-.. code:: cpp
-
-    task_completion_handle& operator=(const task_completion_handle& other);
-
-Performs copy assignment from ``other`` to ``*this``. After the assignment, both refer to the same task.
-
-*Returns*: a reference to ``*this``.
-
-.. code:: cpp
-
-    task_completion_handle& operator=(task_completion_handle&& other);
-
-Performs move assignment from ``other`` to ``*this``. After the move, ``*this`` refers to the task previously referenced by ``other``, which is left empty.
-
-*Returns*: a reference to ``*this``.
-
-Observers
-~~~~~~~~~
-
-.. code:: cpp
-
-    explicit operator bool() const noexcept;
-
-*Returns*: ``true`` if ``*this`` references a task; otherwise, ``false``.
-
-Comparison
-~~~~~~~~~~
-
-.. code:: cpp
-
-    bool operator==(const task_completion_handle& lhs, const task_completion_handle& rhs) noexcept;
-
-*Returns*: ``true`` if ``lhs`` and ``rhs`` reference the same task; otherwise, ``false``.
-
-.. code:: cpp
-
-    bool operator!=(const task_completion_handle& lhs, const task_completion_handle& rhs) noexcept;
-
-Equivalent to ``!(lhs == rhs)``.
-
-.. code:: cpp
-
-    bool operator==(const task_completion_handle& t, std::nullptr_t) noexcept;
-    bool operator==(std::nullptr_t, const task_completion_handle& t) noexcept;
-
-*Returns*: ``true`` if ``t`` does not reference any task; otherwise, ``false``.
-
-.. code:: cpp
-
-    bool operator!=(const task_completion_handle& t, std::nullptr_t) noexcept;
-    bool operator!=(std::nullptr_t, const task_completion_handle& t) noexcept;
-
-Equivalent to ``!(t == nullptr)``.
 
 Member Functions of ``task_handle`` Class
 -----------------------------------------
@@ -373,7 +224,7 @@ Example
 
 The following example demonstrates how to perform parallel reduction over a range using the described API.
 
-.. literalinclude:: ./examples/task_group_extensions_reduction.cpp
+.. literalinclude:: ../examples/task_group_extensions_reduction.cpp
     :language: c++
     :start-after: /*begin_task_group_extensions_reduction_example*/
     :end-before: /*end_task_group_extensions_reduction_example*/
