@@ -211,7 +211,7 @@ TEST_CASE("Test reserved slots argument in create_numa_task_arenas") {
             // reserved slots.
             std::this_thread::sleep_for(std::chrono::milliseconds{1});
 
-            std::thread t([&num_external_threads, &ta, &tg] {
+            std::thread t([num_external_threads, &ta, &tg] {
                 utils::NativeParallelFor(num_external_threads, [&ta, &tg](int) { ta.wait_for(tg); });
             });
             barrier.wait();
