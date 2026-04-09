@@ -21,12 +21,18 @@
 #error Do not #include this internal file directly; use public TBB headers instead.
 #endif
 
+#include <algorithm>
 #include <unordered_map>
 #include <forward_list>
+#include <list>
 #include <functional>
 #include <utility>
 #include <atomic>
 #include <tuple>
+#include <queue>
+#include <map>
+#include <cstdio>
+#include <chrono>
 
 namespace tbb {
 namespace detail {
@@ -35,12 +41,73 @@ namespace d2 {
 template <typename ResourceHandle>
 class resource_consumer_base;
 
+// A request id is made up of
+// 1) an integer that is either unique across all consumers and requests, or unique across requests from the same consumer.
+// 2) optionally, a timestamp that, while global, is not guaranteed to be unique, since it has nanosecond resolution.
+//
+// A request id is used to both uniquely identify a request when stored by a provider as well as to prioritize requests.
+//
+// If a global counter is used to set the integer, it alone is sufficient to uniquely identify the request and priority. No two
+// requests will have the same integer. Earlier ids can also be given higher priority if global FIFO is important.
+//
+// If a consumer-local counter is used, then the consumer pointer can be used with it to uniquely identify the request.
+// No request will have the same combination of consumer pointer and integer.
+// Priority can be based on a combination of the timestamp and the integer, with earlier timestamps being higher priority and the
+// integer being used to break ties in timestamp (with lower integers being higher priority). Or, ties can be treated as equal in
+// priority.
+
+#ifndef __TBB_USE_TIMESTAMP_IN_REQUEST_ID
+#define __TBB_USE_TIMESTAMP_IN_REQUEST_ID 1
+#endif
+
+#ifndef __TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID
+#define __TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID 1
+#endif
+
+#ifndef __TBB_USE_NOTIFY_ON_REPORT_PRESSURE
+#define __TBB_USE_NOTIFY_ON_REPORT_PRESSURE 1
+#endif
+
 class request_id {
     std::uint64_t m_unique_integer;
+#if __TBB_USE_TIMESTAMP_IN_REQUEST_ID
+    std::chrono::steady_clock::time_point m_time_point;
+#endif
 public:
+
+    // defaults to max uint64_t and max time_point
+    // the least priority request, so that any request with a valid id will be
+    // prioritized over this default constructed id
+    request_id()
+        : m_unique_integer(std::numeric_limits<std::uint64_t>::max())
+#if __TBB_USE_TIMESTAMP_IN_REQUEST_ID
+        , m_time_point(std::chrono::steady_clock::time_point::max())
+#endif
+    {}
+
+    // time stamp is taken at construction
     request_id(const std::uint64_t& unique_integer)
         : m_unique_integer(unique_integer)
-    {}
+#if __TBB_USE_TIMESTAMP_IN_REQUEST_ID
+        , m_time_point(std::chrono::steady_clock::now())
+#endif
+    {
+    }
+
+    bool operator<(const request_id& rhs) const {
+#if __TBB_USE_TIMESTAMP_IN_REQUEST_ID
+        // first by time and then by unique integer to break ties in time stamp
+        return m_time_point < rhs.m_time_point
+               || (m_time_point == rhs.m_time_point && m_unique_integer < rhs.m_unique_integer);
+#else
+        return m_unique_integer < rhs.m_unique_integer;
+#endif
+    }
+
+    bool operator==(const request_id& rhs) const {
+        // Equality based on unique integer (identity), not timestamp
+        return m_unique_integer == rhs.m_unique_integer;
+    }
 
     struct hash : protected std::hash<std::uint64_t> {
         std::size_t operator()(request_id id) const {
@@ -54,6 +121,15 @@ public:
         }
     };
 }; // class request_id
+
+#if !__TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID
+// Global counter for request_id when consumer-local counters are not used
+// Using function-local static ensures thread-safe initialization (C++11+)
+inline std::atomic<std::uint64_t>& get_global_request_counter() {
+    static std::atomic<std::uint64_t> counter{0};
+    return counter;
+}
+#endif
 
 template <typename ResourceHandle>
 class resource_handle_optional {
@@ -137,7 +213,13 @@ public:
     virtual ~resource_consumer_base() = default;
 };
 
-// TODO: use actual fair implementation with starvation avoidance
+
+//
+// This is a simmple first-come-first-serve provider.
+// Notifications and acquires are only limited by available resources.
+// Requests that cannot be immediately satisfied are stored until resources become available.
+// When resources are released, all pending requests are notified
+//
 template <typename ResourceHandle>
 class resource_limiter : public resource_provider_base<ResourceHandle> {
 public:
@@ -155,7 +237,7 @@ public:
         tbb::spin_mutex::scoped_lock lock(m_mutex);
 
         if (m_resource_handles.empty()) {
-            m_consumers.emplace_front(std::piecewise_construct, std::forward_as_tuple(id), std::forward_as_tuple(&consumer));
+            m_pending.emplace_front(std::piecewise_construct, std::forward_as_tuple(id), std::forward_as_tuple(&consumer));
         } else {
             // Resource available immediately
             lock.release();
@@ -167,7 +249,8 @@ public:
         tbb::spin_mutex::scoped_lock lock(m_mutex);
 
         if (m_resource_handles.empty()) {
-            m_consumers.emplace_front(std::piecewise_construct, std::forward_as_tuple(id), std::forward_as_tuple(&consumer));
+            // No resources available - return empty optional
+            // The consumer must request again to be notified when resources are available
             return optional_type{};
         } else {
             ResourceHandle handle = std::move(m_resource_handles.front());
@@ -182,15 +265,16 @@ public:
 
         m_resource_handles.emplace_front(std::move(handle.value()));
         
-        auto consumers = std::move(m_consumers);
-        m_consumers.clear();
+        auto pending = std::move(m_pending);
+        m_pending.clear();
 
         lock.release();
-        for (auto consumer_dt : consumers) {
+        for (auto consumer_dt : pending) {
             consumer_dt.second->notify(*this, consumer_dt.first);
         }
     }
 
+    // nothing to do since there are no priorities used
     void report_pressure(consumer_type&, std::size_t) override {}
 
     using consumer_data = std::pair<request_id, resource_consumer_base<ResourceHandle>*>;
@@ -206,8 +290,290 @@ private:
 
     tbb::spin_mutex m_mutex;
     std::forward_list<ResourceHandle> m_resource_handles;
-    std::forward_list<consumer_data>  m_consumers;
+    std::forward_list<consumer_data>  m_pending;
 }; // class resource_limiter
+
+
+// A pressure_aware_resource_limiter prioritizes notifications and acquisitions based on:
+//
+// 1) the current pressure on the consumer, with higher pressure being prioritized
+// 2) and then the request id, with lower request ids being prioritized
+// 
+// The pressure is reported by the consumer and priority is based on the last
+// reported pressure. So if a request is made and is in m_pending or m_notified, 
+// its priority may change over time as the associated consumer's pressure is adjusted.
+//
+// Configuration options:
+// __TBB_USE_TIMESTAMP_IN_REQUEST_ID: when set to 1 a timestamp is included in the request id. 
+//     The timestamp is used for comparisons and ordering. Combined with the local counter option, 
+//     this allows for requests to be prioritized based on when they were made, with ties broken by 
+//     the unique integer.
+// __TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID: when set to 1, the unique integer in the request 
+//     id is based on a counter local to the consumer. Otherwise, the unique integer is based on a global counter.
+// __TBB_USE_NOTIFY_ON_REPORT_PRESSURE: when set to 1, notifications are triggered when
+//     pressure is reported, which allows for changes in priority to be reflected in the
+//     notified requests as soon as possible. But this adds overheads.
+//
+// The defaults are to include a timestamp in the request id, to use a consumer-local counter, 
+// and to notify on report pressure.
+
+template <typename ResourceHandle>
+class pressure_aware_resource_limiter : public resource_provider_base<ResourceHandle> {
+public:
+    using resource_handle_type = ResourceHandle;
+    using consumer_type = typename resource_provider_base<ResourceHandle>::consumer_type;
+    using optional_type = typename resource_provider_base<ResourceHandle>::optional_type;
+
+    template <typename Handle, typename... Handles>
+    pressure_aware_resource_limiter(Handle&& handle, Handles&&... handles) {
+        emplace_handles(std::forward<Handle>(handle), std::forward<Handles>(handles)...);
+    }
+
+    void request(consumer_type& consumer, request_id id) override {
+        tbb::spin_mutex::scoped_lock lock(m_mutex);
+        size_t num_handles = m_resource_handles.size();
+        size_t num_notified = m_notified.size();
+
+        increment_ref_count_for_consumer(consumer);
+
+        if (num_handles == 0) {
+            // no resource available right now, add to pending list
+            // the pending list is unordered
+            m_pending.emplace_back(std::make_unique<consumer_data>(id, &consumer, m_consumer_pressure[&consumer].first));
+            return;
+        }
+
+        consumer_data new_consumer_data{id, &consumer, m_consumer_pressure[&consumer].first};
+        if (num_notified < num_handles) {
+            // there are more resources available than notified requests, so we can
+            // notify this request without comparing priorities
+            m_notified.emplace_back(std::make_unique<consumer_data>(std::move(new_consumer_data)));
+            m_needs_recompute = true;
+            lock.release();
+            consumer.notify(*this, id);
+        } else {
+            // need to compare priority with the lowest priority notified request to determine 
+            // whether to notify this request or add it to pending list.
+            ensure_priorities_current();
+            auto& threshold = m_notified[num_handles - 1];
+            if (new_consumer_data < *threshold) {
+                m_pending.emplace_back(std::make_unique<consumer_data>(id, &consumer, m_consumer_pressure[&consumer].first));
+            } else {
+                // there may be more notifications than available resources, but that's ok.
+                // they will compete for the resources when they attempt acquisition,
+                // with the same priority criteria applied (using updated priorities)
+                m_notified.emplace_back(std::make_unique<consumer_data>(std::move(new_consumer_data)));
+                m_needs_recompute = true;
+                lock.release();
+                consumer.notify(*this, id);
+            }
+        }
+    }
+
+    optional_type acquire(consumer_type& consumer, request_id id) override {
+        tbb::spin_mutex::scoped_lock lock(m_mutex);
+        consumer_data acquisition_data{id, &consumer, m_consumer_pressure[&consumer].first};
+
+        size_t num_handles = m_resource_handles.size();
+        if (num_handles == 0) {
+            // no resource available right now
+            remove_from_notified_list(acquisition_data);
+            return optional_type{};
+        }
+
+        if (m_notified.size() < num_handles) {
+            // there are more resources available than notified requests, so if this 
+            // represents a notified request, it can be given without comparing priorities
+            if (remove_from_notified_list(acquisition_data)) {
+                ResourceHandle handle = std::move(m_resource_handles.front());
+                m_resource_handles.pop_front();
+                decrement_ref_count_for_consumer(consumer);
+                return {typename optional_type::in_place_t{}, std::move(handle)};
+            } else {
+                // not in notified list - should not happen
+                return optional_type{};
+            }
+        }
+
+        ensure_priorities_current();
+        auto& threshold = m_notified[num_handles - 1];
+        bool should_not_acquire = acquisition_data < *threshold;
+
+        // remove from notified list regardless of whether acquisition will be allowed or not, 
+        // the consumer must make a new request if it wants to try again
+        if (remove_from_notified_list(acquisition_data)) {
+            decrement_ref_count_for_consumer(consumer);
+            if (should_not_acquire) {
+                // priority too low - deny acquisition
+                return optional_type{};
+            }
+            // priority high enough - allow acquisition
+            ResourceHandle handle = std::move(m_resource_handles.front());
+            m_resource_handles.pop_front();
+            return {typename optional_type::in_place_t{}, std::move(handle)};
+        } else {
+            // not in notified list - should not happen
+            return optional_type{};
+        }
+    }
+
+    void release(consumer_type&, request_id, optional_type&& handle) override {
+        __TBB_ASSERT(handle.has_value(), nullptr);
+        tbb::spin_mutex::scoped_lock lock(m_mutex);
+        m_resource_handles.emplace_front(std::move(handle.value()));
+        notify_pending(lock); // lock may be released
+    }
+
+    void report_pressure(consumer_type& c, std::size_t pressure) override {
+        tbb::spin_mutex::scoped_lock lock(m_mutex);
+        m_consumer_pressure[&c].first = pressure;  // Only update pressure, keep ref count
+#if __TBB_USE_NOTIFY_ON_REPORT_PRESSURE
+        notify_pending(lock); // lock may be released
+#endif // __TBB_USE_NOTIFY_ON_REPORT_PRESSURE
+    }
+
+private:
+
+    struct consumer_data {
+        request_id id;
+        resource_consumer_base<ResourceHandle>* consumer_ptr;
+        const std::size_t *pressure;
+
+        consumer_data(request_id id, resource_consumer_base<ResourceHandle>* consumer_ptr, const std::size_t& pressure_ref)
+            : id(id), consumer_ptr(consumer_ptr), pressure(&pressure_ref)
+        {}
+
+        bool operator<(const consumer_data& rhs) const {
+            // a consumer_data has less prioritiy if it has lesser pressure, or if
+            // pressures are equal, it has less priority if it has a greater id (lower id is higher priority)
+            if (pressure == rhs.pressure) {
+                return rhs.id < id;  // Earlier id (smaller) has higher priority for FIFO
+            }
+            return *pressure < *rhs.pressure;
+        }
+
+        bool operator==(const consumer_data& rhs) const {
+            // Equality based on identity (id and consumer_ptr), not pressure
+            return id == rhs.id && consumer_ptr == rhs.consumer_ptr;
+        }
+    };
+
+
+    template <typename Handle, typename... Handles>
+    void emplace_handles(Handle&& handle, Handles&&... handles) {
+        m_resource_handles.emplace_front(std::forward<Handle>(handle));
+        emplace_handles(std::forward<Handles>(handles)...);
+    }
+
+    void emplace_handles() {}
+
+    // called under the lock
+    void notify_pending(tbb::spin_mutex::scoped_lock& lock) {
+        size_t num_handles = m_resource_handles.size();
+        if (m_pending.empty() || num_handles == 0) {
+            // no resources or no pending requests, nothing to do
+            return;
+        }
+
+        // Sort pending by priority (highest first)
+        std::sort(m_pending.begin(), m_pending.end(),
+                  [](const std::unique_ptr<consumer_data>& a, const std::unique_ptr<consumer_data>& b) {
+                      return *b < *a;
+                  });
+
+        // Collect items to notify while holding lock
+        std::vector<std::pair<consumer_type*, request_id>> to_notify;
+        auto it = m_pending.begin();
+
+        if (m_notified.size() < num_handles) {
+            // Fast path: more resources than notified, so notify up to num_handles
+            while (it != m_pending.end() && m_notified.size() < num_handles) {
+                to_notify.emplace_back((*it)->consumer_ptr, (*it)->id);
+                m_notified.push_back(std::move(*it));
+                it = m_pending.erase(it);
+            }
+        }
+
+        if (m_notified.size() >= num_handles && it != m_pending.end()) {
+            // Sort notified to find threshold
+            std::sort(m_notified.begin(), m_notified.end(),
+                      [](const std::unique_ptr<consumer_data>& a, const std::unique_ptr<consumer_data>& b) {
+                          return *b < *a;
+                      });
+
+            // Check remaining pending items against threshold
+            while (it != m_pending.end() && !(**it < *m_notified[num_handles - 1])) {
+                to_notify.emplace_back((*it)->consumer_ptr, (*it)->id);
+                m_notified.push_back(std::move(*it));
+                it = m_pending.erase(it);
+            }
+        }
+
+        m_needs_recompute = false;  // Already sorted
+
+        // Release lock once, then notify all
+        lock.release();
+        for (auto& [consumer_ptr, id] : to_notify) {
+            consumer_ptr->notify(*this, id);
+        }
+    }
+
+    // Must be called under lock
+    void ensure_priorities_current() {
+        if (m_needs_recompute) {
+            size_t num_handles = m_resource_handles.size();
+            // Only partition if we have more notified than handles
+            if (m_notified.size() > num_handles) {
+                std::nth_element(m_notified.begin(),
+                                 m_notified.begin() + num_handles,
+                                 m_notified.end(),
+                                 [](const std::unique_ptr<consumer_data>& a, const std::unique_ptr<consumer_data>& b) {
+                                     return *b < *a;  // Higher priority first
+                                 });
+            }
+            m_needs_recompute = false;
+        }
+    }
+
+    // this is called under the lock
+    void increment_ref_count_for_consumer(consumer_type& consumer) {
+        if (m_consumer_pressure.find(&consumer) == m_consumer_pressure.end()) {
+            m_consumer_pressure[&consumer] = {0, 1};
+        } else {
+            m_consumer_pressure[&consumer].second++;
+        }
+    }
+
+    // this is called under the lock
+    void decrement_ref_count_for_consumer(consumer_type& consumer) {
+        auto it = m_consumer_pressure.find(&consumer);
+        __TBB_ASSERT(it != m_consumer_pressure.end(), "Consumer not found in pressure map");
+        if (--(it->second).second == 0) {
+            m_consumer_pressure.erase(it);
+        }
+    }
+
+    // this is called under the lock
+    bool remove_from_notified_list(consumer_data& consumer_dt) {
+        auto it = std::find_if(m_notified.begin(), m_notified.end(),
+                            [&](const std::unique_ptr<consumer_data>& data) { 
+                                return *data == consumer_dt; 
+                            });
+        
+        if (it != m_notified.end()) {
+            m_notified.erase(it);
+            return true;
+        }
+        return false;
+    }
+
+    tbb::spin_mutex m_mutex;
+    bool m_needs_recompute = false;
+    std::list<ResourceHandle> m_resource_handles;
+    std::map<resource_consumer_base<ResourceHandle>*, std::pair<std::size_t, std::size_t>> m_consumer_pressure;
+    std::vector<std::unique_ptr<consumer_data>> m_pending;
+    std::vector<std::unique_ptr<consumer_data>> m_notified;
+}; // class pressure_aware_resource_limiter
 
 template <typename Input, typename OutputPorts>
 class resource_limited_body {
@@ -220,6 +586,8 @@ public:
     virtual ~resource_limited_body() = default;
 
     resource_limited_body(graph& g) : m_graph(g) {}
+
+    virtual void note_try_put(const Input&) {}
 
     graph& graph_reference() { return m_graph; }
 };
@@ -313,6 +681,29 @@ struct release_resources_helper<0> {
     static void run(ConsumerTuple&, request_id, RequestData&) {}
 };
 
+// Helper that releases acquired resources AND re-requests them (used when acquisition fails)
+template <std::size_t Index>
+struct release_and_rerequest_resources_helper {
+    template <typename ConsumerTuple, typename RequestData>
+    static void run(ConsumerTuple& consumers, request_id id, RequestData& req_data) {
+        // Release the resource at Index-1
+        std::get<Index - 1>(consumers).release_to_provider(id, std::move(std::get<Index - 1>(req_data.handles)));
+        std::get<Index - 1>(req_data.handles) = {};
+        // Increment notify_counter because we're about to re-request (expecting a new notification)
+        ++req_data.notify_counter;
+        // Re-request the resource at Index-1
+        std::get<Index - 1>(consumers).request_from_provider(id);
+        // Recursively handle lower indices
+        release_and_rerequest_resources_helper<Index - 1>::run(consumers, id, req_data);
+    }
+};
+
+template <>
+struct release_and_rerequest_resources_helper<0> {
+    template <typename ConsumerTuple, typename RequestData>
+    static void run(ConsumerTuple&, request_id, RequestData&) {}
+};
+
 template <std::size_t Index>
 struct set_body_ptr_helper {
     template <typename ConsumerTuple, typename Body>
@@ -342,8 +733,15 @@ struct acquire_resources_helper {
             return acquire_resources_helper<Index + 1, MaxIndex>::run(body_ptr, consumers, id, req_data);
         } else {
             __TBB_ASSERT(req_data.notify_counter >= 1, "Incorrect notify counter");
-            // One of the resources denied the request
-            release_resources_helper<Index>::run(consumers, id, req_data);
+            // One of the resources denied the request at Index
+            // Undo the optimistic increment from line 709 since acquisition failed
+            --req_data.notify_counter;
+            // Release previously acquired resources (0 through Index-1) and re-request them
+            release_and_rerequest_resources_helper<Index>::run(consumers, id, req_data);
+            // Increment notify_counter because we're about to re-request (expecting a new notification)
+            ++req_data.notify_counter;
+            // Re-request the resource that failed at Index
+            std::get<Index>(consumers).request_from_provider(id);
             body_ptr->release_self_ref(id, req_data); // release the self-reference held at the beginning of resource acquisition
             return false;
         }
@@ -418,14 +816,19 @@ class resource_limited_body_leaf
     requests_map_type    m_requests;
     consumers_tuple_type m_consumers;
     Body                 m_body;
+#if __TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID
     std::uint64_t        m_counter;
+#endif
+    std::atomic<std::size_t> m_pressure;
 
     template <typename ConsumersTuple>
     resource_limited_body_leaf(graph& g, ConsumersTuple&& consumers_tuple, const Body& body)
         : resource_limited_body<Input, OutputPorts>(g)
         , m_consumers(std::forward<ConsumersTuple>(consumers_tuple))
         , m_body(body)
+#if __TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID
         , m_counter(0)
+#endif
     {}
 
 public:
@@ -446,14 +849,18 @@ public:
 
     void operator()(const Input& input, OutputPorts& ports) override {
         auto& res = form_request(input, ports);
-        report_pressure(0); // TODO: report real pressure
+        report_pressure(m_pressure.load(std::memory_order_relaxed));
         request_resources(res.first);
         release_self_ref(res.first, res.second);
     }
 
     typename requests_map_type::reference form_request(const Input& input, OutputPorts& ports) {
         tbb::spin_mutex::scoped_lock lock(m_mutex);
+#if __TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID
         request_id id{++m_counter};
+#else
+        request_id id{++get_global_request_counter()};
+#endif
         auto res = m_requests.emplace(std::piecewise_construct,
                                       std::forward_as_tuple(id),
                                       std::forward_as_tuple(input, ports));
@@ -496,8 +903,9 @@ public:
     }
 
     void release_resources(request_id id, request_data_type& req_data) {
-        // TODO: report real pressure, investigate if it should be done before or after the release
-        report_pressure(0);
+        // Report pressure after decrementing (use return value for atomicity)
+        std::size_t prev_pressure = m_pressure.fetch_sub(1, std::memory_order_relaxed);
+        report_pressure(prev_pressure - 1);
         release_resources_helper<sizeof...(ResourceProviders)>::run(m_consumers, id, req_data);
     }
 
@@ -507,6 +915,16 @@ public:
         this->graph_reference().release_wait();
         __TBB_ASSERT(num_removed == 1, "Removing unregistered request");
         tbb::detail::suppress_unused_warning(num_removed);
+    }
+
+    void note_try_put(const Input&) override {
+        // always increment but only report pressure if there are pending requests
+        auto v = m_pressure.fetch_add(1, std::memory_order_relaxed) + 1;
+        tbb::spin_mutex::scoped_lock lock(m_mutex);
+        if (!m_requests.empty()) {
+            lock.release();
+            report_pressure(v);
+        }
     }
 
     void notify(request_id id) override {
@@ -587,6 +1005,11 @@ public:
         delete m_init_body;
     }
 
+    graph_task* try_put_task( const input_type& t) override {
+        m_body->note_try_put(t);
+        return base_type::try_put_task(t);
+    }
+
     graph_task* apply_body_impl_bypass(const input_type& i
                                        __TBB_FLOW_GRAPH_METAINFO_ARG(const message_metainfo&))
     {
@@ -652,6 +1075,7 @@ public:
         : graph_node(other.my_graph)
         , input_impl_type(other)
     {}
+
 protected:
     void reset_node(reset_flags f) override { input_impl_type::reset(f); }
 }; // class resource_limited_node

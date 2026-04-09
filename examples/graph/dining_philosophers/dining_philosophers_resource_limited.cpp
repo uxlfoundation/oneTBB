@@ -46,6 +46,18 @@
 // think_node → eat_node → (loop back to think_node)
 //
 
+#ifndef USE_STARVATION_AVOIDANCE
+#define USE_STARVATION_AVOIDANCE 1
+#endif
+
+#if USE_STARVATION_AVOIDANCE
+template<typename T>
+using limiter_type = oneapi::tbb::flow::pressure_aware_resource_limiter<T>;
+#else
+template<typename T>
+using limiter_type = oneapi::tbb::flow::resource_limiter<T>;
+#endif
+
 const std::chrono::milliseconds think_time(100);
 const std::chrono::milliseconds eat_time(100);
 const int num_times = 10;
@@ -89,9 +101,14 @@ public:
     int get_left_chopstick_id() const { return my_left_chopstick_id; }
     int get_right_chopstick_id() const { return my_right_chopstick_id; }
 
-    bool should_continue() const { return my_count > 0; }
-    void decrement_count() { --my_count; }
-    void increment_iteration() { ++my_iteration; }
+    bool should_continue() { 
+        auto r = my_count > 1; 
+        if (my_count > 0) {
+            --my_count;
+            ++my_iteration;
+        }
+        return r;
+    }
 
     void think() {
         std::unique_ptr<ScopedTraceEvent> trace;
@@ -196,9 +213,14 @@ int main(int argc, char *argv[]) {
     using oneapi::tbb::flow::output_port;
     using oneapi::tbb::flow::function_node;
     using oneapi::tbb::flow::resource_limited_node;
-    using oneapi::tbb::flow::resource_limiter;
     using oneapi::tbb::flow::continue_msg;
     using oneapi::tbb::flow::unlimited;
+
+#if USE_STARVATION_AVOIDANCE
+using oneapi::tbb::flow::pressure_aware_resource_limiter;
+#else
+using oneapi::tbb::flow::resource_limiter;
+#endif
 
     oneapi::tbb::tick_count main_time = oneapi::tbb::tick_count::now();
     int num_threads;
@@ -209,10 +231,17 @@ int main(int argc, char *argv[]) {
     verbose = !options.silent;
     bool enable_tracing = options.enable_tracing;
 
-    TraceCollector* trace_collector = enable_tracing ? new TraceCollector() : nullptr;
-
     for (num_threads = options.threads.first; num_threads <= options.threads.last;
          num_threads = options.threads.step(num_threads)) {
+
+        std::string trace_filename = "dining_philosophers_resource_limited_" +
+                                    std::to_string(num_philosophers) + "_phil_" +
+                                    std::to_string(num_threads) + "_threads.json";
+
+        TraceCollector* trace_collector = enable_tracing
+            ? new TraceCollector(trace_filename, 1, "dining_philosophers_resource_limited",
+                                TraceCollector::WriteMode::EAGER)
+            : nullptr;
         oneapi::tbb::global_control c(oneapi::tbb::global_control::max_allowed_parallelism,
                                       num_threads);
 
@@ -228,10 +257,15 @@ int main(int argc, char *argv[]) {
 
         // Create chopsticks and resource providers
         std::vector<chopstick> chopsticks(num_philosophers);
-        std::vector<std::unique_ptr<resource_limiter<chopstick*>>> providers;
+#if USE_STARVATION_AVOIDANCE
+        std::cout << "Using pressure_aware_resource_limiter to avoid starvation\n";
+#else
+        std::cout << "Using resource_limiter (no starvation avoidance)\n";
+#endif
+        std::vector<std::unique_ptr<limiter_type<chopstick*>>> providers;
         providers.reserve(num_philosophers);
         for (int i = 0; i < num_philosophers; ++i) {
-            providers.push_back(std::make_unique<resource_limiter<chopstick*>>(&chopsticks[i]));
+            providers.push_back(std::make_unique<limiter_type<chopstick*>>(&chopsticks[i]));
         }
 
         // Create philosophers
@@ -239,7 +273,6 @@ int main(int argc, char *argv[]) {
         philosophers.reserve(num_philosophers);
 
         const int philosopher_base_tid = 1;
-        std::vector<std::pair<int, std::string>> thread_names;
 
         // Node types for the hybrid approach
         typedef function_node<continue_msg, continue_msg> think_node_type;
@@ -260,7 +293,7 @@ int main(int argc, char *argv[]) {
                 philosopher(names[i], tid, trace_collector, left_id, right_id));
 
             if (trace_collector) {
-                thread_names.emplace_back(tid, names[i]);
+                trace_collector->add_thread_name(tid, names[i]);
             }
 
             if (verbose) {
@@ -286,8 +319,6 @@ int main(int argc, char *argv[]) {
                     phil.eat();  // Eat with chopsticks held
 
                     if (phil.should_continue()) {
-                        phil.decrement_count();
-                        phil.increment_iteration();
                         std::get<0>(ports).try_put(continue_msg{});  // Loop back to think
                     }
                     else {
@@ -322,14 +353,6 @@ int main(int argc, char *argv[]) {
                       << " threads have taken " << (t1 - t0).seconds() << "seconds"
                       << "\n";
 
-        if (trace_collector) {
-            std::string trace_filename = "dining_philosophers_resource_limited_" +
-                                        std::to_string(num_philosophers) + "_phil_" +
-                                        std::to_string(num_threads) + "_threads.json";
-            trace_collector->write_trace(trace_filename, 1, "dining_philosophers_resource_limited",
-                                        thread_names);
-        }
-
         for (int i = 0; i < num_philosophers; ++i)
             philosophers[i].check();
 
@@ -339,9 +362,10 @@ int main(int argc, char *argv[]) {
         }
 
         // Resource providers automatically cleaned up by unique_ptr
-    }
 
-    delete trace_collector;
+        // Trace file written by destructor
+        delete trace_collector;
+    }
 
     utility::report_elapsed_time((oneapi::tbb::tick_count::now() - main_time).seconds());
     return 0;

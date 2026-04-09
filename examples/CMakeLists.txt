@@ -54,6 +54,7 @@ endif()
 tbb_add_example(graph dining_philosophers)
 tbb_add_example(graph fgbzip2)
 tbb_add_example(graph logic_sim)
+tbb_add_example(graph resource_perf)
 tbb_add_example(graph som)
 
 tbb_add_example(parallel_for game_of_life)

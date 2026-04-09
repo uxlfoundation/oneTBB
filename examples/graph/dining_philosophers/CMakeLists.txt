@@ -28,6 +28,7 @@ target_compile_options(dining_philosophers PRIVATE ${TBB_CXX_STD_FLAG})
 add_executable(dining_philosophers_resource_limited dining_philosophers_resource_limited.cpp)
 
 target_link_libraries(dining_philosophers_resource_limited TBB::tbb Threads::Threads)
+target_compile_features(dining_philosophers_resource_limited PRIVATE cxx_std_17)
 target_compile_options(dining_philosophers_resource_limited PRIVATE ${TBB_CXX_STD_FLAG})
 
 set(EXECUTABLE "$<TARGET_FILE:dining_philosophers>")
