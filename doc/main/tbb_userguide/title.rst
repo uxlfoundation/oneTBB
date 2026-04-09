@@ -25,6 +25,7 @@
    ../tbb_userguide/Migration_Guide
    ../tbb_userguide/Constraints
    ../tbb_userguide/std_invoke
+   ../tbb_userguide/fg_ctad
    ../tbb_userguide/appendix_A
    ../tbb_userguide/appendix_B
    ../tbb_userguide/References
