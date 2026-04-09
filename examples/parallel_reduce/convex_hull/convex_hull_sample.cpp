@@ -269,37 +269,60 @@ int main(int argc, char *argv[]) {
     pointVec_t points;
     pointVec_t hull;
     int nthreads;
+    double rel_error;
 
     points.reserve(cfg::numberOfPoints);
 
     if (!util::silent) {
-        std::cout << "Starting TBB-buffered version of QUICK HULL algorithm"
-                  << "\n";
+        std::cout << "Starting TBB-buffered version of QUICK HULL algorithm" << "\n";
     }
+
+    if (util::numberOfIterations <= 0) {
+        util::numberOfIterations = 10;
+        std::cout << "Setting the number of iterations = " << util::numberOfIterations
+                  << " default\n";
+    }
+    else {
+        std::cout << "Input for the number of iterations = " << util::numberOfIterations << "\n";
+    }
+
+    utility::measurements mu(util::numberOfIterations);
 
     for (nthreads = threads.first; nthreads <= threads.last; nthreads = threads.step(nthreads)) {
         oneapi::tbb::global_control c(oneapi::tbb::global_control::max_allowed_parallelism,
                                       nthreads);
 
         points.clear();
-        util::my_time_t tm_init = util::gettime();
-        initialize(points);
-        util::my_time_t tm_start = util::gettime();
-        if (!util::silent) {
-            std::cout << "Init time on " << nthreads
-                      << " threads: " << util::time_diff(tm_init, tm_start)
-                      << "  Points in input: " << points.size() << "\n";
-        }
 
-        tm_start = util::gettime();
-        quickhull(points, hull);
-        util::my_time_t tm_end = util::gettime();
-        if (!util::silent) {
-            std::cout << "Time on " << nthreads << " threads: " << util::time_diff(tm_start, tm_end)
-                      << "  Points in hull: " << hull.size() << "\n";
+        for (int iter = 0; iter < util::numberOfIterations; ++iter) {
+            util::my_time_t tm_init = util::gettime();
+            initialize(points);
+
+            util::my_time_t tm_start = util::gettime();
+            if (!util::silent) {
+                std::cout << "Init time on " << nthreads
+                          << " threads: " << util::time_diff(tm_init, tm_start)
+                          << "  Points in input: " << points.size() << "\n";
+            }
+
+            tm_start = util::gettime();
+            mu.start();
+
+            quickhull(points, hull);
+
+            mu.stop();
+            util::my_time_t tm_end = util::gettime();
+            if (!util::silent) {
+                std::cout << "Time on " << nthreads
+                          << " threads: " << util::time_diff(tm_start, tm_end)
+                          << "  Points in hull: " << hull.size() << "\n";
+            }
+            hull.clear();
         }
-        hull.clear();
+        rel_error = mu.computeRelError();
     }
+
     utility::report_elapsed_time(util::time_diff(tm_main_begin, util::gettime()));
+    utility::report_relative_error(rel_error);
     return 0;
 }
