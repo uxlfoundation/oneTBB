@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2026 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ void no_ctad_example() {
         [](continue_msg) {});
 
     input_node<int> src(g,
-        [](flow_control& fc) -> int { fc.stop(); return 0; });
+        [](oneapi::tbb::flow_control& fc) -> int { fc.stop(); return 0; });
 /*end_fg_ctad_no_ctad_example*/
 }
 
@@ -60,7 +60,7 @@ void with_ctad_example() {
 
     // The compiler deduces input_node<int>
     input_node src(g,
-        [](flow_control& fc) -> int { fc.stop(); return 0; });
+        [](oneapi::tbb::flow_control& fc) -> int { fc.stop(); return 0; });
 /*end_fg_ctad_with_ctad_example*/
 }
 
@@ -76,7 +76,7 @@ void preview_ctad_example() {
 
     // Non-functional nodes: CTAD from predecessors/successors
     broadcast_node input(precedes(doubler, squarer));  // deduces broadcast_node<int>
-    join_node join(follows(doubler, squarer));          // deduces join_node<std::tuple<int, int>, queueing>
+    join_node join(follows(doubler, squarer));         // deduces join_node<std::tuple<int, int>, queueing>
 /*end_fg_ctad_preview_example*/
 }
 
