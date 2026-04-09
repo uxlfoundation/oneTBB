@@ -41,7 +41,7 @@ may cause a performance penalty if threads from one NUMA node access the memory 
 a different NUMA node. To reduce this overhead, the work may be divided among several ``task_arena``
 instances, whose execution preference is set to different NUMA nodes. To set execution preference,
 assign a NUMA node identifier to the ``task_arena::constraints::numa_id`` field or use
-``tbb::create_numa_task_arenas`` function to create the set of task arenas,
+the ``tbb::create_numa_task_arenas`` function to create a set of task arenas,
 one per NUMA node on the system.
 
 .. literalinclude:: ./examples/guiding_task_scheduler_execution.cpp
