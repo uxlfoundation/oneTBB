@@ -253,15 +253,18 @@ endforeach()
 #   NDK throws the warning: "argument unused during compilation: '-Wa,--noexecstack'"
 # - For some reason GCC does not instrument code with Thread Sanitizer when lto is enabled and C linker is used.
 if (TBB_ENABLE_IPO AND BUILD_SHARED_LIBS AND NOT ANDROID_PLATFORM AND NOT TBB_SANITIZE MATCHES "thread")
-    if (NOT CMAKE_VERSION VERSION_LESS 3.9)
+    # Under Linux, ipo detection for 2024+ versions of Intel compilers is supported starting cmake 3.30.1.
+    # In this case and for older cmake versions without CheckIPOSupported, try to enable IPO unconditionally.
+    if (CMAKE_VERSION VERSION_LESS 3.9 OR (LINUX AND CMAKE_VERSION VERSION_LESS 3.30.1
+        AND CMAKE_CXX_COMPILER_ID STREQUAL "IntelLLVM" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 2023))
+        set(TBB_IPO_FLAGS TRUE)
+    else()
         cmake_policy(SET CMP0069 NEW)
         include(CheckIPOSupported)
         check_ipo_supported(RESULT TBB_IPO_PROPERTY)
         if (NOT TBB_IPO_PROPERTY)
             message(WARNING "IPO disabled: not supported by this compiler.")
         endif()
-    else()
-        set(TBB_IPO_FLAGS TRUE)
     endif()
     if (TBB_IPO_PROPERTY OR TBB_IPO_FLAGS)
         message(STATUS "IPO enabled")
