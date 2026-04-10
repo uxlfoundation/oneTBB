@@ -26,6 +26,10 @@ DB_handle* open_database() {
     return &global_db_handle;
 }
 
+struct processor_body {
+    int operator()(int id) const { return id; }
+};
+
 auto input_ids = {1, 2, 3};
 
 /*begin_fg_resource_limiting_example*/
@@ -50,6 +54,8 @@ int main() {
             std::get<0>(ports).try_put(id);
         });
 
+    function_node<int, int> processor(g, unlimited, processor_body{});
+
     resource_limited_node_type db_writer(g, unlimited,
         std::tie(db_limiter),
         [](int id, auto& ports, DB_handle* db) {
@@ -59,6 +65,8 @@ int main() {
         }
     );
 
+    make_edge(output_port<0>(db_reader), processor);
+    make_edge(processor, db_writer);
     // Other graph nodes and edges
 
     for (int id : input_ids) {
