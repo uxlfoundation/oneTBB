@@ -10,8 +10,8 @@ Parallel Reduction for rvalues
 Description
 ***********
 
-|full_name| implementation extends the `ParallelReduceFunc <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/named_requirements/algorithms/par_reduce_func>`_ and
-`ParallelReduceReduction <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/named_requirements/algorithms/par_reduce_reduction>`_
+|full_name| implementation extends the :onetbb-spec:`ParallelReduceFunc <named_requirements/algorithms/par_reduce_func>` and
+:onetbb-spec:`ParallelReduceReduction <named_requirements/algorithms/par_reduce_reduction>`
 to optimize operating with ``rvalues`` using functional form of ``tbb::parallel_reduce`` and ``tbb::parallel_deterministic_reduce`` algorithms.
 
 API
@@ -34,8 +34,8 @@ or
 .. cpp:function:: Value Func::operator()(const Range& range, const Value& x) const
 
     Accumulates the result for a subrange, starting with initial value ``x``. The ``Range`` type must meet the
-    `Range requirements <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/named_requirements/algorithms/range>`_.
-    The ``Value`` type must be the same as a corresponding template parameter for the `parallel_reduce algorithm <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/algorithms/functions/parallel_reduce_func>`_.
+    :onetbb-spec:`Range requirements <named_requirements/algorithms/range>`.
+    The ``Value`` type must be the same as a corresponding template parameter for the :onetbb-spec:`parallel_reduce algorithm <algorithms/functions/parallel_reduce_func>`.
 
     If both ``rvalue`` and ``lvalue`` forms are provided, the ``rvalue`` is preferred.
 
@@ -48,7 +48,7 @@ or
 
 .. cpp:function:: Value Reduction::operator()(const Value& x, const Value& y) const
 
-    Combines the ``x`` and ``y`` results. The ``Value`` type must be the same as a corresponding template parameter for the `parallel_reduce algorithm <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/algorithms/functions/parallel_reduce_func>`_.
+    Combines the ``x`` and ``y`` results. The ``Value`` type must be the same as a corresponding template parameter for the :onetbb-spec:`parallel_reduce algorithm <algorithms/functions/parallel_reduce_func>`.
 
     If both ``rvalue`` and ``lvalue`` forms are provided, the ``rvalue`` is preferred.
 
@@ -62,7 +62,7 @@ Example
 
 .. rubric:: See also
 
-* `oneapi::tbb::parallel_reduce specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/algorithms/functions/parallel_reduce_func>`_
-* `oneapi::tbb::parallel_deterministic_reduce specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/algorithms/functions/parallel_deterministic_reduce_func>`_
-* `ParallelReduceFunc specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/named_requirements/algorithms/par_reduce_func>`_
-* `ParallelReduceReduction specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/named_requirements/algorithms/par_reduce_reduction>`_
+* :onetbb-spec:`oneapi::tbb::parallel_reduce specification <algorithms/functions/parallel_reduce_func>`
+* :onetbb-spec:`oneapi::tbb::parallel_deterministic_reduce specification <algorithms/functions/parallel_deterministic_reduce_func>`
+* :onetbb-spec:`ParallelReduceFunc specification <named_requirements/algorithms/par_reduce_func>`
+* :onetbb-spec:`ParallelReduceReduction specification <named_requirements/algorithms/par_reduce_reduction>`

@@ -79,4 +79,4 @@ Example
 
 .. rubric:: See also
 
-* `Enabling Debugging Features specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/v1.4-rev-1/elements/onetbb/source/configuration/enabling_debugging_features>`_
+* :onetbb-spec:`Enabling Debugging Features specification <configuration/enabling_debugging_features>`
