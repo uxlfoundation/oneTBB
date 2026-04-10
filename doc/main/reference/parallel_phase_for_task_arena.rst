@@ -180,7 +180,7 @@ Global Control Integration
 When the ``leave_policy`` parameter is active on a ``global_control`` object with
 the value ``task_arena::leave_policy::fast``, initializing an arena with
 ``task_arena::leave_policy::automatic`` behaves as if the arena is initialized with
-``task_arena::leave_policy::fast``. Arenas that were already initialized are not affected 
+``task_arena::leave_policy::fast``. Arenas that were already initialized (including implicit arenas) are not affected 
 by changes to the ``leave_policy`` parameter on a ``global_control`` object.
 
 When multiple ``global_control`` objects exist for the ``leave_policy`` parameter,
