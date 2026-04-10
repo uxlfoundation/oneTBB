@@ -10,7 +10,7 @@ oneTBB
 ======
 **[spec.version]**
 
-This is the specification of |tbb_full_name|, part of the oneAPI Specification version |tbb_version|.
+This is the specification of |tbb_full_name|, part of the oneAPI Specification.
 
 .. toctree::
    :maxdepth: 2
