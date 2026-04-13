@@ -54,15 +54,17 @@ The proposed approach has several advantages over other alternatives:
   not participate in name mangling, making translation units compiled with modules,
   compatible with the units compiled with regular headers.
 
-The disadvantage of this approach is an obligation to update the module interface unit each time a new API is added.
+The disadvantage of this approach is an obligation to update the module interface unit each time
+new API is added.
 
 ### CMake integration
 
-The library must remain at C++11 as the minimum standard, hence the module source cannot be
-compiled as part of the oneTBB build. Additionally, currently the built module constrains
-the consumer to use a specific version of the C++ standard: the one that was used during
-the module build. Thus, the `.cppm` file is installed as a source file and compiled on the
-consumer side.
+The project policy requires C++11 as the minimum standard, hence the module source cannot
+be compiled as part of the oneTBB build because it would force C++20 standard on the library.
+With the ABI non-breaking approach, the library built with C++11 can be used together with
+the module interface unit compiled with C++20 or higher. Furthermore, a prebuilt module constrains
+the consumer to the exact C++ standard version used during the module build. Thus, the `.cppm` file
+is installed as a source file and compiled on the consumer side.
 
 ```cmake
 find_package(TBB REQUIRED)
