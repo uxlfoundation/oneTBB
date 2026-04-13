@@ -49,7 +49,7 @@
 
 ## :octocat: Open-Source Contributions Integrated
 - Updated tbb4py installation approach to be aligned with PEP517. Contributed by Ben Greiner (https://github.com/uxlfoundation/oneTBB/pull/1941).
-- Improved usage of <windows.h> in oneTBB code. Contributed by Aras PranckeviÄius (https://github.com/uxlfoundation/oneTBB/pull/1932).
+- Improved usage of <windows.h> in oneTBB code. Contributed by Aras Pranckevi&#269;ius (https://github.com/uxlfoundation/oneTBB/pull/1932).
 - Fixed CMake build issue with Clang on Windows*. Contributed by JustinZhu (https://github.com/uxlfoundation/oneTBB/pull/1936).
 
 
