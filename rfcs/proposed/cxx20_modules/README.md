@@ -48,19 +48,19 @@ export namespace tbb {
 The proposed approach has several advantages over other alternatives:
 
 - It does not require the modification of existing headers, as the module includes them as
-  part of global module fragment and then selectively export the necessary `using`
-  declarations. Thus, the development can continue in headers.
-- Since the API is declared as part of global module fragment, the name of the module will
-  not participate in the name mangling, making translation units compiled with modules,
+  part of a global module fragment and then selectively exports the necessary `using`
+  declarations. Thus, development can continue in headers.
+- Since the API is declared as part of a global module fragment, the name of the module will
+  not participate in name mangling, making translation units compiled with modules,
   compatible with the units compiled with regular headers.
 
-The disadvantage of this approach is an obligation to update the module interface unit each time new API is added.
+The disadvantage of this approach is an obligation to update the module interface unit each time a new API is added.
 
 ### CMake integration
 
 The library must remain at C++11 as the minimum standard, hence the module source cannot be
 compiled as part of the oneTBB build. Additionally, currently the built module constrains
-the consumer to use the specific version of the C++ standard: the one that was used during
+the consumer to use a specific version of the C++ standard: the one that was used during
 the module build. Thus, the `.cppm` file is installed as a source file and compiled on the
 consumer side.
 
