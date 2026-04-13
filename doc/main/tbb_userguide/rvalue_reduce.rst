@@ -8,9 +8,8 @@ function and the combine function. This allows efficient use of move operations 
 accumulated results are expensive to copy.
 
 The example below merges a collection of ``std::set`` objects into a single set.
-Because the accumulator is passed as an rvalue reference, the algorithm can use
-the C++17 ``std::set::merge`` function to transfer nodes between sets without copying or
-moving the underlying data.
+Because the accumulator is passed as an rvalue reference, the algorithm can
+transfer nodes between sets without copying or moving the underlying data.
 
 .. literalinclude:: ./examples/rvalue_reduce.cpp
     :language: c++
