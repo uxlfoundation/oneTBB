@@ -4,8 +4,8 @@ Use of r-Values for Reduction
 =============================
 
 The functional form of ``parallel_reduce`` supports rvalue references in both the reduction
-function and the combine function. This allows efficient use of move semantics when
-accumulating results that are expensive to copy, such as containers.
+function and the combine function. This allows efficient use of move operations when
+accumulated results are expensive to copy.
 
 The example below merges a collection of ``std::set`` objects into a single set.
 Because the accumulator is passed as an rvalue reference, the algorithm can use
