@@ -17,9 +17,9 @@
 # oneTBB 2023.0 Release Notes
 
 ## :rocket: Preview Features
-- Introduced ability to wait for a single task in a task_group instead of waiting for all tasks to finish. This increases reactivity and decreases latency in key user workloads.
-- Introduced flow::resource_limited_node and flow::resource_limiter classes. These nodes only execute when they can successfully acquire the necessary resources from the resource limiters associated with the node. This feature is used to guard access to shared resources, while maximizing available parallelism in the graph.
-- Introduced task_arena core type selector to better support hybrid architectures with several core types. Users use this new flexible API to more tightly constrain execution to set preferences for the specific core types that match their workload.
+- Introduced ability to wait for a single task in a ``task_group`` instead of waiting for all tasks to finish. This increases reactivity and decreases latency in key user workloads.
+- Introduced ``flow::resource_limited_node`` and ``flow::resource_limiter`` classes. These nodes only execute when they can successfully acquire the necessary resources from the resource limiters associated with the node. This feature is used to guard access to shared resources, while maximizing available parallelism in the graph.
+- Introduced ``task_arena`` core type selector to better support hybrid architectures with several core types. Users use this new flexible API to more tightly constrain execution to set preferences for the specific core types that match their workload.
 - Added global control parameter to set default block time behavior on server HW. This allows developers to revert to older blocking behavior if their applications are not able to fully utilize all cores, thereby reducing idle spinning.
 
 
@@ -27,7 +27,7 @@
 - Added new API to create a set of NUMA bound task arenas, simplifying common patterns used to optimize for NUMA architectures.
 - Extended Flow Graph functional node deduction guides to support non-static member function and member object pointers as a node bodies.
 - The Flow Graph join_node and indexer_node now support 10 or more input ports.
-- Explicit deduction guides for blocked_nd_range are now a fully supported feature.
+- Explicit deduction guides for ``blocked_nd_range`` are now a fully supported feature.
 - Added native WASM exception handling support.
 - Added support for Python 3.14.
 
