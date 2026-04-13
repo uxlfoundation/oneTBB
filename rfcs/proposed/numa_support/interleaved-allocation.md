@@ -10,7 +10,8 @@ access to a remote node and bandwidth-limited simultaneous access from different
 a single NUMA memory node. A well-known method to mitigate both is a distribution of
 memory objects that are accessed from different CPUs to different NUMA nodes in such a way
 that matches an access pattern. If the access pattern is complex enough, a simple
-round-robin distribution can be good enough. The distribution can be achieved either by employing a first-touch policy of NUMA memory allocation or via special platform-dependent
+round-robin distribution can be good enough. The distribution can be achieved either by
+employing a first-touch policy of NUMA memory allocation or via special platform-dependent
 API. Generally, the latter requires less overhead.
 
 ## Requirements to public API
@@ -50,8 +51,8 @@ void tbb::numa::free_interleaved(void *ptr, size_t size);
 
 Under Linux, only allocations with default interleaving can be supported via HWLOC. Other
 interleaving steps require direct libnuma usage, that creates yet another run-time
-dependency. It's possible to implement allocation with constant number of system call wrt
-allocation size.
+dependency. Using `move_pages` it's possible to implement allocation with constant number
+of system call wrt allocation size.
 
 Under Windows, starting Windows 10 and WS 2016, `VirtualAlloc2(MEM_REPLACE_PLACEHOLDER)`
 can be used to provide desired interleaving, but number of system calls is proportional to
@@ -68,3 +69,8 @@ When non-default `interleaving step` can be used?
 `size` argument for `free_interleaved()` appeared because what we have is wrappers over
 `mmap`/`munmap` and there is no place to put the size after memory is allocated. We can
 put it in, say, an internal cumap. Is it look useful?
+
+Semantics of even distribution of data between NUMA nodes is straightforward: to equally
+balance work between the nodes. Why might someone want to distribute data unequally? Can
+it be a form of fine-tuning “node 0 already loaded with access to static data, let’s
+decrease the load a little”?
