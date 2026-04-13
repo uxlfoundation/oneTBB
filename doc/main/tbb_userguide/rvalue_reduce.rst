@@ -1,7 +1,7 @@
 .. _rvalue_reduce:
 
-Parallel Reduction for Rvalues
-==============================
+Use of r-Values for Reduction
+=============================
 
 The functional form of ``parallel_reduce`` supports rvalue references in both the reduction
 function and the combine function. This allows efficient use of move semantics when
