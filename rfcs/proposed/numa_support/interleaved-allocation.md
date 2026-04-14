@@ -27,25 +27,25 @@ and repetitive allocations are needed, then `std::pmr` or other solutions should
 node, it has page granularity. Currently there are no clear use cases for granularity more
 than page size.
 
-`list of nodes for allocation` is conceptually a set of `tbb::numa_node_id`. However,
-because `tbb::numa_nodes()` returns `std::vector` and creating a `std::set` from it
-requires allocation, `vector` can be used. Because semantics of `tbb::numa_node_id` is
-not defined, we can't use it to construct e.g., a bit mask. Allocation that is unbalanced
-between NUMA nodes doesn't seem to have useful applications, so repeated elements in `list
-of nodes` is an error.
+`list of nodes for allocation` is `std::vector<tbb::numa_node_id>` to be compatible with a
+value returned from `tbb::numa_nodes()`. `libnuma` supports a subset of NUMA nodes for
+allocation, but those nodes are loaded equally. Having `vector` allows us to express
+unbalanced load. Example: using [3, 0, 3] allocates 2/3 memory from node 3 and 1/3 from
+node 0.
 
-One use case for `list of nodes` argument is the desire to run parallel activity on subset of
-nodes and so get memory only from those nodes.
+One use case for `list of nodes` argument is the desire to run parallel activity on subset
+of nodes and so get memory only from those nodes.
 
 Most common usage of the allocation function is expected only with `size` parameter.
 In this case, `interleaving_step` defaults to the page size and memory is allocated on all
 NUMA nodes.
 
-The following functions are provided to illustrate the conceptual API, not yet as the recommended new API.
+The following functions are provided to illustrate the conceptual API, not yet as the
+recommended new API.
 
 ```c++
 void *alloc_interleaved(size_t size, size_t interleaving_step = 0,
-                         const std::vector<tbb::numa_node_id> *nodes = nullptr);
+                        const std::vector<tbb::numa_node_id> *nodes = nullptr);
 void free_interleaved(void *ptr, size_t size);
 ```
 
