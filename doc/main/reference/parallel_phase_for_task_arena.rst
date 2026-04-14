@@ -175,7 +175,7 @@ Global Control Integration
 
 .. cpp:enum:: global_control::leave_policy
 
-**Selection rule**: logical disjunction
+**Selection rule**: see below
 
 When the ``leave_policy`` parameter is active on a ``global_control`` object with
 the value ``task_arena::leave_policy::fast``, initializing an arena with
