@@ -41,10 +41,12 @@ Most common usage of the allocation function is expected only with `size` parame
 In this case, `interleaving_step` defaults to the page size and memory is allocated on all
 NUMA nodes.
 
+The following functions are provided to illustrate the conceptual API, not yet as the recommended new API.
+
 ```c++
-void *tbb::numa::alloc_interleaved(size_t size, size_t interleaving_step = 0,
-                                   const std::vector<tbb::numa_node_id> *nodes = nullptr);
-void tbb::numa::free_interleaved(void *ptr, size_t size);
+void *alloc_interleaved(size_t size, size_t interleaving_step = 0,
+                         const std::vector<tbb::numa_node_id> *nodes = nullptr);
+void free_interleaved(void *ptr, size_t size);
 ```
 
 ## Implementation details
