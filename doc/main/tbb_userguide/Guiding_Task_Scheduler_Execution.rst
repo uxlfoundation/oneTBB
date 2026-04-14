@@ -40,7 +40,9 @@ The execution on systems with non-uniform memory access (NUMA https://en.wikiped
 may cause a performance penalty if threads from one NUMA node access the memory allocated on
 a different NUMA node. To reduce this overhead, the work may be divided among several ``task_arena``
 instances, whose execution preference is set to different NUMA nodes. To set execution preference,
-assign a NUMA node identifier to the ``task_arena::constraints::numa_id`` field.
+assign a NUMA node identifier to the ``task_arena::constraints::numa_id`` field or use
+the ``tbb::create_numa_task_arenas`` function to create a set of task arenas,
+one per NUMA node on the system.
 
 .. literalinclude:: ./examples/guiding_task_scheduler_execution.cpp
     :language: c++

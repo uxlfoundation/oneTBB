@@ -30,15 +30,15 @@ int main() {
                                     std::set<int>{}, // identity element - empty set
                                     [&](const oneapi::tbb::blocked_range<size_t>& range, std::set<int>&& value) {
                                         for (size_t i = range.begin(); i < range.end(); ++i) {
-                                            // Having value as a non-const rvalue reference allows to efficiently
-                                            // transfer nodes from sets[i] without copying/moving the data
+                                            // Having value as a non-const rvalue reference enables efficient
+                                            // transfer of nodes from sets[i] without copying or moving the elements
                                             value.merge(std::move(sets[i]));
                                         }
                                         return value;
                                     },
                                     [&](std::set<int>&& x, std::set<int>&& y) {
                                         x.merge(std::move(y));
-                                        return x;
+                                        return std::move(x);
                                     }
                                     );
 }

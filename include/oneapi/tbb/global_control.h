@@ -108,7 +108,6 @@ public:
     }
 
     static std::size_t active_value(parameter p) {
-        __TBB_ASSERT(p < parameter_max, "Invalid parameter");
         return r1::global_control_active_value((int)p);
     }
 

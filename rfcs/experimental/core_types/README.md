@@ -81,6 +81,8 @@ Similarly, we can create/initialize an arena for core type(s) selected by a user
 #### Synopsis
 
 ```cpp
+#define TBB_HAS_TASK_ARENA_CORE_TYPE_SELECTOR 202xxx
+
 namespace oneapi {
 namespace tbb {
 class task_arena {
@@ -138,7 +140,14 @@ This allows querying the effective concurrency without creating a task arena.
 The key implementation problem is how to pass the additional information about multiple core types
 to the TBB library functions for arena creation while meeting compatibility requirements.
 
-This proposal encapsulates the implementation and can potentially utilize various ways to solve the problem, such as:
+This proposal encapsulates the implementation and can potentially utilize various ways to solve the problem.
+The experimental implementation encodes the extra information into the existing types, using the bit-packing
+scheme described in [Alternative 2](#alternative-2-extend-constraints-api-in-place) internally within the
+selector API. To enable applications compiled with the new functionality to handle execution against older
+oneTBB binaries, the header-side code checks `TBB_runtime_interface_version()` at runtime to fall back
+gracefully when an older library is loaded.
+
+The approaches that were considered include:
 - encoding the extra information into the existing types;
 - [ab]using other existing entry points / data structures with reserved parameters or space to pass information through;
   - for example, using `task_arena_base::my_arena` (which is currently `nullptr` until the arena is initialized),

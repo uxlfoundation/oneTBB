@@ -21,7 +21,6 @@ It also describes features that are not included in the oneTBB specification.
     :titlesonly:
 
     scalable_memory_pools/malloc_replacement_log
-    rvalue_reduce
     assertion_handler
 
 Preview features
@@ -55,3 +54,4 @@ The key properties of a preview feature are:
     custom_mutex_chmap
     try_put_and_wait
     parallel_phase_for_task_arena
+    fg_resource_limiting

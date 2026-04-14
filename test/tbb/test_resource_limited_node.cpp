@@ -298,7 +298,7 @@ void test_root_genie() {
     // TODO: add fairness checks
 }
 
-void test_cancellation_with_active_requests(bool exception) {
+void test_cancellation_with_active_requests(bool same_graph, bool exception) {
     using namespace tbb::flow;
 
     int resource_value = 1;
@@ -316,6 +316,8 @@ void test_cancellation_with_active_requests(bool exception) {
     graph g1;
     graph g2(g2_context);
 
+    graph* cancel_node_graph_ptr = same_graph ? &g2 : &g1;
+
     const std::size_t n_submissions = 100;
     std::atomic<std::size_t> g2_node_body_counter{0};
 
@@ -327,7 +329,7 @@ void test_cancellation_with_active_requests(bool exception) {
             ++g2_node_body_counter;
         });
 
-    node_type cancel_node(g1, unlimited, std::tie(limiter),
+    node_type cancel_node(*cancel_node_graph_ptr, unlimited, std::tie(limiter),
         [&](int input, ports_type&, int resource) {
             CHECK_MESSAGE(input == input_value, "Incorrect input");
             CHECK_MESSAGE(resource == resource_value, "Incorrect resource");
@@ -343,7 +345,7 @@ void test_cancellation_with_active_requests(bool exception) {
                 CHECK_MESSAGE(false, "exception test was called when exceptions are not supported");
 #endif
             } else {
-                g1.cancel();
+                cancel_node_graph_ptr->cancel();
             }
 
             for (std::size_t i = 0; i < n_submissions; ++i) {
@@ -356,20 +358,25 @@ void test_cancellation_with_active_requests(bool exception) {
 #if TBB_USE_EXCEPTIONS
     bool caught_exception = false;
     try {
-        g1.wait_for_all();
+        cancel_node_graph_ptr->wait_for_all();
     } catch (body_exception) {
         caught_exception = true;
     }
 
     CHECK_MESSAGE(exception == caught_exception, "Expected exception was not caught");
 #else
-    g1.wait_for_all();
+    cancel_node_graph_ptr->wait_for_all();
 #endif
 
     g2.wait_for_all();
-    std::size_t expected_g2_body_calls = exception ? n_submissions : 2 * n_submissions;
-    CHECK_MESSAGE(g2_node_body_counter == expected_g2_body_calls,
-                  "Incorrect number of g2 node body calls");
+
+    if (same_graph) {
+        CHECK_MESSAGE(g2_node_body_counter <= n_submissions, "Incorrect number of g2 node body calls");
+    } else {
+        std::size_t expected_g2_body_calls = exception ? n_submissions : 2 * n_submissions;
+        CHECK_MESSAGE(g2_node_body_counter == expected_g2_body_calls,
+                      "Incorrect number of g2 node body calls");
+    }
 }
 
 //! \brief \ref interface
@@ -498,12 +505,14 @@ TEST_CASE("resource_limited_node and std::invoke") {
     }
     CHECK(buf_size == 2);
 }
+#endif // __TBB_CPP17_INVOKE_PRESENT
 
 //! \brief \ref error_guessing
 TEST_CASE("resource_limited_node cancellation with active requests") {
-    test_cancellation_with_active_requests(/*exception =*/false);
+    test_cancellation_with_active_requests(/*same_graph = */false, /*exception =*/false);
+    test_cancellation_with_active_requests(/*same_graph = */true, /*exception =*/false);
 #if TBB_USE_EXCEPTIONS
-    test_cancellation_with_active_requests(/*exception = */true);
+    test_cancellation_with_active_requests(/*same_graph = */false, /*exception =*/true);
+    test_cancellation_with_active_requests(/*same_graph = */true, /*exception =*/true);
 #endif
 }
-#endif
