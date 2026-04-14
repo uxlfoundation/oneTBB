@@ -229,7 +229,7 @@ No API or ABI changes in this release.
 
 **Notes:**
 
-enter/exit_parallel_phase is only used by preview of parallel phase. **WARNING:** there was temporary, inadvertant change that made the `unsafe_wait <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/scheduling_controls/task_scheduler_handle_cls>`_ exception local for this release only.
+enter/exit_parallel_phase is only used by preview of parallel phase. **WARNING:** there was temporary, inadvertent change that made the `unsafe_wait <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/scheduling_controls/task_scheduler_handle_cls>`_ exception local for this release only.
 
 .. _version-2022.0.0:
 
