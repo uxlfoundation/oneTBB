@@ -16,12 +16,12 @@ API. Generally, the latter requires less overhead.
 
 ## Requirements to public API
 
-Free, stateless functions, similar to malloc, are sufficient for the allocation of large
-blocks of memory. To guide the spreading of blocks across NUMA nodes, two additional
-parameters are proposed: `interleaving step` and `list of NUMA nodes to perform
-allocations on`. This single function then serves as a provider of memory blocks with at
-least page granularity and will not employ internal caching. If high-performance, smaller
-and repetitive allocations are needed, then `std::pmr` or other solutions should be used.
+A free stateless function, similar to malloc, is sufficient for the allocation of large
+blocks of memory, contiguous in the address space. To guide the mapping of memory
+across NUMA nodes, two additional parameters are proposed: `interleaving step`
+and `the list of NUMA nodes to get the memory from`. This function allocates whole
+memory pages and does not employ internal caching. If smaller and repetitive allocations
+are needed, then `std::pmr` or other solutions should be used.
 
 `interleaving step` is the size of the contiguous memory block from a particular NUMA
 node, it has page granularity. Currently there are no clear use cases for granularity more
