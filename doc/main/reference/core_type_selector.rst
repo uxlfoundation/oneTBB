@@ -4,7 +4,7 @@ Core Type Selector for Task Arena Constraints
 =============================================
 
 .. note::
-    To enable this feature, set the ``TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR`` macro to 1.
+    To enable this feature, set the ``TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR`` macro to 1. When available and enabled, the feature-test macro ``TBB_HAS_TASK_ARENA_CORE_TYPE_SELECTOR`` is defined.
 
 .. contents::
     :local:
@@ -13,16 +13,15 @@ Core Type Selector for Task Arena Constraints
 Description
 ***********
 
-It is generally best to allow the OS to schedule threads across all core types. However, advanced
-users may occasionally need to constrain scheduling. The ``constraints::set_core_type(core_type_id)``
-API supports only a single core type, which may not allow selecting a suitable subset on processors
-with more than two core types.
+On a system with hybrid CPU cores, it is generally best to allow the OS to schedule threads across
+all core types. However, advanced users may occasionally need to constrain the scheduling.
+The ``constraints::set_core_type(core_type_id)`` API supports only a single core type, which may not allow selecting a suitable subset on processors with more than two core types.
 
 The core type selector addresses this by allowing a callable object (*selector*) to rank every
 available core type. The selector is called once for each core type returned by
 ``tbb::info::core_types()``. Positive scores indicate core types that should be used, negative
 scores exclude core types, and a score of zero means "use only if multi-core-type constraints are
-not supported by the runtime" (see `Selector Requirements`_ for details).
+not supported" (see `Selector Requirements`_ for details).
 
 This feature extends the `tbb::task_arena <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_arena/task_arena_cls>`_
 and the `tbb::info <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/info_namespace>`_
@@ -174,13 +173,14 @@ The selector is called once for each core type. Its return value is interpreted 
         it selects the one with the highest score.
     * - Zero
       - The core type is used **only** if multi-core-type constraints are not supported
-        by the loaded runtime library. When there are positive scores and the rest are
-        zero, the zeros act as an older-runtime fallback to no constraint (rather than
-        falling back to the single best-scored type).
+        by the implementation. When there are positive scores and the rest are zero,
+        the zeros act as a fallback to no constraint (rather than falling back
+        to the single best-scored type).
     * - Negative
       - The core type is excluded from use by the arena.
 
-If all scores are negative, no core type constraint is applied (equivalent to ``automatic``).
+If all scores are negative, no core type constraint is applied. That is equivalent to
+setting ``constraints::core_type`` to ``automatic``.
 
 Example
 *******
