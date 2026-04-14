@@ -4,7 +4,7 @@
 ====================================================================
 
 .. note::
-    To enable this feature, set ``TBB_PREVIEW_PARALLEL_PHASE`` macro to 1.
+    To enable this feature, set ``TBB_PREVIEW_PARALLEL_PHASE`` macro to 1. When available and enabled, the feature-test macro ``TBB_HAS_PARALLEL_PHASE`` is defined.
 
 .. contents::
     :local:
@@ -184,10 +184,12 @@ the value ``task_arena::leave_policy::fast``, initializing an arena with
 by changes to the ``leave_policy`` parameter on a ``global_control`` object.
 
 When multiple ``global_control`` objects exist for the ``leave_policy`` parameter,
-their values are combined using logical disjunction: if any active object has the
-value ``task_arena::leave_policy::fast``, fast leave is enabled globally.
+their values are combined as follows: the active parameter value equals to
+``task_arena::leave_policy::fast`` if any alive ``global_control`` object sets that value,
+otherwise it equals to ``task_arena::leave_policy::automatic``.
 
-The following table summarizes the interaction between the per-arena and global leave policies:
+The following table summarizes the interaction between the per-arena and global leave policies
+when an arena is created:
 
 .. table::
 
