@@ -11,6 +11,7 @@
    /main/intro/Benefits
    /main/intro/testing_approach
    /main/intro/limitations.rst
+   /main/intro/api_abi_changes
 
 
 .. toctree::
