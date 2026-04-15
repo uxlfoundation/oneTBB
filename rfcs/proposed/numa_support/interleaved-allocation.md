@@ -54,7 +54,7 @@ void free_interleaved(void *ptr, size_t size);
 Under Linux, only allocations with default interleaving can be supported via HWLOC. Other
 interleaving steps require direct libnuma usage, that creates yet another run-time
 dependency. Using `move_pages` it's possible to implement allocation with constant number
-of system call wrt allocation size.
+of system calls wrt allocation size.
 
 Under Windows, starting Windows 10 and WS 2016, `VirtualAlloc2(MEM_REPLACE_PLACEHOLDER)`
 can be used to provide desired interleaving, but number of system calls is proportional to
