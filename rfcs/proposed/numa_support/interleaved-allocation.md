@@ -29,9 +29,9 @@ than page size.
 
 `list of nodes for allocation` is `std::vector<tbb::numa_node_id>` to be compatible with a
 value returned from `tbb::numa_nodes()`. `libnuma` supports a subset of NUMA nodes for
-allocation, but those nodes are loaded equally. Having `vector` allows us to express
-unbalanced load. Example: using [3, 0, 3] allocates 2/3 memory from node 3 and 1/3 from
-node 0.
+allocation, but those nodes are loaded equally. Having `vector` allows us to express an
+unbalanced load. Example: allocation over the list of nodes [3, 0, 3] uses 2/3 memory from
+node 3 and 1/3 from node 0.
 
 One use case for `list of nodes` argument is the desire to run parallel activity on subset
 of nodes and so get memory only from those nodes.
