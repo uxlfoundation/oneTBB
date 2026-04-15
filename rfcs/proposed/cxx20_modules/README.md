@@ -41,7 +41,29 @@ export namespace tbb {
     using tbb::parallel_pipeline;
     using tbb::parallel_for_each;
 
-   // other TBB API
+    // Flow Graph API
+    namespace flow {
+        using tbb::flow::graph;
+        // ... other flow graph API
+    }
+
+    // other TBB API
+}
+```
+
+Consumer code uses the module as follows:
+
+```cpp
+import tbb;
+
+int main() {
+    // oneapi:: namespace is also available
+    tbb::parallel_for(0, 100, [](int i) {
+        // Nested namespaces are available as well
+        tbb::this_task_arena::isolate([] {
+            // ... do some work in isolation
+         });
+    });
 }
 ```
 
