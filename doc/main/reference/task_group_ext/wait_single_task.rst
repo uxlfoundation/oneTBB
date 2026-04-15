@@ -146,7 +146,7 @@ Schedules the task represented by ``handle`` for execution (if it has no unresol
 and waits for its completion.
 
 If completion was transferred to another task using ``task_group::transfer_this_task_completion_to``,
-the function waits for the completion of the task that received the completion.
+the function waits for the task that received the completion.
 
 Semantically equivalent to ``task_completion_handle ch = handle; run(std::move(handle)); wait_for_task(ch);``.
 
