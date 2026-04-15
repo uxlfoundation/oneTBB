@@ -13,13 +13,29 @@
 Description
 ***********
 
+By default, oneTBB uses a *delayed leave* heuristic: after completing work in an arena,
+worker threads remain for an implementation-defined duration, anticipating that new parallel
+work will arrive soon. This benefits most workloads by reducing the latency of starting
+subsequent parallel computations. However, the heuristic can hurt performance in two scenarios:
+
+* **Unpredictable work patterns.** When parallel tasks are submitted at irregular intervals or
+  with long gaps, retaining idle workers wastes CPU resources.
+* **Composability with other parallel runtimes.** When oneTBB is interleaved with another
+  runtime (for example, OpenMP), retained workers can cause oversubscription and reduce
+  overall throughput.
+
+This feature gives users explicit control over worker thread retention. A *leave policy*
+determines how quickly workers leave an arena when no work is available. Additionally, the
+*parallel phase* API lets users bracket regions of parallel work so the scheduler can retain
+workers more aggressively during those regions and release them promptly afterward.
+
 This feature extends the :onetbb-spec:`tbb::task_arena specification <task_scheduler/task_arena/task_arena_cls>`
 with the following API:
 
 * Adds the ``leave_policy`` enumeration class to ``task_arena``.
 * Adds ``leave_policy`` as the last parameter in ``task_arena`` constructors and ``task_arena::initialize`` methods.
   This allows you to inform the scheduler about the preferred policy for worker threads
-  when they are about to leave `task_arena` due to a lack of available work.
+  when they are about to leave ``task_arena`` due to a lack of available work.
 * Adds new ``start_parallel_phase`` and ``end_parallel_phase`` interfaces to the ``task_arena`` class
   and the ``this_task_arena`` namespace. These interfaces work as hints to the scheduler to mark the start and end
   of parallel work submission into the arena, enabling different worker thread retention policies.
@@ -27,10 +43,6 @@ with the following API:
 * Adds the ``leave_policy`` parameter to the ``global_control`` class, providing application-wide
   control over the default worker thread leave behavior for arenas initialized with
   ``leave_policy::automatic``.
-
-More details about motivation, semantics and conditions for becoming fully supported functionality can be found in the corresponding
-`Request For Comments document for parallel_phase <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/experimental/parallel_phase_for_task_arena>`_
-and the `Request For Comments document for global_control::leave_policy <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/experimental/global_control_fast_leave>`_.
 
 API
 ***
