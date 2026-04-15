@@ -40,7 +40,7 @@ regardless of whether it is submitted, executing, or completed.
     // task is completed
     // tch is non-empty and represents the completed task
 
-This makes ``task_completion_handle`` useful for:
+The ``task_completion_handle`` class is used for:
 
 * Establishing :ref:`dynamic task dependencies <dynamic_dependencies>`: it can serve as
   a predecessor in ``task_group::set_task_order`` to add successors even when the corresponding
