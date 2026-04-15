@@ -43,8 +43,8 @@ regardless of whether it is submitted, executing, or completed.
 The ``task_completion_handle`` class is used for:
 
 * Establishing :ref:`dynamic task dependencies <dynamic_dependencies>`: it can serve as
-  a predecessor in ``task_group::set_task_order`` to add successors even when the corresponding
-  task is submitted, executing, or completed.
+  a predecessor in ``task_group::set_task_order`` to add successors at any time, including
+  after the corresponding task has been submitted and even completed.
 * :ref:`Waiting for the completion of an individual task <wait_single_task>` using ``task_group::wait``,
   without waiting for all tasks in the group to finish.
 
