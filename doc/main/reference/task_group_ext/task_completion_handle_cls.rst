@@ -17,7 +17,7 @@ An instance of the ``task_completion_handle`` class represents a task for the pu
 setting execution dependencies and tracking task completion.
 Unlike ``task_handle``, which becomes empty once the task
 is submitted for execution, a ``task_completion_handle`` keeps referencing a task
-regardless of whether it has been submitted, executing, or completed.
+regardless of whether it is submitted, executing, or completed.
 
 .. code:: cpp
 
