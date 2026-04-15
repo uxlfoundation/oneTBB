@@ -13,10 +13,10 @@ Waiting for Individual Tasks in ``task_group``
 Description
 ***********
 
-The ``task_group::wait`` and ``task_group::run_and_wait`` functions wait for the completion of
-*all* tasks in the group. This feature extends ``task_group`` and ``task_arena`` with functions
+This feature extends the ``task_group`` and ``task_arena`` classes with functions
 that wait for the completion of a single task, identified by a ``task_handle`` or a
-:ref:`task_completion_handle <task_completion_handle_cls>`.
+:ref:`task_completion_handle <task_completion_handle_cls>`, complementing the existing
+functions that wait for the completion of *all* tasks in a group. 
 
 ``task_group::wait_for_task`` blocks until the task represented by the given ``task_completion_handle``
 has completed. Other tasks in the group may still be in progress when the function returns.
