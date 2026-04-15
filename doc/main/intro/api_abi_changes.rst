@@ -221,8 +221,8 @@ No API or ABI changes in this release.
 
 **API Changes:**
 
-- `Added explicit deduction guides for blocked_nd_range <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/experimental/blocked_nd_range_ctad>`_
-- `preview of parallel phase <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/experimental/parallel_phase_for_task_arena>`_
+- `Added explicit deduction guides for blocked_nd_range <https://github.com/uxlfoundation/oneTBB/tree/v2022.1.0/rfcs/experimental/blocked_nd_range_ctad>`_
+- `preview of parallel phase <https://github.com/uxlfoundation/oneTBB/tree/v2022.1.0/rfcs/experimental/parallel_phase_for_task_arena>`_
 
 **ABI Changes:**
 
