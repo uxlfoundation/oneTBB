@@ -168,22 +168,23 @@ Release Details
 
 **API Changes:**
 
-- `Function to create a set of NUMA bound arenas <https://github.com/uxlfoundation/oneTBB/blob/master/rfcs/supported/numa_support/create-numa-arenas.md>`_
-- Additional deduction guides for flow graph and blocked_range_nd (link TBD)
-- flow graph join_node and indexer_node now support 10 or more input ports (link TBD)
-- `preview: wait for single task in task_group <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/proposed/task_group_wait_single_task>`_
-- `preview: resource_limited_node and resource_limiter classes <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/proposed/flow_graph_serializers>`_
-- `preview: advanced core-type selection <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/experimental/core_types>`_
-- `preview: global control parameter for default block time behavior <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/experimental/parallel_phase_for_task_arena>`_
+- :onetbb-spec:`Function create_numa_task_arenas introduced to create a set of NUMA bound arenas <task_scheduler/task_arena/task_arena_cls>`
+- :doc:`Additional deduction guides for flow graph <../tbb_userguide/fg_ctad>`
+- :onetbb-spec:`Additional deduction guides for blocked_range_nd <algorithms/blocked_ranges/blocked_nd_range_cls>`
+- flow graph :onetbb-spec:`indexer_node <flow_graph/indexer_node_cls>` and :onetbb-spec:`join_node <flow_graph/join_node_cls>` now support 10 or more input ports 
+- :doc:`Preview Feature: wait for single task in task_group <../reference/task_group_ext/wait_single_task>`
+- :doc:`Preview Feature: resource_limited_node and resource_limiter classes <../reference/fg_resource_limiting>`
+- :doc:`Preview Feature: advanced core-type selection <../reference/core_type_selector>`
+- :doc:`Preview Feature: global control parameter for default block time behavior <../reference/parallel_phase_for_task_arena>`
 
 **ABI Changes:**
 
-- ordered container layout changes for scalability improvements, impacts conurrent_map, concurrent_multimap, concurrent_set, 
+- ordered container layout changes for scalability improvements that impact concurrent_map, concurrent_multimap, concurrent_set, 
   and concurrent_multiset
 
 **Notes:**
 
-The ABI is backwards compatible but issues can arise for partial recomplilation cases, when objects with modified layouts are passed 
+The ABI is backwards compatible but issues can arise for partial recomplilation cases when objects with modified layouts are passed 
 across compilation units built against headers with the older layout. 
 
 .. _version-2022.3.0:
@@ -193,9 +194,9 @@ across compilation units built against headers with the older layout.
 
 **API Changes:**
 
-- `task_arena enqueue and wait_for specific task_group <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/proposed/task_arena_waiting>`_
-- `custom assertion handler support <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/supported/assertion_handler>`_
-- `preview of dynamic task graph <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/proposed/task_group_dynamic_dependencies>`_
+- :onetbb-spec:`task_arena::enqueue and task_arena::wait_for to enqueue to and wait for specific task_group <task_scheduler/task_arena/task_arena_cls>`
+- :doc:`custom assertion handler support <../reference/assertion_handler>`
+- :doc:`Preview Feature: dynamic task graph <../reference/task_group_dynamic_dependencies>`
 
 **ABI Changes:**
 
