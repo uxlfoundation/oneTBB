@@ -35,7 +35,7 @@ Summary Table
    * - :ref:`2023.0.0 <version-2023.0.0>`
      - 12.18 / 12180
      - April 2026
-     - *Release Notes TBD*
+     - `Release Notes <https://github.com/uxlfoundation/oneTBB/blob/master/RELEASE_NOTES.md#onetbb-20230-release-notes>`_
      - Yes
      - Layout changes
 
