@@ -276,7 +276,7 @@ endif()
 if (TBB_ENABLE_IPO AND BUILD_SHARED_LIBS AND NOT ANDROID_PLATFORM AND NOT TBB_SANITIZE MATCHES "thread")
     # For older cmake versions without CheckIPOSupported and when ipo detection is broken,
     # try to enable IPO unconditionally.
-    if (CMAKE_VERSION VERSION_LESS 3.9 OR DEFINED TBB_IPO_DETECTION_BROKEN)
+    if (CMAKE_VERSION VERSION_LESS 3.9 OR TBB_IPO_DETECTION_BROKEN)
         set(TBB_IPO_FLAGS TRUE)
     else()
         cmake_policy(SET CMP0069 NEW)
