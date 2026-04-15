@@ -110,7 +110,7 @@ The group was not canceled and all tasks in the group have completed.
 
 The cancellation request has been received. The meaning depends on the context:
 
-* When returned by ``get_status_of``, or by single-task waiting function: the individual task was not executed.
+* When returned by ``get_status_of`` or by a single-task waiting function: the individual task was not executed.
 * When returned by ``wait`` or ``run_and_wait``: group execution was canceled, the completion status of individual tasks is unknown.
 
 -------------------------------------------------------
