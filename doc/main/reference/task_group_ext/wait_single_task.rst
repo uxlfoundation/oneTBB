@@ -177,7 +177,7 @@ Member Functions of ``task_arena`` Class
 Waits for completion of the task represented by ``comp_handle`` in the current arena.
 
 If completion was transferred to another task using ``task_group::transfer_this_task_completion_to``,
-the function waits for completion of the task that received the completion.
+the function waits for the task that received the completion.
 
 Semantically equivalent to: ``execute([&] { tg.wait_for_task(comp_handle); });``, where
 ``tg`` is a ``task_group`` where the task referred to by ``comp_handle`` is registered.
