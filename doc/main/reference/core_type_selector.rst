@@ -35,10 +35,6 @@ specifications with the following API:
 * Adds a new ``info::default_concurrency`` template that returns the effective concurrency for given
   constraints and selector.
 
-More details about motivation, semantics, and conditions for becoming a fully supported feature can
-be found in the corresponding
-`Request For Comments document for core type selection <https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/proposed/core_types>`_.
-
 API
 ***
 
@@ -82,11 +78,6 @@ Synopsis
         } // namespace tbb
     } // namespace oneapi
 
-.. note::
-    ``Selector`` must be a callable type whose call operator accepts a
-    ``std::tuple<tbb::core_type_id, std::size_t, std::size_t>`` and returns a value convertible to ``int``.
-    See `Selector Requirements`_ for the full contract.
-
 Member Constants
 ----------------
 
@@ -102,6 +93,10 @@ Member Functions
                   task_arena::task_arena(constraints a_constraints, Selector a_selector, \
                                         unsigned reserved_slots = 1, \
                                         priority a_priority = priority::normal)
+
+**Requirements**: ``Selector`` must be a callable type whose call operator accepts a
+``std::tuple<tbb::core_type_id, std::size_t, std::size_t>`` and returns a value convertible to ``int``.
+See `Selector Requirements`_ for the full contract.
 
 Constructs a ``task_arena`` whose core type constraint is resolved by calling ``a_selector``
 on every available core type. The ``a_constraints.core_type`` field should be set to
@@ -124,6 +119,10 @@ Functions
 
 .. cpp:function:: template <typename Selector> \
                   int info::default_concurrency(task_arena::constraints c, Selector a_selector)
+
+**Requirements**: ``Selector`` must be a callable type whose call operator accepts a
+``std::tuple<tbb::core_type_id, std::size_t, std::size_t>`` and returns a value convertible to ``int``.
+See `Selector Requirements`_ for the full contract.
 
 Returns the number of threads that would be available for a ``task_arena`` created with the
 given constraints and selector. If ``c.core_type`` is ``selectable``, the selector is applied
