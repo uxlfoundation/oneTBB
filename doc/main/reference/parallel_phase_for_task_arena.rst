@@ -205,8 +205,8 @@ when an arena is created:
 .. note::
    The ``global_control::leave_policy`` parameter provides application-wide control,
    while ``task_arena::leave_policy`` and ``parallel_phase`` provide per-arena control.
-   After initialization, the parallel phase API can independently modify the arena's
-   leave behavior at runtime, regardless of the initial state set by the global control.
+   After arena initialization, the parallel phase API can modify the thread leave behavior
+   for the arena at runtime, regardless of the initial state set by the global control.
 
 Example
 *******
