@@ -132,7 +132,7 @@ Member Functions of ``task_group`` Class
 Waits for the completion of the task represented by ``comp_handle``. 
 
 If completion was transferred to another task using ``task_group::transfer_this_task_completion_to``,
-the function waits for the completion of the task that received the completion.
+the function waits for the task that received the completion.
 
 **Returns**: ``task_group_status::task_complete`` if the task was executed, ``task_group_status::canceled`` otherwise.
 
