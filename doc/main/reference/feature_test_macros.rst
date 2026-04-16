@@ -16,6 +16,25 @@ provided by the library. They are intended for detecting the presence of these f
 Each of these macros is defined in the header ``<oneapi/tbb/version.h>`` and in the feature headers
 specified in the table below.
 
+For preview features, the feature test macro will only be defined if the preview feature macro has
+been defined. You cannot use a feature test macro to guard the setting of a feature's preview macro.
+For example:
+
+.. code:: cpp
+
+    // Wrong
+    #include <oneapi/tbb/version.h>
+    #if TBB_HAS_FEATURE_X
+    #define TBB_PREVIEW_FEATURE_X 1 // Never reached
+    #include <oneapi/tbb/feature_header.h>
+    #endif
+    // Correct
+    #define TBB_PREVIEW_FEATURE_X 1
+    #include <oneapi/tbb/version.h>
+    #if TBB_HAS_FEATURE_X
+    #include <oneapi/tbb/feature_header.h>
+    #endif
+
 Each macro value follows the pattern ``YYYYMM``, where ``YYYY`` is a year, and ``MM`` is a month when
 the corresponding feature was introduced or updated. These values can be increased if the capabilities of given features
 are extended. The table below contains only the most recent values.

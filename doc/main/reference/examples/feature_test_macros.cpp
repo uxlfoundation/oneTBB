@@ -29,6 +29,8 @@ using parallel_loop2_body = parallel_loop_body;
 
 /*begin_feature_test_macros_example*/
 
+#define TBB_PREVIEW_PARALLEL_PHASE 1
+
 #include <oneapi/tbb/version.h>
 #include <oneapi/tbb/parallel_for.h>
 
