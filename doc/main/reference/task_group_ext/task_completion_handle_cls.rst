@@ -63,7 +63,6 @@ Header
 
     #define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
     #include <oneapi/tbb/task_group.h>
-    #include <oneapi/tbb/task_arena.h>
 
 Synopsis
 --------
