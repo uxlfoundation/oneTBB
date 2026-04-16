@@ -13,21 +13,18 @@
 Description
 ***********
 
-By default, oneTBB uses a *delayed leave* heuristic: after completing work in an arena,
+By default, oneTBB uses a *delayed thread leave* heuristic: after completing work in an arena,
 worker threads remain for an implementation-defined duration, anticipating that new parallel
 work will arrive soon. This benefits most workloads by reducing the latency of starting
-subsequent parallel computations. However, the heuristic can hurt performance in two scenarios:
+subsequent parallel computations. However, this behavior can be undesirable, especially if
 
-* **Unpredictable work patterns.** When parallel tasks are submitted at irregular intervals or
-  with long gaps, retaining idle workers wastes CPU resources.
-* **Composability with other parallel runtimes.** When oneTBB is interleaved with another
-  runtime (for example, OpenMP), retained workers can cause oversubscription and reduce
-  overall throughput.
+* parallel tasks are submitted at irregular intervals or with long gaps, and idle threads waste CPU resources;
+* oneTBB use is interleaved with another threading, and idle threads cause CPU oversubscription.
 
-This feature gives users explicit control over worker thread retention. A *leave policy*
-determines how quickly workers leave an arena when no work is available. Additionally, the
-*parallel phase* API lets users bracket regions of parallel work so the scheduler can retain
-workers more aggressively during those regions and release them promptly afterward.
+For explicit control over worker thread retention, a *leave policy* determines
+how fast worker threads leave an arena when no work is available. Additionally, the
+*parallel phase* API lets users bracket regions of recurrent parallel work so the scheduler can
+retain threads more aggressively during those regions and release them promptly afterward.
 
 This feature extends the :onetbb-spec:`tbb::task_arena specification <task_scheduler/task_arena/task_arena_cls>`
 with the following API:
@@ -41,7 +38,7 @@ with the following API:
   of parallel work submission into the arena, enabling different worker thread retention policies.
 * Adds the Resource Acquisition is Initialization (RAII) class ``scoped_parallel_phase`` to ``task_arena``.
 * Adds the ``leave_policy`` parameter to the ``global_control`` class, providing application-wide
-  control over the default worker thread leave behavior for arenas initialized with
+  control over the default worker thread leave behavior for arenas initialized implicitly or with
   ``leave_policy::automatic``.
 
 API
