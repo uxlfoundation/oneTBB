@@ -23,9 +23,8 @@ available core type. The selector is called once for each core type returned by
 scores exclude core types, and a score of zero means "use only if multi-core-type constraints are
 not supported" (see `Selector Requirements`_ for details).
 
-This feature extends the `tbb::task_arena <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_arena/task_arena_cls>`_
-and the `tbb::info <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/info_namespace>`_
-specifications with the following API:
+This feature extends the :onetbb-spec:`tbb::task_arena <task_scheduler/task_arena/task_arena_cls>`
+and the :onetbb-spec:`tbb::info <info_namespace>` specifications with the following API:
 
 * Adds the ``selectable`` constant to ``task_arena``.
 * Adds a new ``task_arena`` constructor template that accepts a ``constraints`` object together with
