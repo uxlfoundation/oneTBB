@@ -4,7 +4,8 @@
 ===================================
 
 .. note::
-    To enable this extension, define the ``TBB_PREVIEW_TASK_GROUP_EXTENSIONS`` macro with a value of ``1``. When available and enabled, the feature-test macro ``TBB_HAS_TASK_GROUP_DEPENDENCIES`` is defined.
+    To enable this extension, define the ``TBB_PREVIEW_TASK_GROUP_EXTENSIONS`` macro with a value of ``1``.
+    When available and enabled, the feature-test macro ``TBB_HAS_TASK_GROUP_DEPENDENCIES`` is defined.
 
 .. contents::
     :local:
