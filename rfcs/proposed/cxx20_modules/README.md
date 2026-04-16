@@ -18,7 +18,8 @@ allow users to use the library using `import tbb;` instead of `#include <oneapi/
 ### ABI non-breaking style with using-declaration
 
 The proposed approach is to provide a wrapper module that includes the existing headers in
-the global module fragment and re-exports public symbols.
+the global module fragment and re-exports public symbols as suggested in
+[LLVM documentation](https://clang.llvm.org/docs/StandardCPlusPlusModules.html#export-using-style).
 
 The module interface unit (e.g., `tbb.cppm`) would follow this structure:
 
@@ -206,12 +207,17 @@ export module tbb;
    that uses `import tbb;` instead of `#include`, or running the existing test suite
    with module imports. Should whitebox tests be covered in the latter scenario?
 
-6. How to provide preview functionality with modules? Should it be a separate `tbb.preview` module
-   or should the `tbb` module be compiled with defined `TBB_PREVIEW_*` macros as needed?
+6. How to provide preview functionality with modules? TBB preview features are currently gated by
+   `TBB_PREVIEW_*` macros that are defined before including headers. Modules do not export macros,
+   and a macro defined by the consumer before `import tbb;` cannot influence the module's
+   already-compiled interface. Should preview functionality be offered as a dedicated `tbb.preview`
+   module, or should the consumer compile the `.cppm` with the desired `TBB_PREVIEW_*` macros defined?
 
-7. How to support public macros such as `TBB_VERSION` or feature-test macros? Some of the options:
-   - Replace them by inline variables where possible.
-   - Resort to inclusion of `tbb/version.h` header.
+7. How to support public macros such as `TBB_VERSION` or feature-test macros?
+   Modules do not export preprocessor definitions, so these macros are not visible
+   after `import tbb;`. Some options:
+   - Replace them with inline variables where possible or provide exported functions.
+   - Require the consumer to `#include <tbb/version.h>` alongside the import.
 
 ## Exit Criteria
 
