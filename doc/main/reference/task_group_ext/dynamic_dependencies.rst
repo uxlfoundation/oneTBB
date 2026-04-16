@@ -14,7 +14,7 @@ Description
 ***********
 
 The |full_name| implementation extends the
-`tbb::task_group specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_group/task_group_cls>`_
+:onetbb-spec:`tbb::task_group specification <task_scheduler/task_group/task_group_cls>`
 with an API for defining predecessor-successor relationships between tasks,
 such that a successor task can begin execution only after all of its predecessors are completed.
 

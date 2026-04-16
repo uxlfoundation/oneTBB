@@ -13,6 +13,7 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import os
+from docutils import nodes
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
@@ -22,6 +23,11 @@ PREAMBLE_FILE = os.path.join(LATEX_DIR, 'preamble.tex')
 TITLE_PAGE_FILE = os.path.join(LATEX_DIR, 'title_page.tex')
 
 BUILD_TYPE = os.getenv("BUILD_TYPE")
+
+# Set up tags for conditional content
+# Tags allow using .. only:: directives in RST files
+if BUILD_TYPE == 'oss' or BUILD_TYPE is None:
+    tags.add('oss')
 
 # -- Project information -----------------------------------------------------
 
@@ -56,7 +62,7 @@ extensions = [
     'sphinx.ext.imgmath',
     'sphinx.ext.ifconfig',
     'sphinx.ext.viewcode',
-    'sphinx.ext.githubpages', 
+    'sphinx.ext.githubpages',
     'sphinx_design'
 ]
 
@@ -83,13 +89,25 @@ language = 'en'
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = []
+# Base exclude patterns - specification files that should never be built
+exclude_patterns = [
+    'main/specification/source/nested-*.rst',
+    'main/specification/source/uncategorized.rst',
+    'main/specification/source/uncategorized/**',
+    'main/specification/source/low_level_task_api.rst',
+    'main/specification/source/low_level_tasking/**',
+]
+
+# Specification is only included in OSS builds (GitHub Pages)
+# Intel builds (oneapi/dita) automatically exclude the entire specification directory
+if BUILD_TYPE == 'oneapi' or BUILD_TYPE == 'dita':
+    exclude_patterns.append('main/specification/**')
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = None
 
 # Syntax highlighting for the :: directive
-highlight_language = 'cpp' 
+highlight_language = 'cpp'
 
 if BUILD_TYPE == 'oneapi' or BUILD_TYPE == 'dita':
     rst_prolog = """
@@ -302,3 +320,48 @@ intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
+
+
+# -- Custom role for oneTBB specification links ------------------------------
+
+def onetbb_spec_role(name, rawtext, text, lineno, inliner, options={}, content=[]):
+    """
+    Custom role that generates internal :doc: links for OSS builds,
+    and external links for oneAPI/DITA builds.
+
+    Usage: :onetbb-spec:`link text <path>`
+    """
+    from sphinx.util.nodes import split_explicit_title
+
+    # Parse the role syntax
+    has_explicit_title, title, target = split_explicit_title(text)
+
+    if BUILD_TYPE == 'oneapi' or BUILD_TYPE == 'dita':
+        # Generate external link for oneAPI/DITA builds
+        url = f'https://uxlfoundation.github.io/oneTBB/main/specification/source/{target}.html'
+        node = nodes.reference(rawtext, title, refuri=url, **options)
+        return [node], []
+    else:
+        # Generate internal :doc: link for OSS builds
+        doc_path = f'/main/specification/source/{target}'
+
+        # Create a pending_xref node that Sphinx will resolve
+        from sphinx.addnodes import pending_xref
+
+        refnode = pending_xref(
+            rawtext,
+            refdomain='std',
+            reftype='doc',
+            reftarget=doc_path,
+            refexplicit=has_explicit_title,
+            refwarn=True
+        )
+        refnode += nodes.inline(rawtext, title)
+
+        return [refnode], []
+
+
+def setup(app):
+    """Setup function to register the custom role"""
+    app.add_role('onetbb-spec', onetbb_spec_role)
+    return {'version': '0.1', 'parallel_read_safe': True, 'parallel_write_safe': True}

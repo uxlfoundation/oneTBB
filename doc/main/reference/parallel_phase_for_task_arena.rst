@@ -13,7 +13,7 @@
 Description
 ***********
 
-This feature extends the `tbb::task_arena specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_arena/task_arena_cls>`_
+This feature extends the :onetbb-spec:`tbb::task_arena specification <task_scheduler/task_arena/task_arena_cls>`
 with the following API:
 
 * Adds the ``leave_policy`` enumeration class to ``task_arena``.

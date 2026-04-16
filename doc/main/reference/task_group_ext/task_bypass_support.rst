@@ -14,7 +14,7 @@ Description
 ***********
 
 The |full_name| implementation extends the requirements for user-provided function object from
-`tbb::task_group specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_group/task_group_cls>`_
+:onetbb-spec:`tbb::task_group specification <task_scheduler/task_group/task_group_cls>`
 to allow them to return a ``task_handle`` object.
 
 `Task Bypassing <../tbb_userguide/Task_Scheduler_Bypass.html>`_ allows developers to reduce task scheduling overhead by providing a hint about
