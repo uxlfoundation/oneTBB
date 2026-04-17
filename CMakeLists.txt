@@ -125,9 +125,4 @@ if (TCM_TEST)
   add_subdirectory(test)
 endif()
 
-if (TCM_BENCHMARKS)
-  enable_testing()
-  add_subdirectory(benchmarks)
-endif()
-
 add_subdirectory(cmake/post_install)
