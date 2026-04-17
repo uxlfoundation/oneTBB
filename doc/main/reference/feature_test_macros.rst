@@ -16,7 +16,7 @@ provided by the library. They are intended for detecting the presence of these f
 Each of these macros is defined in the header ``<oneapi/tbb/version.h>`` and in the feature headers
 specified in the table below.
 
-For preview features, the feature test macro are only defined if the feature is enabled by defining its
+For preview features, the feature test macro is only defined if the feature is enabled by defining its
 preview macro. You cannot use a feature test macro to guard setting of the feature preview macro.
 For example:
 
