@@ -1,14 +1,8 @@
 @echo off
 REM
-REM Copyright (C) 2025 Intel Corporation
+REM Copyright (c) 2025 Intel Corporation
 REM
-REM This software and the related documents are Intel copyrighted materials, and your use of them is
-REM governed by the express license under which they were provided to you ("License"). Unless the
-REM License provides otherwise, you may not use, modify, copy, publish, distribute, disclose or
-REM transmit this software or the related documents without Intel's prior written permission.
-REM
-REM This software and the related documents are provided as is, with no express or implied
-REM warranties, other than those that are expressly stated in the License.
+REM SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 REM
 
 REM Syntax:
