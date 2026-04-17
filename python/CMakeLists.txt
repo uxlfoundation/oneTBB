@@ -45,7 +45,6 @@ add_custom_target(
         TBB_INCLUDEDIRS="${TBB4PY_INCLUDE_STRING}"
         TBB_LIBDIRS=$<TARGET_FILE_DIR:TBB::tbb>
     ${PYTHON_EXECUTABLE} -m pip install
-        --no-build-isolation
         --prefix build
         ./${PYTHON_BUILD_WORK_DIR}
     COMMENT "Build and install to work directory the oneTBB Python module"
