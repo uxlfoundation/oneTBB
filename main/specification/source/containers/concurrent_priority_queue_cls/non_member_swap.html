@@ -1,0 +1,1032 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Non-member swap &#8212; oneTBB  documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../../_static/styles/theme.css?digest=7f76b32a3354e82990f2" rel="stylesheet" />
+<link href="../../../../../_static/styles/pydata-sphinx-theme.css?digest=7f76b32a3354e82990f2" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/styles/sphinx-book-theme.css?v=3c74b3bc" />
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="../../../../../_static/scripts/fontawesome.js?digest=7f76b32a3354e82990f2"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../../_static/scripts/bootstrap.js?digest=7f76b32a3354e82990f2" />
+<link rel="preload" as="script" href="../../../../../_static/scripts/pydata-sphinx-theme.js?digest=7f76b32a3354e82990f2" />
+
+    <script src="../../../../../_static/documentation_options.js?v=9eb32ce0"></script>
+    <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../../../../../_static/scripts/sphinx-book-theme.js?v=fab101a9"></script>
+    <script src="../../../../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'main/specification/source/containers/concurrent_priority_queue_cls/non_member_swap';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <script src="../../../../../_static/custom.js?v=874f1a61"></script>
+    <link rel="icon" href="../../../../../_static/favicons.png"/>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" />
+    <link rel="next" title="Non-member binary comparisons" href="non_member_binary_comparisons.html" />
+    <link rel="prev" title="Concurrently unsafe modifiers" href="unsafe_modifiers.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  
+    
+    <script src="../../../../../_static/searchtools.js"></script>
+    <script src="../../../../../_static/language_data.js"></script>
+    <script src="../../../../../searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../../_static/oneAPI-rgb-rev-100.png" class="logo__image only-light" alt=""/>
+    <img src="../../../../../_static/oneAPI-rgb-rev-100.png" class="logo__image only-dark pst-js-only" alt=""/>
+  
+  
+    <p class="title logo__title">oneTBB Documentation</p>
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/help_support.html">Getting Help and Support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/notation.html">Notational Conventions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/intro_os.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/Benefits.html">oneTBB Benefits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/testing_approach.html">Testing Approach</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/limitations.html">Known Limitations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../intro/api_abi_changes.html">API and ABI Change Log</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Get Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../../../../../GSG/get_started.html">Get Started with oneAPI Threading Building Blocks (oneTBB)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../GSG/system_requirements.html">System Requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../GSG/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../GSG/next_steps.html">Next Steps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../GSG/integrate.html">Integrate oneTBB</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../GSG/samples.html">oneTBB Samples</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../tbb_userguide/title.html">oneTBB Developer Guide</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../tbb_userguide/Package_Contents_os.html">Package Contents</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Debug_Versus_Release_Libraries.html">Debug Versus Release Libraries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Scalable_Memory_Allocator.html">Scalable Memory Allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Windows_OS_ug.html">Windows*</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Linux_OS.html">Linux*</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Mac_OS.html">macOS*</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../tbb_userguide/Parallelizing_Simple_Loops_os.html">Parallelizing Simple Loops</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Initializing_and_Terminating_the_Library.html">Initializing and Terminating the Library</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../tbb_userguide/parallel_for_os.html">parallel_for</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Lambda_Expressions.html">Lambda Expressions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Automatic_Chunking.html">Automatic Chunking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Controlling_Chunking_os.html">Controlling Chunking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Bandwidth_and_Cache_Affinity_os.html">Bandwidth and Cache Affinity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Partitioner_Summary.html">Partitioner Summary</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../tbb_userguide/parallel_reduce.html">parallel_reduce</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Advanced_Example.html">Advanced Example</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/rvalue_reduce.html">Use of r-Values for Reduction</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Advanced_Topic_Other_Kinds_of_Iteration_Spaces.html">Advanced Topic: Other Kinds of Iteration Spaces</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../tbb_userguide/Parallelizing_Complex_Loops.html">Parallelizing Complex Loops</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Cook_Until_Done_parallel_do.html">Cook Until Done: parallel_for_each</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../tbb_userguide/Working_on_the_Assembly_Line_pipeline.html">Working on the Assembly Line: parallel_pipeline</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Using_Circular_Buffers.html">Using Circular Buffers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Throughput_of_pipeline.html">Throughput of pipeline</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Non-Linear_Pipelines.html">Non-Linear Pipelines</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Summary_of_Loops_and_Pipelines.html">Summary of Loops and Pipelines</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../tbb_userguide/Parallelizing_with_Tasks.html">Parallelizing with Tasks</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/creating_tasks_with_parallel_invoke.html">Creating Tasks with parallel_invoke</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/creating_tasks_with_task_group.html">Creating Tasks with task_group</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/task_group_thread_safety.html">task_group Thread Safety</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../tbb_userguide/Flow_Graph.html">Parallelizing Data Flow and Dependence Graphs</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Parallelizing_Flow_Graph.html">Parallelizing Data Flow and Dependency Graphs</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../tbb_userguide/Basic_Flow_Graph_concepts.html">Basic Flow Graph Concepts</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Graph_Object.html">Flow Graph Basics: Graph Object</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Nodes.html">Flow Graph Basics: Nodes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Edges.html">Flow Graph Basics: Edges</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Mapping_Nodes2Tasks.html">Flow Graph Basics: Mapping Nodes to Tasks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Flow_Graph_Message_Passing_Protocol.html">Flow Graph Basics: Message Passing Protocol</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Flow_Graph_Single_Vs_Broadcast.html">Flow Graph Basics: Single-push vs. Broadcast-push</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Flow_Graph_Buffering_in_Nodes.html">Flow Graph Basics: Buffering and Forwarding</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Flow_Graph_Reservation.html">Flow Graph Basics: Reservation</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../tbb_userguide/Graph_Main_Categories.html">Graph Application Categories</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Data_Flow_Graph.html">Data Flow Graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Dependence_Graph.html">Dependence Graph</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Predefined_Node_Types.html">Predefined Node Types</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../tbb_userguide/Flow_Graph_Tips.html">Flow Graph Tips and Tricks</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Flow-Graph-waiting-tips.html">Flow Graph Tips for Waiting for and Destroying a Flow Graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Flow_Graph_making_edges_tips.html">Flow Graph Tips on Making Edges</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Flow_Graph_nested_parallelism_tips.html">Flow Graph Tips on Nested Parallelism</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Flow_Graph_resource_tips.html">Flow Graph Tips for Limiting Resource Consumption</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Flow-Graph-exception-tips.html">Flow Graph Tips for Exception Handling and Cancellation</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/estimate_flow_graph_performance.html">Estimating Flow Graph Performance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/fg_ctad.html">Class Template Argument Deduction for Flow Graph Nodes</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../tbb_userguide/work_isolation.html">Work Isolation</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../tbb_userguide/Exceptions_and_Cancellation.html">Exceptions and Cancellation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Cancellation_Without_An_Exception.html">Cancellation Without An Exception</a></li>
+
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Cancellation_and_Nested_Parallelism.html">Cancellation and Nested Parallelism</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../tbb_userguide/Floating_Point_Settings.html">Floating-point Settings</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../tbb_userguide/Containers.html">Containers</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../tbb_userguide/concurrent_hash_map.html">concurrent_hash_map</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/More_on_HashCompare.html">More on HashCompare</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/concurrent_vector_ug.html">concurrent_vector</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../tbb_userguide/Concurrent_Queue_Classes.html">Concurrent Queue Classes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Iterating_Over_a_Concurrent_Queue_for_Debugging.html">Iterating Over a Concurrent Queue for Debugging</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/When_Not_to_Use_Queues.html">When Not to Use Queues</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Summary_of_Containers.html">Summary of Containers</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../tbb_userguide/Mutual_Exclusion.html">Mutual Exclusion</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Mutex_Flavors.html">Mutex Flavors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Reader_Writer_Mutexes.html">Reader Writer Mutexes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/UpgradeDowngrade.html">Upgrade/Downgrade</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Lock_Pathologies.html">Lock Pathologies</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../tbb_userguide/Timing.html">Timing</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../tbb_userguide/Memory_Allocation.html">Memory Allocation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Which_Dynamic_Libraries_to_Use.html">Which Dynamic Libraries to Use</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Allocator_Configuration.html">Configuring the Memory Allocator</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../tbb_userguide/automatically-replacing-malloc.html">Automatically Replacing <code class="docutils literal notranslate"><span class="pre">malloc</span></code> and Other C/C++ Functions for Dynamic Memory Allocation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Windows_C_Dynamic_Memory_Interface_Replacement.html">Windows* OS C/C++ Dynamic Memory Interface Replacement</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../tbb_userguide/Linux_C_Dynamic_Memory_Interface_Replacement.html">Linux* OS C/C++ Dynamic Memory Interface Replacement</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../tbb_userguide/The_Task_Scheduler.html">The Task Scheduler</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Task-Based_Programming.html">Task-Based Programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/When_Task-Based_Programming_Is_Inappropriate.html">When Task-Based Programming Is Inappropriate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/How_Task_Scheduler_Works.html">How Task Scheduler Works</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Task_Scheduler_Bypass.html">Task Scheduler Bypass</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Guiding_Task_Scheduler_Execution.html">Guiding Task Scheduler Execution</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../tbb_userguide/design_patterns/Design_Patterns.html">Design Patterns</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/design_patterns/Agglomeration.html">Agglomeration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/design_patterns/Elementwise.html">Elementwise</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/design_patterns/Odd-Even_Communication.html">Odd-Even Communication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/design_patterns/Wavefront.html">Wavefront</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/design_patterns/Reduction.html">Reduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/design_patterns/Divide_and_Conquer.html">Divide and Conquer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/design_patterns/GUI_Thread.html">GUI Thread</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/design_patterns/Non-Preemptive_Priorities.html">Non-Preemptive Priorities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/design_patterns/Lazy_Initialization.html">Lazy Initialization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/design_patterns/Local_Serializer.html">Local Serializer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/design_patterns/Fenced_Data_Transfer.html">Fenced Data Transfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/design_patterns/Reference_Counting.html">Reference Counting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/design_patterns/General_References.html">General References</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../tbb_userguide/Migration_Guide.html">Migrating from Threading Building Blocks (TBB)</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Migration_Guide/Task_Scheduler_Init.html">Migrating from tbb::task_scheduler_init</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Migration_Guide/Task_API.html">Migrating from low-level task API</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../tbb_userguide/Migration_Guide/Mixing_Two_Runtimes.html">Mixing two runtimes</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../tbb_userguide/Constraints.html">Constrained APIs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../tbb_userguide/std_invoke.html">Invoke a Callable Object</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../tbb_userguide/appendix_A.html">Appendix A Costs of Time Slicing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../tbb_userguide/appendix_B.html">Appendix B Mixing With Other Threading Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../tbb_userguide/References.html">References</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Developer Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../reference/reference.html">oneTBB API Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../../../reference/feature_test_macros.html">Feature-test Macros</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../reference/scalable_memory_pools/malloc_replacement_log.html">TBB_malloc_replacement_log Function</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../reference/assertion_handler.html">Custom Assertion Handler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../reference/type_specified_message_keys.html">Type-specified message keys for join_node</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../reference/scalable_memory_pools.html">Scalable Memory Pools</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../reference/scalable_memory_pools/memory_pool_cls.html">memory_pool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../reference/scalable_memory_pools/fixed_pool_cls.html">fixed_pool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../reference/scalable_memory_pools/memory_pool_allocator_cls.html">memory_pool_allocator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../reference/helpers_for_expressing_graphs.html">Helper Functions for Expressing Graphs</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../reference/constructors_for_nodes.html">Constructors for Flow Graph nodes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../reference/follows_and_precedes_functions.html"><code class="docutils literal notranslate"><span class="pre">follows</span></code> and <code class="docutils literal notranslate"><span class="pre">precedes</span></code> function templates</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../reference/make_node_set_function.html"><code class="docutils literal notranslate"><span class="pre">make_node_set</span></code> function template</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../reference/make_edges_function.html"><code class="docutils literal notranslate"><span class="pre">make_edges</span></code> function template</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../reference/concurrent_lru_cache_cls.html">concurrent_lru_cache</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../reference/task_group_extensions.html">task_group extensions</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../reference/task_group_ext/task_bypass_support.html">Task Bypass Support for <code class="docutils literal notranslate"><span class="pre">task_group</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../reference/task_group_ext/task_completion_handle_cls.html"><code class="docutils literal notranslate"><span class="pre">task_completion_handle</span></code> Class</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../reference/task_group_ext/dynamic_dependencies.html"><code class="docutils literal notranslate"><span class="pre">task_group</span></code> Dynamic Dependencies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../reference/task_group_ext/wait_single_task.html">Waiting for Individual Tasks in <code class="docutils literal notranslate"><span class="pre">task_group</span></code></a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../reference/custom_mutex_chmap.html">The customizing mutex type for <code class="docutils literal notranslate"><span class="pre">concurrent_hash_map</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../reference/try_put_and_wait.html">Waiting for Single Messages in Flow Graph</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../reference/parallel_phase_for_task_arena.html"><code class="docutils literal notranslate"><span class="pre">parallel_phase</span></code> Interface for Task Arena</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../reference/fg_resource_limiting.html">Resource Limiting in the Flow Graph</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../reference/fg_resource_limiting/resource_limited_node_body_named_requirement.html"><code class="docutils literal notranslate"><span class="pre">ResourceLimitedNodeBody</span></code> Named Requirement</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../reference/fg_resource_limiting/resource_limiter_cls.html"><code class="docutils literal notranslate"><span class="pre">resource_limiter</span></code> Class</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../reference/fg_resource_limiting/resource_limited_node_cls.html"><code class="docutils literal notranslate"><span class="pre">resource_limited_node</span></code> Class</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../../../reference/core_type_selector.html">Core Type Selector for Task Arena Constraints</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Specification</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="../../index.html">oneAPI Threading Building Blocks Specification</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../intro.html">Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../notation.html">Notational Conventions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../identifiers.html">Identifiers</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../named_requirements.html">Named Requirements</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/algorithms/range.html">Range</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/algorithms/splittable.html">Splittable</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/algorithms/par_for_body.html">ParallelForBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/algorithms/par_for_func.html">ParallelForFunc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/algorithms/par_for_index.html">ParallelForIndex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/algorithms/par_reduce_body.html">ParallelReduceBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/algorithms/par_reduce_func.html">ParallelReduceFunc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/algorithms/par_reduce_reduction.html">ParallelReduceReduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/algorithms/par_for_each_body.html">ParallelForEachBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/algorithms/container_based_sequence.html">ContainerBasedSequence</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/algorithms/par_scan_body.html">ParallelScanBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/algorithms/par_scan_combine.html">ParallelScanCombine</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/algorithms/par_scan_func.html">ParallelScanFunc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/algorithms/blocked_range_val.html">BlockedRangeValue</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/algorithms/filter_body.html">FilterBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/mutexes/mutex.html">Mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/mutexes/rw_mutex.html">ReaderWriterMutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/containers/hash_compare.html">HashCompare</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/containers/container_range.html">ContainerRange</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/task_scheduler/suspend_func.html">SuspendFunc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/flow_graph/async_node_body.html">AsyncNodeBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/flow_graph/continue_node_body.html">ContinueNodeBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/flow_graph/gateway_type.html">GatewayType</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/flow_graph/function_node_body.html">FunctionNodeBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/flow_graph/join_node_func_obj.html">JoinNodeFunctionObject</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/flow_graph/input_node_body.html">InputNodeBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/flow_graph/multifunction_node_body.html">MultifunctionNodeBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../named_requirements/flow_graph/sequencer.html">Sequencer</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../thread_safety.html">Thread Safety</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../configuration.html">Configuration</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../configuration/namespaces.html">Namespaces</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../configuration/version_information.html">Version Information</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../configuration/enabling_debugging_features.html">Enabling Debugging Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../configuration/feature_macros.html">Feature Macros</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../algorithms.html">Algorithms</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../algorithms/functions/collaborative_call_once_func.html">collaborative_call_once</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../algorithms/functions/collaborative_once_flag_cls.html">collaborative_once_flag</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../algorithms/functions/parallel_for_func.html">parallel_for</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../algorithms/functions/parallel_reduce_func.html">parallel_reduce</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../algorithms/functions/parallel_deterministic_reduce_func.html">parallel_deterministic_reduce</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../algorithms/functions/parallel_scan_func.html">parallel_scan</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../algorithms/functions/pre_scan_tag_and_final_scan_tag_clses.html">pre_scan_tag and final_scan_tag</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../algorithms/functions/parallel_for_each_func.html">parallel_for_each</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../algorithms/functions/feeder.html">feeder</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../algorithms/functions/parallel_invoke_func.html">parallel_invoke</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../algorithms/functions/parallel_pipeline_func.html">parallel_pipeline</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../algorithms/functions/parallel_pipeline_func/filter_cls.html">filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../algorithms/functions/parallel_pipeline_func/flow_control_cls.html">flow_control</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../algorithms/functions/parallel_sort_func.html">parallel_sort</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../algorithms/blocked_ranges/blocked_range_cls.html">blocked_range</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../algorithms/blocked_ranges/blocked_range2d_cls.html">blocked_range2d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../algorithms/blocked_ranges/blocked_range3d_cls.html">blocked_range3d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../algorithms/blocked_ranges/blocked_nd_range_cls.html">blocked_nd_range</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../algorithms/partitioners/auto_partitioner.html">auto_partitioner</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../algorithms/partitioners/affinity_partitioner.html">affinity_partitioner</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../algorithms/partitioners/static_partitioner.html">static_partitioner</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../algorithms/partitioners/simple_partitioner.html">simple_partitioner</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../algorithms/split_tags/proportional_split_cls.html">proportional split</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../algorithms/split_tags/split_cls.html">split</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../flow_graph.html">Flow Graph</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../flow_graph/graph_cls.html">graph</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../flow_graph/reset_flags_enum.html">reset_flags Enumeration</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/graph_node_cls.html">graph_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/sender.html">sender</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/receiver.html">receiver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/forwarding_and_buffering.html">Forwarding and Buffering</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/continue_node_cls.html">continue_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/func_node_cls.html">function_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/input_node_cls.html">input_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/multifunc_node_cls.html">multifunction_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/async_node_cls.html">async_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/functional_node_policies.html">Function Nodes Policies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/node_priorities.html">Nodes Priorities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/predefined_concurrency_limits.html">Predefined Concurrency Limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/copy_body_func.html">copy_body</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/overwrite_node_cls.html">overwrite_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/write_once_node_cls.html">write_once_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/buffer_node_cls.html">buffer_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/queue_node_cls.html">queue_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/priority_queue_node_cls.html">priority_queue_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/sequencer_node_cls.html">sequencer_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/limiter_node_cls.html">limiter_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/broadcast_node_cls.html">broadcast_node</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../flow_graph/join_node_cls.html">join_node</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../flow_graph/join_node_policies.html">join_node Policies</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/split_node_cls.html">split_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/indexer_node_cls.html">indexer_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/composite_node_cls.html">composite_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/input_port_func.html">input_port</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/output_port_func.html">output_port</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/make_edge_func.html">make_edge</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/remove_edge_func.html">remove_edge</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/continue_msg_cls.html">continue_msg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/tagged_msg_cls.html">tagged_msg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/dependency_flow_graph_example.html">Dependency Flow Graph Example</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../flow_graph/message_flow_graph_example.html">Message Flow Graph Example</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../task_scheduler.html">Task Scheduler</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../task_scheduler/scheduling_controls/task_group_context_cls.html">task_group_context</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../task_scheduler/scheduling_controls/global_control_cls.html">global_control</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../task_scheduler/scheduling_controls/resumable_tasks.html">Resumable tasks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../task_scheduler/scheduling_controls/task_scheduler_handle_cls.html">task_scheduler_handle</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../task_scheduler/task_group/task_group_cls.html">task_group</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../task_scheduler/task_group/task_group_status_enum.html">task_group_status</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../task_scheduler/task_group/task_handle.html">task_handle</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../task_scheduler/task_arena/task_arena_cls.html">task_arena</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../task_scheduler/task_arena/this_task_arena_ns.html">this_task_arena</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../task_scheduler/task_arena/task_scheduler_observer_cls.html">task_scheduler_observer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../task_scheduler/attach_tag_type.html">attach tag type</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="../../containers.html">Containers</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 has-children"><a class="reference internal" href="../concurrent_vector_cls.html">concurrent_vector</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_vector_cls/construct_destroy_copy.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_vector_cls/concurrent_growth.html">Concurrent growth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_vector_cls/element_access.html">Element access</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_vector_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_vector_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_vector_cls/unsafe_operations.html">Concurrently unsafe operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_vector_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_vector_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_vector_cls/non_member_lexicographical_comparisons.html">Non-member lexicographical comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_vector_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_vector_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../concurrent_queue_cls.html">concurrent_queue</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_queue_cls/construct_destroy_copy.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_queue_cls/safe_member_functions.html">Concurrently safe member functions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_queue_cls/unsafe_member_functions.html">Concurrently unsafe member functions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_queue_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_queue_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_queue_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_queue_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../concurrent_bounded_queue_cls.html">concurrent_bounded_queue</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_bounded_queue_cls/construct_destroy_copy.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_bounded_queue_cls/safe_member_functions.html">Concurrently safe member functions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_bounded_queue_cls/unsafe_member_functions.html">Concurrently unsafe member functions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_bounded_queue_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_bounded_queue_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_bounded_queue_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_bounded_queue_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="../concurrent_priority_queue_cls.html">concurrent_priority_queue</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="construct_destroy_copy.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4 current active"><a class="current reference internal" href="#">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../concurrent_hash_map_cls.html">concurrent_hash_map</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_hash_map_cls/accessors.html">accessor and const_accessor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_hash_map_cls/construct_destroy_copy.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_hash_map_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_hash_map_cls/hash_policy.html">Hash policy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_hash_map_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_hash_map_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_hash_map_cls/modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_hash_map_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_hash_map_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_hash_map_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_hash_map_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_hash_map_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../concurrent_unordered_map_cls.html">concurrent_unordered_map</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_map_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_map_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_map_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_map_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_map_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_map_cls/element_access.html">Element access</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_map_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_map_cls/bucket_interface.html">Bucket interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_map_cls/hash_policy.html">Hash policy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_map_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_map_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_map_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_map_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_map_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../concurrent_unordered_multimap.html">concurrent_unordered_multimap</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multimap_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multimap_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multimap_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multimap_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multimap_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multimap_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multimap_cls/bucket_interface.html">Bucket interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multimap_cls/hash_policy.html">Hash policy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multimap_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multimap_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multimap_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multimap_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multimap_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../concurrent_unordered_set_cls.html">concurrent_unordered_set</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_set_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_set_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_set_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_set_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_set_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_set_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_set_cls/bucket_interface.html">Bucket interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_set_cls/hash_policy.html">Hash policy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_set_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_set_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_set_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_set_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_set_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../concurrent_unordered_multiset.html">concurrent_unordered_multiset</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multiset_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multiset_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multiset_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multiset_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multiset_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multiset_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multiset_cls/bucket_interface.html">Bucket interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multiset_cls/hash_policy.html">Hash policy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multiset_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multiset_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multiset_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multiset_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_unordered_multiset_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../concurrent_map_cls.html">concurrent_map</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_map_cls/value_compare_cls.html">value_compare</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_map_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_map_cls/element_access.html">Element access</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_map_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_map_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_map_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_map_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_map_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_map_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_map_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_map_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_map_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_map_cls/non_member_lexicographical_comparisons.html">Non-member lexicographical comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_map_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../concurrent_multimap_cls.html">concurrent_multimap</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multimap_cls/value_compare_cls.html">value_compare</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multimap_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multimap_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multimap_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multimap_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multimap_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multimap_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multimap_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multimap_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multimap_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multimap_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multimap_cls/non_member_lexicographical_comparisons.html">Non-member lexicographical comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multimap_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../concurrent_set_cls.html">concurrent_set</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_set_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_set_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_set_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_set_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_set_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_set_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_set_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_set_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_set_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_set_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_set_cls/non_member_lexicographical_comparisons.html">Non-member lexicographical comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_set_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../concurrent_multiset_cls.html">concurrent_multiset</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multiset_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multiset_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multiset_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multiset_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multiset_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multiset_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multiset_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multiset_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multiset_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multiset_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multiset_cls/non_member_lexicographical_comparisons.html">Non-member lexicographical comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../concurrent_multiset_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../auxiliary/tbb_hash_compare_cls.html">tbb_hash_compare</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../auxiliary/node_handles_cls.html">Node handles</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../thread_local_storage.html">Thread Local Storage</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../thread_local_storage/combinable_cls.html">combinable</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../thread_local_storage/enumerable_thread_specific_cls.html">enumerable_thread_specific</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../thread_local_storage/enumerable_thread_specific_cls/construct_destroy_copy.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../thread_local_storage/enumerable_thread_specific_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../thread_local_storage/enumerable_thread_specific_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../thread_local_storage/enumerable_thread_specific_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../thread_local_storage/enumerable_thread_specific_cls/iteration.html">Iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../thread_local_storage/enumerable_thread_specific_cls/combining.html">Combining</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../thread_local_storage/flattened2d_cls.html">flattened2d</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../memory_allocation.html">Memory Allocation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../memory_allocation/tbb_allocator_cls.html">tbb_allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../memory_allocation/scalable_allocator_cls.html">scalable_allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../memory_allocation/cache_aligned_allocator_cls.html">cache_aligned_allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../memory_allocation/cache_aligned_resource_cls.html">cache_aligned_resource</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../memory_allocation/scalable_memory_resource_func.html">scalable_memory_resource</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../memory_allocation/c_interface_to_scalable_allocator.html">C Interface to Scalable Allocator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../mutual_exclusion.html">Mutual Exclusion</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../mutual_exclusion/mutex_cls.html">mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mutual_exclusion/rw_mutex_cls.html">rw_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mutual_exclusion/spin_mutex_cls.html">spin_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mutual_exclusion/spin_rw_mutex_cls.html">spin_rw_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mutual_exclusion/speculative_spin_mutex_cls.html">speculative_spin_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mutual_exclusion/speculative_spin_rw_mutex_cls.html">speculative_spin_rw_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mutual_exclusion/queuing_mutex_cls.html">queuing_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mutual_exclusion/queuing_rw_mutex_cls.html">queuing_rw_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mutual_exclusion/null_mutex_cls.html">null_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../mutual_exclusion/null_rw_mutex_cls.html">null_rw_mutex</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../timing.html">Timing</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../timing/tick_count_cls.html">tick_count class</a></li>
+
+
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../../info_namespace.html">info Namespace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../deprecated/task_arena_attach_tag.html">task_arena::attach</a></li>
+</ul>
+</details></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/uxlfoundation/oneTBB/edit/master/doc/main/specification/source/containers/concurrent_priority_queue_cls/non_member_swap.rst" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/uxlfoundation/oneTBB/issues/new?title=Issue%20on%20page%20%2Fmain/specification/source/containers/concurrent_priority_queue_cls/non_member_swap.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../../../../../_sources/main/specification/source/containers/concurrent_priority_queue_cls/non_member_swap.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button pst-navbar-icon"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button>
+
+
+<button class="btn btn-sm pst-navbar-icon search-button search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+</button>
+
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Non-member swap</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="non-member-swap">
+<h1>Non-member swap<a class="headerlink" href="#non-member-swap" title="Link to this heading">#</a></h1>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">template</span><span class="w"> </span><span class="o">&lt;</span><span class="k">typename</span><span class="w"> </span><span class="nc">T</span><span class="p">,</span><span class="w"> </span><span class="k">typename</span><span class="w"> </span><span class="nc">Compare</span><span class="p">,</span><span class="w"> </span><span class="k">typename</span><span class="w"> </span><span class="nc">Allocator</span><span class="o">&gt;</span>
+<span class="kt">void</span><span class="w"> </span><span class="n">swap</span><span class="p">(</span><span class="w"> </span><span class="n">concurrent_priority_queue</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span><span class="w"> </span><span class="n">Compare</span><span class="p">,</span><span class="w"> </span><span class="n">Allocator</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">lhs</span><span class="p">,</span>
+<span class="w">           </span><span class="n">concurrent_priority_queue</span><span class="o">&lt;</span><span class="n">T</span><span class="p">,</span><span class="w"> </span><span class="n">Compare</span><span class="p">,</span><span class="w"> </span><span class="n">Allocator</span><span class="o">&gt;&amp;</span><span class="w"> </span><span class="n">rhs</span><span class="w"> </span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Equivalent to <code class="docutils literal notranslate"><span class="pre">lhs.swap(rhs)</span></code>.</p>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="unsafe_modifiers.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Concurrently unsafe modifiers</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="non_member_binary_comparisons.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Non-member binary comparisons</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright UXL Foundation Contributors.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../../_static/scripts/bootstrap.js?digest=7f76b32a3354e82990f2"></script>
+<script defer src="../../../../../_static/scripts/pydata-sphinx-theme.js?digest=7f76b32a3354e82990f2"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
