@@ -61,7 +61,7 @@ are extended. The table below contains only the most recent values.
           -    ``202603``
           -    | ``<oneapi/tbb/task_arena.h>``
                | ``<oneapi/tbb/info.h>``
-        * -    :ref:`task_group Dynamic Dependencies<task_group_dynamic_dependencies>`
+        * -    :ref:`task_group Dynamic Dependencies<dynamic_dependencies>`
           -    ``TBB_HAS_TASK_GROUP_DEPENDENCIES``
           -    ``202603``
           -    | ``<oneapi/tbb/task_group.h>``
