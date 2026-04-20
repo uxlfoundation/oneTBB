@@ -53,7 +53,7 @@ target_include_directories(tbbmalloc
 # TODO: fix warnings
 if (MSVC)
     # signed unsigned mismatch, declaration hides class member
-    set(TBB_WARNING_SUPPRESS ${TBB_WARNING_SUPPRESS} /wd4245 /wd4458)
+    set(TBB_WARNING_SUPPRESS ${TBB_WARNING_SUPPRESS} /wd4267 /wd4244 /wd4245 /wd4458)
 endif()
 
 target_compile_options(tbbmalloc
