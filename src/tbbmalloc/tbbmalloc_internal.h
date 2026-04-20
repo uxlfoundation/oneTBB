@@ -204,10 +204,12 @@ protected:
         if (startIdx % WORD_LEN) {
             // only interested in part of a word, clear bits before startIdx
             pos = WORD_LEN - startIdx % WORD_LEN;
-            uintptr_t actualMask = mask[idx].load(std::memory_order_relaxed) & (((uintptr_t)1<<pos) - 1);
+            uintptr_t actualMask =
+                mask[idx].load(std::memory_order_relaxed) & (((uintptr_t) 1 << pos) - 1);
             idx++;
-            if (-1 != (pos = BitScanRev(actualMask)))
-                return idx*WORD_LEN - pos - 1;
+            pos = BitScanRev(actualMask);
+            if (-1 != pos)
+                return idx * WORD_LEN - pos - 1;
         }
 
         while (idx<SZ)

@@ -326,7 +326,8 @@ private:
         else if (size < minBinnedSize)
             return NO_BIN;
 
-        int bin = (size - minBinnedSize)/freeBinsStep;
+        size_t val = (size - minBinnedSize)/freeBinsStep;
+        int bin = (int)val;
 
         MALLOC_ASSERT(bin < HUGE_BIN, "Invalid size.");
         return bin;

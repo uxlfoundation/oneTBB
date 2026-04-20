@@ -40,8 +40,9 @@ struct BackRefBlock : public BlockI {
 
     BackRefBlock(const BackRefBlock *blockToUse, intptr_t num) :
         nextForUse(nullptr), bumpPtr((FreeObject*)((uintptr_t)blockToUse + slabSize - sizeof(void*))),
-        freeList(nullptr), nextRawMemBlock(nullptr), allocatedCount(0), myNum(num),
-        addedToForUse(false) {
+        freeList(nullptr), nextRawMemBlock(nullptr), allocatedCount(0),
+        myNum((BackRefIdx::main_t)num), addedToForUse(false)
+    {
         memset(static_cast<void*>(&blockMutex), 0, sizeof(MallocMutex));
 
         MALLOC_ASSERT(!(num >> CHAR_BIT*sizeof(BackRefIdx::main_t)),
@@ -181,14 +182,15 @@ bool BackRefMain::requestNewSpace()
 
     MallocMutex::scoped_lock lock(mainMutex); // ... and share under lock
 
-    const size_t numOfUnusedIdxs = BackRefMain::dataSz - lastUsed - 1;
+    const intptr_t numOfUnusedIdxs = BackRefMain::dataSz - lastUsed - 1;
     if (numOfUnusedIdxs <= 0) { // no space in main under lock, roll back
         backend->putBackRefSpace(newBl, blockSpaceSize, isRawMemUsed);
         return false;
     }
     // It's possible that only part of newBl is used, due to lack of indices in main.
     // This is OK as such underutilization is possible only once for backreferneces table.
-    int blocksToUse = min(numOfUnusedIdxs, blockSpaceSize / BackRefBlock::bytes);
+    unsigned blocksToUse =
+        (unsigned)(min((uintptr_t)numOfUnusedIdxs, blockSpaceSize / BackRefBlock::bytes));
 
     // use the first block in the batch to maintain the list of "raw" memory
     // to be released at shutdown
@@ -196,7 +198,9 @@ bool BackRefMain::requestNewSpace()
         newBl->nextRawMemBlock = backRefMain.load(std::memory_order_relaxed)->allRawMemBlocks;
         backRefMain.load(std::memory_order_relaxed)->allRawMemBlocks = newBl;
     }
-    for (BackRefBlock *bl = newBl; blocksToUse>0; bl = (BackRefBlock*)((uintptr_t)bl + BackRefBlock::bytes), blocksToUse--) {
+    for (BackRefBlock *bl = newBl; blocksToUse != 0;
+         bl = (BackRefBlock*)((uintptr_t)bl + BackRefBlock::bytes), blocksToUse--)
+    {
         initEmptyBackRefBlock(bl);
         if (active.load(std::memory_order_relaxed)->allocatedCount.load(std::memory_order_relaxed) == BR_MAX_CNT) {
             active.store(bl, std::memory_order_release); // active leaf is not needed in listForUse

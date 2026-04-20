@@ -47,8 +47,9 @@
 #define MALLOC_ITT_RELEASE_RESOURCES()  ((void)0)
 #endif
 
-inline intptr_t BitScanRev(uintptr_t x) {
-    return x == 0 ? -1 : static_cast<intptr_t>(tbb::detail::log2(x));
+// TODO: Consider conforming to _BitScanReverse interface, an MSVC intrinsic
+inline int BitScanRev(uintptr_t x) {
+    return x == 0 ? -1 : static_cast<int>(tbb::detail::log2(x));
 }
 
 template<typename T>

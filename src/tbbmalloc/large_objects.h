@@ -54,10 +54,11 @@ public:
         return alignUp(size, CacheStep);
     }
 
-    static int sizeToIdx(size_t size) {
+    static unsigned sizeToIdx(size_t size) {
+        MALLOC_ASSERT(MaxSize <= UINT_MAX, ASSERT_TEXT);
         MALLOC_ASSERT(MinSize <= size && size < MaxSize, ASSERT_TEXT);
         MALLOC_ASSERT(size % CacheStep == 0, ASSERT_TEXT);
-        return (size - MinSize) / CacheStep;
+        return (unsigned)((size - MinSize) / CacheStep);
     }
 };
 
@@ -82,7 +83,7 @@ public:
     static size_t alignToBin(size_t size) {
         MALLOC_ASSERT(size >= StepFactor, "Size must not be less than the StepFactor");
 
-        int sizeExp = (int)BitScanRev(size);
+        int sizeExp = BitScanRev(size);
         MALLOC_ASSERT(sizeExp >= 0, "BitScanRev() cannot return -1, as size >= stepfactor > 0");
         MALLOC_ASSERT(sizeExp >= StepFactorExp, "sizeExp >= StepFactorExp, because size >= stepFactor");
         int minorStepExp = sizeExp - StepFactorExp;
@@ -91,18 +92,19 @@ public:
     }
 
     // Sizes between the power of 2 values are approximated to StepFactor.
+    // TODO: Consider returning unsigned for every sizeToIdx
     static int sizeToIdx(size_t size) {
         MALLOC_ASSERT(MinSize <= size && size <= MaxSize, ASSERT_TEXT);
 
-        int sizeExp = (int)BitScanRev(size); // same as __TBB_Log2
+        int sizeExp = BitScanRev(size); // same as __TBB_Log2
         MALLOC_ASSERT(sizeExp >= 0, "BitScanRev() cannot return -1, as size >= stepfactor > 0");
         MALLOC_ASSERT(sizeExp >= StepFactorExp, "sizeExp >= StepFactorExp, because size >= stepFactor");
-        int minorStepExp = sizeExp - StepFactorExp;
+        unsigned minorStepExp = sizeExp - StepFactorExp;
 
         size_t majorStepSize = 1ULL << sizeExp;
-        int minorIdx = (size - majorStepSize) >> minorStepExp;
+        unsigned minorIdx = (unsigned)((size - majorStepSize) >> minorStepExp);
         MALLOC_ASSERT(size == majorStepSize + ((size_t)minorIdx << minorStepExp),
-            "Size is not aligned on the bin");
+                      "Size is not aligned on the bin");
         return StepFactor * (sizeExp - MinSizeExp) + minorIdx;
     }
 };

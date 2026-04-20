@@ -284,7 +284,7 @@ public:
     inline TLSData *getTLS(bool create);
     void clearTLS() { extMemPool.tlsPointerKey.setThreadMallocTLS(nullptr); }
 
-    Block *getEmptyBlock(size_t size);
+    Block *getEmptyBlock(unsigned size);
     void returnEmptyBlock(Block *block, bool poolTheBlock);
 
     // get/put large object to/from local large object cache
@@ -344,7 +344,7 @@ protected:
     friend class LifoList;
     friend void *BootStrapBlocks::allocate(MemoryPool *, size_t);
     friend bool OrphanedBlocks::cleanup(Backend*);
-    friend Block *MemoryPool::getEmptyBlock(size_t);
+    friend Block *MemoryPool::getEmptyBlock(unsigned);
 };
 
 // Use inheritance to guarantee that a user data start on next cache line.
@@ -417,7 +417,7 @@ public:
         suppress_unused_warning(object);
 #endif
     }
-    void initEmptyBlock(TLSData *tls, size_t size);
+    void initEmptyBlock(TLSData *tls, unsigned size);
     size_t findObjectSize(void *object) const;
     MemoryPool *getMemPool() const { return poolPtr; } // do not use on the hot path!
 
@@ -472,7 +472,7 @@ public:
     void addPublicFreeListBlock(Block* block);
 
     void outofTLSBin(Block* block);
-    void verifyTLSBin(size_t size) const;
+    void verifyTLSBin(unsigned size) const;
     void pushTLSBin(Block* block);
 
 #if MALLOC_DEBUG
@@ -595,7 +595,7 @@ private:
 public:
     TLSData(MemoryPool *mPool, Backend *bknd) : memPool(mPool), freeSlabBlocks(bknd), currCacheIdx(0) {}
     MemoryPool *getMemPool() const { return memPool; }
-    Bin* getAllocationBin(size_t size);
+    Bin* getAllocationBin(unsigned size);
     void release();
     bool externalCleanup(bool cleanOnlyUnused, bool cleanBins) {
         if (!unused.load(std::memory_order_relaxed) && cleanOnlyUnused) return false;
@@ -886,7 +886,7 @@ void *BootStrapBlocks::allocate(MemoryPool *memPool, size_t size)
             bootStrapObjectList = bootStrapObjectList->next;
         } else {
             if (!bootStrapBlock) {
-                bootStrapBlock = memPool->getEmptyBlock(size);
+                bootStrapBlock = memPool->getEmptyBlock((unsigned)size);
                 if (!bootStrapBlock) return nullptr;
             }
             result = bootStrapBlock->bumpPtr;
@@ -999,13 +999,13 @@ TLSData* MemoryPool::getTLS(bool create)
 /*
  * Return the bin for the given size.
  */
-inline Bin* TLSData::getAllocationBin(size_t size)
+inline Bin* TLSData::getAllocationBin(unsigned size)
 {
     return bin + getIndex(size);
 }
 
 /* Return an empty uninitialized block in a non-blocking fashion. */
-Block *MemoryPool::getEmptyBlock(size_t size)
+Block *MemoryPool::getEmptyBlock(unsigned size)
 {
     TLSData* tls = getTLS(/*create=*/false);
     // try to use per-thread cache, if TLS available
@@ -1169,9 +1169,9 @@ void MemoryPool::onThreadShutdown(TLSData *tlsData)
 }
 
 #if MALLOC_DEBUG
-void Bin::verifyTLSBin (size_t size) const
+void Bin::verifyTLSBin (unsigned size) const
 {
-/* The debug version verifies the TLSBin as needed */
+    /* The debug version verifies the TLSBin as needed */
     uint32_t objSize = getObjectSize(size);
 
     if (activeBlk) {
@@ -1200,7 +1200,7 @@ void Bin::verifyTLSBin (size_t size) const
     }
 }
 #else /* MALLOC_DEBUG */
-inline void Bin::verifyTLSBin (size_t) const { }
+inline void Bin::verifyTLSBin (unsigned) const { }
 #endif /* MALLOC_DEBUG */
 
 /*
@@ -1574,7 +1574,7 @@ void Block::cleanBlockHeader()
     publicFreeList.store(nullptr, std::memory_order_relaxed);
 }
 
-void Block::initEmptyBlock(TLSData *tls, size_t size)
+void Block::initEmptyBlock(TLSData *tls, unsigned size)
 {
     // Having getIndex and getObjectSize called next to each other
     // allows better compiler optimization as they basically share the code.
@@ -1583,7 +1583,7 @@ void Block::initEmptyBlock(TLSData *tls, size_t size)
 
     cleanBlockHeader();
     MALLOC_ASSERT(objSz <= USHRT_MAX, "objSz must not be less 2^16-1");
-    objectSize = objSz;
+    objectSize = (uint16_t)objSz;
     markOwned(tls);
     // bump pointer should be prepared for first allocation - thus mode it down to objectSize
     bumpPtr = (FreeObject *)((uintptr_t)this + slabSize - objectSize);
@@ -2311,14 +2311,15 @@ void *MemoryPool::getFromLLOCache(TLSData* tls, size_t size, size_t alignment)
             alignDown((uintptr_t)lmb+lmb->unalignedSize - size, alignment);
         // Has some room to shuffle object between cache lines?
         // Note that alignedRight and alignedArea are aligned at alignment.
-        unsigned ptrDelta = alignedRight - (uintptr_t)alignedArea;
+        MALLOC_ASSERT(alignedRight - (uintptr_t)alignedArea <= UINT_MAX, ASSERT_TEXT);
+        unsigned ptrDelta = (unsigned)(alignedRight - (uintptr_t)alignedArea);
         if (ptrDelta && tls) { // !tls is cold path
             // for the hot path of alignment==estimatedCacheLineSize,
             // allow compilers to use shift for division
             // (since estimatedCacheLineSize is a power-of-2 constant)
             unsigned numOfPossibleOffsets = alignment == estimatedCacheLineSize?
-                  ptrDelta / estimatedCacheLineSize :
-                  ptrDelta / alignment;
+                                            ptrDelta / estimatedCacheLineSize :
+                                            (unsigned)(ptrDelta / alignment);
             unsigned myCacheIdx = ++tls->currCacheIdx;
             unsigned offset = myCacheIdx % numOfPossibleOffsets;
 
@@ -2469,7 +2470,9 @@ inline bool Block::isProperlyPlaced(const void *object) const
 FreeObject *Block::findAllocatedObject(const void *address) const
 {
     // calculate offset from the end of the block space
-    uint16_t offset = (uintptr_t)this + slabSize - (uintptr_t)address;
+    const uintptr_t tmp_offset = (uintptr_t)this + slabSize - (uintptr_t)address;
+    MALLOC_ASSERT(tmp_offset <= USHRT_MAX, ASSERT_TEXT);
+    uint16_t offset = (uint16_t)tmp_offset;
     MALLOC_ASSERT( offset<=slabSize-sizeof(Block), ASSERT_TEXT );
     // find offset difference from a multiple of allocation size
     offset %= objectSize;
@@ -2575,7 +2578,7 @@ static void *internalPoolMalloc(MemoryPool* memPool, size_t size)
      * Get an element in thread-local array corresponding to the given size;
      * It keeps ptr to the active block for allocations of this size
      */
-    bin = tls->getAllocationBin(size);
+    bin = tls->getAllocationBin((unsigned)size);
     if ( !bin ) return nullptr;
 
     /* Get a block to try to allocate in. */
@@ -2596,25 +2599,25 @@ static void *internalPoolMalloc(MemoryPool* memPool, size_t size)
             return result;
         /* Else something strange happened, need to retry from the beginning; */
         TRACEF(( "[ScalableMalloc trace] Something is wrong: no objects in public free list; reentering.\n" ));
-        return internalPoolMalloc(memPool, size);
+        return internalPoolMalloc(memPool, (unsigned)size);
     }
 
     /*
      * no suitable own blocks, try to get a partial block that some other thread has discarded.
      */
-    mallocBlock = memPool->extMemPool.orphanedBlocks.get(tls, size);
+    mallocBlock = memPool->extMemPool.orphanedBlocks.get(tls, (unsigned)size);
     while (mallocBlock) {
         bin->pushTLSBin(mallocBlock);
         bin->setActiveBlock(mallocBlock); // TODO: move under the below condition?
         if( FreeObject *result = mallocBlock->allocate() )
             return result;
-        mallocBlock = memPool->extMemPool.orphanedBlocks.get(tls, size);
+        mallocBlock = memPool->extMemPool.orphanedBlocks.get(tls, (unsigned)size);
     }
 
     /*
      * else try to get a new empty block
      */
-    mallocBlock = memPool->getEmptyBlock(size);
+    mallocBlock = memPool->getEmptyBlock((unsigned)size);
     if (mallocBlock) {
         bin->pushTLSBin(mallocBlock);
         bin->setActiveBlock(mallocBlock);
