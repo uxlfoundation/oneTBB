@@ -93,8 +93,7 @@ public:
     }
 
     // Sizes between the power of 2 values are approximated to StepFactor.
-    // TODO: Consider returning unsigned for every sizeToIdx
-    static int sizeToIdx(size_t size) {
+    static unsigned sizeToIdx(size_t size) {
         MALLOC_ASSERT(MinSize <= size && size <= MaxSize, ASSERT_TEXT);
 
         int sizeExp = BitScanRev(size); // same as __TBB_Log2
@@ -106,7 +105,7 @@ public:
         unsigned minorIdx = (unsigned)((size - majorStepSize) >> minorStepExp);
         MALLOC_ASSERT(size == majorStepSize + ((size_t)minorIdx << minorStepExp),
                       "Size is not aligned on the bin");
-        return StepFactor * (sizeExp - MinSizeExp) + minorIdx;
+        return (unsigned)(StepFactor * (sizeExp - MinSizeExp) + minorIdx);
     }
 };
 
@@ -180,7 +179,8 @@ public:
 
         typename MallocAggregator<CacheBinOperation>::type aggregator;
 
-        void ExecuteOperation(CacheBinOperation *op, ExtMemoryPool *extMemPool, BinBitMask *bitMask, int idx, bool longLifeTime = true);
+        void ExecuteOperation(CacheBinOperation *op, ExtMemoryPool *extMemPool, BinBitMask *bitMask,
+                              unsigned idx, bool longLifeTime = true);
 
         /* should be placed in zero-initialized memory, ctor not needed. */
         CacheBin();
@@ -191,7 +191,7 @@ public:
         }
 
         /* ---------- Cache accessors ---------- */
-        void putList(ExtMemoryPool *extMemPool, LargeMemoryBlock *head, BinBitMask *bitMask, int idx);
+        void putList(ExtMemoryPool *extMemPool, LargeMemoryBlock *head, BinBitMask *bitMask, unsigned idx);
         LargeMemoryBlock *get(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask, int idx);
 
         /* ---------- Cleanup functions -------- */
@@ -199,7 +199,7 @@ public:
         bool releaseAllToBackend(ExtMemoryPool *extMemPool, BinBitMask *bitMask, int idx);
         /* ------------------------------------- */
 
-        void updateUsedSize(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask, int idx);
+        void updateUsedSize(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask, unsigned idx);
         void decreaseThreshold() {
             intptr_t threshold = ageThreshold.load(std::memory_order_relaxed);
             if (threshold)
@@ -245,7 +245,7 @@ public:
 
     // Huge bins index for fast regular cleanup searching in case of
     // the "huge size threshold" setting defined
-    intptr_t     hugeSizeThresholdIdx;
+    uintptr_t     hugeSizeThresholdIdx;
 
 private:
     // How many times LOC was "too large"
@@ -261,7 +261,7 @@ public:
     static size_t alignToBin(size_t size) {
         return Props::alignToBin(size);
     }
-    static int sizeToIdx(size_t size) {
+    static unsigned sizeToIdx(size_t size) {
         return Props::sizeToIdx(size);
     }
 
@@ -337,7 +337,7 @@ private:
 
     // Returns artificial bin index,
     // it's used only during sorting and never saved
-    static int sizeToIdx(size_t size);
+    static unsigned sizeToIdx(size_t size);
 
     // Our friends
     friend class Backend;
