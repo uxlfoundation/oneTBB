@@ -50,8 +50,8 @@ cc_library(
     ]),
     copts = ["-w"] + select({
         "@platforms//os:windows": [""],
-        "@platforms//cpu:arm64": [""],
-        "//conditions:default": ["-mwaitpkg"],
+        "@platforms//cpu:x86_64": ["-mwaitpkg"],
+        "//conditions:default": [""],
     }),
     defines =
         select({

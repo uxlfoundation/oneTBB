@@ -132,7 +132,7 @@ See [sub-RFC for increased availability of NUMA API](tbbbind-link-static-hwloc.o
 
 ### Create NUMA-constrained arenas
 
-See [sub-RFC for creation of NUMA-constrained arenas](create-numa-arenas.md)
+This [sub-proposal is supported](../../supported/numa_support/create-numa-arenas.md).
 
 ### NUMA-aware allocation
 

@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -42,6 +43,9 @@
 #ifndef TBB_PREVIEW_MEMORY_POOL
 #define TBB_PREVIEW_MEMORY_POOL 1
 #endif
+#ifndef TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
+#define TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR 1
+#endif
 #endif
 
 #include "oneapi/tbb/detail/_config.h"
@@ -78,6 +82,11 @@ const unsigned MByte = 1024*1024;
 
 #if (_WIN32 && !__TBB_WIN8UI_SUPPORT) || (__linux__ && !__ANDROID__ && !__bg__) || __FreeBSD_version >= 701000
 #define __TBB_TEST_SKIP_AFFINITY 0
+#if __linux__
+#define __TBB_USE_CGROUPS 1
+#else
+#define __TBB_USE_CGROUPS 0
+#endif
 #else
 #define __TBB_TEST_SKIP_AFFINITY 1
 #endif
