@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-find_package(PythonInterp 3.5 REQUIRED)
+find_package(Python3 3.5 REQUIRED)
 
 set(PYTHON_BUILD_WORK_DIR python_build)
 
@@ -44,7 +44,7 @@ add_custom_target(
     ${CMAKE_COMMAND} -E env
         TBB_INCLUDEDIRS="${TBB4PY_INCLUDE_STRING}"
         TBB_LIBDIRS=$<TARGET_FILE_DIR:TBB::tbb>
-    ${PYTHON_EXECUTABLE} -m pip install
+    ${PYTHON3_EXECUTABLE} -m pip install
         --no-build-isolation
         --prefix build
         ./${PYTHON_BUILD_WORK_DIR}
