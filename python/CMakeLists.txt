@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 set(PY_EXECUTABLE "")
 if(CMAKE_VERSION VERSION_LESS 3.12)
   find_package(PythonInterp 3.5 REQUIRED)
