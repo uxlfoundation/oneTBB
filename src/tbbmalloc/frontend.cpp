@@ -2311,15 +2311,17 @@ void *MemoryPool::getFromLLOCache(TLSData* tls, size_t size, size_t alignment)
             alignDown((uintptr_t)lmb+lmb->unalignedSize - size, alignment);
         // Has some room to shuffle object between cache lines?
         // Note that alignedRight and alignedArea are aligned at alignment.
-        MALLOC_ASSERT(alignedRight - (uintptr_t)alignedArea <= UINT_MAX, ASSERT_TEXT);
-        unsigned ptrDelta = (unsigned)(alignedRight - (uintptr_t)alignedArea);
+        uintptr_t ptrDelta = alignedRight - (uintptr_t)alignedArea;
         if (ptrDelta && tls) { // !tls is cold path
             // for the hot path of alignment==estimatedCacheLineSize,
             // allow compilers to use shift for division
             // (since estimatedCacheLineSize is a power-of-2 constant)
-            unsigned numOfPossibleOffsets = alignment == estimatedCacheLineSize?
-                                            ptrDelta / estimatedCacheLineSize :
-                                            (unsigned)(ptrDelta / alignment);
+            MALLOC_ASSERT((alignment == estimatedCacheLineSize?
+                           ptrDelta / estimatedCacheLineSize : ptrDelta / alignment) <= UINT_MAX,
+                          ASSERT_TEXT);
+            unsigned numOfPossibleOffsets =
+                (unsigned)(alignment == estimatedCacheLineSize?
+                           (ptrDelta / estimatedCacheLineSize) : (ptrDelta / alignment));
             unsigned myCacheIdx = ++tls->currCacheIdx;
             unsigned offset = myCacheIdx % numOfPossibleOffsets;
 
