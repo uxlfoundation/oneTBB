@@ -503,7 +503,7 @@ private:
 
         // Initialize object variables
         if (hugePageSize > -1) {
-            pageSize = hugePageSize * 1024; // was read in KB from meminfo
+            pageSize = (size_t)hugePageSize * 1024; // was read in KB from meminfo
         } else {
             pageSize = 0;
         }
