@@ -2572,12 +2572,16 @@ static void *internalPoolMalloc(MemoryPool* memPool, size_t size)
 
     if (!tls) return nullptr;
 
+    // size has lesser value than minLargeObjectSize, so casting is harmless.
+    static_assert(minLargeObjectSize <= UINT_MAX, "The cast below is incorrect");
+    const unsigned uSize = (unsigned)size;
+
     tls->markUsed();
     /*
      * Get an element in thread-local array corresponding to the given size;
      * It keeps ptr to the active block for allocations of this size
      */
-    bin = tls->getAllocationBin((unsigned)size);
+    bin = tls->getAllocationBin(uSize);
     if ( !bin ) return nullptr;
 
     /* Get a block to try to allocate in. */
@@ -2598,25 +2602,25 @@ static void *internalPoolMalloc(MemoryPool* memPool, size_t size)
             return result;
         /* Else something strange happened, need to retry from the beginning; */
         TRACEF(( "[ScalableMalloc trace] Something is wrong: no objects in public free list; reentering.\n" ));
-        return internalPoolMalloc(memPool, (unsigned)size);
+        return internalPoolMalloc(memPool, uSize);
     }
 
     /*
      * no suitable own blocks, try to get a partial block that some other thread has discarded.
      */
-    mallocBlock = memPool->extMemPool.orphanedBlocks.get(tls, (unsigned)size);
+    mallocBlock = memPool->extMemPool.orphanedBlocks.get(tls, uSize);
     while (mallocBlock) {
         bin->pushTLSBin(mallocBlock);
         bin->setActiveBlock(mallocBlock); // TODO: move under the below condition?
         if( FreeObject *result = mallocBlock->allocate() )
             return result;
-        mallocBlock = memPool->extMemPool.orphanedBlocks.get(tls, (unsigned)size);
+        mallocBlock = memPool->extMemPool.orphanedBlocks.get(tls, uSize);
     }
 
     /*
      * else try to get a new empty block
      */
-    mallocBlock = memPool->getEmptyBlock((unsigned)size);
+    mallocBlock = memPool->getEmptyBlock(uSize);
     if (mallocBlock) {
         bin->pushTLSBin(mallocBlock);
         bin->setActiveBlock(mallocBlock);

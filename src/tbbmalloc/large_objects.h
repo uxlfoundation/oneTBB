@@ -55,7 +55,7 @@ public:
     }
 
     static unsigned sizeToIdx(size_t size) {
-        MALLOC_ASSERT(MaxSize <= UINT_MAX, ASSERT_TEXT);
+        static_assert(MaxSize <= UINT_MAX, "The cast below can be incorrect");
         MALLOC_ASSERT(MinSize <= size && size < MaxSize, ASSERT_TEXT);
         MALLOC_ASSERT(size % CacheStep == 0, ASSERT_TEXT);
         return (unsigned)((size - MinSize) / CacheStep);

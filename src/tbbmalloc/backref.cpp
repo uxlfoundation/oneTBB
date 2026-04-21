@@ -189,6 +189,12 @@ bool BackRefMain::requestNewSpace()
     }
     // It's possible that only part of newBl is used, due to lack of indices in main.
     // This is OK as such underutilization is possible only once for backreferneces table.
+
+    // Since numOfUnusedIdxs remains greater than zero after subtraction above, its value should be
+    // less than INT_MAX.
+    MALLOC_ASSERT(numOfUnusedIdxs <= INT_MAX, ASSERT_TEXT);
+
+    // Therefore, the minimum below will be at most as large as the value of numOfUnusedIdxs
     unsigned blocksToUse =
         (unsigned)(min((uintptr_t)numOfUnusedIdxs, blockSpaceSize / BackRefBlock::bytes));
 
