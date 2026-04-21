@@ -117,6 +117,10 @@ EXPORTS
 ?constraints_default_concurrency@r1@detail@tbb@@YAHAEBUconstraints@d1@23@_J@Z
 ?constraints_threads_per_core@r1@detail@tbb@@YAHAEBUconstraints@d1@23@_J@Z
 
+?alloc_interleaved@r1@detail@tbb@@YAPEAX_K0PEBH0@Z
+?free_interleaved@r1@detail@tbb@@YAXPEAX_K@Z
+?free_interleaved@r1@detail@tbb@@YAXPEAX_K@Z
+
 ; Observer (observer_proxy.cpp)
 ?observe@r1@detail@tbb@@YAXAEAVtask_scheduler_observer@d1@23@_N@Z
 

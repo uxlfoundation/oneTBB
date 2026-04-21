@@ -30,6 +30,11 @@
 #include "oneapi/tbb/global_control.h"
 #include "oneapi/tbb/tbb_allocator.h"
 #include "oneapi/tbb/info.h"
+#include "oneapi/tbb/numa_memory.h"
+
+#if __linux__
+#include <numaif.h> // for move_pages
+#endif
 
 #include "task_dispatcher.h"
 
@@ -363,6 +368,7 @@ bool __TBB_EXPORTED_FUNC finalize(d1::task_scheduler_handle& handle, std::intptr
 #pragma weak __TBB_internal_get_affinity_mask
 #pragma weak __TBB_internal_get_default_concurrency
 #pragma weak __TBB_internal_set_tbbbind_assertion_handler
+#pragma weak move_pages
 
 extern "C" {
 void __TBB_internal_initialize_system_topology(
@@ -621,6 +627,161 @@ int __TBB_EXPORTED_FUNC constraints_default_concurrency(const d1::constraints& c
 
 int __TBB_EXPORTED_FUNC constraints_threads_per_core(const d1::constraints&, intptr_t /*reserved*/) {
     return system_topology::automatic;
+}
+
+static std::atomic<do_once_state> interleaved_initialization_state;
+
+#if __linux__
+static long (*move_pages_ptr)(int pid, unsigned long count,
+                void **pages, const int *nodes, int *status, int flags) = nullptr;
+
+static const dynamic_link_descriptor LibnumaLinkTable[] = {
+    DLD(move_pages, move_pages_ptr)
+};
+#elif _WIN32 || _WIN64
+PVOID (*VirtualAlloc2_ptr)(HANDLE Process,
+  PVOID                  BaseAddress,
+  SIZE_T                 Size,
+  ULONG                  AllocationType,
+  ULONG                  PageProtection,
+  MEM_EXTENDED_PARAMETER *ExtendedParameters,
+  ULONG                  ParameterCount
+);
+
+static const dynamic_link_descriptor LibnumaLinkTable[] = {
+    DLD(VirtualAlloc2, VirtualAlloc2_ptr)
+};
+#endif /* __linux__ */
+
+void interleaved_initialization_impl() {
+    system_topology::initialize();
+
+#if __linux__
+    dynamic_link("libnuma.so", LibnumaLinkTable, sizeof(LibnumaLinkTable) / sizeof(dynamic_link_descriptor),
+                 nullptr, DYNAMIC_LINK_GLOBAL | DYNAMIC_LINK_LOAD | DYNAMIC_LINK_WEAK);
+#elif _WIN32 || _WIN64
+    dynamic_link("kernelbase.dll", LibnumaLinkTable, sizeof(LibnumaLinkTable) / sizeof(dynamic_link_descriptor));
+#endif
+}
+
+void *__TBB_EXPORTED_FUNC alloc_interleaved(size_t size, size_t interleaving_step,
+                        const tbb::detail::d1::numa_node_id *nodes_ids, size_t nodes_count) {
+    atomic_do_once(interleaved_initialization_impl, interleaved_initialization_state);
+
+    if (!interleaving_step)
+        interleaving_step = governor::default_page_size();
+    else if (interleaving_step > size)
+        interleaving_step = size;
+    const int *nodes = nodes_count? nodes_ids : system_topology::numa_nodes_indexes;
+    if (!nodes_count)
+        nodes_count = numa_node_count();
+
+#if __linux__
+    void *data = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (data == MAP_FAILED) {
+        printf("interleaved_vector: mmap failed errno %d\n", errno);
+        perror("mmap");
+        throw std::bad_alloc();
+    }
+    // touch each page, otherwise move_pages() will fail with EFAULT
+    for (size_t i = 0; i < size; i += governor::default_page_size())
+        static_cast<char*>(data)[i] = 0;
+
+    // no NUMA nodes or move_pages() not available, just return the memory as is
+    if (numa_node_count() == 1 || !move_pages_ptr) {
+        return data;
+    }
+
+    int count_pages = (size + governor::default_page_size() - 1) / governor::default_page_size();
+    std::unique_ptr<void*[]> pages(new void*[count_pages]);
+    std::unique_ptr<int[]> nodes_per_page(new int[count_pages]);
+    std::unique_ptr<int[]> status(new int[count_pages]);
+
+    char *beg_ptr = reinterpret_cast<char*>(data),
+         *end_ptr = reinterpret_cast<char*>(data) + size;
+    // move_pages() has no length parameter, so must be done per page
+    for (char *ptr = beg_ptr; ptr < end_ptr; ptr += governor::default_page_size()) {
+        unsigned page_idx = (ptr - beg_ptr) / governor::default_page_size();
+        unsigned stride_idx = (ptr - beg_ptr) / interleaving_step;
+        pages[page_idx] = ptr;
+        nodes_per_page[page_idx] = nodes[stride_idx % nodes_count];
+    }
+    long ret = move_pages_ptr(0, count_pages, pages.get(), nodes_per_page.get(), status.get(), 0);
+    if (ret < 0) {
+        printf("interleaved_vector: move_to_node failed errno %d\n", errno);
+        perror("move_pages");
+        throw std::bad_alloc();
+    }
+    for (int i = 0; i < count_pages; ++i)
+        if (status[i] < 0) {
+            printf("interleaved_vector: move_to_node failed at %u status %d\n", i, status[i]);
+            throw std::bad_alloc();
+        }
+
+    return data;
+#elif _WIN32 || _WIN64
+    // TODO: use VirtualAlloc as fallback if VirtualAlloc2 is not available or for no-NUMA machines
+    char* base_addr =
+        static_cast<char*>(VirtualAlloc2_ptr(nullptr, nullptr, size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER,
+                                             PAGE_NOACCESS, nullptr, 0));
+    if (!base_addr) {
+        printf("VirtualAlloc2 reserve failed.\n");
+        return nullptr;
+    }
+
+    int node_index = 0;
+
+    // commit pages round-robin across nodes
+    for (size_t curr_size = 0; curr_size < size; curr_size += interleaving_step, ++node_index) {
+        // must release every but last page
+        if (curr_size < size - interleaving_step) {
+            BOOL ok = VirtualFree(base_addr + curr_size, interleaving_step, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER);
+            if (!ok) {
+                printf("VirtualFree(MEM_PRESERVE_PLACEHOLDER) failed %d\n", GetLastError());
+                VirtualFree(base_addr, 0, MEM_RELEASE);
+                return nullptr;
+            }
+        }
+
+        MEM_EXTENDED_PARAMETER param = { 0 };
+
+        param.Type = MemExtendedParameterNumaNode;
+        // preferred node
+        param.ULong = nodes[node_index % nodes_count];
+
+        // commit the pages to the preferred node
+        PVOID result = VirtualAlloc2_ptr(nullptr, base_addr + curr_size, interleaving_step,
+                                         MEM_RESERVE | MEM_COMMIT | MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE,
+                                         &param, 1);
+
+        if (!result) {
+            printf("Failed to commit page at %p on node %d\n", base_addr + curr_size, (int)param.ULong);
+            VirtualFree(base_addr, 0, MEM_RELEASE);
+            return nullptr;
+        }
+    }
+
+    return base_addr;
+#else
+    return malloc(size);
+#endif
+}
+
+void __TBB_EXPORTED_FUNC free_interleaved(void *ptr, size_t size) {
+    atomic_do_once(interleaved_initialization_impl, interleaved_initialization_state);
+
+#if __linux__
+    int ret = munmap(ptr, size);
+    if (ret < 0) {
+        printf("interleaved_vector: munmap failed errno %d\n", errno);
+        perror("munmap");
+    }
+#elif _WIN32 || _WIN64
+    VirtualFree(ptr, 0, MEM_RELEASE);
+#else
+    (void)size;
+    free(ptr);
+#endif
 }
 
 } // namespace r1
