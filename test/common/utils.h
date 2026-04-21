@@ -487,6 +487,27 @@ public:
     T* operator&() { return &m_value; }
 };
 
+// if non-zero byte found, returns bad value address plus 1
+size_t NonZero(void *ptr, size_t size)
+{
+    size_t words = size / sizeof(intptr_t);
+    size_t tailSz = size % sizeof(intptr_t);
+    intptr_t *buf =(intptr_t*)ptr;
+    char *bufTail =(char*)(buf+words);
+
+    for (size_t i=0; i<words; i++)
+        if (buf[i]) {
+            for (unsigned b=0; b<sizeof(intptr_t); b++)
+                if (((char*)(buf+i))[b])
+                    return sizeof(intptr_t)*i + b + 1;
+        }
+    for (size_t i=0; i<tailSz; i++)
+        if (bufTail[i]) {
+            return words*sizeof(intptr_t)+i+1;
+        }
+    return 0;
+}
+
 } // namespace utils
 
 #endif // __TBB_test_common_utils_H

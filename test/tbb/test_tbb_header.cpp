@@ -219,6 +219,10 @@ static void TestPreviewNames() {
     TestFuncDefinitionPresence( this_task_arena::start_parallel_phase, (), void );
     TestFuncDefinitionPresence( this_task_arena::end_parallel_phase, (bool), void );
 #endif
+#if TBB_PREVIEW_NUMA_ALLOCATION
+    TestFuncDefinitionPresence( allocate_numa_interleaved, (size_t, size_t), void* );
+    TestFuncDefinitionPresence( deallocate_numa_interleaved, (void*, size_t), void );
+#endif
 }
 #endif
 

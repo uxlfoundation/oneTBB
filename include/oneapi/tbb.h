@@ -52,6 +52,9 @@
 #endif
 #include "oneapi/tbb/null_mutex.h"
 #include "oneapi/tbb/null_rw_mutex.h"
+#if TBB_PREVIEW_NUMA_ALLOCATION
+#include "oneapi/tbb/numa_allocation.h"
+#endif
 #include "oneapi/tbb/parallel_for.h"
 #include "oneapi/tbb/parallel_for_each.h"
 #include "oneapi/tbb/parallel_invoke.h"
