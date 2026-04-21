@@ -18,7 +18,7 @@ if(CMAKE_VERSION VERSION_LESS 3.12)
   find_package(PythonInterp 3.5 REQUIRED)
   set(PY_EXECUTABLE "${PYTHON_EXECUTABLE}")
 else()
-  find_package(Python3 3.5 REQUIRED)
+  find_package(Python3 3.5 REQUIRED COMPONENTS Interpreter)
   set(PY_EXECUTABLE "${Python3_EXECUTABLE}")
 endif()
 
