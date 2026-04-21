@@ -2316,14 +2316,11 @@ void *MemoryPool::getFromLLOCache(TLSData* tls, size_t size, size_t alignment)
             // for the hot path of alignment==estimatedCacheLineSize,
             // allow compilers to use shift for division
             // (since estimatedCacheLineSize is a power-of-2 constant)
-            MALLOC_ASSERT((alignment == estimatedCacheLineSize?
-                           ptrDelta / estimatedCacheLineSize : ptrDelta / alignment) <= UINT_MAX,
-                          ASSERT_TEXT);
-            unsigned numOfPossibleOffsets =
-                (unsigned)(alignment == estimatedCacheLineSize?
-                           (ptrDelta / estimatedCacheLineSize) : (ptrDelta / alignment));
+            uintptr_t numOfPossibleOffsets = alignment == estimatedCacheLineSize?
+                ptrDelta / estimatedCacheLineSize : ptrDelta / alignment;
+
             unsigned myCacheIdx = ++tls->currCacheIdx;
-            unsigned offset = myCacheIdx % numOfPossibleOffsets;
+            uintptr_t offset = myCacheIdx % numOfPossibleOffsets;
 
             // Move object to a cache line with an offset that is different from
             // previous allocation. This supposedly allows us to use cache
