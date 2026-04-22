@@ -73,8 +73,10 @@ public:
                     t2 = std::chrono::steady_clock::now())
                 {
                     if (!my_arena.is_empty() && !my_arena.is_recall_requested()) {
-                        // We are going back to stealing loop, thus in order to not set arena EMPTY instantly
-                        // in case when worker failed to find work we need to reset stealing loop backoff counter
+                        // Before thread returns to a stealing loop, we need to reset its 
+                        // waiting counters so that it starts work search from the very
+                        // beginning. Otherwise, thread might fast reset arena's state
+                        // to EMPTY again.
                         reset_wait();
                         return true;
                     }
