@@ -1,0 +1,52 @@
+#%Module1.0###################################################################
+#
+# Copyright (c) 2026 Intel Corporation
+#
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#
+# This modulefile requires Environment Modules 4.1 or later.
+# Type `module --version` to determine the current installed version.
+
+##############################################################################
+
+set min_tcl_ver 8.4
+if { $tcl_version < $min_tcl_ver } {
+    puts stderr " "
+    puts stderr "ERROR: This modulefile requires tcl $min_tcl_ver or greater."
+    puts stderr "Your system reports that tclsh version $tcl_version is installed."
+    exit 1
+}
+
+# if modulefile script name is a symlink, resolve it to get the fully
+# qualified pathname that points to the actual modulefile script
+# see: https://wiki.tcl-lang.org/page/file+normalize
+set scriptpath "${ModulesCurrentModulefile}"
+set scriptpath "[file dirname [file normalize "$scriptpath/___"]]"
+
+# define componentroot, modulefilepath, modulefilename and modulefilever
+set modulefilename "[file tail [file dirname "${scriptpath}"]]"
+set modulefilever "[file tail "${scriptpath}"]"
+set modulefilepath "${scriptpath}"
+set componentroot "[file dirname [file dirname [file dirname [file dirname "${scriptpath}"]]]]"
+
+##############################################################################
+
+module-whatis "Name: Thread Composability Manager"
+module-whatis "Version: $modulefilename/$modulefilever"
+module-whatis "Description: Coordinates CPU usage by threading libraries to avoid CPU oversubscription."
+module-whatis "Dependencies: none"
+
+proc ModulesHelp { } {
+    global modulefilename
+    global modulefilever
+    puts "module whatis ${modulefilename}/${modulefilever}"
+}
+
+##############################################################################
+
+# Define environment variables needed for an isolated component install.
+
+set tcmroot "$componentroot"
+
+setenv TCMROOT "$tcmroot"
+prepend-path LD_LIBRARY_PATH "$tcmroot/lib32"

@@ -1,0 +1,67 @@
+/*
+   Copyright (c) 2023 Intel Corporation
+
+   SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+*/
+/////////////////////////////////////////////////////////////////////////////
+//
+// Includes
+//
+#include <winresrc.h>
+#include "../include/tcm/version.h"
+/////////////////////////////////////////////////////////////////////////////
+// Neutral resources
+#ifdef _WIN32
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+#pragma code_page(1252)
+#endif //_WIN32
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+#define TCM_VERNUMBERS TCM_VERSION_MAJOR,TCM_VERSION_MINOR,TCM_VERSION_PATCH
+
+#define __TCM_STRINGIFY_HELPER(x) #x
+#define __TCM_STRINGIFY(x) __TCM_STRINGIFY_HELPER(x)
+#define TCM_VERSION_FULL __TCM_STRINGIFY(TCM_VERSION_MAJOR) "." \
+                         __TCM_STRINGIFY(TCM_VERSION_MINOR) "." \
+                         __TCM_STRINGIFY(TCM_VERSION_PATCH)
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION TCM_VERNUMBERS
+ PRODUCTVERSION TCM_VERNUMBERS
+ FILEFLAGSMASK 0x17L
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x2L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "000004b0"
+        BEGIN
+            VALUE "CompanyName", "Intel Corporation\0"
+            VALUE "FileDescription", "Thread Composability Manager\0"
+            VALUE "FileVersion", TCM_VERSION_FULL "\0"
+            VALUE "LegalCopyright", "Copyright 2023-${tcm_build_year} Intel Corporation.  All Rights Reserved.\0"
+            VALUE "LegalTrademarks", "\0"
+#ifndef TCM_DEBUG
+            VALUE "OriginalFilename", "tcm.dll\0"
+#else
+            VALUE "OriginalFilename", "tcm_debug.dll\0"
+#endif
+            VALUE "ProductName", "Thread Composability Manager\0"
+            VALUE "ProductVersion", TCM_VERSION_FULL "\0"
+            VALUE "PrivateBuild", "\0"
+            VALUE "SpecialBuild", "\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x0, 1200
+    END
+END

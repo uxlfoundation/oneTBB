@@ -1,0 +1,32 @@
+# Copyright (c) 2023 Intel Corporation
+#
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Depfile options (e.g. -MD) are inserted automatically in some cases.
+# Don't add -MMD to avoid conflicts in such cases.
+if (NOT CMAKE_GENERATOR MATCHES "Ninja" AND NOT CMAKE_CXX_DEPENDS_USE_COMPILER)
+    set(TCM_MMD_FLAG -MMD)
+endif()
+
+set(TCM_WARNING_LEVEL -Wall -Wextra -Wpedantic $<$<BOOL:${TCM_STRICT}>:-Werror> -Wfatal-errors)
+set(TCM_TEST_WARNING_FLAGS
+    -Wshadow -Wcast-qual -Woverloaded-virtual -Wnon-virtual-dtor -Wno-error=deprecated-declarations)
+
+if (NOT ${CMAKE_CXX_COMPILER_ID} STREQUAL Intel)
+    # gcc 6.0 and later have -flifetime-dse option that controls elimination of stores done outside the object lifetime
+    set(TCM_DSE_FLAG $<$<NOT:$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},6.0>>:-flifetime-dse=1>)
+    set(TCM_COMMON_COMPILE_FLAGS ${TCM_COMMON_COMPILE_FLAGS} $<$<NOT:$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},8.0>>:-fstack-clash-protection>)
+endif()
+
+if (NOT MINGW)
+    set(TCM_COMMON_LINK_LIBS dl)
+endif()
+
+# Gnu flags to prevent compiler from optimizing out security checks
+set(TCM_COMMON_COMPILE_FLAGS ${TCM_COMMON_COMPILE_FLAGS} -fno-strict-overflow -fno-delete-null-pointer-checks -fwrapv
+    -Wformat -Wformat-security -Werror=format-security -fstack-protector-strong $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>)
+
+set(TCM_LIB_COMPILE_FLAGS $<$<NOT:$<CONFIG:Debug>>:-flto> $<$<NOT:$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},8.0>>:-fcf-protection=full>)
+
+set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} $<$<NOT:$<CONFIG:Debug>>:-flto>  -Wl,-z,relro,-z,now,-z,noexecstack)
+set(TCM_COMPILE_DEFINITIONS "")
