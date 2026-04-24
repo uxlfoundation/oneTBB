@@ -75,7 +75,7 @@ class CacheBinFunctor {
     typename LargeObjectCacheImpl<Props>::CacheBin *const bin;
     ExtMemoryPool *const extMemPool;
     typename LargeObjectCacheImpl<Props>::BinBitMask *const bitMask;
-    const int idx;
+    const unsigned idx;
 
     LargeMemoryBlock *toRelease;
     bool needCleanup;
@@ -134,7 +134,7 @@ class CacheBinFunctor {
 
 public:
     CacheBinFunctor(typename LargeObjectCacheImpl<Props>::CacheBin *bin, ExtMemoryPool *extMemPool,
-                    typename LargeObjectCacheImpl<Props>::BinBitMask *bitMask, int idx) :
+                    typename LargeObjectCacheImpl<Props>::BinBitMask *bitMask, unsigned idx) :
         bin(bin), extMemPool(extMemPool), bitMask(bitMask), idx(idx), toRelease(nullptr), needCleanup(false), currTime(0) {}
     void operator()(CacheBinOperation* opList);
 
@@ -418,7 +418,8 @@ template<typename Props> void CacheBinFunctor<Props>::operator()(CacheBinOperati
 #if __TBB_MALLOC_WHITEBOX_TEST
             tbbmalloc_whitebox::locPutProcessed+=prep.putListNum;
 #endif
-            toRelease = bin->putList(prep.head, prep.tail, bitMask, idx, prep.putListNum, extMemPool->loc.hugeSizeThreshold);
+            toRelease = bin->putList(prep.head, prep.tail, bitMask, idx, prep.putListNum,
+                                     extMemPool->loc.hugeSizeThreshold);
         }
         needCleanup = extMemPool->loc.isCleanupNeededOnRange(timeRange, startTime);
         currTime = endTime - 1;
@@ -445,7 +446,8 @@ template<typename Props> void CacheBinFunctor<Props>::operator()(CacheBinOperati
 /* ----------------------------------------------------------------------------------------------------- */
 /* --------------------------- Methods for creating and executing operations --------------------------- */
 template<typename Props> void LargeObjectCacheImpl<Props>::
-    CacheBin::ExecuteOperation(CacheBinOperation *op, ExtMemoryPool *extMemPool, BinBitMask *bitMask, int idx, bool longLifeTime)
+    CacheBin::ExecuteOperation(CacheBinOperation *op, ExtMemoryPool *extMemPool, BinBitMask *bitMask,
+                               unsigned idx, bool longLifeTime)
 {
     CacheBinFunctor<Props> func( this, extMemPool, bitMask, idx );
     aggregator.execute( op, func, longLifeTime );
@@ -470,7 +472,8 @@ template<typename Props> LargeMemoryBlock *LargeObjectCacheImpl<Props>::
 }
 
 template<typename Props> void LargeObjectCacheImpl<Props>::
-    CacheBin::putList(ExtMemoryPool *extMemPool, LargeMemoryBlock *head, BinBitMask *bitMask, int idx)
+    CacheBin::putList(ExtMemoryPool *extMemPool, LargeMemoryBlock *head, BinBitMask *bitMask,
+                      unsigned idx)
 {
     MALLOC_ASSERT(sizeof(LargeMemoryBlock)+sizeof(CacheBinOperation)<=head->unalignedSize, "CacheBinOperation is too large to be placed in LargeMemoryBlock!");
 
@@ -527,7 +530,8 @@ template<typename Props> bool LargeObjectCacheImpl<Props>::
 }
 
 template<typename Props> void LargeObjectCacheImpl<Props>::
-    CacheBin::updateUsedSize(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask, int idx)
+    CacheBin::updateUsedSize(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask,
+                             unsigned idx)
 {
     OpUpdateUsedSize data = {size};
     CacheBinOperation op(data);
@@ -537,7 +541,8 @@ template<typename Props> void LargeObjectCacheImpl<Props>::
 /* ------------------------------ Unsafe methods used with the aggregator ------------------------------ */
 
 template<typename Props> LargeMemoryBlock *LargeObjectCacheImpl<Props>::
-    CacheBin::putList(LargeMemoryBlock *head, LargeMemoryBlock *tail, BinBitMask *bitMask, int idx, int num, size_t hugeSizeThreshold)
+    CacheBin::putList(LargeMemoryBlock *head, LargeMemoryBlock *tail, BinBitMask *bitMask,
+                      unsigned idx, int num, size_t hugeSizeThreshold)
 {
     size_t size = head->unalignedSize;
     usedSize.store(usedSize.load(std::memory_order_relaxed) - num * size, std::memory_order_relaxed);
@@ -838,7 +843,7 @@ void LargeObjectCache::reset()
 template<typename Props>
 LargeMemoryBlock *LargeObjectCacheImpl<Props>::get(ExtMemoryPool *extMemoryPool, size_t size)
 {
-    int idx = Props::sizeToIdx(size);
+    unsigned idx = Props::sizeToIdx(size);
 
     LargeMemoryBlock *lmb = bin[idx].get(extMemoryPool, size, &bitMask, idx);
 
@@ -852,7 +857,7 @@ LargeMemoryBlock *LargeObjectCacheImpl<Props>::get(ExtMemoryPool *extMemoryPool,
 template<typename Props>
 void LargeObjectCacheImpl<Props>::updateCacheState(ExtMemoryPool *extMemPool, DecreaseOrIncrease op, size_t size)
 {
-    int idx = Props::sizeToIdx(size);
+    unsigned idx = Props::sizeToIdx(size);
     MALLOC_ASSERT(idx < static_cast<int>(numBins), ASSERT_TEXT);
     bin[idx].updateUsedSize(extMemPool, op==decrease? -size : size, &bitMask, idx);
 }
@@ -878,7 +883,7 @@ void LargeObjectCache::reportStat(FILE *f)
 template<typename Props>
 void LargeObjectCacheImpl<Props>::putList(ExtMemoryPool *extMemPool, LargeMemoryBlock *toCache)
 {
-    int toBinIdx = Props::sizeToIdx(toCache->unalignedSize);
+    unsigned toBinIdx = Props::sizeToIdx(toCache->unalignedSize);
 
     MALLOC_ITT_SYNC_RELEASING(bin+toBinIdx);
     bin[toBinIdx].putList(extMemPool, toCache, &bitMask, toBinIdx);
@@ -909,7 +914,7 @@ size_t LargeObjectCache::alignToBin(size_t size) {
 }
 
 // Used for internal purpose
-int LargeObjectCache::sizeToIdx(size_t size)
+unsigned LargeObjectCache::sizeToIdx(size_t size)
 {
     MALLOC_ASSERT(size <= maxHugeSize, ASSERT_TEXT);
     return size < maxLargeSize ?
@@ -928,7 +933,7 @@ void LargeObjectCache::putList(LargeMemoryBlock *list)
             extMemPool->backend.returnLargeObject(curr);
             continue;
         }
-        int currIdx = sizeToIdx(curr->unalignedSize);
+        unsigned currIdx = sizeToIdx(curr->unalignedSize);
 
         // Find all blocks fitting to same bin. Not use more efficient sorting
         // algorithm because list is short (commonly,
