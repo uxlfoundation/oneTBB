@@ -101,6 +101,10 @@ template <typename T>
 void free_numa_interleaved (T *ptr, size_t count);
 ```
 
+We may also want to add a function that queries the system memory page size, to make
+the use of custom interleaving steps simpler and less error-prone.
+Such a function should likely go into `info.h` and the `tbb::info` namespace.
+
 ### Error handling
 
 Two types of run-time errors might appear in these functions:
@@ -113,10 +117,10 @@ Since the API does not allow to return any error code directly, the options for 
 are:
 
 1. Do nothing except returning `nullptr`; not even argument checks. The requirements to
-   the arguments stem from those of the system API, where the arguments or their derivatives
+   the arguments stem from those of the system API, which the arguments or their derivatives
    are passed to. Therefore usage errors may effectively convert to system errors and result
    in a failed allocation or deallocation.
-   
+
    Together with declaring the behavior undefined if the requirements are not met, this is the simplest
    from the implementation viewpoint. On the downside, there is no way for users to known that
    `free_numa_interleaved` has failed (as it returns nothing), and no diagnostics for usage errors.
@@ -149,8 +153,31 @@ best approach, so we might need to use different ones, depending on a specific e
 
 ## ABI entry points
 
-TODO
+Since there is no memory management involved, the functionality belongs to the main TBB library,
+not the `tbbmalloc` library.
 
+The new ABI entry points should be stable and production-ready when added, so that we do not
+need to change these later. These functions should operate with raw bytes. Overloads are
+discouraged unless absolutely necessary. It is better to avoid the use of standard library types
+in the signatures, as that could cause dependencies on specific standard library implementations
+and/or versions and potentially require multiple sets of binaries for the same platform.
+
+Given that, the following conceptual function signatures are recommended:
+
+```c++
+void *allocate_interleaved (size_t bytes, tbb::numa_node_id *nodes, size_t node_count,
+                            size_t interleaving_step);
+void deallocate_interleaved (void *ptr, size_t bytes);
+```
+
+The names are subject to discussion. Internal namespaces will be used as appropriate.
+
+Note that the list of nodes is passed as a *{pointer, count}* pair of parameters instead of
+a single pointer or a reference. This both avoids using `std::vector` directly and allows
+changing/extending the public API with other contiguous storage types, e.g. `std::span`.
+
+We might consider changing the ABI signatures to also return an error code in some way,
+if we prefer error handling to be done strictly by the public API in the headers.
 
 ## Implementation details
 
@@ -169,11 +196,17 @@ There is no NUMA memory support under macOS, so the implementation can only fall
 
 ## Open Questions
 
+Are there reasons to release the API for preview first?
+
+In what header file should the API be defined?
+
+We need to decide on the way(s) to handle errors.
+
 When non-default `interleaving step` can be used?
 
-`size` argument for `free_interleaved()` appeared because what we have is wrappers over
-`mmap`/`munmap` and there is no place to put the size after memory is allocated. We can
-put it in, say, an internal cumap. Is it look useful?
+`bytes` argument for `free_numa_interleaved()` appeared because what we have is wrappers over
+`mmap`/`munmap` and there is no place in the allocated memory to store the size.
+We can put it in, say, an internal unordered map. Would it be better?
 
 Semantics of even distribution of data between NUMA nodes is straightforward: to equally
 balance work between the nodes. Why might someone want to distribute data unequally? Can
