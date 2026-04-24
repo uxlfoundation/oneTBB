@@ -92,8 +92,13 @@ Instead of raw size in bytes, these functions take a number of objects of the gi
 to indicate the memory size and the interleaving step. The latter (`count_per_chunk`) should be
 such that `count_per_chunk * sizeof(T)` is a multiple of the memory page size.
 
+The allocated memory is not initialized (no constructors are called). Reading from it
+without object initialization results in an undefined behavior.
+
 Last, the functions that free the previously allocated memory take an allocation address
 and the memory size. The latter should match the allocated size at the given address.
+The function template overload does not call destructors; the type information is only
+necessary for the `count` argument to match the corresponding value at the allocation.
 
 ```c++
 void free_numa_interleaved (void *ptr, size_t bytes);
