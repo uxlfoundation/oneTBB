@@ -49,6 +49,7 @@ struct LargeBinStructureProps {
 public:
     static const size_t   MinSize = MIN_SIZE, MaxSize = MAX_SIZE;
     static const size_t   CacheStep = 8 * 1024;
+    static_assert((MaxSize - MinSize) / CacheStep <= UINT_MAX, "The size of NumBins is small.");
     static const unsigned NumBins = (MaxSize - MinSize) / CacheStep;
 
     static size_t alignToBin(size_t size) {
@@ -145,7 +146,7 @@ private:
 
 public:
     // The number of bins to cache large/huge objects.
-    static const uint32_t numBins = Props::NumBins;
+    static const unsigned numBins = Props::NumBins;
 
     typedef BitMaskMax<numBins> BinBitMask;
 
@@ -215,11 +216,11 @@ public:
         /* --------- Unsafe methods used with the aggregator ------- */
         void forgetOutdatedState(uintptr_t currTime);
         LargeMemoryBlock *putList(LargeMemoryBlock *head, LargeMemoryBlock *tail, BinBitMask *bitMask,
-                int idx, int num, size_t hugeObjectThreshold);
+                                  unsigned idx, int num, size_t hugeObjectThreshold);
         LargeMemoryBlock *get();
         LargeMemoryBlock *cleanToThreshold(uintptr_t currTime, BinBitMask *bitMask, int idx);
         LargeMemoryBlock *cleanAll(BinBitMask *bitMask, int idx);
-        void updateUsedSize(size_t size, BinBitMask *bitMask, int idx) {
+        void updateUsedSize(size_t size, BinBitMask *bitMask, unsigned idx) {
             if (!usedSize.load(std::memory_order_relaxed)) bitMask->set(idx, true);
             usedSize.store(usedSize.load(std::memory_order_relaxed) + size, std::memory_order_relaxed);
             if (!usedSize.load(std::memory_order_relaxed) && !first) bitMask->set(idx, false);
@@ -245,7 +246,7 @@ public:
 
     // Huge bins index for fast regular cleanup searching in case of
     // the "huge size threshold" setting defined
-    uintptr_t     hugeSizeThresholdIdx;
+    unsigned hugeSizeThresholdIdx;
 
 private:
     // How many times LOC was "too large"

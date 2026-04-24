@@ -418,7 +418,8 @@ template<typename Props> void CacheBinFunctor<Props>::operator()(CacheBinOperati
 #if __TBB_MALLOC_WHITEBOX_TEST
             tbbmalloc_whitebox::locPutProcessed+=prep.putListNum;
 #endif
-            toRelease = bin->putList(prep.head, prep.tail, bitMask, idx, prep.putListNum, extMemPool->loc.hugeSizeThreshold);
+            toRelease = bin->putList(prep.head, prep.tail, bitMask, idx, prep.putListNum,
+                                     extMemPool->loc.hugeSizeThreshold);
         }
         needCleanup = extMemPool->loc.isCleanupNeededOnRange(timeRange, startTime);
         currTime = endTime - 1;
@@ -540,7 +541,8 @@ template<typename Props> void LargeObjectCacheImpl<Props>::
 /* ------------------------------ Unsafe methods used with the aggregator ------------------------------ */
 
 template<typename Props> LargeMemoryBlock *LargeObjectCacheImpl<Props>::
-    CacheBin::putList(LargeMemoryBlock *head, LargeMemoryBlock *tail, BinBitMask *bitMask, int idx, int num, size_t hugeSizeThreshold)
+    CacheBin::putList(LargeMemoryBlock *head, LargeMemoryBlock *tail, BinBitMask *bitMask,
+                      unsigned idx, int num, size_t hugeSizeThreshold)
 {
     size_t size = head->unalignedSize;
     usedSize.store(usedSize.load(std::memory_order_relaxed) - num * size, std::memory_order_relaxed);
