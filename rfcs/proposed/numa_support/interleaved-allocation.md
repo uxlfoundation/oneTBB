@@ -53,7 +53,7 @@ If a new header is added, it could be aimed to contain either these APIs only (e
 
 The choice might depend on whether the API is initially delivered as a preview feature or not.
 For the preview feature it seems fine to add it to an existing header, while for production
-a new header seem better.
+a new header seems better.
 
 ### Namespace
 
@@ -103,7 +103,49 @@ void free_numa_interleaved (T *ptr, size_t count);
 
 ### Error handling
 
-TODO
+Two types of run-time errors might appear in these functions:
+
+- **Usage errors**: the provided arguments do not match the requirements. Note that some usage errors
+  are non-verifiable, such as allocation size mismatch in `free_numa_interleaved`.
+- **System errors**: those returned by the system API used in the implementation.
+
+Since the API does not allow to return any error code directly, the options for error handling
+are:
+
+1. Do nothing except returning `nullptr`; not even argument checks. The requirements to
+   the arguments stem from those of the system API, where the arguments or their derivatives
+   are passed to. Therefore usage errors may effectively convert to system errors and result
+   in a failed allocation or deallocation.
+   
+   Together with declaring the behavior undefined if the requirements are not met, this is the simplest
+   from the implementation viewpoint. On the downside, there is no way for users to known that
+   `free_numa_interleaved` has failed (as it returns nothing), and no diagnostics for usage errors.
+
+2. Throw an exception: `bad_alloc` or/and more specific types like `system_error` and
+   `invalid_argument`. Note that `bad_alloc`, while typically used as a signal that memory
+   could not be allocated, unfortunately does not allow to set a custom message, and also
+   does not fit well semantically to deallocation.
+
+   The downside is that we know some customers do not want to use exceptions in their codebases.
+   Therefore this probably should not be the only approach, and a "fallback" is needed.
+
+3. Use `errno` to "return" an error code, such as `EINVAL` for bad arguments, `ENOMEM` for lack
+   of memory, etc. The downside is that this approach is currently not used in TBB, and can be
+   seen as a sign of inconsistent design. It is also not quite "authentic" for C++, and it
+   does not have error messages for customized diagnostics.
+
+4. Use assertions, probably in both debug and release builds. The behavior of assertions
+   is reasonably well defined in [the TBB specification](
+   https://uxlfoundation.github.io/oneAPI-spec/spec/elements/oneTBB/source/configuration/enabling_debugging_features.html#tbb-use-assert-macro)
+   and together with
+   [assertion handlers](https://uxlfoundation.github.io/oneTBB/main/reference/assertion_handler.html)
+   can be used for decent error handling and diagnostics.
+
+   However, there is no recovery from an assertion, so it does not fit well for handling system errors
+   during memory allocation.
+
+The choice can again be different for preview vs. production. Also it seems there is no universally
+best approach, so we might need to use different ones, depending on a specific error.
 
 ## ABI entry points
 
