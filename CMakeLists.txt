@@ -134,6 +134,12 @@ if(APPLE)
 option(TBB_BUILD_APPLE_FRAMEWORKS "Build as Apple Frameworks" OFF)
 endif()
 
+
+# Thread Composability Manager (TCM) switches
+option(TCM_BUILD "Enable building of TCM" ON)
+option(TCM_TEST "Enable testing of TCM" ON)
+
+
 if (WIN32)
     if (TBB_VERIFY_DEPENDENCY_SIGNATURE)
         message(STATUS "Dependency signature verification during dynamic linking in run-time is ENABLED.")
@@ -345,8 +351,11 @@ else()
     endif()
 endif()
 
-if (TBB_TEST)
+if (TBB_TEST OR TCM_TEST)
     enable_testing()
+endif()
+
+if (TBB_TEST)
     add_subdirectory(test)
 endif()
 
@@ -408,6 +417,13 @@ endif()
 
 if (TBB4PY_BUILD)
     add_subdirectory(python)
+endif()
+
+if (TCM_BUILD)
+  message(STATUS "Enabling build of Thread Composability Manager (TCM)")
+  add_subdirectory(thread_composability_manager)
+else()
+  message(STATUS "Disabling build of Thread Composability Manager (TCM)")
 endif()
 
 # Keep it the last instruction.
