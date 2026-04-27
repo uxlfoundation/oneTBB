@@ -54,14 +54,14 @@ Where:
 .. code-block::
 
        $ pkg-config --cflags tbb
-       -I<path-to>/tbb/latest/lib/pkgconfig/../..//include
+       -I<path-to>/tbb/latest/lib/pkgconfig/../../include
 
 ``--libs`` provides the Intel(R) oneTBB library name and the search path to find it:
 
 .. code-block::
    
        $ pkg-config –libs tbb
-       -L<path to>tbb/latest/lib/pkgconfig/../..//lib/intel64/gcc4.8 -ltbb
+       -L<path to>tbb/latest/lib/pkgconfig/../../lib/intel64/gcc4.8 -ltbb
 
 .. note::
 
