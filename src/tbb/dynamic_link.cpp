@@ -45,9 +45,6 @@
     #include <wintrust.h>
     #pragma comment (lib, "wintrust")     // Link with the Wintrust.lib file.
 #endif
-#ifndef PATH_MAX
-    #define PATH_MAX                MAX_PATH
-#endif
 #else /* _WIN32 */
     #include <dlfcn.h>
     #include <unistd.h>
@@ -177,7 +174,7 @@ namespace r1 {
             break;
         case dl_buff_too_small:
             TBB_FPRINTF(stderr, "%s An internal buffer representing a path to dynamically loaded "
-                        "module is small. Consider compiling with larger value for PATH_MAX macro.\n",
+                        "module is small.\n",
                         prefix);
             break;
         case dl_unload_fail:
@@ -340,12 +337,15 @@ namespace r1 {
     static std::once_flag init_dl_data_state;
 
     static struct ap_data_t {
-        char _path[PATH_MAX+1];
+        char *_path;
+        std::size_t _capacity;
         std::size_t _len;
     } ap_data;
 
     static void init_ap_data() {
     #if _WIN32
+        ap_data._capacity = MAX_PATH;
+        ap_data._path = (char*)calloc(ap_data._capacity, 1);
         // Get handle of our DLL first.
         HMODULE handle;
         BOOL brc = GetModuleHandleEx(
@@ -356,17 +356,26 @@ namespace r1 {
         if ( !brc ) { // Error occurred.
             int err = GetLastError();
             DYNAMIC_LINK_WARNING( dl_sys_fail, "GetModuleHandleEx", err );
+            free(ap_data._path);
+            ap_data._path = NULL;
+            ap_data._capacity = 0;
             return;
         }
         // Now get path to our DLL.
-        DWORD drc = GetModuleFileName( handle, ap_data._path, static_cast< DWORD >( PATH_MAX ) );
+        DWORD drc = GetModuleFileName( handle, ap_data._path, static_cast< DWORD >( ap_data._capacity ) );
         if ( drc == 0 ) { // Error occurred.
             int err = GetLastError();
             DYNAMIC_LINK_WARNING( dl_sys_fail, "GetModuleFileName", err );
+            free(ap_data._path);
+            ap_data._path = NULL;
+            ap_data._capacity = 0;
             return;
         }
-        if ( drc >= PATH_MAX ) { // Buffer too short.
+        if ( drc >= ap_data._capacity ) { // Buffer too short.
             DYNAMIC_LINK_WARNING( dl_buff_too_small );
+            free(ap_data._path);
+            ap_data._path = NULL;
+            ap_data._capacity = 0;
             return;
         }
         // Find the position of the last backslash.
@@ -374,12 +383,18 @@ namespace r1 {
 
         if ( !backslash ) {    // Backslash not found.
             __TBB_ASSERT_EX( backslash != nullptr, "Unbelievable.");
+            free(ap_data._path);
+            ap_data._path = NULL;
+            ap_data._capacity = 0;
             return;
         }
         __TBB_ASSERT_EX( backslash >= ap_data._path, "Unbelievable.");
         ap_data._len = (std::size_t)(backslash - ap_data._path) + 1;
         *(backslash+1) = 0;
     #else
+        // Initial capacity, double until large enough
+        ap_data._capacity = 4096;
+        ap_data._path = (char*)calloc(ap_data._capacity, 1);
         // There is an use case, when we want to find TBB library, not just some shared object
         // providing "dynamic_link" symbol (it can be shared object that directly includes
         // dynamic_link.cpp). For this case we use a public TBB symbol. Searching for public symbol
@@ -397,6 +412,9 @@ namespace r1 {
         if ( !res ) {
             char const * err = dlerror();
             DYNAMIC_LINK_WARNING( dl_sys_fail, "dladdr", err );
+            free(ap_data._path);
+            ap_data._path = NULL;
+            ap_data._capacity = 0;
             return;
         } else {
             __TBB_ASSERT_EX( dlinfo.dli_fname!=nullptr, "Unbelievable." );
@@ -416,9 +434,14 @@ namespace r1 {
             ap_data._len = 0;
         } else {
             // The library path is relative so get the current working directory
-            if ( !getcwd( ap_data._path, sizeof(ap_data._path)/sizeof(ap_data._path[0]) ) ) {
-                DYNAMIC_LINK_WARNING( dl_buff_too_small );
-                return;
+            while ( !getcwd( ap_data._path, ap_data._capacity) ) {
+                free(ap_data._path);
+                ap_data._capacity *= 2;
+                ap_data._path = (char*)calloc(ap_data._capacity, 1);
+                if (NULL == ap_data._path) {
+                    DYNAMIC_LINK_WARNING( dl_buff_too_small );
+                    return;
+                }
             }
             ap_data._len = std::strlen( ap_data._path );
             ap_data._path[ap_data._len++]='/';
@@ -427,9 +450,12 @@ namespace r1 {
 
         if ( fname_len>0 ) {
             ap_data._len += fname_len;
-            if ( ap_data._len>PATH_MAX ) {
+            if ( ap_data._len>ap_data._capacity ) {
                 DYNAMIC_LINK_WARNING( dl_buff_too_small );
                 ap_data._len=0;
+                free(ap_data._path);
+                ap_data._path = NULL;
+                ap_data._capacity = 0;
                 return;
             }
             std::strncpy( ap_data._path+rc, dlinfo.dli_fname, fname_len );
@@ -463,7 +489,9 @@ namespace r1 {
         if ( full_len < len ) {
             __TBB_ASSERT_EX( ap_data._path[ap_data._len] == 0, nullptr );
             __TBB_ASSERT_EX( std::strlen(ap_data._path) == ap_data._len, nullptr );
-            std::strncpy( path, ap_data._path, ap_data._len + 1 );
+            // No need for strncpy, test above confirmed enough space
+            // and do not need zero padding at the end.
+            std::strcpy( path, ap_data._path);
             __TBB_ASSERT_EX( path[ap_data._len] == 0, nullptr );
             std::strncat( path, name, len - ap_data._len );
             __TBB_ASSERT_EX( std::strlen(path) == full_len, nullptr );
@@ -662,19 +690,18 @@ namespace r1 {
      *         occurs, in which case the error is optionally reported.
      */
     bool has_valid_signature(const char* filepath, const std::size_t length) {
-        __TBB_ASSERT_EX(length <= PATH_MAX, "Too small buffer for path conversion");
-        wchar_t wfilepath[PATH_MAX] = {0};
+        std::unique_ptr<wchar_t[]> wfilepath(new wchar_t[length+1]);
         {
             std::mbstate_t state{};
             const char* ansi_filepath = filepath; // mbsrtowcs moves original pointer
-            const size_t num_converted = mbsrtowcs(wfilepath, &ansi_filepath, length, &state);
+            const size_t num_converted = mbsrtowcs(wfilepath.get(), &ansi_filepath, length, &state);
             if (num_converted == std::size_t(-1))
                 return false;
         }
         WINTRUST_FILE_INFO fdata;
         std::memset(&fdata, 0, sizeof(fdata));
         fdata.cbStruct       = sizeof(WINTRUST_FILE_INFO);
-        fdata.pcwszFilePath  = wfilepath;
+        fdata.pcwszFilePath  = wfilepath.get();
 
         // Check that the certificate used to sign the specified file chains up to a root
         // certificate located in the trusted root certificate store, implying that the identity of
@@ -710,29 +737,26 @@ namespace r1 {
         dynamic_link_handle library_handle = nullptr;
 #if __TBB_DYNAMIC_LOAD_ENABLED
         const char* path = library;
-        std::size_t const len = PATH_MAX + 1;
-        char absolute_path[ len ] = {0};
+        std::size_t len = abs_path(library, NULL, 1);
+        std::unique_ptr<char[]> absolute_path(new char[len]);
         std::size_t length = 0;
         const bool build_absolute_path = flags & DYNAMIC_LINK_BUILD_ABSOLUTE_PATH;
         if (build_absolute_path) {
-            length = abs_path( library, absolute_path, len );
-            if (length > len) {
-                DYNAMIC_LINK_WARNING( dl_buff_too_small );
-                return nullptr;
-            } else if (length == 0) {
+            length = abs_path( library, absolute_path.get(), len );
+            if (length == 0) {
                 // length == 0 means failing of init_ap_data so the warning has already been issued.
                 return nullptr;
-            } else if (!file_exists(absolute_path)) {
+            } else if (!file_exists(absolute_path.get())) {
                 // Path to a file has been built manually. It is not proven to exist however.
-                DYNAMIC_LINK_WARNING( dl_lib_not_found, absolute_path, dlerror() );
+                DYNAMIC_LINK_WARNING( dl_lib_not_found, absolute_path.get(), dlerror() );
                 return nullptr;
             }
-            path = absolute_path;
+            path = absolute_path.get();
         }
 #if _WIN32
 #if !__TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION
         if (!build_absolute_path) { // Get the path if it is not yet built
-            length = get_module_path(absolute_path, len, library);
+            length = get_module_path(absolute_path.get(), (unsigned)len, library);
             if (length == 0) {
                 DYNAMIC_LINK_WARNING( dl_lib_not_found, path, dlerror() );
                 return library_handle;
@@ -741,7 +765,7 @@ namespace r1 {
                 return library_handle;
             }
             length += 1;   // Count terminating NULL character as part of string length
-            path = absolute_path;
+            path = absolute_path.get();
         }
 
         if (!has_valid_signature(path, length))
