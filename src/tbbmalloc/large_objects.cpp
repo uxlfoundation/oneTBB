@@ -462,7 +462,7 @@ template<typename Props> void LargeObjectCacheImpl<Props>::
 }
 
 template<typename Props> LargeMemoryBlock *LargeObjectCacheImpl<Props>::
-    CacheBin::get(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask, int idx)
+    CacheBin::get(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask, unsigned idx)
 {
     LargeMemoryBlock *lmb=nullptr;
     OpGet data = {&lmb, size, static_cast<uintptr_t>(0)};
@@ -483,7 +483,8 @@ template<typename Props> void LargeObjectCacheImpl<Props>::
 }
 
 template<typename Props> bool LargeObjectCacheImpl<Props>::
-    CacheBin::cleanToThreshold(ExtMemoryPool *extMemPool, BinBitMask *bitMask, uintptr_t currTime, int idx)
+    CacheBin::cleanToThreshold(ExtMemoryPool *extMemPool, BinBitMask *bitMask, uintptr_t currTime,
+                               unsigned idx)
 {
     LargeMemoryBlock *toRelease = nullptr;
 
@@ -507,7 +508,7 @@ template<typename Props> bool LargeObjectCacheImpl<Props>::
 }
 
 template<typename Props> bool LargeObjectCacheImpl<Props>::
-    CacheBin::releaseAllToBackend(ExtMemoryPool *extMemPool, BinBitMask *bitMask, int idx)
+    CacheBin::releaseAllToBackend(ExtMemoryPool *extMemPool, BinBitMask *bitMask, unsigned idx)
 {
     LargeMemoryBlock *toRelease = nullptr;
 
@@ -629,7 +630,7 @@ template<typename Props> void LargeObjectCacheImpl<Props>::
 }
 
 template<typename Props> LargeMemoryBlock *LargeObjectCacheImpl<Props>::
-    CacheBin::cleanToThreshold(uintptr_t currTime, BinBitMask *bitMask, int idx)
+    CacheBin::cleanToThreshold(uintptr_t currTime, BinBitMask *bitMask, unsigned idx)
 {
     /* oldest may be more recent then age, that's why cast to signed type
     was used. age overflow is also processed correctly. */
@@ -671,7 +672,7 @@ template<typename Props> LargeMemoryBlock *LargeObjectCacheImpl<Props>::
 }
 
 template<typename Props> LargeMemoryBlock *LargeObjectCacheImpl<Props>::
-    CacheBin::cleanAll(BinBitMask *bitMask, int idx)
+    CacheBin::cleanAll(BinBitMask *bitMask, unsigned idx)
 {
     if (!last.load(std::memory_order_relaxed)) return nullptr;
 
@@ -855,10 +856,11 @@ LargeMemoryBlock *LargeObjectCacheImpl<Props>::get(ExtMemoryPool *extMemoryPool,
 }
 
 template<typename Props>
-void LargeObjectCacheImpl<Props>::updateCacheState(ExtMemoryPool *extMemPool, DecreaseOrIncrease op, size_t size)
+void LargeObjectCacheImpl<Props>::updateCacheState(ExtMemoryPool *extMemPool, DecreaseOrIncrease op,
+                                                   size_t size)
 {
     unsigned idx = Props::sizeToIdx(size);
-    MALLOC_ASSERT(idx < static_cast<int>(numBins), ASSERT_TEXT);
+    MALLOC_ASSERT(idx < numBins, ASSERT_TEXT);
     bin[idx].updateUsedSize(extMemPool, op==decrease? -size : size, &bitMask, idx);
 }
 

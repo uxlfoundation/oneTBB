@@ -193,11 +193,12 @@ public:
 
         /* ---------- Cache accessors ---------- */
         void putList(ExtMemoryPool *extMemPool, LargeMemoryBlock *head, BinBitMask *bitMask, unsigned idx);
-        LargeMemoryBlock *get(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask, int idx);
+        LargeMemoryBlock *get(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask, unsigned idx);
 
         /* ---------- Cleanup functions -------- */
-        bool cleanToThreshold(ExtMemoryPool *extMemPool, BinBitMask *bitMask, uintptr_t currTime, int idx);
-        bool releaseAllToBackend(ExtMemoryPool *extMemPool, BinBitMask *bitMask, int idx);
+        bool cleanToThreshold(ExtMemoryPool *extMemPool, BinBitMask *bitMask, uintptr_t currTime,
+                              unsigned idx);
+        bool releaseAllToBackend(ExtMemoryPool *extMemPool, BinBitMask *bitMask, unsigned idx);
         /* ------------------------------------- */
 
         void updateUsedSize(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask, unsigned idx);
@@ -218,8 +219,8 @@ public:
         LargeMemoryBlock *putList(LargeMemoryBlock *head, LargeMemoryBlock *tail, BinBitMask *bitMask,
                                   unsigned idx, int num, size_t hugeObjectThreshold);
         LargeMemoryBlock *get();
-        LargeMemoryBlock *cleanToThreshold(uintptr_t currTime, BinBitMask *bitMask, int idx);
-        LargeMemoryBlock *cleanAll(BinBitMask *bitMask, int idx);
+        LargeMemoryBlock *cleanToThreshold(uintptr_t currTime, BinBitMask *bitMask, unsigned idx);
+        LargeMemoryBlock *cleanAll(BinBitMask *bitMask, unsigned idx);
         void updateUsedSize(size_t size, BinBitMask *bitMask, unsigned idx) {
             if (!usedSize.load(std::memory_order_relaxed)) bitMask->set(idx, true);
             usedSize.store(usedSize.load(std::memory_order_relaxed) + size, std::memory_order_relaxed);
