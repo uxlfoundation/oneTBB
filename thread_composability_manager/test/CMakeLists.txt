@@ -101,8 +101,8 @@ macro(add_tcm_disabling_test name environment expect_suggesting)
         --unset=ONEAPI_ROOT
         --unset=CMPLR_ROOT
         ${environment}
-        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/test_tcm_disabling
-        WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+        $<TARGET_FILE:test_tcm_disabling>
+        WORKING_DIRECTORY $<TARGET_FILE_DIR:test_tcm_disabling>
     )
     set_tests_properties(test_tcm_disabling_${name} PROPERTIES
         ENVIRONMENT "${environment}"
