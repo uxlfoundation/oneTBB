@@ -49,9 +49,9 @@ struct LargeBinStructureProps {
 public:
     static const size_t   MinSize = MIN_SIZE, MaxSize = MAX_SIZE;
     static const size_t   CacheStep = 8 * 1024;
-    static_assert((MaxSize - MinSize) / CacheStep <= UINT_MAX,
-                  "The type for NumBins is small to represent the desired value.");
     static const unsigned NumBins = (MaxSize - MinSize) / CacheStep;
+    static_assert((MaxSize - MinSize) / CacheStep <= (std::numeric_limits<decltype(NumBins)>::max)(),
+                  "The size of NumBins is enough to represent the desired value.");
 
     static size_t alignToBin(size_t size) {
         return alignUp(size, CacheStep);
