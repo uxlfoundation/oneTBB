@@ -51,6 +51,7 @@
 #if MALLOC_CHECK_RECURSION
 #include <new>        /* for placement new */
 #endif
+#include <limits>               // for std::numeric_limits
 #include "oneapi/tbb/scalable_allocator.h"
 #include "tbbmalloc_internal_api.h"
 

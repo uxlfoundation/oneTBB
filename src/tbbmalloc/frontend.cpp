@@ -2467,17 +2467,19 @@ inline bool Block::isProperlyPlaced(const void *object) const
 #endif
 
 /* Finds the real object inside the block */
-FreeObject *Block::findAllocatedObject(const void *address) const
+FreeObject *Block::findAllocatedObject(const void *address_ptr) const
 {
+    const uintptr_t address = (uintptr_t)address_ptr;
     // calculate offset from the end of the block space
-    const uintptr_t tmp_offset = (uintptr_t)this + slabSize - (uintptr_t)address;
-    MALLOC_ASSERT(tmp_offset <= USHRT_MAX, ASSERT_TEXT);
+    const uintptr_t tmp_offset = (uintptr_t)this + slabSize - address;
+    MALLOC_ASSERT(tmp_offset <= slabSize - sizeof(Block),
+                  "Address is within the small object allocation block");
+    MALLOC_ASSERT(slabSize <= USHRT_MAX, "Below cast is harmless");
     uint16_t offset = (uint16_t)tmp_offset;
-    MALLOC_ASSERT( offset<=slabSize-sizeof(Block), ASSERT_TEXT );
     // find offset difference from a multiple of allocation size
     offset %= objectSize;
     // and move the address down to where the real object starts.
-    return (FreeObject*)((uintptr_t)address - (offset? objectSize-offset: 0));
+    return (FreeObject*)(address - (offset? objectSize-offset: 0));
 }
 
 /*
