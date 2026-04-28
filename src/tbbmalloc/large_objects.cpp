@@ -756,7 +756,7 @@ template<typename Props>
 bool LargeObjectCacheImpl<Props>::cleanAll(ExtMemoryPool *extMemPool)
 {
     bool released = false;
-    for (int i = numBins-1; i >= 0; i--) {
+    for (unsigned i = 0; i < numBins; ++i) {
         released |= bin[i].releaseAllToBackend(extMemPool, &bitMask, i);
     }
     return released;
@@ -765,7 +765,7 @@ bool LargeObjectCacheImpl<Props>::cleanAll(ExtMemoryPool *extMemPool)
 template<typename Props>
 void LargeObjectCacheImpl<Props>::reset() {
     tooLargeLOC.store(0, std::memory_order_relaxed);
-    for (int i = numBins-1; i >= 0; i--)
+    for (unsigned i = 0; i < numBins; ++i)
         bin[i].init();
     bitMask.reset();
 }
@@ -775,7 +775,7 @@ template<typename Props>
 size_t LargeObjectCacheImpl<Props>::getLOCSize() const
 {
     size_t size = 0;
-    for (int i = numBins-1; i >= 0; i--)
+    for (unsigned i = 0; i < numBins; ++i)
         size += bin[i].getSize();
     return size;
 }
@@ -789,7 +789,7 @@ template<typename Props>
 size_t LargeObjectCacheImpl<Props>::getUsedSize() const
 {
     size_t size = 0;
-    for (int i = numBins-1; i >= 0; i--)
+    for (unsigned i = 0; i < numBins; ++i)
         size += bin[i].getUsedSize();
     return size;
 }
@@ -869,7 +869,7 @@ template<typename Props>
 void LargeObjectCacheImpl<Props>::reportStat(FILE *f)
 {
     size_t cachedSize = 0;
-    for (int i=0; i<numBins; i++)
+    for (unsigned i=0; i<numBins; ++i)
         cachedSize += bin[i].reportStat(i, f);
     fprintf(f, "total LOC size %lu MB\n", cachedSize/1024/1024);
 }
