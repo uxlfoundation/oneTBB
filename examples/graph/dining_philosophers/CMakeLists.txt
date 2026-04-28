@@ -25,9 +25,18 @@ add_executable(dining_philosophers dining_philosophers.cpp)
 target_link_libraries(dining_philosophers TBB::tbb Threads::Threads)
 target_compile_options(dining_philosophers PRIVATE ${TBB_CXX_STD_FLAG})
 
+add_executable(dining_philosophers_resource_limited dining_philosophers_resource_limited.cpp)
+
+target_link_libraries(dining_philosophers_resource_limited TBB::tbb Threads::Threads)
+target_compile_options(dining_philosophers_resource_limited PRIVATE ${TBB_CXX_STD_FLAG})
+
 set(EXECUTABLE "$<TARGET_FILE:dining_philosophers>")
+set(EXECUTABLE_RL "$<TARGET_FILE:dining_philosophers_resource_limited>")
 set(ARGS auto 5)
 set(LIGHT_ARGS auto 3)
 
 add_execution_target(run_dining_philosophers dining_philosophers ${EXECUTABLE} "${ARGS}")
 add_execution_target(light_test_dining_philosophers dining_philosophers ${EXECUTABLE} "${LIGHT_ARGS}")
+
+add_execution_target(run_dining_philosophers_resource_limited dining_philosophers_resource_limited ${EXECUTABLE_RL} "${ARGS}")
+add_execution_target(light_test_dining_philosophers_resource_limited dining_philosophers_resource_limited ${EXECUTABLE_RL} "${LIGHT_ARGS}")
