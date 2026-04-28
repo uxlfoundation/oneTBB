@@ -718,7 +718,7 @@ bool LargeObjectCacheImpl<Props>::regularCleanup(ExtMemoryPool *extMemPool, uint
     MALLOC_ASSERT(hugeSizeThresholdIdx > 0, "Invalid size threshold index");
 
     // Starting searching for bin that is less than huge size threshold (can be cleaned-up)
-    unsigned startSearchIdx = (unsigned)(hugeSizeThresholdIdx - 1);
+    int startSearchIdx = (int)(hugeSizeThresholdIdx - 1);
 
     for (int i = bitMask.getMaxTrue(startSearchIdx); i >= 0; i = bitMask.getMaxTrue(i-1)) {
         bin[i].updateBinsSummary(&binsSummary);
