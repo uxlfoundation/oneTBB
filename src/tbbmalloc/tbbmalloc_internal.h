@@ -211,13 +211,17 @@ protected:
                 mask[idx].load(std::memory_order_relaxed) & (((uintptr_t) 1 << pos) - 1);
             idx++;
             pos = BitScanRev(actualMask);
-            if (-1 != pos)
+            if (-1 != pos) {
+                MALLOC_ASSERT(idx * WORD_LEN - pos - 1 <= INT_MAX, ASSERT_TEXT);
                 return idx * WORD_LEN - pos - 1;
+            }
         }
 
         while (idx<SZ)
-            if (-1 != (pos = BitScanRev(mask[idx++].load(std::memory_order_relaxed))))
-                return idx*WORD_LEN - pos - 1;
+            if (-1 != (pos = BitScanRev(mask[idx++].load(std::memory_order_relaxed)))) {
+                MALLOC_ASSERT(idx * WORD_LEN - pos - 1 <= INT_MAX, ASSERT_TEXT);
+                return idx * WORD_LEN - pos - 1;
+            }
         return -1;
     }
 public:
