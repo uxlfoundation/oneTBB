@@ -349,6 +349,22 @@ private:
         return victim_task_pool;
     }
 
+    //! Tries to lock victim's task pool without blocking.
+    d1::task** try_lock_task_pool() {
+        d1::task** victim_task_pool = task_pool.load(std::memory_order_relaxed);
+        if (victim_task_pool == EmptyTaskPool || victim_task_pool == LockedTaskPool) {
+            return victim_task_pool;
+        }
+        d1::task** expected = victim_task_pool;
+        if (task_pool.compare_exchange_strong(expected, LockedTaskPool)) {
+            // Successfully locked the victim's task pool.
+            __TBB_ASSERT(task_pool.load(std::memory_order_relaxed) == LockedTaskPool,
+                         "not really locked victim's task pool?");
+            return victim_task_pool;
+        }
+        return LockedTaskPool;
+    }
+
     //! Unlocks victim's task pool
     /** Restores victim_arena_slot->task_pool munged by lock_task_pool. **/
     void unlock_task_pool(d1::task** victim_task_pool) {
