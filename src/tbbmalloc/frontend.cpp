@@ -2474,7 +2474,7 @@ FreeObject *Block::findAllocatedObject(const void *address_ptr) const
     const uintptr_t tmp_offset = (uintptr_t)this + slabSize - address;
     MALLOC_ASSERT(tmp_offset <= slabSize - sizeof(Block),
                   "Address is within the small object allocation block");
-    MALLOC_ASSERT(slabSize <= USHRT_MAX, "Below cast is harmless");
+    static_assert(slabSize <= USHRT_MAX, "Below cast is harmless");
     uint16_t offset = (uint16_t)tmp_offset;
     // find offset difference from a multiple of allocation size
     offset %= objectSize;
