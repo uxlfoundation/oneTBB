@@ -22,26 +22,21 @@
 
 void set_numa_node_example() {
 /*begin_set_numa_node_example*/
-    std::vector<tbb::numa_node_id> numa_nodes = tbb::info::numa_nodes();
-    std::vector<tbb::task_arena> arenas(numa_nodes.size());
-    std::vector<tbb::task_group> task_groups(numa_nodes.size());
+    std::vector<tbb::task_arena> numa_arenas = tbb::create_numa_task_arenas();
+    std::vector<tbb::task_group> task_groups(numa_arenas.size());
 
-    // Since the library creates one less worker thread than the number of total cores,
-    // all but one of the arenas are created without reserving a slot for an external thread,
-    // allowing them to be fully populated.
-    for(unsigned j = 1; j < numa_nodes.size(); j++) {
-        arenas[j].initialize(tbb::task_arena::constraints(numa_nodes[j]), /*reserved_slots*/ 0);
-        arenas[j].enqueue([](){/*some parallel work*/}, task_groups[j]);
+    // Enqueue work to all but the first arena
+    for(unsigned j = 1; j < numa_arenas.size(); j++) {
+        numa_arenas[j].enqueue([](){/*some parallel work*/}, task_groups[j]);
     }
 
-    // The main thread executes in the arena with the reserved slot.
-    arenas[0].initialize(tbb::task_arena::constraints(numa_nodes[0]));
-    arenas[0].execute([&task_groups](){
-        task_groups[0].run([](){/*some parallel work*/});
+    // The main thread directly executes the work in the remaining arena
+    numa_arenas[0].execute([&task_groups](){
+        task_groups[0].run_and_wait([](){/*some parallel work*/});
     });
 
-    for(unsigned j = 0; j < numa_nodes.size(); j++) {
-        arenas[j].wait_for(task_groups[j]);
+    for(unsigned j = 1; j < numa_arenas.size(); j++) {
+        numa_arenas[j].wait_for(task_groups[j]);
     }
 /*end_set_numa_node_example*/
 }
