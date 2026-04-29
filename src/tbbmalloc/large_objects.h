@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2023 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -49,15 +50,18 @@ public:
     static const size_t   MinSize = MIN_SIZE, MaxSize = MAX_SIZE;
     static const size_t   CacheStep = 8 * 1024;
     static const unsigned NumBins = (MaxSize - MinSize) / CacheStep;
+    static_assert((MaxSize - MinSize) / CacheStep <= (std::numeric_limits<decltype(NumBins)>::max)(),
+                  "The size of NumBins is enough to represent the desired value.");
 
     static size_t alignToBin(size_t size) {
         return alignUp(size, CacheStep);
     }
 
-    static int sizeToIdx(size_t size) {
+    static unsigned sizeToIdx(size_t size) {
+        static_assert(MaxSize <= UINT_MAX, "The cast below can be incorrect");
         MALLOC_ASSERT(MinSize <= size && size < MaxSize, ASSERT_TEXT);
         MALLOC_ASSERT(size % CacheStep == 0, ASSERT_TEXT);
-        return (size - MinSize) / CacheStep;
+        return (unsigned)((size - MinSize) / CacheStep);
     }
 };
 
@@ -81,22 +85,29 @@ public:
 
     static size_t alignToBin(size_t size) {
         MALLOC_ASSERT(size >= StepFactor, "Size must not be less than the StepFactor");
-        size_t minorStepExp = BitScanRev(size) - StepFactorExp;
+
+        int sizeExp = BitScanRev(size);
+        MALLOC_ASSERT(sizeExp >= 0, "BitScanRev() cannot return -1, as size >= stepfactor > 0");
+        MALLOC_ASSERT(sizeExp >= StepFactorExp, "sizeExp >= StepFactorExp, because size >= stepFactor");
+        int minorStepExp = sizeExp - StepFactorExp;
+
         return alignUp(size, 1ULL << minorStepExp);
     }
 
     // Sizes between the power of 2 values are approximated to StepFactor.
-    static int sizeToIdx(size_t size) {
+    static unsigned sizeToIdx(size_t size) {
         MALLOC_ASSERT(MinSize <= size && size <= MaxSize, ASSERT_TEXT);
-        int sizeExp = (int)BitScanRev(size); // same as __TBB_Log2
-        MALLOC_ASSERT(sizeExp >= 0, "A shift amount (sizeExp) must not be negative");
+
+        int sizeExp = BitScanRev(size); // same as __TBB_Log2
+        MALLOC_ASSERT(sizeExp >= 0, "BitScanRev() cannot return -1, as size >= stepfactor > 0");
+        MALLOC_ASSERT(sizeExp >= StepFactorExp, "sizeExp >= StepFactorExp, because size >= stepFactor");
+        unsigned minorStepExp = sizeExp - StepFactorExp;
+
         size_t majorStepSize = 1ULL << sizeExp;
-        int minorStepExp = sizeExp - StepFactorExp;
-        MALLOC_ASSERT(minorStepExp >= 0, "A shift amount (minorStepExp) must not be negative");
-        int minorIdx = (size - majorStepSize) >> minorStepExp;
+        unsigned minorIdx = (unsigned)((size - majorStepSize) >> minorStepExp);
         MALLOC_ASSERT(size == majorStepSize + ((size_t)minorIdx << minorStepExp),
-            "Size is not aligned on the bin");
-        return StepFactor * (sizeExp - MinSizeExp) + minorIdx;
+                      "Size is not aligned on the bin");
+        return (unsigned)(StepFactor * (sizeExp - MinSizeExp) + minorIdx);
     }
 };
 
@@ -136,7 +147,7 @@ private:
 
 public:
     // The number of bins to cache large/huge objects.
-    static const uint32_t numBins = Props::NumBins;
+    static const unsigned numBins = Props::NumBins;
 
     typedef BitMaskMax<numBins> BinBitMask;
 
@@ -170,7 +181,8 @@ public:
 
         typename MallocAggregator<CacheBinOperation>::type aggregator;
 
-        void ExecuteOperation(CacheBinOperation *op, ExtMemoryPool *extMemPool, BinBitMask *bitMask, int idx, bool longLifeTime = true);
+        void ExecuteOperation(CacheBinOperation *op, ExtMemoryPool *extMemPool, BinBitMask *bitMask,
+                              unsigned idx, bool longLifeTime = true);
 
         /* should be placed in zero-initialized memory, ctor not needed. */
         CacheBin();
@@ -181,15 +193,16 @@ public:
         }
 
         /* ---------- Cache accessors ---------- */
-        void putList(ExtMemoryPool *extMemPool, LargeMemoryBlock *head, BinBitMask *bitMask, int idx);
-        LargeMemoryBlock *get(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask, int idx);
+        void putList(ExtMemoryPool *extMemPool, LargeMemoryBlock *head, BinBitMask *bitMask, unsigned idx);
+        LargeMemoryBlock *get(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask, unsigned idx);
 
         /* ---------- Cleanup functions -------- */
-        bool cleanToThreshold(ExtMemoryPool *extMemPool, BinBitMask *bitMask, uintptr_t currTime, int idx);
-        bool releaseAllToBackend(ExtMemoryPool *extMemPool, BinBitMask *bitMask, int idx);
+        bool cleanToThreshold(ExtMemoryPool *extMemPool, BinBitMask *bitMask, uintptr_t currTime,
+                              unsigned idx);
+        bool releaseAllToBackend(ExtMemoryPool *extMemPool, BinBitMask *bitMask, unsigned idx);
         /* ------------------------------------- */
 
-        void updateUsedSize(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask, int idx);
+        void updateUsedSize(ExtMemoryPool *extMemPool, size_t size, BinBitMask *bitMask, unsigned idx);
         void decreaseThreshold() {
             intptr_t threshold = ageThreshold.load(std::memory_order_relaxed);
             if (threshold)
@@ -205,11 +218,11 @@ public:
         /* --------- Unsafe methods used with the aggregator ------- */
         void forgetOutdatedState(uintptr_t currTime);
         LargeMemoryBlock *putList(LargeMemoryBlock *head, LargeMemoryBlock *tail, BinBitMask *bitMask,
-                int idx, int num, size_t hugeObjectThreshold);
+                                  unsigned idx, int num, size_t hugeObjectThreshold);
         LargeMemoryBlock *get();
-        LargeMemoryBlock *cleanToThreshold(uintptr_t currTime, BinBitMask *bitMask, int idx);
-        LargeMemoryBlock *cleanAll(BinBitMask *bitMask, int idx);
-        void updateUsedSize(size_t size, BinBitMask *bitMask, int idx) {
+        LargeMemoryBlock *cleanToThreshold(uintptr_t currTime, BinBitMask *bitMask, unsigned idx);
+        LargeMemoryBlock *cleanAll(BinBitMask *bitMask, unsigned idx);
+        void updateUsedSize(size_t size, BinBitMask *bitMask, unsigned idx) {
             if (!usedSize.load(std::memory_order_relaxed)) bitMask->set(idx, true);
             usedSize.store(usedSize.load(std::memory_order_relaxed) + size, std::memory_order_relaxed);
             if (!usedSize.load(std::memory_order_relaxed) && !first) bitMask->set(idx, false);
@@ -235,7 +248,7 @@ public:
 
     // Huge bins index for fast regular cleanup searching in case of
     // the "huge size threshold" setting defined
-    intptr_t     hugeSizeThresholdIdx;
+    unsigned hugeSizeThresholdIdx;
 
 private:
     // How many times LOC was "too large"
@@ -251,7 +264,7 @@ public:
     static size_t alignToBin(size_t size) {
         return Props::alignToBin(size);
     }
-    static int sizeToIdx(size_t size) {
+    static unsigned sizeToIdx(size_t size) {
         return Props::sizeToIdx(size);
     }
 
@@ -327,7 +340,7 @@ private:
 
     // Returns artificial bin index,
     // it's used only during sorting and never saved
-    static int sizeToIdx(size_t size);
+    static unsigned sizeToIdx(size_t size);
 
     // Our friends
     friend class Backend;
