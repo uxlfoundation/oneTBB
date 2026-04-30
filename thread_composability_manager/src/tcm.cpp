@@ -1148,7 +1148,7 @@ public:
       ph->data.tcm_epoch_snapshot = tcm_state_epoch;
     }
 
-    invoke_callbacks(callbacks); // Invocation of the callbacks is happenning outside of the lock
+    invoke_callbacks(callbacks); // Invocation of the callbacks is happening outside of the lock
 
     if (additional_concurrency_available) {
         renegotiate_permits(/*initiator*/ph);
