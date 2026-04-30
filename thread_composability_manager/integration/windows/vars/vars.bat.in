@@ -1,6 +1,7 @@
 @echo off
 REM
 REM Copyright (c) 2025 Intel Corporation
+REM Copyright (c) 2026 UXL Foundation Contributors
 REM
 REM SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 REM
