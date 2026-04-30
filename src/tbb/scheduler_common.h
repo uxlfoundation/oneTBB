@@ -46,6 +46,12 @@
 #include <memory> // unique_ptr
 #include <unordered_map>
 
+#if __unix__ || __APPLE__
+#include <time.h>
+#elif __MSC_VER
+#include <synchapi.h>
+#endif
+
 //! Mutex type for global locks in the scheduler
 using scheduler_mutex_type = __TBB_SCHEDULER_MUTEX_TYPE;
 
@@ -223,20 +229,47 @@ inline std::uint64_t machine_time_stamp() {
 #endif
 }
 
+inline void short_sleep(std::int32_t microseconds) {
+#if __unix__ || __APPLE__
+    timespec ts {0, microseconds * 1000};
+    nanosleep(&ts, nullptr);
+#elif _MSC_VER
+    thread_local HANDLE timer = CreateWaitableTimerExW(
+        nullptr, nullptr,
+        CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
+        TIMER_ALL_ACCESS);
+    if (timer) {
+        LARGE_INTEGER due;
+        // Negative = relative time, 100ns units. microseconds * 10.
+        due.QuadPart = -static_cast<LONGLONG>(microseconds) * 10;
+        if (SetWaitableTimer(timer, &due, 0, nullptr, nullptr, FALSE)) {
+            WaitForSingleObject(timer, INFINITE);
+            return;
+        }
+    }
+    // Yield if timer creation or setting failed
+    yield();
+#else
+    suppress_unused_warning(microseconds);
+    yield();
+#endif
+}
+
 inline void prolonged_pause_impl() {
     // Assumption based on practice: 1000-2000 ticks seems to be a suitable invariant for the
     // majority of platforms. Currently, skip platforms that define __TBB_STEALING_PAUSE
     // because these platforms require very careful tuning.
     std::uint64_t prev = machine_time_stamp();
     const std::uint64_t finish = prev + 1000;
-    atomic_backoff backoff;
+    std::uint32_t pause_count = 1;
     do {
-        backoff.bounded_pause();
+        machine_pause(pause_count);
         std::uint64_t curr = machine_time_stamp();
         if (curr <= prev)
             // Possibly, the current logical thread is moved to another hardware thread or overflow is occurred.
             break;
         prev = curr;
+        pause_count *= 2;
     } while (prev < finish);
 }
 #else
@@ -273,37 +306,37 @@ inline void prolonged_pause() {
 // for example use rdtsc for it
 class stealing_loop_backoff {
     const int my_pause_threshold;
-    const int my_yield_threshold;
+    const int my_short_sleep_threshold;
     int my_pause_count;
-    int my_yield_count;
+    int my_short_sleep_count;
 public:
     // my_yield_threshold = 100 is an experimental value. Ideally, once we start calling __TBB_Yield(),
     // the time spent spinning before calling out_of_work() should be approximately
     // the time it takes for a thread to be woken up. Doing so would guarantee that we do
     // no worse than 2x the optimal spin time. Or perhaps a time-slice quantum is the right amount.
-    stealing_loop_backoff(int num_workers, int yields_multiplier)
+    stealing_loop_backoff(int num_workers, int sleep_multiplier)
         : my_pause_threshold{ 2 * (num_workers + 1) }
-        , my_yield_threshold{100 * yields_multiplier}
+        , my_short_sleep_threshold{100 * sleep_multiplier}
         , my_pause_count{}
-        , my_yield_count{}
+        , my_short_sleep_count{}
     {}
     bool pause() {
         prolonged_pause();
         if (my_pause_count++ >= my_pause_threshold) {
             my_pause_count = my_pause_threshold;
-            d0::yield();
-            if (my_yield_count++ >= my_yield_threshold) {
-                my_yield_count = my_yield_threshold;
+            short_sleep(10);
+            if (my_short_sleep_count++ >= my_short_sleep_threshold) {
+                my_short_sleep_count = my_short_sleep_threshold;
                 return true;
             }
         }
         return false;
     }
     void reset_wait() {
-        my_pause_count = my_yield_count = 0;
+        my_pause_count = my_short_sleep_count = 0;
     }
     int limited_pause_count() {
-        return my_pause_count + my_yield_count;
+        return my_pause_count + my_short_sleep_count;
     }
 };
 

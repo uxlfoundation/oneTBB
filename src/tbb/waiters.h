@@ -31,16 +31,16 @@ inline d1::task* get_self_recall_task(arena_slot& slot);
 
 class waiter_base {
 public:
-    waiter_base(arena& a, int yields_multiplier = 1) : my_arena(a), my_backoff(int(a.my_num_slots), yields_multiplier) {}
+ waiter_base(arena& a, int sleep_multiplier = 1)
+     : my_arena(a), my_backoff(int(a.my_num_slots), sleep_multiplier) {}
 
-    bool pause() {
-        if (my_backoff.pause()) {
-            my_arena.out_of_work();
-            return true;
-        }
-
-        return false;
-    }
+     bool pause() {
+         if (my_backoff.pause()) {
+             my_arena.out_of_work();
+             return true;
+         }
+         return false;
+     }
 
     void reset_wait() {
         my_backoff.reset_wait();
@@ -81,7 +81,7 @@ public:
                     {
                         break;
                     }
-                    d0::yield();
+                    short_sleep(100);
                 }
             }
             // Leave dispatch loop
