@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@
 
     Most of the checks happen at the compilation or link phases.
 **/
+
+#if !__TBB_TEST_MODULE_EXPORT
 
 #if __INTEL_COMPILER && _MSC_VER
 #pragma warning(disable : 2586) // decorated name length exceeded, name was truncated
@@ -92,8 +94,13 @@
 #include "common/test.h"
 #endif
 
-static volatile size_t g_sink;
+#endif /* !__TBB_TEST_MODULE_EXPORT */
 
+#if __TBB_TEST_MODULE_EXPORT
+inline volatile size_t g_sink;
+#else
+static volatile size_t g_sink;
+#endif /* __TBB_TEST_MODULE_EXPORT */
 #define TestTypeDefinitionPresence( Type ) g_sink = sizeof(tbb::Type);
 #define TestTypeDefinitionPresence2(TypeStart, TypeEnd) g_sink = sizeof(tbb::TypeStart,TypeEnd);
 #define TestTypeDefinitionPresence3(TypeStart, TypeMid, TypeEnd) g_sink = sizeof(tbb::TypeStart,TypeMid,TypeEnd);
@@ -113,6 +120,9 @@ struct Body1b { // binary operator for reduction
 };
 struct Body1bc { // binary operator for comparison
     bool operator() (const int, const int) const { return false; }
+};
+struct Body1c { // body for function_node<int, int>
+    int operator() ( int ) const { return 0; }
 };
 struct Body2 {
     Body2 () {}
@@ -135,10 +145,15 @@ struct Body3a { // for lambda-friednly parallel_scan
     int operator() ( const tbb::blocked_range<int>&, const int, bool ) const { return 0; }
 };
 struct Msg {};
+struct SuspendBody {
+    void operator()(tbb::task::suspend_point) const {}
+};
 
 // Test if all the necessary symbols are exported for the exceptions thrown by TBB.
 // Missing exports result either in link error or in runtime assertion failure.
+#if !__TBB_TEST_MODULE_EXPORT
 #include <stdexcept>
+#endif
 
 template <typename E>
 void TestExceptionClassExports ( const E& exc, tbb::detail::exception_id eid ) {
@@ -163,7 +178,11 @@ void TestExceptionClassExports ( const E& exc, tbb::detail::exception_id eid ) {
 #endif /* TBB_USE_EXCEPTIONS */
 }
 
+#if __TBB_TEST_MODULE_EXPORT
+inline void TestExceptionClassesExports () {
+#else
 static void TestExceptionClassesExports () {
+#endif
     TestExceptionClassExports( std::bad_alloc(), tbb::detail::exception_id::bad_alloc );
     TestExceptionClassExports( tbb::bad_last_alloc(), tbb::detail::exception_id::bad_last_alloc );
     TestExceptionClassExports( std::invalid_argument("test"), tbb::detail::exception_id::nonpositive_step );
@@ -180,7 +199,11 @@ static void TestExceptionClassesExports () {
 #if __TBB_CPF_BUILD
 // These names are only tested in "preview" configuration
 // When a feature becomes fully supported, its names should be moved to the main test
+#if __TBB_TEST_MODULE_EXPORT
+inline void TestPreviewNames() {
+#else
 static void TestPreviewNames() {
+#endif
     TestTypeDefinitionPresence2( concurrent_lru_cache<int, int> );
     TestTypeDefinitionPresence( isolated_task_group );
 #if TBB_PREVIEW_MEMORY_POOL
@@ -188,10 +211,24 @@ static void TestPreviewNames() {
     TestTypeDefinitionPresence( memory_pool<std::allocator<int>> );
     TestTypeDefinitionPresence( fixed_pool );
 #endif
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    TestTypeDefinitionPresence( task_completion_handle );
+    TestFuncDefinitionPresence( is_inside_task, (), bool );
+#endif
+#if __TBB_PREVIEW_PARALLEL_PHASE
+    TestTypeDefinitionPresence( task_arena::leave_policy );
+    TestTypeDefinitionPresence( task_arena::scoped_parallel_phase );
+    TestFuncDefinitionPresence( this_task_arena::start_parallel_phase, (), void );
+    TestFuncDefinitionPresence( this_task_arena::end_parallel_phase, (bool), void );
+#endif
 }
 #endif
 
+#if __TBB_TEST_MODULE_EXPORT
+export inline void DefinitionPresence() {
+#else
 static void DefinitionPresence() {
+#endif
     TestTypeDefinitionPresence( ext::assertion_handler_type );
     TestTypeDefinitionPresence( cache_aligned_allocator<int> );
     TestTypeDefinitionPresence( tbb_hash_compare<int> );
@@ -210,6 +247,10 @@ static void DefinitionPresence() {
     TestTypeDefinitionPresence( concurrent_vector<int> );
     TestTypeDefinitionPresence( combinable<int> );
     TestTypeDefinitionPresence( enumerable_thread_specific<int> );
+    /* TLS names */
+    TestTypeDefinitionPresence( flattened2d<tbb::enumerable_thread_specific<std::vector<int>>> );
+    TestTypeDefinitionPresence( ets_key_usage_type );
+    TestFuncDefinitionPresence( flatten2d, (const tbb::enumerable_thread_specific<std::vector<int>>&), tbb::flattened2d<tbb::enumerable_thread_specific<std::vector<int>>> );
     TestFuncDefinitionPresence( ext::get_assertion_handler, (),
                                 tbb::ext::assertion_handler_type );
     TestFuncDefinitionPresence( ext::set_assertion_handler,
@@ -240,6 +281,12 @@ static void DefinitionPresence() {
     TestTypeDefinitionPresence( flow::limiter_node<int> );
     TestTypeDefinitionPresence2(flow::indexer_node<int, int> );
     TestTypeDefinitionPresence2(flow::composite_node<std::tuple<int>, std::tuple<int> > );
+    TestTypeDefinitionPresence( flow::graph_node );
+    TestTypeDefinitionPresence( flow::reset_flags );
+    TestTypeDefinitionPresence( flow::tag_value );
+    TestTypeDefinitionPresence( flow::node_priority_t );
+    TestFuncDefinitionPresence( flow::copy_body<Body1c>, (tbb::flow::function_node<int, int>&), Body1c );
+    TestFuncDefinitionPresence( flow::cast_to<int>, (tbb::flow::tagged_msg<int, int> const&), const int& );
     /* Mutex names */
     TestTypeDefinitionPresence( null_mutex );
     TestTypeDefinitionPresence( null_rw_mutex );
@@ -259,6 +306,8 @@ static void DefinitionPresence() {
     TestTypeDefinitionPresence( blocked_range3d<int> );
     TestTypeDefinitionPresence2( blocked_nd_range<int,4> );
     TestTypeDefinitionPresence( collaborative_once_flag );
+    TestTypeDefinitionPresence( filter_mode );
+    TestTypeDefinitionPresence( flow_control );
     TestFuncDefinitionPresence( collaborative_call_once, (tbb::collaborative_once_flag&, const Body&), void );
     TestFuncDefinitionPresence( parallel_invoke, (const Body&, const Body&, const Body&), void );
     TestFuncDefinitionPresence( parallel_for_each, (int*, int*, const Body1&), void );
@@ -288,13 +337,42 @@ static void DefinitionPresence() {
     TestTypeDefinitionPresence( task_arena );
     TestFuncDefinitionPresence( this_task_arena::current_thread_index, (), int );
     TestFuncDefinitionPresence( this_task_arena::max_concurrency, (), int );
+    TestFuncDefinitionPresence( this_task_arena::isolate, (Body&&), void );
+    TestFuncDefinitionPresence( this_task_arena::enqueue, (tbb::task_handle&&), void );
+    TestFuncDefinitionPresence( this_task_arena::enqueue, (Body&&), void );
+    TestFuncDefinitionPresence( this_task_arena::enqueue, (Body&&, tbb::task_group&), void );
+    TestFuncDefinitionPresence( create_numa_task_arenas, (tbb::task_arena::constraints, unsigned), std::vector<tbb::task_arena> );
+    TestTypeDefinitionPresence( core_type_id );
+    TestFuncDefinitionPresence( info::core_types, (), std::vector<tbb::core_type_id> );
     TestFuncDefinitionPresence( info::numa_nodes, (), std::vector<tbb::numa_node_id> );
     TestFuncDefinitionPresence( info::default_concurrency, (tbb::numa_node_id), int );
     TestTypeDefinitionPresence( task_scheduler_observer );
     TestTypeDefinitionPresence( tbb_allocator<int> );
     TestTypeDefinitionPresence( tick_count );
     TestTypeDefinitionPresence( global_control );
+    TestTypeDefinitionPresence( task_scheduler_handle );
+    TestFuncDefinitionPresence( finalize, (tbb::task_scheduler_handle&, const std::nothrow_t&), bool );
+#if TBB_USE_EXCEPTIONS
+    TestFuncDefinitionPresence( finalize, (tbb::task_scheduler_handle&), void );
+#endif
     TestTypeDefinitionPresence( scalable_allocator<int> );
+    TestTypeDefinitionPresence( attach );
+#if __TBB_CPP17_MEMORY_RESOURCE_PRESENT
+    /* Allocator resource names */
+    TestTypeDefinitionPresence( cache_aligned_resource );
+    TestFuncDefinitionPresence( scalable_memory_resource, (), std::pmr::memory_resource* );
+#endif
+    /* Task group names */
+    TestTypeDefinitionPresence( task_group_status );
+    TestFuncDefinitionPresence( is_current_task_group_canceling, (), bool );
+    TestTypeDefinitionPresence( task_handle );
+    /* Task names */
+    TestFuncDefinitionPresence( task::current_context, (), tbb::task_group_context* );
+#if __TBB_RESUMABLE_TASKS
+    TestTypeDefinitionPresence( task::suspend_point );
+    TestFuncDefinitionPresence( task::resume, (tbb::task::suspend_point), void );
+    TestFuncDefinitionPresence( task::suspend, (SuspendBody), void );
+#endif
 
 #if __TBB_CPF_BUILD
     TestPreviewNames();
@@ -309,6 +387,7 @@ static void DefinitionPresence() {
     TestExceptionClassesExports();
 }
 
+#if !__TBB_TEST_MODULE_EXPORT
 #if __TBB_TEST_SECONDARY
 /* This mode is used to produce a secondary object file that is linked with
    the main one in order to detect "multiple definition" linker error.
@@ -330,3 +409,4 @@ TEST_CASE("Test for multiple definition linker error") {
     Secondary();
 }
 #endif
+#endif /* !__TBB_TEST_MODULE_EXPORT */
