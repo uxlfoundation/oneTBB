@@ -48,7 +48,7 @@
 
 #if __unix__ || __APPLE__
 #include <time.h>
-#elif __MSC_VER
+#elif !(__TBB_WIN8UI_SUPPORT || defined(WINAPI_FAMILY)) && (_WIN32 || _WIN64)
 #include <synchapi.h>
 #endif
 
@@ -233,7 +233,7 @@ inline void short_sleep(std::int32_t microseconds) {
 #if __unix__ || __APPLE__
     timespec ts {0, microseconds * 1000};
     nanosleep(&ts, nullptr);
-#elif _MSC_VER
+#elif !(__TBB_WIN8UI_SUPPORT || defined(WINAPI_FAMILY)) && (_WIN32 || _WIN64)
     thread_local HANDLE timer = CreateWaitableTimerExW(
         nullptr, nullptr,
         CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
