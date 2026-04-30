@@ -737,13 +737,13 @@ void *__TBB_EXPORTED_FUNC alloc_interleaved(size_t size, size_t interleaving_ste
         if (curr_size < size - interleaving_step) {
             BOOL ok = VirtualFree(base_addr + curr_size, interleaving_step, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER);
             if (!ok) {
-                printf("VirtualFree(MEM_PRESERVE_PLACEHOLDER) failed %d\n", GetLastError());
+                printf("VirtualFree(MEM_PRESERVE_PLACEHOLDER) failed %lu\n", GetLastError());
                 VirtualFree(base_addr, 0, MEM_RELEASE);
                 return nullptr;
             }
         }
 
-        MEM_EXTENDED_PARAMETER param = { 0 };
+        MEM_EXTENDED_PARAMETER param = { {0, 0}, {0} };
 
         param.Type = MemExtendedParameterNumaNode;
         // preferred node
