@@ -688,9 +688,8 @@ void *__TBB_EXPORTED_FUNC alloc_interleaved(size_t size, size_t interleaving_ste
         static_cast<char*>(data)[i] = 0;
 
     // no NUMA nodes or move_pages() not available, just return the memory as is
-    if (numa_node_count() == 1 || !move_pages_ptr) {
+    if (numa_node_count() == 1 || !move_pages_ptr)
         return data;
-    }
 
     int count_pages = (size + governor::default_page_size() - 1) / governor::default_page_size();
     std::unique_ptr<void*[]> pages(new void*[count_pages]);
@@ -720,7 +719,10 @@ void *__TBB_EXPORTED_FUNC alloc_interleaved(size_t size, size_t interleaving_ste
 
     return data;
 #elif _WIN32 || _WIN64
-    // TODO: use VirtualAlloc as fallback if VirtualAlloc2 is not available or for no-NUMA machines
+    // no NUMA nodes or no VirtualAlloc2, just return the memory as is
+    if (numa_node_count() == 1 || !VirtualAlloc2_ptr)
+        return VirtualAlloc(nullptr, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+
     char* base_addr =
         static_cast<char*>(VirtualAlloc2_ptr(nullptr, nullptr, size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER,
                                              PAGE_NOACCESS, nullptr, 0));
@@ -735,7 +737,8 @@ void *__TBB_EXPORTED_FUNC alloc_interleaved(size_t size, size_t interleaving_ste
     for (size_t curr_size = 0; curr_size < size; curr_size += interleaving_step, ++node_index) {
         // must release every but last page
         if (curr_size < size - interleaving_step) {
-            BOOL ok = VirtualFree(base_addr + curr_size, interleaving_step, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER);
+            BOOL ok = VirtualFree(base_addr + curr_size, interleaving_step,
+                                  MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER);
             if (!ok) {
                 printf("VirtualFree(MEM_PRESERVE_PLACEHOLDER) failed %lu\n", GetLastError());
                 VirtualFree(base_addr, 0, MEM_RELEASE);
