@@ -229,9 +229,9 @@ inline std::uint64_t machine_time_stamp() {
 #endif
 }
 
-inline void short_sleep(std::int32_t microseconds) {
+inline void short_sleep(std::int32_t nanoseconds) {
 #if __unix__ || __APPLE__
-    timespec ts {0, microseconds * 1000};
+    timespec ts {0, nanoseconds};
     nanosleep(&ts, nullptr);
 #elif !(__TBB_WIN8UI_SUPPORT || defined(WINAPI_FAMILY)) && (_WIN32 || _WIN64)
     thread_local HANDLE timer = CreateWaitableTimerExW(
@@ -240,8 +240,7 @@ inline void short_sleep(std::int32_t microseconds) {
         TIMER_ALL_ACCESS);
     if (timer) {
         LARGE_INTEGER due;
-        // Negative = relative time, 100ns units. microseconds * 10.
-        due.QuadPart = -static_cast<LONGLONG>(microseconds) * 10;
+        due.QuadPart = -static_cast<LONGLONG>(nanoseconds) / 100;
         if (SetWaitableTimer(timer, &due, 0, nullptr, nullptr, FALSE)) {
             WaitForSingleObject(timer, INFINITE);
             return;
@@ -324,7 +323,7 @@ public:
         prolonged_pause();
         if (my_pause_count++ >= my_pause_threshold) {
             my_pause_count = my_pause_threshold;
-            short_sleep(10);
+            short_sleep(/*nanoseconds*/300);
             if (my_short_sleep_count++ >= my_short_sleep_threshold) {
                 my_short_sleep_count = my_short_sleep_threshold;
                 return true;
