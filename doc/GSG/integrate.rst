@@ -31,7 +31,7 @@ To add oneTBB to another project using CMake*, add the following commands to you
        find_package(TBB REQUIRED)
        target_link_libraries(my_executable TBB::tbb)
 
-Additionally, you can also enable experimental C++20 modules support for TBB using the following command:
+Additionally, you can also enable experimental C++20 modules support for TBB using the following commands:
 
 .. code-block:: cmake
 
