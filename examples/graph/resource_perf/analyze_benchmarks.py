@@ -56,6 +56,7 @@ class VariantConfig:
     timestamp: Optional[bool] = None  # mode2 only
     local_counter: Optional[bool] = None  # mode2 only
     notify: Optional[bool] = None  # mode2 only
+    pressure: Optional[bool] = None  # mode2 only
 
     def get_short_name(self) -> str:
         """Get short variant name for display"""
@@ -64,10 +65,12 @@ class VariantConfig:
         elif self.mode == 'mode1':
             return 'mode1'
         else:  # mode2
+            pressure_prefix = 'nopressure_' if not self.pressure else ''
             counter = 'local' if self.local_counter else 'global'
             ts = '_ts' if self.timestamp else ''
-            notify = '_notify' if self.notify else '_nonotify'
-            return f'mode2_{counter}{ts}{notify}'
+            # Only show notify suffix when pressure is enabled
+            notify = ('_notify' if self.notify else '_nonotify') if self.pressure else ''
+            return f'mode2_{pressure_prefix}{counter}{ts}{notify}'
 
     def get_display_name(self) -> str:
         """Get full display name for legends"""
@@ -76,10 +79,12 @@ class VariantConfig:
         elif self.mode == 'mode1':
             return 'Mode 1: resource_limiter'
         else:  # mode2
+            pressure_prefix = 'no_pressure ' if not self.pressure else ''
             counter = 'local' if self.local_counter else 'global'
             ts = '+timestamp' if self.timestamp else ''
-            notify = '+notify' if self.notify else ''
-            return f'Mode 2: {counter}{ts}{notify}'
+            # Only show notify when pressure is enabled
+            notify = ('+notify' if self.notify else '') if self.pressure else ''
+            return f'Mode 2: {pressure_prefix}{counter}{ts}{notify}'
 
 
 @dataclass
@@ -98,6 +103,7 @@ class ResultsParser:
     CONFIG_PATTERN = re.compile(r'num_executions:\s+(\d+)')
     INPUTS_PATTERN = re.compile(r'num_inputs:\s+(\d+)')
     NODES_PATTERN = re.compile(r'num_nodes/tree_depth:\s+(\d+)')
+    PRESSURE_PATTERN = re.compile(r'__TBB_USE_PRESSURE=(\d+)')
     TIMESTAMP_PATTERN = re.compile(r'__TBB_USE_TIMESTAMP_IN_REQUEST_ID=(\d+)')
     LOCAL_COUNTER_PATTERN = re.compile(r'__TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID=(\d+)')
     NOTIFY_PATTERN = re.compile(r'__TBB_USE_NOTIFY_ON_REPORT_PRESSURE=(\d+)')
@@ -137,6 +143,8 @@ class ResultsParser:
 
             # Parse mode2 configuration
             if current_result.variant.mode == 'mode2':
+                if match := self.PRESSURE_PATTERN.search(line):
+                    current_result.variant.pressure = (match.group(1) == '1')
                 if match := self.TIMESTAMP_PATTERN.search(line):
                     current_result.variant.timestamp = (match.group(1) == '1')
                 if match := self.LOCAL_COUNTER_PATTERN.search(line):
@@ -198,18 +206,19 @@ class TableFormatter:
 
     @staticmethod
     def sort_variants(results: List[BenchmarkResult]) -> List[BenchmarkResult]:
-        """Sort variants: mode0, mode1, then mode2 (global then local, notify then nonotify)"""
+        """Sort variants: mode0, mode1, then mode2 (pressure=1 first, then pressure=0)"""
         def sort_key(result: BenchmarkResult) -> Tuple:
             v = result.variant
             if v.mode == 'mode0':
-                return (0, 0, 0, 0)
+                return (0, 0, 0, 0, 0)
             elif v.mode == 'mode1':
-                return (1, 0, 0, 0)
+                return (1, 0, 0, 0, 0)
             else:  # mode2
+                pressure = 0 if v.pressure else 1  # pressure=1 first (0), pressure=0 second (1)
                 counter = 0 if v.local_counter is False else 1  # global=0, local=1
                 timestamp = 1 if v.timestamp else 0
                 notify = 0 if v.notify else 1  # notify first (0), then nonotify (1)
-                return (2, counter, notify, timestamp)
+                return (2, pressure, counter, notify, timestamp)
 
         return sorted(results, key=sort_key)
 
@@ -337,12 +346,17 @@ class SVGChartGenerator:
     VARIANT_COLORS = {
         'mode0': '#4472C4',  # Blue
         'mode1': '#70AD47',  # Green
+        # Mode 2 with pressure=1 (existing variants)
         'mode2_global_notify': '#FFC000',  # Orange
         'mode2_global_nonotify': '#ED7D31',  # Dark orange
         'mode2_local_notify': '#FF6B6B',  # Red
         'mode2_local_nonotify': '#C92A2A',  # Dark red
         'mode2_local_ts_notify': '#FF8787',  # Light red
         'mode2_local_ts_nonotify': '#862E3D',  # Maroon
+        # Mode 2 with pressure=0 (new nopressure variants)
+        'mode2_nopressure_global': '#9B59B6',  # Purple
+        'mode2_nopressure_local': '#8E44AD',  # Dark purple
+        'mode2_nopressure_local_ts': '#BB8FCE',  # Light purple
     }
 
     def create_chart(self, results: List[BenchmarkResult], metric: str,

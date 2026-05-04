@@ -28,7 +28,8 @@ set_common_project_settings(tbb)
 #   use_timestamp: 0 or 1 (only for mode 2)
 #   use_local_counter: 0 or 1 (only for mode 2)
 #   use_notify: 0 or 1 (only for mode 2)
-function(add_ubench_variant target_name use_mode use_trace use_timestamp use_local_counter use_notify)
+#   use_pressure: 0 or 1 (only for mode 2)
+function(add_ubench_variant target_name use_mode use_trace use_timestamp use_local_counter use_notify use_pressure)
     add_executable(${target_name}
         resource_limited_ubenches.cpp)
 
@@ -37,62 +38,85 @@ function(add_ubench_variant target_name use_mode use_trace use_timestamp use_loc
     target_compile_options(${target_name} PRIVATE ${TBB_CXX_STD_FLAG})
 
     # Use local modified headers instead of system TBB headers
+    # Must come BEFORE target_link_libraries to take precedence
     target_include_directories(${target_name} BEFORE PRIVATE
         ${CMAKE_SOURCE_DIR}/include)
 
-    # Set USE_MODE and USE_TRACE
+    # Set USE_MODE and USE_TRACE plus enable resource limiting preview feature
     target_compile_definitions(${target_name} PRIVATE
         USE_MODE=${use_mode}
-        USE_TRACE=${use_trace})
+        USE_TRACE=${use_trace}
+        TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING=1
+        __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING=1)
 
     # Set pressure-aware configuration macros (only relevant for mode 2)
     if(use_mode EQUAL 2)
         target_compile_definitions(${target_name} PRIVATE
             __TBB_USE_TIMESTAMP_IN_REQUEST_ID=${use_timestamp}
             __TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID=${use_local_counter}
-            __TBB_USE_NOTIFY_ON_REPORT_PRESSURE=${use_notify})
+            __TBB_USE_NOTIFY_ON_REPORT_PRESSURE=${use_notify}
+            __TBB_USE_PRESSURE=${use_pressure})
     endif()
 endfunction()
 
 # Mode 0: join_node (baseline)
-add_ubench_variant(resource_ubench_mode0_notrace 0 0 0 0 0)
-add_ubench_variant(resource_ubench_mode0_eager   0 1 0 0 0)
-add_ubench_variant(resource_ubench_mode0_lazy    0 2 0 0 0)
+add_ubench_variant(resource_ubench_mode0_notrace 0 0 0 0 0 0)
+add_ubench_variant(resource_ubench_mode0_eager   0 1 0 0 0 0)
+add_ubench_variant(resource_ubench_mode0_lazy    0 2 0 0 0 0)
 
 # Mode 1: resource_limiter
-add_ubench_variant(resource_ubench_mode1_notrace 1 0 0 0 0)
-add_ubench_variant(resource_ubench_mode1_eager   1 1 0 0 0)
-add_ubench_variant(resource_ubench_mode1_lazy    1 2 0 0 0)
+add_ubench_variant(resource_ubench_mode1_notrace 1 0 0 0 0 0)
+add_ubench_variant(resource_ubench_mode1_eager   1 1 0 0 0 0)
+add_ubench_variant(resource_ubench_mode1_lazy    1 2 0 0 0 0)
 
-# Mode 2: pressure_aware_resource_limiter with local counter + timestamp + notify
-add_ubench_variant(resource_ubench_mode2_local_ts_notify_notrace 2 0 1 1 1)
-add_ubench_variant(resource_ubench_mode2_local_ts_notify_eager   2 1 1 1 1)
-add_ubench_variant(resource_ubench_mode2_local_ts_notify_lazy    2 2 1 1 1)
+# Mode 2: pressure_aware_resource_limiter with PRESSURE ENABLED (existing variants)
+# local counter + timestamp + notify
+add_ubench_variant(resource_ubench_mode2_local_ts_notify_notrace 2 0 1 1 1 1)
+add_ubench_variant(resource_ubench_mode2_local_ts_notify_eager   2 1 1 1 1 1)
+add_ubench_variant(resource_ubench_mode2_local_ts_notify_lazy    2 2 1 1 1 1)
 
 # Mode 2: pressure_aware_resource_limiter with local counter + timestamp + NO notify
-add_ubench_variant(resource_ubench_mode2_local_ts_nonotify_notrace 2 0 1 1 0)
-add_ubench_variant(resource_ubench_mode2_local_ts_nonotify_eager   2 1 1 1 0)
-add_ubench_variant(resource_ubench_mode2_local_ts_nonotify_lazy    2 2 1 1 0)
+add_ubench_variant(resource_ubench_mode2_local_ts_nonotify_notrace 2 0 1 1 0 1)
+add_ubench_variant(resource_ubench_mode2_local_ts_nonotify_eager   2 1 1 1 0 1)
+add_ubench_variant(resource_ubench_mode2_local_ts_nonotify_lazy    2 2 1 1 0 1)
 
 # Mode 2: pressure_aware_resource_limiter with local counter + NO timestamp + notify
-add_ubench_variant(resource_ubench_mode2_local_notify_notrace 2 0 0 1 1)
-add_ubench_variant(resource_ubench_mode2_local_notify_eager   2 1 0 1 1)
-add_ubench_variant(resource_ubench_mode2_local_notify_lazy    2 2 0 1 1)
+add_ubench_variant(resource_ubench_mode2_local_notify_notrace 2 0 0 1 1 1)
+add_ubench_variant(resource_ubench_mode2_local_notify_eager   2 1 0 1 1 1)
+add_ubench_variant(resource_ubench_mode2_local_notify_lazy    2 2 0 1 1 1)
 
 # Mode 2: pressure_aware_resource_limiter with local counter + NO timestamp + NO notify
-add_ubench_variant(resource_ubench_mode2_local_nonotify_notrace 2 0 0 1 0)
-add_ubench_variant(resource_ubench_mode2_local_nonotify_eager   2 1 0 1 0)
-add_ubench_variant(resource_ubench_mode2_local_nonotify_lazy    2 2 0 1 0)
+add_ubench_variant(resource_ubench_mode2_local_nonotify_notrace 2 0 0 1 0 1)
+add_ubench_variant(resource_ubench_mode2_local_nonotify_eager   2 1 0 1 0 1)
+add_ubench_variant(resource_ubench_mode2_local_nonotify_lazy    2 2 0 1 0 1)
 
 # Mode 2: pressure_aware_resource_limiter with global counter + notify
-add_ubench_variant(resource_ubench_mode2_global_notify_notrace 2 0 0 0 1)
-add_ubench_variant(resource_ubench_mode2_global_notify_eager   2 1 0 0 1)
-add_ubench_variant(resource_ubench_mode2_global_notify_lazy    2 2 0 0 1)
+add_ubench_variant(resource_ubench_mode2_global_notify_notrace 2 0 0 0 1 1)
+add_ubench_variant(resource_ubench_mode2_global_notify_eager   2 1 0 0 1 1)
+add_ubench_variant(resource_ubench_mode2_global_notify_lazy    2 2 0 0 1 1)
 
 # Mode 2: pressure_aware_resource_limiter with global counter + NO notify
-add_ubench_variant(resource_ubench_mode2_global_nonotify_notrace 2 0 0 0 0)
-add_ubench_variant(resource_ubench_mode2_global_nonotify_eager   2 1 0 0 0)
-add_ubench_variant(resource_ubench_mode2_global_nonotify_lazy    2 2 0 0 0)
+add_ubench_variant(resource_ubench_mode2_global_nonotify_notrace 2 0 0 0 0 1)
+add_ubench_variant(resource_ubench_mode2_global_nonotify_eager   2 1 0 0 0 1)
+add_ubench_variant(resource_ubench_mode2_global_nonotify_lazy    2 2 0 0 0 1)
+
+# Mode 2: pressure_aware_resource_limiter with PRESSURE DISABLED
+# Note: When pressure=0, notify has no effect, so we only vary local/global and timestamp
+
+# No pressure + local counter + timestamp
+add_ubench_variant(resource_ubench_mode2_nopressure_local_ts_notrace 2 0 1 1 0 0)
+add_ubench_variant(resource_ubench_mode2_nopressure_local_ts_eager   2 1 1 1 0 0)
+add_ubench_variant(resource_ubench_mode2_nopressure_local_ts_lazy    2 2 1 1 0 0)
+
+# No pressure + local counter + NO timestamp
+add_ubench_variant(resource_ubench_mode2_nopressure_local_notrace 2 0 0 1 0 0)
+add_ubench_variant(resource_ubench_mode2_nopressure_local_eager   2 1 0 1 0 0)
+add_ubench_variant(resource_ubench_mode2_nopressure_local_lazy    2 2 0 1 0 0)
+
+# No pressure + global counter (timestamp and notify don't apply)
+add_ubench_variant(resource_ubench_mode2_nopressure_global_notrace 2 0 0 0 0 0)
+add_ubench_variant(resource_ubench_mode2_nopressure_global_eager   2 1 0 0 0 0)
+add_ubench_variant(resource_ubench_mode2_nopressure_global_lazy    2 2 0 0 0 0)
 
 # Convenience targets to build all variants of a specific configuration
 add_custom_target(build_all_mode0
@@ -135,6 +159,21 @@ add_custom_target(build_all_mode2_global_nonotify
             resource_ubench_mode2_global_nonotify_eager
             resource_ubench_mode2_global_nonotify_lazy)
 
+add_custom_target(build_all_mode2_nopressure_local_ts
+    DEPENDS resource_ubench_mode2_nopressure_local_ts_notrace
+            resource_ubench_mode2_nopressure_local_ts_eager
+            resource_ubench_mode2_nopressure_local_ts_lazy)
+
+add_custom_target(build_all_mode2_nopressure_local
+    DEPENDS resource_ubench_mode2_nopressure_local_notrace
+            resource_ubench_mode2_nopressure_local_eager
+            resource_ubench_mode2_nopressure_local_lazy)
+
+add_custom_target(build_all_mode2_nopressure_global
+    DEPENDS resource_ubench_mode2_nopressure_global_notrace
+            resource_ubench_mode2_nopressure_global_eager
+            resource_ubench_mode2_nopressure_global_lazy)
+
 # Build all mode2 variants
 add_custom_target(build_all_mode2
     DEPENDS build_all_mode2_local_ts_notify
@@ -142,7 +181,10 @@ add_custom_target(build_all_mode2
             build_all_mode2_local_notify
             build_all_mode2_local_nonotify
             build_all_mode2_global_notify
-            build_all_mode2_global_nonotify)
+            build_all_mode2_global_nonotify
+            build_all_mode2_nopressure_local_ts
+            build_all_mode2_nopressure_local
+            build_all_mode2_nopressure_global)
 
 # Build all notrace variants
 add_custom_target(build_all_notrace
@@ -153,7 +195,10 @@ add_custom_target(build_all_notrace
             resource_ubench_mode2_local_notify_notrace
             resource_ubench_mode2_local_nonotify_notrace
             resource_ubench_mode2_global_notify_notrace
-            resource_ubench_mode2_global_nonotify_notrace)
+            resource_ubench_mode2_global_nonotify_notrace
+            resource_ubench_mode2_nopressure_local_ts_notrace
+            resource_ubench_mode2_nopressure_local_notrace
+            resource_ubench_mode2_nopressure_global_notrace)
 
 # Build all eager variants
 add_custom_target(build_all_eager
@@ -164,7 +209,10 @@ add_custom_target(build_all_eager
             resource_ubench_mode2_local_notify_eager
             resource_ubench_mode2_local_nonotify_eager
             resource_ubench_mode2_global_notify_eager
-            resource_ubench_mode2_global_nonotify_eager)
+            resource_ubench_mode2_global_nonotify_eager
+            resource_ubench_mode2_nopressure_local_ts_eager
+            resource_ubench_mode2_nopressure_local_eager
+            resource_ubench_mode2_nopressure_global_eager)
 
 # Build all lazy variants
 add_custom_target(build_all_lazy
@@ -175,9 +223,12 @@ add_custom_target(build_all_lazy
             resource_ubench_mode2_local_notify_lazy
             resource_ubench_mode2_local_nonotify_lazy
             resource_ubench_mode2_global_notify_lazy
-            resource_ubench_mode2_global_nonotify_lazy)
+            resource_ubench_mode2_global_nonotify_lazy
+            resource_ubench_mode2_nopressure_local_ts_lazy
+            resource_ubench_mode2_nopressure_local_lazy
+            resource_ubench_mode2_nopressure_global_lazy)
 
-# Build all 24 variants (3 mode0 + 3 mode1 + 18 mode2)
+# Build all 33 variants (3 mode0 + 3 mode1 + 27 mode2)
 add_custom_target(build_all_ubenches
     DEPENDS build_all_mode0
             build_all_mode1
@@ -187,9 +238,15 @@ add_custom_target(build_all_ubenches
 add_custom_target(resource_perf
     DEPENDS build_all_ubenches)
 
-# Execution targets with default arguments (1 execution, 100 inputs)
-set(DEFAULT_ARGS all 1 100)
-set(LIGHT_ARGS all 5 50)
+# Execution targets with default arguments (1 execution, 25 inputs, generation_rate=1.0)
+# std::string benchmark = "all";
+# int num_executions = 1;
+# int num_inputs = 100;
+# double generation_rate = 5.0;
+# int num_nodes = 10;
+# int num_resources = 1;
+set(DEFAULT_ARGS all 1 25 5.0 10 2)
+set(LIGHT_ARGS all 1 10 5.0 10 2)
 
 # Main run target for examples system integration
 add_execution_target(run_resource_perf resource_perf
@@ -197,7 +254,7 @@ add_execution_target(run_resource_perf resource_perf
 add_execution_target(light_test_resource_perf resource_perf
                      "$<TARGET_FILE:resource_ubench_mode1_notrace>" "${LIGHT_ARGS}")
 
-# Execution targets for all 24 variants
+# Execution targets for all 33 variants
 
 # Mode 0 (join_node)
 add_execution_target(run_resource_ubench_mode0_notrace resource_ubench_mode0_notrace
@@ -263,7 +320,31 @@ add_execution_target(run_resource_ubench_mode2_global_nonotify_eager resource_ub
 add_execution_target(run_resource_ubench_mode2_global_nonotify_lazy resource_ubench_mode2_global_nonotify_lazy
                      "$<TARGET_FILE:resource_ubench_mode2_global_nonotify_lazy>" "${DEFAULT_ARGS}")
 
-# Master target to run all 24 variants
+# Mode 2: No pressure + local counter + timestamp
+add_execution_target(run_resource_ubench_mode2_nopressure_local_ts_notrace resource_ubench_mode2_nopressure_local_ts_notrace
+                     "$<TARGET_FILE:resource_ubench_mode2_nopressure_local_ts_notrace>" "${DEFAULT_ARGS}")
+add_execution_target(run_resource_ubench_mode2_nopressure_local_ts_eager resource_ubench_mode2_nopressure_local_ts_eager
+                     "$<TARGET_FILE:resource_ubench_mode2_nopressure_local_ts_eager>" "${DEFAULT_ARGS}")
+add_execution_target(run_resource_ubench_mode2_nopressure_local_ts_lazy resource_ubench_mode2_nopressure_local_ts_lazy
+                     "$<TARGET_FILE:resource_ubench_mode2_nopressure_local_ts_lazy>" "${DEFAULT_ARGS}")
+
+# Mode 2: No pressure + local counter + NO timestamp
+add_execution_target(run_resource_ubench_mode2_nopressure_local_notrace resource_ubench_mode2_nopressure_local_notrace
+                     "$<TARGET_FILE:resource_ubench_mode2_nopressure_local_notrace>" "${DEFAULT_ARGS}")
+add_execution_target(run_resource_ubench_mode2_nopressure_local_eager resource_ubench_mode2_nopressure_local_eager
+                     "$<TARGET_FILE:resource_ubench_mode2_nopressure_local_eager>" "${DEFAULT_ARGS}")
+add_execution_target(run_resource_ubench_mode2_nopressure_local_lazy resource_ubench_mode2_nopressure_local_lazy
+                     "$<TARGET_FILE:resource_ubench_mode2_nopressure_local_lazy>" "${DEFAULT_ARGS}")
+
+# Mode 2: No pressure + global counter
+add_execution_target(run_resource_ubench_mode2_nopressure_global_notrace resource_ubench_mode2_nopressure_global_notrace
+                     "$<TARGET_FILE:resource_ubench_mode2_nopressure_global_notrace>" "${DEFAULT_ARGS}")
+add_execution_target(run_resource_ubench_mode2_nopressure_global_eager resource_ubench_mode2_nopressure_global_eager
+                     "$<TARGET_FILE:resource_ubench_mode2_nopressure_global_eager>" "${DEFAULT_ARGS}")
+add_execution_target(run_resource_ubench_mode2_nopressure_global_lazy resource_ubench_mode2_nopressure_global_lazy
+                     "$<TARGET_FILE:resource_ubench_mode2_nopressure_global_lazy>" "${DEFAULT_ARGS}")
+
+# Master target to run all 33 variants
 add_custom_target(run_all_ubenches
     DEPENDS run_resource_ubench_mode0_notrace
             run_resource_ubench_mode0_eager
@@ -288,9 +369,18 @@ add_custom_target(run_all_ubenches
             run_resource_ubench_mode2_global_notify_lazy
             run_resource_ubench_mode2_global_nonotify_notrace
             run_resource_ubench_mode2_global_nonotify_eager
-            run_resource_ubench_mode2_global_nonotify_lazy)
+            run_resource_ubench_mode2_global_nonotify_lazy
+            run_resource_ubench_mode2_nopressure_local_ts_notrace
+            run_resource_ubench_mode2_nopressure_local_ts_eager
+            run_resource_ubench_mode2_nopressure_local_ts_lazy
+            run_resource_ubench_mode2_nopressure_local_notrace
+            run_resource_ubench_mode2_nopressure_local_eager
+            run_resource_ubench_mode2_nopressure_local_lazy
+            run_resource_ubench_mode2_nopressure_global_notrace
+            run_resource_ubench_mode2_nopressure_global_eager
+            run_resource_ubench_mode2_nopressure_global_lazy)
 
-# Run only notrace variants (8 variants)
+# Run only notrace variants (11 variants)
 add_custom_target(run_all_notrace_ubenches
     DEPENDS run_resource_ubench_mode0_notrace
             run_resource_ubench_mode1_notrace
@@ -299,9 +389,12 @@ add_custom_target(run_all_notrace_ubenches
             run_resource_ubench_mode2_local_notify_notrace
             run_resource_ubench_mode2_local_nonotify_notrace
             run_resource_ubench_mode2_global_notify_notrace
-            run_resource_ubench_mode2_global_nonotify_notrace)
+            run_resource_ubench_mode2_global_nonotify_notrace
+            run_resource_ubench_mode2_nopressure_local_ts_notrace
+            run_resource_ubench_mode2_nopressure_local_notrace
+            run_resource_ubench_mode2_nopressure_global_notrace)
 
-# Run only eager trace variants (8 variants)
+# Run only eager trace variants (11 variants)
 add_custom_target(run_all_eager_ubenches
     DEPENDS run_resource_ubench_mode0_eager
             run_resource_ubench_mode1_eager
@@ -310,9 +403,12 @@ add_custom_target(run_all_eager_ubenches
             run_resource_ubench_mode2_local_notify_eager
             run_resource_ubench_mode2_local_nonotify_eager
             run_resource_ubench_mode2_global_notify_eager
-            run_resource_ubench_mode2_global_nonotify_eager)
+            run_resource_ubench_mode2_global_nonotify_eager
+            run_resource_ubench_mode2_nopressure_local_ts_eager
+            run_resource_ubench_mode2_nopressure_local_eager
+            run_resource_ubench_mode2_nopressure_global_eager)
 
-# Run only lazy trace variants (8 variants)
+# Run only lazy trace variants (11 variants)
 add_custom_target(run_all_lazy_ubenches
     DEPENDS run_resource_ubench_mode0_lazy
             run_resource_ubench_mode1_lazy
@@ -321,4 +417,7 @@ add_custom_target(run_all_lazy_ubenches
             run_resource_ubench_mode2_local_notify_lazy
             run_resource_ubench_mode2_local_nonotify_lazy
             run_resource_ubench_mode2_global_notify_lazy
-            run_resource_ubench_mode2_global_nonotify_lazy)
+            run_resource_ubench_mode2_global_nonotify_lazy
+            run_resource_ubench_mode2_nopressure_local_ts_lazy
+            run_resource_ubench_mode2_nopressure_local_lazy
+            run_resource_ubench_mode2_nopressure_global_lazy)

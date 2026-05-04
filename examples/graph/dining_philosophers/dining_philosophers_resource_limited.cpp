@@ -52,7 +52,7 @@
 
 #if USE_STARVATION_AVOIDANCE
 template<typename T>
-using limiter_type = oneapi::tbb::flow::pressure_aware_resource_limiter<T>;
+using limiter_type = oneapi::tbb::flow::priority_aware_resource_limiter<T>;
 #else
 template<typename T>
 using limiter_type = oneapi::tbb::flow::resource_limiter<T>;
@@ -217,7 +217,7 @@ int main(int argc, char *argv[]) {
     using oneapi::tbb::flow::unlimited;
 
 #if USE_STARVATION_AVOIDANCE
-using oneapi::tbb::flow::pressure_aware_resource_limiter;
+using oneapi::tbb::flow::priority_aware_resource_limiter;
 #else
 using oneapi::tbb::flow::resource_limiter;
 #endif
@@ -258,7 +258,7 @@ using oneapi::tbb::flow::resource_limiter;
         // Create chopsticks and resource providers
         std::vector<chopstick> chopsticks(num_philosophers);
 #if USE_STARVATION_AVOIDANCE
-        std::cout << "Using pressure_aware_resource_limiter to avoid starvation\n";
+        std::cout << "Using priority_aware_resource_limiter to avoid starvation\n";
 #else
         std::cout << "Using resource_limiter (no starvation avoidance)\n";
 #endif

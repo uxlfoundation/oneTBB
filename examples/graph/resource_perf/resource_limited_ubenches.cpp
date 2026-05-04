@@ -22,7 +22,8 @@
 #include "oneapi/tbb/flow_graph.h"
 using namespace oneapi::tbb::flow;
 
-// USE_TRACE: 0 = no tracing, 1 = eager, 2 = lazy
+
+
 #ifndef USE_TRACE
 #define USE_TRACE 2
 #endif
@@ -36,6 +37,12 @@ using namespace oneapi::tbb::flow;
 #ifndef USE_MODE
 #define USE_MODE 0
 #endif
+
+// Other settings that can be configured via compile-time macros when using mode 2 (priority-aware resource limiter):
+// __TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID: use local or else global counter for request ID generation (useful only for priority-aware resource limiter)
+// __TBB_USE_TIMESTAMP_IN_REQUEST_ID: include timestamp in request ID generation or not (useful only for local counter and priority-aware resource limiter)
+// __TBB_USE_PRESSURE: enable or disable pressure awareness in the priority-aware resource limiter
+// __TBB_USE_NOTIFY_ON_REPORT_PRESSURE: enable or disable eager notification on pressure report in priority-aware resource limiter
 
 #if USE_MODE == 0
 template<typename InputTuple>
@@ -86,19 +93,26 @@ using limiter_type = oneapi::tbb::flow::resource_limiter<T>;
 #else 
 // USE_MODE == 2
 template<typename T>
-using limiter_type = oneapi::tbb::flow::pressure_aware_resource_limiter<T>;
+using limiter_type = oneapi::tbb::flow::priority_aware_resource_limiter<T>;
 #endif
+
+const int genie_sleep_time_ms = 10;
+const int cycle_sleep_time_ms = 10;
 
 #if USE_TRACE > 0
 // Thread IDs represent nodes, not actual worker threads
 constexpr int ROOT_NODE_TID = 1;
 constexpr int GENIE_NODE_TID = 2;
 constexpr int ROOT_GENIE_NODE_TID = 3;
+constexpr int PROPAGATING_NODE_TID = 4;
+constexpr int CALIBRATION_A_NODE_TID = 5;
+constexpr int CALIBRATION_B_NODE_TID = 6;
+constexpr int CALIBRATION_C_NODE_TID = 7;
 
 std::unique_ptr<TraceCollector> make_trace_collector(std::string_view graph_name, int num_executions = 10, int num_inputs = 100) {
        // Create trace filename based on configuration
     std::ostringstream filename;
-    filename << graph_name << "_mode" << (USE_MODE == 0 ? "join" : (USE_MODE == 1 ? "limited" : "pressure"));
+    filename << graph_name << "_mode" << (USE_MODE == 0 ? "join" : (USE_MODE == 1 ? "limited" : "priority"));
 
 #if USE_MODE == 2
     // Counter type: local or global
@@ -148,24 +162,216 @@ struct counting_resource {
     }
 };
 
+// ============================================================================
+// Helper Functions and Templates for Benchmark Refactoring
+// ============================================================================
+
+// Phase 1: Execution Loop Template
+template<typename SourceNode, typename Resource>
+std::chrono::high_resolution_clock::time_point
+run_execution_loop(graph& g, SourceNode& source, Resource& resource,
+                   int num_executions, int num_inputs,
+                   double generation_rate, double delay_ms,
+                   std::chrono::high_resolution_clock::time_point& start_time) {
+    for (int i = -1; i < num_executions; ++i) {
+        if (i == 0) {
+            resource.counter = 0;
+            start_time = std::chrono::high_resolution_clock::now();
+        }
+
+        for (int j = 0; j < num_inputs; ++j) {
+            source.try_put(j);
+
+            // Add delay between messages (except after last message)
+            if (j < num_inputs - 1 && delay_ms > 0) {
+                std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(delay_ms));
+            }
+        }
+        g.wait_for_all();
+    }
+
+    return std::chrono::high_resolution_clock::now();
+}
+
+// Overload for multiple resources (vector)
+template<typename SourceNode>
+std::chrono::high_resolution_clock::time_point
+run_execution_loop(graph& g, SourceNode& source, std::vector<counting_resource>& resources,
+                   int num_executions, int num_inputs,
+                   double generation_rate, double delay_ms,
+                   std::chrono::high_resolution_clock::time_point& start_time) {
+    for (int i = -1; i < num_executions; ++i) {
+        if (i == 0) {
+            // Reset all resource counters
+            for (auto& res : resources) {
+                res.counter = 0;
+            }
+            start_time = std::chrono::high_resolution_clock::now();
+        }
+
+        for (int j = 0; j < num_inputs; ++j) {
+            source.try_put(j);
+
+            // Add delay between messages (except after last message)
+            if (j < num_inputs - 1 && delay_ms > 0) {
+                std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(delay_ms));
+            }
+        }
+        g.wait_for_all();
+    }
+
+    return std::chrono::high_resolution_clock::now();
+}
+
+// Phase 1: Result Validation Helper
+inline void validate_resource_usage(const counting_resource& resource,
+                                    int expected_uses,
+                                    const char* benchmark_name) {
+    if (resource.counter != expected_uses) {
+        std::cerr << "Error: " << benchmark_name << " resource was used "
+                  << resource.counter << " times, expected "
+                  << expected_uses << " times." << std::endl;
+    }
+}
+
+// Overload for multiple resources
+inline void validate_resource_usage(const std::vector<counting_resource>& resources,
+                                    int expected_uses_total,
+                                    const char* benchmark_name) {
+    std::size_t total_uses = 0;
+    for (const auto& res : resources) {
+        total_uses += res.counter.load();
+    }
+    if (total_uses != expected_uses_total) {
+        std::cerr << "Error: " << benchmark_name << " resources were used "
+                  << total_uses << " times total, expected "
+                  << expected_uses_total << " times." << std::endl;
+    }
+}
+
+// Phase 2: Mode-Specific Type Traits
+template<int Mode, typename InputType, typename ResourceType>
+struct node_types;
+
+#if USE_MODE == 0
+// Mode 0: join_node with explicit resource passing
+template<typename InputType, typename ResourceType>
+struct node_types<0, InputType, ResourceType> {
+    using resource_tuple = std::tuple<InputType, ResourceType>;
+    using node_type = resource_composite_node<resource_tuple>;
+    using ports_type = typename multifunction_node<resource_tuple, resource_tuple>::output_ports_type;
+};
+#elif USE_MODE == 1
+// Mode 1: resource_limiter
+template<typename InputType, typename ResourceType>
+struct node_types<1, InputType, ResourceType> {
+    using node_type = resource_limited_node<InputType, std::tuple<InputType>>;
+    using ports_type = typename node_type::output_ports_type;
+};
+#elif USE_MODE == 2
+// Mode 2: priority_aware_resource_limiter
+template<typename InputType, typename ResourceType>
+struct node_types<2, InputType, ResourceType> {
+    using node_type = resource_limited_node<InputType, std::tuple<InputType>>;
+    using ports_type = typename node_type::output_ports_type;
+};
+#endif
+
+// Phase 2: Resource Limiter Setup Helper Macro
+// Extra level of indirection needed for proper macro expansion
+#define SETUP_RESOURCE_LIMITER(mode, graph_var, resource_var, limiter_var) \
+    SETUP_RESOURCE_LIMITER_EXPAND(mode, graph_var, resource_var, limiter_var)
+
+#define SETUP_RESOURCE_LIMITER_EXPAND(mode, graph_var, resource_var, limiter_var) \
+    SETUP_RESOURCE_LIMITER_IMPL_##mode(graph_var, resource_var, limiter_var)
+
+#define SETUP_RESOURCE_LIMITER_IMPL_0(g, res, lim) \
+    buffer_node<counting_resource*> lim(g); \
+    lim.try_put(&res);
+
+#define SETUP_RESOURCE_LIMITER_IMPL_1(g, res, lim) \
+    limiter_type<counting_resource*> lim(&res);
+
+#define SETUP_RESOURCE_LIMITER_IMPL_2(g, res, lim) \
+    limiter_type<counting_resource*> lim(&res);
+
+// Helper function to initialize multiple resources into buffer_node (Mode 0)
+template<typename BufferNode>
+inline void init_multiple_resources_mode0(BufferNode& buffer, std::vector<counting_resource>& resources) {
+    for (auto& res : resources) {
+        buffer.try_put(&res);
+    }
+}
+
+// Helper template to create resource_limiter with multiple resources (Mode 1/2)
+// Using index_sequence to expand vector into variadic arguments
+template<typename LimiterType, std::size_t... Is>
+inline auto create_limiter_impl(std::vector<counting_resource>& resources, std::index_sequence<Is...>) {
+    return LimiterType(&resources[Is]...);
+}
+
+template<typename LimiterType>
+inline auto create_limiter_with_resources(std::vector<counting_resource>& resources, int num_resources) {
+    // Dispatch based on num_resources
+    switch (num_resources) {
+        case 1: return LimiterType(&resources[0]);
+        case 2: return create_limiter_impl<LimiterType>(resources, std::make_index_sequence<2>{});
+        case 3: return create_limiter_impl<LimiterType>(resources, std::make_index_sequence<3>{});
+        case 5: return create_limiter_impl<LimiterType>(resources, std::make_index_sequence<5>{});
+        case 10: return create_limiter_impl<LimiterType>(resources, std::make_index_sequence<10>{});
+        case 20: return create_limiter_impl<LimiterType>(resources, std::make_index_sequence<20>{});
+        default:
+            std::cerr << "Error: num_resources=" << num_resources << " not supported. Supported values: 1,2,3,5,10,20\n";
+            std::exit(1);
+    }
+}
+
+// Phase 5: Trace Setup Helper
+#if USE_TRACE > 0
+template<typename... ThreadNames>
+std::unique_ptr<TraceCollector> setup_trace(const char* graph_name,
+                                            int num_executions,
+                                            int num_inputs,
+                                            ThreadNames&&... thread_names) {
+    auto trace = make_trace_collector(graph_name, num_executions, num_inputs);
+    int tid = 1;
+    (trace->add_thread_name(tid++, std::forward<ThreadNames>(thread_names)), ...);
+    return trace;
+}
+#endif
+
+// ============================================================================
+// Benchmark Functions
+// ============================================================================
+
 // returns both the time to construct the graph and the time to execute the graph
 std::tuple<std::chrono::duration<double>, std::chrono::duration<double>>
-run_genie_bench(int num_executions = 10, int num_inputs = 100) {
+run_genie_bench(int num_executions = 10, int num_inputs = 100, double generation_rate = 1.0) {
     auto start_construction_time = std::chrono::high_resolution_clock::now();
 
-     
+    // Calculate delay between messages based on generation rate
+    // Genie: max(genie, root) + genie_root = 10ms + 10ms = 20ms
+    const double total_graph_time_ms = 2.0 * genie_sleep_time_ms;
+    const double delay_ms = total_graph_time_ms / generation_rate;
+
 #if USE_TRACE > 0
     std::unique_ptr<TraceCollector> trace_collector = make_trace_collector("genie_bench", num_executions, num_inputs);
     trace_collector->add_thread_name(ROOT_NODE_TID, "root_node");
     trace_collector->add_thread_name(GENIE_NODE_TID, "genie_node");
     trace_collector->add_thread_name(ROOT_GENIE_NODE_TID, "root_genie_node");
+    trace_collector->add_thread_name(PROPAGATING_NODE_TID, "propagating_node");
+    trace_collector->add_thread_name(CALIBRATION_A_NODE_TID, "calibration_a_node");
+    trace_collector->add_thread_name(CALIBRATION_B_NODE_TID, "calibration_b_node");
+    trace_collector->add_thread_name(CALIBRATION_C_NODE_TID, "calibration_c_node");
 #endif
 
     counting_resource root_resource;
     counting_resource genie_resource;
+    counting_resource db_resource_1;
+    counting_resource db_resource_2;
 
     using namespace oneapi::tbb::flow;
-   graph g;
+    graph g;
 
 #if USE_MODE == 0
     // providers of resources
@@ -173,52 +379,54 @@ run_genie_bench(int num_executions = 10, int num_inputs = 100) {
     root_limiter.try_put(&root_resource);
     buffer_node<counting_resource*> genie_limiter(g);
     genie_limiter.try_put(&genie_resource);
+    buffer_node<counting_resource*> db_limiter(g);
+    db_limiter.try_put(&db_resource_1);
+    db_limiter.try_put(&db_resource_2);
 
+    using node_type_0 = function_node<int, int>;
     using node_type_1 = resource_composite_node<std::tuple<int, counting_resource*>>;
     using node_type_2 = resource_composite_node<std::tuple<int, counting_resource*, counting_resource*>>;
 #else
     // providers of resources
     limiter_type<counting_resource*> root_limiter(&root_resource);
     limiter_type<counting_resource*> genie_limiter(&genie_resource);
+    limiter_type<counting_resource*> db_limiter(&db_resource_1, &db_resource_2);
 
+    using node_type_0 = function_node<int, int>;
     using node_type = resource_limited_node<int, std::tuple<int>>;
     using ports_type = typename node_type::output_ports_type;
 #endif
 
-
-    const int sleep_time_ms = 10; // Simulated work time for each node
-
-
     broadcast_node<int> start(g);
-
 
     #if USE_MODE == 0
     using mfn_ports_1 = typename multifunction_node<std::tuple<int, counting_resource*>, std::tuple<int, counting_resource*>>::output_ports_type;
     using mfn_ports_2 = typename multifunction_node<std::tuple<int, counting_resource*, counting_resource*>, std::tuple<int, counting_resource*, counting_resource*>>::output_ports_type;
 
-    node_type_1 root_node(g, 1,
+    node_type_1 root_node(g, unlimited,
         [&](const std::tuple<int, counting_resource*> &input_tuple, mfn_ports_1& ports) {
             auto [input, root] = input_tuple;
 #if USE_TRACE > 0
             std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, ROOT_NODE_TID);
 #endif
             root->use();
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms)); // Simulate work
+            std::this_thread::sleep_for(std::chrono::milliseconds(genie_sleep_time_ms)); // Simulate work
             std::get<0>(ports).try_put(input);
             std::get<1>(ports).try_put(root); // return the resource
         });
 
-    node_type_1 genie_node(g, 1,
+    node_type_1 genie_node(g, unlimited,
         [&](const std::tuple<int, counting_resource*>& input_tuple, mfn_ports_1& ports) {
             auto [input, genie] = input_tuple;
 #if USE_TRACE > 0
             std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, GENIE_NODE_TID);
 #endif
             genie->use();
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms)); // Simulate work
+            std::this_thread::sleep_for(std::chrono::milliseconds(genie_sleep_time_ms)); // Simulate work
             std::get<0>(ports).try_put(input);
             std::get<1>(ports).try_put(genie); // return the resource
         });
+
 
     node_type_2 root_genie_node(g, 1,
         [&](const std::tuple<int, counting_resource*, counting_resource*> &input_tuple, mfn_ports_2& ports) {
@@ -228,10 +436,55 @@ run_genie_bench(int num_executions = 10, int num_inputs = 100) {
 #endif
             root->use();
             genie->use();
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms)); // Simulate work
+            std::this_thread::sleep_for(std::chrono::milliseconds(genie_sleep_time_ms)); // Simulate work
             std::get<0>(ports).try_put(input);
             std::get<1>(ports).try_put(root); // return the resource
             std::get<2>(ports).try_put(genie); // return the resource
+        });
+
+    node_type_0 propagating_node(g, unlimited, 
+        [&](const int& input) {
+#if USE_TRACE > 0
+            std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, PROPAGATING_NODE_TID);
+#endif
+            std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+            return input;
+        }); 
+
+    node_type_1 calibration_a_node(g, unlimited,
+        [&](const std::tuple<int, counting_resource*>& input_tuple, mfn_ports_1& ports) {
+            auto [input, db] = input_tuple;
+#if USE_TRACE > 0
+            std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, CALIBRATION_A_NODE_TID);
+#endif
+            db->use();
+            std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+            std::get<0>(ports).try_put(input);
+            std::get<1>(ports).try_put(db); // return the resource
+        });
+
+    node_type_1 calibration_b_node(g, unlimited,
+        [&](const std::tuple<int, counting_resource*>& input_tuple, mfn_ports_1& ports) {
+            auto [input, db] = input_tuple;
+#if USE_TRACE > 0
+            std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, CALIBRATION_B_NODE_TID);
+#endif
+            db->use();
+            std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+            std::get<0>(ports).try_put(input);
+            std::get<1>(ports).try_put(db); // return the resource
+        });
+
+    node_type_1 calibration_c_node(g, 1,
+        [&](const std::tuple<int, counting_resource*>& input_tuple, mfn_ports_1& ports) {
+            auto [input, db] = input_tuple;
+#if USE_TRACE > 0
+            std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, CALIBRATION_C_NODE_TID);
+#endif
+            db->use();
+            std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+            std::get<0>(ports).try_put(input);
+            std::get<1>(ports).try_put(db); // return the resource
         });
 #else
     node_type root_node(g, 1, std::tie(root_limiter),
@@ -240,7 +493,7 @@ run_genie_bench(int num_executions = 10, int num_inputs = 100) {
             std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, ROOT_NODE_TID);
 #endif
             root->use();
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms)); // Simulate work
+            std::this_thread::sleep_for(std::chrono::milliseconds(genie_sleep_time_ms)); // Simulate work
             std::get<0>(ports).try_put(input);
         });
 
@@ -250,7 +503,7 @@ run_genie_bench(int num_executions = 10, int num_inputs = 100) {
             std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, GENIE_NODE_TID);
 #endif
             genie->use();
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms)); // Simulate work
+            std::this_thread::sleep_for(std::chrono::milliseconds(genie_sleep_time_ms)); // Simulate work
             std::get<0>(ports).try_put(input);
         });
 
@@ -261,17 +514,59 @@ run_genie_bench(int num_executions = 10, int num_inputs = 100) {
 #endif
             root->use();
             genie->use();
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms)); // Simulate work
+            std::this_thread::sleep_for(std::chrono::milliseconds(genie_sleep_time_ms)); // Simulate work
             std::get<0>(ports).try_put(input);
         });
-#endif
 
+    node_type_0 propagating_node(g, unlimited, 
+        [&](const int& input) {
+#if USE_TRACE > 0
+            std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, PROPAGATING_NODE_TID);
+#endif
+            std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+            return input;
+        });
+
+        node_type calibration_a_node(g, unlimited, std::tie(db_limiter),
+            [&](int input, ports_type& ports, counting_resource* db) {
+#if USE_TRACE > 0
+                std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, CALIBRATION_A_NODE_TID);
+#endif
+                db->use();
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+                std::get<0>(ports).try_put(input);
+            });
+
+        node_type calibration_b_node(g, unlimited, std::tie(db_limiter),
+            [&](int input, ports_type& ports, counting_resource* db) {
+#if USE_TRACE > 0
+                std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, CALIBRATION_B_NODE_TID);
+#endif
+                db->use();
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+                std::get<0>(ports).try_put(input);
+            });
+
+        node_type calibration_c_node(g, 1, std::tie(db_limiter),
+            [&](int input, ports_type& ports, counting_resource* db) {
+#if USE_TRACE > 0
+                std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, CALIBRATION_C_NODE_TID);
+#endif
+                db->use();
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+                std::get<0>(ports).try_put(input);
+            });
+#endif
 
 
 #if USE_MODE == 0
     make_edge(start, std::get<0>(root_node.input_ports()));
     make_edge(start, std::get<0>(root_genie_node.input_ports()));
     make_edge(start, std::get<0>(genie_node.input_ports()));
+    make_edge(start, propagating_node);
+    make_edge(start, std::get<0>(calibration_a_node.input_ports()));
+    make_edge(start, std::get<0>(calibration_b_node.input_ports()));
+    make_edge(start, std::get<0>(calibration_c_node.input_ports()));
 
     make_edge(root_limiter, std::get<1>(root_node.input_ports()));
     make_edge(root_limiter, std::get<1>(root_genie_node.input_ports()));
@@ -282,46 +577,75 @@ run_genie_bench(int num_executions = 10, int num_inputs = 100) {
     make_edge(genie_limiter, std::get<2>(root_genie_node.input_ports()));
     make_edge(std::get<1>(genie_node.output_ports()), genie_limiter);
     make_edge(std::get<2>(root_genie_node.output_ports()), genie_limiter);
+
+    make_edge(db_limiter, std::get<1>(calibration_a_node.input_ports()));
+    make_edge(db_limiter, std::get<1>(calibration_b_node.input_ports()));
+    make_edge(db_limiter, std::get<1>(calibration_c_node.input_ports()));
+
+    make_edge(std::get<1>(calibration_a_node.output_ports()), db_limiter);
+    make_edge(std::get<1>(calibration_b_node.output_ports()), db_limiter);
+    make_edge(std::get<1>(calibration_c_node.output_ports()), db_limiter);
 #else
     make_edge(start, root_node);
     make_edge(start, root_genie_node);
     make_edge(start, genie_node);
+    make_edge(start, propagating_node);
+    make_edge(start, calibration_a_node);
+    make_edge(start, calibration_b_node);
+    make_edge(start, calibration_c_node);
 #endif
 
     auto end_construction_time = std::chrono::high_resolution_clock::now();
     std::chrono::high_resolution_clock::time_point start_execution_time = std::chrono::high_resolution_clock::now();
-        
+
     for (int i = -1; i < num_executions; ++i) {
         if (i == 0) {
             root_resource.counter = 0;
             genie_resource.counter = 0;
+            db_resource_1.counter = 0;
+            db_resource_2.counter = 0;
             start_execution_time = std::chrono::high_resolution_clock::now();
         }
 
-        for (int i = 0; i < num_inputs; ++i) {
-            start.try_put(i);
+        for (int j = 0; j < num_inputs; ++j) {
+            start.try_put(j);
+
+            // Add delay between messages (except after last message)
+            if (j < num_inputs - 1 && delay_ms > 0) {
+                std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(delay_ms));
+            }
         }
         g.wait_for_all();
     }
     auto end_execution_time = std::chrono::high_resolution_clock::now();
 
-    if (root_resource.counter != num_inputs * 2 * num_executions) {
-        std::cerr << "Error: root resource was used " << root_resource.counter
-                  << " times, expected " << num_inputs * 2 * num_executions << " times." << std::endl;
+    // Validate resource usages using helper
+    int expected_uses_root_genie = num_inputs * 2 * num_executions;
+    validate_resource_usage(root_resource, expected_uses_root_genie, "genie_bench:root_resource");
+    validate_resource_usage(genie_resource, expected_uses_root_genie, "genie_bench:genie_resource");
+
+    // Validate db resources: 3 nodes share 2 resources from db_limiter
+    int expected_uses_db_total = num_inputs * 3 * num_executions;
+    std::size_t actual_db_uses = db_resource_1.counter.load() + db_resource_2.counter.load();
+    if (actual_db_uses != expected_uses_db_total) {
+        std::cerr << "Error: genie_bench db_resources were used "
+                  << actual_db_uses << " times total, expected "
+                  << expected_uses_db_total << " times." << std::endl;
     }
-    if (genie_resource.counter != num_inputs * 2 * num_executions) {
-        std::cerr << "Error: genie resource was used " << genie_resource.counter
-                  << " times, expected " << num_inputs * 2 * num_executions << " times." << std::endl;
-    }
+
     return {end_construction_time - start_construction_time, end_execution_time - start_execution_time};
 }
 
 // returns both the time to construct the graph and the time to execute the graph
 std::tuple<std::chrono::duration<double>, std::chrono::duration<double>>
-run_genie_diamond_bench(int num_executions = 10, int num_inputs = 100) {
+run_genie_diamond_bench(int num_executions = 10, int num_inputs = 100, double generation_rate = 1.0) {
     auto start_construction_time = std::chrono::high_resolution_clock::now();
 
-     
+    // Calculate delay between messages based on generation rate
+    // Genie Diamond: max(genie, root) + genie_root = 10ms + 10ms = 20ms
+    const double total_graph_time_ms = 2.0 * genie_sleep_time_ms;
+    const double delay_ms = total_graph_time_ms / generation_rate;
+
 #if USE_TRACE > 0
     std::unique_ptr<TraceCollector> trace_collector = make_trace_collector("genie_diamond_bench", num_executions, num_inputs);
     trace_collector->add_thread_name(ROOT_NODE_TID, "root_node");
@@ -331,6 +655,8 @@ run_genie_diamond_bench(int num_executions = 10, int num_inputs = 100) {
 
     counting_resource root_resource;
     counting_resource genie_resource;
+    counting_resource db_resource_1;
+    counting_resource db_resource_2;
 
     using namespace oneapi::tbb::flow;
    graph g;
@@ -341,20 +667,25 @@ run_genie_diamond_bench(int num_executions = 10, int num_inputs = 100) {
     root_limiter.try_put(&root_resource);
     buffer_node<counting_resource*> genie_limiter(g);
     genie_limiter.try_put(&genie_resource);
+    buffer_node<counting_resource*> db_limiter(g);
+    db_limiter.try_put(&db_resource_1);
+    db_limiter.try_put(&db_resource_2);
 
+
+    using node_type_0 = function_node<int, int>;
     using node_type_1 = resource_composite_node<std::tuple<int, counting_resource*>>;
     using node_type_2 = resource_composite_node<std::tuple<std::tuple<int, int>, counting_resource*, counting_resource*>>;
 #else
     // providers of resources
     limiter_type<counting_resource*> root_limiter(&root_resource);
     limiter_type<counting_resource*> genie_limiter(&genie_resource);
+    limiter_type<counting_resource*> db_limiter(&db_resource_1, &db_resource_2);
 
+    using node_type_0 = function_node<int, int>;
     using node_type_1 = resource_limited_node<int, std::tuple<int>>;
     using node_type_2 = resource_limited_node<std::tuple<int, int>, std::tuple<std::tuple<int, int>>>;
     using ports_type = typename node_type_1::output_ports_type;
 #endif
-
-    const int sleep_time_ms = 10; // Simulated work time for each node
 
     broadcast_node<int> start(g);
 
@@ -369,7 +700,7 @@ run_genie_diamond_bench(int num_executions = 10, int num_inputs = 100) {
             std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, ROOT_NODE_TID);
 #endif
             root->use();
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms)); // Simulate work
+            std::this_thread::sleep_for(std::chrono::milliseconds(genie_sleep_time_ms)); // Simulate work
             std::get<0>(ports).try_put(input);
             std::get<1>(ports).try_put(root); // return the resource
         });
@@ -381,7 +712,7 @@ run_genie_diamond_bench(int num_executions = 10, int num_inputs = 100) {
             std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, GENIE_NODE_TID);
 #endif
             genie->use();
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms)); // Simulate work
+            std::this_thread::sleep_for(std::chrono::milliseconds(genie_sleep_time_ms)); // Simulate work
             std::get<0>(ports).try_put(input);
             std::get<1>(ports).try_put(genie); // return the resource
         });
@@ -395,10 +726,55 @@ run_genie_diamond_bench(int num_executions = 10, int num_inputs = 100) {
 #endif
             root->use();
             genie->use();
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms)); // Simulate work
+            std::this_thread::sleep_for(std::chrono::milliseconds(genie_sleep_time_ms)); // Simulate work
             std::get<0>(ports).try_put(std::make_tuple(input_from_root, input_from_genie));
             std::get<1>(ports).try_put(root); // return the resource
             std::get<2>(ports).try_put(genie); // return the resource
+        });
+
+    node_type_0 propagating_node(g, unlimited, 
+        [&](const int& input) {
+#if USE_TRACE > 0
+            std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, PROPAGATING_NODE_TID);
+#endif
+            std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+            return input;
+        }); 
+
+    node_type_1 calibration_a_node(g, unlimited,
+        [&](const std::tuple<int, counting_resource*>& input_tuple, mfn_ports_1& ports) {
+            auto [input, db] = input_tuple;
+#if USE_TRACE > 0
+            std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, CALIBRATION_A_NODE_TID);
+#endif
+            db->use();
+            std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+            std::get<0>(ports).try_put(input);
+            std::get<1>(ports).try_put(db); // return the resource
+        });
+
+    node_type_1 calibration_b_node(g, unlimited,
+        [&](const std::tuple<int, counting_resource*>& input_tuple, mfn_ports_1& ports) {
+            auto [input, db] = input_tuple;
+#if USE_TRACE > 0
+            std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, CALIBRATION_B_NODE_TID);
+#endif
+            db->use();
+            std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+            std::get<0>(ports).try_put(input);
+            std::get<1>(ports).try_put(db); // return the resource
+        });
+
+    node_type_1 calibration_c_node(g, 1,
+        [&](const std::tuple<int, counting_resource*>& input_tuple, mfn_ports_1& ports) {
+            auto [input, db] = input_tuple;
+#if USE_TRACE > 0
+            std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, CALIBRATION_C_NODE_TID);
+#endif
+            db->use();
+            std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+            std::get<0>(ports).try_put(input);
+            std::get<1>(ports).try_put(db); // return the resource
         });
 #else
     node_type_1 root_node(g, 1, std::tie(root_limiter),
@@ -407,7 +783,7 @@ run_genie_diamond_bench(int num_executions = 10, int num_inputs = 100) {
             std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, ROOT_NODE_TID);
 #endif
             root->use();
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms)); // Simulate work
+            std::this_thread::sleep_for(std::chrono::milliseconds(genie_sleep_time_ms)); // Simulate work
             std::get<0>(ports).try_put(input);
         });
 
@@ -417,7 +793,7 @@ run_genie_diamond_bench(int num_executions = 10, int num_inputs = 100) {
             std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, GENIE_NODE_TID);
 #endif
             genie->use();
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms)); // Simulate work
+            std::this_thread::sleep_for(std::chrono::milliseconds(genie_sleep_time_ms)); // Simulate work
             std::get<0>(ports).try_put(input);
         });
 
@@ -429,9 +805,48 @@ run_genie_diamond_bench(int num_executions = 10, int num_inputs = 100) {
 #endif
             root->use();
             genie->use();
-            std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms)); // Simulate work
+            std::this_thread::sleep_for(std::chrono::milliseconds(genie_sleep_time_ms)); // Simulate work
             std::get<0>(ports).try_put(std::make_tuple(input_from_root, input_from_genie));
         });
+
+    node_type_0 propagating_node(g, unlimited,
+        [&](const int& input) {
+#if USE_TRACE > 0
+            std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, PROPAGATING_NODE_TID);
+#endif
+            std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+            return input;
+        });
+
+        node_type_1 calibration_a_node(g, unlimited, std::tie(db_limiter),
+            [&](int input, ports_type& ports, counting_resource* db) {
+#if USE_TRACE > 0
+                std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, CALIBRATION_A_NODE_TID);
+#endif
+                db->use();
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+                std::get<0>(ports).try_put(input);
+            });
+
+        node_type_1 calibration_b_node(g, unlimited, std::tie(db_limiter),
+            [&](int input, ports_type& ports, counting_resource* db) {
+#if USE_TRACE > 0
+                std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, CALIBRATION_B_NODE_TID);
+#endif
+                db->use();
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+                std::get<0>(ports).try_put(input);
+            });
+
+        node_type_1 calibration_c_node(g, 1, std::tie(db_limiter),
+            [&](int input, ports_type& ports, counting_resource* db) {
+#if USE_TRACE > 0
+                std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, CALIBRATION_C_NODE_TID);
+#endif
+                db->use();
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms)); // Simulate work
+                std::get<0>(ports).try_put(input);
+            });
 #endif
 
     // Key functions for key_matching join - both ports receive int and use it as key
@@ -454,70 +869,105 @@ run_genie_diamond_bench(int num_executions = 10, int num_inputs = 100) {
     make_edge(genie_limiter, std::get<2>(root_genie_node.input_ports()));
     make_edge(std::get<1>(genie_node.output_ports()), genie_limiter);
     make_edge(std::get<2>(root_genie_node.output_ports()), genie_limiter);
+
+    make_edge(start, propagating_node);
+    make_edge(start, std::get<0>(calibration_a_node.input_ports()));
+    make_edge(start, std::get<0>(calibration_b_node.input_ports()));
+    make_edge(start, std::get<0>(calibration_c_node.input_ports()));
+    make_edge(db_limiter, std::get<1>(calibration_a_node.input_ports()));
+    make_edge(db_limiter, std::get<1>(calibration_b_node.input_ports()));
+    make_edge(db_limiter, std::get<1>(calibration_c_node.input_ports()));
+    make_edge(std::get<1>(calibration_a_node.output_ports()), db_limiter);
+    make_edge(std::get<1>(calibration_b_node.output_ports()), db_limiter);
+    make_edge(std::get<1>(calibration_c_node.output_ports()), db_limiter);
 #else
     make_edge(start, root_node);
     make_edge(start, genie_node);
     make_edge(root_node, oneapi::tbb::flow::input_port<0>(middle_join));
     make_edge(genie_node, oneapi::tbb::flow::input_port<1>(middle_join));
     make_edge(middle_join, root_genie_node);
+    make_edge(start, propagating_node);
+    make_edge(start, calibration_a_node);
+    make_edge(start, calibration_b_node);
+    make_edge(start, calibration_c_node);
 #endif
 
     auto end_construction_time = std::chrono::high_resolution_clock::now();
     std::chrono::high_resolution_clock::time_point start_execution_time = std::chrono::high_resolution_clock::now();
-        
+
     for (int i = -1; i < num_executions; ++i) {
         if (i == 0) {
             root_resource.counter = 0;
             genie_resource.counter = 0;
+            db_resource_1.counter = 0;
+            db_resource_2.counter = 0;
             start_execution_time = std::chrono::high_resolution_clock::now();
         }
 
-        for (int i = 0; i < num_inputs; ++i) {
-            start.try_put(i);
+        for (int j = 0; j < num_inputs; ++j) {
+            start.try_put(j);
+
+            // Add delay between messages (except after last message)
+            if (j < num_inputs - 1 && delay_ms > 0) {
+                std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(delay_ms));
+            }
         }
         g.wait_for_all();
     }
     auto end_execution_time = std::chrono::high_resolution_clock::now();
 
-    if (root_resource.counter != num_inputs * 2 * num_executions) {
-        std::cerr << "Error: root resource was used " << root_resource.counter
-                  << " times, expected " << num_inputs * 2 * num_executions << " times." << std::endl;
+    // Validate both resource usages using helper
+    int expected_uses = num_inputs * 2 * num_executions;
+    validate_resource_usage(root_resource, expected_uses, "genie_diamond_bench:root_resource");
+    validate_resource_usage(genie_resource, expected_uses, "genie_diamond_bench:genie_resource");
+
+    // Validate db resources: 3 nodes share 2 resources from db_limiter
+    int expected_uses_db_total = num_inputs * 3 * num_executions;
+    std::size_t actual_db_uses = db_resource_1.counter.load() + db_resource_2.counter.load();
+    if (actual_db_uses != expected_uses_db_total) {
+        std::cerr << "Error: genie_bench db_resources were used "
+                  << actual_db_uses << " times total, expected "
+                  << expected_uses_db_total << " times." << std::endl;
     }
-    if (genie_resource.counter != num_inputs * 2 * num_executions) {
-        std::cerr << "Error: genie resource was used " << genie_resource.counter
-                  << " times, expected " << num_inputs * 2 * num_executions << " times." << std::endl;
-    }
+
     return {end_construction_time - start_construction_time, end_execution_time - start_execution_time};
 }
 
 // Baseline Cycle: self-propagating chain with N nodes that executes M times
 // Measures overhead of resource acquisition with no contention
 std::tuple<std::chrono::duration<double>, std::chrono::duration<double>>
-run_baseline_cycle_bench(int num_executions = 10, int num_nodes = 10) {
+run_baseline_cycle_bench(int num_executions = 10, int num_inputs = 100, int num_nodes = 10, double generation_rate = 1.0, int num_resources = 1) {
     auto start_construction_time = std::chrono::high_resolution_clock::now();
+    // Note: generation_rate is not used in baseline_cycle (self-propagating cycle)
 
 #if USE_TRACE > 0
-    std::unique_ptr<TraceCollector> trace_collector = make_trace_collector("baseline_cycle_bench", num_executions, num_nodes);
+    std::unique_ptr<TraceCollector> trace_collector = make_trace_collector("baseline_cycle_bench", num_executions, num_inputs);
 #endif
 
-    counting_resource shared_resource;
+    std::vector<counting_resource> resources(num_resources);
 
     using namespace oneapi::tbb::flow;
     graph g;
 
+    // Use type traits for mode-specific types
+    using node_types_t = node_types<USE_MODE, int, counting_resource*>;
+    using node_type = typename node_types_t::node_type;
 #if USE_MODE == 0
-    buffer_node<counting_resource*> resource_limiter(g);
-    resource_limiter.try_put(&shared_resource);
-
-    using node_type = resource_composite_node<std::tuple<int, counting_resource*>>;
-    using mfn_ports = typename multifunction_node<std::tuple<int, counting_resource*>, std::tuple<int, counting_resource*>>::output_ports_type;
+    using mfn_ports = typename node_types_t::ports_type;
 #else
-    limiter_type<counting_resource*> resource_limiter(&shared_resource);
-    using node_type = resource_limited_node<int, std::tuple<int>>;
-    using ports_type = typename node_type::output_ports_type;
+    using ports_type = typename node_types_t::ports_type;
 #endif
 
-    const int sleep_time_ms = 1;
+    // Setup resource limiter with multiple resources
+#if USE_MODE == 0
+    buffer_node<counting_resource*> resource_limiter(g);
+    init_multiple_resources_mode0(resource_limiter, resources);
+#elif USE_MODE == 1
+    auto resource_limiter = create_limiter_with_resources<limiter_type<counting_resource*>>(resources, num_resources);
+#else  // USE_MODE == 2
+    auto resource_limiter = create_limiter_with_resources<limiter_type<counting_resource*>>(resources, num_resources);
+#endif
+
     std::vector<node_type*> nodes;
 
     // Create N nodes
@@ -528,7 +978,7 @@ run_baseline_cycle_bench(int num_executions = 10, int num_nodes = 10) {
                 auto [input, resource] = input_tuple;
 
                 // N_0 is conditional - check stop condition BEFORE using resource
-                if (i == 0 && input >= num_executions) {
+                if (i == 0 && input >= num_inputs) {
                     std::get<1>(ports).try_put(resource); // return resource only, don't execute
                     return;
                 }
@@ -537,7 +987,7 @@ run_baseline_cycle_bench(int num_executions = 10, int num_nodes = 10) {
                 std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, i + 1);
 #endif
                 resource->use();
-                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms));
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms));
                 std::get<0>(ports).try_put(input + (i == num_nodes - 1 ? 1 : 0)); // increment on last node
                 std::get<1>(ports).try_put(resource);
             }));
@@ -545,7 +995,7 @@ run_baseline_cycle_bench(int num_executions = 10, int num_nodes = 10) {
         nodes.push_back(new node_type(g, 1, std::tie(resource_limiter),
             [&, i](int input, ports_type& ports, counting_resource* resource) {
                 // N_0 is conditional - check stop condition BEFORE using resource
-                if (i == 0 && input >= num_executions) {
+                if (i == 0 && input >= num_inputs) {
                     // Don't send message forward, cycle stops, don't execute
                     return;
                 }
@@ -554,7 +1004,7 @@ run_baseline_cycle_bench(int num_executions = 10, int num_nodes = 10) {
                 std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, i + 1);
 #endif
                 resource->use();
-                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms));
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms));
                 std::get<0>(ports).try_put(input + (i == num_nodes - 1 ? 1 : 0));
             }));
 #endif
@@ -582,24 +1032,33 @@ run_baseline_cycle_bench(int num_executions = 10, int num_nodes = 10) {
 
     auto end_construction_time = std::chrono::high_resolution_clock::now();
 
-    // Start the cycle with initial message
-    shared_resource.counter = 0;
-    auto start_execution_time = std::chrono::high_resolution_clock::now();
+    // Execute with warm-up + num_executions runs
+    std::chrono::high_resolution_clock::time_point start_execution_time;
 
+    for (int i = -1; i < num_executions; ++i) {
+        if (i == 0) {
+            // Reset all resource counters
+            for (auto& res : resources) {
+                res.counter = 0;
+            }
+            start_execution_time = std::chrono::high_resolution_clock::now();
+        }
+
+        // Start the cycle with initial message
 #if USE_MODE == 0
-    std::get<0>(nodes[0]->input_ports()).try_put(0);
+        std::get<0>(nodes[0]->input_ports()).try_put(0);
 #else
-    nodes[0]->try_put(0);
+        nodes[0]->try_put(0);
 #endif
 
-    g.wait_for_all();
+        g.wait_for_all();
+    }
+
     auto end_execution_time = std::chrono::high_resolution_clock::now();
 
-    int expected_uses = num_executions * num_nodes;
-    if (shared_resource.counter != expected_uses) {
-        std::cerr << "Error: resource was used " << shared_resource.counter
-                  << " times, expected " << expected_uses << " times." << std::endl;
-    }
+    // Validate resource usage using helper
+    int expected_uses = num_inputs * num_nodes * num_executions;
+    validate_resource_usage(resources, expected_uses, "baseline_cycle_bench");
 
     // Cleanup
     for (auto* node : nodes) {
@@ -611,31 +1070,41 @@ run_baseline_cycle_bench(int num_executions = 10, int num_nodes = 10) {
 
 // Performance of a Chain: input_node drives N sequential nodes
 std::tuple<std::chrono::duration<double>, std::chrono::duration<double>>
-run_chain_bench(int num_executions = 10, int num_inputs = 100, int num_nodes = 10) {
+run_chain_bench(int num_executions = 10, int num_inputs = 100, int num_nodes = 10, double generation_rate = 1.0, int num_resources = 1) {
     auto start_construction_time = std::chrono::high_resolution_clock::now();
+
+    // Calculate delay between messages based on generation rate
+    // Chain: sum of all stages = num_nodes * cycle_sleep_time_ms
+    const double total_graph_time_ms = num_nodes * cycle_sleep_time_ms;
+    const double delay_ms = total_graph_time_ms / generation_rate;
 
 #if USE_TRACE > 0
     std::unique_ptr<TraceCollector> trace_collector = make_trace_collector("chain_bench", num_executions, num_inputs);
 #endif
 
-    counting_resource shared_resource;
+    std::vector<counting_resource> resources(num_resources);
 
     using namespace oneapi::tbb::flow;
     graph g;
 
+    // Use type traits for mode-specific types
+    using node_types_t = node_types<USE_MODE, int, counting_resource*>;
+    using node_type = typename node_types_t::node_type;
 #if USE_MODE == 0
-    buffer_node<counting_resource*> resource_limiter(g);
-    resource_limiter.try_put(&shared_resource);
-
-    using node_type = resource_composite_node<std::tuple<int, counting_resource*>>;
-    using mfn_ports = typename multifunction_node<std::tuple<int, counting_resource*>, std::tuple<int, counting_resource*>>::output_ports_type;
+    using mfn_ports = typename node_types_t::ports_type;
 #else
-    limiter_type<counting_resource*> resource_limiter(&shared_resource);
-    using node_type = resource_limited_node<int, std::tuple<int>>;
-    using ports_type = typename node_type::output_ports_type;
+    using ports_type = typename node_types_t::ports_type;
 #endif
 
-    const int sleep_time_ms = 1;
+    // Setup resource limiter with multiple resources
+#if USE_MODE == 0
+    buffer_node<counting_resource*> resource_limiter(g);
+    init_multiple_resources_mode0(resource_limiter, resources);
+#elif USE_MODE == 1
+    auto resource_limiter = create_limiter_with_resources<limiter_type<counting_resource*>>(resources, num_resources);
+#else  // USE_MODE == 2
+    auto resource_limiter = create_limiter_with_resources<limiter_type<counting_resource*>>(resources, num_resources);
+#endif
 
     broadcast_node<int> source(g);
     std::vector<node_type*> nodes;
@@ -650,7 +1119,7 @@ run_chain_bench(int num_executions = 10, int num_inputs = 100, int num_nodes = 1
                 std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, i + 1);
 #endif
                 resource->use();
-                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms));
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms));
                 std::get<0>(ports).try_put(input);
                 std::get<1>(ports).try_put(resource);
             }));
@@ -661,7 +1130,7 @@ run_chain_bench(int num_executions = 10, int num_inputs = 100, int num_nodes = 1
                 std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, i + 1);
 #endif
                 resource->use();
-                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms));
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms));
                 std::get<0>(ports).try_put(input);
             }));
 #endif
@@ -690,26 +1159,16 @@ run_chain_bench(int num_executions = 10, int num_inputs = 100, int num_nodes = 1
     }
 
     auto end_construction_time = std::chrono::high_resolution_clock::now();
-    std::chrono::high_resolution_clock::time_point start_execution_time = std::chrono::high_resolution_clock::now();
 
-    for (int i = -1; i < num_executions; ++i) {
-        if (i == 0) {
-            shared_resource.counter = 0;
-            start_execution_time = std::chrono::high_resolution_clock::now();
-        }
+    // Use execution loop helper
+    std::chrono::high_resolution_clock::time_point start_execution_time;
+    auto end_execution_time = run_execution_loop(g, source, resources,
+                                                  num_executions, num_inputs,
+                                                  generation_rate, delay_ms, start_execution_time);
 
-        for (int j = 0; j < num_inputs; ++j) {
-            source.try_put(j);
-        }
-        g.wait_for_all();
-    }
-    auto end_execution_time = std::chrono::high_resolution_clock::now();
-
+    // Validate resource usage using helper
     int expected_uses = num_inputs * num_nodes * num_executions;
-    if (shared_resource.counter != expected_uses) {
-        std::cerr << "Error: resource was used " << shared_resource.counter
-                  << " times, expected " << expected_uses << " times." << std::endl;
-    }
+    validate_resource_usage(resources, expected_uses, "chain_bench");
 
     // Cleanup
     for (auto* node : nodes) {
@@ -721,31 +1180,41 @@ run_chain_bench(int num_executions = 10, int num_inputs = 100, int num_nodes = 1
 
 // Performance for Siblings: input_node drives N sibling nodes
 std::tuple<std::chrono::duration<double>, std::chrono::duration<double>>
-run_siblings_bench(int num_executions = 10, int num_inputs = 100, int num_nodes = 10) {
+run_siblings_bench(int num_executions = 10, int num_inputs = 100, int num_nodes = 10, double generation_rate = 1.0, int num_resources = 1) {
     auto start_construction_time = std::chrono::high_resolution_clock::now();
+
+    // Calculate delay between messages based on generation rate
+    // Siblings: sum of all stages = num_nodes * cycle_sleep_time_ms
+    const double total_graph_time_ms = num_nodes * cycle_sleep_time_ms;
+    const double delay_ms = total_graph_time_ms / generation_rate;
 
 #if USE_TRACE > 0
     std::unique_ptr<TraceCollector> trace_collector = make_trace_collector("siblings_bench", num_executions, num_inputs);
 #endif
 
-    counting_resource shared_resource;
+    std::vector<counting_resource> resources(num_resources);
 
     using namespace oneapi::tbb::flow;
     graph g;
 
+    // Use type traits for mode-specific types
+    using node_types_t = node_types<USE_MODE, int, counting_resource*>;
+    using node_type = typename node_types_t::node_type;
 #if USE_MODE == 0
-    buffer_node<counting_resource*> resource_limiter(g);
-    resource_limiter.try_put(&shared_resource);
-
-    using node_type = resource_composite_node<std::tuple<int, counting_resource*>>;
-    using mfn_ports = typename multifunction_node<std::tuple<int, counting_resource*>, std::tuple<int, counting_resource*>>::output_ports_type;
+    using mfn_ports = typename node_types_t::ports_type;
 #else
-    limiter_type<counting_resource*> resource_limiter(&shared_resource);
-    using node_type = resource_limited_node<int, std::tuple<int>>;
-    using ports_type = typename node_type::output_ports_type;
+    using ports_type = typename node_types_t::ports_type;
 #endif
 
-    const int sleep_time_ms = 1;
+    // Setup resource limiter with multiple resources
+#if USE_MODE == 0
+    buffer_node<counting_resource*> resource_limiter(g);
+    init_multiple_resources_mode0(resource_limiter, resources);
+#elif USE_MODE == 1
+    auto resource_limiter = create_limiter_with_resources<limiter_type<counting_resource*>>(resources, num_resources);
+#else  // USE_MODE == 2
+    auto resource_limiter = create_limiter_with_resources<limiter_type<counting_resource*>>(resources, num_resources);
+#endif
 
     broadcast_node<int> source(g);
     std::vector<node_type*> nodes;
@@ -760,7 +1229,7 @@ run_siblings_bench(int num_executions = 10, int num_inputs = 100, int num_nodes 
                 std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, i + 1);
 #endif
                 resource->use();
-                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms));
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms));
                 std::get<0>(ports).try_put(input);
                 std::get<1>(ports).try_put(resource);
             }));
@@ -771,7 +1240,7 @@ run_siblings_bench(int num_executions = 10, int num_inputs = 100, int num_nodes 
                 std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, i + 1);
 #endif
                 resource->use();
-                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms));
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms));
                 std::get<0>(ports).try_put(input);
             }));
 #endif
@@ -789,26 +1258,16 @@ run_siblings_bench(int num_executions = 10, int num_inputs = 100, int num_nodes 
     }
 
     auto end_construction_time = std::chrono::high_resolution_clock::now();
-    std::chrono::high_resolution_clock::time_point start_execution_time = std::chrono::high_resolution_clock::now();
 
-    for (int i = -1; i < num_executions; ++i) {
-        if (i == 0) {
-            shared_resource.counter = 0;
-            start_execution_time = std::chrono::high_resolution_clock::now();
-        }
+    // Use execution loop helper
+    std::chrono::high_resolution_clock::time_point start_execution_time;
+    auto end_execution_time = run_execution_loop(g, source, resources,
+                                                  num_executions, num_inputs,
+                                                  generation_rate, delay_ms, start_execution_time);
 
-        for (int j = 0; j < num_inputs; ++j) {
-            source.try_put(j);
-        }
-        g.wait_for_all();
-    }
-    auto end_execution_time = std::chrono::high_resolution_clock::now();
-
+    // Validate resource usage using helper
     int expected_uses = num_inputs * num_nodes * num_executions;
-    if (shared_resource.counter != expected_uses) {
-        std::cerr << "Error: resource was used " << shared_resource.counter
-                  << " times, expected " << expected_uses << " times." << std::endl;
-    }
+    validate_resource_usage(resources, expected_uses, "siblings_bench");
 
     // Cleanup
     for (auto* node : nodes) {
@@ -820,31 +1279,42 @@ run_siblings_bench(int num_executions = 10, int num_inputs = 100, int num_nodes 
 
 // Performance of a Tree: binary tree structure
 std::tuple<std::chrono::duration<double>, std::chrono::duration<double>>
-run_tree_bench(int num_executions = 10, int num_inputs = 100, int num_nodes = 10) {
+run_tree_bench(int num_executions = 10, int num_inputs = 100, int num_nodes = 10, double generation_rate = 1.0, int num_resources = 1) {
     auto start_construction_time = std::chrono::high_resolution_clock::now();
+
+    // Calculate delay between messages based on generation rate
+    // Tree: sum of all stages = num_nodes * cycle_sleep_time_ms
+    const double total_graph_time_ms = num_nodes * cycle_sleep_time_ms;
+    const double delay_ms = total_graph_time_ms / generation_rate;
 
 #if USE_TRACE > 0
     std::unique_ptr<TraceCollector> trace_collector = make_trace_collector("tree_bench", num_executions, num_inputs);
 #endif
 
-    counting_resource shared_resource;
+    std::vector<counting_resource> resources(num_resources);
 
     using namespace oneapi::tbb::flow;
     graph g;
 
+    // Tree benchmark has unique output type for modes 1&2 (binary fanout)
 #if USE_MODE == 0
-    buffer_node<counting_resource*> resource_limiter(g);
-    resource_limiter.try_put(&shared_resource);
-
-    using node_type = resource_composite_node<std::tuple<int, counting_resource*>>;
-    using mfn_ports = typename multifunction_node<std::tuple<int, counting_resource*>, std::tuple<int, counting_resource*>>::output_ports_type;
+    using node_types_t = node_types<USE_MODE, int, counting_resource*>;
+    using node_type = typename node_types_t::node_type;
+    using mfn_ports = typename node_types_t::ports_type;
 #else
-    limiter_type<counting_resource*> resource_limiter(&shared_resource);
     using node_type = resource_limited_node<int, std::tuple<int, int>>;
     using ports_type = typename node_type::output_ports_type;
 #endif
 
-    const int sleep_time_ms = 1;
+    // Setup resource limiter with multiple resources
+#if USE_MODE == 0
+    buffer_node<counting_resource*> resource_limiter(g);
+    init_multiple_resources_mode0(resource_limiter, resources);
+#elif USE_MODE == 1
+    auto resource_limiter = create_limiter_with_resources<limiter_type<counting_resource*>>(resources, num_resources);
+#else  // USE_MODE == 2
+    auto resource_limiter = create_limiter_with_resources<limiter_type<counting_resource*>>(resources, num_resources);
+#endif
 
     broadcast_node<int> source(g);
 
@@ -876,7 +1346,7 @@ run_tree_bench(int num_executions = 10, int num_inputs = 100, int num_nodes = 10
                 std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, i + 1);
 #endif
                 resource->use();
-                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms));
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms));
                 std::get<0>(ports).try_put(input);
                 std::get<1>(ports).try_put(resource);
             });
@@ -887,7 +1357,7 @@ run_tree_bench(int num_executions = 10, int num_inputs = 100, int num_nodes = 10
                 std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, i + 1);
 #endif
                 resource->use();
-                std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time_ms));
+                std::this_thread::sleep_for(std::chrono::milliseconds(cycle_sleep_time_ms));
                 // Send to both output ports for binary tree fanout
                 std::get<0>(ports).try_put(input);
                 std::get<1>(ports).try_put(input);
@@ -929,26 +1399,16 @@ run_tree_bench(int num_executions = 10, int num_inputs = 100, int num_nodes = 10
     }
 
     auto end_construction_time = std::chrono::high_resolution_clock::now();
-    std::chrono::high_resolution_clock::time_point start_execution_time = std::chrono::high_resolution_clock::now();
 
-    for (int i = -1; i < num_executions; ++i) {
-        if (i == 0) {
-            shared_resource.counter = 0;
-            start_execution_time = std::chrono::high_resolution_clock::now();
-        }
+    // Use execution loop helper
+    std::chrono::high_resolution_clock::time_point start_execution_time;
+    auto end_execution_time = run_execution_loop(g, source, resources,
+                                                  num_executions, num_inputs,
+                                                  generation_rate, delay_ms, start_execution_time);
 
-        for (int j = 0; j < num_inputs; ++j) {
-            source.try_put(j);
-        }
-        g.wait_for_all();
-    }
-    auto end_execution_time = std::chrono::high_resolution_clock::now();
-
+    // Validate resource usage using helper
     int expected_uses = num_inputs * total_nodes * num_executions;
-    if (shared_resource.counter != expected_uses) {
-        std::cerr << "Error: resource was used " << shared_resource.counter
-                  << " times, expected " << expected_uses << " times." << std::endl;
-    }
+    validate_resource_usage(resources, expected_uses, "tree_bench");
 
     // Cleanup
     for (auto* node : nodes) {
@@ -958,17 +1418,25 @@ run_tree_bench(int num_executions = 10, int num_inputs = 100, int num_nodes = 10
     return {end_construction_time - start_construction_time, end_execution_time - start_execution_time};
 }
 
-void print_results(const std::string& bench_name, std::chrono::duration<double> construction_time, std::chrono::duration<double> execution_time, int num_executions, int num_inputs) {
+void print_results(const std::string& bench_name, std::chrono::duration<double> construction_time, std::chrono::duration<double> execution_time, int num_executions, int num_inputs, double generation_rate, double delay_ms, double total_graph_time_ms) {
     std::cout << bench_name << " results:\n";
     std::cout << "  Construction time: " << construction_time.count() << " seconds\n";
     std::cout << "  Execution time: " << execution_time.count() << " seconds\n";
     std::cout << "  Total time: " << (construction_time + execution_time).count() << " seconds\n";
     std::cout << "  Time per execution: " << (execution_time.count() / num_executions) << " seconds\n";
     std::cout << "  Time per input: " << (execution_time.count() / (num_executions * num_inputs)) << " seconds\n";
+
+    // Display generation rate and delay info
+    if (bench_name == "baseline_cycle_bench") {
+        std::cout << "  Generation rate: N/A (not applicable to self-propagating cycle)\n";
+    } else {
+        std::cout << "  Generation rate: " << generation_rate
+                  << " (delay: " << delay_ms << "ms, graph_time: " << total_graph_time_ms << "ms)\n";
+    }
 }
 
 int main(int argc, char* argv[]) {
-    // usage: resource_limited_ubenches [benchmark] [num_executions] [num_inputs/num_nodes] [num_nodes/tree_depth]
+    // usage: resource_limited_ubenches [benchmark] [num_executions] [num_inputs] [generation_rate] [num_nodes] [num_resources]
     // benchmark: genie, genie_diamond, baseline_cycle, chain, siblings, tree, all
     // USE_MODE: 0 = flow graph with join_node, 1 = flow graph with resource limiting, 2 = pressure-aware resource limiter
     // USE_TRACE: 0 = no tracing, 1 = eager, 2 = lazy
@@ -976,7 +1444,9 @@ int main(int argc, char* argv[]) {
     std::string benchmark = "all";
     int num_executions = 1;
     int num_inputs = 100;
+    double generation_rate = 5.0;
     int num_nodes = 10;
+    int num_resources = 1;
 
     // Parse command line arguments
     if (argc >= 2) {
@@ -989,13 +1459,19 @@ int main(int argc, char* argv[]) {
         num_inputs = std::atoi(argv[3]);
     }
     if (argc >= 5) {
-        num_nodes = std::atoi(argv[4]);
+        generation_rate = std::atof(argv[4]);
+    }
+    if (argc >= 6) {
+        num_nodes = std::atoi(argv[5]);
+    }
+    if (argc >= 7) {
+        num_resources = std::atoi(argv[6]);
     }
 
     std::cout << "USE_MODE=" << USE_MODE << " (";
     if (USE_MODE == 0) std::cout << "join_node";
     else if (USE_MODE == 1) std::cout << "resource_limiter";
-    else if (USE_MODE == 2) std::cout << "pressure_aware_resource_limiter";
+    else if (USE_MODE == 2) std::cout << "priority_aware_resource_limiter";
     std::cout << ")\n";
     std::cout << "Benchmark: " << benchmark << "\n\n";
 
@@ -1005,7 +1481,8 @@ int main(int argc, char* argv[]) {
 #elif USE_MODE == 1
     std::cout << "  USE_MODE=1: flow graph with resource_limited_node and notify all resource limiter\n";
 #elif USE_MODE == 2
-    std::cout << "  USE_MODE=2: flow graph with pressure-aware resource limiter\n";
+    std::cout << "  USE_MODE=2: flow graph with priority-aware resource limiter\n";
+    std::cout << "  __TBB_USE_PRESSURE=" << __TBB_USE_PRESSURE << "\n";
     std::cout << "  __TBB_USE_TIMESTAMP_IN_REQUEST_ID=" << __TBB_USE_TIMESTAMP_IN_REQUEST_ID << "\n";
     std::cout << "  __TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID=" << __TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID << "\n";
     std::cout << "  __TBB_USE_NOTIFY_ON_REPORT_PRESSURE=" << __TBB_USE_NOTIFY_ON_REPORT_PRESSURE << "\n";
@@ -1014,41 +1491,61 @@ int main(int argc, char* argv[]) {
     std::cout << "Configuration parameters:\n";
     std::cout << "  num_executions: " << num_executions << "\n";
     std::cout << "  num_inputs: " << num_inputs << "\n";
-    std::cout << "  num_nodes/tree_depth: " << num_nodes << "\n\n";
+    std::cout << "  num_nodes/tree_depth: " << num_nodes << "\n";
+    std::cout << "  num_resources: " << num_resources << "\n";
+    std::cout << "  generation_rate: " << generation_rate << "\n\n";
 
     if (benchmark == "genie" || benchmark == "all") {
-        auto [construction_time, execution_time] = run_genie_bench(num_executions, num_inputs);
-        print_results("genie_bench", construction_time, execution_time, num_executions, num_inputs);
+        auto [construction_time, execution_time] = run_genie_bench(num_executions, num_inputs, generation_rate);
+        double total_graph_time_ms = 2.0 * genie_sleep_time_ms;
+        double delay_ms = total_graph_time_ms / generation_rate;
+        print_results("genie_bench", construction_time, execution_time, num_executions, num_inputs,
+                      generation_rate, delay_ms, total_graph_time_ms);
         std::cout << "\n";
     }
 
     if (benchmark == "genie_diamond" || benchmark == "all") {
-        auto [diamond_construction_time, diamond_execution_time] = run_genie_diamond_bench(num_executions, num_inputs);
-        print_results("genie_diamond_bench", diamond_construction_time, diamond_execution_time, num_executions, num_inputs);
+        auto [diamond_construction_time, diamond_execution_time] = run_genie_diamond_bench(num_executions, num_inputs, generation_rate);
+        double total_graph_time_ms = 2.0 * genie_sleep_time_ms;
+        double delay_ms = total_graph_time_ms / generation_rate;
+        print_results("genie_diamond_bench", diamond_construction_time, diamond_execution_time, num_executions, num_inputs,
+                      generation_rate, delay_ms, total_graph_time_ms);
         std::cout << "\n";
     }
 
     if (benchmark == "baseline_cycle" || benchmark == "all") {
-        auto [cycle_construction_time, cycle_execution_time] = run_baseline_cycle_bench(num_executions, num_nodes);
-        print_results("baseline_cycle_bench", cycle_construction_time, cycle_execution_time, num_executions, num_nodes);
+        auto [cycle_construction_time, cycle_execution_time] = run_baseline_cycle_bench(num_executions, num_inputs, num_nodes, generation_rate, num_resources);
+        double total_graph_time_ms = 0;  // N/A for self-propagating cycle
+        double delay_ms = 0;  // Not applicable
+        print_results("baseline_cycle_bench", cycle_construction_time, cycle_execution_time, num_executions, num_inputs,
+                      generation_rate, delay_ms, total_graph_time_ms);
         std::cout << "\n";
     }
 
     if (benchmark == "chain" || benchmark == "all") {
-        auto [chain_construction_time, chain_execution_time] = run_chain_bench(num_executions, num_inputs, num_nodes);
-        print_results("chain_bench", chain_construction_time, chain_execution_time, num_executions, num_inputs);
+        auto [chain_construction_time, chain_execution_time] = run_chain_bench(num_executions, num_inputs, num_nodes, generation_rate, num_resources);
+        double total_graph_time_ms = num_nodes * cycle_sleep_time_ms;
+        double delay_ms = total_graph_time_ms / generation_rate;
+        print_results("chain_bench", chain_construction_time, chain_execution_time, num_executions, num_inputs,
+                      generation_rate, delay_ms, total_graph_time_ms);
         std::cout << "\n";
     }
 
     if (benchmark == "siblings" || benchmark == "all") {
-        auto [siblings_construction_time, siblings_execution_time] = run_siblings_bench(num_executions, num_inputs, num_nodes);
-        print_results("siblings_bench", siblings_construction_time, siblings_execution_time, num_executions, num_inputs);
+        auto [siblings_construction_time, siblings_execution_time] = run_siblings_bench(num_executions, num_inputs, num_nodes, generation_rate, num_resources);
+        double total_graph_time_ms = num_nodes * cycle_sleep_time_ms;
+        double delay_ms = total_graph_time_ms / generation_rate;
+        print_results("siblings_bench", siblings_construction_time, siblings_execution_time, num_executions, num_inputs,
+                      generation_rate, delay_ms, total_graph_time_ms);
         std::cout << "\n";
     }
 
     if (benchmark == "tree" || benchmark == "all") {
-        auto [tree_construction_time, tree_execution_time] = run_tree_bench(num_executions, num_inputs, num_nodes);
-        print_results("tree_bench", tree_construction_time, tree_execution_time, num_executions, num_inputs);
+        auto [tree_construction_time, tree_execution_time] = run_tree_bench(num_executions, num_inputs, num_nodes, generation_rate, num_resources);
+        double total_graph_time_ms = num_nodes * cycle_sleep_time_ms;
+        double delay_ms = total_graph_time_ms / generation_rate;
+        print_results("tree_bench", tree_construction_time, tree_execution_time, num_executions, num_inputs,
+                      generation_rate, delay_ms, total_graph_time_ms);
         std::cout << "\n";
     }
 

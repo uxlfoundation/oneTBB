@@ -55,15 +55,27 @@ class resource_consumer_base;
 // Priority can be based on a combination of the timestamp and the integer, with earlier timestamps being higher priority and the
 // integer being used to break ties in timestamp (with lower integers being higher priority). Or, ties can be treated as equal in
 // priority.
+//
+// Pressure can be combined with the counter / timestamp priorities to implement different prioritiziation policies
+//
 
+// if defined to 0, usage of local counters will result in non-global FIFO ordering
 #ifndef __TBB_USE_TIMESTAMP_IN_REQUEST_ID
 #define __TBB_USE_TIMESTAMP_IN_REQUEST_ID 1
 #endif
 
+// if defined to 0, this implies a global counter
 #ifndef __TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID
 #define __TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID 1
 #endif
 
+
+// if defined to 0, the priority-aware provider uses only request_id ordering
+#ifndef __TBB_USE_PRESSURE
+#define __TBB_USE_PRESSURE 1
+#endif
+
+// if defined to 0, the provider may update its pressure-awareness more lazily
 #ifndef __TBB_USE_NOTIFY_ON_REPORT_PRESSURE
 #define __TBB_USE_NOTIFY_ON_REPORT_PRESSURE 1
 #endif
@@ -200,7 +212,7 @@ public:
 
     virtual void          request(consumer_type&, request_id) = 0;
     virtual optional_type acquire(consumer_type&, request_id) = 0;
-    virtual void          report_pressure(consumer_type&, std::size_t) = 0;
+    virtual void          report_pressure(consumer_type&, std::size_t) {};
     virtual void          release(consumer_type&, request_id, optional_type&&) = 0;
     virtual ~resource_provider_base() = default;
 };
@@ -212,7 +224,6 @@ public:
     virtual void notify(provider_type&, request_id) = 0;
     virtual ~resource_consumer_base() = default;
 };
-
 
 //
 // This is a simmple first-come-first-serve provider.
@@ -294,7 +305,7 @@ private:
 }; // class resource_limiter
 
 
-// A pressure_aware_resource_limiter prioritizes notifications and acquisitions based on:
+// A priority_aware_resource_limiter prioritizes notifications and acquisitions based on:
 //
 // 1) the current pressure on the consumer, with higher pressure being prioritized
 // 2) and then the request id, with lower request ids being prioritized
@@ -318,14 +329,14 @@ private:
 // and to notify on report pressure.
 
 template <typename ResourceHandle>
-class pressure_aware_resource_limiter : public resource_provider_base<ResourceHandle> {
+class priority_aware_resource_limiter : public resource_provider_base<ResourceHandle> {
 public:
     using resource_handle_type = ResourceHandle;
     using consumer_type = typename resource_provider_base<ResourceHandle>::consumer_type;
     using optional_type = typename resource_provider_base<ResourceHandle>::optional_type;
 
     template <typename Handle, typename... Handles>
-    pressure_aware_resource_limiter(Handle&& handle, Handles&&... handles) {
+    priority_aware_resource_limiter(Handle&& handle, Handles&&... handles) {
         emplace_handles(std::forward<Handle>(handle), std::forward<Handles>(handles)...);
     }
 
@@ -424,13 +435,15 @@ public:
         notify_pending(lock); // lock may be released
     }
 
+#if __TBB_USE_PRESSURE
     void report_pressure(consumer_type& c, std::size_t pressure) override {
         tbb::spin_mutex::scoped_lock lock(m_mutex);
         m_consumer_pressure[&c].first = pressure;  // Only update pressure, keep ref count
-#if __TBB_USE_NOTIFY_ON_REPORT_PRESSURE
+    #if __TBB_USE_NOTIFY_ON_REPORT_PRESSURE
         notify_pending(lock); // lock may be released
-#endif // __TBB_USE_NOTIFY_ON_REPORT_PRESSURE
+    #endif // __TBB_USE_NOTIFY_ON_REPORT_PRESSURE
     }
+#endif // __TBB_USE_PRESSURE
 
 private:
 
@@ -573,7 +586,7 @@ private:
     std::map<resource_consumer_base<ResourceHandle>*, std::pair<std::size_t, std::size_t>> m_consumer_pressure;
     std::vector<std::unique_ptr<consumer_data>> m_pending;
     std::vector<std::unique_ptr<consumer_data>> m_notified;
-}; // class pressure_aware_resource_limiter
+}; // class priority_aware_resource_limiter
 
 template <typename Input, typename OutputPorts>
 class resource_limited_body {
