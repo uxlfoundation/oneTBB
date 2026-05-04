@@ -233,7 +233,7 @@ inline void short_sleep(std::int32_t nanoseconds) {
 #if __unix__ || __APPLE__
     timespec ts {0, nanoseconds};
     nanosleep(&ts, nullptr);
-#elif !(__TBB_WIN8UI_SUPPORT || defined(WINAPI_FAMILY)) && (_WIN32 || _WIN64)
+#elif !__TBB_WIN8UI_SUPPORT && (_WIN32 || _WIN64)
     thread_local HANDLE timer = CreateWaitableTimerExW(
         nullptr, nullptr,
         CREATE_WAITABLE_TIMER_HIGH_RESOLUTION,
@@ -249,7 +249,7 @@ inline void short_sleep(std::int32_t nanoseconds) {
     // Yield if timer creation or setting failed
     yield();
 #else
-    suppress_unused_warning(microseconds);
+    suppress_unused_warning(nanoseconds);
     yield();
 #endif
 }
