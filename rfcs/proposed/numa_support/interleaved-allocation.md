@@ -44,16 +44,20 @@ and the memory is spread across all NUMA nodes.
 ### Header file
 
 None of the existing public TBB headers is really a good fit for the NUMA allocation API,
-with `tbb_allocator.h` being probably better than others.
+with `tbb/tbb_allocator.h` being probably better than others.
 
-If a new header is added, it could be aimed to contain either these APIs only (e.g.,
-`numa_allocation.h`) or a broader set of NUMA-related APIs, both existing and added later
-(`numa.h`). In the latter case the header should also include other public headers such as
-`task_arena.h` and `info.h`.
+If a new header is added, it could
+- contain NUMA allocation APIs only ;
+- provide a broader set of NUMA-related APIs, including that from other public headers
+  such as `tbb/task_arena.h` and `tbb/info.h`;
+- provide a broader set of memory-related APIs, including that from other public headers
+  such as `tbb/tbb_allocator.h`.
 
-The choice might depend on whether the API is initially delivered as a preview feature or not.
-For the preview feature it seems fine to add it to an existing header, while for production
-a new header seems better.
+After an internal discussion in the team, the last option above was selected. We propose the new
+`tbb/memory.h` header which, besides defining the functions from this RFC, also #includes `tbb/tbb_allocator.h`
+and `tbb/cache_aligned_allocator.h` with their respective allocator and memory resource classes.
+Note that `tbb/scalable_allocator.h` is **not** proposed to be included there, as it would introduce
+a dependency on the `tbbmalloc` shared library.
 
 ### Namespace
 
@@ -63,21 +67,31 @@ this practice rather than to introduce a new nested namespace.
 
 ### Functions
 
-With three possible arguments for the allocation. of which two might be optional, a single
-allocation function does not seem sufficient. Therefore two overloads are proposed:
+With three possible arguments for the allocation, of which two might be optional, a single
+allocation function does not seem sufficient. Therefore we propose two overloads for memory
+allocation, as well as a deallocation function:
 
 ```c++
 void *allocate_numa_interleaved (size_t bytes,
                                  const std::vector<tbb::numa_node_id>& nodes,
                                  size_t bytes_per_chunk = 0);
 void *allocate_numa_interleaved (size_t bytes, size_t bytes_per_chunk = 0);
+void deallocate_numa_interleaved (void *ptr, size_t bytes);
 ```
 
 The default value of `0` for the interleaving step (`bytes_per_chunk`) indicates that
 the implementation should choose one automatically. If specified, the step should be
 a multiple of the memory page size.
 
-In addition, function templates are proposed to allocate memory for objects of a certain type:
+The functions that frees the memory take an allocation address and the memory size,
+which should match the allocated size at the given address. This follows the standard practice
+for C++ memory allocators and memory resources, and it is needed for the implementation
+to properly call system routines. Alternative variants to store the size somehow between
+the calls (an internal map, an extra memory page, a shared pointer with custom deleter)
+were considered and rejected, as those come with some kind of overhead or/and deviate from
+the common API paradigms to allocate/free the memory.
+
+We also propose function templates to allocate and free memory for objects of a certain type:
 
 ```c++
 template <typename T>
@@ -86,25 +100,22 @@ T *allocate_numa_interleaved (size_t count,
                               size_t count_per_chunk = 0);
 template <typename T>
 T *allocate_numa_interleaved (size_t count, size_t count_per_chunk = 0);
+template <typename T>
+void deallocate_numa_interleaved (T *ptr, size_t count);
 ```
 
 Instead of raw size in bytes, these functions take a number of objects of the given type
 to indicate the memory size and the interleaving step. The latter (`count_per_chunk`) should be
 such that `count_per_chunk * sizeof(T)` is a multiple of the memory page size.
 
+The template argument for ``allocate_numa_interleaved`` cannot be deduced and should always be provided
+explicitly. The template argument for ``deallocate_numa_interleaved`` is deducible from the type of
+the first argument (pointer). As a downside, that requires an explicit pointer cast to ``void*``
+in order to call the non-typed deallocation function.
+
 The allocated memory is not initialized (no constructors are called). Reading from it
-without object initialization results in an undefined behavior.
-
-Last, the functions that free the previously allocated memory take an allocation address
-and the memory size. The latter should match the allocated size at the given address.
-The function template overload does not call destructors; the type information is only
-necessary for the `count` argument to match the corresponding value at the allocation.
-
-```c++
-void free_numa_interleaved (void *ptr, size_t bytes);
-template <typename T>
-void free_numa_interleaved (T *ptr, size_t count);
-```
+without object initialization results in an undefined behavior. Similarly, deallocation
+does not call destructors.
 
 We may also want to add a function that queries the system memory page size, to make
 the use of custom interleaving steps simpler and less error-prone.
