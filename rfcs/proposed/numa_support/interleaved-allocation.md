@@ -9,10 +9,13 @@ There are two kinds of NUMA-related performance bottlenecks: latency increasing 
 access to a remote node and bandwidth-limited simultaneous access from different CPUs to
 a single NUMA memory node. A well-known method to mitigate both is a distribution of
 memory objects that are accessed from different CPUs to different NUMA nodes in such a way
-that matches an access pattern. If the access pattern is complex enough, a simple
-round-robin distribution can be good enough. The distribution can be achieved either by
-employing a first-touch policy of NUMA memory allocation or via special platform-dependent
-API. Generally, the latter requires less overhead.
+that matches the access pattern. If the access pattern is complex enough, a simple
+round-robin distribution can be good enough to address at least the second issue.
+To address the first issue best, depending on the access pattern it might be necessary
+to choose the set of NUMA nodes and/or the amount of memory mapped to a node.
+
+The distribution can be achieved either by employing a first-touch policy of NUMA memory
+allocation or via special platform-dependent API. Generally, the latter requires less overhead.
 
 ## The overall approach
 
@@ -26,9 +29,9 @@ To guide the mapping of memory across NUMA nodes, two additional parameters are 
 `interleaving step` is the size of the contiguous memory block from a particular NUMA node,
 it has page granularity. Currently there are no clear use cases for granularity more than page size.
 
-`list of nodes for allocation` is `std::vector<tbb::numa_node_id>` to be compatible with a
-value returned from `tbb::numa_nodes()`. `libnuma` supports a subset of NUMA nodes for
-allocation, but those nodes are loaded equally. Having `vector` allows us to express an
+`list of nodes for allocation` is `std::vector<tbb::numa_node_id>` to be compatible with
+the values returned from `tbb::info::numa_nodes()`. `libnuma` supports a subset of NUMA nodes
+for allocation, but those nodes are loaded equally. Using `vector` allows us to express an
 unbalanced load. Example: allocation over the list of nodes [3, 0, 3] uses 2/3 memory from
 node 3 and 1/3 from node 0.
 
@@ -83,13 +86,13 @@ The default value of `0` for the interleaving step (`bytes_per_chunk`) indicates
 the implementation should choose one automatically. If specified, the step should be
 a multiple of the memory page size.
 
-The functions that frees the memory take an allocation address and the memory size,
+The function that frees the memory takes an allocation address and the memory size,
 which should match the allocated size at the given address. This follows the standard practice
 for C++ memory allocators and memory resources, and it is needed for the implementation
 to properly call system routines. Alternative variants to store the size somehow between
 the calls (an internal map, an extra memory page, a shared pointer with custom deleter)
 were considered and rejected, as those come with some kind of overhead or/and deviate from
-the common API paradigms to allocate/free the memory.
+the common C++ API paradigms to allocate/free memory.
 
 We also propose function templates to allocate and free memory for objects of a certain type:
 
@@ -105,12 +108,12 @@ void deallocate_numa_interleaved (T *ptr, size_t count);
 ```
 
 Instead of raw size in bytes, these functions take a number of objects of the given type
-to indicate the memory size and the interleaving step. The latter (`count_per_chunk`) should be
+to indicate the memory size and the interleaving step. The latter, `count_per_chunk`, should be
 such that `count_per_chunk * sizeof(T)` is a multiple of the memory page size.
 
-The template argument for ``allocate_numa_interleaved`` cannot be deduced and should always be provided
-explicitly. The template argument for ``deallocate_numa_interleaved`` is deducible from the type of
-the first argument (pointer). As a downside, that requires an explicit pointer cast to ``void*``
+The template argument for `allocate_numa_interleaved` cannot be deduced and should always be provided
+explicitly. The template argument for `deallocate_numa_interleaved` is deducible from the type of
+the first argument (pointer). As a downside, an explicit pointer cast to `void*` is required
 in order to call the non-typed deallocation function.
 
 The allocated memory is not initialized (no constructors are called). Reading from it
@@ -126,7 +129,7 @@ Such a function should likely go into `info.h` and the `tbb::info` namespace.
 Two types of run-time errors might appear in these functions:
 
 - **Usage errors**: the provided arguments do not match the requirements. Note that some usage errors
-  are non-verifiable, such as allocation size mismatch in `free_numa_interleaved`.
+  are non-verifiable, specifically the allocation size mismatch in `deallocate_numa_interleaved`.
 - **System errors**: those returned by the system API used in the implementation.
 
 Since the API does not allow to return any error code directly, the options for error handling
@@ -149,23 +152,41 @@ are:
    The downside is that we know some customers do not want to use exceptions in their codebases.
    Therefore this probably should not be the only approach, and a "fallback" is needed.
 
-3. Use `errno` to "return" an error code, such as `EINVAL` for bad arguments, `ENOMEM` for lack
-   of memory, etc. The downside is that this approach is currently not used in TBB, and can be
-   seen as a sign of inconsistent design. It is also not quite "authentic" for C++, and it
-   does not have error messages for customized diagnostics.
-
-4. Use assertions, probably in both debug and release builds. The behavior of assertions
+3. Use assertions, possibly in both debug and release builds. The behavior of assertions
    is reasonably well defined in [the TBB specification](
-   https://uxlfoundation.github.io/oneAPI-spec/spec/elements/oneTBB/source/configuration/enabling_debugging_features.html#tbb-use-assert-macro)
-   and together with
-   [assertion handlers](https://uxlfoundation.github.io/oneTBB/main/reference/assertion_handler.html)
-   can be used for decent error handling and diagnostics.
+   https://uxlfoundation.github.io/oneAPI-spec/spec/elements/oneTBB/source/configuration/enabling_debugging_features.html#tbb-use-assert-macro),
+   and they can provide decent handling and diagnostics of user errors via
+   [assertion handlers](https://uxlfoundation.github.io/oneTBB/main/reference/assertion_handler.html).
 
    However, there is no recovery from an assertion, so it does not fit well for handling system errors
    during memory allocation.
 
-The choice can again be different for preview vs. production. Also it seems there is no universally
-best approach, so we might need to use different ones, depending on a specific error.
+4. Embed an error code into the return value type. There are several variations to consider,
+   e.g. a) return only the error code directly and use a separate function parameter for
+   the memory address, b) combine both into `std::tuple` or a simple custom class, or c)
+   implement a custom analogue of `std::expected` and related APIs from C++23.
+   
+   The common downside of all the variations is again that the API would deviate from the common
+   memory allocation practices known to C++ developers. For example, (4a) is somewhat typical
+   for the API design in C (though not for `malloc/free`) rather than C++. On the other hand,
+   (4c) is more of modern C++ style, but it would require notable implementation and maintenance
+   efforts for the sake of essentially a single function.
+
+   It might make sense to consider (4b), as it is the closest to the existing practice, especially
+   if used together with structural binding.
+   
+The following options were considered and rejected:
+
+- As a fallback, use regular allocation/memory mapping if the interleaved allocation fails.
+  The problem with that is that then deallocation should somehow know whether the allocated block
+  is interleaved, with the only feasible implementation being an internal map of allocations.
+- Use `errno` to "return" an error code, such as `EINVAL` for bad arguments, `ENOMEM` for lack
+  of memory, etc. The problems are that this approach is currently not used in TBB, and so can be
+  viewed as a sign of inconsistent design. It is also not quite "authentic" for C++, and it
+  does not have error messages for customized diagnostics.
+
+It seems there is no universally best approach, so we might need to use different ones
+depending on a specific error and/or via additional overloads (e.g., with a `nothrow` parameter).
 
 ## ABI entry points
 
@@ -192,8 +213,9 @@ Note that the list of nodes is passed as a *{pointer, count}* pair of parameters
 a single pointer or a reference. This both avoids using `std::vector` directly and allows
 changing/extending the public API with other contiguous storage types, e.g. `std::span`.
 
-We might consider changing the ABI signatures to also return an error code in some way,
-if we prefer error handling to be done strictly by the public API in the headers.
+The ABI signatures might need to be adjusted to also return an error code in some way
+if we prefer error handling to be done fully or partially in the header, specifically for
+the option (4). That would certainly become necessary if the API is first released for preview.
 
 ## Implementation details
 
@@ -215,6 +237,9 @@ There is no NUMA memory support under macOS, so the implementation can only fall
 The only major question left is that of error handling but it may impact but API and ABI.
 We may want to release the API for preview first, in order to think more of the error handling
 question and possibly get some feedback.
+
+Does it make sense to add a function to query the system page size now, or is it better
+added on demand?
 
 Semantics of even distribution of data between NUMA nodes is straightforward: to equally
 balance work between the nodes. Why might someone want to distribute data unequally? Can
