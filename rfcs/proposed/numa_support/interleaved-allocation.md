@@ -203,7 +203,7 @@ dependency. Using `move_pages` it's possible to implement allocation with consta
 of system calls wrt allocation size.
 
 Under Windows, starting Windows 10 and WS 2016, `VirtualAlloc2(MEM_REPLACE_PLACEHOLDER)`
-can be used to provide desired interleaving, but number of system calls is proportional to
+can be used to provide desired interleaving, but the number of system calls is proportional to
 allocation size. For older Windows, either fallback to `VirtualAlloc` or manual touching
 from threads pre-pinned to NUMA nodes can be used.
 
@@ -212,17 +212,9 @@ There is no NUMA memory support under macOS, so the implementation can only fall
 
 ## Open Questions
 
-Are there reasons to release the API for preview first?
-
-In what header file should the API be defined?
-
-We need to decide on the way(s) to handle errors.
-
-When non-default `interleaving step` can be used?
-
-`bytes` argument for `free_numa_interleaved()` appeared because what we have is wrappers over
-`mmap`/`munmap` and there is no place in the allocated memory to store the size.
-We can put it in, say, an internal unordered map. Would it be better?
+The only major question left is that of error handling but it may impact but API and ABI.
+We may want to release the API for preview first, in order to think more of the error handling
+question and possibly get some feedback.
 
 Semantics of even distribution of data between NUMA nodes is straightforward: to equally
 balance work between the nodes. Why might someone want to distribute data unequally? Can
