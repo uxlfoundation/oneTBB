@@ -94,12 +94,12 @@ find_package(TBB REQUIRED)
 
 add_executable(myapp main.cpp)
 target_link_libraries(myapp PRIVATE TBB::tbb)
-# tbb.cppm file is located under include/tbb/modules
+# tbb.cppm file is located under include/oneapi
 get_target_property(_tbb_include_dir TBB::tbb INTERFACE_INCLUDE_DIRECTORIES)
 target_sources(myapp PRIVATE
    FILE_SET cxx_modules TYPE CXX_MODULES
    BASE_DIRS ${_tbb_include_dir}
-   FILES ${_tbb_include_dir}/tbb/modules/tbb.cppm
+   FILES ${_tbb_include_dir}/oneapi/tbb.cppm
 )
 ```
 
