@@ -249,25 +249,6 @@ foreach(FILE_WITH_EXTRA_TARGETS ${FILES_WITH_EXTRA_TARGETS})
     include(${FILE_WITH_EXTRA_TARGETS})
 endforeach()
 
-# - Enabling LTO on Android causes the NDK bug.
-#   NDK throws the warning: "argument unused during compilation: '-Wa,--noexecstack'"
-# - For some reason GCC does not instrument code with Thread Sanitizer when lto is enabled and C linker is used.
-if (TBB_ENABLE_IPO AND BUILD_SHARED_LIBS AND NOT ANDROID_PLATFORM AND NOT TBB_SANITIZE MATCHES "thread")
-    if (NOT CMAKE_VERSION VERSION_LESS 3.9)
-        cmake_policy(SET CMP0069 NEW)
-        include(CheckIPOSupported)
-        check_ipo_supported(RESULT TBB_IPO_PROPERTY)
-        if (NOT TBB_IPO_PROPERTY)
-            message(WARNING "IPO disabled: not supported by this compiler.")
-        endif()
-    else()
-        set(TBB_IPO_FLAGS TRUE)
-    endif()
-    if (TBB_IPO_PROPERTY OR TBB_IPO_FLAGS)
-        message(STATUS "IPO enabled")
-    endif()
-endif()
-
 if (TBB_FILE_TRIM)
     file(RELATIVE_PATH TBB_RELATIVE_BIN_PATH ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_SOURCE_DIR})
     file(TO_NATIVE_PATH ${CMAKE_SOURCE_DIR} NATIVE_TBB_PROJECT_ROOT_DIR)
@@ -287,6 +268,27 @@ if (EXISTS ${TBB_COMPILER_SETTINGS_FILE})
     include(${TBB_COMPILER_SETTINGS_FILE})
 else()
     message(WARNING "TBB compiler settings not found ${TBB_COMPILER_SETTINGS_FILE}")
+endif()
+
+# - Enabling LTO on Android causes the NDK bug.
+#   NDK throws the warning: "argument unused during compilation: '-Wa,--noexecstack'"
+# - For some reason GCC does not instrument code with Thread Sanitizer when lto is enabled and C linker is used.
+if (TBB_ENABLE_IPO AND BUILD_SHARED_LIBS AND NOT ANDROID_PLATFORM AND NOT TBB_SANITIZE MATCHES "thread")
+    # For older cmake versions without CheckIPOSupported and when ipo detection is broken,
+    # try to enable IPO unconditionally.
+    if (CMAKE_VERSION VERSION_LESS 3.9 OR TBB_IPO_DETECTION_BROKEN)
+        set(TBB_IPO_FLAGS TRUE)
+    else()
+        cmake_policy(SET CMP0069 NEW)
+        include(CheckIPOSupported)
+        check_ipo_supported(RESULT TBB_IPO_PROPERTY)
+        if (NOT TBB_IPO_PROPERTY)
+            message(WARNING "IPO disabled: not supported by this compiler.")
+        endif()
+    endif()
+    if (TBB_IPO_PROPERTY OR TBB_IPO_FLAGS)
+        message(STATUS "IPO enabled")
+    endif()
 endif()
 
 if (TBB_FIND_PACKAGE AND TBB_DIR)
