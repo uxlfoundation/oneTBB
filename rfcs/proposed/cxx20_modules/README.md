@@ -94,12 +94,12 @@ find_package(TBB REQUIRED)
 
 add_executable(myapp main.cpp)
 target_link_libraries(myapp PRIVATE TBB::tbb)
-# For example, tbb.cppm is located under include/modules
+# tbb.cppm file is located under include/tbb/modules
 get_target_property(_tbb_include_dir TBB::tbb INTERFACE_INCLUDE_DIRECTORIES)
 target_sources(myapp PRIVATE
    FILE_SET cxx_modules TYPE CXX_MODULES
    BASE_DIRS ${_tbb_include_dir}
-   FILES ${_tbb_include_dir}/modules/tbb.cppm
+   FILES ${_tbb_include_dir}/tbb/modules/tbb.cppm
 )
 ```
 
@@ -109,6 +109,15 @@ In the future, `TBBConfig.cmake` could provide a helper function (e.g.,
 The consumer compiles the `.cppm` as part of their own target with their own flags. Name
 mangling is unchanged, so the consumer links against the same `libtbb.so` / `tbb.lib`
 regardless of whether they use modules or headers.
+
+### Testing
+
+Module-based API availability is tested by extending `test_tbb_header`. A C++20 module interface
+unit (`test_tbb_header_module.cppm`) either includes TBB headers in its global module fragment
+or imports the `tbb` module, then exports the test code. A consumer imports this module to verify
+public API accessibility through module imports.
+
+Long-term plans include extending module testing across the existing test suite.
 
 ## Alternatives Considered
 
@@ -188,32 +197,25 @@ export module tbb;
 
 ## Open Questions
 
-1. Should the module be named `tbb`, `oneapi.tbb`, or `onetbb`?
-
-2. Where should the module interface unit live? Options include `include/modules/tbb.cppm`,
-   `src/tbb/tbb.cppm`.
-  
-3. What is the install destination for the module source file? Should it live under
-   `share/tbb/modules/`, `include/modules/`, or next to `TBBConfig.cmake`?
-
-4. Should the module be split into partitions (e.g., `tbb:algorithms`, `tbb:containers`,
+1. Should the module be split into partitions (e.g., `tbb:algorithms`, `tbb:containers`,
    `tbb:flow_graph`) to organize the `using`-declarations?
    Partitions are internal to the module and not importable by consumers, but could
    improve maintainability of the module interface. Alternatively, should multiple
    fine-grained submodules (e.g., `tbb.flow_graph`, `tbb.containers`) be provided so
    that consumers can import only what they need?
 
-5. How should module-based consumption be tested? Options include a dedicated test
+2. How should module-based consumption be tested? Options include a dedicated test
    that uses `import tbb;` instead of `#include`, or running the existing test suite
    with module imports. Should whitebox tests be covered in the latter scenario?
+    * Currently extending `test_tbb_header` is suggested to check public API availability via modules.
 
-6. How to provide preview functionality with modules? TBB preview features are currently gated by
-   `TBB_PREVIEW_*` macros that are defined before including headers. Modules do not export macros,
-   and a macro defined by the consumer before `import tbb;` cannot influence the module's
-   already-compiled interface. Should preview functionality be offered as a dedicated `tbb.preview`
-   module, or should the consumer compile the `.cppm` with the desired `TBB_PREVIEW_*` macros defined?
+3. How to provide preview functionality with modules? TBB preview features that extend existing
+   classes would create distinct types in a `tbb.preview` module, incompatible with the stable
+   `tbb` module, meaning that they cannot be used together. 
+    * Current workaround is to require the consumer to compile `tbb.cppm` with desired
+    `TBB_PREVIEW_*` macros defined.
 
-7. How to support public macros such as `TBB_VERSION` or feature-test macros?
+4. How to support public macros such as `TBB_VERSION` or feature-test macros?
    Modules do not export preprocessor definitions, so these macros are not visible
    after `import tbb;`. Some options:
    - Replace them with inline variables where possible or provide exported functions.
