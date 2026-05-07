@@ -113,7 +113,9 @@ such that `count_per_chunk * sizeof(T)` is a multiple of the memory page size.
 The template argument for `allocate_numa_interleaved` cannot be deduced and should always be provided
 explicitly. The template argument for `deallocate_numa_interleaved` is deducible from the type of
 the first argument (pointer). As a downside, an explicit pointer cast to `void*` is required
-in order to call the non-typed deallocation function.
+in order to call the non-typed deallocation function. That can be changed if the pointer type is
+wrapped into e.g. `std::decay_t<T>`, making it non-deducible; in this case, the template argument
+for `deallocate_numa_interleaved` will also need to be specified explicitly.
 
 No constructors are called in the allocated memory. Unless the type is trivially constructible,
 reading from the memory without object initialization results in an undefined behavior.
