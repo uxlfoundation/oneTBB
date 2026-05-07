@@ -47,20 +47,15 @@ and the memory is spread across all NUMA nodes.
 ### Header file
 
 None of the existing public TBB headers is really a good fit for the NUMA allocation API,
-with `tbb/tbb_allocator.h` being probably better than others.
+with `tbb/tbb_allocator.h` being probably better than others. We propose therefore to add
+a new header, `tbb/numa_allocation.h`.
 
-If a new header is added, it could
-- contain NUMA allocation APIs only ;
-- provide a broader set of NUMA-related APIs, including that from other public headers
+Other options were considered and rejected:
+
+- a new header for a broader set of NUMA-related APIs, including that from other public headers
   such as `tbb/task_arena.h` and `tbb/info.h`;
-- provide a broader set of memory-related APIs, including that from other public headers
+- a new header for a broader set of memory-related APIs, including that from other public headers
   such as `tbb/tbb_allocator.h`.
-
-After an internal discussion in the team, the last option above was selected. We propose the new
-`tbb/memory.h` header which, besides defining the functions from this RFC, also #includes `tbb/tbb_allocator.h`
-and `tbb/cache_aligned_allocator.h` with their respective allocator and memory resource classes.
-Note that `tbb/scalable_allocator.h` is **not** proposed to be included there, as it would introduce
-a dependency on the `tbbmalloc` shared library.
 
 ### Namespace
 
@@ -94,7 +89,11 @@ the calls (an internal map, an extra memory page, a shared pointer with custom d
 were considered and rejected, as those come with some kind of overhead or/and deviate from
 the common C++ API paradigms to allocate/free memory.
 
-We also propose function templates to allocate and free memory for objects of a certain type:
+The system APIs that will be used in the implementation (see below) zero-initialize
+allocated memory. It makes sense for `allocate_numa_interleaved` to keep that guarantee.
+
+While the above functions are seen as the minimally viable set, as an option, we also propose
+function templates to allocate and free memory for objects of a certain type:
 
 ```c++
 template <typename T>
@@ -116,9 +115,9 @@ explicitly. The template argument for `deallocate_numa_interleaved` is deducible
 the first argument (pointer). As a downside, an explicit pointer cast to `void*` is required
 in order to call the non-typed deallocation function.
 
-The allocated memory is not initialized (no constructors are called). Reading from it
-without object initialization results in an undefined behavior. Similarly, deallocation
-does not call destructors.
+No constructors are called in the allocated memory. Unless the type is trivially constructible,
+reading from the memory without object initialization results in an undefined behavior.
+Similarly, deallocation does not call destructors.
 
 We may also want to add a function that queries the system memory page size, to make
 the use of custom interleaving steps simpler and less error-prone.
@@ -160,33 +159,31 @@ are:
 
    However, there is no recovery from an assertion, so it does not fit well for handling system errors
    during memory allocation.
-
-4. Embed an error code into the return value type. There are several variations to consider,
-   e.g. a) return only the error code directly and use a separate function parameter for
-   the memory address, b) combine both into `std::tuple` or a simple custom class, or c)
-   implement a custom analogue of `std::expected` and related APIs from C++23.
    
-   The common downside of all the variations is again that the API would deviate from the common
-   memory allocation practices known to C++ developers. For example, (4a) is somewhat typical
-   for the API design in C (though not for `malloc/free`) rather than C++. On the other hand,
-   (4c) is more of modern C++ style, but it would require notable implementation and maintenance
-   efforts for the sake of essentially a single function.
+It seems there is no universally best approach, so we might need to use different ones,
+depending on a specific error and/or via additional overloads (e.g., with a `nothrow` parameter).
+The question remains open.
 
-   It might make sense to consider (4b), as it is the closest to the existing practice, especially
-   if used together with structural binding.
-   
-The following options were considered and rejected:
+Meanwhile, the following options were considered and rejected:
 
 - As a fallback, use regular allocation/memory mapping if the interleaved allocation fails.
   The problem with that is that then deallocation should somehow know whether the allocated block
   is interleaved, with the only feasible implementation being an internal map of allocations.
+
 - Use `errno` to "return" an error code, such as `EINVAL` for bad arguments, `ENOMEM` for lack
   of memory, etc. The problems are that this approach is currently not used in TBB, and so can be
   viewed as a sign of inconsistent design. It is also not quite "authentic" for C++, and it
   does not have error messages for customized diagnostics.
 
-It seems there is no universally best approach, so we might need to use different ones
-depending on a specific error and/or via additional overloads (e.g., with a `nothrow` parameter).
+- Embed an error code into the return value type. We considered several variants of that:
+
+  a) return only the error code directly and use a separate function parameter for the memory address
+  b) combine both into `std::tuple` or a simple custom class
+  c) implement a custom analogue of `std::expected` and related APIs from C++23.
+
+  and neither seems to be a good one. The common downside is again that the API would deviate
+  to some degree from the common memory allocation practices known to C++ developers. It is also
+  the only error handling option that requires error codes to be passed through the ABI entry points.
 
 ## ABI entry points
 
@@ -199,7 +196,7 @@ discouraged unless absolutely necessary. It is better to avoid the use of standa
 in the signatures, as that could cause dependencies on specific standard library implementations
 and/or versions and potentially require multiple sets of binaries for the same platform.
 
-Given that, the following conceptual function signatures are recommended:
+Given that, the following conceptual function signatures are proposed:
 
 ```c++
 void *allocate_interleaved (size_t bytes, tbb::numa_node_id *nodes, size_t node_count,
@@ -207,15 +204,11 @@ void *allocate_interleaved (size_t bytes, tbb::numa_node_id *nodes, size_t node_
 void deallocate_interleaved (void *ptr, size_t bytes);
 ```
 
-The names are subject to discussion. Internal namespaces will be used as appropriate.
+Internal namespaces should be used as appropriate.
 
 Note that the list of nodes is passed as a *{pointer, count}* pair of parameters instead of
 a single pointer or a reference. This both avoids using `std::vector` directly and allows
 changing/extending the public API with other contiguous storage types, e.g. `std::span`.
-
-The ABI signatures might need to be adjusted to also return an error code in some way
-if we prefer error handling to be done fully or partially in the header, specifically for
-the option (4). That would certainly become necessary if the API is first released for preview.
 
 ## Implementation details
 
@@ -232,11 +225,21 @@ from threads pre-pinned to NUMA nodes can be used.
 There is no NUMA memory support under macOS, so the implementation can only fall back to
 `malloc`.
 
+## Next steps
+
+Due to the remaining open questions and the desire to get better understanding of performance
+impact, we propose to initially deliver the functionality for *preview*, with the following
+key choices:
+
+- Finalize the ABI as described;
+- Only provide the 3 non-typed functions;
+- Do nothing special for error handling, except for returning `nullptr`;
+
 ## Open Questions
 
-The only major question left is that of error handling but it may impact but API and ABI.
-We may want to release the API for preview first, in order to think more of the error handling
-question and possibly get some feedback.
+The major open question still unresolved is the approach to error handling.
+
+Do the type-aware function templates provide sufficient extra usability to be added?
 
 Does it make sense to add a function to query the system page size now, or is it better
 added on demand?
