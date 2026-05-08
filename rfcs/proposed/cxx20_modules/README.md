@@ -197,21 +197,21 @@ export module tbb;
 
 ## Open Questions
 
-1. Should the module be split into partitions (e.g., `tbb:algorithms`, `tbb:containers`,
-   `tbb:flow_graph`) to organize the `using`-declarations?
-   Partitions are internal to the module and not importable by consumers, but could
-   improve maintainability of the module interface. Alternatively, should multiple
-   fine-grained submodules (e.g., `tbb.flow_graph`, `tbb.containers`) be provided so
-   that consumers can import only what they need?
+1. Besides the single `tbb` module, should fine-grained submodules
+   (e.g., `tbb.flow_graph`, `tbb.containers`) be provided so that consumers can precompile and
+   import only what they need?
 
 2. How should module-based consumption be tested? Options include a dedicated test
    that uses `import tbb;` instead of `#include`, or running the existing test suite
    with module imports. Should whitebox tests be covered in the latter scenario?
     * Currently extending `test_tbb_header` is suggested to check public API availability via modules.
 
-3. How to provide preview functionality with modules? TBB preview features that extend existing
-   classes would create distinct types in a `tbb.preview` module, incompatible with the stable
-   `tbb` module, meaning that they cannot be used together. 
+3. How to provide preview functionality with modules? TBB preview features are currently gated by
+   `TBB_PREVIEW_*` macros that are defined before including headers. Macros defined by the consumer
+   before `import tbb;` cannot influence the module's already-compiled interface. One option is to
+   provide a separate `tbb.preview` module. However, some preview features are extensions to
+   existing classes and exporting them would create distinct types in a `tbb.preview` module, which
+   raises questions about whether `tbb` and `tbb.preview` modules can be used together.
     * Current workaround is to require the consumer to compile `tbb.cppm` with desired
     `TBB_PREVIEW_*` macros defined.
 
@@ -220,6 +220,11 @@ export module tbb;
    after `import tbb;`. Some options:
    - Replace them with inline variables where possible or provide exported functions.
    - Require the consumer to `#include <tbb/version.h>` alongside the import.
+
+5. Should the module be split into partitions (e.g., `tbb:algorithms`, `tbb:containers`,
+   `tbb:flow_graph`) to organize the `using`-declarations?
+   Partitions are internal to the module and not importable by consumers, but could
+   improve maintainability of the module interface.
 
 ## Exit Criteria
 
