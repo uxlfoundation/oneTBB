@@ -157,7 +157,7 @@ TEST_CASE("test basics") {
         numa_nodes.erase(numa_nodes.begin(), numa_nodes.begin() + numa_nodes.size() / 2);
         VerifySizeAndNodes(lib, obj_size, numa_nodes, 7 * page_size);
 
-        // duplcated nodes are supported
+        // duplicated nodes are supported
         std::vector<tbb::numa_node_id> numa_nodes_1 = tbb::info::numa_nodes();
         // we treat no-NUMA as single-NUMA with node index 0, but numa_nodes() return -1 in this case
         if (numa_nodes_1.size() == 1)
