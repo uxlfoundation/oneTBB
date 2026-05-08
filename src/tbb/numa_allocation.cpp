@@ -27,8 +27,8 @@
 #include <sys/mman.h>
 
 // must support build without numaif.h
-long move_pages(int pid, unsigned long count,
-                void **pages, const int *nodes, int *status, int flags);
+extern "C" long move_pages(int pid, unsigned long count,
+                           void **pages, const int *nodes, int *status, int flags);
 #endif
 
 namespace tbb {
