@@ -167,14 +167,14 @@ namespace tbb {
 namespace detail {
 namespace d2 {
 
-static inline std::pair<graph_task*, graph_task*> order_tasks(graph_task* first, graph_task* second) {
+inline std::pair<graph_task*, graph_task*> order_tasks(graph_task* first, graph_task* second) {
     if (second->priority > first->priority)
         return std::make_pair(second, first);
     return std::make_pair(first, second);
 }
 
 // submit task if necessary. Returns the non-enqueued task if there is one.
-static inline graph_task* combine_tasks(graph& g, graph_task* left, graph_task* right) {
+inline graph_task* combine_tasks(graph& g, graph_task* left, graph_task* right) {
     // if no RHS task, don't change left.
     if (right == nullptr) return left;
     // right != nullptr
@@ -3302,10 +3302,14 @@ inline void set_name(const async_node<Input, Output, Policy>& node, const char *
 {
     fgt_multioutput_node_desc(&node, name);
 }
+
 } // d2
 } // detail
 } // tbb
 
+#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
+#include "detail/_flow_graph_resource_limiting.h"
+#endif
 
 // Include deduction guides for node classes
 #include "detail/_flow_graph_nodes_deduction.h"
@@ -3365,6 +3369,10 @@ inline namespace v1 {
     using detail::d2::make_edges;
 #endif
 
+#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
+    using detail::d2::resource_limiter;
+    using detail::d2::resource_limited_node;
+#endif
 } // v1
 } // flow
 

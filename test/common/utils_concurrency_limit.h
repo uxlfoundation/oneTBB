@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2020-2025 Intel Corporation
-    Copyright (c) 2025-2026 UXL Foundation Contributors
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -491,12 +491,12 @@ public:
     }
 };
 
-#if __unix__
+#if defined(__unix__) && ! defined(__gnu_hurd__)
 #include <sched.h>
 #endif
 
 bool can_change_thread_priority() {
-#if __unix__
+#if defined(__unix__) && ! defined(__gnu_hurd__)
     pthread_t this_thread = pthread_self();
     sched_param old_params;
     int old_policy;
@@ -516,7 +516,7 @@ bool can_change_thread_priority() {
     return false;
 }
 
-#if __unix__
+#if defined(__unix__) && ! defined(__gnu_hurd__)
 class increased_priority_guard {
 public:
     increased_priority_guard() : m_backup(get_current_schedparam()) {

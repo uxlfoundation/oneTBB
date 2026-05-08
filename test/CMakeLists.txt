@@ -1,5 +1,5 @@
 # Copyright (c) 2020-2025 Intel Corporation
-# Copyright (c) 2025-2026 UXL Foundation Contributors
+# Copyright (c) 2025 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -278,7 +278,7 @@ function(tbb_add_tbbbind_test)
     if (NOT DEFINED HWLOC_TARGET_EXPLICITLY_DEFINED AND TARGET PkgConfig::HWLOC AND TARGET TBB::${TBBBIND_LIBRARY_NAME})
         set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
             PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*${TBBBIND_LIBRARY_NAME}"
-            FAIL_REGULAR_EXPRESSION "Status: FAILURE!"
+            FAIL_REGULAR_EXPRESSION "Status:.*FAILURE!"
         )
         target_link_libraries(${_tbbbind_test_NAME} PRIVATE PkgConfig::HWLOC)
         target_compile_definitions(${_tbbbind_test_NAME} PRIVATE __TBB_HWLOC_VALID_ENVIRONMENT)
@@ -500,6 +500,7 @@ if (TARGET TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_write_once_node DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_async_node DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_input_node DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR tbb NAME test_resource_limited_node DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_profiling DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_concurrent_queue_whitebox DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_intrusive_list DEPENDENCIES TBB::tbb)
@@ -589,6 +590,14 @@ if (TARGET TBB::tbb)
         if (NOT TBB_OPENMP_NO_LINK_FLAG)
             set_target_properties(test_openmp PROPERTIES LINK_FLAGS ${TBB_OPENMP_FLAG})
         endif()
+    endif()
+
+    if (UNIX)
+      tbb_add_test(SUBDIR tbb NAME test_cgroup_support)
+      target_include_directories(test_cgroup_support PRIVATE
+        $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>
+      )
+      target_link_libraries(test_cgroup_support PRIVATE Threads::Threads)
     endif()
 
     # Define the conformance tests
