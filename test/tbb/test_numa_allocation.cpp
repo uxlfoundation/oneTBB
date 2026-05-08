@@ -26,7 +26,9 @@
 #include <psapi.h>
 #else
 #include <unistd.h> // for sysconf(_SC_PAGESIZE)
+#endif
 
+#if __linux__
 static long (*move_pages_ptr)(int pid, unsigned long count,
                 void **pages, const int *nodes, int *status, int flags) = nullptr;
 #endif
