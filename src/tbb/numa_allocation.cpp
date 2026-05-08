@@ -143,7 +143,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
 #elif _WIN32 || _WIN64
     // no NUMA nodes or no VirtualAlloc2, just return the memory as is
     if (numa_node_count() == 1 || !VirtualAlloc2_ptr)
-        // do not use VirtualAlloc(), because it compiled incorrecly by MSVC 2017 with
+        // do not use VirtualAlloc(), because it compiled incorrectly by MSVC 2017 with
         // -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug -DTBB_WINDOWS_DRIVER=ON
         return VirtualAllocEx(GetCurrentProcess(), nullptr, bytes, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
