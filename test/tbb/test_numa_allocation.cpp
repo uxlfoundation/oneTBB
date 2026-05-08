@@ -104,11 +104,15 @@ void VerifySizeAndNodes(bool use_find_node, size_t bytes, const std::vector<tbb:
 TEST_CASE("test basics") {
     size_t page_size = DefaultSystemPageSize();
 #if __linux__
+#if __TBB_DYNAMIC_LOAD_ENABLED
     utils::LIBRARY_HANDLE lib = utils::OpenLibrary("libnuma.so");
     WARN_MESSAGE(lib, "Can't load libnuma.so, skipping NUMA ownership checks");
     if (lib)
         utils::GetAddress(lib, "move_pages", move_pages_ptr);
 #else
+    bool lib = false;
+#endif
+#else // on Windows we use VirtualAllocEx and QueryWorkingSetEx, so no need to load any library
     bool lib = true;
 #endif
 
@@ -162,7 +166,7 @@ TEST_CASE("test basics") {
         VerifySizeAndNodes(lib, obj_size, numa_nodes, 3 * page_size);
     }
 
-#if __linux__
+#if __linux__ && __TBB_DYNAMIC_LOAD_ENABLED
     if (lib)
         utils::CloseLibrary(lib);
 #endif
