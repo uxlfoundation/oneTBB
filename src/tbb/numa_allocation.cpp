@@ -37,8 +37,11 @@ template<typename T>
 static inline T alignUp(T arg, uintptr_t alignment) {
     return T(((uintptr_t)arg+(alignment-1)) & ~(alignment-1));
 }
+#else
 
-#endif // _WIN32 || _WIN64
+#include <stdlib.h> // for malloc and free
+
+#endif
 
 namespace tbb {
 namespace detail {
