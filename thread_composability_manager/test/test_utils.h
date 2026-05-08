@@ -1,0 +1,744 @@
+/*
+   Copyright (c) 2023 Intel Corporation
+   Copyright (c) 2026 UXL Foundation Contributors
+
+   SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+*/
+
+#ifndef __TCM_TESTS_TEST_UTILS_HEADER
+#define __TCM_TESTS_TEST_UTILS_HEADER
+
+#include "basic_test_utils.h"
+#include "concurrency_utils.h"
+#include "test_exceptions.h"
+
+#include "hwloc_test_utils.h"
+#include "../src/utils.h"
+#include "tcm/detail/_tcm_assert.h"
+#include "tcm.h"
+
+#include <algorithm>
+#include <cstdio>
+#include <initializer_list>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+/***************************************************************************************************
+ * Helpers for work with CPU masks
+ **************************************************************************************************/
+using tcm_const_cpu_mask_t = hwloc_const_bitmap_t; // TODO: Consider introducing into TCM API
+
+inline std::string to_string(const tcm_const_cpu_mask_t mask) {
+  const unsigned max_size = 1024;
+  char buf[max_size] = "nullptr";
+  if (mask)
+      hwloc_bitmap_snprintf(buf, max_size, mask);
+  return std::string(buf);
+}
+
+inline tcm_cpu_mask_t allocate_cpu_mask() { return hwloc_bitmap_alloc(); }
+inline void free_cpu_mask(tcm_cpu_mask_t mask) {
+  __TCM_ASSERT(mask, "CPU mask should not be nullptr");
+  hwloc_bitmap_free(mask);
+}
+
+struct mask_deleter {
+  void operator()(tcm_cpu_mask_t* mask) const { free_cpu_mask(*mask); }
+};
+
+struct masks_guard_t {
+  masks_guard_t(uint32_t size) : m_size(size) {}
+  void operator()(tcm_cpu_mask_t* cpu_masks) const {
+    __TCM_ASSERT(cpu_masks, "Array of CPU masks cannot be nullptr");
+    for (uint32_t i = 0; i < m_size; ++i) {
+      free_cpu_mask(cpu_masks[i]);
+    }
+    delete [] cpu_masks;
+  }
+private:
+  const uint32_t m_size;
+};
+
+inline bool is_equal(tcm_const_cpu_mask_t mask_1, tcm_const_cpu_mask_t mask_2) {
+  __TCM_ASSERT(mask_1, "CPU mask should not be nullptr");
+  __TCM_ASSERT(mask_2, "CPU mask should not be nullptr");
+  return hwloc_bitmap_compare(mask_1, mask_2) == 0;
+}
+
+inline bool is_intersect(tcm_const_cpu_mask_t mask_1, tcm_const_cpu_mask_t mask_2) {
+  __TCM_ASSERT(mask_1, "CPU mask should not be nullptr");
+  __TCM_ASSERT(mask_2, "CPU mask should not be nullptr");
+  return hwloc_bitmap_intersects(mask_1, mask_2);
+}
+
+inline void copy(tcm_cpu_mask_t dst, tcm_const_cpu_mask_t src) {
+  __TCM_ASSERT(dst, "Destination CPU mask should not be nullptr");
+  __TCM_ASSERT(src, "Source CPU mask should not be nullptr");
+  int result = hwloc_bitmap_copy(dst, src);
+  __TCM_ASSERT_EX(0 == result, "Unable to copy the CPU mask");
+}
+
+inline int32_t hardware_concurrency(tcm_const_cpu_mask_t mask) {
+  __TCM_ASSERT(mask, "CPU mask should not be nullptr");
+  return int32_t(hwloc_bitmap_weight(mask));
+}
+
+constexpr float tcm_oversubscription_factor = 1.0f;
+
+inline int32_t tcm_concurrency(tcm_const_cpu_mask_t mask) {
+  __TCM_ASSERT(mask, "CPU mask should not be nullptr");
+  return int32_t(tcm_oversubscription_factor * hardware_concurrency(mask));
+}
+
+inline tcm_const_cpu_mask_t process_affinity_mask = []() {
+    tcm_test::system_topology::construct();
+    auto& tp = tcm_test::system_topology::instance();
+    return tp.process_affinity_mask();
+}();
+
+//! Returns available concurrency on the platform, taking into account the mask of the process and
+//! CPU constraints.
+inline int32_t platform_hardware_concurrency() {
+  static int32_t c = [] () -> int32_t { 
+      int process_concurrency = hardware_concurrency(process_affinity_mask);
+#if __linux__
+      int cfs_constraint;
+      if (cgroup_info::is_cpu_constrained(cfs_constraint)) {
+        process_concurrency = std::min(process_concurrency, cfs_constraint);
+      }
+#endif
+      return process_concurrency;
+  } ();
+  return c;
+}
+
+//! Returns available concurrency on the platform, taking into account the degree of
+//! oversubscription (oversubscription_factor must be greater than zero) and process mask.
+inline int32_t platform_tcm_concurrency() {
+  static int32_t c = int32_t(tcm_oversubscription_factor * platform_hardware_concurrency());
+  return c;
+}
+
+inline void extract_first_n_bits_from_process_affinity_mask(tcm_cpu_mask_t result, int n_threads,
+                                                            tcm_const_cpu_mask_t hint = nullptr)
+{
+  __TCM_ASSERT(result, "Result CPU mask should be pre-allocated on the caller side");
+  __TCM_ASSERT(hwloc_bitmap_iszero(result), "Result CPU mask should be empty");
+
+  int start_id = -1;
+  if (hint)
+    start_id = hwloc_bitmap_last(hint);
+  start_id = hwloc_bitmap_next(process_affinity_mask, start_id);
+
+  for (int idx = start_id; idx != -1 && n_threads-- > 0;
+       idx = hwloc_bitmap_next(process_affinity_mask, idx))
+  {
+    hwloc_bitmap_set(result, idx);
+  }
+}
+
+
+/***************************************************************************************************
+ * Helpers for testing TCM permits properties
+ **************************************************************************************************/
+
+inline bool has_masks(tcm_permit_t const& p) {
+    if (!p.size)
+        return false;
+
+    for (unsigned i = 0; i < p.size; ++i) {
+        if (!p.cpu_masks[i])
+            return false;
+
+        auto c = hardware_concurrency(p.cpu_masks[i]);
+        if (!c) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+inline bool check_permit_size(const tcm_permit_t& expected, const tcm_permit_t& actual,
+                              const unsigned num_indents = 0, const bool report = true)
+{
+  const auto& a = actual.size;
+  const auto& e = expected.size;
+  const bool result = (a == e);
+
+  std::string report_str = "Check size of arrays inside permit, expected " + std::to_string(e) +
+      " equals to actual " + std::to_string(a);
+
+  return report ? check(result, report_str, num_indents) : result;
+}
+
+struct concurrency_comparator_base {
+  concurrency_comparator_base(unsigned num_indents = 0, bool report = true)
+    : m_num_indents(num_indents), m_report(report)
+  {}
+
+protected:
+  unsigned m_num_indents;
+  bool m_report;
+};
+
+/**
+ * Checks precise distribution of concurrency. Should be used when there is no uncertainty with
+ * regard to what TCM recommends.
+ */
+struct precise_concurrency_distribution_checker : concurrency_comparator_base {
+  precise_concurrency_distribution_checker(unsigned num_indents = 0, bool report = true)
+    : concurrency_comparator_base(num_indents, report) {}
+
+  bool operator()(const uint32_t* expected, const uint32_t* actual, uint32_t size) {
+    auto const& expected_concurrencies = to_string(expected, size);
+    auto const& actual_concurrencies = to_string(actual, size);
+    std::string report_str = "Check concurrencies precisely, expected " + expected_concurrencies +
+                             " equals to actual " + actual_concurrencies;
+    const bool result = std::equal(expected, expected + size, actual);
+    return m_report ? check(result, report_str, m_num_indents) : result;
+  }
+};
+
+/**
+ * Checks the overall concurrency rather than its distribution. Useful when the concurrency
+ * distribution depends on the resource distribution strategy.
+ */
+struct distribution_agnostic_concurrency_checker : concurrency_comparator_base {
+  distribution_agnostic_concurrency_checker(unsigned num_indents = 0, bool report = true)
+    : concurrency_comparator_base(num_indents, report) {}
+
+  bool operator()(const uint32_t* expected, const uint32_t* actual, uint32_t size) {
+    std::string report_str{};
+
+    auto const& expected_concurrencies = to_string(expected, size);
+    auto const& actual_concurrencies = to_string(actual, size);
+
+    report_str = "Check concurrencies in distribution-agnostic way, expected "
+                 + expected_concurrencies + " actual " + actual_concurrencies;
+
+    uint32_t expected_sum = 0, actual_sum = 0;
+    for (uint32_t i = 0; i < size; ++i) {
+      expected_sum += expected[i];
+      actual_sum   += actual[i];
+    }
+
+    const bool result = (expected_sum == actual_sum);
+
+    return m_report ? check(result, report_str, m_num_indents) : result;
+  }
+};
+
+template <typename ConcurrencyComparator = precise_concurrency_distribution_checker>
+inline bool check_permit_concurrency(const tcm_permit_t& expected, const tcm_permit_t& actual,
+                                     const unsigned num_indents = 0, const bool report = true)
+{
+  check(expected.size == actual.size, "Size of concurrency arrays matches", num_indents);
+  ConcurrencyComparator compare_concurrencies(num_indents, report);
+  return compare_concurrencies(expected.concurrencies, actual.concurrencies, expected.size);
+}
+
+inline uint32_t get_permit_concurrency(const tcm_permit_t& permit) {
+  uint32_t total_grant = 0;
+  for (unsigned i = 0; i < permit.size; ++i) {
+    const auto& e = permit.concurrencies[i];
+    total_grant += e;
+  }
+
+  return total_grant;
+}
+
+inline bool check_permit_mask(const tcm_permit_t& expected, const tcm_permit_t& actual,
+                              const unsigned num_indents = 0, const bool report = true)
+{
+  std::string report_str{};
+  // check the cpu_masks pointers
+  if (expected.cpu_masks == nullptr && actual.cpu_masks == nullptr) {
+    return check(true, report ? "Both masks are null pointers" : "", num_indents);
+  } else if (expected.cpu_masks == nullptr || actual.cpu_masks == nullptr) {
+    report_str = "Check CPU mask, expected cpu_masks pointer '" +
+        std::to_string(uintptr_t(expected.cpu_masks)) + "' equals to actual cpu_masks pointer '" +
+        std::to_string(uintptr_t(actual.cpu_masks)) + "'";
+    return report ? check(false, report_str, num_indents) : false;
+  }
+
+  bool result = true;
+  for (unsigned i = 0; i < expected.size; ++i) {
+    // check the cpu_masks values
+    const auto& e = expected.cpu_masks[i]; const auto& a = actual.cpu_masks[i];
+
+    if (e && a) {
+      result &= is_equal(e, a);
+      report_str = "Check CPU mask, expected '" + to_string(e) +
+        "' equals to actual '" + to_string(a) + "', mask index " + std::to_string(i);
+    } else {
+      result &= (e == nullptr && a == nullptr);
+      report_str = "Check CPU mask is not nullptr: actual '" +  to_string(a) +
+        "', index " + std::to_string(i);
+    }
+
+    if (report) {
+        result &= check(result, report_str, num_indents);
+    }
+  }
+
+  return result;
+}
+
+inline bool check_permit_state(const tcm_permit_t& expected, const tcm_permit_t& actual,
+                               const unsigned num_indents = 0, const bool report = true)
+{
+  const auto& e = expected.state; const auto& a = actual.state;
+  const bool result = (e == a);
+  std::string report_str = "Check state, expected " + to_string(e) + " (" + std::to_string(e) +
+                           ") equals to actual " + to_string(a) + " (" + std::to_string(a) + ")";
+
+  return report ? check(result, report_str, num_indents) : result;
+}
+
+inline bool check_permit_flags(const tcm_permit_t& expected, const tcm_permit_t& actual,
+                               const unsigned num_indents = 0, const bool report = true)
+{
+  const auto& e = expected.flags; const auto& a = actual.flags;
+  bool result = true;
+  result &= e.stale == a.stale;
+  result &= e.rigid_concurrency == a.rigid_concurrency;
+  result &= e.exclusive == a.exclusive;
+  result &= e.request_as_inactive == a.request_as_inactive;
+
+  std::string report_str("Check flags, expected: " + to_string(e) +
+                         " equals to actual: " + to_string(a));
+
+  return report ? check(result, report_str, num_indents) : result;
+}
+
+struct skip_checks_t {
+  bool size = false;
+  bool concurrency = false;
+  bool state = false;
+  bool flags = false;
+  bool mask = false;
+};
+
+static constexpr skip_checks_t skip_concurrency_check = []() {
+    skip_checks_t skip{};
+    skip.concurrency = true;
+    return skip;
+}();
+
+
+inline skip_checks_t operator|(const skip_checks_t& lhs, const skip_checks_t& rhs) {
+  return {
+    lhs.size || rhs.size,
+    lhs.concurrency || rhs.concurrency,
+    lhs.state || rhs.state,
+    lhs.flags || rhs.flags,
+    lhs.mask || rhs.mask
+  };
+}
+
+// Compares two permits' data. Returns true if the data is equal, false -
+// otherwise. Function allows skipping check of specific permit data fields.
+template <typename ConcurrencyComparator = precise_concurrency_distribution_checker>
+inline bool check_permit(const tcm_permit_t& expected, const tcm_permit_t& actual,
+                         const skip_checks_t skip = {}, unsigned num_indents = 1,
+                         const bool report = true)
+{
+  bool result = true;
+  result &= skip.size        || check_permit_size(expected, actual, num_indents, report);
+  result &= skip.concurrency || check_permit_concurrency<ConcurrencyComparator>
+                                    (expected, actual, num_indents, report);
+  result &= skip.mask        || check_permit_mask(expected, actual, num_indents, report);
+  result &= skip.state       || check_permit_state(expected, actual, num_indents, report);
+  result &= skip.flags       || check_permit_flags(expected, actual, num_indents, report);
+  return result;
+}
+
+//! Checks the expected permit data with the data obtained by reading passed
+//! permit handle. Returns true if the data is equal, and false - otherwise.
+template <typename ConcurrencyComparator = precise_concurrency_distribution_checker>
+inline bool check_permit(const tcm_permit_t& expected, tcm_permit_handle_t ph,
+                         const skip_checks_t skip = {}, const unsigned num_indents = 1,
+                         const bool report = true)
+{
+  std::string msg;
+  if (report)
+    msg = "check permit_handle=" + to_string(ph) + " is not nullptr";
+  check(ph, msg, num_indents);
+
+  __TCM_ASSERT(expected.size > 0, "Permit size cannot be zero.");
+  std::vector<uint32_t> concurrencies(expected.size, 0);
+  std::unique_ptr<tcm_cpu_mask_t[], masks_guard_t> cpu_masks(nullptr, masks_guard_t(expected.size));
+  if (expected.cpu_masks) {
+    cpu_masks.reset(new tcm_cpu_mask_t[expected.size]);
+    for (uint32_t i = 0; i < expected.size; ++i) {
+      cpu_masks[i] = allocate_cpu_mask();
+    }
+  }
+
+  tcm_permit_t actual = make_void_permit(concurrencies.data(), cpu_masks.get(), expected.size);
+  tcm_result_t reading_result = tcmGetPermitData(ph, &actual);
+  check(reading_result == TCM_RESULT_SUCCESS, "Reading data from ph=" + to_string(ph), num_indents,
+        "tcmGetPermitData() returns status " + std::to_string(reading_result));
+
+  bool result = check_permit<ConcurrencyComparator>(expected, actual, skip, num_indents, report);
+  return result;
+}
+
+typedef std::pair<const tcm_permit_t&, const tcm_permit_t&> tcm_permits_pair_t;
+
+inline bool check_permits(std::initializer_list<tcm_permits_pair_t> expected_and_actual_permit_pairs,
+                          const unsigned num_indents = 0, const skip_checks_t skip = {},
+                          const bool report = true)
+{
+    bool result = true;
+    for (const auto& pair : expected_and_actual_permit_pairs) {
+        const auto& expected = pair.first; const auto& actual = pair.second;
+        result &= check_permit(expected, actual, skip, num_indents, report);
+    }
+    return result;
+}
+
+typedef std::pair<const tcm_permit_t&, tcm_permit_handle_t&> tcm_permit_and_handle_pair_t;
+
+inline bool check_permits(
+  std::initializer_list<tcm_permit_and_handle_pair_t> expected_and_actual_permit_pairs,
+  const unsigned num_indents = 1, const skip_checks_t skip = {}, const bool report = true)
+{
+    bool result = true;
+    for (const auto& pair : expected_and_actual_permit_pairs) {
+        const auto& expected = pair.first; auto& permit_handle = pair.second;
+        result &= check_permit(expected, permit_handle, skip, num_indents, report);
+    }
+    return result;
+}
+
+
+typedef std::vector< std::pair<tcm_permit_handle_t, tcm_permit_t*> > permits_data_t;
+
+/**
+ * \brief Returns a set of permit handles, whose data is equal to corresponding
+ * (expected) permit data passed as a sequence of pairs.
+ *
+ * Thus, if existing permits are passed as a parameter, the function returns
+ * permit handles, for which the renegotiation should not have taken place.
+ */
+inline std::set<tcm_permit_handle_t> list_unchanged_permits(const permits_data_t& pds,
+                                                            const unsigned num_indents = 0)
+{
+  std::set<tcm_permit_handle_t> result;
+
+  for (auto& pd : pds) {
+    const tcm_permit_handle_t ph = pd.first;
+    const tcm_permit_t& expected = *pd.second;
+
+    if (check_permit(expected, ph, skip_checks_t{}, num_indents, /*report*/false))
+      result.insert(ph);
+  }
+
+  return result;
+}
+
+
+/*
+ * Test helpers to simplify regular work with the TCM.
+ */
+// TODO: Make use of these helpers in all the tests, utilizing RAII for releasing permits, closing
+// connections that remain after exception occurs.
+inline tcm_client_id_t connect_new_client(tcm_callback_t callback = nullptr,
+                                          const std::string& error_message = "tcmConnect failed",
+                                          const std::string& log_message = "")
+{
+  tcm_client_id_t client_id;
+
+  tcm_result_t r = tcmConnect(callback, &client_id);
+  if (!check_success(r, log_message))
+    throw tcm_connect_error(error_message.c_str());
+
+  tcm_tests.add_client(client_id);
+
+  return client_id;
+}
+
+inline void disconnect_client(const tcm_client_id_t& client_id,
+                              const std::string& error_message = "tcmDisconnect failed",
+                              const std::string& log_message = "")
+{
+  tcm_result_t r = tcmDisconnect(client_id);
+  if (!check_success(r, log_message))
+    throw tcm_disconnect_error(error_message.c_str());
+
+  tcm_tests.remove_client(client_id);
+}
+
+inline tcm_permit_handle_t
+request_permit(tcm_client_id_t client, const tcm_permit_request_t& req, void* callback_arg = nullptr,
+               tcm_permit_handle_t permit_handle = nullptr,
+               const std::string& error_message = "tcmRequestPermit failed",
+               const std::string& log_message = "")
+{
+  std::string actual_log_message = log_message;
+  if ("" == log_message) {
+      const std::string num_resources_msg = "[" + std::to_string(req.min_sw_threads) + ", " +
+                                            std::to_string(req.max_sw_threads) + "]";
+      std::string ph_type_msg = "new";
+      if (permit_handle) {
+          ph_type_msg = "existing";
+      }
+      actual_log_message = std::string("tcmRequestPermit on ") + ph_type_msg + " permit_handle for "
+                           + num_resources_msg + " software threads";
+      if (req.constraints_size > 0) {
+          actual_log_message += ", with " + std::to_string(req.constraints_size) + " constraints: ";
+          for (uint32_t i = 0; i < req.constraints_size; ++i) {
+              actual_log_message += "\n\t" + std::to_string(i) + ": {";
+              tcm_cpu_constraints_t c = req.cpu_constraints[i];
+              actual_log_message += "min_concurrency=" + std::to_string(c.min_concurrency)
+                                    + ", max_concurrency=" + std::to_string(c.max_concurrency)
+                                    + ", mask=" + to_string(c.mask)
+                                    + ", numa_id=" + std::to_string(c.numa_id)
+                                    + ", core_type_id=" + std::to_string(c.core_type_id)
+                                    + ", threads_per_core=" + std::to_string(c.threads_per_core);
+              actual_log_message += "} ";
+          }
+      }
+  }
+
+  auto r = tcmRequestPermit(client, req, callback_arg, &permit_handle, /*permit*/nullptr);
+  if (!check_success(r, actual_log_message)) {
+    throw tcm_request_permit_error(error_message);
+  }
+
+  return permit_handle;
+}
+
+inline void activate_permit(tcm_permit_handle_t permit_handle,
+                            const std::string& error_message = "",
+                            const std::string& log_message = "tcmActivatePermit")
+{
+  auto r = tcmActivatePermit(permit_handle);
+  if (!check_success(r, log_message)) {
+    throw tcm_activate_permit_error(error_message);
+  }
+}
+
+inline void deactivate_permit(tcm_permit_handle_t permit_handle,
+                              const std::string& error_message = "",
+                              const std::string& log_message = "tcmDeactivatePermit")
+{
+  auto r = tcmDeactivatePermit(permit_handle);
+  if (!check_success(r, log_message)) {
+    throw tcm_deactivate_permit_error(error_message);
+  }
+}
+
+inline void idle_permit(tcm_permit_handle_t permit_handle, const std::string& error_message = "")
+{
+  auto r = tcmIdlePermit(permit_handle);
+  if (!check_success(r, "tcmIdlePermit")) {
+    throw tcm_idle_permit_error(error_message);
+  }
+}
+
+inline void release_permit(tcm_permit_handle_t ph,
+                           const std::string& error_message = "tcmReleasePermit failed",
+                           const std::string& log_message = "")
+{
+  tcm_result_t r = tcmReleasePermit(ph);
+
+  if (!check_success(r, log_message)) {
+    throw tcm_release_permit_error(error_message);
+  }
+}
+
+inline void register_thread(tcm_permit_handle_t ph, const std::string& error_message = "",
+                            const std::string& log_message = "")
+{
+  auto r = tcmRegisterThread(ph);
+
+  std::string msg = log_message;
+  if (log_message.empty())
+      msg = "tcmRegisterThread for " + to_string(ph);
+  if (!check_success(r, msg)) {
+    throw tcm_register_thread_error(error_message);
+  }
+}
+
+inline void unregister_thread(const std::string& error_message = "",
+                              const std::string& log_message = "tcmUnregisterThread")
+{
+  auto r = tcmUnregisterThread();
+
+  if (!check_success(r, log_message)) {
+    throw tcm_unregister_thread_error(error_message);
+  }
+}
+
+template <int size = 1>
+class permit_t {
+public:
+    permit_t(bool allocate_mask = false)
+        : concurrencies(new uint32_t[size]{0}),
+          cpu_masks(allocate_mask? new tcm_cpu_mask_t[size] : nullptr, masks_guard_t(size)),
+          permit{
+              concurrencies.get(), cpu_masks.get(), size, TCM_PERMIT_STATE_VOID,
+              tcm_permit_flags_t{}
+          }
+    {
+        if (allocate_mask)
+            for (uint32_t i = 0; i < size; ++i) {
+                cpu_masks[i] = allocate_cpu_mask();
+                __TCM_ASSERT(cpu_masks[i], "Failed allocating CPU mask");
+            }
+    }
+
+    operator tcm_permit_t&() { return permit; }
+
+    uint32_t concurrency() { return get_permit_concurrency(permit); }
+
+    tcm_const_cpu_mask_t cpu_mask(size_t idx = 0) {
+      __TCM_ASSERT(idx < size, "Index is out of range");
+      return cpu_masks ? cpu_masks[idx] : nullptr;
+    }
+private:
+    std::unique_ptr<uint32_t[]> concurrencies;
+    std::unique_ptr<tcm_cpu_mask_t[], masks_guard_t> cpu_masks;
+    tcm_permit_t permit;
+};
+
+inline void get_permit_data(tcm_permit_handle_t ph, tcm_permit_t& permit,
+                            const std::string& error_message = "",
+                            const std::string& log_message = "")
+{
+    std::string log = "tcmGetPermitData for ph=" + to_string(ph);
+    if (!log_message.empty())
+        log = log_message;
+    auto r = tcmGetPermitData(ph, &permit);
+    if (!check_success(r, log)) {
+        throw tcm_get_permit_data_error(error_message.c_str());
+    }
+}
+
+template <int size = 1>
+permit_t<size> get_permit_data(tcm_permit_handle_t ph, bool allocate_mask = false,
+                               const std::string& error_message = "") {
+  permit_t<size> permit_wrapper(allocate_mask);
+  tcm_permit_t& permit = permit_wrapper;
+
+  auto r = tcmGetPermitData(ph, &permit);
+  if (!check_success(r, "tcmGetPermitData for ph=" + to_string(ph))) {
+    throw tcm_get_permit_data_error(error_message);
+  }
+
+  return permit_wrapper;
+}
+
+template<int size = 1>
+inline permit_t<size> make_active_permit(uint32_t expected_concurrency,
+                                         tcm_cpu_mask_t* cpu_masks = nullptr,
+                                         tcm_permit_flags_t flags = {})
+{
+  static_assert(size == 1, "Unsupported. TODO: Accept array of concurrencies");
+  const bool allocate_mask = bool(cpu_masks);
+  permit_t<size> permit_wrapper(allocate_mask);
+  tcm_permit_t& permit = permit_wrapper;
+  permit.concurrencies[0] = expected_concurrency;
+  if (allocate_mask) {
+      for (int i = 0; i < size; ++i) {
+          __TCM_ASSERT(permit.cpu_masks[i], "Nothing to copy into");
+          __TCM_ASSERT(cpu_masks[i], "Nothing to copy from");
+          hwloc_bitmap_copy(permit.cpu_masks[i], cpu_masks[i]);
+      }
+  }
+  permit.state = TCM_PERMIT_STATE_ACTIVE;
+  permit.flags = flags;
+  return permit_wrapper;
+}
+
+inline permit_t</*size*/1> make_inactive_permit(tcm_cpu_mask_t* cpu_masks = nullptr,
+                                                tcm_permit_flags_t flags = {})
+{
+  const bool allocate_mask = bool(cpu_masks);
+  permit_t</*size*/1> permit_wrapper(allocate_mask);
+  tcm_permit_t& permit = permit_wrapper;
+  permit.state = TCM_PERMIT_STATE_INACTIVE;
+  permit.flags = flags;
+  return permit_wrapper;
+}
+
+/**
+ * The following set of helper functions allow checking for high-level expectations in the tests
+ * such as whether platform resources are available or not.
+ *
+ * The checks are based on the TCM invariants. For example, if all platform resources are occupied
+ * then requesting even for any single resource should not be successful.
+ *
+ * The functions return the state of the TCM as it was before they were started.
+ */
+
+/**
+ * Checks if TCM has available or can negotiate given number of resources.
+ */
+inline bool can_find(tcm_client_id_t client_id, uint32_t num_resources) {
+  // TODO: Add possibility to check resource availability using CPU constraints
+  const int32_t min_sw_threads = num_resources, max_sw_threads = num_resources;
+  tcm_permit_handle_t ph = request_permit(client_id, make_request(min_sw_threads, max_sw_threads));
+  auto expected = make_active_permit(max_sw_threads);
+  bool result = check_permit(expected, ph, skip_checks_t{}, /*num_indents*/ 1, /*report*/ false);
+  release_permit(ph);
+  return result;
+}
+
+/**
+ * Asserts TCM can find at most given number of resources.
+ */
+inline bool can_find_at_most(const uint32_t num_resources) {
+  const int num_to_fully_subscribe = int(num_resources);
+  tcm_permit_request_t req = make_request(/*min_sw_threads*/num_to_fully_subscribe,
+                                          /*max_sw_threads*/num_to_fully_subscribe);
+
+  tcm_client_id_t client_id = connect_new_client();
+  tcm_permit_handle_t ph = request_permit(client_id, req);
+  permit_t<1> expected = make_active_permit(/*expected_concurrency*/uint32_t(num_to_fully_subscribe));
+  bool result = check_permit(expected, ph, skip_checks_t{}, /*num_indents*/ 1, /*report*/ false);
+
+  // Making the second request while holding the first for one more resource. Forcing a nested
+  // request to overcome the lack of information if the first request was a nested one already.
+  check_success(tcmRegisterThread(ph));
+
+  const int32_t num_exceeding = 1 + /*inherited*/1;
+  tcm_permit_handle_t ph2 = request_permit(client_id, make_request(/*min_sw_threads*/num_exceeding,
+                                                                   /*max_sw_threads*/num_exceeding));
+  uint32_t expected_concurrency = 0;
+  result &= check_permit(make_pending_permit(&expected_concurrency), ph2, skip_checks_t{},
+                        /*num_indents*/1, /*report*/false);
+
+  check_success(tcmUnregisterThread());
+
+  release_permit(ph2);
+  release_permit(ph);
+
+  disconnect_client(client_id);
+
+  return result;
+}
+
+/**
+ * Requests permit for all platform resources. Checks that it was granted and releases the permit
+ * back.
+ */
+inline void assert_all_resources_available(const std::string& log_message =
+                                           "checking all resources are available")
+{
+  test_log("Begin " + log_message);
+
+  tcm_client_id_t client_id = connect_new_client();
+  if (!can_find(client_id, platform_tcm_concurrency()))
+      throw tcm_exception{"Not all platform resources are available"};
+  disconnect_client(client_id);
+
+  test_log("End " + log_message);
+}
+
+#endif // __TCM_TESTS_TEST_UTILS_HEADER
