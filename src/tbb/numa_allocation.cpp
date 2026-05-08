@@ -77,10 +77,12 @@ static const dynamic_link_descriptor LibnumaLinkTable[] = {
 
 void interleaved_initialization_impl() {
 #if __linux__
-    dynamic_link("libnuma.so", LibnumaLinkTable, sizeof(LibnumaLinkTable) / sizeof(dynamic_link_descriptor),
-                 nullptr, DYNAMIC_LINK_GLOBAL | DYNAMIC_LINK_LOAD | DYNAMIC_LINK_WEAK);
+    dynamic_link("libnuma.so", LibnumaLinkTable,
+                 sizeof(LibnumaLinkTable) / sizeof(dynamic_link_descriptor), nullptr,
+                 DYNAMIC_LINK_GLOBAL | DYNAMIC_LINK_LOAD | DYNAMIC_LINK_WEAK);
 #elif _WIN32 || _WIN64
-    dynamic_link("kernelbase.dll", LibnumaLinkTable, sizeof(LibnumaLinkTable) / sizeof(dynamic_link_descriptor));
+    dynamic_link("kernelbase.dll", LibnumaLinkTable,
+                 sizeof(LibnumaLinkTable) / sizeof(dynamic_link_descriptor));
 #endif
 }
 
@@ -137,7 +139,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     std::unique_ptr<int[]> status(new int[count_pages]);
 
     char *end_ptr = base_addr + bytes;
-    // move_pages() has no length parameter, so must be done per page
+    // move_pages() has no length parameter, so moving must be done per page
     for (char *ptr = base_addr; ptr < end_ptr; ptr += governor::default_page_size()) {
         unsigned page_idx = (ptr - base_addr) / governor::default_page_size();
         unsigned stride_idx = (ptr - base_addr) / bytes_per_chunk;
@@ -208,6 +210,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
 }
 #else /* __linux__ || _WIN32 || _WIN64 */
 
+// fallback implementation with malloc/free
 void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
                         const tbb::detail::d1::numa_node_id *nodes_ids, size_t nodes_count,
                         size_t bytes_per_chunk) {
