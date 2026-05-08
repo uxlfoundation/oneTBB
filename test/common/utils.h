@@ -488,7 +488,7 @@ public:
 };
 
 // if non-zero byte found, returns bad value address plus 1
-size_t NonZero(void *ptr, size_t size)
+inline size_t NonZero(void *ptr, size_t size)
 {
     size_t words = size / sizeof(intptr_t);
     size_t tailSz = size % sizeof(intptr_t);
