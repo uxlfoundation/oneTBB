@@ -149,7 +149,7 @@ TEST_CASE("test basics") {
         // explicit nodes and bytes_per_chunk
         VerifySizeAndNodes(lib, obj_size, numa_nodes, 3 * page_size);
 
-        // revet numa_nodes and check that interleaving works as expected
+        // reverse numa_nodes and check that interleaving works as expected
         std::reverse(numa_nodes.begin(), numa_nodes.end());
         VerifySizeAndNodes(lib, obj_size, numa_nodes, 3 * page_size);
 
