@@ -146,7 +146,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
         pages[page_idx] = ptr;
         nodes_per_page[page_idx] = nodes[stride_idx % nodes_count];
     }
-    long ret = move_pages_ptr(0, count_pages, pages.get(), nodes_per_page.get(), status.get(), 0);
+    long ret = move_pages_ptr(/*pid = */0, count_pages, pages.get(), nodes_per_page.get(), status.get(), /*flags = */0);
     if (ret < 0)
         return nullptr;
 
