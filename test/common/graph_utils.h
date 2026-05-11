@@ -953,7 +953,7 @@ template<typename NodeType>
 void test_lightweight(unsigned N) {
     test_unlimited_lightweight_execution<NodeType>(N);
     test_limited_lightweight_execution<NodeType>(N, tbb::flow::serial);
-    test_limited_lightweight_execution<NodeType>(N, (std::min)(std::thread::hardware_concurrency() / 2, N/2));
+    test_limited_lightweight_execution<NodeType>(N, (std::min)((std::thread::hardware_concurrency()+1) / 2, N/2));
 
     test_limited_lightweight_execution_with_throwing_body<NodeType>(N, tbb::flow::serial);
 }

@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -50,6 +51,7 @@
 #if MALLOC_CHECK_RECURSION
 #include <new>        /* for placement new */
 #endif
+#include <limits>               // for std::numeric_limits
 #include "oneapi/tbb/scalable_allocator.h"
 #include "tbbmalloc_internal_api.h"
 
@@ -197,22 +199,30 @@ protected:
             mask[i].fetch_and(~(1ULL << pos));
         }
     }
-    int getMinTrue(unsigned startIdx) const {
+    int getMinTrue(int startIndex) const {
+        MALLOC_ASSERT(startIndex >= 0, ASSERT_TEXT);
+        const unsigned startIdx = (unsigned)startIndex;
         unsigned idx = startIdx / WORD_LEN;
         int pos;
 
         if (startIdx % WORD_LEN) {
             // only interested in part of a word, clear bits before startIdx
             pos = WORD_LEN - startIdx % WORD_LEN;
-            uintptr_t actualMask = mask[idx].load(std::memory_order_relaxed) & (((uintptr_t)1<<pos) - 1);
+            uintptr_t actualMask =
+                mask[idx].load(std::memory_order_relaxed) & (((uintptr_t) 1 << pos) - 1);
             idx++;
-            if (-1 != (pos = BitScanRev(actualMask)))
-                return idx*WORD_LEN - pos - 1;
+            pos = BitScanRev(actualMask);
+            if (-1 != pos) {
+                MALLOC_ASSERT(idx * WORD_LEN - pos - 1 <= INT_MAX, ASSERT_TEXT);
+                return idx * WORD_LEN - pos - 1;
+            }
         }
 
         while (idx<SZ)
-            if (-1 != (pos = BitScanRev(mask[idx++].load(std::memory_order_relaxed))))
-                return idx*WORD_LEN - pos - 1;
+            if (-1 != (pos = BitScanRev(mask[idx++].load(std::memory_order_relaxed)))) {
+                MALLOC_ASSERT(idx * WORD_LEN - pos - 1 <= INT_MAX, ASSERT_TEXT);
+                return idx * WORD_LEN - pos - 1;
+            }
         return -1;
     }
 public:
@@ -223,7 +233,7 @@ template<unsigned NUM>
 class BitMaskMin : public BitMaskBasic<NUM> {
 public:
     void set(size_t idx, bool val) { BitMaskBasic<NUM>::set(idx, val); }
-    int getMinTrue(unsigned startIdx) const {
+    int getMinTrue(int startIdx) const {
         return BitMaskBasic<NUM>::getMinTrue(startIdx);
     }
 };
@@ -236,8 +246,8 @@ public:
 
         BitMaskBasic<NUM>::set(NUM - 1 - idx, val);
     }
-    int getMaxTrue(unsigned startIdx) const {
-        MALLOC_ASSERT(NUM >= startIdx + 1, ASSERT_TEXT);
+    int getMaxTrue(int startIdx) const {
+        MALLOC_ASSERT((int)NUM >= startIdx + 1, ASSERT_TEXT);
 
         int p = BitMaskBasic<NUM>::getMinTrue(NUM-startIdx-1);
         return -1==p? -1 : (int)NUM - 1 - p;
@@ -501,7 +511,7 @@ private:
 
         // Initialize object variables
         if (hugePageSize > -1) {
-            pageSize = hugePageSize * 1024; // was read in KB from meminfo
+            pageSize = (size_t)hugePageSize * 1024; // was read in KB from meminfo
         } else {
             pageSize = 0;
         }

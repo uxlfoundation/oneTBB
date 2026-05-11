@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025-2026 UXL Foundation Contributors
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -2165,7 +2165,7 @@ TEST_CASE("Test that a thread calling wait_for completes tasks when workers are 
 
     // Occupy all worker threads with work
     for (std::size_t i = 0; i < num_threads-1; ++i) {
-        ta_busy.enqueue([&] {
+        ta_busy.enqueue([&, i] {
             barrier.wait();
             if (i % 2) {
                 ta.enqueue(body, tg);
