@@ -35,7 +35,9 @@ TBB_EXPORT void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t byt
 inline void *allocate_numa_interleaved(size_t bytes,
                                        const std::vector<tbb::numa_node_id>& nodes,
                                        size_t bytes_per_chunk = 0) {
-    return allocate_interleaved(bytes, nodes.empty() ? nullptr : nodes.data(), nodes.size(), bytes_per_chunk);
+    if (nodes.empty())
+        return nullptr;
+    return allocate_interleaved(bytes, nodes.data(), nodes.size(), bytes_per_chunk);
 }
 
 inline void *allocate_numa_interleaved (size_t bytes, size_t bytes_per_chunk = 0) {

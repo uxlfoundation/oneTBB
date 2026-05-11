@@ -89,6 +89,16 @@ int find_numa_node(void* addr) {
 TEST_CASE("invalid parameters") {
     REQUIRE_MESSAGE(tbb::allocate_numa_interleaved(1, 7) == nullptr,
                     "bytes_per_chunk must be multiple of the memory page size");
+    const std::vector<tbb::numa_node_id> empty_nodes;
+    REQUIRE_MESSAGE(tbb::allocate_numa_interleaved(1, empty_nodes, 1) == nullptr,
+                    "empty nodes vector is forbidden, because superfluous");
+    REQUIRE_MESSAGE(tbb::detail::r1::allocate_interleaved(0, nullptr, 0, 0) == nullptr,
+                    "allocation of 0 bytes must return nullptr");
+    REQUIRE_MESSAGE(tbb::detail::r1::allocate_interleaved(4096, nullptr, 1, 0) == nullptr,
+                    "nodes_count must be 0 if nodes_ids is nullptr");
+    int node = 0;
+    REQUIRE_MESSAGE(tbb::detail::r1::allocate_interleaved(4096, &node, 0, 0) == nullptr,
+                    "nodes_count must be greater than 0 if nodes_ids is not nullptr");
 }
 
 void VerifySizeAndNodes(bool use_find_node, size_t bytes, const std::vector<tbb::numa_node_id>& nodes,
@@ -114,7 +124,7 @@ TEST_CASE("test basics") {
 #else
     bool lib = false;
 #endif
-#else // on Windows we use VirtualAllocEx and QueryWorkingSetEx, so no need to load any library
+#else // on Windows we use VirtualAllocEx and QueryWorkingSetEx, so always can check NUMA node
     bool lib = true;
 #endif
 
