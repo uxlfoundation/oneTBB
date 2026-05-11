@@ -562,17 +562,20 @@ if (TARGET TBB::tbb)
 
     if (TBB_TEST_CXX20_MODULES)
         if (CMAKE_VERSION VERSION_LESS 3.28)
-            message(WARNING "CMake 3.28 or higher is required to use C++20 modules, skipping module test")
+            message(WARNING "CMake 3.28 or higher is required to use C++20 modules, skipping module tests")
         elseif (NOT CMAKE_CXX_STANDARD OR CMAKE_CXX_STANDARD LESS 20)
-            message(WARNING "C++ standard 20 or higher is required, skipping module test")
+            message(WARNING "C++ standard 20 or higher is required, skipping module tests")
         else()
+            add_custom_target(tbb_cxx20_modules_tests)
             tbb_add_test(SUBDIR tbb NAME test_tbb_header_module_consumer DEPENDENCIES TBB::tbb TBB::tbbmalloc)
             target_sources(test_tbb_header_module_consumer
                 PUBLIC FILE_SET CXX_MODULES FILES
                 ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_module.cppm)
             set_target_properties(test_tbb_header_module_consumer PROPERTIES
+                LABELS "tbb_cxx20_modules_tests"
                 CXX_STANDARD 20
                 CXX_STANDARD_REQUIRED ON)
+            add_dependencies(tbb_cxx20_modules_tests test_tbb_header_module_consumer)
         endif()
     endif()
 
