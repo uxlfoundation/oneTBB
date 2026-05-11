@@ -89,6 +89,7 @@ int find_numa_node(void* addr) {
     #define NUMA_EQ WARN_EQ
 #endif
 
+//! \brief \ref requirement
 TEST_CASE("invalid parameters") {
     REQUIRE_MESSAGE(tbb::allocate_numa_interleaved(1, 7) == nullptr,
                     "bytes_per_chunk must be multiple of the memory page size");
