@@ -92,9 +92,7 @@ bool verify_args(size_t bytes, const tbb::detail::d1::numa_node_id *nodes_ids, s
         return false;
     if (bytes_per_chunk % governor::default_page_size() != 0)
         return false;
-    if ((nodes_ids == nullptr && nodes_count != 0) || (nodes_ids != nullptr && nodes_count == 0))
-        return false;
-    return true;
+    return nodes_ids == nullptr ? nodes_count == 0 : nodes_count != 0;
 }
 
 // interleaved memory allocation is only supported for those platforms
