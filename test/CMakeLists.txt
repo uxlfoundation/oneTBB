@@ -572,9 +572,11 @@ if (TARGET TBB::tbb)
                 PUBLIC FILE_SET CXX_MODULES FILES
                 ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_module.cppm)
             set_target_properties(test_tbb_header_module_consumer PROPERTIES
-                LABELS "tbb_cxx20_modules_tests"
                 CXX_STANDARD 20
                 CXX_STANDARD_REQUIRED ON)
+            set_tests_properties(test_tbb_header_module_consumer PROPERTIES
+                LABELS "tbb_cxx20_modules_tests"
+            )
             add_dependencies(tbb_cxx20_modules_tests test_tbb_header_module_consumer)
         endif()
     endif()
