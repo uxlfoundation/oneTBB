@@ -55,13 +55,13 @@ static std::atomic<do_once_state> interleaved_initialization_state;
 
 #if __linux__
 static long (*move_pages_ptr)(int pid, unsigned long count,
-                void **pages, const int *nodes, int *status, int flags) = nullptr;
+             void **pages, const int *nodes, int *status, int flags);
 
 static const dynamic_link_descriptor LibnumaLinkTable[] = {
     DLD(move_pages, move_pages_ptr)
 };
 #elif _WIN32 || _WIN64
-PVOID (*VirtualAlloc2_ptr)(HANDLE Process,
+static PVOID (*VirtualAlloc2_ptr)(HANDLE Process,
   PVOID                  BaseAddress,
   SIZE_T                 Size,
   ULONG                  AllocationType,
@@ -224,10 +224,9 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
 void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t bytes) {
     atomic_do_once(interleaved_initialization_impl, interleaved_initialization_state);
 
+    // TODO: process return value of munmap()/VirtualFree()
 #if __linux__
-    int ret = munmap(ptr, bytes);
-    if (ret < 0)
-        return;
+    munmap(ptr, bytes);
 #elif _WIN32 || _WIN64
     (void)bytes;
     VirtualFree(ptr, 0, MEM_RELEASE);
