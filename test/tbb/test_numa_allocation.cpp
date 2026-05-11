@@ -146,8 +146,8 @@ TEST_CASE("test basics") {
             tbb::deallocate_numa_interleaved(ptr, obj_size);
         }
 
+        for (size_t bytes_per_chunk : std::vector<size_t>{page_size, 3 * page_size, 41 * page_size})
         {
-            size_t bytes_per_chunk = 3 * page_size;
             char *ptr = (char *)tbb::allocate_numa_interleaved(obj_size, bytes_per_chunk);
             REQUIRE(ptr != nullptr);
             REQUIRE_EQ(utils::NonZero(ptr, obj_size), 0);
