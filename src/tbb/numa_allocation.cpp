@@ -27,17 +27,11 @@
 
 #include <sys/mman.h>
 
-// must support build without numaif.h
+// must support build without numaif.h, because TBB build must not depend of numactl presence
 extern "C" long move_pages(int pid, unsigned long count,
                            void **pages, const int *nodes, int *status, int flags);
 
-#elif _WIN32 || _WIN64
-
-template<typename T>
-static inline T alignUp(T arg, uintptr_t alignment) {
-    return T(((uintptr_t)arg+(alignment-1)) & ~(alignment-1));
-}
-#else
+#elif !(_WIN32 || _WIN64)
 
 #include <stdlib.h> // for malloc and free
 
@@ -86,7 +80,7 @@ void interleaved_initialization_impl() {
 #endif
 }
 
-bool verify_args(size_t bytes, const tbb::detail::d1::numa_node_id *nodes_ids, size_t nodes_count,
+bool is_args_valid(size_t bytes, const tbb::detail::d1::numa_node_id *nodes_ids, size_t nodes_count,
                  size_t bytes_per_chunk) {
     if (bytes == 0) // to be consistent with mmap
         return false;
@@ -103,7 +97,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
                         size_t bytes_per_chunk) {
     atomic_do_once(interleaved_initialization_impl, interleaved_initialization_state);
 
-    if (!verify_args(bytes, nodes_ids, nodes_count, bytes_per_chunk))
+    if (!is_args_valid(bytes, nodes_ids, nodes_count, bytes_per_chunk))
         return nullptr;
 
     if (!bytes_per_chunk)
@@ -114,7 +108,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
 
 #if __linux__
     char *base_addr = reinterpret_cast<char*>(
-        mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+        mmap(/*addr=*/nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, /*fd=*/-1, /*offset=*/0));
     if (base_addr == MAP_FAILED)
         return nullptr;
 
@@ -123,13 +117,13 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     };
     std::unique_ptr<void, decltype(unmap)> data_holder(base_addr, unmap);
 
-    // touch each page, otherwise move_pages() will fail with EFAULT
-    for (size_t i = 0; i < bytes; i += governor::default_page_size())
-        base_addr[i] = 0;
-
     // no NUMA nodes or move_pages() not available, just return the memory as is
     if (numa_node_count() == 1 || !move_pages_ptr)
         return data_holder.release();
+
+    // touch each page, otherwise move_pages() will fail with EFAULT
+    for (size_t i = 0; i < bytes; i += governor::default_page_size())
+        base_addr[i] = 0;
 
     size_t count_pages = (bytes + governor::default_page_size() - 1) / governor::default_page_size();
     std::unique_ptr<void*[]> pages(new void*[count_pages]);
@@ -144,7 +138,8 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
         pages[page_idx] = ptr;
         nodes_per_page[page_idx] = nodes[stride_idx % nodes_count];
     }
-    long ret = move_pages_ptr(/*pid = */0, count_pages, pages.get(), nodes_per_page.get(), status.get(), /*flags = */0);
+    long ret = move_pages_ptr(/*pid=*/0, count_pages, pages.get(), nodes_per_page.get(), status.get(),
+                              /*flags=*/0);
     if (ret < 0)
         return nullptr;
 
@@ -158,18 +153,20 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     if (numa_node_count() == 1 || !VirtualAlloc2_ptr)
         // do not use VirtualAlloc(), because it compiled incorrectly by MSVC 2017 with
         // -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug -DTBB_WINDOWS_DRIVER=ON
-        return VirtualAllocEx(GetCurrentProcess(), nullptr, bytes, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+        return VirtualAllocEx(GetCurrentProcess(), /*BaseAddress=*/nullptr, bytes, MEM_RESERVE | MEM_COMMIT,
+                              PAGE_READWRITE);
 
     // for VirtualAlloc2 it must be a multiple of the page size
-    bytes = alignUp(bytes, governor::default_page_size());
+    bytes = align_up(bytes, governor::default_page_size());
     char* base_addr =
-        static_cast<char*>(VirtualAlloc2_ptr(nullptr, nullptr, bytes, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER,
-                                             PAGE_NOACCESS, nullptr, 0));
+        static_cast<char*>(VirtualAlloc2_ptr(/*Process=*/nullptr, /*BaseAddress=*/nullptr, bytes,
+                                             MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS,
+                                             /*ExtendedParameters=*/nullptr, /*ParameterCount=*/0));
     if (!base_addr)
         return nullptr;
 
      auto unmap = [](char* base_addr) {
-        VirtualFree(base_addr, 0, MEM_RELEASE);
+        VirtualFree(base_addr, /*dwSize=*/0, MEM_RELEASE);
     };
     std::unique_ptr<char, decltype(unmap)> data_holder(base_addr, unmap);
 
@@ -197,7 +194,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
                      "and bytes_per_chunk is a multiple of page size");
         PVOID result = VirtualAlloc2_ptr(nullptr, base_addr + curr_size, chunk_size,
                                          MEM_RESERVE | MEM_COMMIT | MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE,
-                                         &param, 1);
+                                         &param, /*ParameterCount=*/1);
 
         if (!result)
             return nullptr;
@@ -212,7 +209,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
 void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
                         const tbb::detail::d1::numa_node_id *nodes_ids, size_t nodes_count,
                         size_t bytes_per_chunk) {
-    return verify_args(bytes, nodes_ids, nodes_count, bytes_per_chunk) ?
+    return is_args_valid(bytes, nodes_ids, nodes_count, bytes_per_chunk) ?
         calloc(bytes, 1) : nullptr;
 }
 
@@ -227,7 +224,7 @@ void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t bytes) {
     munmap(ptr, bytes);
 #elif _WIN32 || _WIN64
     (void)bytes;
-    VirtualFree(ptr, 0, MEM_RELEASE);
+    VirtualFree(ptr, /*dwSize=*/0, MEM_RELEASE);
 #else
     (void)bytes;
     free(ptr);

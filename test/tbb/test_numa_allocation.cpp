@@ -62,18 +62,10 @@ int find_numa_node(void* addr) {
     PSAPI_WORKING_SET_EX_INFORMATION pv = { nullptr, {0} };
     pv.VirtualAddress = addr;
 
-    // Query the working set extended information
-    if (!QueryWorkingSetEx(GetCurrentProcess(), &pv, sizeof(pv))) {
-        std::cerr << "QueryWorkingSetEx failed." << std::endl;
-        // Function failed (e.g., invalid handle or pointer)
-        return -1;
-    }
+    REQUIRE_MESSAGE(QueryWorkingSetEx(GetCurrentProcess(), &pv, sizeof(pv)), "QueryWorkingSetEx failed.");
 
     // If Valid == 0, the page is either swapped out or not yet faulted in.
-    if (!pv.VirtualAttributes.Valid) {
-        std::cerr << "VirtualAttributes invalid" << std::endl;
-        return -1;
-    }
+    REQUIRE_MESSAGE(pv.VirtualAttributes.Valid, "VirtualAttributes invalid");
 
     // Extract the NUMA Node from the bitfield (0-63)
     return (int)pv.VirtualAttributes.Node;
