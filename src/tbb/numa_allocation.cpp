@@ -118,7 +118,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     if (base_addr == MAP_FAILED)
         return nullptr;
 
-    auto unmap = [bytes](void* ptr) {
+    auto unmap = [bytes](void *ptr) {
         munmap(ptr, bytes);
     };
     std::unique_ptr<void, decltype(unmap)> data_holder(base_addr, unmap);
