@@ -44,7 +44,7 @@ inline void *allocate_numa_interleaved(size_t bytes,
     return r1::allocate_interleaved(bytes, nodes.data(), nodes.size(), bytes_per_chunk);
 }
 
-inline void *allocate_numa_interleaved (size_t bytes, size_t bytes_per_chunk = 0) {
+inline void *allocate_numa_interleaved(size_t bytes, size_t bytes_per_chunk = 0) {
     return r1::allocate_interleaved(bytes, nullptr, 0, bytes_per_chunk);
 }
 
