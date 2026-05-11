@@ -170,7 +170,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     if (!base_addr)
         return nullptr;
 
-     auto unmap = [bytes](char* base_addr) {
+     auto unmap = [](char* base_addr) {
         VirtualFree(base_addr, 0, MEM_RELEASE);
     };
     std::unique_ptr<char, decltype(unmap)> data_holder(base_addr, unmap);
