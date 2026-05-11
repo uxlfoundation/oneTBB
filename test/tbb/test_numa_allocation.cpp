@@ -117,6 +117,7 @@ void VerifySizeAndNodes(bool use_find_node, size_t bytes, const std::vector<tbb:
     tbb::deallocate_numa_interleaved(ptr, bytes);
 }
 
+//! \brief \ref interface \ref requirement
 TEST_CASE("test basics") {
     size_t page_size = DefaultSystemPageSize();
 #if __linux__
