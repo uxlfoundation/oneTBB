@@ -19,7 +19,7 @@
 
 #include "config.h"
 
-#if !defined(DOCTEST_CONFIG_IMPLEMENT)
+#if !defined(DOCTEST_CONFIG_IMPLEMENT) && !defined(__TBB_DOCTEST_SKIP_MAIN)
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #endif
 #if TBB_USE_EXCEPTIONS

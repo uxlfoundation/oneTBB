@@ -568,9 +568,14 @@ if (TARGET TBB::tbb)
         else()
             add_custom_target(tbb_cxx20_modules_tests)
             tbb_add_test(SUBDIR tbb NAME test_tbb_header_module_consumer DEPENDENCIES TBB::tbb TBB::tbbmalloc)
-            target_sources(test_tbb_header_module_consumer
-                PUBLIC FILE_SET CXX_MODULES FILES
-                ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_module.cppm)
+            target_sources(test_tbb_header_module_consumer PUBLIC
+              ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_secondary.cpp
+            )
+            target_sources(test_tbb_header_module_consumer PUBLIC
+                FILE_SET CXX_MODULES
+                FILES ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_module.cppm
+            )
+
             set_target_properties(test_tbb_header_module_consumer PROPERTIES
                 CXX_STANDARD 20
                 CXX_STANDARD_REQUIRED ON)

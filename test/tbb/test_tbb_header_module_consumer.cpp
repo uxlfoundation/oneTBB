@@ -24,3 +24,10 @@ import tbb_header_test;
 TEST_CASE("Test for definition presence in module interface") {
     DefinitionPresence();
 }
+
+void Secondary();
+//! Test usage together with C++20 modules
+//! \brief \ref error_guessing
+TEST_CASE("Test for multiple definition linker error") {
+    Secondary();
+}
