@@ -624,7 +624,7 @@ int __TBB_EXPORTED_FUNC constraints_threads_per_core(const d1::constraints&, int
 }
 
 // we need read-only access without making a copy
-const int *get_numa_nodes_indexes() {
+const int* get_numa_nodes_indexes() {
     system_topology::initialize();
     return system_topology::numa_nodes_indexes;
 }
