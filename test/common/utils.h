@@ -488,7 +488,7 @@ public:
 };
 
 // if non-zero byte found, returns bad value offset plus 1
-// do not use standart algorithms like std::find_if, because they don't check by words
+// do not use standard algorithms like std::find_if, because they loop over bytes
 inline size_t NonZero(void *ptr, size_t size)
 {
     size_t words = size / sizeof(intptr_t);
