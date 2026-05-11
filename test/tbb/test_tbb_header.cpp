@@ -94,6 +94,10 @@
 #include "common/test.h"
 #endif
 
+// Test if all the necessary symbols are exported for the exceptions thrown by TBB.
+// Missing exports result either in link error or in runtime assertion failure.
+#include <stdexcept>
+
 #endif /* !__TBB_TEST_MODULE_EXPORT */
 
 #if __TBB_TEST_MODULE_EXPORT
@@ -148,12 +152,6 @@ struct Msg {};
 struct SuspendBody {
     void operator()(tbb::task::suspend_point) const {}
 };
-
-// Test if all the necessary symbols are exported for the exceptions thrown by TBB.
-// Missing exports result either in link error or in runtime assertion failure.
-#if !__TBB_TEST_MODULE_EXPORT
-#include <stdexcept>
-#endif
 
 template <typename E>
 void TestExceptionClassExports ( const E& exc, tbb::detail::exception_id eid ) {
