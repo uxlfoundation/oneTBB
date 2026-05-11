@@ -159,9 +159,9 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     // for VirtualAlloc2 it must be a multiple of the page size
     bytes = align_up(bytes, governor::default_page_size());
     char* base_addr =
-        static_cast<char*>(VirtualAlloc2_ptr(/*Process=*/nullptr, /*BaseAddress=*/nullptr, bytes,
-                                             MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS,
-                                             /*ExtendedParameters=*/nullptr, /*ParameterCount=*/0));
+        reinterpret_cast<char*>(VirtualAlloc2_ptr(/*Process=*/nullptr, /*BaseAddress=*/nullptr, bytes,
+                                                  MEM_RESERVE | MEM_RESERVE_PLACEHOLDER, PAGE_NOACCESS,
+                                                  /*ExtendedParameters=*/nullptr, /*ParameterCount=*/0));
     if (!base_addr)
         return nullptr;
 
