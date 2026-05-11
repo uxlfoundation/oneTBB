@@ -110,7 +110,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
 
     if (!bytes_per_chunk)
         bytes_per_chunk = governor::default_page_size();
-    const int *nodes = nodes_count? nodes_ids : get_numa_nodes_indexes();
+    const int *nodes = nodes_count ? nodes_ids : get_numa_nodes_indexes();
     if (!nodes_count)
         nodes_count = numa_node_count();
 
