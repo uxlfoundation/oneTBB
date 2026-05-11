@@ -33,7 +33,8 @@
 
 #if __linux__
 static long (*move_pages_ptr)(int pid, unsigned long count,
-                void **pages, const int *nodes, int *status, int flags) = nullptr;
+                              void **pages, const int *nodes,
+                              int *status, int flags) = nullptr;
 #endif
 
 size_t DefaultSystemPageSize() {
