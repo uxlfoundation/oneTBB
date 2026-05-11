@@ -22,6 +22,9 @@
 
 #include "tbb/numa_allocation.h"
 
+//! \file test_numa_allocation.cpp
+//! \brief Test for [preview] functionality
+
 #if _WIN32 || _WIN64
 #include <psapi.h>
 #else
