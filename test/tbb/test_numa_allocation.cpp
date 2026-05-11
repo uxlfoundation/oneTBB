@@ -107,7 +107,8 @@ TEST_CASE("invalid parameters") {
 }
 
 void VerifySizeAndNodes(bool use_find_node, size_t bytes, const std::vector<tbb::numa_node_id>& nodes,
-     size_t bytes_per_chunk) {
+                        size_t bytes_per_chunk)
+{
     char* ptr = (char*)tbb::allocate_numa_interleaved(bytes, nodes, bytes_per_chunk);
     REQUIRE(ptr != nullptr);
     REQUIRE_EQ(utils::NonZero(ptr, bytes), 0);
