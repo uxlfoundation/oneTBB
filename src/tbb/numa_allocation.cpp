@@ -141,8 +141,8 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     char *end_ptr = base_addr + bytes;
     // move_pages() has no length parameter, so moving must be done per page
     for (char *ptr = base_addr; ptr < end_ptr; ptr += governor::default_page_size()) {
-        unsigned page_idx = (ptr - base_addr) / governor::default_page_size();
-        unsigned stride_idx = (ptr - base_addr) / bytes_per_chunk;
+        size_t page_idx = (ptr - base_addr) / governor::default_page_size();
+        size_t stride_idx = (ptr - base_addr) / bytes_per_chunk;
         pages[page_idx] = ptr;
         nodes_per_page[page_idx] = nodes[stride_idx % nodes_count];
     }
