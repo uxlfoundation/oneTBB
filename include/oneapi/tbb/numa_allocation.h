@@ -32,28 +32,32 @@ TBB_EXPORT void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     const tbb::detail::d1::numa_node_id *nodes, size_t nodes_count, size_t bytes_per_chunk);
 TBB_EXPORT void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t bytes);
 
+} // namespace r1
+
+namespace d1 {
+
 inline void *allocate_numa_interleaved(size_t bytes,
                                        const std::vector<tbb::numa_node_id>& nodes,
                                        size_t bytes_per_chunk = 0) {
     if (nodes.empty())
         return nullptr;
-    return allocate_interleaved(bytes, nodes.data(), nodes.size(), bytes_per_chunk);
+    return r1::allocate_interleaved(bytes, nodes.data(), nodes.size(), bytes_per_chunk);
 }
 
 inline void *allocate_numa_interleaved (size_t bytes, size_t bytes_per_chunk = 0) {
-    return allocate_interleaved(bytes, nullptr, 0, bytes_per_chunk);
+    return r1::allocate_interleaved(bytes, nullptr, 0, bytes_per_chunk);
 }
 
 inline void deallocate_numa_interleaved(void *ptr, size_t bytes) {
-    deallocate_interleaved(ptr, bytes);
+    r1::deallocate_interleaved(ptr, bytes);
 }
 
-} // namespace r1
+} // namespace d1
 } // namespace detail
 
 inline namespace v1 {
-using detail::r1::allocate_numa_interleaved;
-using detail::r1::deallocate_numa_interleaved;
+using detail::d1::allocate_numa_interleaved;
+using detail::d1::deallocate_numa_interleaved;
 } // inline namespace v1
 
 } // namespace tbb
