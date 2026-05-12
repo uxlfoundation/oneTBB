@@ -87,6 +87,8 @@ bool is_args_valid(size_t bytes, const tbb::detail::d1::numa_node_id *nodes_ids,
         return false;
     if (bytes_per_chunk % governor::default_page_size() != 0)
         return false;
+    // nodes_ids and nodes_count must be consistent with each other,
+    // i.e. either nodes_ids is nullptr and nodes_count is 0 or vice versa
     return (nodes_ids == nullptr) ^ (nodes_count != 0);
 }
 
