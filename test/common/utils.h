@@ -488,24 +488,26 @@ public:
 };
 
 // if non-zero byte found, returns bad value offset plus 1
-// do not use standard algorithms like std::find_if, because they loop over bytes
 inline size_t NonZero(void *ptr, size_t size)
 {
     size_t words = size / sizeof(intptr_t);
-    size_t tailSz = size % sizeof(intptr_t);
-    intptr_t *buf =(intptr_t*)ptr;
-    char *bufTail =(char*)(buf+words);
+    size_t tail_sz = size % sizeof(intptr_t);
+    intptr_t *buf = (intptr_t*)ptr;
+    char *buf_tail = (char*)(buf+words);
 
-    for (size_t i=0; i<words; i++)
-        if (buf[i]) {
-            for (unsigned b=0; b<sizeof(intptr_t); b++)
-                if (((char*)(buf+i))[b])
-                    return sizeof(intptr_t)*i + b + 1;
-        }
-    for (size_t i=0; i<tailSz; i++)
-        if (bufTail[i]) {
-            return words*sizeof(intptr_t)+i+1;
-        }
+    intptr_t *word_it = std::find_if_not(buf, buf + words, [](intptr_t v) { return v == 0; });
+    if (word_it != buf + words) {
+        // find exact byte in non-zero word
+        char *bytes = (char*)word_it;
+        char *byte_it = std::find_if_not(bytes, bytes + sizeof(intptr_t),
+                                         [](unsigned char c) { return c == 0; });
+        return (byte_it - (char*)ptr) + 1;
+    }
+
+    char *tail_it = std::find_if_not(buf_tail, buf_tail + tail_sz, [](char c) { return c == 0; });
+    if (tail_it != buf_tail + tail_sz) {
+        return (tail_it - (char*)ptr) + 1;
+    }
     return 0;
 }
 
