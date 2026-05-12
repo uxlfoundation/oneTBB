@@ -42,13 +42,14 @@ namespace tbb {
 namespace detail {
 namespace r1 {
 
-#if __TBB_WEAK_SYMBOLS_PRESENT
-#pragma weak move_pages
-#endif /* __TBB_WEAK_SYMBOLS_PRESENT */
-
 static std::atomic<do_once_state> interleaved_initialization_state;
 
 #if __linux__
+
+#if __TBB_WEAK_SYMBOLS_PRESENT
+#pragma weak move_pages
+#endif
+
 static long (*move_pages_ptr)(int pid, unsigned long count,
              void **pages, const int *nodes, int *status, int flags);
 
@@ -95,9 +96,8 @@ bool is_args_valid(size_t bytes, const tbb::detail::d1::numa_node_id *nodes_ids,
 // interleaved memory allocation is only supported for those platforms
 #if __linux__ || _WIN32 || _WIN64
 
-void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
-                        const tbb::detail::d1::numa_node_id *nodes_ids, size_t nodes_count,
-                        size_t bytes_per_chunk) {
+static const int *common_init(size_t bytes, const tbb::detail::d1::numa_node_id *nodes_ids,
+                              size_t &nodes_count, size_t &bytes_per_chunk) {
     atomic_do_once(interleaved_initialization_impl, interleaved_initialization_state);
 
     if (!is_args_valid(bytes, nodes_ids, nodes_count, bytes_per_chunk))
@@ -109,7 +109,17 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     if (!nodes_count)
         nodes_count = numa_node_count();
 
+    return nodes;
+}
+
 #if __linux__
+void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
+                        const tbb::detail::d1::numa_node_id *nodes_ids, size_t nodes_count,
+                        size_t bytes_per_chunk) {
+    const int *nodes = common_init(bytes, nodes_ids, nodes_count, bytes_per_chunk);
+    if (!nodes)
+        return nullptr;
+
     char *base_addr = reinterpret_cast<char*>(
         mmap(/*addr=*/nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, /*fd=*/-1, /*offset=*/0));
     if (base_addr == MAP_FAILED)
@@ -149,9 +159,18 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     for (size_t i = 0; i < count_pages; ++i)
         if (status[i] < 0)
             return nullptr;
-
     return data_holder.release();
+}
+
 #elif _WIN32 || _WIN64
+
+void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
+                        const tbb::detail::d1::numa_node_id *nodes_ids, size_t nodes_count,
+                        size_t bytes_per_chunk) {
+    const int *nodes = common_init(bytes, nodes_ids, nodes_count, bytes_per_chunk);
+    if (!nodes)
+        return nullptr;
+
     // no NUMA nodes or no VirtualAlloc2, just return the memory as is
     if (numa_node_count() == 1 || !VirtualAlloc2_ptr)
         // do not use VirtualAlloc(), because it compiled incorrectly by MSVC 2017 with
@@ -202,10 +221,11 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
         if (!result)
             return nullptr;
     }
-
     return data_holder.release();
-#endif
 }
+
+#endif // _WIN32 || _WIN64
+
 #else /* __linux__ || _WIN32 || _WIN64 */
 
 // fallback implementation with malloc/free
