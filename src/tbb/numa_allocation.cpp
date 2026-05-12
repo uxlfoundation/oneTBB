@@ -27,7 +27,8 @@
 
 #include <sys/mman.h>
 
-// must support build without numaif.h, because TBB build must not depend of numactl presence
+// TBB build must be done without numaif.h, but we need signature of move_pages()
+// for dynamic loading, so declare it here.
 extern "C" long move_pages(int pid, unsigned long count,
                            void **pages, const int *nodes, int *status, int flags);
 
