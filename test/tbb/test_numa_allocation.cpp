@@ -116,10 +116,15 @@ TEST_CASE("test basics") {
     size_t page_size = DefaultSystemPageSize();
 #if __linux__
 #if __TBB_DYNAMIC_LOAD_ENABLED
-    utils::LIBRARY_HANDLE lib = utils::OpenLibrary("libnuma.so");
-    WARN_MESSAGE(lib, "Can't load libnuma.so, skipping NUMA ownership checks");
-    if (lib)
-        utils::GetAddress(lib, "move_pages", move_pages_ptr);
+    utils::LIBRARY_HANDLE lib = nullptr;
+    // In case of single NUMA node, memory is untouched and page query is not working.
+    // Anyway, it has not much sense to check it on single-NUMA system.
+    if (tbb::info::numa_nodes().size() > 1) {
+        lib = utils::OpenLibrary("libnuma.so");
+        WARN_MESSAGE(lib, "Can't load libnuma.so, skipping NUMA ownership checks");
+        if (lib)
+            utils::GetAddress(lib, "move_pages", move_pages_ptr);
+    }
 #else
     bool lib = false;
 #endif
