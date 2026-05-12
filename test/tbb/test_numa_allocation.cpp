@@ -185,12 +185,13 @@ TEST_CASE("test basics") {
         numa_nodes.insert(numa_nodes.end(), numa_nodes_1.begin(), numa_nodes_1.end());
         VerifySizeAndNodes(lib, obj_size, numa_nodes, 3 * page_size);
     }
-    // explicitly check the basic allocation scenario
+    // explicitly check that allocation with tbb::info::numa_nodes() works
     {
-        size_t obj_size = 8;
+        size_t obj_size = 1024 * 1024LLU;
         std::vector<tbb::numa_node_id> numa_nodes = tbb::info::numa_nodes();
         char *ptr = (char *)tbb::allocate_numa_interleaved(obj_size, numa_nodes);
         REQUIRE(ptr != nullptr);
+        REQUIRE_EQ(utils::NonZero(ptr, obj_size), 0);
         tbb::deallocate_numa_interleaved(ptr, obj_size);
     }
 
