@@ -226,6 +226,18 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
 
 #endif // _WIN32 || _WIN64
 
+void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t bytes) {
+    atomic_do_once(interleaved_initialization_impl, interleaved_initialization_state);
+
+    // TODO: process return value of munmap()/VirtualFree()
+#if __linux__
+    munmap(ptr, bytes);
+#elif _WIN32 || _WIN64
+    (void)bytes;
+    VirtualFree(ptr, /*dwSize=*/0, MEM_RELEASE);
+#endif
+}
+
 #else /* __linux__ || _WIN32 || _WIN64 */
 
 // fallback implementation with malloc/free
@@ -236,23 +248,12 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
         calloc(bytes, 1) : nullptr;
 }
 
-#endif /* __linux__ || _WIN32 || _WIN64 */
-
-
 void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t bytes) {
-    atomic_do_once(interleaved_initialization_impl, interleaved_initialization_state);
-
-    // TODO: process return value of munmap()/VirtualFree()
-#if __linux__
-    munmap(ptr, bytes);
-#elif _WIN32 || _WIN64
-    (void)bytes;
-    VirtualFree(ptr, /*dwSize=*/0, MEM_RELEASE);
-#else
     (void)bytes;
     free(ptr);
-#endif
 }
+
+#endif /* __linux__ || _WIN32 || _WIN64 */
 
 } // namespace r1
 } // namespace detail
