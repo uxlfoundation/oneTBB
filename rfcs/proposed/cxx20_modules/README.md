@@ -115,9 +115,13 @@ regardless of whether they use modules or headers.
 Module-based API availability is tested by extending `test_tbb_header`. A C++20 module interface
 unit (`test_tbb_header_module.cppm`) either includes TBB headers in its global module fragment
 or imports the `tbb` module, then exports the test code. A consumer imports this module to verify
-public API accessibility through module imports.
+public API accessibility. An ABI compatibility check, in particular, combining
+module and header based TBB usage across multiple translation units, can also be performed.
 
-Long-term plans include extending module testing across the existing test suite.
+Running the whole TBB test suite with `import tbb;` seems to provide little value, since the module
+unit is implemented as a wrapper around headers. It may help catch some missing exported API, but
+implementing and maintaining such an "import" mode can be challenging and costly. Hence,
+the proposed testing approach seems to be a good balance between coverage and maintainability.
 
 ## Alternatives Considered
 
@@ -201,12 +205,7 @@ export module tbb;
    (e.g., `tbb.flow_graph`, `tbb.containers`) be provided so that consumers can precompile and
    import only what they need?
 
-2. How should module-based consumption be tested? Options include a dedicated test
-   that uses `import tbb;` instead of `#include`, or running the existing test suite
-   with module imports. Should whitebox tests be covered in the latter scenario?
-    * Currently extending `test_tbb_header` is suggested to check public API availability via modules.
-
-3. How to provide preview functionality with modules? TBB preview features are currently gated by
+2. How to provide preview functionality with modules? TBB preview features are currently gated by
    `TBB_PREVIEW_*` macros that are defined before including headers. Macros defined by the consumer
    before `import tbb;` cannot influence the module's already-compiled interface. One option is to
    provide a separate `tbb.preview` module. However, some preview features are extensions to
@@ -215,13 +214,13 @@ export module tbb;
     * Current workaround is to require the consumer to compile `tbb.cppm` with desired
     `TBB_PREVIEW_*` macros defined.
 
-4. How to support public macros such as `TBB_VERSION` or feature-test macros?
+3. How to support public macros such as `TBB_VERSION` or feature-test macros?
    Modules do not export preprocessor definitions, so these macros are not visible
    after `import tbb;`. Some options:
    - Replace them with inline variables where possible or provide exported functions.
    - Require the consumer to `#include <tbb/version.h>` alongside the import.
 
-5. Should the module be split into partitions (e.g., `tbb:algorithms`, `tbb:containers`,
+4. Should the module be split into partitions (e.g., `tbb:algorithms`, `tbb:containers`,
    `tbb:flow_graph`) to organize the `using`-declarations?
    Partitions are internal to the module and not importable by consumers, but could
    improve maintainability of the module interface.
