@@ -113,6 +113,9 @@ void VerifySizeAndNodes(bool use_find_node, size_t bytes, const std::vector<tbb:
 
 //! \brief \ref interface \ref requirement
 TEST_CASE("test basics") {
+    CHECK_MESSAGE(TBB_HAS_NUMA_ALLOCATION == 202605,
+                  "Incorrect feature test macro for NUMA allocation");
+
     size_t page_size = DefaultSystemPageSize();
 #if __linux__
 #if __TBB_DYNAMIC_LOAD_ENABLED
