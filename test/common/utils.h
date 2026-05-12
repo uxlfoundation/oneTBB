@@ -500,7 +500,7 @@ inline size_t NonZero(void *ptr, size_t size)
         // find exact byte in non-zero word
         char *bytes = (char*)word_it;
         char *byte_it = std::find_if_not(bytes, bytes + sizeof(intptr_t),
-                                         [](unsigned char c) { return c == 0; });
+                                         [](char c) { return c == 0; });
         return (byte_it - (char*)ptr) + 1;
     }
 
