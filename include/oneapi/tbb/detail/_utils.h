@@ -312,6 +312,13 @@ enum class do_once_state {
     initialized = executed  ///< Convenience alias
 };
 
+// Run the initializer which can not fail
+template<typename Functor>
+void run_initializer(const Functor& f, std::atomic<do_once_state>& state ) {
+    f();
+    state.store(do_once_state::executed, std::memory_order_release);
+}
+
 //! One-time initialization function
 /** /param initializer Pointer to function without arguments
            The variant that returns bool is used for cases when initialization can fail
@@ -343,13 +350,6 @@ void atomic_do_once( const F& initializer, std::atomic<do_once_state>& state ) {
         }
         spin_wait_while_eq( state, do_once_state::pending );
     }
-}
-
-// Run the initializer which can not fail
-template<typename Functor>
-void run_initializer(const Functor& f, std::atomic<do_once_state>& state ) {
-    f();
-    state.store(do_once_state::executed, std::memory_order_release);
 }
 
 #if __TBB_CPP20_CONCEPTS_PRESENT
