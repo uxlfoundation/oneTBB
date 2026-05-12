@@ -47,8 +47,15 @@ TEST_CASE("Test NUMA topology traversal correctness") {
 
     std::vector<oneapi::tbb::numa_node_id> numa_indexes = oneapi::tbb::info::numa_nodes();
     for (const auto& numa_id: numa_indexes) {
+        // numa_info.index is set to 0 in numa_topology_parsing() if
+        // no NUMA support is present.  No use comparing it with the
+        // numa_id which is -1 when no NUMA support is present, so
+        // handle -1 specially.
         auto pos = std::find_if(numa_nodes_info.begin(), numa_nodes_info.end(),
-            [&](const index_info& numa_info){ return numa_info.index == numa_id; }
+            [&](const index_info& numa_info){
+             printf("numa_info.index %d == numa_id %d\n", numa_info.index, numa_id);
+             return -1 == numa_id || numa_info.index == numa_id;
+           }
         );
 
         REQUIRE_MESSAGE(pos != numa_nodes_info.end(), "Wrong, extra or repeated NUMA node index detected.");
