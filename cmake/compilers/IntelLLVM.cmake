@@ -18,10 +18,10 @@ if (WIN32)
     set(TBB_OPENMP_FLAG /Qopenmp)
     set(TBB_IPO_COMPILE_FLAGS $<$<NOT:$<CONFIG:Debug>>:/Qipo>)
     set(TBB_IPO_LINK_FLAGS $<$<NOT:$<CONFIG:Debug>>:/INCREMENTAL:NO>)
-    # same symbols are defined in both libmmt.lib and libucrt.lib, fix linking of the tests and the examples
+    # Same symbols are defined in both libmmt.lib and libucrt.lib, fix linking of the tests and the examples
     # by not linking with libmmt.lib for this configuration
-    if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND ("${CMAKE_MSVC_RUNTIME_LIBRARY}" STREQUAL "MultiThreaded"
-                                        OR "${CMAKE_MSVC_RUNTIME_LIBRARY}" STREQUAL "MultiThreadedDebug"))
+    if (CMAKE_SIZEOF_VOID_P EQUAL 4 AND ("${CMAKE_MSVC_RUNTIME_LIBRARY}" STREQUAL "MultiThreaded"
+                                         OR "${CMAKE_MSVC_RUNTIME_LIBRARY}" STREQUAL "MultiThreadedDebug"))
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /Qoption,link,/NODEFAULTLIB:libmmt.lib")
     endif()
 else()
