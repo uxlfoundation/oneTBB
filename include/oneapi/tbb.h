@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -52,6 +53,9 @@
 #endif
 #include "oneapi/tbb/null_mutex.h"
 #include "oneapi/tbb/null_rw_mutex.h"
+#if TBB_PREVIEW_NUMA_ALLOCATION
+#include "oneapi/tbb/numa_allocation.h"
+#endif
 #include "oneapi/tbb/parallel_for.h"
 #include "oneapi/tbb/parallel_for_each.h"
 #include "oneapi/tbb/parallel_invoke.h"

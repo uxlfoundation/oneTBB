@@ -46,6 +46,9 @@
 #ifndef TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
 #define TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR 1
 #endif
+#ifndef TBB_PREVIEW_NUMA_ALLOCATION
+#define TBB_PREVIEW_NUMA_ALLOCATION 1
+#endif
 #endif
 
 #include "oneapi/tbb/detail/_config.h"
