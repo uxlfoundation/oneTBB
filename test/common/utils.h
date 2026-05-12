@@ -495,16 +495,13 @@ inline size_t NonZero(void *ptr, size_t size)
     intptr_t *buf = (intptr_t*)ptr;
     char *buf_tail = (char*)(buf+words);
 
-    intptr_t *word_it = std::find_if_not(buf, buf + words, [](intptr_t v) { return v == 0; });
+    intptr_t *word_it = std::find_if(buf, buf + words, [](intptr_t v) { return v != 0; });
     if (word_it != buf + words) {
         // find exact byte in non-zero word
-        char *bytes = (char*)word_it;
-        char *byte_it = std::find_if_not(bytes, bytes + sizeof(intptr_t),
-                                         [](char c) { return c == 0; });
-        return (byte_it - (char*)ptr) + 1;
+        buf_tail = (char*)word_it;
+        tail_sz = sizeof(intptr_t);
     }
-
-    char *tail_it = std::find_if_not(buf_tail, buf_tail + tail_sz, [](char c) { return c == 0; });
+    char *tail_it = std::find_if(buf_tail, buf_tail + tail_sz, [](char c) { return c != 0; });
     if (tail_it != buf_tail + tail_sz) {
         return (tail_it - (char*)ptr) + 1;
     }
