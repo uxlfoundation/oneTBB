@@ -138,7 +138,8 @@ TEST_CASE("test basics") {
     for (size_t obj_size = 8; obj_size <= 1024 * 1024LLU; obj_size *= 2)
     {
         std::vector<tbb::numa_node_id> numa_nodes = tbb::info::numa_nodes();
-        // we treat no-NUMA as single-NUMA with node index 0, but numa_nodes() return -1 in this case
+        // during ownership checking we treat no-NUMA as single-NUMA with node index 0,
+        // but numa_nodes() return -1 in this case
         if (numa_nodes.size() == 1)
             numa_nodes[0] = 0;
 
