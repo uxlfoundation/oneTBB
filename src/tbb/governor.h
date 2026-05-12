@@ -152,8 +152,6 @@ public:
     }
 }; // class governor
 
-const int* get_numa_nodes_indexes();
-
 } // namespace r1
 } // namespace detail
 } // namespace tbb
