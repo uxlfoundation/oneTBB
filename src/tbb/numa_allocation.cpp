@@ -42,8 +42,6 @@ namespace tbb {
 namespace detail {
 namespace r1 {
 
-static std::atomic<do_once_state> interleaved_initialization_state;
-
 #if __linux__
 
 #if __TBB_WEAK_SYMBOLS_PRESENT
@@ -84,6 +82,8 @@ bool is_args_valid(size_t bytes, const tbb::detail::d1::numa_node_id *nodes_ids,
 
 // interleaved memory allocation is only supported for those platforms
 #if __linux__ || _WIN32 || _WIN64
+
+static std::atomic<do_once_state> interleaved_initialization_state;
 
 void interleaved_initialization_impl() {
 #if __linux__
