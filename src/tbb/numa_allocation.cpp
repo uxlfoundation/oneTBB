@@ -73,13 +73,13 @@ static const dynamic_link_descriptor LibnumaLinkTable[] = {
 
 void interleaved_initialization_impl() {
 #if __linux__
-    dynamic_link("libnuma.so", LibnumaLinkTable,
-                 sizeof(LibnumaLinkTable) / sizeof(dynamic_link_descriptor), nullptr,
-                 DYNAMIC_LINK_GLOBAL | DYNAMIC_LINK_LOAD | DYNAMIC_LINK_WEAK);
+const char* numa_lib_name = "libnuma.so";
 #elif _WIN32 || _WIN64
-    dynamic_link("kernelbase.dll", LibnumaLinkTable,
-                 sizeof(LibnumaLinkTable) / sizeof(dynamic_link_descriptor));
+const char* numa_lib_name = "kernelbase.dll";
 #endif
+    dynamic_link(numa_lib_name, LibnumaLinkTable,
+                 sizeof(LibnumaLinkTable) / sizeof(dynamic_link_descriptor), /*handle*/nullptr,
+                 DYNAMIC_LINK_GLOBAL | DYNAMIC_LINK_LOAD | DYNAMIC_LINK_WEAK);
 }
 
 bool is_args_valid(size_t bytes, const tbb::detail::d1::numa_node_id *nodes_ids, size_t nodes_count,
