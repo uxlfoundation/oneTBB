@@ -121,13 +121,10 @@ T max ( const T& val1, const T& val2 ) {
     return val1 < val2 ? val2 : val1;
 }
 
-#if _WIN32 || _WIN64
-// currently used only for this OS
 template<typename T>
-static inline T align_up(T arg, uintptr_t alignment) {
-    return T(((uintptr_t)arg+(alignment-1)) & ~(alignment-1));
+inline T align_up( T arg, uintptr_t alignment ) {
+    return T( ((uintptr_t)arg + (alignment - 1)) & ~(alignment - 1) );
 }
-#endif
 
 //! Utility helper structure to ease overload resolution
 template<int > struct int_to_type {};
