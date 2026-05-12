@@ -225,6 +225,13 @@ export module tbb;
    Partitions are internal to the module and not importable by consumers, but could
    improve maintainability of the module interface.
 
+5. Currently there is [a limitation](https://github.com/uxlfoundation/oneTBB/pull/2043#discussion_r3092568832)
+   with transitive inclusion of the STL headers. Certain combinations of standard headers inclusions
+   and C++23 standard module imports can cause compilation errors. It in unclear whether this is a
+   compiler limitation or a limitation of modules in general. Regardless, the question is how to
+   address this issue (e.g. allow the consumer to switch between includes and imports in TBB module unit)
+   and how should the testing suite be extended to cover these problematic scenarios.
+
 ## Exit Criteria
 
 The following conditions should be met before this feature graduates from
