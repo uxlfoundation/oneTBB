@@ -71,17 +71,6 @@ static const dynamic_link_descriptor LibnumaLinkTable[] = {
 };
 #endif /* __linux__ */
 
-void interleaved_initialization_impl() {
-#if __linux__
-const char* numa_lib_name = "libnuma.so";
-#elif _WIN32 || _WIN64
-const char* numa_lib_name = "kernelbase.dll";
-#endif
-    dynamic_link(numa_lib_name, LibnumaLinkTable,
-                 sizeof(LibnumaLinkTable) / sizeof(dynamic_link_descriptor), /*handle*/nullptr,
-                 DYNAMIC_LINK_GLOBAL | DYNAMIC_LINK_LOAD | DYNAMIC_LINK_WEAK);
-}
-
 bool is_args_valid(size_t bytes, const tbb::detail::d1::numa_node_id *nodes_ids, size_t nodes_count,
                  size_t bytes_per_chunk) {
     if (bytes == 0) // to be consistent with mmap
@@ -95,6 +84,17 @@ bool is_args_valid(size_t bytes, const tbb::detail::d1::numa_node_id *nodes_ids,
 
 // interleaved memory allocation is only supported for those platforms
 #if __linux__ || _WIN32 || _WIN64
+
+void interleaved_initialization_impl() {
+#if __linux__
+const char* numa_lib_name = "libnuma.so";
+#elif _WIN32 || _WIN64
+const char* numa_lib_name = "kernelbase.dll";
+#endif
+    dynamic_link(numa_lib_name, LibnumaLinkTable,
+                 sizeof(LibnumaLinkTable) / sizeof(dynamic_link_descriptor), /*handle*/nullptr,
+                 DYNAMIC_LINK_GLOBAL | DYNAMIC_LINK_LOAD | DYNAMIC_LINK_WEAK);
+}
 
 static const int *common_init(size_t bytes, const tbb::detail::d1::numa_node_id *nodes_ids,
                               size_t &nodes_count, size_t &bytes_per_chunk) {
