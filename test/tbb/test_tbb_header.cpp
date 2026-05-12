@@ -25,7 +25,7 @@
     Most of the checks happen at the compilation or link phases.
 **/
 
-#if !__TBB_TEST_MODULE_EXPORT
+#if !__TBB_TEST_MODULE_EXPORT && !__TBB_IN_MODULE_USE
 
 #if __INTEL_COMPILER && _MSC_VER
 #pragma warning(disable : 2586) // decorated name length exceeded, name was truncated
@@ -98,7 +98,7 @@
 // Missing exports result either in link error or in runtime assertion failure.
 #include <stdexcept>
 
-#endif /* !__TBB_TEST_MODULE_EXPORT */
+#endif /* !__TBB_TEST_MODULE_EXPORT && !__TBB_IN_MODULE_USE */
 
 #if __TBB_TEST_MODULE_EXPORT
 inline volatile size_t g_sink;
@@ -279,6 +279,10 @@ static void DefinitionPresence() {
     TestTypeDefinitionPresence( flow::limiter_node<int> );
     TestTypeDefinitionPresence2(flow::indexer_node<int, int> );
     TestTypeDefinitionPresence2(flow::composite_node<std::tuple<int>, std::tuple<int> > );
+#if TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
+    TestTypeDefinitionPresence( flow::resource_limiter<int> );
+    TestTypeDefinitionPresence2(flow::resource_limited_node<int, std::tuple<int> > );
+#endif
     TestTypeDefinitionPresence( flow::graph_node );
     TestTypeDefinitionPresence( flow::reset_flags );
     TestTypeDefinitionPresence( flow::tag_value );

@@ -165,6 +165,7 @@ export namespace tbb {
     using tbb::task_handle;
 #if TBB_PREVIEW_TASK_GROUP_EXTENSIONS
     using tbb::task_completion_handle;
+    using tbb::task_complete;
 #endif
     using tbb::task_scheduler_observer;
 
@@ -192,15 +193,21 @@ export namespace tbb {
         // TODO: should abstract APIs be part of module
         using tbb::flow::receiver;
         using tbb::flow::sender;
-        using tbb::flow::graph_node;
+
+        using tbb::flow::serial;
+        using tbb::flow::unlimited;
 
         using tbb::flow::reset_flags;
         using tbb::flow::rf_reset_protocol;
         using tbb::flow::rf_reset_bodies;
         using tbb::flow::rf_clear_edges;
 
+        using tbb::flow::graph;
+        using tbb::flow::graph_node;
         using tbb::flow::continue_msg;
+
         using tbb::flow::input_node;
+        using tbb::flow::function_node;
         using tbb::flow::multifunction_node;
         using tbb::flow::split_node;
         using tbb::flow::output_port;
@@ -227,12 +234,6 @@ export namespace tbb {
         using tbb::flow::async_node;
         using tbb::flow::node_priority_t;
         using tbb::flow::no_priority;
-#if TBB_PREVIEW_FLOW_GRAPH_EXTENSIONS
-        using tbb::flow::follows;
-        using tbb::flow::precedes;
-        using tbb::flow::make_node_set;
-        using tbb::flow::make_edges;
-#endif
         using tbb::flow::rejecting;
         using tbb::flow::reserving;
         using tbb::flow::queueing;
@@ -241,6 +242,18 @@ export namespace tbb {
         using tbb::flow::tag_matching;
         using tbb::flow::queueing_lightweight;
         using tbb::flow::rejecting_lightweight;
+
+    #if __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
+        using tbb::flow::follows;
+        using tbb::flow::precedes;
+        using tbb::flow::make_node_set;
+        using tbb::flow::make_edges;
+    #endif
+
+    #if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
+        using tbb::flow::resource_limiter;
+        using tbb::flow::resource_limited_node;
+    #endif
     } // namespace flow
 
     namespace profiling {
