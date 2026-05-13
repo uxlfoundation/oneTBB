@@ -121,6 +121,11 @@ T max ( const T& val1, const T& val2 ) {
     return val1 < val2 ? val2 : val1;
 }
 
+template<typename T>
+inline T align_up( T arg, uintptr_t alignment ) {
+    return T( ((uintptr_t)arg + (alignment - 1)) & ~(alignment - 1) );
+}
+
 //! Utility helper structure to ease overload resolution
 template<int > struct int_to_type {};
 
@@ -220,6 +225,8 @@ void destroy_binding_handler(binding_handler* handler_ptr);
 void apply_affinity_mask(binding_handler* handler_ptr, int slot_num);
 void restore_affinity_mask(binding_handler* handler_ptr, int slot_num);
 tcm_cpu_mask_t get_affinity_mask(binding_handler* handler_ptr);
+
+const int* get_numa_nodes_indexes();
 
 // RTM specific section
 // abort code for mutexes that detect a conflict with another thread.
