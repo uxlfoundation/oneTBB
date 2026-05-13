@@ -201,7 +201,7 @@ and/or versions and potentially require multiple sets of binaries for the same p
 Given that, the following conceptual function signatures are proposed:
 
 ```c++
-void *allocate_interleaved (size_t bytes, tbb::numa_node_id *nodes, size_t node_count,
+void *allocate_interleaved (size_t bytes, const tbb::numa_node_id *nodes, size_t node_count,
                             size_t bytes_per_chunk);
 void deallocate_interleaved (void *ptr, size_t bytes);
 ```
