@@ -243,6 +243,10 @@ void parallel_quick_sort( RandomAccessIterator begin, RandomAccessIterator end, 
         }
     }
 
+#if __TBB_PREVIEW_PARALLEL_PHASE
+    tbb::this_task_arena::start_parallel_phase();
+#endif
+
     // Check is input range already sorted
     parallel_for(blocked_range<RandomAccessIterator>(k + 1, end),
                  quick_sort_pretest_body<RandomAccessIterator, Compare>(comp, my_context),
@@ -251,6 +255,10 @@ void parallel_quick_sort( RandomAccessIterator begin, RandomAccessIterator end, 
 
     if( my_context.is_group_execution_cancelled() )
         do_parallel_quick_sort(begin, end, comp);
+
+#if __TBB_PREVIEW_PARALLEL_PHASE
+    tbb::this_task_arena::end_parallel_phase();
+#endif
 }
 
 /** \page parallel_sort_iter_req Requirements on iterators for parallel_sort
