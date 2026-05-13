@@ -19,6 +19,7 @@
 
 #include "detail/_namespace_injection.h"
 #include "parallel_for.h"
+#include "parallel_reduce.h"
 #include "blocked_range.h"
 #include "profiling.h"
 
@@ -72,84 +73,103 @@ class quick_sort_range {
     }
 
     std::size_t split_range( quick_sort_range& range ) {
+#if 0
         RandomAccessIterator array = range.begin;
-        // RandomAccessIterator first_element = range.begin;
+        RandomAccessIterator first_element = range.begin;
         std::size_t m = pseudo_median_of_nine(array, range);
         if( m != 0 ) std::iter_swap(array, array + m);
 
-        constexpr std::size_t BLOCK_SIZE = 256;
-
-        std::size_t left_mismatches[BLOCK_SIZE];
-        std::size_t right_mismatches[BLOCK_SIZE];
-
-        std::size_t left_head = 0, left_count = 0;
-        std::size_t right_head = 0, right_count = 0;
-
-        std::size_t left = 1;
-        std::size_t right = range.size - 1;
-
-        while (left <= right) {
-            // Scan block of items from left to right
-            std::size_t left_num_scanned = 0;
-
-            while (left <= right && left_num_scanned < BLOCK_SIZE && left_count < BLOCK_SIZE) {
-                if (!comp(*(array + left), *array)) {
-                    left_mismatches[(left_head + left_count) % BLOCK_SIZE] = left;
-                    ++left_count;
-                }
-                ++left_num_scanned;
-                ++left;
-            }
-
-            // Scan block of items from right to left
-            std::size_t right_num_scanned = 0;
-            while (left <= right && right_num_scanned < BLOCK_SIZE && right_count < BLOCK_SIZE) {
-                if (!comp(*array, *(array + right))) {
-                    right_mismatches[(right_head + right_count) % BLOCK_SIZE] = right;
-                    ++right_count;
-                }
-                ++right_num_scanned;
-                if (right == 0) break;
-                --right;
-            }
-
-            // Swap scanned pairs
-            while (left_count != 0 && right_count != 0) {
-                std::iter_swap(array + left_mismatches[left_head], array + right_mismatches[right_head]);
-                left_head = (left_head + 1) % BLOCK_SIZE;
-                right_head = (right_head + 1) % BLOCK_SIZE;
-                --left_count;
-                --right_count;
-            }
+        std::size_t i = 0;
+        std::size_t j = range.size;
+        // Partition interval [i + 1,j - 1] with key *first_element.
+        for(;;) {
+            __TBB_ASSERT( i < j, nullptr );
+            // Loop must terminate since array[l] == *first_element.
+            do {
+                --j;
+                __TBB_ASSERT( i <= j, "bad ordering relation?" );
+            } while( comp(*first_element, array[j]) );
+            do {
+                __TBB_ASSERT( i <= j, nullptr );
+                if( i == j ) goto partition;
+                ++i;
+            } while( comp(array[i], *first_element) );
+            if( i == j ) goto partition;
+            std::iter_swap(array + i, array + j);
         }
-
-        if (left_count != 0) left = left_mismatches[left_head];
-        if (right_count != 0) right = right_mismatches[right_head];
-
-        // Finish the remaining interval
-        for (;;) {
-            while (right > 0) {
-                if (!comp(*array, *(array + right))) break;
-                --right;
-            }
-
-            while (left < right) {
-                if (!comp(*(array + left), *array)) break;
-                ++left;
-            }
-
-            if (left >= right) break;
-
-            std::iter_swap(array + left, array + right);
-            ++left;
-        }
-
-        // Return the pivot on its place
-        std::iter_swap(array, array + right);
-        left = right + 1;
-        std::size_t new_range_size = range.size - left;
-        range.size = right;
+partition:
+        // Put the partition key were it belongs
+        std::iter_swap(array + j, first_element);
+        // array[l..j) is less or equal to key.
+        // array(j..r) is greater or equal to key.
+        // array[j] is equal to key
+        i = j + 1;
+        std::size_t new_range_size = range.size - i;
+        range.size = j;
         return new_range_size;
+#else
+        RandomAccessIterator array = range.begin;
+        RandomAccessIterator last = array + range.size;
+        std::size_t m = pseudo_median_of_nine(array, range);
+        if (m != 0) std::iter_swap(array, array + m);
+
+        struct PartitionRange {
+            RandomAccessIterator begin;
+            RandomAccessIterator pivot;
+            RandomAccessIterator end;
+        };
+
+        PartitionRange init{last, last, last};
+
+        auto reductor = [](PartitionRange range1, PartitionRange range2) -> PartitionRange {
+            auto size1 = range1.end - range1.pivot;
+            auto size2 = range2.pivot - range2.begin;
+            auto new_begin = range2.begin - (range1.end - range1.begin);
+
+            if (range1.end == range1.pivot) {
+                return {new_begin, range2.pivot, range2.end};
+            }
+
+            if (size2 > size1) {
+                blocked_range<RandomAccessIterator> frange(range1.pivot, range1.pivot + size1);
+                parallel_for(frange, [&](const blocked_range<RandomAccessIterator>& r) {
+                    std::swap_ranges(r.begin(), r.end(), (range2.pivot - size1) + (r.begin() - range1.pivot));
+                });
+                
+                return {new_begin, range2.pivot - size1, range2.end};
+            }
+
+            blocked_range<RandomAccessIterator> frange(range1.pivot, range1.pivot + size2);
+            parallel_for(frange, [&](const blocked_range<RandomAccessIterator>& r) {
+                std::swap_ranges(r.begin(), r.end(), range2.begin + (r.begin() - range1.pivot));
+            });
+
+            return {new_begin, range1.pivot + size2, range2.end};
+        };
+
+        blocked_range<RandomAccessIterator> rrange(array + 1, last);
+        PartitionRange result = parallel_reduce(rrange, init,
+            [&](const blocked_range<RandomAccessIterator>& r, PartitionRange value) {
+                using reference = std::iterator_traits<RandomAccessIterator>::reference;
+                RandomAccessIterator pivot = std::partition(r.begin(), r.end(),
+                    [&](reference item) {
+                        return comp(item, *array);
+                    });
+                return reductor(value, {r.begin(), pivot, r.end()});
+            },
+            reductor);
+
+        std::size_t original_size = range.size;
+        RandomAccessIterator pivot_pos = result.pivot;
+        if (pivot_pos != array) {
+            --pivot_pos;
+            std::iter_swap(pivot_pos, array);
+        }
+
+        range.size = pivot_pos - array;
+        std::size_t new_range_size = original_size - range.size - 1;
+        return new_range_size;
+#endif
     }
 
 public:
