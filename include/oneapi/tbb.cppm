@@ -107,6 +107,10 @@ export namespace tbb {
     using tbb::v1::memory_pool;
     using tbb::v1::fixed_pool;
 #endif
+#if TBB_PREVIEW_NUMA_ALLOCATION
+    using tbb::v1::allocate_numa_interleaved;
+    using tbb::v1::deallocate_numa_interleaved;
+#endif
 
     // Thread Local Storage
     using tbb::v1::combinable;
