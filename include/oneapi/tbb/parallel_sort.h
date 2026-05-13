@@ -72,47 +72,8 @@ class quick_sort_range {
 
     }
 
-    std::size_t split_range( quick_sort_range& range ) {
-#if 0
-        RandomAccessIterator array = range.begin;
-        RandomAccessIterator first_element = range.begin;
-        std::size_t m = pseudo_median_of_nine(array, range);
-        if( m != 0 ) std::iter_swap(array, array + m);
-
-        std::size_t i = 0;
-        std::size_t j = range.size;
-        // Partition interval [i + 1,j - 1] with key *first_element.
-        for(;;) {
-            __TBB_ASSERT( i < j, nullptr );
-            // Loop must terminate since array[l] == *first_element.
-            do {
-                --j;
-                __TBB_ASSERT( i <= j, "bad ordering relation?" );
-            } while( comp(*first_element, array[j]) );
-            do {
-                __TBB_ASSERT( i <= j, nullptr );
-                if( i == j ) goto partition;
-                ++i;
-            } while( comp(array[i], *first_element) );
-            if( i == j ) goto partition;
-            std::iter_swap(array + i, array + j);
-        }
-partition:
-        // Put the partition key were it belongs
-        std::iter_swap(array + j, first_element);
-        // array[l..j) is less or equal to key.
-        // array(j..r) is greater or equal to key.
-        // array[j] is equal to key
-        i = j + 1;
-        std::size_t new_range_size = range.size - i;
-        range.size = j;
-        return new_range_size;
-#else
-        RandomAccessIterator array = range.begin;
-        RandomAccessIterator last = array + range.size;
-        std::size_t m = pseudo_median_of_nine(array, range);
-        if (m != 0) std::iter_swap(array, array + m);
-
+    template <typename Pred>
+    RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccessIterator last, Pred pred) {
         struct PartitionRange {
             RandomAccessIterator begin;
             RandomAccessIterator pivot;
@@ -147,29 +108,50 @@ partition:
             return {new_begin, range1.pivot + size2, range2.end};
         };
 
-        blocked_range<RandomAccessIterator> rrange(array + 1, last);
+        blocked_range<RandomAccessIterator> rrange(first, last);
         PartitionRange result = parallel_reduce(rrange, init,
             [&](const blocked_range<RandomAccessIterator>& r, PartitionRange value) {
-                using reference = typename std::iterator_traits<RandomAccessIterator>::reference;
-                RandomAccessIterator pivot = std::partition(r.begin(), r.end(),
-                    [&](reference item) {
-                        return comp(item, *array);
-                    });
+                RandomAccessIterator pivot = std::partition(r.begin(), r.end(), pred);
                 return reductor(value, {r.begin(), pivot, r.end()});
             },
             reductor);
 
+        return result.pivot;
+    }
+
+    template <typename Pred>
+    RandomAccessIterator partition_range(RandomAccessIterator first, RandomAccessIterator last, Pred pred) {
+        constexpr std::size_t serial_cutoff = 1000000;
+
+        if (std::size_t(last - first) < serial_cutoff) {
+            return std::partition(first, last, pred);
+        } else {
+            return parallel_partition(first, last, pred);
+        }
+    }
+
+    std::size_t split_range( quick_sort_range& range ) {
+        RandomAccessIterator array = range.begin;
+        RandomAccessIterator last = array + range.size;
+        std::size_t m = pseudo_median_of_nine(array, range);
+        if (m != 0) std::iter_swap(array, array + m);
+
+        using reference = typename std::iterator_traits<RandomAccessIterator>::reference;
+
+        RandomAccessIterator pivot = partition_range(array + 1, last,
+            [&](reference item) {
+                return comp(item, *array);
+            });
+
         std::size_t original_size = range.size;
-        RandomAccessIterator pivot_pos = result.pivot;
-        if (pivot_pos != array) {
-            --pivot_pos;
-            std::iter_swap(pivot_pos, array);
+        if (pivot != array) {
+            --pivot;
+            std::iter_swap(pivot, array);
         }
 
-        range.size = pivot_pos - array;
+        range.size = pivot - array;
         std::size_t new_range_size = original_size - range.size - 1;
         return new_range_size;
-#endif
     }
 
 public:
