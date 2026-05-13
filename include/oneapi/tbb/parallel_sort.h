@@ -150,7 +150,7 @@ partition:
         blocked_range<RandomAccessIterator> rrange(array + 1, last);
         PartitionRange result = parallel_reduce(rrange, init,
             [&](const blocked_range<RandomAccessIterator>& r, PartitionRange value) {
-                using reference = std::iterator_traits<RandomAccessIterator>::reference;
+                using reference = typename std::iterator_traits<RandomAccessIterator>::reference;
                 RandomAccessIterator pivot = std::partition(r.begin(), r.end(),
                     [&](reference item) {
                         return comp(item, *array);
