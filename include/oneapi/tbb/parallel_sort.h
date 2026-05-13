@@ -121,7 +121,7 @@ class quick_sort_range {
 
     template <typename Pred>
     RandomAccessIterator partition_range(RandomAccessIterator first, RandomAccessIterator last, Pred pred) {
-        constexpr std::size_t serial_cutoff = 1000000;
+        constexpr std::size_t serial_cutoff = 10000;
 
         if (std::size_t(last - first) < serial_cutoff) {
             return std::partition(first, last, pred);
