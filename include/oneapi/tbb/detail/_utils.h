@@ -248,7 +248,7 @@ inline T align_up(T arg, std::uintptr_t alignment) {
     return T( ((std::uintptr_t)arg + (alignment - 1)) & ~(alignment - 1) );
 }
 
-// if arg is aleady aligned, returns the next aligned value after arg
+// if arg is already aligned, returns the next aligned value after arg
 template<typename T>
 inline T align_up_next(T arg, std::uintptr_t alignment) {
     return T( ((std::uintptr_t)arg + (alignment)) & ~(alignment - 1) );
