@@ -73,37 +73,82 @@ class quick_sort_range {
 
     std::size_t split_range( quick_sort_range& range ) {
         RandomAccessIterator array = range.begin;
-        RandomAccessIterator first_element = range.begin;
+        // RandomAccessIterator first_element = range.begin;
         std::size_t m = pseudo_median_of_nine(array, range);
         if( m != 0 ) std::iter_swap(array, array + m);
 
-        std::size_t i = 0;
-        std::size_t j = range.size;
-        // Partition interval [i + 1,j - 1] with key *first_element.
-        for(;;) {
-            __TBB_ASSERT( i < j, nullptr );
-            // Loop must terminate since array[l] == *first_element.
-            do {
-                --j;
-                __TBB_ASSERT( i <= j, "bad ordering relation?" );
-            } while( comp(*first_element, array[j]) );
-            do {
-                __TBB_ASSERT( i <= j, nullptr );
-                if( i == j ) goto partition;
-                ++i;
-            } while( comp(array[i], *first_element) );
-            if( i == j ) goto partition;
-            std::iter_swap(array + i, array + j);
+        constexpr std::size_t BLOCK_SIZE = 256;
+
+        std::size_t left_mismatches[BLOCK_SIZE];
+        std::size_t right_mismatches[BLOCK_SIZE];
+
+        std::size_t left_head = 0, left_count = 0;
+        std::size_t right_head = 0, right_count = 0;
+
+        std::size_t left = 1;
+        std::size_t right = range.size - 1;
+
+        while (left <= right) {
+            // Scan block of items from left to right
+            std::size_t left_num_scanned = 0;
+
+            while (left <= right && left_num_scanned < BLOCK_SIZE && left_count < BLOCK_SIZE) {
+                if (!comp(*(array + left), *array)) {
+                    left_mismatches[(left_head + left_count) % BLOCK_SIZE] = left;
+                    ++left_count;
+                }
+                ++left_num_scanned;
+                ++left;
+            }
+
+            // Scan block of items from right to left
+            std::size_t right_num_scanned = 0;
+            while (left <= right && right_num_scanned < BLOCK_SIZE && right_count < BLOCK_SIZE) {
+                if (!comp(*array, *(array + right))) {
+                    right_mismatches[(right_head + right_count) % BLOCK_SIZE] = right;
+                    ++right_count;
+                }
+                ++right_num_scanned;
+                if (right == 0) break;
+                --right;
+            }
+
+            // Swap scanned pairs
+            while (left_count != 0 && right_count != 0) {
+                std::iter_swap(array + left_mismatches[left_head], array + right_mismatches[right_head]);
+                left_head = (left_head + 1) % BLOCK_SIZE;
+                right_head = (right_head + 1) % BLOCK_SIZE;
+                --left_count;
+                --right_count;
+            }
         }
-partition:
-        // Put the partition key were it belongs
-        std::iter_swap(array + j, first_element);
-        // array[l..j) is less or equal to key.
-        // array(j..r) is greater or equal to key.
-        // array[j] is equal to key
-        i = j + 1;
-        std::size_t new_range_size = range.size - i;
-        range.size = j;
+
+        if (left_count != 0) left = left_mismatches[left_head];
+        if (right_count != 0) right = right_mismatches[right_head];
+
+        // Finish the remaining interval
+        for (;;) {
+            while (right > 0) {
+                if (!comp(*array, *(array + right))) break;
+                --right;
+            }
+
+            while (left < right) {
+                if (!comp(*(array + left), *array)) break;
+                ++left;
+            }
+
+            if (left >= right) break;
+
+            std::iter_swap(array + left, array + right);
+            ++left;
+        }
+
+        // Return the pivot on its place
+        std::iter_swap(array, array + right);
+        left = right + 1;
+        std::size_t new_range_size = range.size - left;
+        range.size = right;
         return new_range_size;
     }
 
