@@ -307,7 +307,7 @@ inline void destroy_coroutine(coroutine_type& c) {
 
 inline void create_coroutine(coroutine_type& c, std::size_t stack_size, void* arg) {
     const std::size_t REG_PAGE_SIZE = governor::default_page_size();
-    const std::size_t page_aligned_stack_size = (stack_size + (REG_PAGE_SIZE - 1)) & ~(REG_PAGE_SIZE - 1);
+    const std::size_t page_aligned_stack_size = align_up(stack_size, REG_PAGE_SIZE);
     const std::size_t protected_stack_size = page_aligned_stack_size + 2 * REG_PAGE_SIZE;
 
     // Allocate the stack with protection property

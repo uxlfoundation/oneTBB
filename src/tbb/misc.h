@@ -121,11 +121,6 @@ T max ( const T& val1, const T& val2 ) {
     return val1 < val2 ? val2 : val1;
 }
 
-template<typename T>
-inline T align_up( T arg, uintptr_t alignment ) {
-    return T( ((uintptr_t)arg + (alignment - 1)) & ~(alignment - 1) );
-}
-
 //! Utility helper structure to ease overload resolution
 template<int > struct int_to_type {};
 
