@@ -14,9 +14,9 @@
     limitations under the License.
 */
 
-//! \file test_tbb_header_module.cppm
-//! \brief C++20 module interface unit to test TBB public API included as part of global module fragment
-module;
+//! \file test_tbb_header_module_consumer_tbbmod.cpp
+//! \brief Test for [all] specification using C++20 modules
+
 // Preprocessing macros from test_tbb_header.cpp
 #if __INTEL_COMPILER && _MSC_VER
 #pragma warning(disable : 2586) // decorated name length exceeded, name was truncated
@@ -27,12 +27,10 @@ module;
 #endif
 
 #define __TBB_NO_IMPLICIT_LINKAGE 1
-#define __TBB_TEST_MODULE_EXPORT 1
+#define __TBB_IN_MODULE_USE 1
 
-#define __TBB_DOCTEST_SKIP_MAIN 1
 #include "common/test.h"
-#include "oneapi/tbb/detail/_config.h"
-#include "tbb/tbb.h"
+#include "oneapi/tbb/detail/_exception.h"
 
 #include <cstddef>
 #include <exception>
@@ -40,6 +38,6 @@ module;
 #include <tuple>
 #include <vector>
 
-export module tbb_header_test;
+import tbb;
 
 #include "test_tbb_header.cpp"

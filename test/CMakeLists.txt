@@ -193,6 +193,35 @@ function(tbb_add_lib_test)
     )
 endfunction()
 
+function(tbb_add_cxx20_modules_test)
+    set(oneValueArgs SUBDIR NAME)
+    set(multiValueArgs MODULES)
+    cmake_parse_arguments(_tbb_test "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    if (NOT TARGET tbb_cxx20_modules_tests)
+        add_custom_target(tbb_cxx20_modules_tests)
+    endif()
+
+    tbb_add_test(SUBDIR ${_tbb_test_SUBDIR} NAME ${_tbb_test_NAME} DEPENDENCIES TBB::tbb TBB::tbbmalloc)
+    if (NOT _tbb_test_MODULES)
+        set(_tbb_test_MODULES test_tbb_header_module.cppm)
+    endif()
+
+    target_sources(${_tbb_test_NAME} PUBLIC
+        FILE_SET CXX_MODULES
+        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/${_tbb_test_SUBDIR} ${CMAKE_SOURCE_DIR}/include
+        FILES ${_tbb_test_MODULES}
+    )
+
+    set_target_properties(${_tbb_test_NAME} PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON)
+    set_tests_properties(${_tbb_test_NAME} PROPERTIES
+        LABELS "tbb_cxx20_modules_tests"
+    )
+    add_dependencies(tbb_cxx20_modules_tests ${_tbb_test_NAME})
+endfunction()
+
 function(_tbb_get_hwloc_runtime_vars)
     set(oneValueArgs ENV_EXTENSION_VARIABLE)
     set(multiValueArgs HWLOC_VERSION_LIST)
@@ -558,32 +587,33 @@ if (TARGET TBB::tbb)
         tbb_add_test(SUBDIR tbb NAME test_tbb_fork DEPENDENCIES TBB::tbb)
     endif()
 
-    tbb_add_test(SUBDIR tbb NAME test_tbb_header DEPENDENCIES TBB::tbb TBB::tbbmalloc)
-    target_sources(test_tbb_header PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_secondary.cpp)
+    if (TARGET TBB::tbbmalloc)
+        tbb_add_test(SUBDIR tbb NAME test_tbb_header DEPENDENCIES TBB::tbb TBB::tbbmalloc)
+        target_sources(test_tbb_header PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_secondary.cpp)
 
-    if (TBB_TEST_CXX20_MODULES)
-        if (CMAKE_VERSION VERSION_LESS 3.28)
-            message(WARNING "CMake 3.28 or higher is required to use C++20 modules, skipping module tests")
-        elseif (NOT CMAKE_CXX_STANDARD OR CMAKE_CXX_STANDARD LESS 20)
-            message(WARNING "C++ standard 20 or higher is required, skipping module tests")
-        else()
-            add_custom_target(tbb_cxx20_modules_tests)
-            tbb_add_test(SUBDIR tbb NAME test_tbb_header_module_consumer DEPENDENCIES TBB::tbb TBB::tbbmalloc)
-            target_sources(test_tbb_header_module_consumer PUBLIC
-              ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_secondary.cpp
-            )
-            target_sources(test_tbb_header_module_consumer PUBLIC
-                FILE_SET CXX_MODULES
-                FILES ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_module.cppm
-            )
-
-            set_target_properties(test_tbb_header_module_consumer PROPERTIES
-                CXX_STANDARD 20
-                CXX_STANDARD_REQUIRED ON)
-            set_tests_properties(test_tbb_header_module_consumer PROPERTIES
-                LABELS "tbb_cxx20_modules_tests"
-            )
-            add_dependencies(tbb_cxx20_modules_tests test_tbb_header_module_consumer)
+        if (TBB_TEST_CXX20_MODULES)
+            if (CMAKE_VERSION VERSION_LESS 3.28)
+                message(WARNING "CMake 3.28 or higher is required to use C++20 modules, skipping module tests")
+            elseif (NOT CMAKE_CXX_STANDARD OR CMAKE_CXX_STANDARD LESS 20)
+                message(WARNING "C++ standard 20 or higher is required, skipping module tests")
+            else()
+                tbb_add_cxx20_modules_test(
+                    SUBDIR tbb
+                    NAME test_tbb_header_module_consumer
+                    MODULES ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_module.cppm
+                )
+                target_sources(test_tbb_header_module_consumer PUBLIC
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_secondary.cpp
+                )
+                tbb_add_cxx20_modules_test(
+                    SUBDIR tbb
+                    NAME test_tbb_header_module_consumer_tbbmod
+                    MODULES ${CMAKE_SOURCE_DIR}/include/oneapi/tbb.cppm
+                )
+                target_sources(test_tbb_header_module_consumer_tbbmod PUBLIC
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_secondary.cpp
+                )
+            endif()
         endif()
     endif()
 
@@ -693,7 +723,7 @@ if (TARGET TBB::tbbmalloc)
     if (NOT "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "mips")
         if (NOT TBB_EMSCRIPTEN)
             # Define TBB malloc tests
-	    tbb_add_test(SUBDIR tbbmalloc NAME test_scalable_allocator DEPENDENCIES TBB::tbbmalloc)
+       	    tbb_add_test(SUBDIR tbbmalloc NAME test_scalable_allocator DEPENDENCIES TBB::tbbmalloc)
             tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_pools DEPENDENCIES TBB::tbbmalloc)
             tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_init_shutdown DEPENDENCIES TBB::tbbmalloc)
             tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_regression DEPENDENCIES TBB::tbbmalloc)
@@ -716,8 +746,7 @@ if (TARGET TBB::tbbmalloc)
         # ----------------------------------------------------------------------------------------
         # Whitebox testing
         if (NOT TBB_EMSCRIPTEN)
-	    add_executable(test_malloc_whitebox tbbmalloc/test_malloc_whitebox.cpp)
-
+       	    add_executable(test_malloc_whitebox tbbmalloc/test_malloc_whitebox.cpp)
             target_include_directories(test_malloc_whitebox
                 PRIVATE
                 ${CMAKE_CURRENT_SOURCE_DIR}/../include
