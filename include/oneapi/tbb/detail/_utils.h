@@ -243,6 +243,19 @@ constexpr bool is_aligned(T* pointer, std::uintptr_t alignment) {
     return 0 == (reinterpret_cast<std::uintptr_t>(pointer) & (alignment - 1));
 }
 
+template<typename T>
+inline T align_up(T arg, std::uintptr_t alignment) {
+    __TBB_ASSERT(alignment != 0 && is_power_of_two(alignment), "Alignment should be a non-zero power of two");
+    return T( ((std::uintptr_t)arg + (alignment - 1)) & ~(alignment - 1) );
+}
+
+// if arg is already aligned, returns the next aligned value after arg
+template<typename T>
+inline T align_up_next(T arg, std::uintptr_t alignment) {
+    __TBB_ASSERT(alignment != 0 && is_power_of_two(alignment), "Alignment should be a non-zero power of two");
+    return T( ((std::uintptr_t)arg + (alignment)) & ~(alignment - 1) );
+}
+
 #if TBB_USE_ASSERT
 __TBB_GLOBAL_VAR void* const poisoned_ptr = reinterpret_cast<void*>(-1);
 
