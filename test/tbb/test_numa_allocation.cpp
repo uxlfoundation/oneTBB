@@ -214,11 +214,11 @@ TEST_CASE("test NonZero") {
     REQUIRE_EQ(utils::NonZero(buffer.data(), buffer.size()), 1);
 
     // non-zero in the middle of the buffer
-    std::fill(buffer.begin(), buffer.end(), 0);
+    std::fill(buffer.begin(), buffer.end(), (char)0);
     buffer[sizeof(intptr_t)+1] = 1;
     REQUIRE_EQ(utils::NonZero(buffer.data(), buffer.size()), sizeof(intptr_t)+1+1);
 
-    std::fill(buffer.begin(), buffer.end(), 0);
+    std::fill(buffer.begin(), buffer.end(), (char)0);
     // not complete word at the end
     buffer[buffer.size()-1] = 1;
     REQUIRE_EQ(utils::NonZero(buffer.data(), buffer.size()-1), 0);
@@ -228,7 +228,7 @@ TEST_CASE("test NonZero") {
     buffer[buffer.size()-2] = 1;
     REQUIRE_EQ(utils::NonZero(buffer.data(), buffer.size()-1), buffer.size()-2 + 1);
     // short buffer
-    std::fill(buffer.begin(), buffer.end(), 0);
+    std::fill(buffer.begin(), buffer.end(), (char)0);
     buffer[3] = 1;
     REQUIRE_EQ(utils::NonZero(buffer.data(), 0), 0);
     REQUIRE_EQ(utils::NonZero(buffer.data(), 3), 0);
