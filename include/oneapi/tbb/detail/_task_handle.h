@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2020-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -147,6 +147,7 @@ public:
     task_group_status wait_for_completion(d1::task_group_context&);
     task_group_status run_self_and_wait_for_completion(d1::task_group_context&);
     void add_notify_node(notify_list_node* new_notify_node, notify_list_node* current_notify_list_head);
+    void resolve_completion_state_and_add_notify_node(notify_list_node* new_notify_node);
     void add_notify_list(notify_list_node* notify_list);
 
     using notify_list_state_flag = std::uintptr_t;
@@ -411,10 +412,30 @@ inline bool operator!=(std::nullptr_t, task_handle const& th) noexcept {
 }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+inline void task_dynamic_state::resolve_completion_state_and_add_notify_node(notify_list_node* new_notify_node) {
+    notify_list_node* current_notify_list_head = m_notify_list_head.load(std::memory_order_acquire);
+
+    if (represents_completed_task(current_notify_list_head)) {
+        new_notify_node->notify_on_completion();
+    } else if (represents_canceled_task(current_notify_list_head)) {
+        new_notify_node->notify_on_cancellation();
+    } else if (represents_transferred_completion(current_notify_list_head)) {
+        // Redirect notify_node to the task received the completion
+        task_dynamic_state* new_completion_point = m_new_completion_point.load(std::memory_order_relaxed);
+        __TBB_ASSERT(new_completion_point, "notify list is marked as transferred, but new dynamic state is not set");
+        new_completion_point->resolve_completion_state_and_add_notify_node(new_notify_node);
+    } else {
+        add_notify_node(new_notify_node, current_notify_list_head);
+    }
+}
+
 inline void task_dynamic_state::add_notify_node(notify_list_node* new_notify_node,
                                                 notify_list_node* current_notify_list_head)
 {
     __TBB_ASSERT(new_notify_node != nullptr, nullptr);
+    __TBB_ASSERT(!represents_completed_task(current_notify_list_head) &&
+                 !represents_canceled_task(current_notify_list_head) &&
+                 !represents_transferred_completion(current_notify_list_head), nullptr);
 
     new_notify_node->next_node = current_notify_list_head;
 
@@ -433,7 +454,7 @@ inline void task_dynamic_state::add_notify_node(notify_list_node* new_notify_nod
             // Redirect notify_node to the task received the completion
             task_dynamic_state* new_completion_point = m_new_completion_point.load(std::memory_order_relaxed);
             __TBB_ASSERT(new_completion_point, "notify list is marked as transferred, but new dynamic state is not set");
-            new_completion_point->add_notify_node(new_notify_node, new_completion_point->m_notify_list_head.load(std::memory_order_acquire));
+            new_completion_point->resolve_completion_state_and_add_notify_node(new_notify_node);
             break;
         }
 

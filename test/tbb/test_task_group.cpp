@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -1998,6 +1998,65 @@ void test_adding_successors_after_transfer(submit_function func) {
     CHECK_MESSAGE(new_successor_task_placeholder == finished_task, "new successor task was not finished");
 }
 
+// Regression test for a race in task_dynamic_state::add_notify_node.
+
+// Setup: thread A calls set_task_order(sender, succ). Thread B is
+// executing the sender, which transfers its completion to a recipient that
+// then completes quickly.
+
+// The race: thread A first observes the sender as not-completed and not-yet transferred,
+// allocates a notify node, and tries to CAS it onto the sender's notify
+// list. Meanwhile thread B marks the sender as transferred to recipient and
+// finishes the recipient. Thread A's CAS fails, observes transferred, and
+// must redirect the new node to the recipient.
+
+// The old implementation contained a bug: the redirect path called add_notify_node on
+// the recipient with whatever head it just loaded, never re-classifying it as
+// completed. The successor node was inserted into the notify list of already completed
+// task and therefore, was never notified.
+void test_adding_successors_during_transfer_to_completed_recipient() {
+    const int num_threads = tbb::this_task_arena::max_concurrency();
+    const std::size_t num_iterations = num_threads * 100;
+
+    // Need at least 2 threads to reproduce the race
+    if (num_threads < 2) return;
+    
+    for (std::size_t i = 0; i < num_iterations; ++i) {
+        tbb::task_group tg;
+        std::atomic<int> succ_count{0};
+
+        tbb::task_handle recipient = tg.defer([] {});
+
+        tbb::task_handle sender = tg.defer([&recipient] {
+            tbb::task_group::transfer_this_task_completion_to(recipient);
+            // Bypassing the recipient to minimize the window between the transferring
+            // and the completion of recipient
+            return std::move(recipient);
+        });
+
+        tbb::task_completion_handle sender_ch = sender;
+
+        // Barrier to stop num_threads - 1 threads just before adding the successor
+        // and the submitter thread just before running the sender
+        utils::SpinBarrier barrier(num_threads);
+
+        utils::NativeParallelFor(num_threads, [&](int idx) {
+            if (idx == 0) {
+                barrier.wait();
+                tg.run(std::move(sender));
+            } else {
+                tbb::task_handle succ = tg.defer([&] { ++succ_count; });
+                barrier.wait();
+                tbb::task_group::set_task_order(sender_ch, succ);
+                tg.run(std::move(succ));
+            }
+        });
+
+        tg.wait();
+        CHECK_MESSAGE(succ_count == num_threads - 1, "Lost successors");
+    }
+}
+
 void test_transferring_completion(unsigned num_threads, submit_function func) {
     test_recursive_reduction(func);
     if (num_threads != 1) test_adding_successors_after_transfer(func);
@@ -2121,6 +2180,11 @@ TEST_CASE("test dependencies and cancellation") {
     }
     tbb::task_group_status status = tg.wait();
     CHECK_MESSAGE(status == tbb::task_group_status::canceled, "Incorrect status of cancelled task_group");
+}
+
+//! \brief \ref regression
+TEST_CASE("Test race when successors are added during transfer") {
+    test_adding_successors_during_transfer_to_completed_recipient();
 }
 #endif
 
