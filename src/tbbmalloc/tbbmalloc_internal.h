@@ -213,15 +213,17 @@ protected:
             idx++;
             pos = BitScanRev(actualMask);
             if (-1 != pos) {
-                MALLOC_ASSERT(idx * WORD_LEN - pos - 1 <= INT_MAX, ASSERT_TEXT);
-                return idx * WORD_LEN - pos - 1;
+                const int result = idx * WORD_LEN - pos - 1;
+                MALLOC_ASSERT(0 <= result && (unsigned)result < NUM, ASSERT_TEXT);
+                return result;
             }
         }
 
         while (idx<SZ)
             if (-1 != (pos = BitScanRev(mask[idx++].load(std::memory_order_relaxed)))) {
-                MALLOC_ASSERT(idx * WORD_LEN - pos - 1 <= INT_MAX, ASSERT_TEXT);
-                return idx * WORD_LEN - pos - 1;
+                const int result = idx * WORD_LEN - pos - 1;
+                MALLOC_ASSERT(0 <= result && (unsigned)result < NUM, ASSERT_TEXT);
+                return result;
             }
         return -1;
     }
