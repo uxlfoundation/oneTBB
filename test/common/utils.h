@@ -491,7 +491,7 @@ public:
 inline size_t NonZero(const void *ptr, size_t size)
 {
     REQUIRE_MESSAGE((uintptr_t)(ptr) % sizeof(intptr_t) == 0,
-                    "Unaligned access in unefficient, but usage model for NonZero assumes"
+                    "Unaligned access is inefficient, but usage model for NonZero assumes"
                     " that pointer is aligned to word size");
 
     size_t words = size / sizeof(intptr_t);
