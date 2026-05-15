@@ -200,3 +200,38 @@ TEST_CASE("test basics") {
         utils::CloseLibrary(lib);
 #endif
 }
+
+//! \brief \ref requirement
+TEST_CASE("test NonZero") {
+    std::vector<char> buffer(3*sizeof(intptr_t), 0);
+    REQUIRE_EQ(utils::NonZero(buffer.data(), buffer.size()), 0);
+    buffer[1] = 1;
+    REQUIRE_EQ(utils::NonZero(buffer.data(), buffer.size()), 2);
+    // still found 1st non-zero
+    buffer[2] = 1;
+    REQUIRE_EQ(utils::NonZero(buffer.data(), buffer.size()), 2);
+    buffer[0] = 1;
+    REQUIRE_EQ(utils::NonZero(buffer.data(), buffer.size()), 1);
+
+    // non-zero in the middle of the buffer
+    std::fill(buffer.begin(), buffer.end(), (char)0);
+    buffer[sizeof(intptr_t)+1] = 1;
+    REQUIRE_EQ(utils::NonZero(buffer.data(), buffer.size()), sizeof(intptr_t)+1+1);
+
+    std::fill(buffer.begin(), buffer.end(), (char)0);
+    // not complete word at the end
+    buffer[buffer.size()-1] = 1;
+    REQUIRE_EQ(utils::NonZero(buffer.data(), buffer.size()-1), 0);
+    buffer[2] = 1;
+    REQUIRE_EQ(utils::NonZero(buffer.data(), buffer.size()-1), 3);
+    buffer[2] = 0;
+    buffer[buffer.size()-2] = 1;
+    REQUIRE_EQ(utils::NonZero(buffer.data(), buffer.size()-1), buffer.size()-2 + 1);
+    // short buffer
+    std::fill(buffer.begin(), buffer.end(), (char)0);
+    buffer[3] = 1;
+    REQUIRE_EQ(utils::NonZero(buffer.data(), 0), 0);
+    REQUIRE_EQ(utils::NonZero(buffer.data(), 3), 0);
+    buffer[1] = 1;
+    REQUIRE_EQ(utils::NonZero(buffer.data(), 3), 2);
+}
