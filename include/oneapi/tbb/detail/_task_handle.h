@@ -147,7 +147,6 @@ public:
     task_group_status wait_for_completion(d1::task_group_context&);
     task_group_status run_self_and_wait_for_completion(d1::task_group_context&);
     void add_notify_node(notify_list_node* new_notify_node, notify_list_node* current_notify_list_head);
-    void resolve_completion_state_and_add_notify_node(notify_list_node* new_notify_node);
     void add_notify_list(notify_list_node* notify_list);
 
     using notify_list_state_flag = std::uintptr_t;
@@ -412,23 +411,6 @@ inline bool operator!=(std::nullptr_t, task_handle const& th) noexcept {
 }
 
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-inline void task_dynamic_state::resolve_completion_state_and_add_notify_node(notify_list_node* new_notify_node) {
-    notify_list_node* current_notify_list_head = m_notify_list_head.load(std::memory_order_acquire);
-
-    if (represents_completed_task(current_notify_list_head)) {
-        new_notify_node->notify_on_completion();
-    } else if (represents_canceled_task(current_notify_list_head)) {
-        new_notify_node->notify_on_cancellation();
-    } else if (represents_transferred_completion(current_notify_list_head)) {
-        // Redirect notify_node to the task received the completion
-        task_dynamic_state* new_completion_point = m_new_completion_point.load(std::memory_order_relaxed);
-        __TBB_ASSERT(new_completion_point, "notify list is marked as transferred, but new dynamic state is not set");
-        new_completion_point->resolve_completion_state_and_add_notify_node(new_notify_node);
-    } else {
-        add_notify_node(new_notify_node, current_notify_list_head);
-    }
-}
-
 inline void task_dynamic_state::add_notify_node(notify_list_node* new_notify_node,
                                                 notify_list_node* current_notify_list_head)
 {
@@ -437,28 +419,50 @@ inline void task_dynamic_state::add_notify_node(notify_list_node* new_notify_nod
                  !represents_canceled_task(current_notify_list_head) &&
                  !represents_transferred_completion(current_notify_list_head), nullptr);
 
+    // Trying to insert new_notify_node into the notify list
+    // calling functions already checked current_notify_list_head for sentinel values
+
     new_notify_node->next_node = current_notify_list_head;
+    if (m_notify_list_head.compare_exchange_strong(current_notify_list_head, new_notify_node)) {
+        return;
+    }
 
-    while (!m_notify_list_head.compare_exchange_strong(current_notify_list_head, new_notify_node)) {
-        // Other thread updated the head of the list
+    // CAS failed, another thread has updated the list head
+    // current_notify_list_head is updated by the CAS call
 
+    // current_state will walk through the transfer chain to find the correct list to
+    // retry the insertion
+    task_dynamic_state* current_state = this;
+
+    while (true) {
         if (represents_completed_task(current_notify_list_head)) {
-            // Current task has completed while we tried to insert the node to the list
+            // Current task has completed while we tried to insert the node into the list
             new_notify_node->notify_on_completion();
             break;
-        } else if (represents_canceled_task(current_notify_list_head)) {
-            // Current task has canceled while we tried to insert the node to the list
+        }
+        if (represents_canceled_task(current_notify_list_head)) {
+            // Current task has canceled while we tried to insert the node into the list
             new_notify_node->notify_on_cancellation();
             break;
-        } else if (represents_transferred_completion(current_notify_list_head)) {
-            // Redirect notify_node to the task received the completion
-            task_dynamic_state* new_completion_point = m_new_completion_point.load(std::memory_order_relaxed);
-            __TBB_ASSERT(new_completion_point, "notify list is marked as transferred, but new dynamic state is not set");
-            new_completion_point->resolve_completion_state_and_add_notify_node(new_notify_node);
-            break;
+        }
+        if (represents_transferred_completion(current_notify_list_head)) {
+            // Switch to the notify list of the recipient of the transferred completion
+            current_state = current_state->m_new_completion_point.load(std::memory_order_relaxed);
+            __TBB_ASSERT(current_state, "notify list is marked as transferred, but new completion point is not set");
+            current_notify_list_head = current_state->m_notify_list_head.load(std::memory_order_acquire);
+
+            // The recipient may be already completed, canceled, or its completion may be transferred,
+            // re-checking will be performed by the next iteration of the while loop
+            continue;
         }
 
+        // current_notify_list_head is a regular list node. Trying to insert the node into the list
         new_notify_node->next_node = current_notify_list_head;
+        if (current_state->m_notify_list_head.compare_exchange_strong(current_notify_list_head, new_notify_node)) {
+            break;
+        }
+        // CAS failed, another thread has updated the list head
+        // current_notify_list_head is updated by the CAS call
     }
 }
 
