@@ -120,7 +120,9 @@ export namespace tbb {
     using tbb::v1::ets_key_usage_type;
     using tbb::v1::ets_key_per_instance;
     using tbb::v1::ets_no_key;
+#if __TBB_RESUMABLE_TASKS
     using tbb::v1::ets_suspend_aware;
+#endif
 
     // Task Scheduler
     using tbb::v1::global_control;
@@ -136,9 +138,11 @@ export namespace tbb {
 #endif
 
     namespace task {
+#if __TBB_RESUMABLE_TASKS
         using tbb::v1::task::suspend_point;
         using tbb::v1::task::resume;
         using tbb::v1::task::suspend;
+#endif
         using tbb::v1::task::current_context;
     } // namespace task
 

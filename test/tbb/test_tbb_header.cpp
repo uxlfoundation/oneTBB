@@ -149,9 +149,12 @@ struct Body3a { // for lambda-friednly parallel_scan
     int operator() ( const tbb::blocked_range<int>&, const int, bool ) const { return 0; }
 };
 struct Msg {};
+
+#if __TBB_RESUMABLE_TASKS
 struct SuspendBody {
     void operator()(tbb::task::suspend_point) const {}
 };
+#endif
 
 template <typename E>
 void TestExceptionClassExports ( const E& exc, tbb::detail::exception_id eid ) {
