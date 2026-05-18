@@ -419,50 +419,50 @@ inline void task_dynamic_state::add_notify_node(notify_list_node* new_notify_nod
                  !represents_canceled_task(current_notify_list_head) &&
                  !represents_transferred_completion(current_notify_list_head), nullptr);
 
-    // Trying to insert new_notify_node into the notify list
-    // calling functions already checked current_notify_list_head for sentinel values
+    // Try to insert new_notify_node into the notify list
+    // Calling functions have already checked current_notify_list_head for sentinel values
 
     new_notify_node->next_node = current_notify_list_head;
     if (m_notify_list_head.compare_exchange_strong(current_notify_list_head, new_notify_node)) {
         return;
     }
 
-    // CAS failed, another thread has updated the list head
-    // current_notify_list_head is updated by the CAS call
+    // CAS failed; another thread has updated the list head
+    // current_notify_list_head has been updated by the CAS call
 
-    // current_state will walk through the transfer chain to find the correct list to
+    // current_state walks through the transfer chain to find the correct list on which to
     // retry the insertion
     task_dynamic_state* current_state = this;
 
     while (true) {
         if (represents_completed_task(current_notify_list_head)) {
-            // Current task has completed while we tried to insert the node into the list
+            // The current task has completed while we were trying to insert the node into the list
             new_notify_node->notify_on_completion();
             break;
         }
         if (represents_canceled_task(current_notify_list_head)) {
-            // Current task has canceled while we tried to insert the node into the list
+            // The current task has been canceled while we were trying to insert the node into the list
             new_notify_node->notify_on_cancellation();
             break;
         }
         if (represents_transferred_completion(current_notify_list_head)) {
             // Switch to the notify list of the recipient of the transferred completion
             current_state = current_state->m_new_completion_point.load(std::memory_order_relaxed);
-            __TBB_ASSERT(current_state, "notify list is marked as transferred, but new completion point is not set");
+            __TBB_ASSERT(current_state, "notify list is marked as transferred, but the new completion point is not set");
             current_notify_list_head = current_state->m_notify_list_head.load(std::memory_order_acquire);
 
-            // The recipient may be already completed, canceled, or its completion may be transferred,
+            // The recipient may already be completed or canceled, or its completion may itself have been transferred
             // re-checking will be performed by the next iteration of the while loop
             continue;
         }
 
-        // current_notify_list_head is a regular list node. Trying to insert the node into the list
+        // current_notify_list_head is a regular list node. Try to insert the node into the list
         new_notify_node->next_node = current_notify_list_head;
         if (current_state->m_notify_list_head.compare_exchange_strong(current_notify_list_head, new_notify_node)) {
             break;
         }
-        // CAS failed, another thread has updated the list head
-        // current_notify_list_head is updated by the CAS call
+        // CAS failed; another thread has updated the list head
+        // current_notify_list_head has been updated by the CAS call
     }
 }
 
