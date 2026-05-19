@@ -67,7 +67,7 @@ export namespace tbb {
     using tbb::v1::tbb_hash_compare;
     using tbb::v1::concurrent_hash_map;
 
-#if TBB_PREVIEW_CONCURRENT_LRU_CACHE
+#if __TBB_PREVIEW_CONCURRENT_LRU_CACHE
     using tbb::v1::concurrent_lru_cache;
 #endif
 
@@ -102,12 +102,12 @@ export namespace tbb {
     using tbb::v1::scalable_allocator;
     using tbb::v1::scalable_memory_resource;
     using tbb::v1::tbb_allocator;
-#if TBB_PREVIEW_MEMORY_POOL
+#if __TBB_PREVIEW_MEMORY_POOL
     using tbb::v1::memory_pool_allocator;
     using tbb::v1::memory_pool;
     using tbb::v1::fixed_pool;
 #endif
-#if TBB_PREVIEW_NUMA_ALLOCATION
+#if __TBB_PREVIEW_NUMA_ALLOCATION
     using tbb::v1::allocate_numa_interleaved;
     using tbb::v1::deallocate_numa_interleaved;
 #endif
@@ -148,7 +148,7 @@ export namespace tbb {
 
     using tbb::v1::task_arena;
     using tbb::v1::create_numa_task_arenas;
-#if TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
     using tbb::v1::is_inside_task;
 #endif
 
@@ -157,7 +157,7 @@ export namespace tbb {
         using tbb::v1::this_task_arena::max_concurrency;
         using tbb::v1::this_task_arena::isolate;
         using tbb::v1::this_task_arena::enqueue;
-#if TBB_PREVIEW_PARALLEL_PHASE
+#if __TBB_PREVIEW_PARALLEL_PHASE
         using tbb::v1::this_task_arena::start_parallel_phase;
         using tbb::v1::this_task_arena::end_parallel_phase;
 #endif
@@ -165,7 +165,7 @@ export namespace tbb {
 
     using tbb::v1::task_group_context;
     using tbb::v1::task_group;
-#if TBB_PREVIEW_ISOLATED_TASK_GROUP
+#if __TBB_PREVIEW_ISOLATED_TASK_GROUP
     using tbb::v1::isolated_task_group;
 #endif
     using tbb::v1::task_group_status;
@@ -174,7 +174,7 @@ export namespace tbb {
     using tbb::v1::canceled;
     using tbb::v1::is_current_task_group_canceling;
     using tbb::v1::task_handle;
-#if TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
     using tbb::v1::task_completion_handle;
     using tbb::v1::task_complete;
 #endif

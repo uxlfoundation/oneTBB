@@ -17,7 +17,8 @@
 #ifndef __TBB_memory_pool_H
 #define __TBB_memory_pool_H
 
-#if !TBB_PREVIEW_MEMORY_POOL
+#include "detail/_config.h"
+#if !__TBB_PREVIEW_MEMORY_POOL
 #error Set TBB_PREVIEW_MEMORY_POOL to include memory_pool.h
 #endif
 /** @file */

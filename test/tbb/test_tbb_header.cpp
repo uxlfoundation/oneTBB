@@ -197,7 +197,7 @@ static void TestExceptionClassesExports () {
     TestExceptionClassExports( tbb::unsafe_wait("test"), tbb::detail::exception_id::unsafe_wait );
 }
 
-#if __TBB_CPF_BUILD
+#if __TBB_TEST_PREVIEW
 // These names are only tested in "preview" configuration
 // When a feature becomes fully supported, its names should be moved to the main test
 #if __TBB_TEST_MODULE_EXPORT
@@ -383,7 +383,7 @@ static void DefinitionPresence() {
     TestFuncDefinitionPresence( task::suspend, (SuspendBody), void );
 #endif
 
-#if __TBB_CPF_BUILD
+#if __TBB_TEST_PREVIEW
     TestPreviewNames();
 #endif
 #ifdef DO_TEST_DEBUG_MACRO

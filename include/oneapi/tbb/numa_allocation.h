@@ -17,7 +17,8 @@
 #ifndef __TBB_numa_allocation_H
 #define __TBB_numa_allocation_H
 
-#if !TBB_PREVIEW_NUMA_ALLOCATION
+#include "detail/_config.h"
+#if !__TBB_PREVIEW_NUMA_ALLOCATION
 #error Set TBB_PREVIEW_NUMA_ALLOCATION to include numa_allocation.h
 #endif
 

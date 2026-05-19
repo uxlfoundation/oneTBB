@@ -20,12 +20,13 @@
 
 /**
     This header bulk-includes declarations or definitions of all the functionality
-    provided by TBB (save for tbbmalloc and 3rd party dependent headers).
+    provided by TBB (save for 3rd party dependent headers).
 
     If you use only a few TBB constructs, consider including specific headers only.
     Any header listed below can be included independently of others.
 **/
 
+#include "oneapi/tbb/detail/_config.h"
 #include "oneapi/tbb/blocked_range.h"
 #include "oneapi/tbb/blocked_range2d.h"
 #include "oneapi/tbb/blocked_range3d.h"
@@ -33,7 +34,7 @@
 #include "oneapi/tbb/cache_aligned_allocator.h"
 #include "oneapi/tbb/combinable.h"
 #include "oneapi/tbb/concurrent_hash_map.h"
-#if TBB_PREVIEW_CONCURRENT_LRU_CACHE
+#if __TBB_PREVIEW_CONCURRENT_LRU_CACHE
 #include "tbb/concurrent_lru_cache.h"
 #endif
 #include "oneapi/tbb/collaborative_call_once.h"
@@ -48,12 +49,12 @@
 #include "oneapi/tbb/flow_graph.h"
 #include "oneapi/tbb/global_control.h"
 #include "oneapi/tbb/info.h"
-#if TBB_PREVIEW_MEMORY_POOL
+#if __TBB_PREVIEW_MEMORY_POOL
 #include "oneapi/tbb/memory_pool.h"
 #endif
 #include "oneapi/tbb/null_mutex.h"
 #include "oneapi/tbb/null_rw_mutex.h"
-#if TBB_PREVIEW_NUMA_ALLOCATION
+#if __TBB_PREVIEW_NUMA_ALLOCATION
 #include "oneapi/tbb/numa_allocation.h"
 #endif
 #include "oneapi/tbb/parallel_for.h"

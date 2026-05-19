@@ -79,7 +79,7 @@ function(tbb_add_test)
 
     target_compile_definitions(${_tbb_test_TARGET_NAME} PRIVATE
         $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>
-        $<$<BOOL:${TBB_CPF}>:__TBB_CPF_BUILD=1>
+        $<$<BOOL:${TBB_TEST_PREVIEW}>:__TBB_TEST_PREVIEW=1>
         $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:__TBB_DYNAMIC_LOAD_ENABLED=0>
         $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:__TBB_SOURCE_DIRECTLY_INCLUDED=1>
         $<$<BOOL:${TBB_TCM_TESTING}>:__TBB_TCM_TESTING_ENABLED=1>)
@@ -121,7 +121,7 @@ function(tbb_add_c_test)
 
     target_compile_definitions(${_tbb_test_NAME} PRIVATE
         $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>
-        $<$<BOOL:${TBB_CPF}>:__TBB_CPF_BUILD=1>)
+        $<$<BOOL:${TBB_TEST_PREVIEW}>:__TBB_TEST_PREVIEW=1>)
 
     target_link_libraries(${_tbb_test_NAME} PRIVATE ${_tbb_test_DEPENDENCIES} Threads::Threads)
 endfunction()
@@ -163,7 +163,7 @@ function(tbb_add_lib_test)
 
     target_compile_definitions(_${_tbb_test_NAME} PRIVATE
         $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>
-        $<$<BOOL:${TBB_CPF}>:__TBB_CPF_BUILD=1>
+        $<$<BOOL:${TBB_TEST_PREVIEW}>:__TBB_TEST_PREVIEW=1>
         $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:__TBB_DYNAMIC_LOAD_ENABLED=0>
         $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:__TBB_SOURCE_DIRECTLY_INCLUDED=1>)
 
