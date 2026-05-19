@@ -51,7 +51,7 @@ jobs:
           export PATH="${PWD}/cov-linux64-tool/bin:${PATH}"
           mkdir build && cd build
           cmake -DCMAKE_CXX_STANDARD=20 -DCMAKE_BUILD_TYPE=relwithdebinfo \
-            -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc -DTBB_CPF=ON ..
+            -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc -DTBB_TEST_PREVIEW=ON ..
           cov-build --dir cov-int make VERBOSE=1 -j${{env.BUILD_CONCURRENCY}}
       - name: Archive Coverity build results
         run: |
@@ -91,7 +91,7 @@ jobs:
         run: |
           export PATH="${PWD}/cov-win64-tool/bin:${PATH}"
           cmake -DCMAKE_CXX_STANDARD=14 -DCMAKE_BUILD_TYPE=relwithdebinfo \
-            -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DTBB_CPF=ON .
+            -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DTBB_TEST_PREVIEW=ON .
           cov-configure --msvc
           cov-build --dir cov-int msbuild.exe ALL_BUILD.vcxproj -m -v:n
       - name: Archive Coverity build results
