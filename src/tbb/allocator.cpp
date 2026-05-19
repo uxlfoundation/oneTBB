@@ -229,7 +229,7 @@ static void* std_cache_aligned_allocate(std::size_t bytes, std::size_t alignment
     if (!base) {
         return nullptr;
     }
-    std::uintptr_t result = align_up_next(base, nfs_size);
+    std::uintptr_t result = align_to_greater(base, nfs_size);
     // Round up to the next cache line (align the base address)
     __TBB_ASSERT((result - base) >= sizeof(std::uintptr_t), "Cannot store a base pointer to the header");
     __TBB_ASSERT(space - (result - base) >= bytes, "Not enough space for the storage");
@@ -250,7 +250,7 @@ static void std_cache_aligned_deallocate(void* p) {
         __TBB_ASSERT(reinterpret_cast<std::uintptr_t>(p) >= 0x4096, "attempt to free block not obtained from cache_aligned_allocator");
         // Recover where block actually starts
         std::uintptr_t base = (reinterpret_cast<std::uintptr_t*>(p))[-1];
-        __TBB_ASSERT(align_up_next(base, nfs_size) == reinterpret_cast<std::uintptr_t>(p), "Incorrect alignment or not allocated by std_cache_aligned_deallocate?");
+        __TBB_ASSERT(align_to_greater(base, nfs_size) == reinterpret_cast<std::uintptr_t>(p), "Incorrect alignment or not allocated by std_cache_aligned_deallocate?");
         std::free(reinterpret_cast<void*>(base));
     }
 #endif
