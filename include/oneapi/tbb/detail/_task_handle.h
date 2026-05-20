@@ -419,17 +419,6 @@ inline void task_dynamic_state::add_notify_node(notify_list_node* new_notify_nod
                  !represents_canceled_task(current_notify_list_head) &&
                  !represents_transferred_completion(current_notify_list_head), nullptr);
 
-    // Try to insert new_notify_node into the notify list
-    // Calling functions have already checked current_notify_list_head for sentinel values
-
-    new_notify_node->next_node = current_notify_list_head;
-    if (m_notify_list_head.compare_exchange_strong(current_notify_list_head, new_notify_node)) {
-        return;
-    }
-
-    // CAS failed; another thread has updated the list head
-    // current_notify_list_head has been updated by the CAS call
-
     // current_state walks through the transfer chain to find the correct list on which to
     // retry the insertion
     task_dynamic_state* current_state = this;
@@ -458,7 +447,9 @@ inline void task_dynamic_state::add_notify_node(notify_list_node* new_notify_nod
 
         // current_notify_list_head is a regular list node. Try to insert the node into the list
         new_notify_node->next_node = current_notify_list_head;
-        if (current_state->m_notify_list_head.compare_exchange_strong(current_notify_list_head, new_notify_node)) {
+        if (current_state->m_notify_list_head.compare_exchange_strong(current_notify_list_head, new_notify_node,
+                                                                      std::memory_order_release, std::memory_order_relaxed))
+        {
             break;
         }
         // CAS failed; another thread has updated the list head
