@@ -1584,7 +1584,7 @@ void Block::initEmptyBlock(TLSData *tls, unsigned size)
 
     cleanBlockHeader();
     MALLOC_ASSERT(index < numBlockBinLimit, "index must be within the array bounds");
-    MALLOC_ASSERT(objSz <= USHRT_MAX, "objSz must be less than 2^16-1");
+    MALLOC_ASSERT(objSz <= fittingSize5, "objSz is limited by fittingSize5.");
     objectSize = (uint16_t)objSz;
     markOwned(tls);
     // bump pointer should be prepared for first allocation - thus mode it down to objectSize
