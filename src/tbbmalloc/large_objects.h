@@ -61,9 +61,7 @@ public:
         static_assert(MaxSize <= UINT_MAX, "The cast below can be incorrect");
         MALLOC_ASSERT(MinSize <= size && size < MaxSize, ASSERT_TEXT);
         MALLOC_ASSERT(size % CacheStep == 0, ASSERT_TEXT);
-        const unsigned index = (unsigned)((size - MinSize) / CacheStep);
-        MALLOC_ASSERT(index < NumBins, "Array out of bounds access found.");
-        return index;
+        return (unsigned)((size - MinSize) / CacheStep);
     }
 };
 
@@ -101,7 +99,7 @@ public:
         MALLOC_ASSERT(MinSize <= size && size <= MaxSize, ASSERT_TEXT);
 
         int sizeExp = BitScanRev(size); // same as __TBB_Log2
-        MALLOC_ASSERT(sizeExp >= 0, "BitScanRev() cannot return -1, as size >= stepfactor > 0");
+        MALLOC_ASSERT(sizeExp >= MinSizeExp, "BitScanRev() cannot return -1, as size >= stepfactor > 0");
         MALLOC_ASSERT(sizeExp >= StepFactorExp, "sizeExp >= StepFactorExp, because size >= stepFactor");
         unsigned minorStepExp = sizeExp - StepFactorExp;
 
@@ -109,7 +107,7 @@ public:
         unsigned minorIdx = (unsigned)((size - majorStepSize) >> minorStepExp);
         MALLOC_ASSERT(size == majorStepSize + ((size_t)minorIdx << minorStepExp),
                       "Size is not aligned on the bin");
-        return (unsigned)(StepFactor * (sizeExp - MinSizeExp) + minorIdx);
+        return (unsigned)((sizeExp - MinSizeExp) * StepFactor + minorIdx);
     }
 };
 
