@@ -340,10 +340,6 @@ private:
     // strict 1:1 relation, never changed
     ExtMemoryPool *extMemPool;
 
-    // Returns artificial bin index,
-    // it's used only during sorting and never saved
-    static unsigned sizeToIdx(size_t size);
-
     // Our friends
     friend class Backend;
 

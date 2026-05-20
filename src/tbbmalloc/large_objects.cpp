@@ -915,17 +915,16 @@ size_t LargeObjectCache::alignToBin(size_t size) {
     return size < maxLargeSize ? LargeCacheType::alignToBin(size) : HugeCacheType::alignToBin(size);
 }
 
-// Used for internal purpose
-unsigned LargeObjectCache::sizeToIdx(size_t size)
-{
-    MALLOC_ASSERT(size <= maxHugeSize, ASSERT_TEXT);
-    return size < maxLargeSize ?
-        LargeCacheType::sizeToIdx(size) :
-        LargeCacheType::numBins + HugeCacheType::sizeToIdx(size);
-}
-
 void LargeObjectCache::putList(LargeMemoryBlock *list)
 {
+    auto sizeToIdx = [](size_t size) -> unsigned {
+        // Returns artificial bin index, which is used only during sorting and never saved
+        MALLOC_ASSERT(size <= maxHugeSize, ASSERT_TEXT);
+        return size < maxLargeSize ?
+            LargeCacheType::sizeToIdx(size) :
+            LargeCacheType::numBins + HugeCacheType::sizeToIdx(size);
+    };
+
     LargeMemoryBlock *toProcess, *n;
 
     for (LargeMemoryBlock *curr = list; curr; curr = toProcess) {
