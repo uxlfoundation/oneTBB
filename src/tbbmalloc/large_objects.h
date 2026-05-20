@@ -61,7 +61,9 @@ public:
         static_assert(MaxSize <= UINT_MAX, "The cast below can be incorrect");
         MALLOC_ASSERT(MinSize <= size && size < MaxSize, ASSERT_TEXT);
         MALLOC_ASSERT(size % CacheStep == 0, ASSERT_TEXT);
-        return (unsigned)((size - MinSize) / CacheStep);
+        const unsigned index = (unsigned)((size - MinSize) / CacheStep);
+        MALLOC_ASSERT(index < NumBins, "Array out of bounds access found.");
+        return index;
     }
 };
 

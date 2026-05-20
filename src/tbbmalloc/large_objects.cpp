@@ -845,7 +845,6 @@ template<typename Props>
 LargeMemoryBlock *LargeObjectCacheImpl<Props>::get(ExtMemoryPool *extMemoryPool, size_t size)
 {
     const unsigned idx = Props::sizeToIdx(size);
-    MALLOC_ASSERT(idx < numBins, "Array out of bounds access found.");
 
     LargeMemoryBlock *lmb = bin[idx].get(extMemoryPool, size, &bitMask, idx);
 
