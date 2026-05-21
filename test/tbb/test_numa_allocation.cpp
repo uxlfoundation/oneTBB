@@ -115,13 +115,13 @@ TEST_CASE("invalid parameters") {
 
 void VerifySizeAndNodes(char *ptr, size_t bytes, const std::vector<tbb::numa_node_id>& nodes,
                         size_t bytes_per_chunk, bool check_ownership) {
-    static const size_t page_size = DefaultSystemPageSize();
-
     REQUIRE(ptr != nullptr);
     REQUIRE_EQ(utils::NonZero(ptr, bytes), 0);
     if (!check_ownership)
         return;
 #if __linux__
+    static const size_t page_size = DefaultSystemPageSize();
+
     // for such granularity, interleaving can be done not in exact order of nodes
     if (bytes_per_chunk == page_size) {
         std::vector<tbb::numa_node_id> sorted_nodes(nodes);
@@ -147,13 +147,7 @@ void VerifySizeAndNodes(char *ptr, size_t bytes, const std::vector<tbb::numa_nod
 
             for (size_t offset = 0, page_index = it - sorted_nodes.begin(); offset < bytes;
                  offset += page_size, ++page_index) {
-#if 1
-                if (find_numa_node(ptr + offset) != sorted_nodes[page_index % sorted_nodes.size()]) {
-                    abort();
-                }
-#else
                 NUMA_EQ(find_numa_node(ptr + offset), sorted_nodes[page_index % sorted_nodes.size()]);
-#endif
             }
         }
     }
