@@ -149,12 +149,12 @@ void VerifySizeAndNodes(char *ptr, size_t bytes, const std::vector<tbb::numa_nod
                  offset += page_size, ++page_index) {
                 NUMA_EQ(find_numa_node(ptr + offset), sorted_nodes[page_index % sorted_nodes.size()]);
             }
+            return;
         }
     }
-    else
 #endif // __linux__
-        for (size_t i = 0; i < bytes; i += bytes_per_chunk)
-            NUMA_EQ(find_numa_node(ptr + i), nodes[i / bytes_per_chunk % nodes.size()]);
+    for (size_t i = 0; i < bytes; i += bytes_per_chunk)
+        NUMA_EQ(find_numa_node(ptr + i), nodes[i / bytes_per_chunk % nodes.size()]);
 }
 
 void AllocateAndVerify(bool use_find_node, size_t bytes, const std::vector<tbb::numa_node_id>& nodes,

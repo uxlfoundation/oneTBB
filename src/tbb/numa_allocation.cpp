@@ -25,6 +25,7 @@
 
 #if __linux__
 
+#include <algorithm> // for std::any_of
 #include <sys/mman.h>
 
 // TBB build must be done without numaif.h, but we need signature of move_pages()
@@ -160,7 +161,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     // for chunk size equal to page size and all nodes being different we can place memory right to
     // the appropriate NUMA nodes with a single system call, otherwise we need to touch each page
     // from current thread and only then move them
-    if (bytes_per_chunk == governor::default_page_size()) {
+    if (bytes_per_chunk == governor::default_page_size() && nodes_count <= numa_node_count()) {
         auto bitmask_free = [](struct bitmask *m) {
             numa_bitmask_free_ptr(m);
         };
@@ -204,10 +205,8 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     if (ret < 0)
         return nullptr;
 
-    for (size_t i = 0; i < count_pages; ++i)
-        if (status[i] < 0)
-            return nullptr;
-    return data_holder.release();
+    return std::any_of(status.get(), status.get() + count_pages, [](int s) { return s < 0; }) ?
+        nullptr : data_holder.release();
 }
 
 #elif _WIN32 || _WIN64
@@ -281,7 +280,7 @@ void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t bytes) {
 #if __linux__
     munmap(ptr, bytes);
 #elif _WIN32 || _WIN64
-    (void)bytes;
+    suppress_unused_warning(bytes);
     VirtualFree(ptr, /*dwSize=*/0, MEM_RELEASE);
 #endif
 }
@@ -296,8 +295,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
         calloc(bytes, 1) : nullptr;
 }
 
-void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t bytes) {
-    (void)bytes;
+void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t /*bytes*/) {
     free(ptr);
 }
 
