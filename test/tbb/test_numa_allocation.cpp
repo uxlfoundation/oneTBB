@@ -124,26 +124,38 @@ void VerifySizeAndNodes(char *ptr, size_t bytes, const std::vector<tbb::numa_nod
 #if __linux__
     // for such granularity, interleaving can be done not in exact order of nodes
     if (bytes_per_chunk == page_size) {
-        // touch each page, otherwise move_pages() will fail with EFAULT
-        // and so detecting NUMA node will be impossible
-        for (size_t i = 0; i < bytes; i += page_size)
-            ptr[i] = 0;
+        std::vector<tbb::numa_node_id> sorted_nodes(nodes);
+        std::sort(sorted_nodes.begin(), sorted_nodes.end());
+        auto adj = std::adjacent_find(sorted_nodes.begin(), sorted_nodes.end());
+        // numa_interleave_memory() can be used only for non-repeated nodes case
+        if (adj == sorted_nodes.end()) {
+            // touch each page, otherwise move_pages() will fail with EFAULT
+            // and so detecting NUMA node will be impossible
+            for (size_t i = 0; i < bytes; i += page_size)
+                ptr[i] = 0;
 
-        int start_node = find_numa_node(ptr);
-        auto it = std::find_if(nodes.begin(), nodes.end(),
-                               [start_node](tbb::numa_node_id node)
-                               { return node == start_node; });
-        if (it == nodes.end()) {
+            int start_node = find_numa_node(ptr);
+            auto it = std::find_if(sorted_nodes.begin(), sorted_nodes.end(),
+                                   [start_node](tbb::numa_node_id node)
+                                   { return node == start_node; });
+            if (it == sorted_nodes.end()) {
+                const std::string nodes_str = NodesToString(sorted_nodes);
+                REQUIRE_MESSAGE(false, "Unexpected NUMA node " << start_node
+                                << " for the first page, expected one of: " << nodes_str);
+                return;
+            }
 
-            const std::string nodes_str = NodesToString(nodes);
-            REQUIRE_MESSAGE(false, "Unexpected NUMA node " << start_node
-                            << " for the first page, expected one of: " << nodes_str);
-            return;
+            for (size_t offset = 0, page_index = it - sorted_nodes.begin(); offset < bytes;
+                 offset += page_size, ++page_index) {
+#if 1
+                if (find_numa_node(ptr + offset) != sorted_nodes[page_index % sorted_nodes.size()]) {
+                    abort();
+                }
+#else
+                NUMA_EQ(find_numa_node(ptr + offset), sorted_nodes[page_index % sorted_nodes.size()]);
+#endif
+            }
         }
-
-        for (size_t offset = 0, page_index = it - nodes.begin(); offset < bytes;
-             offset += page_size, ++page_index)
-            NUMA_EQ(find_numa_node(ptr + offset), nodes[page_index % nodes.size()]);
     }
     else
 #endif // __linux__
