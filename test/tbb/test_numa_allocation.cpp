@@ -85,7 +85,7 @@ int find_numa_node(void* addr) {
     // Extract the NUMA Node from the bitfield (0-63)
     return (int)pv.VirtualAttributes.Node;
 #else
-    (void)addr;
+    utils::suppress_unused_warning(addr);
     return 0;
 #endif
 }
@@ -185,19 +185,16 @@ TEST_CASE("test basics") {
 #else
     bool lib = false;
 #endif
-#else // on Windows we use VirtualAllocEx and QueryWorkingSetEx, so always can check NUMA node
-    bool lib = true;
+#else
+    // On Windows we use VirtualAllocEx and QueryWorkingSetEx, so always can find NUMA node,
+    // but do it only if there are more than 1 NUMA node.
+    bool lib = tbb::info::numa_nodes().size() > 1;
 #endif
 
     for (size_t obj_size = 8; obj_size <= 1024 * 1024LLU; obj_size *= 2)
     {
         {
-           std::vector<tbb::numa_node_id> numa_nodes = tbb::info::numa_nodes();
-            // during ownership checking we treat no-NUMA as single-NUMA with node index 0,
-            // but numa_nodes() return -1 in this case
-            if (numa_nodes.size() == 1)
-                numa_nodes[0] = 0;
-
+            std::vector<tbb::numa_node_id> numa_nodes = tbb::info::numa_nodes();
             {
                 char *ptr = (char *)tbb::allocate_numa_interleaved(obj_size);
                 VerifySizeAndNodes(ptr, obj_size, numa_nodes, page_size, lib);
