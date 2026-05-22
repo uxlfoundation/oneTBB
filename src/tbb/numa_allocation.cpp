@@ -28,7 +28,7 @@
 #include <algorithm> // for std::any_of
 #include <sys/mman.h>
 
-// TBB build must be done without numaif.h, but we need signature of move_pages()
+// TBB build must be done without numaif.h, but we need signatures of those functions
 // for dynamic loading, so declare it here.
 extern "C" {
 long move_pages(int pid, unsigned long count,
