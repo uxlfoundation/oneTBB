@@ -136,6 +136,15 @@ static const int *common_init(size_t bytes, const tbb::detail::d1::numa_node_id 
     return nodes;
 }
 
+static bool is_numa_funcs_found() {
+#if __linux__
+    return move_pages_ptr && numa_bitmask_alloc_ptr && numa_bitmask_free_ptr &&
+           numa_bitmask_isbitset_ptr && numa_bitmask_setbit_ptr && numa_interleave_memory_ptr;
+#elif _WIN32 || _WIN64
+    return VirtualAlloc2_ptr;
+ #endif
+}
+
 #if __linux__
 void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
                         const tbb::detail::d1::numa_node_id *nodes_ids, size_t nodes_count,
@@ -150,7 +159,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
         return nullptr;
 
     // no NUMA nodes or move_pages() not available, just return the memory as is
-    if (numa_node_count() == 1 || !move_pages_ptr)
+    if (numa_node_count() == 1 || !is_numa_funcs_found())
         return base_addr;
 
     auto unmap = [bytes](void *ptr) {
@@ -219,7 +228,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
         return nullptr;
 
     // no NUMA nodes or no VirtualAlloc2, just return the memory as is
-    if (numa_node_count() == 1 || !VirtualAlloc2_ptr)
+    if (numa_node_count() == 1 || !is_numa_funcs_found())
         // do not use VirtualAlloc(), because it compiled incorrectly by MSVC 2017 with
         // -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug -DTBB_WINDOWS_DRIVER=ON
         return VirtualAllocEx(GetCurrentProcess(), /*BaseAddress=*/nullptr, bytes, MEM_RESERVE | MEM_COMMIT,
