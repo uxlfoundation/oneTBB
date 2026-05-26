@@ -430,7 +430,7 @@ inline void task_dynamic_state::add_notify_node(notify_list_node* new_notify_nod
            !current_state->m_notify_list_head.compare_exchange_strong(current_notify_list_head, new_notify_node,
                                                                       std::memory_order_release, std::memory_order_relaxed))
     {
-        // The recheck was requested because of switching to the next node to the transfer chain
+        // The recheck was requested because of switching to the next node in the transfer chain
         // Or the CAS failed because of another thread that updated the list head
         // current_notify_list_head has been updated by the CAS call
         recheck_current_state = false;
