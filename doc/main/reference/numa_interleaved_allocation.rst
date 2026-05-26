@@ -85,7 +85,7 @@ The code below provides a simple example with direct use of interleaved memory a
     :start-after: /*begin_allocate_numa_interleaved_example*/
     :end-before: /*end_allocate_numa_interleaved_example*/
 
-In this example, interleaved memory is wrapped to ``tbb::memory_pool``. This allows to amortize allocation
+In this example, interleaved memory is wrapped in ``tbb::memory_pool``. This allows to amortize allocation
 overhead.
 
 .. literalinclude:: ./examples/allocate_numa_interleaved_pool.cpp
