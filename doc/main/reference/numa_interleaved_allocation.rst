@@ -67,7 +67,7 @@ Functions
     ``bytes_per_chunk``. ``bytes_per_chunk`` must be a multiple of the system page size. If
     ``bytes_per_chunk`` is zero, a system page size is used. Allocated memory contains zeros and is aligned to
     the system page size.
-    In case of allocation failure, returns ``nullptr``.
+    In case of allocation failure or invalid arguments, returns ``nullptr``.
 
 .. cpp:function:: void tbb::deallocate_numa_interleaved(void *ptr, size_t bytes)
 
