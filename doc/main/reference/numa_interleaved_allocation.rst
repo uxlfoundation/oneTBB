@@ -19,8 +19,8 @@ nodes. There are two parameters that control the interleaving: the set of NUMA n
 distributed and the chunk size used for interleaving. The first parameter allows users to select a subset of
 NUMA nodes, which may be desirable if a parallel algorithm uses only part of the available NUMA nodes. The
 second parameter controls the granularity of interleaving, which may be desirable to optimize for specific
-access patterns. The allocation/deallocation functions call OS directly, if some form of caching is desirable,
-it can be implemented on top of this API.
+access patterns. The allocation/deallocation functions call the OS directly. If some form of caching is
+desirable, it can be implemented on top of this API.
 
 API
 ***
