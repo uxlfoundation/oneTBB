@@ -419,14 +419,16 @@ inline void task_dynamic_state::add_notify_node(notify_list_node* new_notify_nod
                  !represents_canceled_task(current_notify_list_head) &&
                  !represents_transferred_completion(current_notify_list_head), nullptr);
 
+    new_notify_node->next_node = current_notify_list_head;
+
     // current_state walks through the transfer chain to find the correct list on which to
     // retry the insertion. Rechecking for sentinel values is required for each list in the transfer chain
     task_dynamic_state* current_state = this;
     bool recheck_current_state = false;
 
     while (recheck_current_state ||
-           current_state->m_notify_list_head.compare_exchange_strong(current_notify_list_head, new_notify_node,
-                                                                     std::memory_order_release, std::memory_order_relaxed))
+           !current_state->m_notify_list_head.compare_exchange_strong(current_notify_list_head, new_notify_node,
+                                                                      std::memory_order_release, std::memory_order_relaxed))
     {
         // The recheck was requested because of switching to the next node to the transfer chain
         // Or the CAS failed because of another thread that updated the list head
