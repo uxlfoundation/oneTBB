@@ -26,7 +26,7 @@ int main() {
     if (!ptr)
         return -1;
     tbb::parallel_for(std::size_t(0), size, [&ptr](std::size_t i) {
-        ((char*)ptr)[i] = 0;
+        ptr[i] = i;
     });
 
     tbb::deallocate_numa_interleaved(ptr, size*sizeof(double));
