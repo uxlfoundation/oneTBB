@@ -16,7 +16,7 @@ Description
 
 A well-known method to improve performance on NUMA systems is to interleave memory between several NUMA
 nodes. There are two parameters that control the interleaving: the set of NUMA nodes across which memory is
-distributed and the chunk size used for interleaving. The first parameter allows users to select a subset of
+allocated and the chunk size used for interleaving. The first parameter allows users to select a subset of
 NUMA nodes, which may be desirable if a parallel algorithm uses only part of the available NUMA nodes. The
 second parameter controls the granularity of interleaving, which may be desirable to optimize for specific
 access patterns. The allocation/deallocation functions call the OS directly. If some form of caching is
@@ -63,11 +63,7 @@ Functions
 
 .. cpp:function:: void *tbb::allocate_numa_interleaved(size_t bytes, size_t bytes_per_chunk = 0)
 
-    **Returns:** Allocated memory interleaved between all NUMA nodes with interleaved chunk size of
-    ``bytes_per_chunk``. ``bytes_per_chunk`` must be a multiple of the system page size. If
-    ``bytes_per_chunk`` is zero, a system page size is used. Allocated memory contains zeros and is aligned to
-    the system page size.
-    In case of allocation failure or invalid arguments, returns ``nullptr``.
+    Same as the above but allocates memory from all available NUMA nodes.
 
 .. cpp:function:: void tbb::deallocate_numa_interleaved(void *ptr, size_t bytes)
 

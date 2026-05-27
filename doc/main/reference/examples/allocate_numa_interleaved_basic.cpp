@@ -31,5 +31,4 @@ int main() {
 
     tbb::deallocate_numa_interleaved(ptr, size*sizeof(double));
 }
-
 /*end_allocate_numa_interleaved_example*/

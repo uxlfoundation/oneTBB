@@ -39,8 +39,9 @@ public:
 };
 
 int main() {
-    // Memory pool requests memory in big chunks, slices them internally and uses caching,
-    // so may improve performance for many small allocations and reuse scenarios.
+    // Memory pool requests memory in big chunks, slices them internally and uses
+    // memory caching, so may improve performance for many small allocations and
+    // scenarios with the objects reuse.
     tbb::memory_pool<numa_interleaved_allocator> pool;
     for (int i = 0; i < 10*1000; ++i) {
         void* ptr = pool.malloc(1024);
@@ -48,5 +49,4 @@ int main() {
         pool.free(ptr);
     }
 }
-
 /*end_allocate_numa_interleaved_pool_example*/
