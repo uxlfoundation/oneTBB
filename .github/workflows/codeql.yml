@@ -24,7 +24,7 @@ on:
       - 'src/**'
       - 'include/**'
       - 'test/**'
-      - 'python/**'
+- 'python/**'
       - '.github/workflows/codeql.yml'
   schedule:
     - cron: '0 0 * * 1'
