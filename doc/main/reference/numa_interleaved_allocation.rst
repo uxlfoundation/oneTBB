@@ -23,7 +23,7 @@ access patterns. The allocation/deallocation functions call the OS directly. If 
 desirable, it can be implemented on top of this API.
 
 Under Linux*, the API uses the ``libnuma`` library, which must be available at runtime. If the library is not
-available, the allocation functions fall back to standard memory allocation. On Windows, the API uses
+available, the allocation functions fall back to standard memory allocation. On Windows*, the API uses
 functionality available starting from Windows 10 / Windows Server 2016; on older versions of Windows, the
 allocation functions also fall back to standard memory allocation.
 
