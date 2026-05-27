@@ -60,7 +60,9 @@ Functions
                   size_t bytes_per_chunk = 0)
 
     **Returns:** Allocated memory interleaved between specified NUMA ``nodes`` with interleaved chunk size of
-    ``bytes_per_chunk``. ``nodes`` can contain duplicates, in this case memory load is proportional to the
+    ``bytes_per_chunk``. 
+    
+    If ``nodes`` contains duplicates, the memory load is proportional to the
     number of occurrences of each node. ``nodes`` must not be empty.
     ``bytes_per_chunk`` must be a multiple of the system page size. If ``bytes_per_chunk`` is zero, a system
     page size is used. Allocated memory contains zeros and is aligned to the system page size.
