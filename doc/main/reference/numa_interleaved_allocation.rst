@@ -24,8 +24,8 @@ desirable, it can be implemented on top of this API.
 
 Under Linux*, the API uses the ``libnuma`` library, which must be available at runtime. If the library is not
 available, the allocation functions fall back to standard memory allocation. On Windows*, the API uses
-functionality available starting from Microsoft* Windows* 10 / Microsoft* Windows* Server 2016; on older versions of Microsoft* Windows*, the
-allocation functions also fall back to standard memory allocation.
+functionality available starting from Microsoft* Windows* 10 / Microsoft* Windows* Server 2016; on older
+versions of Microsoft* Windows*, the allocation functions also fall back to standard memory allocation.
 
 API
 ***
@@ -43,15 +43,17 @@ Synopsis
 
 .. code:: cpp
 
-    namespace tbb {
-        inline void *allocate_numa_interleaved(size_t bytes,
-                                               const std::vector<tbb::numa_node_id>& nodes,
-                                               size_t bytes_per_chunk = 0);
+    namespace oneapi {
+        namespace tbb {
+            inline void* allocate_numa_interleaved(size_t bytes,
+                                                   const std::vector<tbb::numa_node_id>& nodes,
+                                                   size_t bytes_per_chunk = 0);
 
-        inline void *allocate_numa_interleaved(size_t bytes, size_t bytes_per_chunk = 0);
+            inline void* allocate_numa_interleaved(size_t bytes, size_t bytes_per_chunk = 0);
 
-        inline void deallocate_numa_interleaved(void *ptr, size_t bytes);
-    } // namespace tbb
+            inline void deallocate_numa_interleaved(void* ptr, size_t bytes);
+        } // namespace tbb
+    } // namespace oneapi
 
 Functions
 ---------
@@ -60,22 +62,22 @@ Functions
                   size_t bytes_per_chunk = 0)
 
     **Returns:** Allocated memory interleaved between specified NUMA ``nodes`` with interleaved chunk size of
-    ``bytes_per_chunk``. 
-    
-    If ``nodes`` contains duplicates, the memory load is proportional to the
-    number of occurrences of each node. ``nodes`` must not be empty.
-    ``bytes_per_chunk`` must be a multiple of the system page size. If ``bytes_per_chunk`` is zero, a system
-    page size is used. Allocated memory contains zeros and is aligned to the system page size.
-    In case of allocation failure or invalid arguments, returns ``nullptr``.
+    ``bytes_per_chunk``. In case of allocation failure or invalid arguments, returns ``nullptr``.
 
-.. cpp:function:: void *tbb::allocate_numa_interleaved(size_t bytes, size_t bytes_per_chunk = 0)
+    If ``nodes`` contains duplicates, the memory load is proportional to the number of occurrences of each
+    node. ``nodes`` must not be empty. ``bytes_per_chunk`` must be a multiple of the system page size. If
+    ``bytes_per_chunk`` is zero, a system page size is used. `bytes` must be non-zero. Allocated memory
+    contains zeros and is aligned to the system page size.
+    
+
+.. cpp:function:: void* allocate_numa_interleaved(size_t bytes, size_t bytes_per_chunk = 0)
 
     Same as the above but allocates memory from all available NUMA nodes.
 
-.. cpp:function:: void tbb::deallocate_numa_interleaved(void *ptr, size_t bytes)
+.. cpp:function:: void deallocate_numa_interleaved(void* ptr, size_t bytes)
 
-    **Effects:** Deallocates memory allocated by ``allocate_numa_interleaved``. ``bytes`` must be the same as
-    the one passed to the corresponding allocation function. The behavior is undefined if ``ptr`` was not
+    Deallocates memory allocated by ``allocate_numa_interleaved``. The behavior is undefined if ``bytes`` is
+    not the same as the one passed to the corresponding allocation function, ``ptr`` was not
     allocated by ``allocate_numa_interleaved`` or if the same pointer is deallocated more than once.
 
 Example
@@ -88,8 +90,8 @@ The code below provides a simple example with direct use of interleaved memory a
     :start-after: /*begin_allocate_numa_interleaved_example*/
     :end-before: /*end_allocate_numa_interleaved_example*/
 
-In the following example, interleaved memory is wrapped in ``tbb::memory_pool``. This allows to amortize allocation
-overhead.
+In the following example, interleaved memory is wrapped in ``tbb::memory_pool``. This allows to amortize
+allocation overhead.
 
 .. literalinclude:: ./examples/allocate_numa_interleaved_pool.cpp
     :language: c++
