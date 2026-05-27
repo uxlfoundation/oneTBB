@@ -87,7 +87,7 @@ static std::atomic<do_once_state> interleaved_initialization_state;
 
 void interleaved_initialization_impl() {
 #if __linux__
-const char* numa_lib_name = "libnuma.so";
+const char* numa_lib_name = "libnuma.so.1";
 #elif _WIN32 || _WIN64
 const char* numa_lib_name = "kernelbase.dll";
 #endif
