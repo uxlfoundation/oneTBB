@@ -56,7 +56,7 @@ Synopsis
 Functions
 ---------
 
-.. cpp:function:: void *tbb::allocate_numa_interleaved(size_t bytes, const std::vector<tbb::numa_node_id>& nodes, \
+.. cpp:function:: void* allocate_numa_interleaved(size_t bytes, const std::vector<tbb::numa_node_id>& nodes, \
                   size_t bytes_per_chunk = 0)
 
     **Returns:** Allocated memory interleaved between specified NUMA ``nodes`` with interleaved chunk size of
