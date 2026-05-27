@@ -23,7 +23,9 @@ private:
     void serial_compute_forces();
     void serial_integrate();
 
+    void parallel_zero_forces();
     void parallel_compute_forces();
+    void parallel_integrate();
 
     // Convert world (physics) coordinates to pixel coordinates.
     int world_to_px_x(double wx, int px_w) const;

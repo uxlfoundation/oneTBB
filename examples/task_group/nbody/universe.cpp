@@ -14,7 +14,7 @@
 
 #include <oneapi/tbb/task_group.h>
 
-constexpr std::size_t serial_threshold = 128;
+constexpr std::size_t serial_threshold = 64;
 
 void apply_forces(std::size_t i, std::size_t j, NBodies& b, double eps2) {
     double dx = b.x_position[j] - b.x_position[i];
@@ -50,9 +50,11 @@ void serial_rectangle_forces(std::size_t i0, std::size_t i1, std::size_t j0, std
     }
 }
 
-void n_body_parallel_rectangle(oneapi::tbb::task_group& tg, std::size_t i0, std::size_t i1, std::size_t j0, std::size_t j1, NBodies& bodies, double eps2) {
+oneapi::tbb::task_handle n_body_parallel_rectangle(oneapi::tbb::task_group& tg, std::size_t i0, std::size_t i1,
+                                                   std::size_t j0, std::size_t j1, NBodies& bodies, double eps2) {
     std::size_t di = i1 - i0;
     std::size_t dj = j1 - j0;
+    oneapi::tbb::task_handle next_task;
 
     if (di <= serial_threshold || dj <= serial_threshold) {
         serial_rectangle_forces(i0, i1, j0, j1, bodies, eps2);
@@ -61,19 +63,19 @@ void n_body_parallel_rectangle(oneapi::tbb::task_group& tg, std::size_t i0, std:
         std::size_t jm = j0 + dj / 2;
 
         oneapi::tbb::task_handle left_lower_rectangle = tg.defer([=, &tg, &bodies] {
-            n_body_parallel_rectangle(tg, i0, im, j0, jm, bodies, eps2);
+            return n_body_parallel_rectangle(tg, i0, im, j0, jm, bodies, eps2);
         });
 
         oneapi::tbb::task_handle right_upper_rectangle = tg.defer([=, &tg, &bodies] {
-            n_body_parallel_rectangle(tg, im, i1, jm, j1, bodies, eps2);
+            return n_body_parallel_rectangle(tg, im, i1, jm, j1, bodies, eps2);
         });
 
         oneapi::tbb::task_handle left_upper_rectangle = tg.defer([=, &tg, &bodies] {
-            n_body_parallel_rectangle(tg, i0, im, jm, j1, bodies, eps2);
+            return n_body_parallel_rectangle(tg, i0, im, jm, j1, bodies, eps2);
         });
 
         oneapi::tbb::task_handle right_lower_rectangle = tg.defer([=, &tg, &bodies] {
-            n_body_parallel_rectangle(tg, im, i1, j0, jm, bodies, eps2);
+            return n_body_parallel_rectangle(tg, im, i1, j0, jm, bodies, eps2);
         });
 
         oneapi::tbb::task_handle empty_sync = tg.defer([] {});
@@ -88,47 +90,48 @@ void n_body_parallel_rectangle(oneapi::tbb::task_group& tg, std::size_t i0, std:
 
         oneapi::tbb::task_group::transfer_this_task_completion_to(empty_sync);
 
-        tg.run(std::move(left_lower_rectangle));
         tg.run(std::move(right_upper_rectangle));
         tg.run(std::move(left_upper_rectangle));
         tg.run(std::move(right_lower_rectangle));
         tg.run(std::move(empty_sync));
+        next_task = std::move(left_lower_rectangle);
     }
-
+    return std::move(next_task);
 }
 
-void n_body_parallel_triangle(oneapi::tbb::task_group& tg, std::size_t n0, std::size_t n1, NBodies& bodies, double eps2) {
+oneapi::tbb::task_handle n_body_parallel_triangle(oneapi::tbb::task_group& tg, std::size_t n0, std::size_t n1,
+                                                  NBodies& bodies, double eps2) {
     std::size_t dn = n1 - n0;
-
-    if (dn <= 1) return;
+    oneapi::tbb::task_handle next_task;
 
     if (dn <= serial_threshold) {
         serial_triangle_forces(n0, n1, bodies, eps2);
-        return;
+    } else {
+        std::size_t nm = n0 + dn / 2;
+
+        oneapi::tbb::task_handle triangle1 = tg.defer([=, &tg, &bodies] {
+            return n_body_parallel_triangle(tg, n0, nm, bodies, eps2);
+        });
+
+        oneapi::tbb::task_handle triangle2 = tg.defer([=, &tg, &bodies] {
+            return n_body_parallel_triangle(tg, nm, n1, bodies, eps2);
+        });
+
+        oneapi::tbb::task_handle rectangle = tg.defer([=, &tg, &bodies] {
+            return n_body_parallel_rectangle(tg, n0, nm, nm, n1, bodies, eps2);
+        });
+
+        oneapi::tbb::task_group::set_task_order(triangle1, rectangle);
+        oneapi::tbb::task_group::set_task_order(triangle2, rectangle);
+
+        oneapi::tbb::task_group::transfer_this_task_completion_to(rectangle);
+
+        tg.run(std::move(triangle2));
+        tg.run(std::move(rectangle));
+
+        next_task = std::move(triangle1);
     }
-
-    std::size_t nm = n0 + dn / 2;
-
-    oneapi::tbb::task_handle triangle1 = tg.defer([=, &tg, &bodies] {
-        n_body_parallel_triangle(tg, n0, nm, bodies, eps2);
-    });
-
-    oneapi::tbb::task_handle triangle2 = tg.defer([=, &tg, &bodies] {
-        n_body_parallel_triangle(tg, nm, n1, bodies, eps2);
-    });
-
-    oneapi::tbb::task_handle rectangle = tg.defer([=, &tg, &bodies] {
-        n_body_parallel_rectangle(tg, n0, nm, nm, n1, bodies, eps2);
-    });
-
-    oneapi::tbb::task_group::set_task_order(triangle1, rectangle);
-    oneapi::tbb::task_group::set_task_order(triangle2, rectangle);
-
-    oneapi::tbb::task_group::transfer_this_task_completion_to(rectangle);
-
-    tg.run(std::move(triangle1));
-    tg.run(std::move(triangle2));
-    tg.run(std::move(rectangle));
+    return std::move(next_task);
 }
 
 Universe::Universe(std::size_t n_bodies, double dt, double eps2)
@@ -361,7 +364,7 @@ void Universe::parallel_compute_forces() {
     oneapi::tbb::task_group tg;
 
     tg.run_and_wait([&tg, this] {
-        n_body_parallel_triangle(tg, 0, m_bodies.count, m_bodies, m_eps2);
+        return n_body_parallel_triangle(tg, 0, m_bodies.count, m_bodies, m_eps2);
     });
 }
 
