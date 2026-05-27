@@ -711,7 +711,7 @@ namespace TestIsolationNS {
     public:
         DummyFunctor() {}
         void operator()() const {
-            for ( volatile int j = 0; j < 10; ++j ) {}
+            utils::doDummyWork(10);
         }
     };
 
