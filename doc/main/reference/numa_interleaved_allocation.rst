@@ -40,8 +40,8 @@ Synopsis
 
     namespace tbb {
         inline void *allocate_numa_interleaved(size_t bytes,
-                                       const std::vector<tbb::numa_node_id>& nodes,
-                                       size_t bytes_per_chunk = 0);
+                                               const std::vector<tbb::numa_node_id>& nodes,
+                                               size_t bytes_per_chunk = 0);
 
         inline void *allocate_numa_interleaved(size_t bytes, size_t bytes_per_chunk = 0);
 
