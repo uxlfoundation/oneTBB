@@ -705,7 +705,6 @@ void TestMoveSemantics() {
 }
 //------------------------------------------------------------------------
 
-// TODO: TBB_REVAMP_TODO - enable when ETS is available
 #if __TBB_PREVIEW_ISOLATED_TASK_GROUP
 namespace TestIsolationNS {
     class DummyFunctor {
