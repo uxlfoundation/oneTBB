@@ -22,10 +22,10 @@ second parameter controls the granularity of interleaving, which may be desirabl
 access patterns. The allocation/deallocation functions call the OS directly. If some form of caching is
 desirable, it can be implemented on top of this API.
 
-Under Linux, the API is using ``libnuma`` library, so it must be available at runtime. If the library is
-not available, the allocation functions fallback to standard memory allocation. On Windows, the API is using
-functionality that is available starting from Windows 10 / Windows Server 2016, for older versions of Windows
-the allocation functions fallback to standard memory allocation as well.
+Under Linux, the API uses the ``libnuma`` library, which must be available at runtime. If the library is not
+available, the allocation functions fall back to standard memory allocation. On Windows, the API uses
+functionality available starting from Windows 10 / Windows Server 2016; on older versions of Windows, the
+allocation functions also fall back to standard memory allocation.
 
 API
 ***
