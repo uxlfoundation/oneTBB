@@ -35,7 +35,7 @@ permissions:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ubuntu-latest-large
+    runs-on: ubuntu-latest
     # timeout-minutes: 
     permissions:
       # required for all workflows
