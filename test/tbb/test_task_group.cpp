@@ -28,6 +28,7 @@
 #include "common/utils.h"
 #include "oneapi/tbb/detail/_config.h"
 #include "tbb/global_control.h"
+#include "tbb/enumerable_thread_specific.h"
 
 #include "tbb/task_group.h"
 
@@ -705,7 +706,7 @@ void TestMoveSemantics() {
 //------------------------------------------------------------------------
 
 // TODO: TBB_REVAMP_TODO - enable when ETS is available
-#if TBBTEST_USE_TBB && TBB_PREVIEW_ISOLATED_TASK_GROUP
+#if __TBB_PREVIEW_ISOLATED_TASK_GROUP
 namespace TestIsolationNS {
     class DummyFunctor {
     public:
@@ -832,7 +833,7 @@ TEST_CASE("Move semantics test for the task group") {
     }
 }
 
-#if TBB_PREVIEW_ISOLATED_TASK_GROUP
+#if __TBB_PREVIEW_ISOLATED_TASK_GROUP
 
 #if __TBB_USE_ADDRESS_SANITIZER
 //! Test for thread safety for the isolated_task_group
@@ -1157,7 +1158,7 @@ void test() {
 //! Respect task_group_context passed from outside
 //! \brief \ref interface \ref requirement
 TEST_CASE("Respect task_group_context passed from outside") {
-#if TBB_PREVIEW_ISOLATED_TASK_GROUP
+#if __TBB_PREVIEW_ISOLATED_TASK_GROUP
     accept_task_group_context::test<tbb::isolated_task_group>();
 #endif
 }
@@ -1264,14 +1265,14 @@ TEST_CASE("task_handle cannot be scheduled into other task_group of the same con
 TEST_CASE("Concurrent exception handling in task_group wait") {
     const int num_waiters = 4;
     const int num_iterations = 5;
-    
+
     for (int iter = 0; iter < num_iterations; ++iter) {
         tbb::task_group tg;
         utils::SpinBarrier barrier(num_waiters + 1); // +1 for main thread
         std::atomic<int> exceptions_caught{0};
         std::atomic<int> normal_completions{0};
         std::atomic<bool> task_thrown{false};
-        
+
         // Launch a task that will throw an exception
         tg.run([&] {
             barrier.wait(); // Wait for all waiters to be ready
@@ -1279,7 +1280,7 @@ TEST_CASE("Concurrent exception handling in task_group wait") {
             task_thrown = true;
             throw test_exception("Concurrent wait exception test");
         });
-        
+
         // Launch multiple threads that will concurrently call wait()
         std::vector<std::thread> waiters;
         for (int i = 0; i < num_waiters; ++i) {
@@ -1290,7 +1291,7 @@ TEST_CASE("Concurrent exception handling in task_group wait") {
                     if (status != tbb::not_complete)
                         ++normal_completions;
                 } catch (const test_exception& e) {
-                    CHECK_MESSAGE(std::string(e.what()) == "Concurrent wait exception test", 
+                    CHECK_MESSAGE(std::string(e.what()) == "Concurrent wait exception test",
                                 "Unexpected exception message");
                     ++exceptions_caught;
                 } catch (...) {
@@ -1298,29 +1299,29 @@ TEST_CASE("Concurrent exception handling in task_group wait") {
                 }
             });
         }
-                
+
         try {
             tbb::task_group_status status = tg.wait();
             if (status != tbb::not_complete)
                 ++normal_completions;
         } catch (const test_exception& e) {
-            CHECK_MESSAGE(std::string(e.what()) == "Concurrent wait exception test", 
+            CHECK_MESSAGE(std::string(e.what()) == "Concurrent wait exception test",
                         "Unexpected exception message");
             ++exceptions_caught;
         } catch (...) {
             CHECK_MESSAGE(false, "Unexpected exception type caught");
         }
-        
+
         // Wait for all threads to complete
         for (auto& waiter : waiters) {
             waiter.join();
         }
-        
+
         // Verify that the exception was properly handled
         CHECK_MESSAGE(task_thrown.load(), "Task should have thrown an exception");
-        
+
         // At least one thread should have caught the exception
-        CHECK_MESSAGE(exceptions_caught.load() > 0, 
+        CHECK_MESSAGE(exceptions_caught.load() > 0,
                      "At least one waiter should have caught the exception");
         CHECK_MESSAGE(normal_completions.load() + exceptions_caught.load() == num_waiters + 1,
                      "The total caught or completed is num_waiters + 1");
@@ -1328,10 +1329,10 @@ TEST_CASE("Concurrent exception handling in task_group wait") {
 }
 
 //! \brief \ref error_guessing
-TEST_CASE("Arena exception handling race condition test") { 
+TEST_CASE("Arena exception handling race condition test") {
     const int num_iterations = 5;
     const int num_threads = std::thread::hardware_concurrency();
-    
+
     for (int iter = 0; iter < num_iterations; ++iter) {
         bool throw_to_arena = (iter < num_iterations/2) ? false : true;
         utils::SpinBarrier barrier(num_threads);
@@ -1340,10 +1341,10 @@ TEST_CASE("Arena exception handling race condition test") {
         std::atomic<int> expected_arena_caught{0};
         std::atomic<int> successful_executions{0};
         std::vector<std::thread> threads;
-        
+
         tbb::task_arena arena{num_threads};
         for (int t = 0; t < num_threads; ++t) {
-            threads.emplace_back([throw_to_arena, &barrier, &arena, &exception_count, 
+            threads.emplace_back([throw_to_arena, &barrier, &arena, &exception_count,
                                   &expected_task_group_caught, &expected_arena_caught,
                                   &successful_executions, t]() {
                 try {
@@ -1351,7 +1352,7 @@ TEST_CASE("Arena exception handling race condition test") {
                     arena.execute([throw_to_arena, &exception_count, &expected_task_group_caught, t]() {
                         // Create nested task groups that will throw exceptions simultaneously
                         tbb::task_group tg;
-                        
+
                         // Launch multiple tasks that throw at the same time
                         for (int i = 0; i < 10; ++i) {
                             tg.run([&exception_count, t, i]() {
@@ -1361,7 +1362,7 @@ TEST_CASE("Arena exception handling race condition test") {
                                 throw std::runtime_error("Test exception " + std::to_string(t) + "_" + std::to_string(i));
                             });
                         }
-                        
+
                         // This wait() should trigger the arena exception handling code
                         try {
                             tg.wait();
@@ -1377,12 +1378,12 @@ TEST_CASE("Arena exception handling race condition test") {
                 }
             });
         }
-        
+
         // Wait for all threads
         for (auto& thread : threads) {
             thread.join();
         }
-        
+
         // Verify we didn't crash and all threads completed
         CHECK_MESSAGE(successful_executions.load() == num_threads, "All executions should finish");
         CHECK_MESSAGE(exception_count.load(), "Should have thrown at least one exception");
@@ -1400,21 +1401,21 @@ TEST_CASE("Arena exception handling race condition test") {
 //! \brief \ref error_guessing
 TEST_CASE("Task dispatcher exception handling race condition test") {
     if (tbb::this_task_arena::max_concurrency() < 2) return;
-    
+
     const int num_iterations = 50;
     const int tasks_to_throw = 20;
     const int num_concurrent_waits = 8;
-    
+
     for (int iter = 0; iter < num_iterations; ++iter) {
         utils::SpinBarrier barrier(num_concurrent_waits);
         std::atomic<int> exceptions_thrown{0};
         std::atomic<int> expected_exceptions_caught{0};
         std::atomic<int> unexpected_exceptions_caught{0};
         std::vector<std::thread> threads;
-        
+
         // Create a shared task group that will have exceptions
         tbb::task_group shared_tg;
-        
+
         // Launch tasks that will throw exceptions
         for (int i = 0; i < tasks_to_throw; ++i) {
             shared_tg.run([&exceptions_thrown, i]() {
@@ -1426,19 +1427,19 @@ TEST_CASE("Task dispatcher exception handling race condition test") {
                 throw std::runtime_error("Dispatcher test exception " + std::to_string(i));
             });
         }
-        
+
         // Launch multiple threads that will wait on the same task group simultaneously
         // This will trigger concurrent calls to task_dispatcher::execute_and_wait
         for (int t = 0; t < num_concurrent_waits; ++t) {
-            threads.emplace_back([&barrier, &shared_tg, 
-                                  &expected_exceptions_caught, 
+            threads.emplace_back([&barrier, &shared_tg,
+                                  &expected_exceptions_caught,
                                   &unexpected_exceptions_caught]() {
                 try {
                     barrier.wait();
 
                     // Create a nested task group for additional complexity
                     tbb::task_group nested_tg;
-                    
+
                     // Add some non-throwing tasks to the nested group
                     for (int i = 0; i < 5; ++i) {
                         nested_tg.run([i]() {
@@ -1447,7 +1448,7 @@ TEST_CASE("Task dispatcher exception handling race condition test") {
                             (void)x;
                         });
                     }
-                    
+
                     // Wait on both groups - this should trigger the exception handling
                     // in task_dispatcher::execute_and_wait when the shared_tg exceptions propagate
                     try {
@@ -1462,12 +1463,12 @@ TEST_CASE("Task dispatcher exception handling race condition test") {
                 }
             });
         }
-        
+
         // Wait for all threads to complete
         for (auto& thread : threads) {
             thread.join();
         }
-        
+
         // Verify all waits completed successfully without crashes
         CHECK_MESSAGE(exceptions_thrown.load(), "Should have thrown at least one exception");
         CHECK_MESSAGE(expected_exceptions_caught.load(), "Should have caught at least one exception");
@@ -1479,21 +1480,21 @@ TEST_CASE("Task dispatcher exception handling race condition test") {
 //! \brief \ref error_guessing
 TEST_CASE("Mixed arena and task_group race test") {
     const int num_iterations = 50;
-    
+
     for (int iter = 0; iter < num_iterations; ++iter) {
         utils::SpinBarrier barrier(3);
         std::atomic<int> successful_completions{0};
         std::atomic<int> total_exceptions{0};
         std::atomic<int> exceptions_caught{0};
-        
+
         tbb::task_arena shared_arena;
-        
+
         std::thread arena_thread([&barrier, &shared_arena, &total_exceptions,
                                  &successful_completions, &exceptions_caught]() {
             try {
                 barrier.wait();
                 shared_arena.execute([&total_exceptions, &successful_completions]() {
-                    tbb::task_group tg; 
+                    tbb::task_group tg;
                     for (int i = 0; i < 15; ++i) {
                         tg.run([&total_exceptions, i]() { // this will bind to shared_arena's task_group_context
                             std::this_thread::sleep_for(std::chrono::microseconds(i % 3));
@@ -1508,13 +1509,13 @@ TEST_CASE("Mixed arena and task_group race test") {
                 exceptions_caught.fetch_add(1);
             }
         });
-        
+
         // Thread 2: Exercises task dispatcher exception handling
-        std::thread dispatcher_thread([&barrier, &total_exceptions, 
+        std::thread dispatcher_thread([&barrier, &total_exceptions,
                                        &successful_completions, &exceptions_caught]() {
             try {
                 barrier.wait();
-                tbb::task_group tg; 
+                tbb::task_group tg;
                 for (int i = 0; i < 12; ++i) {
                     tg.run([&total_exceptions, i]() { // this will bind to dispatcher_thread arena
                         std::this_thread::sleep_for(std::chrono::microseconds((i + 1) % 4));
@@ -1528,14 +1529,14 @@ TEST_CASE("Mixed arena and task_group race test") {
                 exceptions_caught.fetch_add(1);
             }
         });
-        
+
         // Thread 3: Mixed workload
         std::thread mixed_thread([&barrier, &shared_arena, &total_exceptions,
                                   &successful_completions, &exceptions_caught]() {
             try {
                 barrier.wait();
                 tbb::task_group outer_tg; // binds to mixed_thread's arena's context
-                
+
                 // Task that uses arena
                 outer_tg.run([&shared_arena, &total_exceptions]() {
                     try {
@@ -1548,25 +1549,25 @@ TEST_CASE("Mixed arena and task_group race test") {
                         throw; // back to mixed_thread's task_group_context
                     }
                 });
-                
+
                 // Task that doesn't use arena
                 outer_tg.run([&total_exceptions]() { // binds to mixed_thread's arena's context
                     std::this_thread::sleep_for(std::chrono::microseconds(2));
                     total_exceptions.fetch_add(1);
                     throw std::overflow_error("Mixed direct exception");
                 });
-                
+
                 outer_tg.wait();
                 successful_completions.fetch_add(1);
             } catch (const std::exception&) {
                 exceptions_caught.fetch_add(1);
             }
         });
-        
+
         arena_thread.join();
         dispatcher_thread.join();
         mixed_thread.join();
-        
+
         // All threads should have completed successfully despite exceptions
         // Verify all waits completed successfully without crashes
         CHECK_MESSAGE(total_exceptions.load(), "Should have thrown at least one exception");
@@ -1634,7 +1635,7 @@ TEST_CASE("test task_completion_handle") {
 
         handle_copy = completion_handle;
         CHECK_MESSAGE(!handle_copy, "Non-empty completion_handle after copy assignment from empty completion_handle");
-        
+
         handle_move = std::move(completion_handle);
         CHECK_MESSAGE(!handle_move, "Non-empty completion_handle after move assignment from empty completion_handle");
     }
@@ -1675,7 +1676,7 @@ TEST_CASE("test task_completion_handle") {
         CHECK_MESSAGE(task3_completion_handle2, "Empty task completion_handle after move assignment from non-empty handle");
         CHECK_MESSAGE(!task3_completion_handle1, "Moved-from task_completion_handle is non-empty");
 
-        tbb::task_handle task4_handle = tg.defer(task_body);        
+        tbb::task_handle task4_handle = tg.defer(task_body);
         tg.run_and_wait(std::move(task4_handle));
         CHECK_MESSAGE(task_placeholder == 4, "Task body was not executed");
     }
@@ -1768,7 +1769,7 @@ struct combine_task {
 
 void test_not_submitted_predecessors(submit_function submit_function_tag) {
     tbb::task_arena arena;
-    constexpr std::size_t depth = 100; 
+    constexpr std::size_t depth = 100;
 
     tbb::task_group tg;
     std::size_t task_initializer = 0;
@@ -1799,7 +1800,7 @@ void test_not_submitted_predecessors(submit_function submit_function_tag) {
         left_leaf_completion_handle = combine_completion_handle;
         left_leaf_placeholder = combine_placeholder;
     }
-    
+
     CHECK(deepest_left_leaf_task);
     CHECK_MESSAGE(*left_leaf_placeholder == 0, "Receiving results from incomplete task graph");
 
@@ -1951,7 +1952,7 @@ void test_adding_successors_after_transfer(submit_function func) {
         CHECK(receiver_task_placeholder == finished_task);
         CHECK(successor_task_placeholder == not_finished_task);
         CHECK(transferring_task_placeholder == finished_task);
-        
+
         successor_task_placeholder = finished_task;
     });
 
@@ -1976,7 +1977,7 @@ void test_adding_successors_after_transfer(submit_function func) {
     });
 
     tbb::task_completion_handle transferring_task_completion_handle = transferring_task;
-    
+
     tbb::task_group::set_task_order(transferring_task, successor_task);
 
     submit(func, std::move(successor_task), tg, arena);
@@ -2020,7 +2021,7 @@ void test_adding_successors_during_transfer_to_completed_recipient() {
 
     // Need at least 2 threads to reproduce the race
     if (num_threads < 2) return;
-    
+
     for (std::size_t i = 0; i < num_iterations; ++i) {
         tbb::task_group tg;
         std::atomic<int> succ_count{0};
@@ -2109,7 +2110,7 @@ TEST_CASE("test task_group dynamic dependencies") {
         test_transferring_completion(p, submit_function::run_and_wait);
         test_transferring_completion(p, submit_function::arena_enqueue);
         test_transferring_completion(p, submit_function::this_arena_enqueue);
-        
+
         test_return_task_with_dependencies(submit_function::run);
         test_return_task_with_dependencies(submit_function::run_and_wait);
         test_return_task_with_dependencies(submit_function::arena_enqueue);
@@ -2225,7 +2226,7 @@ TEST_CASE("Test stateful task body") {
     CHECK_MESSAGE(placeholder == 1, "Not submitted task was executed");
 }
 
-#if TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
 enum class wait_for_function_tag {
     group_wait_task,
@@ -2292,7 +2293,7 @@ void test_single_task_wait_with_no_dependencies(bool do_cancellation, wait_for_f
     tbb::task_completion_handle first_block_comp_handle = first_block_task;
 
     tbb::task_group_status task_status = run_and_wait_for(std::move(first_block_task), tg, arena, tag);
-    
+
     tbb::task_group_status expected_task_status = tbb::task_group_status::not_complete;
     tbb::task_group_status expected_group_status = tbb::task_group_status::not_complete;
     std::size_t expected_item = 0;
@@ -2304,7 +2305,7 @@ void test_single_task_wait_with_no_dependencies(bool do_cancellation, wait_for_f
         expected_group_status = tbb::task_group_status::complete;
         expected_item = 1;
     }
-    
+
     CHECK_MESSAGE(task_status == expected_task_status, "Incorrect task status returned");
     for (std::size_t i = 0; i < block_size; ++i) {
         CHECK_MESSAGE(items[i] == expected_item, "Incorrect item processing result");
@@ -2319,7 +2320,7 @@ void test_single_task_wait_with_no_dependencies(bool do_cancellation, wait_for_f
 
     tbb::task_group_status group_status = arena.wait_for(tg);
     CHECK_MESSAGE(group_status == expected_group_status, "Incorrect group status returned");
-    
+
     if (!do_cancellation) {
         for (auto& item : items) {
             CHECK_MESSAGE(item == 1, "Some task was not executed");
@@ -2412,7 +2413,7 @@ public:
 void test_single_task_wait_with_dependencies(bool do_cancellation, wait_for_function_tag tag) {
     tbb::task_group tg;
     tbb::task_arena arena;
-    
+
     test_single_task_wait_graph graph(tg, arena, do_cancellation);
     graph.run();
 
@@ -2425,7 +2426,7 @@ void test_single_task_wait_with_dependencies(bool do_cancellation, wait_for_func
         CHECK_MESSAGE(task_status == tbb::task_group_status::task_complete, "Incorrect task_group_status returned");
         CHECK_MESSAGE((graph.wait_task_executed() && !graph.all_tasks_executed()), "successor task should be executed");
     }
-    
+
     // Allow execution of controlled task
     graph.execution_allowed = 1;
 
@@ -2469,7 +2470,7 @@ void test_single_task_wait_transferring(bool do_cancellation, wait_for_function_
         CHECK_MESSAGE(task_status == tbb::task_group_status::task_complete, "Incorrect task_group_status returned");
         CHECK_MESSAGE((graph.wait_task_executed() && !graph.all_tasks_executed()), "successor task should be executed");
     }
-    
+
     // Allow execution of controlled task
     graph.execution_allowed = 1;
 
@@ -2490,7 +2491,7 @@ void test_concurrent_single_task_wait(bool do_cancellation, wait_for_function_ta
 
     tbb::task_handle task;
     tbb::task_completion_handle comp_handle;
-    
+
     arena.execute([&] {
         task = tg.defer([&] {
             CHECK_MESSAGE(!do_cancellation, "Task should not be called in case of group cancellation");
@@ -2511,7 +2512,7 @@ void test_concurrent_single_task_wait(bool do_cancellation, wait_for_function_ta
             if (index == 0) {
                 // Short sleep to increase the number of threads entered the wait_for function
                 utils::Sleep(10);
-                
+
                 if (do_cancellation) {
                     tg.cancel();
                 }
@@ -2575,7 +2576,7 @@ void test_get_status_of_with_transferring(bool cancellation) {
         if (cancellation) tg.cancel();
         tg.run(std::move(receiver));
     });
-    
+
     sender_comp_handle = sender;
 
     CHECK_MESSAGE(tg.get_status_of(sender_comp_handle) == tbb::task_group_status::not_complete,
@@ -2615,7 +2616,7 @@ void test_get_status_of() {
         tbb::task_handle task = tg.defer(task_body);
 
         comp_handle = task;
-        
+
         CHECK_MESSAGE(tg.get_status_of(comp_handle) == tbb::task_group_status::not_complete,
                     "Incorrect task_group_status returned");
         tg.run_and_wait(std::move(task));
@@ -2627,7 +2628,7 @@ void test_get_status_of() {
     {
         tbb::task_group tg;
         tg_ptr = &tg;
-        
+
         tbb::task_handle task = tg.defer(task_body);
         comp_handle = task;
         tg.cancel();
@@ -2657,7 +2658,7 @@ TEST_CASE("test single task wait") {
 TEST_CASE("test task_group::get_status_of") {
     test_get_status_of();
 }
-#endif
+#endif // __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 
 #if _MSC_VER
 #pragma warning (pop)

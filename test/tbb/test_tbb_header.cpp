@@ -80,12 +80,12 @@
 #undef _DEBUG
 #endif /* !TBB_USE_DEBUG && defined(_DEBUG) */
 
-#if __TBB_TEST_SECONDARY && TBB_PREVIEW_MEMORY_POOL && defined(_CRTDBG_MAP_ALLOC)
+#if __TBB_TEST_SECONDARY && __TBB_PREVIEW_MEMORY_POOL && defined(_CRTDBG_MAP_ALLOC)
 // when _CRTDBG_MAP_ALLOC is defined, the base versions of malloc, free and realloc are replaced with
 // their debug versions with different amount of arguments. It is implemented as #define malloc(x) _malloc_dbg(x, additional-args)
 // that breaks the definition of tbb::detail::d1::base_pool::malloc/free/realloc
 // excluding memory_pool.h from testing when this mode is enabled
-#undef TBB_PREVIEW_MEMORY_POOL
+#undef __TBB_PREVIEW_MEMORY_POOL
 #endif
 
 #include "tbb/tbb.h"
@@ -207,7 +207,7 @@ static void TestPreviewNames() {
 #endif
     TestTypeDefinitionPresence2( concurrent_lru_cache<int, int> );
     TestTypeDefinitionPresence( isolated_task_group );
-#if TBB_PREVIEW_MEMORY_POOL
+#if __TBB_PREVIEW_MEMORY_POOL
     TestTypeDefinitionPresence( memory_pool_allocator<int> );
     TestTypeDefinitionPresence( memory_pool<std::allocator<int>> );
     TestTypeDefinitionPresence( fixed_pool );
@@ -222,7 +222,7 @@ static void TestPreviewNames() {
     TestFuncDefinitionPresence( this_task_arena::start_parallel_phase, (), void );
     TestFuncDefinitionPresence( this_task_arena::end_parallel_phase, (bool), void );
 #endif
-#if TBB_PREVIEW_NUMA_ALLOCATION
+#if __TBB_PREVIEW_NUMA_ALLOCATION
     TestFuncDefinitionPresence( allocate_numa_interleaved, (size_t, size_t), void* );
     TestFuncDefinitionPresence( deallocate_numa_interleaved, (void*, size_t), void );
 #endif
@@ -286,7 +286,7 @@ static void DefinitionPresence() {
     TestTypeDefinitionPresence( flow::limiter_node<int> );
     TestTypeDefinitionPresence2(flow::indexer_node<int, int> );
     TestTypeDefinitionPresence2(flow::composite_node<std::tuple<int>, std::tuple<int> > );
-#if TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
+#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
     TestTypeDefinitionPresence( flow::resource_limiter<int> );
     TestTypeDefinitionPresence2(flow::resource_limited_node<int, std::tuple<int> > );
 #endif
