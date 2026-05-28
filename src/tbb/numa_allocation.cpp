@@ -163,7 +163,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     long ret = move_pages_ptr(/*pid=*/0, count_pages, pages.get(), nodes_per_page.get(), status.get(),
                               /*flags=*/0);
     if (ret < 0) {
-        printf("move_pages failed for allocate_interleaved: bytes=%zu, ret=%ld\n", bytes, ret);
+        printf("move_pages failed for allocate_interleaved: bytes=%zu, ret=%ld, errno=%d\n", bytes, ret, errno);
         fflush(stdout);
         return nullptr;
     }
