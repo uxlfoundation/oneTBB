@@ -294,12 +294,12 @@ public:
 
 // GCC 12.x-15.x issues a warning here that to_wait_node(n)->my_is_in_list might have size 0, since n is
 // a base_node pointer. (This cannot happen, because only wait_node pointers are added to my_waitset.)
-#if (__TBB_GCC_VERSION >= 120100 && __TBB_GCC_VERSION < 160000 ) && !__clang__ && !__INTEL_COMPILER
+#if (__TBB_GCC_VERSION >= 120100 && __TBB_GCC_VERSION < 170000 ) && !__clang__ && !__INTEL_COMPILER
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-overflow"
 #endif
                 to_wait_node(n)->my_is_in_list.store(false, std::memory_order_relaxed);
-#if (__TBB_GCC_VERSION >= 120100 && __TBB_GCC_VERSION < 160000 ) && !__clang__ && !__INTEL_COMPILER
+#if (__TBB_GCC_VERSION >= 120100 && __TBB_GCC_VERSION < 170000 ) && !__clang__ && !__INTEL_COMPILER
 #pragma GCC diagnostic pop
 #endif
             }
