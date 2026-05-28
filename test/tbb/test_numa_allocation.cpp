@@ -35,6 +35,20 @@
 static long (*move_pages_ptr)(int pid, unsigned long count,
                               void **pages, const int *nodes,
                               int *status, int flags) = nullptr;
+#include <sstream>
+
+std::string NodesToString(const std::vector<tbb::numa_node_id>& nodes) {
+    std::ostringstream os;
+    os << '[';
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+        if (i != 0) {
+            os << ", ";
+        }
+        os << nodes[i];
+    }
+    os << ']';
+    return os.str();
+}
 #endif
 
 size_t DefaultSystemPageSize() {
@@ -123,8 +137,9 @@ TEST_CASE("test basics") {
     // In case of single NUMA node, memory is untouched and page query is not working.
     // Anyway, it has not much sense to check it on single-NUMA system.
     if (tbb::info::numa_nodes().size() > 1) {
-        lib = utils::OpenLibrary("libnuma.so");
-        WARN_MESSAGE(lib, "Can't load libnuma.so, skipping NUMA ownership checks");
+        lib = utils::OpenLibrary("libnuma.so.1");
+        const std::string nodes_str = NodesToString(tbb::info::numa_nodes());
+        WARN_MESSAGE(lib, "Can't load libnuma.so.1, skipping NUMA ownership checks, nodes: " << nodes_str);
         if (lib)
             utils::GetAddress(lib, "move_pages", move_pages_ptr);
     }
@@ -145,7 +160,7 @@ TEST_CASE("test basics") {
 
         {
             char *ptr = (char *)tbb::allocate_numa_interleaved(obj_size);
-            REQUIRE(ptr != nullptr);
+            REQUIRE_MESSAGE(ptr != nullptr, "Failed to allocate NUMA interleaved memory for size " << obj_size);
             REQUIRE_EQ(utils::NonZero(ptr, obj_size), 0);
             if (lib)
                 for (size_t i = 0; i < obj_size; i += page_size) {

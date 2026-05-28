@@ -23,6 +23,8 @@
 #include <atomic>
 #include <memory> // for std::unique_ptr
 
+#include <stdio.h>
+
 #if __linux__
 
 #include <sys/mman.h>
@@ -117,13 +119,20 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
                         const tbb::detail::d1::numa_node_id *nodes_ids, size_t nodes_count,
                         size_t bytes_per_chunk) {
     const int *nodes = common_init(bytes, nodes_ids, nodes_count, bytes_per_chunk);
-    if (!nodes)
+    if (!nodes) {
+        printf("Invalid parameters for allocate_interleaved: bytes=%zu, nodes_count=%zu, bytes_per_chunk=%zu\n",
+               bytes, nodes_count, bytes_per_chunk);
+        fflush(stdout);
         return nullptr;
+    }
 
     char *base_addr = reinterpret_cast<char*>(
         mmap(/*addr=*/nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, /*fd=*/-1, /*offset=*/0));
-    if (base_addr == MAP_FAILED)
+    if (base_addr == MAP_FAILED) {
+        printf("mmap failed for allocate_interleaved: bytes=%zu\n", bytes);
+        fflush(stdout);
         return nullptr;
+    }
 
     auto unmap = [bytes](void *ptr) {
         munmap(ptr, bytes);
@@ -153,12 +162,18 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     }
     long ret = move_pages_ptr(/*pid=*/0, count_pages, pages.get(), nodes_per_page.get(), status.get(),
                               /*flags=*/0);
-    if (ret < 0)
+    if (ret < 0) {
+        printf("move_pages failed for allocate_interleaved: bytes=%zu, ret=%ld\n", bytes, ret);
+        fflush(stdout);
         return nullptr;
+    }
 
     for (size_t i = 0; i < count_pages; ++i)
-        if (status[i] < 0)
+        if (status[i] < 0) {
+            printf("move_pages failed for allocate_interleaved: bytes=%zu, page=%zu, status=%d\n", bytes, i, status[i]);
+            fflush(stdout);
             return nullptr;
+        }
     return data_holder.release();
 }
 
