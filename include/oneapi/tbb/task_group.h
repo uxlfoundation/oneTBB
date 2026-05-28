@@ -637,7 +637,8 @@ public:
 
     template<typename F>
     void run(F&& f) {
-        d1::spawn(*prepare_task(std::forward<F>(f)), context());
+        // d1::spawn(*prepare_task(std::forward<F>(f)), context());
+        d1::aggregate(*prepare_task(std::forward<F>(f)), context());
     }
 
     void run(d2::task_handle&& h) {
@@ -653,7 +654,8 @@ public:
             return;
         }
 #endif
-        d1::spawn(*task_ptr, context());
+        // d1::spawn(*task_ptr, context());
+        d1::aggregate(*task_ptr, context());
     }
 
     template<typename F>

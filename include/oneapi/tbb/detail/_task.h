@@ -56,6 +56,7 @@ class task_group_base;
 namespace r1 {
 //! Task spawn/wait entry points
 TBB_EXPORT void __TBB_EXPORTED_FUNC spawn(d1::task& t, d1::task_group_context& ctx);
+TBB_EXPORT void __TBB_EXPORTED_FUNC aggregate(d1::task& t, d1::task_group_context& ctx);
 TBB_EXPORT void __TBB_EXPORTED_FUNC spawn(d1::task& t, d1::task_group_context& ctx, d1::slot_id id);
 TBB_EXPORT void __TBB_EXPORTED_FUNC execute_and_wait(d1::task& t, d1::task_group_context& t_ctx, d1::wait_context&, d1::task_group_context& w_ctx);
 TBB_EXPORT void __TBB_EXPORTED_FUNC wait(d1::wait_context&, d1::task_group_context& ctx);
@@ -224,6 +225,11 @@ inline bool is_stolen(const execution_data& ed) {
 inline void spawn(task& t, task_group_context& ctx) {
     call_itt_task_notify(releasing, &t);
     r1::spawn(t, ctx);
+}
+
+inline void aggregate(task& t, task_group_context& ctx) {
+    call_itt_task_notify(releasing, &t);
+    r1::aggregate(t, ctx);
 }
 
 inline void spawn(task& t, task_group_context& ctx, slot_id id) {

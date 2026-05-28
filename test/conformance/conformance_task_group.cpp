@@ -281,3 +281,18 @@ TEST_CASE("Respect task_group_context passed from outside") {
     accept_task_group_context::test<tbb::task_group>();
 }
 
+TEST_CASE("AAA") {
+    tbb::tick_count start = tbb::tick_count::now();
+    tbb::task_group tg;
+
+    for (std::size_t i = 0; i < 1000000; ++i) {
+        tg.run([&]() { std::this_thread::sleep_for(std::chrono::nanoseconds(1)); });
+    }
+
+    tg.wait();
+
+    tbb::tick_count finish = tbb::tick_count::now();
+
+    std::cout << "Elapsed time: " << (finish - start).seconds() << std::endl;
+}
+

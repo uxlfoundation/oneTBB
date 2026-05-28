@@ -28,6 +28,11 @@ static inline void spawn_and_notify(d1::task& t, arena_slot* slot, arena* a) {
     // TODO: TBB_REVAMP_TODO slot->assert_task_pool_valid();
 }
 
+static inline void aggregate_and_notify(d1::task& t, arena_slot* slot, arena* a, d1::task_group_context& ctx) {
+    slot->aggregate(t, ctx);
+    a->advertise_new_work<arena::work_spawned>();
+}
+
 void __TBB_EXPORTED_FUNC spawn(d1::task& t, d1::task_group_context& ctx) {
     thread_data* tls = governor::get_thread_data();
     task_group_context_impl::bind_to(ctx, tls);
@@ -38,6 +43,18 @@ void __TBB_EXPORTED_FUNC spawn(d1::task& t, d1::task_group_context& ctx) {
     // Mark isolation
     task_accessor::isolation(t) = tls->my_task_dispatcher->m_execute_data_ext.isolation;
     spawn_and_notify(t, slot, a);
+}
+
+void __TBB_EXPORTED_FUNC aggregate(d1::task& t, d1::task_group_context& ctx) {
+    thread_data* tls = governor::get_thread_data();
+    task_group_context_impl::bind_to(ctx, tls);
+    arena* a = tls->my_arena;
+    arena_slot* slot = tls->my_arena_slot;
+    // Capture current context
+    task_accessor::context(t) = &ctx;
+    // Mark isolation
+    task_accessor::isolation(t) = tls->my_task_dispatcher->m_execute_data_ext.isolation;
+    aggregate_and_notify(t, slot, a, ctx);
 }
 
 void __TBB_EXPORTED_FUNC spawn(d1::task& t, d1::task_group_context& ctx, d1::slot_id id) {

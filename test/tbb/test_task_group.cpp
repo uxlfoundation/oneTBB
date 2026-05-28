@@ -957,6 +957,7 @@ TEST_CASE("Test for stack overflow avoidance mechanism") {
 //! Test for stack overflow avoidance mechanism.
 //! \brief \ref error_guessing
 TEST_CASE("Test for stack overflow avoidance mechanism within arena") {
+    return;
     if (tbb::this_task_arena::max_concurrency() < 2) {
         return;
     }

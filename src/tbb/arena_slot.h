@@ -28,6 +28,7 @@
 #include "misc.h"
 #include "mailbox.h"
 #include "scheduler_common.h"
+#include "task_aggregation.h"
 
 #include <atomic>
 
@@ -84,6 +85,9 @@ struct alignas(max_nfs_size) arena_slot_private_state {
     //! Task pool of the scheduler that owns this slot
     // TODO: previously was task**__TBB_atomic, but seems like not accessed on other thread
     d1::task** task_pool_ptr;
+
+    // Aggregation tree
+    task_aggregator aggregation_tree;
 };
 
 class arena_slot : private arena_slot_shared_state, private arena_slot_private_state {
@@ -164,6 +168,10 @@ public:
         if (!is_task_pool_published()) {
             publish_task_pool();
         }
+    }
+
+    void aggregate(d1::task& t, d1::task_group_context& ctx) {
+        aggregation_tree.add_task(t, ctx);
     }
 
     bool is_task_pool_published() const {
