@@ -66,6 +66,11 @@ target_compile_options(tachyon PRIVATE ${TBB_CXX_STD_FLAG})
 if (MSVC)
   if (CMAKE_CXX_COMPILER_ID STREQUAL IntelLLVM)
     target_compile_options(tachyon PRIVATE -D_CRT_SECURE_NO_WARNINGS)
+    if (TBB_SINCOS_BROKEN)
+      # -fno-builtin-sincos exists, but has no effect: icx-cl still emits sincos,
+      # so we use -fno-builtin to disable all built-in functions.
+      target_compile_options(tachyon PRIVATE -fno-builtin)
+    endif()
   else()
     target_compile_options(tachyon PRIVATE /EHsc)
   endif()

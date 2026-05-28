@@ -23,6 +23,9 @@ if (WIN32)
     if (CMAKE_SIZEOF_VOID_P EQUAL 4 AND ("${CMAKE_MSVC_RUNTIME_LIBRARY}" STREQUAL "MultiThreaded"
                                          OR "${CMAKE_MSVC_RUNTIME_LIBRARY}" STREQUAL "MultiThreadedDebug"))
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /Qoption,link,/NODEFAULTLIB:libmmt.lib")
+        # _sincos is provided by libmmt, but we have to disable libmmt,
+        # so need to disable _sincos generation as well
+        set(TBB_SINCOS_BROKEN TRUE)
     endif()
 else()
     include(${CMAKE_CURRENT_LIST_DIR}/Clang.cmake)
