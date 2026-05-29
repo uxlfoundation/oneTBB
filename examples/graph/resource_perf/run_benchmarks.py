@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Orchestrate building and running resource_perf benchmarks based on workloads.md.
+Orchestrate building and running resource_perf benchmarks
 
 Usage:
     python run_benchmarks.py --workload chain_scaling
