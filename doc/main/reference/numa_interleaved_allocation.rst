@@ -27,6 +27,10 @@ available, the allocation functions fall back to standard memory allocation. On 
 functionality available starting from Microsoft* Windows* 10 / Microsoft* Windows* Server 2016; on older
 versions of Microsoft* Windows*, the allocation functions also fall back to standard memory allocation.
 
+.. note::
+    By default, Docker environment blocks ``move_pages`` system call, which is used for interleaved memory
+    allocation. For successive allocation, this syscall must be unblocked.
+
 API
 ***
 
