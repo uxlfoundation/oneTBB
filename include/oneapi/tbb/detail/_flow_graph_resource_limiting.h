@@ -34,6 +34,10 @@
 #include <cstdio>
 #include <chrono>
 
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+#include "_debug_buffer.h"
+#endif
+
 namespace tbb {
 namespace detail {
 namespace d2 {
@@ -78,6 +82,11 @@ class resource_consumer_base;
 // if defined to 0, the provider may update its pressure-awareness more lazily
 #ifndef __TBB_USE_NOTIFY_ON_REPORT_PRESSURE
 #define __TBB_USE_NOTIFY_ON_REPORT_PRESSURE 1
+#endif
+
+// if defined to 1, enables debug logging of resource acquisition attempts and pressure values to stderr
+#ifndef __TBB_DEBUG_RESOURCE_ACQUISITION
+#define __TBB_DEBUG_RESOURCE_ACQUISITION 0
 #endif
 
 class request_id {
@@ -132,6 +141,11 @@ public:
             return std::equal_to<std::uint64_t>::operator()(lhs.m_unique_integer, rhs.m_unique_integer);
         }
     };
+
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+    // Accessor for debugging only
+    std::uint64_t get_unique_integer() const { return m_unique_integer; }
+#endif
 }; // class request_id
 
 #if !__TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID
@@ -345,12 +359,23 @@ public:
         size_t num_handles = m_resource_handles.size();
         size_t num_notified = m_notified.size();
 
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        std::size_t my_pressure = m_consumer_pressure[&consumer].first;
+        TBB_DEBUG_LOG("[REQUEST] consumer=%p id=%llu pressure=%zu num_handles=%zu num_notified=%zu num_pending=%zu\n",
+                    (void*)&consumer, (unsigned long long)id.get_unique_integer(), my_pressure,
+                    num_handles, num_notified, m_pending.size());
+#endif
+
         increment_ref_count_for_consumer(consumer);
 
         if (num_handles == 0) {
             // no resource available right now, add to pending list
             // the pending list is unordered
             m_pending.emplace_back(std::make_unique<consumer_data>(id, &consumer, m_consumer_pressure[&consumer].first));
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+            TBB_DEBUG_LOG("[REQUEST] consumer=%p id=%llu -> PENDING (no handles available)\n",
+                        (void*)&consumer, (unsigned long long)id.get_unique_integer());
+#endif
             return;
         }
 
@@ -360,21 +385,33 @@ public:
             // notify this request without comparing priorities
             m_notified.emplace_back(std::make_unique<consumer_data>(std::move(new_consumer_data)));
             m_needs_recompute = true;
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+            TBB_DEBUG_LOG("[REQUEST] consumer=%p id=%llu -> NOTIFY (no priority check needed)\n",
+                        (void*)&consumer, (unsigned long long)id.get_unique_integer());
+#endif
             lock.release();
             consumer.notify(*this, id);
         } else {
-            // need to compare priority with the lowest priority notified request to determine 
+            // need to compare priority with the lowest priority notified request to determine
             // whether to notify this request or add it to pending list.
             ensure_priorities_current();
             auto& threshold = m_notified[num_handles - 1];
             if (new_consumer_data < *threshold) {
                 m_pending.emplace_back(std::make_unique<consumer_data>(id, &consumer, m_consumer_pressure[&consumer].first));
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+                TBB_DEBUG_LOG("[REQUEST] consumer=%p id=%llu -> PENDING (priority too low)\n",
+                            (void*)&consumer, (unsigned long long)id.get_unique_integer());
+#endif
             } else {
                 // there may be more notifications than available resources, but that's ok.
                 // they will compete for the resources when they attempt acquisition,
                 // with the same priority criteria applied (using updated priorities)
                 m_notified.emplace_back(std::make_unique<consumer_data>(std::move(new_consumer_data)));
                 m_needs_recompute = true;
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+                TBB_DEBUG_LOG("[REQUEST] consumer=%p id=%llu -> NOTIFY (priority sufficient)\n",
+                            (void*)&consumer, (unsigned long long)id.get_unique_integer());
+#endif
                 lock.release();
                 consumer.notify(*this, id);
             }
@@ -386,22 +423,42 @@ public:
         consumer_data acquisition_data{id, &consumer, m_consumer_pressure[&consumer].first};
 
         size_t num_handles = m_resource_handles.size();
+
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        std::size_t my_pressure = m_consumer_pressure[&consumer].first;
+        TBB_DEBUG_LOG("[ACQUIRE] consumer=%p id=%llu pressure=%zu num_handles=%zu num_notified=%zu\n",
+                    (void*)&consumer, (unsigned long long)id.get_unique_integer(), my_pressure,
+                    num_handles, m_notified.size());
+#endif
+
         if (num_handles == 0) {
             // no resource available right now
             remove_from_notified_list(acquisition_data);
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+            TBB_DEBUG_LOG("[ACQUIRE] consumer=%p id=%llu DENIED: no_handles\n",
+                        (void*)&consumer, (unsigned long long)id.get_unique_integer());
+#endif
             return optional_type{};
         }
 
         if (m_notified.size() < num_handles) {
-            // there are more resources available than notified requests, so if this 
+            // there are more resources available than notified requests, so if this
             // represents a notified request, it can be given without comparing priorities
             if (remove_from_notified_list(acquisition_data)) {
                 ResourceHandle handle = std::move(m_resource_handles.front());
                 m_resource_handles.pop_front();
                 decrement_ref_count_for_consumer(consumer);
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+                TBB_DEBUG_LOG("[ACQUIRE] consumer=%p id=%llu SUCCESS: no_priority_check\n",
+                            (void*)&consumer, (unsigned long long)id.get_unique_integer());
+#endif
                 return {typename optional_type::in_place_t{}, std::move(handle)};
             } else {
                 // not in notified list - should not happen
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+                TBB_DEBUG_LOG("[ACQUIRE] consumer=%p id=%llu ERROR: not_in_notified_list\n",
+                            (void*)&consumer, (unsigned long long)id.get_unique_integer());
+#endif
                 return optional_type{};
             }
         }
@@ -410,28 +467,52 @@ public:
         auto& threshold = m_notified[num_handles - 1];
         bool should_not_acquire = acquisition_data < *threshold;
 
-        // remove from notified list regardless of whether acquisition will be allowed or not, 
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        std::size_t threshold_pressure = *threshold->pressure;
+        TBB_DEBUG_LOG("[ACQUIRE] consumer=%p id=%llu priority_check: my_pressure=%zu threshold_pressure=%zu should_deny=%d\n",
+                    (void*)&consumer, (unsigned long long)id.get_unique_integer(), my_pressure,
+                    threshold_pressure, should_not_acquire);
+#endif
+
+        // remove from notified list regardless of whether acquisition will be allowed or not,
         // the consumer must make a new request if it wants to try again
         if (remove_from_notified_list(acquisition_data)) {
             decrement_ref_count_for_consumer(consumer);
             if (should_not_acquire) {
                 // priority too low - deny acquisition
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+                TBB_DEBUG_LOG("[ACQUIRE] consumer=%p id=%llu DENIED: priority_too_low\n",
+                            (void*)&consumer, (unsigned long long)id.get_unique_integer());
+#endif
                 return optional_type{};
             }
             // priority high enough - allow acquisition
             ResourceHandle handle = std::move(m_resource_handles.front());
             m_resource_handles.pop_front();
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+            TBB_DEBUG_LOG("[ACQUIRE] consumer=%p id=%llu SUCCESS: priority_ok\n",
+                        (void*)&consumer, (unsigned long long)id.get_unique_integer());
+#endif
             return {typename optional_type::in_place_t{}, std::move(handle)};
         } else {
             // not in notified list - should not happen
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+            TBB_DEBUG_LOG("[ACQUIRE] consumer=%p id=%llu ERROR: not_in_notified_list_after_priority_check\n",
+                        (void*)&consumer, (unsigned long long)id.get_unique_integer());
+#endif
             return optional_type{};
         }
     }
 
-    void release(consumer_type&, request_id, optional_type&& handle) override {
+    void release(consumer_type& consumer, request_id id, optional_type&& handle) override {
         __TBB_ASSERT(handle.has_value(), nullptr);
         tbb::spin_mutex::scoped_lock lock(m_mutex);
         m_resource_handles.emplace_front(std::move(handle.value()));
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        TBB_DEBUG_LOG("[RELEASE] consumer=%p id=%llu num_handles=%zu num_pending=%zu\n",
+                    (void*)&consumer, (unsigned long long)id.get_unique_integer(),
+                    m_resource_handles.size(), m_pending.size());
+#endif
         notify_pending(lock); // lock may be released
     }
 
@@ -459,7 +540,7 @@ private:
         bool operator<(const consumer_data& rhs) const {
             // a consumer_data has less prioritiy if it has lesser pressure, or if
             // pressures are equal, it has less priority if it has a greater id (lower id is higher priority)
-            if (pressure == rhs.pressure) {
+            if (*pressure == *rhs.pressure) {
                 return rhs.id < id;  // Earlier id (smaller) has higher priority for FIFO
             }
             return *pressure < *rhs.pressure;
@@ -483,8 +564,20 @@ private:
     // called under the lock
     void notify_pending(tbb::spin_mutex::scoped_lock& lock) {
         size_t num_handles = m_resource_handles.size();
+        size_t num_pending = m_pending.size();
+        size_t num_notified = m_notified.size();
+
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        TBB_DEBUG_LOG("[NOTIFY_PENDING] num_handles=%zu num_pending=%zu num_notified=%zu\n",
+                    num_handles, num_pending, num_notified);
+#endif
+
         if (m_pending.empty() || num_handles == 0) {
             // no resources or no pending requests, nothing to do
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+            TBB_DEBUG_LOG("[NOTIFY_PENDING] -> SKIP (pending=%zu handles=%zu)\n",
+                        num_pending, num_handles);
+#endif
             return;
         }
 
@@ -498,6 +591,7 @@ private:
         std::vector<std::pair<consumer_type*, request_id>> to_notify;
         auto it = m_pending.begin();
 
+        // This just checks if there is room for more notifications
         if (m_notified.size() < num_handles) {
             // Fast path: more resources than notified, so notify up to num_handles
             while (it != m_pending.end() && m_notified.size() < num_handles) {
@@ -507,6 +601,8 @@ private:
             }
         }
 
+        // This checks if the remaining pending requests have higher priority than the notified
+        // requests
         if (m_notified.size() >= num_handles && it != m_pending.end()) {
             // Sort notified to find threshold
             std::sort(m_notified.begin(), m_notified.end(),
@@ -524,9 +620,21 @@ private:
 
         m_needs_recompute = false;  // Already sorted
 
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        TBB_DEBUG_LOG("[NOTIFY_PENDING] -> Notifying %zu consumers\n", to_notify.size());
+        for (auto& [consumer_ptr, id] : to_notify) {
+            TBB_DEBUG_LOG("[NOTIFY_PENDING] -> Will notify consumer=%p id=%llu\n",
+                        (void*)consumer_ptr, (unsigned long long)id.get_unique_integer());
+        }
+#endif
+
         // Release lock once, then notify all
         lock.release();
         for (auto& [consumer_ptr, id] : to_notify) {
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+            TBB_DEBUG_LOG("[NOTIFY_PENDING] -> Calling notify() for consumer=%p id=%llu\n",
+                        (void*)consumer_ptr, (unsigned long long)id.get_unique_integer());
+#endif
             consumer_ptr->notify(*this, id);
         }
     }
@@ -618,6 +726,13 @@ public:
     {}
 
     void request_from_provider(request_id id) {
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        // Print consumer-to-body mapping on first request (id=1) for each consumer
+        if (id.get_unique_integer() == 1) {
+            TBB_DEBUG_LOG("[CONSUMER_TO_BODY_MAP] consumer=%p body=%p\n",
+                        (void*)this, (void*)m_body_ptr);
+        }
+#endif
         m_resource_provider.request(*this, id);
     }
 
@@ -803,7 +918,15 @@ public:
     }
 
     d1::task* execute(d1::execution_data& ed) override {
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        TBB_DEBUG_LOG("[TASK_EXECUTE_RUN] body=%p id=%llu - Executing try_acquire_resources_and_execute\n",
+                    (void*)m_body, (unsigned long long)m_id.get_unique_integer());
+#endif
         m_body->try_acquire_resources_and_execute(m_id, m_request_data);
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        TBB_DEBUG_LOG("[TASK_EXECUTE_DONE] body=%p id=%llu - Finished try_acquire_resources_and_execute\n",
+                    (void*)m_body, (unsigned long long)m_id.get_unique_integer());
+#endif
         graph_task::template finalize<try_acquire_resources_and_execute_task>(ed);
         return nullptr;
     }
@@ -861,10 +984,22 @@ public:
     }
 
     void operator()(const Input& input, OutputPorts& ports) override {
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        TBB_DEBUG_LOG("[TASK_INITIAL] body=%p input=%d - Initial task spawned, forming request\n",
+                    (void*)this, input);
+#endif
         auto& res = form_request(input, ports);
         report_pressure(m_pressure.load(std::memory_order_relaxed));
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        TBB_DEBUG_LOG("[TASK_INITIAL] body=%p input=%d id=%llu - Requesting resources\n",
+                    (void*)this, input, (unsigned long long)res.first.get_unique_integer());
+#endif
         request_resources(res.first);
         release_self_ref(res.first, res.second);
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        TBB_DEBUG_LOG("[TASK_INITIAL] body=%p input=%d id=%llu - Initial task complete\n",
+                    (void*)this, input, (unsigned long long)res.first.get_unique_integer());
+#endif
     }
 
     typename requests_map_type::reference form_request(const Input& input, OutputPorts& ports) {
@@ -904,15 +1039,33 @@ public:
     }
 
     void try_acquire_resources_and_execute(request_id id, request_data_type& req_data) {
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        TBB_DEBUG_LOG("[TRY_ACQUIRE] body=%p id=%llu - Attempting to acquire resources\n",
+                    (void*)this, (unsigned long long)id.get_unique_integer());
+#endif
         if (try_acquire_resources(id, req_data)) {
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+            TBB_DEBUG_LOG("[ACQUIRED_ALL] body=%p id=%llu - All resources acquired, calling user body\n",
+                        (void*)this, (unsigned long long)id.get_unique_integer());
+#endif
             // Access to all resources is granted
             try_call([&] {
                 call_body(req_data.input_message, req_data.output_ports, req_data.handles);
             }).on_completion([&] {
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+                TBB_DEBUG_LOG("[BODY_COMPLETE] body=%p id=%llu - User body complete, releasing resources\n",
+                            (void*)this, (unsigned long long)id.get_unique_integer());
+#endif
                 release_resources(id, req_data);
                 remove_request(id);
             });
         }
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        else {
+            TBB_DEBUG_LOG("[ACQUIRE_FAILED] body=%p id=%llu - Resource acquisition failed, will retry\n",
+                        (void*)this, (unsigned long long)id.get_unique_integer());
+        }
+#endif
     }
 
     void release_resources(request_id id, request_data_type& req_data) {
@@ -930,9 +1083,13 @@ public:
         tbb::detail::suppress_unused_warning(num_removed);
     }
 
-    void note_try_put(const Input&) override {
+    void note_try_put(const Input& input) override {
         // always increment but only report pressure if there are pending requests
         auto v = m_pressure.fetch_add(1, std::memory_order_relaxed) + 1;
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        TBB_DEBUG_LOG("[NOTE_TRY_PUT] consumer=%p input=%d pressure=%zu pending_requests=%zu\n",
+                    (void*)this, input, (std::size_t)v, m_requests.size());
+#endif
         tbb::spin_mutex::scoped_lock lock(m_mutex);
         if (!m_requests.empty()) {
             lock.release();
@@ -949,7 +1106,16 @@ public:
 
         std::size_t prev_value = data.notify_counter--;
         __TBB_ASSERT(prev_value != 0, "Overflow detected");
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+        TBB_DEBUG_LOG("[NOTIFY] body=%p id=%llu notify_counter: %zu -> %zu\n",
+                    (void*)this, (unsigned long long)id.get_unique_integer(),
+                    prev_value, prev_value - 1);
+#endif
         if (prev_value == 1) {
+#if __TBB_DEBUG_RESOURCE_ACQUISITION
+            TBB_DEBUG_LOG("[TASK_EXECUTE] body=%p id=%llu - Spawning try_acquire_resources_and_execute_task\n",
+                        (void*)this, (unsigned long long)id.get_unique_integer());
+#endif
             d1::small_object_allocator allocator;
             using task_type = try_acquire_resources_and_execute_task<resource_limited_body_leaf, request_data_type>;
             graph_task* t = allocator.new_object<task_type>(this->graph_reference(), allocator, this, id, data);

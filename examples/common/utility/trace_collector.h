@@ -37,16 +37,16 @@ public:
 private:
     struct trace_event {
         std::string name;
-        std::string phase;  // "B" or "E"
+        std::string phase;  // "B", "E", or "X"
         int tid;
         int64_t ts;  // microseconds from start
+        int64_t dur;  // duration in microseconds (only for "X" phase)
     };
 
     WriteMode write_mode;
     std::string filename;
     int pid;
     std::string category;
-    std::chrono::time_point<std::chrono::steady_clock> start_time;
     std::vector<trace_event> events;  // Only used in lazy mode
     std::vector<std::pair<int, std::string>> thread_names;
     std::mutex mtx;
@@ -55,10 +55,23 @@ private:
     std::ofstream trace_file;
     bool file_opened;
     bool first_event;  // Track if we need comma before next event
+    bool lazy_written;  // Track if lazy trace already written
+
+public:
+    std::chrono::time_point<std::chrono::steady_clock> start_time;
+
+private:
 
     // Write all events in lazy mode (called by destructor)
     void write_lazy_trace() {
         std::lock_guard<std::mutex> lock(mtx);
+
+        // Safe to call multiple times (e.g., signal + destructor)
+        if (lazy_written) {
+            return;
+        }
+        lazy_written = true;
+
         std::sort(events.begin(), events.end(),
             [](const trace_event& a, const trace_event& b) { return a.ts < b.ts; });
 
@@ -87,8 +100,11 @@ private:
                      << ", \"ph\": \"" << e.phase << "\""
                      << ", \"ts\": " << e.ts
                      << ", \"pid\": " << pid
-                     << ", \"tid\": " << e.tid
-                     << "}";
+                     << ", \"tid\": " << e.tid;
+            if (e.phase == "X") {
+                out_file << ", \"dur\": " << e.dur;
+            }
+            out_file << "}";
             if (i < events.size() - 1) out_file << ",";
             out_file << "\n";
         }
@@ -109,6 +125,7 @@ public:
         , start_time(std::chrono::steady_clock::now())
         , file_opened(false)
         , first_event(true)
+        , lazy_written(false)
     {
         if (write_mode == WriteMode::EAGER) {
             trace_file.open(filename);
@@ -132,6 +149,13 @@ public:
     }
 
     WriteMode get_mode() const { return write_mode; }
+
+    // Force flush of lazy trace (safe to call multiple times)
+    void flush() {
+        if (write_mode == WriteMode::LAZY) {
+            write_lazy_trace();
+        }
+    }
 
     void add_thread_name(int tid, const std::string& name) {
         std::lock_guard<std::mutex> lock(mtx);
@@ -161,7 +185,7 @@ public:
 
         if (write_mode == WriteMode::LAZY) {
             // Lazy mode: buffer in memory
-            events.push_back({name, phase, tid, ts_us});
+            events.push_back({name, phase, tid, ts_us, 0});
         } else {
             // Eager mode: write immediately
             if (file_opened) {
@@ -181,6 +205,34 @@ public:
             }
         }
     }
+
+    // Record a DURATION event (single event with start time and duration)
+    void record_duration_event(const std::string& name, int tid, int64_t ts_us, int64_t dur_us) {
+        std::lock_guard<std::mutex> lock(mtx);
+
+        if (write_mode == WriteMode::LAZY) {
+            // Lazy mode: buffer in memory
+            events.push_back({name, "X", tid, ts_us, dur_us});
+        } else {
+            // Eager mode: write immediately
+            if (file_opened) {
+                if (!first_event) {
+                    trace_file << ",\n";
+                } else {
+                    first_event = false;
+                }
+                trace_file << "  {\"name\": \"" << name << "\""
+                           << ", \"cat\": \"" << category << "\""
+                           << ", \"ph\": \"X\""
+                           << ", \"ts\": " << ts_us
+                           << ", \"dur\": " << dur_us
+                           << ", \"pid\": " << pid
+                           << ", \"tid\": " << tid
+                           << "}";
+                trace_file.flush();  // Ensure immediate write to disk
+            }
+        }
+    }
 };
 
 // RAII class for scoped trace events
@@ -188,14 +240,31 @@ class ScopedTraceEvent {
     TraceCollector& collector;
     std::string name;
     int tid;
+    std::chrono::time_point<std::chrono::steady_clock> start_time;
+    bool use_duration;
 public:
-    ScopedTraceEvent(TraceCollector& c, const std::string& n, int t)
-        : collector(c), name(n), tid(t) {
-        collector.record_event(name, "B", tid);
+    // Constructor for duration events (recommended to avoid nesting issues)
+    ScopedTraceEvent(TraceCollector& c, const std::string& n, int t, bool use_dur = true)
+        : collector(c), name(n), tid(t), use_duration(use_dur) {
+        if (use_duration) {
+            start_time = std::chrono::steady_clock::now();
+        } else {
+            collector.record_event(name, "B", tid);
+        }
     }
     ~ScopedTraceEvent() {
-        collector.record_event(name, "E", tid);
+        if (use_duration) {
+            auto end_time = std::chrono::steady_clock::now();
+            auto ts_us = std::chrono::duration_cast<std::chrono::microseconds>(start_time - collector.start_time).count();
+            auto dur_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+            collector.record_duration_event(name, tid, ts_us, dur_us);
+        } else {
+            collector.record_event(name, "E", tid);
+        }
     }
+
+    // Make start_time accessible to record_duration_event
+    friend class TraceCollector;
 };
 
 #endif // TRACE_COLLECTOR_H
