@@ -19,6 +19,8 @@ private:
     drawing_memory m_dmem;
     color_t m_bg_color = 0;
 
+    void integrate_bodies(std::size_t begin, std::size_t end);
+
     void serial_zero_forces();
     void serial_compute_forces();
     void serial_integrate();

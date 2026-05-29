@@ -337,12 +337,12 @@ void Universe::serial_compute_forces() {
     serial_triangle_forces(0, m_bodies.count, m_bodies, m_eps2);
 }
 
-void Universe::serial_integrate() {
+void Universe::integrate_bodies(std::size_t begin, std::size_t end) {
     auto& b = m_bodies;
 
     const double dt = m_dt;
 
-    for (std::size_t i = 0; i < b.count; ++i) {
+    for (std::size_t i = begin; i < end; ++i) {
         double ax = b.x_force[i] / b.mass[i];
         double ay = b.y_force[i] / b.mass[i];
 
@@ -352,6 +352,27 @@ void Universe::serial_integrate() {
         b.x_position[i] += b.x_velocity[i] * dt;
         b.y_position[i] += b.y_velocity[i] * dt;
     }
+}
+
+void Universe::serial_integrate() {
+    integrate_bodies(0, m_bodies.count);
+}
+
+void Universe::parallel_integrate() {
+    auto& b = m_bodies;
+
+    tbb::task_group tg;
+    std::size_t i = 0;
+
+    while (i + serial_threshold < b.count) {
+        tg.run([&, i]() {
+            integrate_bodies(i, i + serial_threshold);
+        });
+        i += serial_threshold;
+    }
+
+    integrate_bodies(i, b.count);
+    tg.wait();
 }
 
 void Universe::serial_update() {
@@ -371,7 +392,7 @@ void Universe::parallel_compute_forces() {
 void Universe::parallel_update() {
     serial_zero_forces();
     parallel_compute_forces();
-    serial_integrate();
+    parallel_integrate();
 }
 
 int Universe::world_to_px_x(double wx, int px_w) const {
