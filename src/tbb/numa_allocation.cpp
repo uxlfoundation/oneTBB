@@ -27,6 +27,7 @@
 
 #if __linux__
 
+#include <string.h>
 #include <sys/mman.h>
 
 // TBB build must be done without numaif.h, but we need signature of move_pages()
@@ -144,8 +145,12 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
         return data_holder.release();
 
     // touch each page, otherwise move_pages() will fail with EFAULT
+#if 0
     for (size_t i = 0; i < bytes; i += governor::default_page_size())
         base_addr[i] = 0;
+#else
+    memset(base_addr, 0, bytes);
+#endif
 
     size_t count_pages = (bytes + governor::default_page_size() - 1) / governor::default_page_size();
     std::unique_ptr<void*[]> pages(new void*[count_pages]);
