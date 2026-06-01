@@ -71,7 +71,7 @@ are extended. The table below contains only the most recent values.
           -    ``202603``
           -    | ``<oneapi/tbb/task_group.h>``
                | ``<oneapi/tbb/task_arena.h>``
-        * -    :ref:`API to allocate memory interleaved between NUMA nodes<numa_interleaved_allocation>`
+        * -    :ref:`Allocate Memory Interleaved between NUMA Nodes<numa_interleaved_allocation>`
           -    ``TBB_HAS_NUMA_ALLOCATION``
           -    ``202605``
           -    | ``<oneapi/tbb/numa_allocation.h>``

@@ -1,7 +1,7 @@
 .. _numa_interleaved_allocation:
 
-API to allocate memory interleaved between NUMA nodes
-=====================================================
+Allocate Memory Interleaved between NUMA Nodes
+==============================================
 
 .. note::
     To enable this feature, set the ``TBB_PREVIEW_NUMA_ALLOCATION`` macro to 1. When available and enabled,
@@ -76,18 +76,20 @@ Functions
 
 .. cpp:function:: void* allocate_numa_interleaved(size_t bytes, size_t bytes_per_chunk = 0)
 
-    Same as the above but allocates memory from all available NUMA nodes.
+    Same as the above, but allocates memory interleaved across all available NUMA nodes.
 
 .. cpp:function:: void deallocate_numa_interleaved(void* ptr, size_t bytes)
 
-    Deallocates memory allocated by ``allocate_numa_interleaved``. The behavior is undefined if ``bytes`` is
-    not the same as the one passed to the corresponding allocation function, ``ptr`` was not
-    allocated by ``allocate_numa_interleaved`` or if the same pointer is deallocated more than once.
+    Deallocates memory allocated by ``allocate_numa_interleaved``.
+    
+    **Requirements:** ``ptr`` must be previously allocated by ``allocate_numa_interleaved`` and not yet
+    deallocated, and ``bytes`` must be the same as the corresponding value used to allocate the memory.
+    Otherwise, the behavior is undefined.
 
-Example
-*******
+Examples
+********
 
-The code below provides a simple example with direct use of interleaved memory allocation as arrays.
+The code below provides a simple example with direct use of the allocated memory as a NUMA-interleaved array.
 
 .. literalinclude:: ./examples/allocate_numa_interleaved_basic.cpp
     :language: c++

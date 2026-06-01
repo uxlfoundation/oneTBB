@@ -21,14 +21,14 @@
 #include <oneapi/tbb/parallel_for.h>
 
 int main() {
-    std::size_t size = 10LLU * 1024 * 1024;
-    double* ptr = (double*)tbb::allocate_numa_interleaved(size*sizeof(double));
+    std::size_t array_size = 10LLU * 1024 * 1024;
+    double* ptr = (double*)tbb::allocate_numa_interleaved(array_size * sizeof(double));
     if (!ptr)
         return -1;
-    tbb::parallel_for(std::size_t(0), size, [&ptr](std::size_t i) {
+    tbb::parallel_for(std::size_t(0), array_size, [=](std::size_t i) {
         ptr[i] = i;
     });
 
-    tbb::deallocate_numa_interleaved(ptr, size*sizeof(double));
+    tbb::deallocate_numa_interleaved(ptr, array_size * sizeof(double));
 }
 /*end_allocate_numa_interleaved_example*/
