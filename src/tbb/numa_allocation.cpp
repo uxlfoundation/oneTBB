@@ -149,7 +149,10 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     for (size_t i = 0; i < bytes; i += governor::default_page_size())
         base_addr[i] = 0;
 #else
-    memset(base_addr, 0, bytes);
+    if (madvise(base_addr, bytes, MADV_POPULATE_WRITE) != 0) {
+        printf("madvise failed for allocate_interleaved: bytes=%zu, errno=%d\n", bytes, errno);
+        fflush(stdout);
+    }
 #endif
 
     size_t count_pages = (bytes + governor::default_page_size() - 1) / governor::default_page_size();
