@@ -145,15 +145,8 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
         return data_holder.release();
 
     // touch each page, otherwise move_pages() will fail with EFAULT
-#if 0
     for (size_t i = 0; i < bytes; i += governor::default_page_size())
-        base_addr[i] = 0;
-#else
-    if (madvise(base_addr, bytes, MADV_POPULATE_WRITE) != 0) {
-        printf("madvise failed for allocate_interleaved: bytes=%zu, errno=%d\n", bytes, errno);
-        fflush(stdout);
-    }
-#endif
+        base_addr[i] = i;
 
     size_t count_pages = (bytes + governor::default_page_size() - 1) / governor::default_page_size();
     std::unique_ptr<void*[]> pages(new void*[count_pages]);
@@ -182,6 +175,11 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
             fflush(stdout);
             return nullptr;
         }
+
+    // restore expected zeros
+    for (size_t i = 0; i < bytes; i += governor::default_page_size())
+        base_addr[i] = 0;
+
     return data_holder.release();
 }
 
