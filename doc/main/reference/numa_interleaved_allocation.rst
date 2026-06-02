@@ -99,7 +99,7 @@ The code below provides a simple example with direct use of the allocated memory
     :end-before: /*end_allocate_numa_interleaved_example*/
 
 In the following example, interleaved memory is wrapped in ``tbb::memory_pool``. This allows to amortize
-allocation overhead.
+allocation overhead and construct a container that uses interleaved NUMA memory.
 
 .. literalinclude:: ./examples/allocate_numa_interleaved_pool.cpp
     :language: c++
