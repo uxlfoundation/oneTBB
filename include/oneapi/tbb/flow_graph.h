@@ -3371,6 +3371,7 @@ inline namespace v1 {
 
 #if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
     using detail::d2::resource_limiter;
+    using detail::d2::priority_aware_resource_limiter;
     using detail::d2::resource_limited_node;
 #endif
 } // v1

@@ -219,8 +219,8 @@ void test_root_genie() {
     using node_type = resource_limited_node<int, std::tuple<int>>;
     using ports_type = typename node_type::output_ports_type;
 
-    resource_limiter<counting_resource*> root_limiter(&root_resource);
-    resource_limiter<counting_resource*> genie_limiter(&genie_resource);
+    pressure_aware_resource_limiter<counting_resource*> root_limiter(&root_resource);
+    pressure_aware_resource_limiter<counting_resource*> genie_limiter(&genie_resource);
 
     graph g;
 
