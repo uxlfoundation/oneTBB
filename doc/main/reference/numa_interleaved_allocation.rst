@@ -68,10 +68,12 @@ Functions
     **Returns:** Allocated memory interleaved between specified NUMA ``nodes`` with interleaved chunk size of
     ``bytes_per_chunk``. In case of allocation failure or invalid arguments, returns ``nullptr``.
 
-    If ``nodes`` contains duplicates, the memory load is proportional to the number of occurrences of each
-    node. ``nodes`` must not be empty. ``bytes_per_chunk`` must be a multiple of the system page size. If
-    ``bytes_per_chunk`` is zero, a system page size is used. `bytes` must be non-zero. Allocated memory
-    contains zeros and is aligned to the system page size.
+    **Requirements:** ``bytes`` must be non-zero, ``nodes`` must not be empty, and ``bytes_per_chunk``
+    must be a multiple of the system page size.
+    
+    If ``nodes`` contains duplicate NUMA node IDs, each of these IDs independently participates
+    in the interleaving order. If ``bytes_per_chunk`` is zero, the system page size is used.
+    The allocated memory contains zeros and is aligned to the system page size.
     
 
 .. cpp:function:: void* allocate_numa_interleaved(size_t bytes, size_t bytes_per_chunk = 0)
