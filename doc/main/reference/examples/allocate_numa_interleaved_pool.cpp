@@ -20,21 +20,22 @@
 
 #include <oneapi/tbb/numa_allocation.h>
 #include <oneapi/tbb/memory_pool.h>
+#include <oneapi/tbb/parallel_for.h>
 
-#include <cassert>
 #include <array>
+#include <vector>
 
-class numa_interleaved_allocator {
+class numa_interleaved_provider {
 public:
     // Guarantee that each allocation is a multiple of the system page size,
     // so allocate_numa_interleaved() requirements are satisfied.
     typedef std::array<char, 4*1024> value_type;
-    numa_interleaved_allocator() {}
+    numa_interleaved_provider() {}
     void *allocate(size_t size) {
-        return tbb::allocate_numa_interleaved(size*sizeof(value_type));
+        return oneapi::tbb::allocate_numa_interleaved(size*sizeof(value_type));
     }
     void deallocate(void *ptr, size_t size) {
-        tbb::deallocate_numa_interleaved(ptr, size*sizeof(value_type));
+        oneapi::tbb::deallocate_numa_interleaved(ptr, size*sizeof(value_type));
     }
 };
 
@@ -42,11 +43,21 @@ int main() {
     // Memory pool requests memory in big chunks, slices them internally and uses
     // memory caching, so may improve performance for many small allocations and
     // scenarios with the objects reuse.
-    tbb::memory_pool<numa_interleaved_allocator> pool;
-    for (int i = 0; i < 10*1000; ++i) {
-        void* ptr = pool.malloc(1024);
-        assert(ptr);
+    oneapi::tbb::memory_pool<numa_interleaved_provider> pool;
+
+    oneapi::tbb::parallel_for(0, 1024*1024, [&pool](std::size_t i) {
+        // If needed, a temporary array can be allocated from the pool that uses
+        // interleaved NUMA memory. It's faster than
+        // allocate_numa_interleaved()/deallocate_numa_interleaved()
+        // because of the caching in the pool.
+        double* ptr = (double*)pool.malloc(10*1000*sizeof(double));
+        // ...
         pool.free(ptr);
-    }
+    });
+
+    // std::vector uses interleaved NUMA memory
+    using pool_allocator_t = oneapi::tbb::memory_pool_allocator<double>;
+    std::vector<double, pool_allocator_t> values(pool_allocator_t{pool});
+    values.push_back(3.14);
 }
 /*end_allocate_numa_interleaved_pool_example*/
