@@ -31,8 +31,8 @@ public:
     // so allocate_numa_interleaved() requirements are satisfied.
     typedef std::array<char, 4*1024> value_type;
     numa_interleaved_provider() {}
-    // As std::allocator<T>::allocate, those functions are expeting number of objects
-    // with sizeof(value_type)
+    // Like std::allocator<T>::allocate, these functions expect the number of
+    // objects, where each object has size sizeof(value_type).
     void *allocate(size_t num_of_objects) {
         return
             oneapi::tbb::allocate_numa_interleaved(num_of_objects * sizeof(value_type));
