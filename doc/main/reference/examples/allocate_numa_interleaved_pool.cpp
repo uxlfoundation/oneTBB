@@ -32,7 +32,7 @@ public:
     typedef std::array<char, 4*1024> value_type;
     numa_interleaved_provider() {}
     // Like std::allocator<T>::allocate, these functions expect the number of
-    // objects, where each object has size sizeof(value_type).
+    // objects of the same size as sizeof(value_type).
     void *allocate(size_t num_of_objects) {
         return
             oneapi::tbb::allocate_numa_interleaved(num_of_objects * sizeof(value_type));
@@ -49,10 +49,10 @@ int main() {
     oneapi::tbb::memory_pool<numa_interleaved_provider> pool;
 
     oneapi::tbb::parallel_for(0, 1024*1024, [&pool](std::size_t i) {
-        // If needed, a temporary array can be allocated from the pool that uses
-        // interleaved NUMA memory. It's faster than
+        // Temporary arrays allocated from the pool will reside in different
+        // NUMA domains for better overall memory throughput.
+        // As the pool caches the memory, on average it is faster than
         // allocate_numa_interleaved()/deallocate_numa_interleaved()
-        // because of the caching in the pool.
         double* ptr = (double*)pool.malloc(10*1000*sizeof(double));
         // ...
         pool.free(ptr);
