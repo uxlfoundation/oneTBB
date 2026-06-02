@@ -65,8 +65,8 @@ Functions
 .. cpp:function:: void* allocate_numa_interleaved(size_t bytes, const std::vector<tbb::numa_node_id>& nodes, \
                   size_t bytes_per_chunk = 0)
 
-    **Returns:** Allocated memory interleaved between specified NUMA ``nodes`` with interleaved chunk size of
-    ``bytes_per_chunk``. In case of allocation failure or invalid arguments, returns ``nullptr``.
+    **Returns:** A pointer to the allocated memory interleaved between the specified NUMA ``nodes`` in chunks
+    of ``bytes_per_chunk``. In case of allocation failure or invalid arguments, returns ``nullptr``.
 
     **Requirements:** ``bytes`` must be non-zero, ``nodes`` must not be empty, and ``bytes_per_chunk``
     must be a multiple of the system page size.
