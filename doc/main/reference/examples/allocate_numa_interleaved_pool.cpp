@@ -37,7 +37,7 @@ public:
         return
             oneapi::tbb::allocate_numa_interleaved(num_of_objects * sizeof(value_type));
     }
-    void deallocate(void *ptr, size_t num_of_objects) {
+    void deallocate(void* ptr, std::size_t num_of_objects) {
         oneapi::tbb::deallocate_numa_interleaved(ptr, num_of_objects * sizeof(value_type));
     }
 };
