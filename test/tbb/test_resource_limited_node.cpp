@@ -516,3 +516,56 @@ TEST_CASE("resource_limited_node cancellation with active requests") {
     test_cancellation_with_active_requests(/*same_graph = */true, /*exception =*/true);
 #endif
 }
+
+//! \brief \ref requirement
+TEST_CASE("concurrency limit with multiple resources") {
+    using namespace oneapi::tbb::flow;
+
+    // Number of resources exceeds concurrency limit
+    resource_limiter<int> limiter{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+
+    using node_type = resource_limited_node<int, std::tuple<>>;
+    using ports_type = typename node_type::output_ports_type;
+
+    const std::size_t max_concurrency = 2;
+    std::atomic<std::size_t> concurrent_count{0};
+    std::atomic<std::size_t> max_observed{0};
+
+    auto node_body = [&](int /*input*/, ports_type&, int /*resource*/) {
+        std::size_t current = ++concurrent_count;
+        std::size_t prev_max = max_observed.load(std::memory_order_relaxed);
+        while (current > prev_max &&
+               !max_observed.compare_exchange_weak(prev_max, current,
+                                                   std::memory_order_release,
+                                                   std::memory_order_relaxed));
+
+        // Busy wait for a bit
+        for (std::size_t i = 0; i < 10000; ++i) {
+            std::size_t count = concurrent_count.load(std::memory_order_relaxed);
+            CHECK_MESSAGE(count <= max_concurrency,
+                         "Too many concurrent executions: " << count << " > " << max_concurrency);
+        }
+
+        --concurrent_count;
+    };
+
+    graph g;
+    node_type node(g, max_concurrency, std::tie(limiter), node_body);
+
+    const int num_messages = 50;
+    for (int i = 0; i < num_messages; ++i) {
+        node.try_put(i);
+    }
+
+    g.wait_for_all();
+
+    CHECK_MESSAGE(concurrent_count.load() == 0, "Final concurrent count should be zero");
+    CHECK_MESSAGE(max_observed.load() <= max_concurrency,
+                 "Concurrency limit was violated: max_observed=" << max_observed.load()
+                 << " > max_concurrency=" << max_concurrency);
+
+    // We should have observed some concurrency (at least 2 concurrent executions)
+    CHECK_MESSAGE(max_observed.load() >= 2,
+                 "Expected to observe concurrent execution but max_observed=" << max_observed.load());
+}
+
