@@ -22,7 +22,8 @@
 
 int main() {
     std::size_t array_size = 10LLU * 1024 * 1024;
-    double* ptr = (double*)oneapi::tbb::allocate_numa_interleaved(array_size * sizeof(double));
+    double* ptr =
+        (double*)oneapi::tbb::allocate_numa_interleaved(array_size * sizeof(double));
     if (!ptr)
         return -1;
     oneapi::tbb::parallel_for(std::size_t(0), array_size, [=](std::size_t i) {
