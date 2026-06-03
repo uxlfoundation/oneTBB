@@ -25,6 +25,7 @@
 #include "common/utils_assert.h"
 #include "common/test_follows_and_precedes_api.h"
 #include "common/concepts_common.h"
+#include "common/graph_utils.h"
 
 #include <cstdio>
 #include <atomic>
