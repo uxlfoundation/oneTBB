@@ -29,7 +29,7 @@ versions of Microsoft* Windows*, the allocation functions also fall back to stan
 
 .. note::
     By default, Docker environment blocks ``move_pages`` system call, which is used for interleaved memory
-    allocation. For successive allocation, this syscall must be unblocked.
+    allocation. For successful allocation, this syscall must be unblocked.
 
 API
 ***
