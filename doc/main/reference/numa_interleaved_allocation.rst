@@ -72,10 +72,10 @@ Functions
     **Requirements:** ``bytes`` must be non-zero, ``nodes`` must not be empty, and ``bytes_per_chunk``
     must be a multiple of the system page size.
     
-    If ``nodes`` contains duplicate NUMA node IDs, each of these IDs independently participates
-    in the interleaving order. Repeated IDs allow flexible load balancing between nodes. If ``bytes_per_chunk``
-    is zero, the system page size is used. The allocated memory contains zeros and is aligned to the system
-    page size.
+    If ``nodes`` contains some NUMA node IDs more than once, each of these IDs independently
+    participates in the interleaving order. That allows flexible load balancing between nodes.
+    If ``bytes_per_chunk`` is zero, the system page size is used. The allocated memory contains zeros 
+    and is aligned to the system page size.
     
 
 .. cpp:function:: void* allocate_numa_interleaved(size_t bytes, size_t bytes_per_chunk = 0)
