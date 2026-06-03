@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -17,7 +18,8 @@
 #ifndef __TBB_concurrent_lru_cache_H
 #define __TBB_concurrent_lru_cache_H
 
-#if ! TBB_PREVIEW_CONCURRENT_LRU_CACHE
+#include "detail/_config.h"
+#if ! __TBB_PREVIEW_CONCURRENT_LRU_CACHE
     #error Set TBB_PREVIEW_CONCURRENT_LRU_CACHE to include concurrent_lru_cache.h
 #endif
 

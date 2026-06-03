@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2020-2021 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -19,7 +20,7 @@
 
 #include "config.h"
 
-#if !defined(DOCTEST_CONFIG_IMPLEMENT)
+#if !defined(DOCTEST_CONFIG_IMPLEMENT) && !defined(__TBB_DOCTEST_SKIP_MAIN)
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #endif
 #if TBB_USE_EXCEPTIONS

@@ -491,12 +491,12 @@ public:
     }
 };
 
-#if __unix__
+#if defined(__unix__) && ! defined(__gnu_hurd__)
 #include <sched.h>
 #endif
 
 bool can_change_thread_priority() {
-#if __unix__
+#if defined(__unix__) && ! defined(__gnu_hurd__)
     pthread_t this_thread = pthread_self();
     sched_param old_params;
     int old_policy;
@@ -516,7 +516,7 @@ bool can_change_thread_priority() {
     return false;
 }
 
-#if __unix__
+#if defined(__unix__) && ! defined(__gnu_hurd__)
 class increased_priority_guard {
 public:
     increased_priority_guard() : m_backup(get_current_schedparam()) {

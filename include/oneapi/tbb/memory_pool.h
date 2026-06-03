@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -17,7 +18,8 @@
 #ifndef __TBB_memory_pool_H
 #define __TBB_memory_pool_H
 
-#if !TBB_PREVIEW_MEMORY_POOL
+#include "detail/_config.h"
+#if !__TBB_PREVIEW_MEMORY_POOL
 #error Set TBB_PREVIEW_MEMORY_POOL to include memory_pool.h
 #endif
 /** @file */

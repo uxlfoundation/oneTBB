@@ -21,6 +21,7 @@
 #define TBB_PREVIEW_PARALLEL_PHASE 1
 
 #include <chrono>
+#include <utility>
 
 #include "common/test.h"
 #include "common/utils.h"
@@ -161,7 +162,7 @@ class start_time_collection_sequenced_phases
     using base = start_time_collection_base<start_time_collection_sequenced_phases>;
     friend base;
 
-    bool with_fast_leave;
+    std::pair<bool, bool> with_fast_leave {false, false};
 
     std::size_t measure_impl() {
         std::size_t median_start_time;
@@ -181,7 +182,10 @@ class start_time_collection_sequenced_phases
                         }
                         barrier.wait();
                     });
-                    arena->end_parallel_phase(with_fast_leave);
+                    if (with_fast_leave.first)
+                        arena->end_parallel_phase(with_fast_leave.second);
+                    else
+                        arena->end_parallel_phase();
                 }
             );
         } else {
@@ -194,7 +198,10 @@ class start_time_collection_sequenced_phases
                         tbb::this_task_arena::enqueue(body);
                     }
                     barrier.wait();
-                    tbb::this_task_arena::end_parallel_phase(with_fast_leave); 
+                    if (with_fast_leave.first)
+                        tbb::this_task_arena::end_parallel_phase(with_fast_leave.second);
+                    else
+                        tbb::this_task_arena::end_parallel_phase();
                 }
             );
         }
@@ -202,12 +209,20 @@ class start_time_collection_sequenced_phases
     }
 
 public:
-    start_time_collection_sequenced_phases(tbb::task_arena& ta, std::size_t ntrials, bool fast_leave = false) :
-        base(ta, ntrials), with_fast_leave(fast_leave)
+    explicit start_time_collection_sequenced_phases(std::size_t ntrials) :
+        base(ntrials)
     {}
 
-    explicit start_time_collection_sequenced_phases(std::size_t ntrials, bool fast_leave = false) :
-        base(ntrials), with_fast_leave(fast_leave)
+    start_time_collection_sequenced_phases(tbb::task_arena& ta, std::size_t ntrials) :
+        base(ta, ntrials)
+    {}
+
+    start_time_collection_sequenced_phases(tbb::task_arena& ta, std::size_t ntrials, bool fast_leave) :
+        base(ta, ntrials), with_fast_leave(/*is_set*/true, fast_leave)
+    {}
+
+    explicit start_time_collection_sequenced_phases(std::size_t ntrials, bool fast_leave) :
+        base(ntrials), with_fast_leave(/*is_set*/true, fast_leave)
     {}
 };
 
