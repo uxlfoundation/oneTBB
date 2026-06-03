@@ -19,8 +19,9 @@ nodes. There are two parameters that control the interleaving: the set of NUMA n
 allocated and the chunk size used for interleaving. The first parameter allows users to select a subset of
 NUMA nodes, which may be desirable if a parallel algorithm uses only part of the available NUMA nodes. The
 second parameter controls the granularity of interleaving, which may be desirable to optimize for specific
-access patterns. The allocation/deallocation functions call the OS directly. If some form of caching is
-desirable, it can be implemented on top of this API.
+access patterns.
+
+Allocated memory is not split or cached. It's returned back immediately upon deallocation.
 
 Under Linux*, the API uses the ``libnuma`` library, which must be available at runtime. If the library is not
 available, the allocation functions fall back to standard memory allocation. On Windows*, the API uses
@@ -72,8 +73,9 @@ Functions
     must be a multiple of the system page size.
     
     If ``nodes`` contains duplicate NUMA node IDs, each of these IDs independently participates
-    in the interleaving order. If ``bytes_per_chunk`` is zero, the system page size is used.
-    The allocated memory contains zeros and is aligned to the system page size.
+    in the interleaving order. Repeated IDs allow flexible load balancing between nodes. If ``bytes_per_chunk``
+    is zero, the system page size is used. The allocated memory contains zeros and is aligned to the system
+    page size.
     
 
 .. cpp:function:: void* allocate_numa_interleaved(size_t bytes, size_t bytes_per_chunk = 0)
