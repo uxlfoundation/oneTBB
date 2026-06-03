@@ -33,9 +33,8 @@ public:
     numa_interleaved_provider() {}
     // Like std::allocator<T>::allocate, these functions expect the number of
     // objects of the same size as sizeof(value_type).
-    void *allocate(size_t num_of_objects) {
-        return
-            oneapi::tbb::allocate_numa_interleaved(num_of_objects * sizeof(value_type));
+    void* allocate(std::size_t num_of_objects) {
+        return oneapi::tbb::allocate_numa_interleaved(num_of_objects * sizeof(value_type));
     }
     void deallocate(void* ptr, std::size_t num_of_objects) {
         oneapi::tbb::deallocate_numa_interleaved(ptr, num_of_objects * sizeof(value_type));
