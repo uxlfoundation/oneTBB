@@ -88,6 +88,8 @@ class resource_consumer_base;
 #ifndef __TBB_DEBUG_RESOURCE_ACQUISITION
 #define __TBB_DEBUG_RESOURCE_ACQUISITION 0
 #endif
+template <typename Input, typename OutputPorts>
+class resource_limited_input;
 
 class request_id {
     std::uint64_t m_unique_integer;
@@ -704,6 +706,7 @@ public:
     virtual void                   notify(request_id id) = 0;
     virtual resource_limited_body* clone() = 0;
     virtual void*                  get_body_ptr() = 0;
+    virtual void                   update_input_ptr(resource_limited_input<Input, OutputPorts>* ptr) = 0;
     virtual ~resource_limited_body() = default;
 
     resource_limited_body(graph& g) : m_graph(g) {}
@@ -956,20 +959,24 @@ class resource_limited_body_leaf
     std::uint64_t        m_counter;
 #endif
     std::atomic<std::size_t> m_pressure;
+    resource_limited_input<Input, OutputPorts>* m_input_ptr;
 
     template <typename ConsumersTuple>
-    resource_limited_body_leaf(graph& g, ConsumersTuple&& consumers_tuple, const Body& body)
+    resource_limited_body_leaf(graph& g, ConsumersTuple&& consumers_tuple, const Body& body,
+                              resource_limited_input<Input, OutputPorts>* input_ptr)
         : resource_limited_body<Input, OutputPorts>(g)
         , m_consumers(std::forward<ConsumersTuple>(consumers_tuple))
         , m_body(body)
 #if __TBB_USE_CONSUMER_LOCAL_COUNTER_FOR_REQUEST_ID
         , m_counter(0)
 #endif
+        , m_input_ptr(input_ptr)
     {}
 
 public:
-    resource_limited_body_leaf(graph& g, std::tuple<ResourceProviders&...> resource_providers, const Body& body)
-        : resource_limited_body_leaf(g, get_consumers_tuple(resource_providers), body)
+    resource_limited_body_leaf(graph& g, std::tuple<ResourceProviders&...> resource_providers, const Body& body,
+                              resource_limited_input<Input, OutputPorts>* input_ptr)
+        : resource_limited_body_leaf(g, get_consumers_tuple(resource_providers), body, input_ptr)
     {}
 
     consumers_tuple_type get_consumers_tuple(std::tuple<ResourceProviders&...> resource_providers) {
@@ -1057,6 +1064,8 @@ public:
                             (void*)this, (unsigned long long)id.get_unique_integer());
 #endif
                 release_resources(id, req_data);
+                // delay release of concurrency slot until after body completes
+                release_concurrency_and_spawn_next(req_data.input_message);
                 remove_request(id);
             });
         }
@@ -1066,6 +1075,17 @@ public:
                         (void*)this, (unsigned long long)id.get_unique_integer());
         }
 #endif
+    } 
+
+    void release_concurrency_and_spawn_next(const Input& input_msg) {
+        if (m_input_ptr) {
+            // Call back to the input layer to release concurrency slot and get next task
+            // Only do this if concurrency is limited (not unlimited)
+            graph_task* next_task = m_input_ptr->release_concurrency_slot(input_msg);
+            if (next_task && next_task != SUCCESSFULLY_ENQUEUED) {
+                spawn_in_graph_arena(this->graph_reference(), *next_task);
+            }
+        }
     }
 
     void release_resources(request_id id, request_data_type& req_data) {
@@ -1128,12 +1148,16 @@ public:
     }
 
     resource_limited_body_leaf* clone() override {
-        resource_limited_body_leaf* new_body = new resource_limited_body_leaf(this->graph_reference(), m_consumers, this->m_body);
+        resource_limited_body_leaf* new_body = new resource_limited_body_leaf(this->graph_reference(), m_consumers, this->m_body, m_input_ptr);
         set_body_ptr_helper<sizeof...(ResourceProviders)>::run(new_body->m_consumers, new_body);
         return new_body;
     }
 
     void* get_body_ptr() override { return &m_body; }
+
+    void update_input_ptr(resource_limited_input<Input, OutputPorts>* ptr) override {
+        m_input_ptr = ptr;
+    }
 
     template <typename ResourceHandlesTuple>
     void call_body(const Input& input, OutputPorts& ports, ResourceHandlesTuple& tuple) {
@@ -1167,8 +1191,8 @@ public:
                            std::tuple<ResourceProviders&...> resource_providers,
                            Body& body)
         : base_type(g, max_concurrency, no_priority, is_body_noexcept(body, resource_providers))
-        , m_body(new resource_limited_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body))
-        , m_init_body(new resource_limited_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body))
+        , m_body(new resource_limited_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body, this))
+        , m_init_body(new resource_limited_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body, this))
         , m_output_ports(init_output_ports<output_ports_type>::call(g, m_output_ports))
     {}
 
@@ -1177,7 +1201,10 @@ public:
         , m_body(other.m_init_body->clone())
         , m_init_body(other.m_init_body->clone())
         , m_output_ports(init_output_ports<output_ports_type>::call(this->graph_reference(), m_output_ports))
-    {}
+    {
+        m_body->update_input_ptr(this);
+        m_init_body->update_input_ptr(this);
+    }
 
     ~resource_limited_input() {
         delete m_body;
@@ -1192,12 +1219,24 @@ public:
     graph_task* apply_body_impl_bypass(const input_type& i
                                        __TBB_FLOW_GRAPH_METAINFO_ARG(const message_metainfo&))
     {
+        // Call the body to initiate resource acquisition
+        // NOTE: function_input_base has already acquired a concurrency slot for us
+        // We must NOT release it until the body actually completes execution
         (*m_body)(i, m_output_ports);
-        graph_task* ttask = nullptr;
+
+        // DO NOT call try_get_postponed_task() here!
+        // The slot will be released after async body execution completes
+        return SUCCESSFULLY_ENQUEUED;
+    }
+
+    // Called by body_leaf after body execution completes to release concurrency slot
+    graph_task* release_concurrency_slot(const input_type& i) {
+        // Only release concurrency if limiting is enabled (not unlimited)
         if (base_type::my_max_concurrency != 0) {
-            ttask = base_type::try_get_postponed_task(i);
+            // Delegate to base class method which releases slot and dequeues next message
+            return base_type::try_get_postponed_task(i);
         }
-        return ttask ? ttask : SUCCESSFULLY_ENQUEUED;
+        return nullptr;
     }
 
     output_ports_type& output_ports() { return m_output_ports; }
