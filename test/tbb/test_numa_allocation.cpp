@@ -115,7 +115,7 @@ TEST_CASE("invalid parameters") {
 
 void VerifySizeAndNodes(char *ptr, size_t bytes, const std::vector<tbb::numa_node_id>& nodes,
                         size_t bytes_per_chunk, bool check_ownership) {
-    REQUIRE(ptr != nullptr);
+    REQUIRE_MESSAGE(ptr != nullptr, "Failed to allocate NUMA interleaved memory for size " << bytes);
     REQUIRE_EQ(utils::NonZero(ptr, bytes), 0);
     if (!check_ownership)
         return;
@@ -238,7 +238,7 @@ TEST_CASE("test basics") {
         size_t obj_size = 1024 * 1024LLU;
         std::vector<tbb::numa_node_id> numa_nodes = tbb::info::numa_nodes();
         char *ptr = (char *)tbb::allocate_numa_interleaved(obj_size, numa_nodes);
-        REQUIRE(ptr != nullptr);
+        REQUIRE_MESSAGE(ptr != nullptr, "Failed to allocate NUMA interleaved memory for size " << obj_size);
         REQUIRE_EQ(utils::NonZero(ptr, obj_size), 0);
         tbb::deallocate_numa_interleaved(ptr, obj_size);
     }
