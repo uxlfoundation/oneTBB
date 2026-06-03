@@ -208,7 +208,11 @@ run_dining_philosophers_bench(int num_executions, int num_philosophers, int num_
 
         forward_nodes.push_back(new forward_node_type(
             g, unlimited,
-            [&phil = philosophers[i]](const continue_msg&, forward_node_type::output_ports_type& out_ports) {
+            [&phil = philosophers[i]
+#if USE_TRACE > 0
+             , &trace_collector
+#endif
+            ](const continue_msg&, forward_node_type::output_ports_type& out_ports) {
                 // Return chopsticks
                 std::get<1>(out_ports).try_put(chopstick());
                 std::get<2>(out_ports).try_put(chopstick());
@@ -216,6 +220,9 @@ run_dining_philosophers_bench(int num_executions, int num_philosophers, int num_
                 // Continue if not done
                 if (phil.get_count() > 0) {
                     phil.decrement_count();
+#if USE_TRACE > 0
+                    record_input_start(trace_collector, phil.get_tid());
+#endif
                     std::get<0>(out_ports).try_put(continue_msg());
                 }
             }));
@@ -245,8 +252,12 @@ run_dining_philosophers_bench(int num_executions, int num_philosophers, int num_
         }
 
         // Start all philosophers thinking
-        for (int j = 0; j < num_philosophers; ++j)
+        for (int j = 0; j < num_philosophers; ++j) {
+#if USE_TRACE > 0
+            record_input_start(trace_collector, j);
+#endif
             think_nodes[j]->try_put(continue_msg());
+        }
 
         g.wait_for_all();
 
@@ -375,6 +386,9 @@ run_dining_philosophers_bench(int num_executions, int num_philosophers, int num_
                     phil.eat(work_time_ms);
                 }
                 if (phil.should_continue()) {
+#if USE_TRACE > 0
+                    record_input_start(trace_collector, phil.get_tid());
+#endif
                     std::get<0>(ports).try_put(continue_msg{});  // Loop back to think
                 }
             }));
@@ -398,6 +412,9 @@ run_dining_philosophers_bench(int num_executions, int num_philosophers, int num_
 
         // Bootstrap: start all philosophers thinking
         for (int j = 0; j < num_philosophers; ++j) {
+#if USE_TRACE > 0
+            record_input_start(trace_collector, j);
+#endif
             think_nodes[j]->try_put(continue_msg{});
         }
 

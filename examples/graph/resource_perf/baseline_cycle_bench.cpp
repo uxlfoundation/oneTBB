@@ -163,8 +163,14 @@ run_baseline_cycle_bench(int num_executions, int num_inputs, int num_nodes, doub
 
         // Start the cycle with initial message
 #if USE_MODE == 0
+#if USE_TRACE > 0
+        record_input_start(trace_collector, 0);
+#endif
         std::get<0>(nodes[0]->input_ports()).try_put(0);
 #else
+#if USE_TRACE > 0
+        record_input_start(trace_collector, 0);
+#endif
         nodes[0]->try_put(0);
 #endif
 

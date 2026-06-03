@@ -98,8 +98,11 @@ private:
             out_file << "  {\"name\": \"" << e.name << "\""
                      << ", \"cat\": \"" << category << "\""
                      << ", \"ph\": \"" << e.phase << "\""
-                     << ", \"ts\": " << e.ts
-                     << ", \"pid\": " << pid
+                     << ", \"ts\": " << e.ts;
+            if (e.phase == "i") {
+                out_file << ", \"s\": \"g\"";  // Scope: global for instant events
+            }
+            out_file << ", \"pid\": " << pid
                      << ", \"tid\": " << e.tid;
             if (e.phase == "X") {
                 out_file << ", \"dur\": " << e.dur;
@@ -230,6 +233,37 @@ public:
                            << ", \"tid\": " << tid
                            << "}";
                 trace_file.flush();  // Ensure immediate write to disk
+            }
+        }
+    }
+
+    // Record an INSTANT event (phase "i")
+    void record_instant_event(const std::string& name, int tid) {
+        auto now = std::chrono::steady_clock::now();
+        auto ts_us = std::chrono::duration_cast<std::chrono::microseconds>(now - start_time).count();
+
+        std::lock_guard<std::mutex> lock(mtx);
+
+        if (write_mode == WriteMode::LAZY) {
+            // Lazy mode: buffer in memory (duration field unused for instant events)
+            events.push_back({name, "i", tid, ts_us, 0});
+        } else {
+            // Eager mode: write immediately
+            if (file_opened) {
+                if (!first_event) {
+                    trace_file << ",\n";
+                } else {
+                    first_event = false;
+                }
+                trace_file << "  {\"name\": \"" << name << "\""
+                           << ", \"cat\": \"" << category << "\""
+                           << ", \"ph\": \"i\""
+                           << ", \"ts\": " << ts_us
+                           << ", \"s\": \"g\""  // Scope: global (required for instant events)
+                           << ", \"pid\": " << pid
+                           << ", \"tid\": " << tid
+                           << "}";
+                trace_file.flush();
             }
         }
     }

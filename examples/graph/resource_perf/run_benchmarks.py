@@ -406,6 +406,91 @@ WORKLOADS = {
         ]
     ),
 
+    # Comprehensive trace collection: All trace workloads combined for latency analysis
+    "all_traces": Workload(
+        name="All Trace Workloads - Comprehensive Collection",
+        description="Run all trace collection workloads for comprehensive latency analysis across all benchmarks and scenarios",
+        expected_outcomes="Complete set of trace files for analyze_latency.py to compare modes, workloads, and resource configurations",
+        configs=[
+            # Genie benchmark - rate 4.0
+            *[BenchmarkConfig("genie_bench", mode,
+                            ["1", "100", "4.0", "14"],
+                            description=f"Genie: Mode {mode}, r=4.0",
+                            trace_mode="lazy")
+              for mode in [0, 1, 2]],
+
+            # Genie diamond benchmark - rate 4.0
+            *[BenchmarkConfig("genie_diamond_bench", mode,
+                            ["1", "100", "4.0", "14"],
+                            description=f"Diamond: Mode {mode}, r=4.0",
+                            trace_mode="lazy")
+              for mode in [0, 1, 2]],
+
+            # Dining philosophers - 5 philosophers
+            *[BenchmarkConfig("dining_philosophers_bench", mode,
+                            ["1", "5", "10", "100.0"],
+                            description=f"Dining: Mode {mode}, 5 phil",
+                            trace_mode="lazy")
+              for mode in [0, 1, 2]],
+
+            # Chain - full pipeline
+            *[BenchmarkConfig("chain_bench", mode,
+                            ["1", "100", "10", "10.0", "10"],
+                            description=f"Chain: Mode {mode}, r=10, R_L=10",
+                            trace_mode="lazy")
+              for mode in [0, 1, 2]],
+
+            # Baseline cycle
+            *[BenchmarkConfig("baseline_cycle_bench", mode,
+                            ["1", "64", "15", "1.0", "2"],
+                            description=f"Baseline: Mode {mode}, N_F=15, L=2",
+                            trace_mode="lazy")
+              for mode in [0, 1, 2]],
+
+            # Siblings - low rate
+            *[BenchmarkConfig("siblings_bench", mode,
+                            ["1", "100", "10", "1.0", "10"],
+                            description=f"Siblings: Mode {mode}, r=1, R_L=10",
+                            trace_mode="lazy")
+              for mode in [0, 1, 2]],
+
+            # Siblings - high rate
+            *[BenchmarkConfig("siblings_bench", mode,
+                            ["1", "100", "10", "1000.0", "10"],
+                            description=f"Siblings: Mode {mode}, r=1000, R_L=10",
+                            trace_mode="lazy")
+              for mode in [0, 1, 2]],
+
+            # Siblings - high rate, limited resources
+            *[BenchmarkConfig("siblings_bench", mode,
+                            ["1", "100", "10", "1000.0", "2"],
+                            description=f"Siblings: Mode {mode}, r=1000, R_L=2",
+                            trace_mode="lazy")
+              for mode in [0, 1, 2]],
+
+            # Tree - low rate
+            *[BenchmarkConfig("tree_bench", mode,
+                            ["1", "100", "15", "1.0", "10"],
+                            description=f"Tree: Mode {mode}, r=1, R_L=10",
+                            trace_mode="lazy")
+              for mode in [0, 1, 2]],
+
+            # Tree - high rate
+            *[BenchmarkConfig("tree_bench", mode,
+                            ["1", "100", "15", "1000.0", "10"],
+                            description=f"Tree: Mode {mode}, r=1000, R_L=10",
+                            trace_mode="lazy")
+              for mode in [0, 1, 2]],
+
+            # Tree - high rate, limited resources
+            *[BenchmarkConfig("tree_bench", mode,
+                            ["1", "100", "15", "1000.0", "2"],
+                            description=f"Tree: Mode {mode}, r=1000, R_L=2",
+                            trace_mode="lazy")
+              for mode in [0, 1, 2]],
+        ]
+    ),
+
     # Dining Philosophers: Balanced servicing test
     "dining_philosophers": Workload(
         name="Dining Philosophers - Balanced Servicing Test",

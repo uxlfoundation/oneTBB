@@ -146,7 +146,11 @@ run_chain_bench(int num_executions, int num_inputs, int num_nodes, double genera
     std::chrono::high_resolution_clock::time_point start_execution_time;
     auto end_execution_time = run_execution_loop(g, source, resources,
                                                   num_executions, num_inputs,
-                                                  generation_rate, delay_ms, start_execution_time);
+                                                  generation_rate, delay_ms, start_execution_time
+#if USE_TRACE > 0
+                                                  , trace_collector
+#endif
+                                                  );
 
     // Validate resource usage using helper
     int expected_uses = num_inputs * num_nodes * num_executions;

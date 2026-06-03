@@ -155,6 +155,13 @@ std::unique_ptr<ScopedTraceEvent> make_event(std::unique_ptr<TraceCollector>& tr
     std::string event_name = "input_" + std::to_string(input);
     return std::make_unique<ScopedTraceEvent>(*trace_collector, event_name, tid);
 }
+
+inline void record_input_start(std::unique_ptr<TraceCollector>& trace_collector, int input) {
+    if (trace_collector) {
+        std::string event_name = "latency_start_input_" + std::to_string(input);
+        trace_collector->record_instant_event(event_name, 0);  // tid=0 for source events
+    }
+}
 #endif
 
 
@@ -176,7 +183,11 @@ std::chrono::high_resolution_clock::time_point
 run_execution_loop(graph& g, SourceNode& source, Resource& resource,
                    int num_executions, int num_inputs,
                    double generation_rate, double delay_ms,
-                   std::chrono::high_resolution_clock::time_point& start_time) {
+                   std::chrono::high_resolution_clock::time_point& start_time
+#if USE_TRACE > 0
+                   , std::unique_ptr<TraceCollector>& trace_collector
+#endif
+                   ) {
     for (int i = -1; i < num_executions; ++i) {
         if (i == 0) {
             resource.counter = 0;
@@ -184,6 +195,9 @@ run_execution_loop(graph& g, SourceNode& source, Resource& resource,
         }
 
         for (int j = 0; j < num_inputs; ++j) {
+#if USE_TRACE > 0
+            record_input_start(trace_collector, j);
+#endif
             source.try_put(j);
 
             // Add delay between messages (except after last message)
@@ -203,7 +217,11 @@ std::chrono::high_resolution_clock::time_point
 run_execution_loop(graph& g, SourceNode& source, std::vector<counting_resource>& resources,
                    int num_executions, int num_inputs,
                    double generation_rate, double delay_ms,
-                   std::chrono::high_resolution_clock::time_point& start_time) {
+                   std::chrono::high_resolution_clock::time_point& start_time
+#if USE_TRACE > 0
+                   , std::unique_ptr<TraceCollector>& trace_collector
+#endif
+                   ) {
     for (int i = -1; i < num_executions; ++i) {
         if (i == 0) {
             // Reset all resource counters
@@ -214,6 +232,9 @@ run_execution_loop(graph& g, SourceNode& source, std::vector<counting_resource>&
         }
 
         for (int j = 0; j < num_inputs; ++j) {
+#if USE_TRACE > 0
+            record_input_start(trace_collector, j);
+#endif
             source.try_put(j);
 
             // Add delay between messages (except after last message)

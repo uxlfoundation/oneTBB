@@ -387,6 +387,9 @@ run_genie_bench(int num_executions, int num_inputs, double generation_rate) {
         }
 
         for (int j = 0; j < num_inputs; ++j) {
+#if USE_TRACE > 0
+            record_input_start(trace_collector, j);
+#endif
             start.try_put(j);
 
             // Add delay between messages (except after last message)
