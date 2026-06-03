@@ -26,10 +26,11 @@
 #include <vector>
 
 class numa_interleaved_provider {
+    static constexpr std::size_t page_size = 4 * 1024;
 public:
     // Guarantee that each allocation is a multiple of the system page size,
     // so allocate_numa_interleaved() requirements are satisfied.
-    typedef std::array<char, 4*1024> value_type;
+    typedef std::array<char, page_size> value_type;
     numa_interleaved_provider() {}
     // Like std::allocator<T>::allocate, these functions expect the number of
     // objects of the same size as sizeof(value_type).
@@ -47,7 +48,7 @@ int main() {
     // scenarios with the objects reuse.
     oneapi::tbb::memory_pool<numa_interleaved_provider> pool;
 
-    oneapi::tbb::parallel_for(0, 1024*1024, [&pool](std::size_t i) {
+    oneapi::tbb::parallel_for(0, 1024*1024, [&pool](std::size_t) {
         // Temporary arrays allocated from the pool will reside in different
         // NUMA domains for better overall memory throughput.
         // As the pool caches the memory, on average it is faster than
