@@ -52,7 +52,7 @@ int main() {
         // Temporary arrays allocated from the pool will reside in different
         // NUMA domains for better overall memory throughput.
         // As the pool caches the memory, on average it is faster than
-        // allocate_numa_interleaved()/deallocate_numa_interleaved()
+        // allocate_numa_interleaved()/deallocate_numa_interleaved().
         double* ptr = (double*)pool.malloc(10*1000*sizeof(double));
         // ...
         pool.free(ptr);
