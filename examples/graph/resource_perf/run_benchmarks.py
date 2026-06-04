@@ -315,6 +315,19 @@ WORKLOADS = {
         ]
     ),
 
+    "chain_trace_slammed_pipeline": Workload(
+        name="Chain Trace Collection - Slammed Pipeline",
+        description="Collect trace for chain_bench at r=1000 with pipelining (R_L=10)",
+        expected_outcomes="Trace files will be generated showing pipelining behavior with r=1000, R_L=10",
+        configs=[
+            BenchmarkConfig("chain_bench", mode,
+                          ["1", "100", "10", "1000.0", "10"],  # 1 exec, 100 inputs, 10 nodes, r=1000.0, R_L=10
+                          description=f"Mode {mode}, r=1000, R_L=10, trace=lazy",
+                          trace_mode="lazy")
+            for mode in [0, 1, 2]
+        ]
+    ),
+
     "baseline_trace": Workload(
         name="Baseline Cycle Trace Collection",
         description="Collect trace for baseline_cycle_bench with N_F=15, L=2",
@@ -433,10 +446,17 @@ WORKLOADS = {
                             trace_mode="lazy")
               for mode in [0, 1, 2]],
 
-            # Chain - full pipeline
+            # Chain - high rate, concurrency=1
             *[BenchmarkConfig("chain_bench", mode,
-                            ["1", "100", "10", "10.0", "10"],
-                            description=f"Chain: Mode {mode}, r=10, R_L=10",
+                            ["1", "100", "10", "1000.0", "10", "1"],
+                            description=f"Chain: Mode {mode}, r=1000, R_L=10, conc=1",
+                            trace_mode="lazy")
+              for mode in [0, 1, 2]],
+
+            # Chain - high rate, concurrency=0 (unlimited)
+            *[BenchmarkConfig("chain_bench", mode,
+                            ["1", "100", "10", "1000.0", "10", "0"],
+                            description=f"Chain: Mode {mode}, r=1000, R_L=10, conc=0",
                             trace_mode="lazy")
               for mode in [0, 1, 2]],
 
@@ -454,10 +474,17 @@ WORKLOADS = {
                             trace_mode="lazy")
               for mode in [0, 1, 2]],
 
-            # Siblings - high rate
+            # Siblings - high rate, concurrency=1
             *[BenchmarkConfig("siblings_bench", mode,
-                            ["1", "100", "10", "1000.0", "10"],
-                            description=f"Siblings: Mode {mode}, r=1000, R_L=10",
+                            ["1", "100", "10", "1000.0", "10", "1"],
+                            description=f"Siblings: Mode {mode}, r=1000, R_L=10, conc=1",
+                            trace_mode="lazy")
+              for mode in [0, 1, 2]],
+
+            # Siblings - high rate, concurrency=0 (unlimited)
+            *[BenchmarkConfig("siblings_bench", mode,
+                            ["1", "100", "10", "1000.0", "10", "0"],
+                            description=f"Siblings: Mode {mode}, r=1000, R_L=10, conc=0",
                             trace_mode="lazy")
               for mode in [0, 1, 2]],
 
@@ -475,10 +502,17 @@ WORKLOADS = {
                             trace_mode="lazy")
               for mode in [0, 1, 2]],
 
-            # Tree - high rate
+            # Tree - high rate, concurrency=1
             *[BenchmarkConfig("tree_bench", mode,
-                            ["1", "100", "15", "1000.0", "10"],
-                            description=f"Tree: Mode {mode}, r=1000, R_L=10",
+                            ["1", "100", "15", "1000.0", "10", "1"],
+                            description=f"Tree: Mode {mode}, r=1000, R_L=10, conc=1",
+                            trace_mode="lazy")
+              for mode in [0, 1, 2]],
+
+            # Tree - high rate, concurrency=0 (unlimited)
+            *[BenchmarkConfig("tree_bench", mode,
+                            ["1", "100", "15", "1000.0", "10", "0"],
+                            description=f"Tree: Mode {mode}, r=1000, R_L=10, conc=0",
                             trace_mode="lazy")
               for mode in [0, 1, 2]],
 

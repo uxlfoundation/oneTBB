@@ -113,7 +113,8 @@ constexpr int CALIBRATION_B_NODE_TID = 6;
 constexpr int CALIBRATION_C_NODE_TID = 7;
 
 #if USE_TRACE > 0
-std::unique_ptr<TraceCollector> make_trace_collector(std::string_view graph_name, int num_executions = 10, int num_inputs = 100) {
+std::unique_ptr<TraceCollector> make_trace_collector(std::string_view graph_name, int num_executions = 10, int num_inputs = 100,
+                                                      double generation_rate = -1, int num_resources = -1, int concurrency = -1) {
        // Create trace filename based on configuration
     std::ostringstream filename;
     filename << graph_name << "_mode" << (USE_MODE == 0 ? "join" : (USE_MODE == 1 ? "limited" : "priority"));
@@ -136,7 +137,20 @@ std::unique_ptr<TraceCollector> make_trace_collector(std::string_view graph_name
 #endif
 
     filename << "_exec" << num_executions
-             << "_input" << num_inputs << ".json";
+             << "_input" << num_inputs;
+
+    // Add rate, resources, and concurrency if provided
+    if (generation_rate >= 0) {
+        filename << "_r" << static_cast<int>(generation_rate);
+    }
+    if (num_resources >= 0) {
+        filename << "_rl" << num_resources;
+    }
+    if (concurrency >= 0) {
+        filename << "_conc" << concurrency;
+    }
+
+    filename << ".json";
 
     // Create TraceCollector based on USE_TRACE value
     TraceCollector::WriteMode mode = (USE_TRACE == 1)

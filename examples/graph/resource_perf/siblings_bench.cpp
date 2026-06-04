@@ -36,16 +36,18 @@ void timeout_signal_handler(int signum) {
 
 // Performance for Siblings: input_node drives N sibling nodes
 std::tuple<std::chrono::duration<double>, std::chrono::duration<double>>
-run_siblings_bench(int num_executions, int num_inputs, int num_nodes, double generation_rate, int num_resources) {
+run_siblings_bench(int num_executions, int num_inputs, int num_nodes, double generation_rate, int num_resources, int concurrency=1) {
     auto start_construction_time = std::chrono::high_resolution_clock::now();
 
     // Calculate delay between messages based on generation rate
     // Siblings: sum of all stages = num_nodes * cycle_sleep_time_ms
     const double total_graph_time_ms = num_nodes * cycle_sleep_time_ms;
-    const double delay_ms = total_graph_time_ms / generation_rate;
+    double delay_ms = total_graph_time_ms / generation_rate;
+    if (generation_rate >= 1000)
+        delay_ms = 0;
 
 #if USE_TRACE > 0
-    std::unique_ptr<TraceCollector> trace_collector = make_trace_collector("siblings_bench", num_executions, num_inputs);
+    std::unique_ptr<TraceCollector> trace_collector = make_trace_collector("siblings_bench", num_executions, num_inputs, generation_rate, num_resources, concurrency);
 #if USE_TRACE == 2
     // Register for signal handling so lazy trace gets flushed on timeout
     g_trace_collector.store(trace_collector.get());
@@ -94,7 +96,7 @@ run_siblings_bench(int num_executions, int num_inputs, int num_nodes, double gen
     // Create N sibling nodes
     for (int i = 0; i < num_nodes; ++i) {
 #if USE_MODE == 0
-        nodes.push_back(new node_type(g, 1,
+        nodes.push_back(new node_type(g, concurrency,
             [&, i](const std::tuple<int, counting_resource*>& input_tuple, mfn_ports& ports) {
                 auto [input, resource] = input_tuple;
 #if USE_TRACE > 0
@@ -106,7 +108,7 @@ run_siblings_bench(int num_executions, int num_inputs, int num_nodes, double gen
                 std::get<1>(ports).try_put(resource);
             }));
 #else
-        nodes.push_back(new node_type(g, 1, std::tie(resource_limiter),
+        nodes.push_back(new node_type(g, concurrency, std::tie(resource_limiter),
             [&, i](int input, ports_type& ports, counting_resource* resource) {
 #if USE_TRACE > 0
                 std::unique_ptr<ScopedTraceEvent> trace = make_event(trace_collector, input, i + 1);
@@ -167,6 +169,7 @@ int main(int argc, char* argv[]) {
     int num_nodes = (argc >= 4) ? std::atoi(argv[3]) : 10;
     double generation_rate = (argc >= 5) ? std::atof(argv[4]) : 5.0;
     int num_resources = (argc >= 6) ? std::atoi(argv[5]) : 1;
+    int concurrency = (argc >= 7) ? std::atoi(argv[6]) : 1;
 
     // Print configuration
 #if USE_MODE == 0
@@ -214,9 +217,10 @@ int main(int argc, char* argv[]) {
     std::cout << "  num_nodes/tree_depth: " << num_nodes << "\n";
     std::cout << "  num_resources: " << num_resources << "\n";
     std::cout << "  generation_rate: " << generation_rate << "\n";
+    std::cout << "  concurrency: " << concurrency << " (node in-flight limit)\n";
 
     // Run benchmark
-    auto [construction_time, execution_time] = run_siblings_bench(num_executions, num_inputs, num_nodes, generation_rate, num_resources);
+    auto [construction_time, execution_time] = run_siblings_bench(num_executions, num_inputs, num_nodes, generation_rate, num_resources, concurrency);
 
     // Print results
     double total_graph_time_ms = num_nodes * cycle_sleep_time_ms;
