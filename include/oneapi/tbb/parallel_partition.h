@@ -145,10 +145,6 @@ std::size_t choose_block_size(std::size_t) {
     return 4096;
 }
 
-std::size_t choose_num_tasks(std::size_t n, std::size_t block_size) {
-    return this_task_arena::max_concurrency();
-    // return std::max<std::size_t>(1, n / (2 * block_size));
-}
 enum class side_kind {
     left, right
 };
@@ -243,12 +239,21 @@ RandomAccessIterator finalize_partition(RandomAccessIterator first, Compare comp
     relocate_side<side_kind::left >(first, block_size, left_slab_begin, left_slab_end, left_dirty_blocks);
     relocate_side<side_kind::right>(first, block_size, right_slab_begin, right_slab_end, right_dirty_blocks);
 
-    return std::partition(first + left_slab_begin, first + right_slab_end, comp);
+    return std::partition(first + left_slab_begin, first + right_slab_begin, comp);
 }
 
 // First element is a pivot element
 template <typename RandomAccessIterator, typename Compare>
-RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccessIterator last, Compare comp)
+RandomAccessIterator serial_partition(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
+    return std::partition(std::next(first), last, [&](typename std::iterator_traits<RandomAccessIterator>::reference x) {
+        return comp(x, *first);
+    });
+}
+
+// First element is a pivot element
+template <typename RandomAccessIterator, typename Compare>
+RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccessIterator last, Compare comp,
+                                        std::size_t num_tasks)
 {
     using traits = std::iterator_traits<RandomAccessIterator>;
     using diff_type = typename traits::difference_type;
@@ -260,14 +265,9 @@ RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccess
     const diff_type n = std::distance(first, last);
 
     const std::size_t block_size = choose_block_size(n);
-    const std::size_t num_tasks  = choose_num_tasks(n, block_size);
-
-    auto compare_with_pivot = [&](reference x) {
-        return comp(x, *first);
-    };
 
     if (n < diff_type(4 * block_size * num_tasks)) {
-        return std::partition(std::next(first), last, compare_with_pivot);
+        return serial_partition(first, last, comp);
     }
 
     value_type pivot = *first; // TODO: move later
@@ -290,14 +290,16 @@ RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccess
 
     wait(wait_ctx, ctx);
 
-    return finalize_partition(std::next(first), compare_with_pivot, diff_type(block_size),
+    auto comp_with_pivot = [&](reference x) { return comp(x, pivot); };
+
+    return finalize_partition(std::next(first), comp_with_pivot, diff_type(block_size),
                               g_head.load(std::memory_order_relaxed), g_tail.load(std::memory_order_relaxed),
                               g_left_partials, g_right_partials);
 }
 
 template <typename RandomAccessIterator, typename Compare>
 void parallel_quick_sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp,
-                         wait_context& wait_ctx, task_group_context& ctx);
+                         wait_context& wait_ctx, task_group_context& ctx, std::size_t budget);
 
 template <typename RandomAccessIterator, typename Compare>
 class ParallelQuickSortTask : public task {
@@ -306,16 +308,18 @@ class ParallelQuickSortTask : public task {
     Compare                m_comp;
     wait_context&          m_wait_ctx;
     task_group_context&    m_ctx;
+    std::size_t            m_budget;
     small_object_allocator m_allocator;
 public:
     ParallelQuickSortTask(RandomAccessIterator first, RandomAccessIterator last, Compare comp,
-                          wait_context& wait_ctx, task_group_context& ctx,
+                          wait_context& wait_ctx, task_group_context& ctx, std::size_t budget,
                           small_object_allocator& allocator)
         : m_first(first)
         , m_last(last)
         , m_comp(comp)
         , m_wait_ctx(wait_ctx)
         , m_ctx(ctx)
+        , m_budget(budget)
         , m_allocator(allocator)
     {
         m_wait_ctx.reserve();
@@ -327,7 +331,7 @@ public:
     }
 
     task* execute(execution_data& ed) override {
-        parallel_quick_sort(m_first, m_last, m_comp, m_wait_ctx, m_ctx);
+        parallel_quick_sort(m_first, m_last, m_comp, m_wait_ctx, m_ctx, m_budget);
         m_allocator.delete_object(this, ed);
         return nullptr;
     }
@@ -359,7 +363,8 @@ DifferenceType pseudo_median_of_nine( RandomAccessIterator array, DifferenceType
 
 template <typename RandomAccessIterator, typename Compare>
 void parallel_quick_sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp,
-                         wait_context& wait_ctx, task_group_context& ctx)
+                         wait_context& wait_ctx, task_group_context& ctx,
+                         std::size_t budget)
 {
     using diff_type = typename std::iterator_traits<RandomAccessIterator>::difference_type;
 
@@ -371,7 +376,8 @@ void parallel_quick_sort(RandomAccessIterator first, RandomAccessIterator last, 
         if (pivot != 0) std::iter_swap(first, first + pivot);
 
         // Partition the range
-        auto it = parallel_partition(first, last, comp);
+        auto it = budget >= 2 ? parallel_partition(first, last, comp, budget)
+                              : serial_partition(first, last, comp);
 
         RandomAccessIterator pivot_pos;
         if (it == std::next(first)) {
@@ -385,14 +391,21 @@ void parallel_quick_sort(RandomAccessIterator first, RandomAccessIterator last, 
         small_object_allocator allocator;
         using quick_sort_task = ParallelQuickSortTask<RandomAccessIterator, Compare>;
 
-        if ((pivot_pos - first) > (last - (pivot_pos + 1))) {
-            // Left part is bigger
-            spawn(*allocator.new_object<quick_sort_task>(first, pivot_pos, comp, wait_ctx, ctx, allocator), ctx);
+        diff_type left_size = pivot_pos - first;
+        diff_type right_size = last - (pivot_pos + 1);
+        diff_type total = left_size + right_size;
+
+        std::size_t left_budget = std::max(1ul, budget * left_size / total);
+        std::size_t right_budget = std::max(1ul, budget - left_budget);
+
+        if (left_size > right_size) {
+            spawn(*allocator.new_object<quick_sort_task>(first, pivot_pos, comp, wait_ctx, ctx, left_budget, allocator), ctx);
             first = pivot_pos + 1;
+            budget = right_budget;
         } else {
-            // Right part is bigger
-            spawn(*allocator.new_object<quick_sort_task>(pivot_pos + 1, last, comp, wait_ctx, ctx, allocator), ctx);
+            spawn(*allocator.new_object<quick_sort_task>(pivot_pos + 1, last, comp, wait_ctx, ctx, right_budget, allocator), ctx);
             last = pivot_pos;
+            budget = left_budget;
         }
     }
 
@@ -409,8 +422,9 @@ void parallel_qsort(RandomAccessIterator first, RandomAccessIterator last, Compa
     if (n < serial_sort_cutoff) {
         std::sort(first, last, comp);
     } else {
+        std::size_t parallel_partition_budget = this_task_arena::max_concurrency();
         wait_context wait_ctx(0);
-        parallel_quick_sort(first, last, comp, wait_ctx, ctx);
+        parallel_quick_sort(first, last, comp, wait_ctx, ctx, parallel_partition_budget);
         wait(wait_ctx, ctx);
     }
 }
