@@ -239,7 +239,7 @@ RandomAccessIterator finalize_partition(RandomAccessIterator first, Compare comp
     relocate_side<side_kind::left >(first, block_size, left_slab_begin, left_slab_end, left_dirty_blocks);
     relocate_side<side_kind::right>(first, block_size, right_slab_begin, right_slab_end, right_dirty_blocks);
 
-    return std::partition(first + left_slab_begin, first + right_slab_begin, comp);
+    return std::partition(first + left_slab_begin, first + right_slab_end, comp);
 }
 
 // First element is a pivot element
@@ -395,8 +395,8 @@ void parallel_quick_sort(RandomAccessIterator first, RandomAccessIterator last, 
         diff_type right_size = last - (pivot_pos + 1);
         diff_type total = left_size + right_size;
 
-        std::size_t left_budget = std::max(1ul, budget * left_size / total);
-        std::size_t right_budget = std::max(1ul, budget - left_budget);
+        std::size_t left_budget = std::max<std::size_t>(1, budget * left_size / total);
+        std::size_t right_budget = std::max<std::size_t>(1, budget - left_budget);
 
         if (left_size > right_size) {
             spawn(*allocator.new_object<quick_sort_task>(first, pivot_pos, comp, wait_ctx, ctx, left_budget, allocator), ctx);

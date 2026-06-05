@@ -24,12 +24,15 @@ int main() {
 
     tbb::tick_count finish_parallel = tbb::tick_count::now();
 
-    std::sort(v.begin(), v.end(), std::less<int>{});
+    tbb::tick_count start_serial = tbb::tick_count::now();
+
+    std::sort(v_copy.begin(), v_copy.end(), std::less<int>{});
 
     tbb::tick_count finish_serial = tbb::tick_count::now();
-    
-    std::cout << "Elapsed time (parallel): " << (finish_parallel - start_parallel).seconds() << std::endl;
-    std::cout << "Elapsed time (serial) " << (finish_serial - finish_parallel).seconds() << std::endl;
 
-    std::cout << std::is_sorted(v.begin(), v.end()) << std::endl;
+    std::cout << "Elapsed time (parallel): " << (finish_parallel - start_parallel).seconds() << std::endl;
+    std::cout << "Elapsed time (serial) " << (finish_serial - start_serial).seconds() << std::endl;
+
+    std::cout << "parallel sorted: " << std::is_sorted(v.begin(), v.end()) << std::endl;
+    std::cout << "matches serial:  " << (v == v_copy) << std::endl;
 }
