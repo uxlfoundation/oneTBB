@@ -50,7 +50,7 @@ int main() {
 #if TEST_DPL
     tbb::tick_count start_dpl = tbb::tick_count::now();
 
-    oneapi::dpl::sort(oneapi::dpl::execution::par, v_copy2.begin(), v_copy2.end(), std::less<int>{});
+    oneapi::dpl::sort(oneapi::dpl::execution::par, v_copy3.begin(), v_copy3.end(), std::less<int>{});
 
     tbb::tick_count finish_dpl = tbb::tick_count::now();
 #endif
