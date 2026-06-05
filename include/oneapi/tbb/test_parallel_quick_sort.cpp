@@ -4,13 +4,14 @@
 #include <random>
 #include <algorithm>
 #include <iostream>
+#include <limits>
 
 int main() {
     constexpr std::size_t n = 10000000;
     std::vector<int> v(n);
 
     std::mt19937 rng(0);
-    std::uniform_int_distribution<int> dist(0, 100);
+    std::uniform_int_distribution<int> dist(0, std::numeric_limits<int>::max());
 
     std::generate(v.begin(), v.end(), [&] { return dist(rng); });
 
