@@ -279,7 +279,7 @@ void benchmark_psort_with_type() {
     benchmark_psort_with_size<Sorter, TypeTraits>(1e5);
     benchmark_psort_with_size<Sorter, TypeTraits>(1e6);
     benchmark_psort_with_size<Sorter, TypeTraits>(1e7);
-    benchmark_psort_with_size<Sorter, TypeTraits>(1e8);
+    // benchmark_psort_with_size<Sorter, TypeTraits>(1e8);
 };
 
 template <typename Sorter>
