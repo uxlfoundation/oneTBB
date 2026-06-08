@@ -103,7 +103,7 @@ void VerifySizeAndNodes(bool use_find_node, size_t bytes, const std::vector<tbb:
 {
     char* ptr = (char*)tbb::allocate_numa_interleaved(bytes, nodes, bytes_per_chunk);
     REQUIRE(ptr != nullptr);
-    REQUIRE_EQ(utils::NonZero(ptr, bytes), 0);
+    REQUIRE_EQ(utils::FindNonZero(ptr, bytes), 0);
     if (use_find_node)
         for (size_t i = 0; i < bytes; i += bytes_per_chunk) {
             NUMA_EQ(find_numa_node(ptr + i), nodes[i / bytes_per_chunk % nodes.size()]);
@@ -146,7 +146,7 @@ TEST_CASE("test basics") {
         {
             char *ptr = (char *)tbb::allocate_numa_interleaved(obj_size);
             REQUIRE(ptr != nullptr);
-            REQUIRE_EQ(utils::NonZero(ptr, obj_size), 0);
+            REQUIRE_EQ(utils::FindNonZero(ptr, obj_size), 0);
             if (lib)
                 for (size_t i = 0; i < obj_size; i += page_size) {
                     NUMA_EQ(find_numa_node(ptr + i), numa_nodes[i / page_size % numa_nodes.size()]);
@@ -158,7 +158,7 @@ TEST_CASE("test basics") {
         {
             char *ptr = (char *)tbb::allocate_numa_interleaved(obj_size, bytes_per_chunk);
             REQUIRE(ptr != nullptr);
-            REQUIRE_EQ(utils::NonZero(ptr, obj_size), 0);
+            REQUIRE_EQ(utils::FindNonZero(ptr, obj_size), 0);
             if (lib)
                 for (size_t i = 0; i < obj_size; i += bytes_per_chunk) {
                     NUMA_EQ(find_numa_node(ptr + i), numa_nodes[i / bytes_per_chunk % numa_nodes.size()]);
@@ -191,7 +191,7 @@ TEST_CASE("test basics") {
         std::vector<tbb::numa_node_id> numa_nodes = tbb::info::numa_nodes();
         char *ptr = (char *)tbb::allocate_numa_interleaved(obj_size, numa_nodes);
         REQUIRE(ptr != nullptr);
-        REQUIRE_EQ(utils::NonZero(ptr, obj_size), 0);
+        REQUIRE_EQ(utils::FindNonZero(ptr, obj_size), 0);
         tbb::deallocate_numa_interleaved(ptr, obj_size);
     }
 

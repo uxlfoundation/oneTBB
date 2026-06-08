@@ -488,10 +488,10 @@ public:
 };
 
 // if non-zero byte found, returns bad value offset plus 1
-inline size_t NonZero(const void *ptr, size_t size)
+inline size_t FindNonZero(const void *ptr, size_t size)
 {
     REQUIRE_MESSAGE((uintptr_t)(ptr) % sizeof(intptr_t) == 0,
-                    "Unaligned access is inefficient, but usage model for NonZero assumes"
+                    "Unaligned access is inefficient, but usage model for FindNonZero assumes"
                     " that pointer is aligned to word size");
 
     size_t words = size / sizeof(intptr_t);
