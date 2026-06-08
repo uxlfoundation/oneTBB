@@ -167,10 +167,12 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     };
     std::unique_ptr<void, decltype(unmap)> data_holder(base_addr, unmap);
 
-    // for chunk size equal to page size and all nodes being different we can place memory right to
+    // For chunk size equal to page size and all nodes being different we can place memory right to
     // the appropriate NUMA nodes with a single system call, otherwise we need to touch each page
-    // from current thread and only then move them
-    if (bytes_per_chunk == governor::default_page_size() && nodes_count <= numa_node_count()) {
+    // from current thread and only then move them.
+    // Another case is allocation from a single NUMA node, in this case bytes_per_chunk is irrelevant.
+    if ((bytes_per_chunk == governor::default_page_size() && nodes_count <= numa_node_count())
+         || nodes_count == 1) {
         auto bitmask_free = [](struct bitmask *m) {
             numa_bitmask_free_ptr(m);
         };

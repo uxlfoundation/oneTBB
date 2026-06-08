@@ -152,6 +152,11 @@ void VerifySizeAndNodes(char *ptr, size_t bytes, const std::vector<tbb::numa_nod
             return;
         }
     }
+    // for single-node allocation, it's possible an optimization when memory is not touched inside
+    // allocate_numa_interleaved(), so touch each page to make move_pages() work correctly
+    if (nodes.size() == 1)
+        for (size_t i = 0; i < bytes; i += page_size)
+            ptr[i] = 0;
 #endif // __linux__
     for (size_t i = 0; i < bytes; i += bytes_per_chunk)
         NUMA_EQ(find_numa_node(ptr + i), nodes[i / bytes_per_chunk % nodes.size()]);
@@ -231,6 +236,9 @@ TEST_CASE("test basics") {
                 numa_nodes_1[0] = 0;
             numa_nodes.insert(numa_nodes.end(), numa_nodes_1.begin(), numa_nodes_1.end());
             AllocateAndVerify(lib, obj_size, numa_nodes, bytes_per_chunk);
+
+            // check that single-node interleaving works
+            AllocateAndVerify(lib, obj_size, {numa_nodes[0]}, bytes_per_chunk);
         }
     }
     // explicitly check that allocation with tbb::info::numa_nodes() works
