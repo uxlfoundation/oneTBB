@@ -392,6 +392,7 @@ void parallel_quick_sort(RandomAccessIterator first, RandomAccessIterator last, 
 
             if (left_size == 0) {
                 first = pivot_pos + 1;
+                leftmost = false;
                 continue;
             }
 
