@@ -31,6 +31,18 @@
 #include <unistd.h> // for sysconf(_SC_PAGESIZE)
 #endif
 
+size_t DefaultSystemPageSize() {
+#if _WIN32 || _WIN64
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    return si.dwPageSize;
+#else
+    return sysconf(_SC_PAGESIZE);
+#endif
+}
+
+static const size_t page_size = DefaultSystemPageSize();
+
 #if __linux__
 static long (*move_pages_ptr)(int pid, unsigned long count,
                               void **pages, const int *nodes,
@@ -38,7 +50,7 @@ static long (*move_pages_ptr)(int pid, unsigned long count,
 
 #include <sstream>
 
-std::string NodesToString(const std::vector<tbb::numa_node_id>& nodes) {
+static std::string NodesToString(const std::vector<tbb::numa_node_id>& nodes) {
     std::ostringstream os;
     os << '[';
     for (std::size_t i = 0; i < nodes.size(); ++i) {
@@ -50,17 +62,12 @@ std::string NodesToString(const std::vector<tbb::numa_node_id>& nodes) {
     os << ']';
     return os.str();
 }
-#endif
 
-size_t DefaultSystemPageSize() {
-#if _WIN32 || _WIN64
-    SYSTEM_INFO si;
-    GetSystemInfo(&si);
-    return si.dwPageSize;
-#else
-    return sysconf(_SC_PAGESIZE);
-#endif
+static void TouchEachPage(char* base_addr, size_t bytes) {
+    for (size_t i = 0; i < bytes; i += page_size)
+        base_addr[i] = 0;
 }
+#endif
 
 int find_numa_node(void* addr) {
 #if __linux__
@@ -120,8 +127,6 @@ void VerifySizeAndNodes(char *ptr, size_t bytes, const std::vector<tbb::numa_nod
     if (!check_ownership)
         return;
 #if __linux__
-    static const size_t page_size = DefaultSystemPageSize();
-
     // for such granularity, interleaving can be done not in exact order of nodes
     if (bytes_per_chunk == page_size) {
         std::vector<tbb::numa_node_id> sorted_nodes(nodes);
@@ -131,8 +136,7 @@ void VerifySizeAndNodes(char *ptr, size_t bytes, const std::vector<tbb::numa_nod
         if (adj == sorted_nodes.end()) {
             // touch each page, otherwise move_pages() will fail with EFAULT
             // and so detecting NUMA node will be impossible
-            for (size_t i = 0; i < bytes; i += page_size)
-                ptr[i] = 0;
+            TouchEachPage(ptr, bytes);
 
             int start_node = find_numa_node(ptr);
             auto it = std::find_if(sorted_nodes.begin(), sorted_nodes.end(),
@@ -155,8 +159,7 @@ void VerifySizeAndNodes(char *ptr, size_t bytes, const std::vector<tbb::numa_nod
     // for single-node allocation, it's possible an optimization when memory is not touched inside
     // allocate_numa_interleaved(), so touch each page to make move_pages() work correctly
     if (nodes.size() == 1)
-        for (size_t i = 0; i < bytes; i += page_size)
-            ptr[i] = 0;
+        TouchEachPage(ptr, bytes);
 #endif // __linux__
     for (size_t i = 0; i < bytes; i += bytes_per_chunk)
         NUMA_EQ(find_numa_node(ptr + i), nodes[i / bytes_per_chunk % nodes.size()]);
@@ -175,7 +178,6 @@ TEST_CASE("test basics") {
     CHECK_MESSAGE(TBB_HAS_NUMA_ALLOCATION == 202605,
                   "Incorrect feature test macro for NUMA allocation");
 
-    size_t page_size = DefaultSystemPageSize();
 #if __linux__
 #if __TBB_DYNAMIC_LOAD_ENABLED
     utils::LIBRARY_HANDLE lib = nullptr;
