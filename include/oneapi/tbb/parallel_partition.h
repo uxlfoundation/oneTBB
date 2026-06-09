@@ -140,7 +140,7 @@ public:
 };
 
 std::size_t choose_block_size(std::size_t) {
-    return 4096;
+    return 1024;
 }
 
 enum class side_kind {
@@ -331,7 +331,7 @@ public:
     }
 };
 
-inline constexpr std::size_t serial_sort_cutoff = 500;
+inline constexpr std::size_t serial_sort_cutoff = 2000;
 
 template <typename RandomAccessIterator, typename DifferenceType, typename Compare>
 DifferenceType median_of_three( RandomAccessIterator array, DifferenceType l, DifferenceType m, DifferenceType r, Compare comp ) {
@@ -436,7 +436,9 @@ void parallel_qsort(RandomAccessIterator first, RandomAccessIterator last, Compa
     if (n < serial_sort_cutoff) {
         std::sort(first, last, comp);
     } else {
-        std::size_t parallel_partition_budget = this_task_arena::max_concurrency();
+        std::size_t num_threads = this_task_arena::max_concurrency();
+	std::size_t size_cap = std::max<std::size_t>(1, std::size_t(n) / 32768);
+	std::size_t parallel_partition_budget = std::min<std::size_t>(num_threads, size_cap);
         wait_context wait_ctx(0);
         parallel_quick_sort(first, last, comp, wait_ctx, ctx, parallel_partition_budget, /*leftmost = */true);
         wait(wait_ctx, ctx);

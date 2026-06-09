@@ -13,7 +13,7 @@
 #endif
 
 int main() {
-    constexpr std::size_t n = 10000000;
+    constexpr std::size_t n = 100000000;
     std::vector<int> v(n);
 
     std::mt19937 rng(0);

@@ -276,16 +276,37 @@ void benchmark_psort_with_size(std::size_t problem_size) {
 template <typename Sorter, typename TypeTraits>
 void benchmark_psort_with_type() {
     benchmark_psort_with_size<Sorter, TypeTraits>(1e4);
+    benchmark_psort_with_size<Sorter, TypeTraits>(12000);
+    benchmark_psort_with_size<Sorter, TypeTraits>(15000);
+    benchmark_psort_with_size<Sorter, TypeTraits>(18000);
+    benchmark_psort_with_size<Sorter, TypeTraits>(22000);
+    benchmark_psort_with_size<Sorter, TypeTraits>(27000);
+    benchmark_psort_with_size<Sorter, TypeTraits>(33000);
+    benchmark_psort_with_size<Sorter, TypeTraits>(40000);
+    benchmark_psort_with_size<Sorter, TypeTraits>(50000);
+    benchmark_psort_with_size<Sorter, TypeTraits>(65000);
+    benchmark_psort_with_size<Sorter, TypeTraits>(80000);
     benchmark_psort_with_size<Sorter, TypeTraits>(1e5);
+    benchmark_psort_with_size<Sorter, TypeTraits>(130000);
+    benchmark_psort_with_size<Sorter, TypeTraits>(160000);
+    benchmark_psort_with_size<Sorter, TypeTraits>(2e5);
+    benchmark_psort_with_size<Sorter, TypeTraits>(250000);
+    benchmark_psort_with_size<Sorter, TypeTraits>(320000);
+    benchmark_psort_with_size<Sorter, TypeTraits>(4e5);
+    benchmark_psort_with_size<Sorter, TypeTraits>(5e5);
+    benchmark_psort_with_size<Sorter, TypeTraits>(650000);
+    benchmark_psort_with_size<Sorter, TypeTraits>(8e5);
     benchmark_psort_with_size<Sorter, TypeTraits>(1e6);
-    benchmark_psort_with_size<Sorter, TypeTraits>(1e7);
+    // benchmark_psort_with_size<Sorter, TypeTraits>(1e5);
+    // benchmark_psort_with_size<Sorter, TypeTraits>(1e6);
+    // benchmark_psort_with_size<Sorter, TypeTraits>(1e7);
     // benchmark_psort_with_size<Sorter, TypeTraits>(1e8);
 };
 
 template <typename Sorter>
 void benchmark_psort() {
     benchmark_psort_with_type<Sorter, uint32_traits>();
-    benchmark_psort_with_type<Sorter, kv16_traits>();
+    // benchmark_psort_with_type<Sorter, kv16_traits>();
     // TODO: add strings sorting benchmark
 }
 
