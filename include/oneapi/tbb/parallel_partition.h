@@ -1,6 +1,7 @@
 #include "detail/_task.h"
 #include "task_group.h"
 #include "task_arena.h"
+#include <array>
 
 namespace tbb {
 namespace detail {
@@ -13,11 +14,89 @@ struct Partial {
     bool           is_valid;
 };
 
+template <typename DiffType>
+bool try_get_left_block(DiffType& chunk_begin, DiffType block_size, std::atomic<DiffType>& g_distance, std::atomic<DiffType>& g_head) {
+    auto rem = g_distance.fetch_sub(block_size, std::memory_order_relaxed);
+    if (rem < block_size) {
+        g_distance.fetch_add(block_size, std::memory_order_relaxed);
+        return false;
+    }
+    chunk_begin = g_head.fetch_add(block_size, std::memory_order_relaxed);
+    return true;
+}
+
+template <typename DiffType>
+bool try_get_right_block(DiffType& chunk_begin, DiffType block_size, std::atomic<DiffType>& g_distance, std::atomic<DiffType>& g_tail) {
+    auto rem = g_distance.fetch_sub(block_size, std::memory_order_relaxed);
+    if (rem < block_size) {
+        g_distance.fetch_add(block_size, std::memory_order_relaxed);
+        return false;
+    }
+    auto chunk_end = g_tail.fetch_sub(block_size, std::memory_order_relaxed);
+    chunk_begin = chunk_end - block_size;
+    return true;
+}
+
+template <typename RandomAccessIterator, typename Predicate,
+          typename DiffType = typename std::iterator_traits<RandomAccessIterator>::difference_type>
+void parallel_partition_task_body(std::size_t index, DiffType block_size, Predicate& pred, RandomAccessIterator g_begin,
+                                  std::atomic<DiffType>& g_distance, std::atomic<DiffType>& g_head, std::atomic<DiffType>& g_tail,
+                                  std::vector<Partial<DiffType>>& g_left_partitions, std::vector<Partial<DiffType>>& g_right_partitions)
+{
+    DiffType left_begin = 0, right_begin = 0;
+    bool have_left_block  = try_get_left_block(left_begin, block_size, g_distance, g_head);
+    bool have_right_block = try_get_right_block(right_begin, block_size, g_distance, g_tail);
+
+    DiffType left_index = left_begin;
+    DiffType left_end   = left_begin + block_size;
+    DiffType right_end  = right_begin + block_size;
+
+    while (have_left_block && have_right_block) {
+        while (left_index < left_end &&  pred(g_begin[left_index])) {
+            ++left_index;
+        }
+        while (right_end > right_begin && !pred(g_begin[right_end - 1])) {
+            --right_end;
+        }
+
+        if (left_index < left_end && right_end > right_begin) {
+            std::iter_swap(g_begin + left_index, g_begin + (right_end - 1));
+            ++left_index;
+            --right_end;
+            continue;
+        }
+
+        // Left block fully processed
+        if (left_index == left_end) {
+            have_left_block = try_get_left_block(left_begin, block_size, g_distance, g_head);
+            if (have_left_block) {
+                left_index = left_begin;
+                left_end   = left_begin + block_size;
+            }
+        }
+
+        // Right block fully processed
+        if (right_end == right_begin) {
+            have_right_block = try_get_right_block(right_begin, block_size, g_distance, g_tail);
+            if (have_right_block) {
+                right_end = right_begin + block_size;
+            }
+        }
+    }
+
+    // Store dirty blocks
+    if (have_left_block) {
+        g_left_partitions[index]  = Partial<DiffType>{left_begin, left_index, true};
+    }
+    if (have_right_block) {
+        g_right_partitions[index] = Partial<DiffType>{right_begin, right_end, true};
+    }
+}
+
 template <typename RandomAccessIterator, typename Predicate>
 class ParallelPartitionTask : public task {
 public:
     using diff_type = typename std::iterator_traits<RandomAccessIterator>::difference_type;
-    using value_type = typename std::iterator_traits<RandomAccessIterator>::value_type;
     using partial_type = Partial<diff_type>;
 
 private:
@@ -56,77 +135,9 @@ public:
         , g_right_partitions(global_right_partitions)
     {}
 
-    bool try_get_left_block(diff_type& chunk_begin) {
-        diff_type block_size = diff_type(m_block_size);
-        auto rem = g_distance.fetch_sub(block_size, std::memory_order_relaxed);
-        if (rem < block_size) {
-            g_distance.fetch_add(block_size, std::memory_order_relaxed);
-            return false;
-        }
-        chunk_begin = g_head.fetch_add(block_size, std::memory_order_relaxed);
-        return true;
-    }
-
-    bool try_get_right_block(diff_type& chunk_begin) {
-        diff_type block_size = diff_type(m_block_size);
-        auto rem = g_distance.fetch_sub(block_size, std::memory_order_relaxed);
-        if (rem < block_size) {
-            g_distance.fetch_add(block_size, std::memory_order_relaxed);
-            return false;
-        }
-        auto chunk_end = g_tail.fetch_sub(block_size, std::memory_order_relaxed);
-        chunk_begin = chunk_end - block_size;
-        return true;
-    }
-
     task* execute(execution_data& ed) override {
-        diff_type left_begin = 0, right_begin = 0;
-        bool have_left_block  = try_get_left_block(left_begin);
-        bool have_right_block = try_get_right_block(right_begin);
-
-        diff_type left_index = left_begin;
-        diff_type left_end   = left_begin + m_block_size;
-        diff_type right_end  = right_begin + m_block_size;
-
-        while (have_left_block && have_right_block) {
-            while (left_index < left_end &&  m_pred(g_begin[left_index])) {
-                ++left_index;
-            }
-            while (right_end > right_begin && !m_pred(g_begin[right_end - 1])) {
-                --right_end;
-            }
-
-            if (left_index < left_end && right_end > right_begin) {
-                std::iter_swap(g_begin + left_index, g_begin + (right_end - 1));
-                ++left_index;
-                --right_end;
-                continue;
-            }
-
-            // Left block fully processed
-            if (left_index == left_end) {
-                have_left_block = try_get_left_block(left_begin);
-                if (have_left_block) {
-                    left_index = left_begin;
-                    left_end   = left_begin + m_block_size;
-                }
-            }
-
-            // Right block fully processed
-            if (right_end == right_begin) {
-                have_right_block = try_get_right_block(right_begin);
-                if (have_right_block) {
-                    right_end = right_begin + m_block_size;
-                }
-            }
-        }
-
-        if (have_left_block) {
-            g_left_partitions[m_index]  = partial_type{left_begin, left_index, true};
-        }
-        if (have_right_block) {
-            g_right_partitions[m_index] = partial_type{right_begin, right_end, true};
-        }
+        parallel_partition_task_body(m_index, m_block_size, m_pred, g_begin, g_distance,
+                                     g_head, g_tail, g_left_partitions, g_right_partitions);
 
         m_wait_ctx.release();
         m_allocator.delete_object(this, ed);
@@ -243,8 +254,10 @@ RandomAccessIterator finalize_partition(RandomAccessIterator first, Compare comp
 // First element is a pivot element
 template <typename RandomAccessIterator, typename Predicate>
 RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccessIterator last, Predicate pred,
-                                        std::size_t num_tasks)
+                                        std::size_t num_tasks, task_group_context& ctx)
 {
+    __TBB_ASSERT(num_tasks > 1, nullptr);
+
     using traits = std::iterator_traits<RandomAccessIterator>;
     using diff_type = typename traits::difference_type;
     using reference = typename traits::reference;
@@ -268,14 +281,15 @@ RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccess
     std::vector<partial_type> g_right_partials(num_tasks, partial_type{0, 0, false});
 
     small_object_allocator allocator;
-    wait_context wait_ctx(num_tasks);
-    task_group_context ctx;
+    wait_context wait_ctx(num_tasks - 1);
 
-    for (std::size_t i = 0; i < num_tasks; ++i) {
-        spawn(*allocator.new_object<task_type>(
-            i, static_cast<diff_type>(block_size), pred, wait_ctx, allocator,
-            first, g_distance, g_head, g_tail, g_left_partials, g_right_partials), ctx);
+    for (std::size_t i = 0; i < num_tasks - 1; ++i) {
+        spawn(*allocator.new_object<task_type>(i, diff_type(block_size), pred, wait_ctx, allocator,
+                                               first, g_distance, g_head, g_tail, g_left_partials, g_right_partials), ctx);
     }
+
+    parallel_partition_task_body(num_tasks - 1, diff_type(block_size), pred, first,
+                                 g_distance, g_head, g_tail, g_left_partials, g_right_partials);
 
     wait(wait_ctx, ctx);
 
@@ -369,14 +383,14 @@ void parallel_quick_sort(RandomAccessIterator first, RandomAccessIterator last, 
             // Different pivot?
             value_type pivot = *first;
             auto leq = [&](const value_type& x) { return !comp(pivot, x); };
-            auto it = budget >= 2 ? parallel_partition(first, last, leq, budget)
+            auto it = budget >= 2 ? parallel_partition(first, last, leq, budget, ctx)
                                   : std::partition(first, last, leq);
             first = it;
         } else {
             value_type pivot = *first;
             auto less = [&](const value_type& x) { return comp(x, pivot); };
 
-            auto it = budget >= 2 ? parallel_partition(std::next(first), last, less, budget)
+            auto it = budget >= 2 ? parallel_partition(std::next(first), last, less, budget, ctx)
                                   : std::partition(std::next(first), last, less);
 
             RandomAccessIterator pivot_pos;
@@ -431,15 +445,17 @@ void parallel_qsort(RandomAccessIterator first, RandomAccessIterator last, Compa
     using diff_type = typename std::iterator_traits<RandomAccessIterator>::difference_type;
     
     diff_type n = last - first;
-    task_group_context ctx;
 
     if (n < serial_sort_cutoff) {
         std::sort(first, last, comp);
     } else {
         std::size_t num_threads = this_task_arena::max_concurrency();
-	std::size_t size_cap = std::max<std::size_t>(1, std::size_t(n) / 32768);
-	std::size_t parallel_partition_budget = std::min<std::size_t>(num_threads, size_cap);
+        std::size_t size_cap = std::max<std::size_t>(1, std::size_t(n) / 32768);
+        std::size_t parallel_partition_budget = std::min<std::size_t>(num_threads, size_cap);
+
+        task_group_context ctx;
         wait_context wait_ctx(0);
+
         parallel_quick_sort(first, last, comp, wait_ctx, ctx, parallel_partition_budget, /*leftmost = */true);
         wait(wait_ctx, ctx);
     }
