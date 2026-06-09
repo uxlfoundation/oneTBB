@@ -154,6 +154,14 @@ std::size_t choose_block_size(std::size_t) {
     return 1024;
 }
 
+template <typename DiffType>
+std::size_t choose_task_count(DiffType n, std::size_t budget, std::size_t block_size) {
+    std::size_t grain = 4 * block_size;
+    std::size_t feasible = std::size_t(n) / grain;
+
+    return std::min<std::size_t>(budget, feasible);
+}
+
 enum class side_kind {
     left, right
 };
@@ -383,14 +391,19 @@ void parallel_quick_sort(RandomAccessIterator first, RandomAccessIterator last, 
             // Different pivot?
             value_type pivot = *first;
             auto leq = [&](const value_type& x) { return !comp(pivot, x); };
-            auto it = budget >= 2 ? parallel_partition(first, last, leq, budget, ctx)
+
+            std::size_t ptasks = choose_task_count(last - first, budget, choose_block_size(last - first));
+
+            auto it = ptasks >= 2 ? parallel_partition(first, last, leq, ptasks, ctx)
                                   : std::partition(first, last, leq);
             first = it;
         } else {
             value_type pivot = *first;
             auto less = [&](const value_type& x) { return comp(x, pivot); };
 
-            auto it = budget >= 2 ? parallel_partition(std::next(first), last, less, budget, ctx)
+            std::size_t ptasks = choose_task_count(last - first, budget, choose_block_size(last - first));
+
+            auto it = ptasks >= 2 ? parallel_partition(std::next(first), last, less, ptasks, ctx)
                                   : std::partition(std::next(first), last, less);
 
             RandomAccessIterator pivot_pos;
@@ -449,9 +462,7 @@ void parallel_qsort(RandomAccessIterator first, RandomAccessIterator last, Compa
     if (n < serial_sort_cutoff) {
         std::sort(first, last, comp);
     } else {
-        std::size_t num_threads = this_task_arena::max_concurrency();
-        std::size_t size_cap = std::max<std::size_t>(1, std::size_t(n) / 32768);
-        std::size_t parallel_partition_budget = std::min<std::size_t>(num_threads, size_cap);
+        std::size_t parallel_partition_budget = this_task_arena::max_concurrency();
 
         task_group_context ctx;
         wait_context wait_ctx(0);
