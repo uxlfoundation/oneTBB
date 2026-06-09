@@ -5,7 +5,12 @@
 #include <oneapi/dpl/execution>
 #include <algorithm>
 #include <iostream>
+#include <thread>
 #include <vector>
+#if TEST_TASKFLOW
+#include <taskflow/taskflow.hpp>
+#include <taskflow/algorithm/sort.hpp>
+#endif
 
 struct std_sorter {
     template <typename Iterator, typename Compare>
@@ -50,6 +55,25 @@ struct dpl_parallel_sorter {
         return "dpl_sort";
     }
 };
+
+#if TEST_TASKFLOW
+struct taskflow_sorter {
+    static tf::Executor executor;
+
+    template <typename Iterator, typename Compare>
+    static void sort(Iterator begin, Iterator end, Compare comp) {
+        tf::Taskflow taskflow;
+        taskflow.sort(begin, end, comp);
+        executor.run(taskflow).get();
+    }
+
+    static const char* name() {
+        return "taskflow_sort";
+    }
+};
+
+tf::Executor taskflow_sorter::executor{std::thread::hardware_concurrency()};
+#endif
 
 struct uint32_traits {
     using data_type = std::uint32_t;
@@ -276,31 +300,14 @@ void benchmark_psort_with_size(std::size_t problem_size) {
 template <typename Sorter, typename TypeTraits>
 void benchmark_psort_with_type() {
     benchmark_psort_with_size<Sorter, TypeTraits>(1e4);
-    benchmark_psort_with_size<Sorter, TypeTraits>(12000);
-    benchmark_psort_with_size<Sorter, TypeTraits>(15000);
-    benchmark_psort_with_size<Sorter, TypeTraits>(18000);
-    benchmark_psort_with_size<Sorter, TypeTraits>(22000);
-    benchmark_psort_with_size<Sorter, TypeTraits>(27000);
-    benchmark_psort_with_size<Sorter, TypeTraits>(33000);
-    benchmark_psort_with_size<Sorter, TypeTraits>(40000);
-    benchmark_psort_with_size<Sorter, TypeTraits>(50000);
-    benchmark_psort_with_size<Sorter, TypeTraits>(65000);
-    benchmark_psort_with_size<Sorter, TypeTraits>(80000);
     benchmark_psort_with_size<Sorter, TypeTraits>(1e5);
-    benchmark_psort_with_size<Sorter, TypeTraits>(130000);
-    benchmark_psort_with_size<Sorter, TypeTraits>(160000);
     benchmark_psort_with_size<Sorter, TypeTraits>(2e5);
-    benchmark_psort_with_size<Sorter, TypeTraits>(250000);
-    benchmark_psort_with_size<Sorter, TypeTraits>(320000);
-    benchmark_psort_with_size<Sorter, TypeTraits>(4e5);
     benchmark_psort_with_size<Sorter, TypeTraits>(5e5);
-    benchmark_psort_with_size<Sorter, TypeTraits>(650000);
-    benchmark_psort_with_size<Sorter, TypeTraits>(8e5);
+    benchmark_psort_with_size<Sorter, TypeTraits>(7e5);
     benchmark_psort_with_size<Sorter, TypeTraits>(1e6);
-    // benchmark_psort_with_size<Sorter, TypeTraits>(1e5);
-    // benchmark_psort_with_size<Sorter, TypeTraits>(1e6);
-    // benchmark_psort_with_size<Sorter, TypeTraits>(1e7);
-    // benchmark_psort_with_size<Sorter, TypeTraits>(1e8);
+    benchmark_psort_with_size<Sorter, TypeTraits>(5e6);
+    benchmark_psort_with_size<Sorter, TypeTraits>(1e7);
+    benchmark_psort_with_size<Sorter, TypeTraits>(1e8);
 };
 
 template <typename Sorter>
@@ -315,4 +322,7 @@ int main() {
     benchmark_psort<tbb_parallel_sorter>();
     benchmark_psort<tbb_parallel_quick_sorter>();
     benchmark_psort<dpl_parallel_sorter>();
+#if TEST_TASKFLOW
+    benchmark_psort<taskflow_sorter>();
+#endif
 }
