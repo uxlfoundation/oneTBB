@@ -498,12 +498,16 @@ inline size_t FindNonZero(const void *ptr, size_t size)
     const intptr_t *buf = (const intptr_t*)ptr;
 
     const intptr_t *word_it = std::find_if(buf, buf + words, [](intptr_t v) { return v != 0; });
-    const char *char_it = (const char *)word_it;
-    // If points to end, search in tail. Otherwise, find exact byte in the non-zero word.
-    size_t tail_sz = word_it == buf + words ? size % sizeof(intptr_t) : sizeof(intptr_t);
-    const char *tail_it = std::find_if(char_it, char_it + tail_sz,
-                                       [](char c) { return c != 0; });
-    return tail_it == char_it + tail_sz ? 0 : (tail_it - (const char*)ptr) + 1;
+
+    size_t offset = (word_it - buf) * sizeof(intptr_t);
+    // If we in the middle of the buffer, then current word is non-zero and we make max
+    // sizeof(intptr_t) iterations. Otherwise we are in the tail and we make
+    // size % sizeof(intptr_t) iterations.
+    for (; offset < size; ++offset) {
+        if (*((const char*)ptr + offset) != 0)
+            return offset + 1;
+    }
+    return 0;
 }
 
 } // namespace utils
