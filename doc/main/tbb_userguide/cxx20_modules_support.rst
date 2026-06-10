@@ -3,13 +3,6 @@
 C++20 Modules Support
 =====================
 
-.. contents::
-    :local:
-    :depth: 2
-
-Description
-***********
-
 .. note::
     Support for C++20 modules is experimental and subject to change in future releases.
 
@@ -18,8 +11,8 @@ Description
 source file under ``<install-prefix>/include/oneapi/tbb.cppm`` and must be compiled as
 part of your own build target.
 
-CMake Integration
-*****************
+CMake* Integration
+******************
 
 To add the ``tbb`` module to your CMake target, locate ``tbb.cppm`` using the
 ``INTERFACE_INCLUDE_DIRECTORIES`` property of the ``TBB::tbb`` target and register it as
@@ -55,7 +48,7 @@ An then in your C++ source files, you can import the module:
     }
 
 Usage Of Predefined Macros
-******************************
+**************************
 
 C++20 modules do not export preprocessor macros. Macros defined in
 ``<oneapi/tbb/version.h>`` (such as ``TBB_VERSION`` or feature-test macros) are **not** available
@@ -77,7 +70,7 @@ As a workaround, include the version header alongside the module import.
     #endif
 
 Enabling Preview Features
-**************************
+*************************
 
 |short_name| preview features are gated by ``TBB_PREVIEW_*`` macros that are normally defined
 before including TBB headers. With modules, macros defined by the consumer before
