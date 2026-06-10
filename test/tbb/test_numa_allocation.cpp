@@ -126,10 +126,14 @@ void VerifySizeAndNodes(char *ptr, size_t bytes, const std::vector<tbb::numa_nod
     REQUIRE_EQ(utils::NonZero(ptr, bytes), 0);
     if (!check_ownership)
         return;
+    const std::vector<tbb::numa_node_id> *nodes_to_check = &nodes;
+    size_t page_index = 0;
 #if __linux__
-    // for such granularity, interleaving can be done not in exact order of nodes
-    if (bytes_per_chunk == page_size) {
-        std::vector<tbb::numa_node_id> sorted_nodes(nodes);
+    std::vector<tbb::numa_node_id> sorted_nodes;
+    // For such granularity, interleaving can be done not in exact order of nodes.
+    // 1-node case is correctly processed by generic code path below, so exclude it.
+    if (bytes_per_chunk == page_size && nodes.size() > 1) {
+        sorted_nodes = nodes;
         std::sort(sorted_nodes.begin(), sorted_nodes.end());
         auto adj = std::adjacent_find(sorted_nodes.begin(), sorted_nodes.end());
         // numa_interleave_memory() can be used only for non-repeated nodes case
@@ -149,20 +153,17 @@ void VerifySizeAndNodes(char *ptr, size_t bytes, const std::vector<tbb::numa_nod
                 return;
             }
 
-            for (size_t offset = 0, page_index = it - sorted_nodes.begin(); offset < bytes;
-                 offset += page_size, ++page_index) {
-                NUMA_EQ(find_numa_node(ptr + offset), sorted_nodes[page_index % sorted_nodes.size()]);
-            }
-            return;
+            nodes_to_check = &sorted_nodes;
+            page_index = it - sorted_nodes.begin();
         }
     }
-    // for single-node allocation, it's possible an optimization when memory is not touched inside
+    // for single-node allocation, an optimization is possible where memory is not touched inside
     // allocate_numa_interleaved(), so touch each page to make move_pages() work correctly
     if (nodes.size() == 1)
         TouchEachPage(ptr, bytes);
 #endif // __linux__
-    for (size_t i = 0; i < bytes; i += bytes_per_chunk)
-        NUMA_EQ(find_numa_node(ptr + i), nodes[i / bytes_per_chunk % nodes.size()]);
+    for (size_t offset = 0; offset < bytes; offset += bytes_per_chunk, ++page_index)
+        NUMA_EQ(find_numa_node(ptr + offset), (*nodes_to_check)[page_index % nodes_to_check->size()]);
 }
 
 void AllocateAndVerify(bool use_find_node, size_t bytes, const std::vector<tbb::numa_node_id>& nodes,
