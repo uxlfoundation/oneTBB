@@ -575,7 +575,7 @@ void CMemTest::Zerofilling()
             continue;
         for (size_t j=0; j<CountElement; j++)
         {
-            if (utils::NonZero(TSMas+j, sizeof(TestStruct)))
+            if (utils::FindNonZero(TSMas+j, sizeof(TestStruct)))
             {
                 CountErrors++;
                 if (ShouldReportError()) REPORT("detect nonzero element at TestStruct\n");
@@ -772,7 +772,7 @@ void CMemTest::NULLReturn(UINT MinSize, UINT MaxSize, int total_threads)
                         if (ShouldReportError()) REPORT("nullptr returned, error: errno(%d) != ENOMEM\n", errno);
                     }
                     // check data integrity
-                    if (utils::NonZero(PointerList[i].Pointer, PointerList[i].Size)) {
+                    if (utils::FindNonZero(PointerList[i].Pointer, PointerList[i].Size)) {
                         CountErrors++;
                         if (ShouldReportError()) REPORT("nullptr returned, error: data changed\n");
                     }
@@ -815,7 +815,7 @@ void CMemTest::UniquePointer()
     if (FullLog) REPORT("malloc....");
     for (UINT i=0; i<COUNT_ELEM-1; i++)
     {
-        if (size_t badOff = utils::NonZero(MasPointer[i], sizeof(int)*MasCountElem[i])) {
+        if (size_t badOff = utils::FindNonZero(MasPointer[i], sizeof(int)*MasCountElem[i])) {
             CountErrors++;
             if (ShouldReportError())
                 REPORT("error, detect non-zero at %p\n", (char*)MasPointer[i]+badOff-1);
@@ -838,7 +838,7 @@ void CMemTest::UniquePointer()
     if (FullLog) REPORT("calloc....");
     for (int i=0; i<COUNT_ELEM-1; i++)
     {
-        if (size_t badOff = utils::NonZero(MasPointer[i], sizeof(int)*MasCountElem[i])) {
+        if (size_t badOff = utils::FindNonZero(MasPointer[i], sizeof(int)*MasCountElem[i])) {
             CountErrors++;
             if (ShouldReportError())
                 REPORT("error, detect non-zero at %p\n", (char*)MasPointer[i]+badOff-1);
@@ -862,7 +862,7 @@ void CMemTest::UniquePointer()
     if (FullLog) REPORT("realloc....");
     for (int i=0; i<COUNT_ELEM-1; i++)
     {
-        if (utils::NonZero(MasPointer[i], sizeof(int)*MasCountElem[i]))
+        if (utils::FindNonZero(MasPointer[i], sizeof(int)*MasCountElem[i]))
             CountErrors++;
         memset(MasPointer[i], 1, sizeof(int)*MasCountElem[i]);
     }
