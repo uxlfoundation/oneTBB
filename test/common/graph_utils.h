@@ -1028,9 +1028,12 @@ void spin_try_get(BufferingNode& node, T& value) {
 
             // This workaround assumes the calling thread is in the graph arena and all
             // task elements are submitted to the graph before calling spin_try_get.
-            CHECK_MESSAGE(oneapi::tbb::this_task_arena::current_thread_index() !=
-                          oneapi::tbb::task_arena::not_initialized,
-                          "Calling thread is expected to be within an arena");
+
+            // Usage of oneapi::tbb::task_arena::not_initialized directly in CHECK_MESSAGE
+            // results in ODR-use and undefined reference
+            bool is_current_thread_in_arena = oneapi::tbb::this_task_arena::current_thread_index() !=
+                                              oneapi::tbb::task_arena::not_initialized;
+            CHECK_MESSAGE(is_current_thread_in_arena, "Calling thread is not in arena");
             oneapi::tbb::this_task_arena::enqueue([] {});
         }
         ++count;
