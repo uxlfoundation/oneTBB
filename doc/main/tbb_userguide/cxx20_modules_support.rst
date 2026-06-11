@@ -14,13 +14,19 @@ part of your own build target.
 CMake* Integration
 ******************
 
-To add the ``tbb`` module to your CMake target, locate ``tbb.cppm`` using the
+To add the ``tbb`` module to your CMake* target, locate ``tbb.cppm`` using the
 ``INTERFACE_INCLUDE_DIRECTORIES`` property of the ``TBB::tbb`` target and register it as
 a ``CXX_MODULES`` file set:
 
+.. note::
+    To support C++20 modules, CMake 3.28 or later and a compiler and generator with C++20 modules
+    support are required. Refer to the
+    `CMake documentation <https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html>`_
+    for the list of supported compilers and generators.
+
 .. code:: cmake
 
-    cmake_minimum_required(VERSION 3.28)  # CMake 3.28+ required for CXX_MODULES file sets
+    cmake_minimum_required(VERSION 3.28)
     project(myapp CXX)
 
     set(CMAKE_CXX_STANDARD 20)
@@ -46,6 +52,12 @@ An then in your C++ source files, you can import the module:
     int main() {
         tbb::parallel_for(0, 100, [](int i) { /* ... */ });
     }
+
+.. note::
+    Translation units built with ``import tbb;`` are ABI-compatible with those built using
+    ``#include <oneapi/tbb.h>``. Because the exported API is attached to the global module
+    fragment, the module name does not participate in symbol mangling, and both can be linked
+    into the same program.
 
 Usage Of Predefined Macros
 **************************
@@ -77,7 +89,7 @@ before including TBB headers. With modules, macros defined by the consumer befor
 ``import tbb;`` **cannot** affect the module's already-compiled interface.
 
 To enable a preview feature, define the corresponding macro when **compiling**
-``tbb.cppm`` itself. In CMake, use ``target_compile_definitions``:
+``tbb.cppm`` itself. In CMake*, use ``target_compile_definitions``:
 
 .. code:: cmake
 
