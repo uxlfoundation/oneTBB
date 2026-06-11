@@ -1,6 +1,8 @@
 #include "detail/_task.h"
 #include "task_group.h"
 #include "task_arena.h"
+#include "parallel_for.h"
+#include "partitioner.h"
 #include <array>
 
 namespace tbb {
@@ -454,6 +456,135 @@ void parallel_quick_sort(RandomAccessIterator first, RandomAccessIterator last, 
 }
 
 template <typename RandomAccessIterator, typename Compare>
+struct qsort_range {
+    RandomAccessIterator m_first;
+    RandomAccessIterator m_last;
+    const Compare&       m_comp;
+    task_group_context&  m_ctx;
+    std::size_t          m_budget;
+    bool                 m_leftmost;
+
+    qsort_range(RandomAccessIterator first, RandomAccessIterator last, const Compare& comp,
+                task_group_context& ctx, std::size_t budget)
+        : m_first(first)
+        , m_last(last)
+        , m_comp(comp)
+        , m_ctx(ctx)
+        , m_budget(budget)
+        , m_leftmost(true)
+    {}
+
+    qsort_range(qsort_range& range, split)
+        : m_comp(range.m_comp)
+        , m_ctx(range.m_ctx)
+    {
+        range.split_range(*this);
+    }
+
+    bool empty() const { return m_first == m_last; }
+    bool is_divisible() const { return (m_last - m_first) >= serial_sort_cutoff; }
+
+    void split_range(qsort_range& range) {
+        if (!is_divisible()) { // Can happen during the recursive calls to split_range
+            range.m_first = m_last;
+            range.m_last  = m_last;
+            range.m_budget = m_budget;
+            range.m_leftmost = false;
+            return;
+        }
+
+        using diff_type = typename std::iterator_traits<RandomAccessIterator>::difference_type;
+        using value_type = typename std::iterator_traits<RandomAccessIterator>::value_type;
+
+        diff_type pivot = pseudo_median_of_nine(m_first, m_last - m_first, m_comp);
+
+        if (pivot != 0) std::iter_swap(m_first, m_first + pivot);
+
+        if (!m_leftmost && !m_comp(*(m_first - 1), *m_first)) {
+            value_type pivot = *m_first;
+            auto leq = [&](const value_type& x) { return !m_comp(pivot, x); };
+
+            std::size_t ptasks = choose_task_count(m_last - m_first, m_budget, choose_block_size(m_last - m_first));
+
+            auto it = ptasks >= 2 ? parallel_partition(m_first, m_last, leq, ptasks, m_ctx)
+                                  : std::partition(m_first, m_last, leq);
+            m_first = it;
+            split_range(range);
+        } else {
+            value_type pivot = *m_first;
+            auto less = [&](const value_type& x) { return m_comp(x, pivot); };
+
+            std::size_t ptasks = choose_task_count(m_last - m_first, m_budget, choose_block_size(m_last - m_first));
+
+            auto it = ptasks >= 2 ? parallel_partition(std::next(m_first), m_last, less, ptasks, m_ctx)
+                                  : std::partition(std::next(m_first), m_last, less);
+
+            RandomAccessIterator pivot_pos;
+            if (it == std::next(m_first)) {
+                pivot_pos = m_first;
+            } else {
+                std::iter_swap(std::prev(it), m_first);
+                pivot_pos = std::prev(it);
+            }
+
+            diff_type left_size = pivot_pos - m_first;
+            diff_type right_size = m_last - (pivot_pos + 1);
+
+            if (left_size == 0) {
+                m_first = pivot_pos + 1;
+                m_leftmost = false;
+                split_range(range);
+                return;
+            }
+
+            if (right_size == 0) {
+                m_last = pivot_pos;
+                split_range(range);
+                return;
+            }
+
+            diff_type total = left_size + right_size;
+
+            std::size_t left_budget = std::max<std::size_t>(1, m_budget * left_size / total);
+            std::size_t right_budget = std::max<std::size_t>(1, m_budget - left_budget);
+
+            if (left_size > right_size) {
+                range.m_first = m_first;
+                range.m_last = pivot_pos;
+                range.m_budget = left_budget;
+                range.m_leftmost = m_leftmost;
+
+                m_first = pivot_pos + 1;
+                m_budget = right_budget;
+                m_leftmost = false;
+            } else {
+                range.m_first = pivot_pos + 1;
+                range.m_last = m_last;
+                range.m_budget = right_budget;
+                range.m_leftmost = false;
+
+                m_last = pivot_pos;
+                m_budget = left_budget;
+            }
+        }
+    }
+};
+
+template <typename RandomAccessIterator, typename Compare>
+void parallel_for_quick_sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp,
+                             task_group_context& ctx, std::size_t budget)
+{
+    using range_type = qsort_range<RandomAccessIterator, Compare>;
+    range_type range(first, last, comp, ctx, budget);
+
+    auto leaf_sort = [](const range_type& r) {
+        std::sort(r.m_first, r.m_last, r.m_comp);
+    };
+
+    parallel_for(range, leaf_sort, auto_partitioner(), ctx);
+}
+
+template <typename RandomAccessIterator, typename Compare>
 void parallel_qsort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
     using diff_type = typename std::iterator_traits<RandomAccessIterator>::difference_type;
     
@@ -469,6 +600,20 @@ void parallel_qsort(RandomAccessIterator first, RandomAccessIterator last, Compa
 
         parallel_quick_sort(first, last, comp, wait_ctx, ctx, parallel_partition_budget, /*leftmost = */true);
         wait(wait_ctx, ctx);
+    }
+}
+
+template <typename RandomAccessIterator, typename Compare>
+void parallel_for_qsort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
+    auto n = last - first;
+
+    if (n < serial_sort_cutoff) {
+        std::sort(first, last, comp);
+    } else {
+        std::size_t parallel_partition_budget = this_task_arena::max_concurrency();
+        task_group_context ctx;
+
+        parallel_for_quick_sort(first, last, comp, ctx, parallel_partition_budget);
     }
 }
 
