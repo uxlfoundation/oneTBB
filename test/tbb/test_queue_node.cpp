@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -38,22 +39,6 @@
 
 #define N 1000
 #define C 10
-
-template< typename T >
-void spin_try_get( tbb::flow::queue_node<T> &q, T &value ) {
-    int count = 0;
-    while ( q.try_get(value) != true ) {
-        if (count < 1000000) {
-            ++count;
-        }
-        if (count == 1000000) {
-            // Perhaps, we observe the missed wakeup. Enqueue a task to wake up threads.
-            tbb::task_arena a(tbb::task_arena::attach{});
-            a.enqueue([]{});
-            ++count;
-        }
-    }
-}
 
 template< typename T >
 void check_item( T* next_value, T &value ) {

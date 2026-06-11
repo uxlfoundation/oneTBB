@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -31,11 +32,6 @@
 
 #define N 1000
 #define C 10
-
-template< typename T >
-void spin_try_get( tbb::flow::buffer_node<T> &b, T &value ) {
-    while ( b.try_get(value) != true ) {}
-}
 
 template< typename T >
 void check_item( T* count_value, T &value ) {
