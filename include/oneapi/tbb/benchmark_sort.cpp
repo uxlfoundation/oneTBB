@@ -332,6 +332,7 @@ int main() {
     benchmark_psort<std_sorter>();
     benchmark_psort<tbb_parallel_sorter>();
     benchmark_psort<tbb_parallel_quick_sorter>();
+    benchmark_psort<tbb_parallel_for_quick_sorter>();
     benchmark_psort<dpl_parallel_sorter>();
 #if TEST_TASKFLOW
     benchmark_psort<taskflow_sorter>();
