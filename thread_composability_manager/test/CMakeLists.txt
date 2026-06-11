@@ -151,7 +151,7 @@ add_test(NAME ${TCM_TEST_PREMATURE_EXIT} COMMAND ${TCM_TEST_PREMATURE_EXIT})
 set_tests_properties(${TCM_TEST_PREMATURE_EXIT} PROPERTIES ENVIRONMENT "TCM_ENABLE=1")
 
 if (UNIX)
-  set(TCM_TEST_CGROUP_INFO test_cgroup_support)
+  set(TCM_TEST_CGROUP_INFO test_cgroups_support)
   add_executable(${TCM_TEST_CGROUP_INFO} test_cgroup_support.cpp)
   target_compile_features(${TCM_TEST_CGROUP_INFO} PRIVATE cxx_std_17)
   target_include_directories(${TCM_TEST_CGROUP_INFO} PRIVATE
