@@ -16,6 +16,8 @@ add_library(tcm SHARED
   version.cpp
 )
 
+target_compile_features(tcm PRIVATE cxx_std_17) # Minimally supported version of the C++ standard
+
 if (WIN32)
     string(TIMESTAMP tcm_build_year "%Y" UTC)
     if (NOT tcm_build_year)
