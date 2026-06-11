@@ -48,7 +48,7 @@ struct tbb_parallel_quick_sorter {
 struct tbb_parallel_for_quick_sorter {
     template <typename Iterator, typename Compare>
     static void sort(Iterator begin, Iterator end, Compare comp) {
-        tbb::detail::d1::parallel_for_quick_sort(begin, end, comp);
+        tbb::detail::d1::parallel_for_qsort(begin, end, comp);
     }
 
     static const char* name() {

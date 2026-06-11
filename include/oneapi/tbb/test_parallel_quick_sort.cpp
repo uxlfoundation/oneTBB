@@ -33,7 +33,7 @@ int main() {
 
     for (std::size_t i = 0; i < 200; ++i) {
         std::vector<int> copy = v;
-        parallel_qsort(copy.begin(), copy.end(), std::less<int>{});
+        parallel_for_qsort(copy.begin(), copy.end(), std::less<int>{});
     }
 
     tbb::tick_count finish_parallel = tbb::tick_count::now();
