@@ -165,6 +165,17 @@ if(TBB_BUILD_APPLE_FRAMEWORKS)
         MACOSX_FRAMEWORK_SHORT_VERSION_STRING ${TBB_BINARY_VERSION})
 endif()
 
+# On Xcode when building a universal binary, the x86_64-specific flags need to
+# be set as an Xcode attribute because of the way Xcode invokes the compiler
+# compared to all other generators.
+if(DEFINED TBB_X86_XCODE_COMPILE_FLAGS AND CMAKE_GENERATOR STREQUAL "Xcode")
+    # $(OTHER_CPLUSPLUSFLAGS) must be passed as a literal to also use all
+    # common compilation flags
+    set_target_properties(tbb PROPERTIES
+      XCODE_ATTRIBUTE_OTHER_CPLUSPLUSFLAGS[arch=x86_64] "\$(OTHER_CPLUSPLUSFLAGS) ${TBB_X86_XCODE_COMPILE_FLAGS}"
+    )
+endif()
+
 tbb_install_target(tbb)
 
 if (TBB_INSTALL)
