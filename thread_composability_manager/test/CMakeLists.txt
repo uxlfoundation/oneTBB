@@ -25,6 +25,9 @@ function(add_tcm_test)
   cmake_parse_arguments(_tcm_test "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
   add_executable(${_tcm_test_NAME} ${_tcm_test_NAME}.cpp)
+
+  target_compile_features(${_tcm_test_NAME} PRIVATE cxx_std_17) # At least C++17 is needed for tests
+
   target_compile_options(${_tcm_test_NAME}
     PRIVATE
     ${TCM_WARNING_LEVEL}
@@ -132,6 +135,7 @@ endforeach()
 # Test no crash occurs if the app exits while still using TCM
 set(TCM_TEST_PREMATURE_EXIT test_premature_exit)
 add_executable(${TCM_TEST_PREMATURE_EXIT} test_premature_exit.cpp)
+target_compile_features(${TCM_TEST_PREMATURE_EXIT} PRIVATE cxx_std_17)
 target_compile_options(
   ${TCM_TEST_PREMATURE_EXIT} PRIVATE ${TCM_WARNING_LEVEL} ${TCM_COMMON_COMPILE_FLAGS})
 target_compile_definitions(${TCM_TEST_PREMATURE_EXIT}
@@ -149,6 +153,7 @@ set_tests_properties(${TCM_TEST_PREMATURE_EXIT} PROPERTIES ENVIRONMENT "TCM_ENAB
 if (UNIX)
   set(TCM_TEST_CGROUP_INFO test_cgroup_support)
   add_executable(${TCM_TEST_CGROUP_INFO} test_cgroup_support.cpp)
+  target_compile_features(${TCM_TEST_CGROUP_INFO} PRIVATE cxx_std_17)
   target_include_directories(${TCM_TEST_CGROUP_INFO} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../src ${CMAKE_CURRENT_SOURCE_DIR}/../include)
   target_link_libraries(${TCM_TEST_CGROUP_INFO} PRIVATE Threads::Threads)
