@@ -617,6 +617,55 @@ void parallel_for_qsort(RandomAccessIterator first, RandomAccessIterator last, C
     }
 }
 
+template <typename RandomAccessIterator, typename Compare>
+void parallel_for_qsort_precheck(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
+    auto n = last - first;
+
+    if (n < serial_sort_cutoff) {
+        std::sort(first, last, comp);
+    } else {
+        constexpr std::size_t first_touch_cutoff = 9;
+
+        RandomAccessIterator k = first;
+        while (k != first + first_touch_cutoff) {
+            if (comp(*(k + 1), *k)) {
+                std::size_t parallel_partition_budget = this_task_arena::max_concurrency();
+                task_group_context ctx;
+
+                parallel_for_quick_sort(first, last, comp, ctx, parallel_partition_budget);
+                return;
+            }
+            ++k;
+        }
+
+        task_group_context check_context;
+
+        // Full check
+        using range_type = blocked_range<RandomAccessIterator>;
+        parallel_for(range_type(k + 1, last),
+                     [&](const range_type& range) {
+                        RandomAccessIterator my_end = range.end();
+
+                        std::size_t i = 0;
+                        for (RandomAccessIterator k = range.begin(); k != my_end; ++k, ++i) {
+                            if (i % 64 == 0 && check_context.is_group_execution_cancelled()) break;
+
+                            if (comp(*(k), *(k - 1))) {
+                                check_context.cancel_group_execution();
+                                break;
+                            }
+                        }
+                     }, auto_partitioner(), check_context);
+
+        if (check_context.is_group_execution_cancelled()) {
+            std::size_t parallel_partition_budget = this_task_arena::max_concurrency();
+            task_group_context ctx;
+
+            parallel_for_quick_sort(first, last, comp, ctx, parallel_partition_budget);
+        }
+    }
+}
+
 } // namespace d1
 } // namespace detail
 } // namespace tbb

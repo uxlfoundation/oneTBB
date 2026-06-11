@@ -56,6 +56,17 @@ struct tbb_parallel_for_quick_sorter {
     }
 };
 
+struct tbb_parallel_for_quick_checked_sorter {
+    template <typename Iterator, typename Compare>
+    static void sort(Iterator begin, Iterator end, Compare comp) {
+        tbb::detail::d1::parallel_for_qsort_precheck(begin, end, comp);
+    }
+
+    static const char* name() {
+        return "tbb_new_parallel_for_sort_checked";
+    }
+};
+
 struct dpl_parallel_sorter {
     template <typename Iterator, typename Compare>
     static void sort(Iterator begin, Iterator end, Compare comp) {
@@ -333,6 +344,7 @@ int main() {
     benchmark_psort<tbb_parallel_sorter>();
     benchmark_psort<tbb_parallel_quick_sorter>();
     benchmark_psort<tbb_parallel_for_quick_sorter>();
+    benchmark_psort<tbb_parallel_for_quick_checked_sorter>();
     benchmark_psort<dpl_parallel_sorter>();
 #if TEST_TASKFLOW
     benchmark_psort<taskflow_sorter>();
