@@ -63,7 +63,7 @@ Usage Of Predefined Macros
 **************************
 
 C++20 modules do not export preprocessor macros. Macros defined in
-``<oneapi/tbb/version.h>`` (such as ``TBB_VERSION`` or feature-test macros) are **not** available
+``<oneapi/tbb/version.h>`` (such as version or feature-test macros) are **not** available
 after ``import tbb;``.
 
 As a workaround, include the version header alongside the module import.
