@@ -19,6 +19,8 @@ endif()
 # Find Threads library (for example, pthread)
 find_package(Threads REQUIRED)
 
+set(TCM_TEST_SUITE_NAME "tcm_tests")
+
 function(add_tcm_test)
   set(oneValueArgs NAME)
   set(multiValueArgs ENVIRONMENT DEPENDENCIES)
@@ -46,7 +48,8 @@ function(add_tcm_test)
   )
   add_test(NAME ${_tcm_test_NAME} COMMAND ${_tcm_test_NAME} WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
-  set_tests_properties(${_tcm_test_NAME} PROPERTIES ENVIRONMENT "${_tcm_test_ENVIRONMENT}")
+  set_tests_properties(${_tcm_test_NAME} PROPERTIES ENVIRONMENT "${_tcm_test_ENVIRONMENT}"
+    LABELS ${TCM_TEST_SUITE_NAME})
 endfunction()
 
 add_tcm_test(NAME test_basic_apis ENVIRONMENT "TCM_ENABLE=1" DEPENDENCIES HWLOC::hwloc)
@@ -69,7 +72,7 @@ add_tcm_test(NAME test_tcm_environment)
 add_tcm_test(NAME test_tcm_disabling)
 
 set_tests_properties(test_tcm_environment PROPERTIES
-  FAIL_REGULAR_EXPRESSION "TCM: VERSION.*TCM: VERSION"
+  FAIL_REGULAR_EXPRESSION "TCM: VERSION.*TCM: VERSION" LABELS ${TCM_TEST_SUITE_NAME}
 )
 
 add_test(NAME test_tcm_environment_version_set COMMAND test_tcm_environment
@@ -78,6 +81,7 @@ set_tests_properties(test_tcm_environment_version_set PROPERTIES
   ENVIRONMENT "TCM_VERSION=1;TCM_ENABLE=1"
   PASS_REGULAR_EXPRESSION "TCM: VERSION.*TCM: VERSION;TCM: TCM_ENABLE *1"
   FAIL_REGULAR_EXPRESSION "ERROR"
+  LABELS ${TCM_TEST_SUITE_NAME}
 )
 
 add_test(NAME test_tcm_environment_disable COMMAND test_tcm_environment
@@ -85,6 +89,7 @@ add_test(NAME test_tcm_environment_disable COMMAND test_tcm_environment
 set_tests_properties(test_tcm_environment_disable PROPERTIES
   PASS_REGULAR_EXPRESSION  "TCM: TCM *disabled"
   FAIL_REGULAR_EXPRESSION "ERROR"
+  LABELS ${TCM_TEST_SUITE_NAME}
 )
 
 add_test(NAME test_tcm_environment_disable_version_set COMMAND test_tcm_environment
@@ -93,6 +98,7 @@ set_tests_properties(test_tcm_environment_disable_version_set PROPERTIES
   ENVIRONMENT "TCM_VERSION=1"
   PASS_REGULAR_EXPRESSION  "TCM: VERSION.*TCM: VERSION;TCM: TCM_ENABLE *0"
   FAIL_REGULAR_EXPRESSION "ERROR"
+  LABELS ${TCM_TEST_SUITE_NAME}
 )
 
 # Group of tests that runs the same test in different environment checking TCM
@@ -109,7 +115,7 @@ macro(add_tcm_disabling_test name environment expect_suggesting)
         WORKING_DIRECTORY $<TARGET_FILE_DIR:test_tcm_disabling>
     )
     set_tests_properties(test_tcm_disabling_${name} PROPERTIES
-        ENVIRONMENT "${environment}"
+        ENVIRONMENT "${environment}" LABELS ${TCM_TEST_SUITE_NAME}
     )
     if (${expect_suggesting})
         set_tests_properties(test_tcm_disabling_${name} PROPERTIES
@@ -148,7 +154,8 @@ endif (UNIX)
 target_include_directories(${TCM_TEST_PREMATURE_EXIT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 target_link_libraries(${TCM_TEST_PREMATURE_EXIT} PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
 add_test(NAME ${TCM_TEST_PREMATURE_EXIT} COMMAND ${TCM_TEST_PREMATURE_EXIT})
-set_tests_properties(${TCM_TEST_PREMATURE_EXIT} PROPERTIES ENVIRONMENT "TCM_ENABLE=1")
+set_tests_properties(${TCM_TEST_PREMATURE_EXIT} PROPERTIES ENVIRONMENT "TCM_ENABLE=1"
+  LABELS ${TCM_TEST_SUITE_NAME})
 
 if (UNIX)
   set(TCM_TEST_CGROUP_INFO test_cgroups_support)
@@ -158,4 +165,20 @@ if (UNIX)
     ${CMAKE_CURRENT_SOURCE_DIR}/../src ${CMAKE_CURRENT_SOURCE_DIR}/../include)
   target_link_libraries(${TCM_TEST_CGROUP_INFO} PRIVATE Threads::Threads)
   add_test(NAME ${TCM_TEST_CGROUP_INFO} COMMAND ${TCM_TEST_CGROUP_INFO})
+  set_tests_properties(${TCM_TEST_CGROUP_INFO} PROPERTIES LABELS ${TCM_TEST_SUITE_NAME})
 endif (UNIX)
+
+add_custom_target(${TCM_TEST_SUITE_NAME}
+  COMMAND ${CMAKE_CTEST_COMMAND} -L ${TCM_TEST_SUITE_NAME}
+  DEPENDS
+  test_basic_apis
+  test_rb
+  test_constrained_requests
+  test_tcm_version
+  test_tcm_environment
+  test_tcm_disabling
+  test_tcm_environment
+  test_tcm_disabling
+  ${TCM_TEST_PREMATURE_EXIT}
+)
+add_dependencies(${TCM_TEST_SUITE_NAME} ${TCM_TEST_CGROUP_INFO})
