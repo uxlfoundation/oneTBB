@@ -55,31 +55,7 @@ An then in your C++ source files, you can import the module:
 
 .. note::
     Translation units built with ``import tbb;`` are ABI-compatible with those built using
-    ``#include <oneapi/tbb.h>``. Because the exported API is attached to the global module
-    fragment, the module name does not participate in symbol mangling, and both can be linked
-    into the same program.
-
-Usage Of Predefined Macros
-**************************
-
-C++20 modules do not export preprocessor macros. Macros defined in
-|short_name| library headers (such as version or feature-test macros) are **not** available
-after ``import tbb;``.
-
-As a workaround, include the `<oneapi/tbb/version.h>` header alongside the module import.
-
-.. code:: cpp
-
-    #define TBB_PREVIEW_FEATURE_X 1
-    #include <oneapi/tbb/version.h>  // macros available here
-    import tbb;
-
-    static_assert(TBB_VERSION_MAJOR >= 2023, "Major version 2023 or later required");
-
-    // Feature-test macros are also available
-    #ifdef TBB_HAS_FEATURE_X
-    // use feature X
-    #endif
+    ``#include <oneapi/tbb.h>``.
 
 Enabling Preview Features
 *************************
@@ -105,8 +81,37 @@ To enable a preview feature, define the corresponding macro when **compiling**
         FILES ${_tbb_include_dir}/oneapi/tbb.cppm
     )
 
-    # Enable preview feature X when compiling the module
+    # Enable preview feature X when compiling the target that uses the module
     target_compile_definitions(my_executable PRIVATE TBB_PREVIEW_FEATURE_X=1)
 
 After this, the preview API is included in the compiled module and available to all
 translation units that use ``import tbb;``.
+
+Usage Of Predefined Macros
+**************************
+
+C++20 modules do not export preprocessor macros. Macros defined in
+|short_name| library headers (such as version or feature-test macros) are **not** available
+after ``import tbb;``.
+
+As a workaround, include the `<oneapi/tbb/version.h>` header alongside the module import.
+
+.. caution::
+    In typical usage with CMake* integration, ``tbb.cppm`` is compiled as part of your target,
+    so ``TBB_PREVIEW_*`` macros defined via ``target_compile_definitions`` are already applied
+    when the module is built. There is no need to redefine them in application source files.
+    In any other scenario, make sure to define the same preview macros both when compiling
+    the module and in your source code to avoid a mismatch.
+
+.. code:: cpp
+
+    // It is assumed that the application is compiled with preview macros predefined
+    #include <oneapi/tbb/version.h>  // macros available here
+    import tbb;
+
+    static_assert(TBB_VERSION_MAJOR >= 2023, "Major version 2023 or later required");
+
+    // Feature-test macros are also available
+    #ifdef TBB_HAS_FEATURE_X
+    // use feature X
+    #endif
