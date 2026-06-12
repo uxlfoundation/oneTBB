@@ -58,3 +58,4 @@ The key properties of a preview feature are:
     fg_resource_limiting
     core_type_selector
     numa_interleaved_allocation
+    ../tbb_userguide/cxx20_modules_support
