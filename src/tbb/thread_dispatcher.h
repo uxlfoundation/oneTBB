@@ -28,6 +28,8 @@
 #include "rml_tbb.h"
 #include "thread_dispatcher_client.h"
 
+#include "oneapi/tbb/bravo_rw_mutex.h"
+
 namespace tbb {
 namespace detail {
 namespace r1 {
@@ -36,7 +38,7 @@ class threading_control_impl;
 
 class thread_dispatcher : no_copy, rml::tbb_client {
     using client_list_type = intrusive_list<thread_dispatcher_client>;
-    using client_list_mutex_type = d1::rw_mutex;
+    using client_list_mutex_type = d1::BRAVO_rw_mutex<d1::rw_mutex>;
 public:
     thread_dispatcher(threading_control& tc, unsigned hard_limit, std::size_t stack_size);
     ~thread_dispatcher();

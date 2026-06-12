@@ -63,7 +63,7 @@ bool thread_dispatcher::try_unregister_client(thread_dispatcher_client* client, 
     __TBB_ASSERT(client, nullptr);
     // we hold reference to the server, so market cannot be destroyed at any moment here
     __TBB_ASSERT(!is_poisoned(my_server), nullptr);
-    my_list_mutex.lock();
+    client_list_mutex_type::scoped_lock lock(my_list_mutex);
     for (auto& it : my_client_list[priority]) {
         if (client == &it) {
             if (it.get_aba_epoch() == aba_epoch) {
@@ -77,7 +77,7 @@ bool thread_dispatcher::try_unregister_client(thread_dispatcher_client* client, 
                     remove_client(*client);
                     ++my_clients_aba_epoch;
 
-                    my_list_mutex.unlock();
+                    lock.release();
                     destroy_client(client);
 
                     return true;
@@ -86,7 +86,6 @@ bool thread_dispatcher::try_unregister_client(thread_dispatcher_client* client, 
             break;
         }
     }
-    my_list_mutex.unlock();
     return false;
 }
 
