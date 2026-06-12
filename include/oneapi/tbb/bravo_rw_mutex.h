@@ -14,8 +14,8 @@ struct BRAVO_rw_mutex_base {
     using reader_slot_type = std::atomic<BRAVO_rw_mutex_base*>;
 
     static constexpr std::size_t num_visible_readers = 4096;
-    static inline constexpr std::size_t slowdown_guard = 9;
-    static inline reader_slot_type visible_readers[num_visible_readers];
+    static constexpr std::size_t slowdown_guard = 9;
+    static reader_slot_type visible_readers[num_visible_readers];
 };
 
 template <typename UnderlyingRWMutex>

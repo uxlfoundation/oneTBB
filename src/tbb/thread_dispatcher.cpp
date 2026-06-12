@@ -19,8 +19,13 @@
 
 namespace tbb {
 namespace detail {
+namespace d1 {
+constexpr std::size_t BRAVO_rw_mutex_base::num_visible_readers;
+constexpr std::size_t BRAVO_rw_mutex_base::slowdown_guard;
+BRAVO_rw_mutex_base::reader_slot_type BRAVO_rw_mutex_base::visible_readers[BRAVO_rw_mutex_base::num_visible_readers] = {};
+} // namespace d1
 namespace r1 {
-
+    
 thread_dispatcher::thread_dispatcher(threading_control& tc, unsigned hard_limit, std::size_t stack_size)
     : my_threading_control(tc)
     , my_num_workers_hard_limit(hard_limit)
