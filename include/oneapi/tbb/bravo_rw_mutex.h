@@ -101,7 +101,7 @@ public:
             }
         }
 
-        bool try_acquire(BRAVO_rw_mutex& mutex, bool write = true) {
+        bool try_acquire(BRAVO_rw_mutex&, bool = true) {
             throw "Unimplemented";
             return false;
         }
