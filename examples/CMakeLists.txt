@@ -76,3 +76,4 @@ tbb_add_example(task_group sudoku)
 tbb_add_example(test_all fibonacci)
 
 tbb_add_example(migration recursive_fibonacci)
+tbb_add_example(migration wavefront)
