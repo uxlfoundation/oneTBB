@@ -40,32 +40,31 @@ const char* bad_last_alloc::what() const noexcept(true) { return "bad allocation
 const char* user_abort::what() const noexcept(true) { return "User-initiated abort has terminated this operation"; }
 const char* missing_wait::what() const noexcept(true) { return "wait() was not called on the structured_task_group"; }
 
-#if TBB_USE_EXCEPTIONS
-    template <typename F>
-    /*[[noreturn]]*/ void do_throw_noexcept(F throw_func) noexcept {
-        throw_func();
-    }
+template <typename F>
+/*[[noreturn]]*/ void do_throw_noexcept(F throw_func) noexcept {
+    throw_func();
+}
 
-    /*[[noreturn]]*/ void do_throw_noexcept(void (*throw_func)()) noexcept {
-        throw_func();
+/*[[noreturn]]*/ void do_throw_noexcept(void (*throw_func)()) noexcept {
+    throw_func();
 #if __GNUC__ == 7
-        // In release, GCC 7 loses noexcept attribute during tail call optimization.
-        // The following statement prevents tail call optimization.
-        volatile bool reach_this_point = true;
-        suppress_unused_warning(reach_this_point);
+    // In release, GCC 7 loses noexcept attribute during tail call optimization.
+    // The following statement prevents tail call optimization.
+    volatile bool reach_this_point = true;
+    suppress_unused_warning(reach_this_point);
 #endif
+}
+
+bool terminate_on_exception(); // defined in global_control.cpp and ipc_server.cpp
+
+template <typename F>
+/*[[noreturn]]*/ void do_throw(F throw_func) {
+    if (terminate_on_exception()) {
+        do_throw_noexcept(throw_func);
     }
-
-    bool terminate_on_exception(); // defined in global_control.cpp and ipc_server.cpp
-
-    template <typename F>
-    /*[[noreturn]]*/ void do_throw(F throw_func) {
-        if (terminate_on_exception()) {
-            do_throw_noexcept(throw_func);
-        }
-        throw_func();
-    }
-
+    throw_func();
+}
+#if TBB_USE_EXCEPTIONS
     #define DO_THROW(exc, init_args) do_throw( []{ throw exc init_args; } );
 #else /* !TBB_USE_EXCEPTIONS */
     #define PRINT_ERROR_AND_ABORT(exc_name, msg) \
