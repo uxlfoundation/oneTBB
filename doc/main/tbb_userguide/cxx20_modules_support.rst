@@ -7,7 +7,7 @@ C++20 Modules Support
     Support for C++20 modules is experimental and subject to change in future releases.
 
 |short_name| provides a C++20 module interface unit, ``tbb.cppm``, that lets you use |short_name| via
-``import tbb;`` instead of ``#include <oneapi/tbb.h>``. The module is installed as a
+``import tbb;`` instead of regular library headers. The module is installed as a
 source file under ``<install-prefix>/include/oneapi/tbb.cppm`` and must be compiled as
 part of your own build target.
 
@@ -19,9 +19,9 @@ To add the ``tbb`` module to your CMake* target, locate ``tbb.cppm`` using the
 a ``CXX_MODULES`` file set:
 
 .. note::
-    To support C++20 modules, CMake 3.28 or later and a compiler and generator with C++20 modules
+    To support C++20 modules, CMake* 3.28 or later and a compiler and generator with C++20 modules
     support are required. Refer to the
-    `CMake documentation <https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html>`_
+    `CMake* documentation <https://cmake.org/cmake/help/latest/manual/cmake-cxxmodules.7.html>`_
     for the list of supported compilers and generators.
 
 .. code:: cmake
@@ -63,10 +63,10 @@ Usage Of Predefined Macros
 **************************
 
 C++20 modules do not export preprocessor macros. Macros defined in
-``<oneapi/tbb/version.h>`` (such as version or feature-test macros) are **not** available
+|short_name| library headers (such as version or feature-test macros) are **not** available
 after ``import tbb;``.
 
-As a workaround, include the version header alongside the module import.
+As a workaround, include the `<oneapi/tbb/version.h>` header alongside the module import.
 
 .. code:: cpp
 
