@@ -105,7 +105,7 @@ To enable a preview feature, define the corresponding macro when **compiling**
         FILES ${_tbb_include_dir}/oneapi/tbb.cppm
     )
 
-    # Enable preview features when compiling the module
+    # Enable preview feature X when compiling the module
     target_compile_definitions(my_executable PRIVATE TBB_PREVIEW_FEATURE_X=1)
 
 After this, the preview API is included in the compiled module and available to all
