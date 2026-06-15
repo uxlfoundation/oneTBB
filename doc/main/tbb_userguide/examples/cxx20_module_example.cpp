@@ -28,7 +28,6 @@ static_assert(TBB_VERSION_MAJOR >= 2023, "Major version 2023 or later is require
 /* end_cxx20_modules_macro_example */
 
 /* begin_cxx20_modules_basic_example */
-
 int main() {
     tbb::parallel_for(0, 100, [](int i) { /* ... */ });
 }

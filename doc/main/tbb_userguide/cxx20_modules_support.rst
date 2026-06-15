@@ -52,8 +52,7 @@ An then in your C++ source files, you can import the module:
    :end-before: /* end_cxx20_modules_basic_example */
 
 .. note::
-    Translation units built with ``import tbb;`` are ABI-compatible with those built using
-    ``#include <oneapi/tbb.h>``.
+    Translation units that use ``import tbb;`` are ABI-compatible with those that use library headers.
 
 Enabling Preview Features
 *************************
