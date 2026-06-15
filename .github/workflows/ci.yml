@@ -500,7 +500,7 @@ jobs:
           cmake --build . -v --target light_test_examples
 
   linux-doc-examples-testing:
-    name: doc_examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}
+    name: doc_examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_${{ matrix.cmake_extra }}
     runs-on: ['${{ matrix.os }}']
     timeout-minutes: 10
     strategy:
@@ -544,7 +544,7 @@ jobs:
           ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure -L doc-examples
 
   windows-doc-examples-testing:
-    name: doc_examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}
+    name: doc_examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_${{ matrix.cmake_extra }}
     runs-on: ['${{ matrix.os }}']
     timeout-minutes: 10
     strategy:
@@ -553,6 +553,7 @@ jobs:
         include:
           - os: windows-2022
             generator: "Visual Studio 17 2022"
+            generator_arch: "-A x64"
             c_compiler: cl
             cxx_compiler: cl
             std: 20
@@ -575,7 +576,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake -G "${{ matrix.generator }}" -A x64 -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
+          cmake -G "${{ matrix.generator }}" "${{ matrix.generator_arch }}" -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} `
             -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} ${{ matrix.cmake_extra }} -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON ..
           cmake --build . --config ${{ matrix.build_type }} -v --parallel --target build-doc-examples
