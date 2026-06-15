@@ -14,8 +14,8 @@ struct BRAVO_rw_mutex_base {
     using reader_slot_type = std::atomic<BRAVO_rw_mutex_base*>;
 
     static constexpr std::size_t num_visible_readers = 4096;
-    static constexpr std::size_t slowdown_guard = 9;
-    static reader_slot_type visible_readers[num_visible_readers];
+    static inline constexpr std::size_t slowdown_guard = 9;
+    static inline reader_slot_type visible_readers[num_visible_readers];
 };
 
 template <typename UnderlyingRWMutex>
@@ -62,7 +62,7 @@ public:
                 underlying_scoped_lock::acquire(mutex.m_underlying_rw_mutex, /*write = */true);
 
                 // If RBias is set, wait for pending fast-path readers to leave
-                if (mutex.m_rbias.load(std::memory_order_acquire)) {
+                if (mutex.m_rbias.load(std::memory_order_relaxed)) {
                     // prevent more fast-path readers to lock the mutex
                     mutex.m_rbias.store(false, std::memory_order_relaxed);
                     std::atomic_thread_fence(std::memory_order_seq_cst);
@@ -75,7 +75,8 @@ public:
 
                     auto now = clock_type::now();
 
-                    mutex.m_inhibit_until.store(now + (now - start) * slowdown_guard);
+                    mutex.m_inhibit_until.store(now + (now - start) * slowdown_guard,
+                                                std::memory_order_relaxed);
                 }
             } else { // reader
                 if (mutex.m_rbias.load(std::memory_order_acquire)) {
@@ -96,7 +97,7 @@ public:
                 if (!mutex.m_rbias.load(std::memory_order_acquire) && 
                     clock_type::now() >= mutex.m_inhibit_until.load(std::memory_order_relaxed))
                 {
-                    mutex.m_rbias.store(true, std::memory_order_relaxed);
+                    mutex.m_rbias.store(true, std::memory_order_release);
                 }
             }
         }
