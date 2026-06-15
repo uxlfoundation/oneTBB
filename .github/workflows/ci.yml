@@ -530,7 +530,7 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          sudo apt-get update && sudo apt-get install -y ninja
+          sudo apt-get update && sudo apt-get install -y ninja-build
       - name: Test doc examples
         run: |
           mkdir build && cd build
