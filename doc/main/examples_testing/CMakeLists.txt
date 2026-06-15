@@ -57,9 +57,7 @@ if (TBB_TEST_CXX20_MODULES)
             BASE_DIRS ${CMAKE_SOURCE_DIR}/include
             FILES ${CMAKE_SOURCE_DIR}/include/oneapi/tbb.cppm
         )
-        set_target_properties(cxx20_module_example PROPERTIES
-            CXX_STANDARD 20
-            CXX_STANDARD_REQUIRED ON)
+        target_compile_features(cxx20_module_example PRIVATE cxx_std_20)
     endif()
 endif()
 
