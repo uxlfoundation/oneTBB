@@ -531,6 +531,9 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update && sudo apt-get install -y ninja-build
+          if [[ "${{ matrix.cxx_compiler }}" == "clang++" ]]; then
+            sudo apt-get install -y libomp-dev
+          fi
       - name: Test doc examples
         run: |
           mkdir build && cd build
