@@ -45,13 +45,11 @@ a ``CXX_MODULES`` file set:
 
 An then in your C++ source files, you can import the module:
 
-.. code:: cpp
-
-    import tbb;
-
-    int main() {
-        tbb::parallel_for(0, 100, [](int i) { /* ... */ });
-    }
+.. literalinclude:: ./examples/cxx20_module_example.cpp
+   :language: c++
+   :prepend: import tbb;
+   :start-after: /* begin_cxx20_modules_basic_example */
+   :end-before: /* end_cxx20_modules_basic_example */
 
 .. note::
     Translation units built with ``import tbb;`` are ABI-compatible with those built using
@@ -103,15 +101,7 @@ As a workaround, include the `<oneapi/tbb/version.h>` header alongside the modul
     In any other scenario, make sure to define the same preview macros both when compiling
     the module and in your source code to avoid a mismatch.
 
-.. code:: cpp
-
-    // It is assumed that the application is compiled with preview macros predefined
-    #include <oneapi/tbb/version.h>  // macros available here
-    import tbb;
-
-    static_assert(TBB_VERSION_MAJOR >= 2023, "Major version 2023 or later required");
-
-    // Feature-test macros are also available
-    #ifdef TBB_HAS_FEATURE_X
-    // use feature X
-    #endif
+.. literalinclude:: ./examples/cxx20_module_example.cpp
+   :language: c++
+   :start-after: /* begin_cxx20_modules_macro_example */
+   :end-before: /* end_cxx20_modules_macro_example */
