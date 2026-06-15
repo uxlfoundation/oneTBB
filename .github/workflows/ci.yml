@@ -536,6 +536,7 @@ jobs:
           fi
       - name: Test doc examples
         run: |
+          set -x
           mkdir build && cd build
           cmake -G "${{ matrix.generator }}" -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} \
             -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
@@ -553,13 +554,6 @@ jobs:
         include:
           - os: windows-2022
             generator: "Visual Studio 17 2022"
-            generator_arch: "-A x64"
-            c_compiler: cl
-            cxx_compiler: cl
-            std: 20
-            build_type: relwithdebinfo
-          - os: windows-2022
-            generator: Ninja
             c_compiler: cl
             cxx_compiler: cl
             std: 20
@@ -574,9 +568,8 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Test doc examples
         run: |
-          mkdir build
-          cd build
-          cmake -G "${{ matrix.generator }}" "${{ matrix.generator_arch }}" -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
+          mkdir build && cd build
+          cmake -G "${{ matrix.generator }}" -A x64 -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} `
             -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} ${{ matrix.cmake_extra }} -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON ..
           cmake --build . --config ${{ matrix.build_type }} -v --parallel --target build-doc-examples
