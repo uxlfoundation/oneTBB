@@ -244,11 +244,11 @@ Member functions
 
 .. cpp:function:: void initialize(int max_concurrency, unsigned reserved_slots = 1, priority a_priority = priority::normal)
 
-    Same as above, but overrides previous ``max_concurrency``, ``reserved_slots``, and ``a_priority`` arena parameters.
+    Same as ``initialize()``, but overrides ``max_concurrency``, ``reserved_slots``, and ``a_priority`` arena parameters set at construction.
 
 .. cpp:function:: void initialize(constraints constraints_, unsigned reserved_slots = 1, priority a_priority = priority::normal)
 
-    Same as above, but overrides previous :cpp:struct:`constraints`, ``reserved_slots``, and ``a_priority`` arena parameters.
+    Same as ``initialize()``, but overrides :cpp:struct:`constraints`, ``reserved_slots``, and ``a_priority`` arena parameters set at construction.
 
 .. cpp:function:: void initialize(oneapi::tbb::attach)
 
