@@ -84,8 +84,8 @@ set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 string(TOLOWER ${PROJECT_NAME}-${CPACK_PACKAGE_VERSION}-${TCM_ARCH}-${CMAKE_BUILD_TYPE}-${CMAKE_SYSTEM_NAME} CPACK_PACKAGE_FILE_NAME)
 set(CPACK_GENERATOR ZIP)
 
-string(COMPARE EQUAL "${CMAKE_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}" is_tcm_standalone)
-if (is_tcm_standalone)
+# Note: this is an internal non-documented variable set by CPack
+if (NOT CPack_CMake_INCLUDED)
   include(CPack)
 endif()
 include(CMakePackageConfigHelpers)
