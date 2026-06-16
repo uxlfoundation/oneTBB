@@ -181,7 +181,7 @@ int main() {
     const std::size_t hw = std::max<std::size_t>(1, std::thread::hardware_concurrency());
 
     const std::vector<std::size_t> thread_counts =
-        env_list("BENCH_THREADS", {1, 2, 4, 8, hw});
+        env_list("BENCH_THREADS", {1, 2, 4, 8, 16, 32, 64, 72, 96, 128, 164, hw});
     const std::vector<std::size_t> write_permilles =
         env_list("BENCH_WRITE_PERMILLE", {0, 1, 10, 100});
 
