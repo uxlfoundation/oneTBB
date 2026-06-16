@@ -27,6 +27,7 @@
 
 #include <algorithm> // for std::any_of
 #include <sys/mman.h>
+#include <stdio.h>
 
 // TBB build must be done without numaif.h, but we need signatures of those functions
 // for dynamic loading, so declare it here.
@@ -193,6 +194,15 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
         }
     }
     // process non-standard chunk size or repeated nodes
+
+    // If /sys/kernel/mm/transparent_hugepage/enabled is set to "always", allocations of objects
+    // > 2MB with non-default bytes_per_chunk (say, 8K) fail, because move_pages() can't fulfill
+    // the request. MADV_NOHUGEPAGE prevents this. Cover smaller sizes as well, because several
+    // allocations with smaller sizes can be potentially joined by THP.
+    int r = madvise(base_addr, align_to_greater_or_equal(bytes, governor::default_page_size()),
+                    MADV_NOHUGEPAGE);
+    if (r != 0)
+        return nullptr;
 
     // touch each page, otherwise move_pages() will fail with EFAULT
     for (size_t i = 0; i < bytes; i += governor::default_page_size())
