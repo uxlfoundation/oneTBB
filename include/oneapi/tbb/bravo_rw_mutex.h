@@ -13,7 +13,7 @@ namespace d1 {
 struct BRAVO_rw_mutex_base {
     using reader_slot_type = std::atomic<BRAVO_rw_mutex_base*>;
 
-    static constexpr std::size_t num_visible_readers = 4096;
+    static constexpr std::size_t num_visible_readers = 512;
     static inline constexpr std::size_t slowdown_guard = 9;
     static inline reader_slot_type visible_readers[num_visible_readers];
 };
@@ -25,7 +25,7 @@ class BRAVO_rw_mutex : public BRAVO_rw_mutex_base {
     using clock_type = std::chrono::steady_clock;
 
     underlying_rw_mutex_type            m_underlying_rw_mutex;
-    std::atomic<bool>                   m_rbias{false};
+    alignas(64) std::atomic<bool>                   m_rbias{false};
     std::atomic<clock_type::time_point> m_inhibit_until{};
 public:
     static_assert(underlying_rw_mutex_type::is_rw_mutex, "Underlying mutex is not a reader-writer mutex");
@@ -82,7 +82,7 @@ public:
                 if (mutex.m_rbias.load(std::memory_order_acquire)) {
                     m_slot = visible_readers + hash(mutex);
                     BRAVO_rw_mutex_base* expected = nullptr;
-                    if (m_slot->compare_exchange_strong(expected, &mutex)) {
+                    if (m_slot->load(std::memory_order_relaxed) == expected && m_slot->compare_exchange_strong(expected, &mutex)) {
                         if (mutex.m_rbias.load(std::memory_order_acquire)) {
                             // fast-path, acquired
                             this->m_is_writer = false;
@@ -137,7 +137,7 @@ public:
         }
 
         static std::size_t hash(BRAVO_rw_mutex& mutex) {
-            std::uint64_t bravo_thread_id_hash = std::hash<std::thread::id>{}(std::this_thread::get_id());
+            static thread_local std::uint64_t bravo_thread_id_hash = std::hash<std::thread::id>{}(std::this_thread::get_id());
 
             std::uint64_t z = reinterpret_cast<std::uintptr_t>(&mutex) ^
                               (bravo_thread_id_hash * 0x9E3779B97F4A7C15ull);
