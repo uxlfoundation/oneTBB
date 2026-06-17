@@ -27,8 +27,6 @@
 
 #include <algorithm> // for std::any_of
 #include <sys/mman.h>
-#include <stdio.h>
-
 // TBB build must be done without numaif.h, but we need signatures of those functions
 // for dynamic loading, so declare it here.
 extern "C" {
