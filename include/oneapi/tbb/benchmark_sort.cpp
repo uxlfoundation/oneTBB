@@ -116,7 +116,7 @@ struct taskflow_sorter {
     taskflow_sorter() : taskflow_sorter(std::thread::hardware_concurrency()) {}
 
     template <typename Iterator, typename Compare>
-    static void sort(Iterator begin, Iterator end, Compare comp) {
+    void sort(Iterator begin, Iterator end, Compare comp) {
         tf::Taskflow taskflow;
         taskflow.sort(begin, end, comp);
         executor.run(taskflow).get();
