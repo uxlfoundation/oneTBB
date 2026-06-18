@@ -19,8 +19,11 @@
 #include <random>
 
 struct std_sorter {
+    std_sorter() = default;
+    std_sorter(std::size_t) : std_sorter() {}
+
     template <typename Iterator, typename Compare>
-    static void sort(Iterator begin, Iterator end, Compare comp) {
+    void sort(Iterator begin, Iterator end, Compare comp) {
         std::sort(begin, end, comp);   
     }
 
@@ -29,9 +32,20 @@ struct std_sorter {
     }
 };
 
-struct tbb_parallel_sorter {
+struct tbb_global_control_holder {
+    oneapi::tbb::global_control ctx;
+
+    tbb_global_control_holder(std::size_t num_threads)
+        : ctx(oneapi::tbb::global_control::max_allowed_parallelism, num_threads) {}
+
+    tbb_global_control_holder() : tbb_global_control_holder(std::thread::hardware_concurrency()) {}
+};
+
+struct tbb_parallel_sorter : tbb_global_control_holder {
+    using tbb_global_control_holder::tbb_global_control_holder;
+
     template <typename Iterator, typename Compare>
-    static void sort(Iterator begin, Iterator end, Compare comp) {
+    void sort(Iterator begin, Iterator end, Compare comp) {
         oneapi::tbb::parallel_sort(begin, end, comp);
     }
 
@@ -40,9 +54,11 @@ struct tbb_parallel_sorter {
     }
 };
 
-struct tbb_parallel_quick_sorter {
+struct tbb_parallel_quick_sorter : tbb_global_control_holder {
+    using tbb_global_control_holder::tbb_global_control_holder;
+
     template <typename Iterator, typename Compare>
-    static void sort(Iterator begin, Iterator end, Compare comp) {
+    void sort(Iterator begin, Iterator end, Compare comp) {
         tbb::detail::d1::parallel_qsort(begin, end, comp);
     }
 
@@ -51,9 +67,11 @@ struct tbb_parallel_quick_sorter {
     }
 };
 
-struct tbb_parallel_for_quick_sorter {
+struct tbb_parallel_for_quick_sorter : tbb_global_control_holder {
+    using tbb_global_control_holder::tbb_global_control_holder;
+
     template <typename Iterator, typename Compare>
-    static void sort(Iterator begin, Iterator end, Compare comp) {
+    void sort(Iterator begin, Iterator end, Compare comp) {
         tbb::detail::d1::parallel_for_qsort(begin, end, comp);
     }
 
@@ -62,9 +80,11 @@ struct tbb_parallel_for_quick_sorter {
     }
 };
 
-struct tbb_parallel_for_quick_checked_sorter {
+struct tbb_parallel_for_quick_checked_sorter : tbb_global_control_holder {
+    using tbb_global_control_holder::tbb_global_control_holder;
+
     template <typename Iterator, typename Compare>
-    static void sort(Iterator begin, Iterator end, Compare comp) {
+    void sort(Iterator begin, Iterator end, Compare comp) {
         tbb::detail::d1::parallel_for_qsort_precheck(begin, end, comp);
     }
 
@@ -74,9 +94,11 @@ struct tbb_parallel_for_quick_checked_sorter {
 };
 
 #if TEST_ONEDPL
-struct dpl_parallel_sorter {
+struct dpl_parallel_sorter : tbb_global_control_holder {
+    using tbb_global_control_holder::tbb_global_control_holder;
+
     template <typename Iterator, typename Compare>
-    static void sort(Iterator begin, Iterator end, Compare comp) {
+    void sort(Iterator begin, Iterator end, Compare comp) {
         oneapi::dpl::sort(oneapi::dpl::execution::par, begin, end, comp);
     }
 
@@ -88,7 +110,10 @@ struct dpl_parallel_sorter {
 
 #if TEST_TASKFLOW
 struct taskflow_sorter {
-    static tf::Executor executor;
+    tf::Executor executor;
+
+    taskflow_sorter(std::size_t num_threads) : executor(num_threads) {}
+    taskflow_sorter() : taskflow_sorter(std::thread::hardware_concurrency()) {}
 
     template <typename Iterator, typename Compare>
     static void sort(Iterator begin, Iterator end, Compare comp) {
@@ -101,8 +126,6 @@ struct taskflow_sorter {
         return "taskflow_sort";
     }
 };
-
-tf::Executor taskflow_sorter::executor{std::thread::hardware_concurrency()};
 #endif
 
 struct uint32_traits {
@@ -299,10 +322,12 @@ void benchmark_psort_with_distribution(std::size_t problem_size) {
 
     typename TypeTraits::compare comp;
 
+    Sorter sorter;
+
     // Warmup
     for (std::size_t i = 0; i < 2; ++i) {
         std::vector<data_type> data = base;
-        Sorter::sort(data.begin(), data.end(), comp);
+        sorter.sort(data.begin(), data.end(), comp);
     }
 
     std::vector<double> times(num_samples);
@@ -310,7 +335,7 @@ void benchmark_psort_with_distribution(std::size_t problem_size) {
         std::vector<data_type> data = base;
 
         oneapi::tbb::tick_count start = oneapi::tbb::tick_count::now();
-        Sorter::sort(data.begin(), data.end(), comp);
+        sorter.sort(data.begin(), data.end(), comp);
         oneapi::tbb::tick_count finish = oneapi::tbb::tick_count::now();
 
         // Validate
@@ -397,22 +422,22 @@ void scalability_benchmark_psort(std::size_t problem_size) {
     typename TypeTraits::compare comp;
 
     for (std::size_t thread_num : concurrency_range(std::thread::hardware_concurrency())) {
-        oneapi::tbb::global_control gc(oneapi::tbb::global_control::max_allowed_parallelism, thread_num);
+        
+        Sorter sorter(thread_num);
 
         std::vector<double> times(num_samples);
-
 
         // Warmup
         for (std::size_t i = 0; i < 2; ++i) {
             std::vector<data_type> data = base;
-            Sorter::sort(data.begin(), data.end(), comp);
+            sorter.sort(data.begin(), data.end(), comp);
         }
 
         for (std::size_t i = 0; i < num_samples; ++i) {
             std::vector<data_type> data = base;
 
             oneapi::tbb::tick_count start = oneapi::tbb::tick_count::now();
-            Sorter::sort(data.begin(), data.end(), comp);
+            sorter.sort(data.begin(), data.end(), comp);
             oneapi::tbb::tick_count finish = oneapi::tbb::tick_count::now();
 
             times[i] = (finish - start).seconds();
