@@ -1,16 +1,22 @@
 #include "parallel_sort.h"
 #include "parallel_partition.h"
 #include "tick_count.h"
+#include "global_control.h"
+#if TEST_ONEDPL
 #include <oneapi/dpl/algorithm>
 #include <oneapi/dpl/execution>
-#include <algorithm>
-#include <iostream>
-#include <thread>
-#include <vector>
+#endif
+
 #if TEST_TASKFLOW
 #include <taskflow/taskflow.hpp>
 #include <taskflow/algorithm/sort.hpp>
 #endif
+
+#include <algorithm>
+#include <iostream>
+#include <thread>
+#include <vector>
+#include <random>
 
 struct std_sorter {
     template <typename Iterator, typename Compare>
@@ -67,6 +73,7 @@ struct tbb_parallel_for_quick_checked_sorter {
     }
 };
 
+#if TEST_ONEDPL
 struct dpl_parallel_sorter {
     template <typename Iterator, typename Compare>
     static void sort(Iterator begin, Iterator end, Compare comp) {
@@ -77,6 +84,7 @@ struct dpl_parallel_sorter {
         return "dpl_sort";
     }
 };
+#endif
 
 #if TEST_TASKFLOW
 struct taskflow_sorter {
@@ -271,6 +279,17 @@ void report(std::size_t problem_size, double elapsed_time) {
               << std::endl;
 }
 
+template <typename Sorter, typename Generator, typename TypeTraits>
+void report(std::size_t problem_size, std::size_t thread_num, double elapsed_time) {
+    std::cout << Sorter::name() << ","
+              << TypeTraits::name() << ","
+              << problem_size << ","
+              << thread_num << ","
+              << Generator::name() << ","
+              << elapsed_time
+              << std::endl;
+}
+
 template <typename Sorter, typename TypeTraits, typename Generator>
 void benchmark_psort_with_distribution(std::size_t problem_size) {
     using data_type = typename TypeTraits::data_type;
@@ -339,14 +358,92 @@ void benchmark_psort() {
     // TODO: add strings sorting benchmark
 }
 
-int main() {
+void benchmark() {
     benchmark_psort<std_sorter>();
     benchmark_psort<tbb_parallel_sorter>();
     benchmark_psort<tbb_parallel_quick_sorter>();
     benchmark_psort<tbb_parallel_for_quick_sorter>();
     benchmark_psort<tbb_parallel_for_quick_checked_sorter>();
+#if TEST_ONEDPL
     benchmark_psort<dpl_parallel_sorter>();
+#endif
 #if TEST_TASKFLOW
     benchmark_psort<taskflow_sorter>();
 #endif
+}
+
+inline std::vector<std::size_t> concurrency_range(std::size_t max_threads) {
+    std::vector<std::size_t> range;
+    std::size_t step = 1;
+
+    for (std::size_t thread_num = 1; thread_num <= max_threads; thread_num += step++) {
+        range.push_back(thread_num);
+    }
+
+    if (range.back() != max_threads) {
+        range.push_back(max_threads);
+    }
+
+    return range;
+}
+
+template <typename Sorter, typename TypeTraits, typename Generator>
+void scalability_benchmark_psort(std::size_t problem_size) {
+    using data_type = typename TypeTraits::data_type;
+    std::vector<data_type> base(problem_size);
+    
+    Generator::generate(base.begin(), base.end());
+
+    typename TypeTraits::compare comp;
+
+    for (std::size_t thread_num : concurrency_range(std::thread::hardware_concurrency())) {
+        oneapi::tbb::global_control gc(oneapi::tbb::global_control::max_allowed_parallelism, thread_num);
+
+        std::vector<double> times(num_samples);
+
+
+        // Warmup
+        for (std::size_t i = 0; i < 2; ++i) {
+            std::vector<data_type> data = base;
+            Sorter::sort(data.begin(), data.end(), comp);
+        }
+
+        for (std::size_t i = 0; i < num_samples; ++i) {
+            std::vector<data_type> data = base;
+
+            oneapi::tbb::tick_count start = oneapi::tbb::tick_count::now();
+            Sorter::sort(data.begin(), data.end(), comp);
+            oneapi::tbb::tick_count finish = oneapi::tbb::tick_count::now();
+
+            times[i] = (finish - start).seconds();
+        }
+
+        double elapsed_time_median = median(times.begin(), times.end());
+
+        report<Sorter, Generator, TypeTraits>(problem_size, thread_num, elapsed_time_median);
+    }
+}
+
+void scalability_benchmark() {
+    // Report serial
+    using type_traits = uint32_traits;
+    using distribution = uniform_distribution;
+    std::size_t problem_size = 1e7;
+
+    // Report serial time
+    benchmark_psort_with_distribution<std_sorter, type_traits, distribution>(problem_size);
+
+    scalability_benchmark_psort<tbb_parallel_sorter, type_traits, distribution>(problem_size);
+    scalability_benchmark_psort<tbb_parallel_for_quick_checked_sorter, type_traits, distribution>(problem_size);
+#if TEST_ONEDPL
+    scalability_benchmark_psort<dpl_parallel_sorter, type_traits, distribution>(problem_size);
+#endif
+#if TEST_TASKFLOW
+    scalability_benchmark_psort<taskflow_sorter, type_traits, distribution>(problem_size);
+#endif
+}
+
+int main() {
+    // benchmark();
+    scalability_benchmark();
 }
