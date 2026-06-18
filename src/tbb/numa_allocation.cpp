@@ -197,8 +197,8 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     // > 2MB with non-default bytes_per_chunk (say, 8K) fail, because move_pages() can't fulfill
     // the request. MADV_NOHUGEPAGE prevents this. Cover smaller sizes as well, because several
     // allocations with smaller sizes can be potentially joined by Transparent Huge Pages (THP).
-    int r = madvise(base_addr, align_to_greater_or_equal(bytes, governor::default_page_size()),
-                    MADV_NOHUGEPAGE);
+    // Expecting that madvise() is aligning bytes to page size.
+    int r = madvise(base_addr, bytes, MADV_NOHUGEPAGE);
     if (r != 0)
         return nullptr;
 
