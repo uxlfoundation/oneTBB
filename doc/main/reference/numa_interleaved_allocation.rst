@@ -21,7 +21,8 @@ NUMA nodes, which may be desirable if a parallel algorithm uses only part of the
 second parameter controls the granularity of interleaving, which may be desirable to optimize for specific
 access patterns.
 
-Allocated memory is not split or cached. It's returned back immediately upon deallocation.
+Allocated memory is not split or cached. It's returned back immediately upon deallocation. Interleaving is
+only a recommendation. Memory can be placed on different NUMA nodes and in a different order than requested.
 
 Under Linux*, the API uses the ``libnuma`` library, which must be available at runtime. If the library is not
 available, the allocation functions fall back to standard memory allocation. On Windows*, the API uses
