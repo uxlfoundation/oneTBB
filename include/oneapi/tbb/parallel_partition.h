@@ -225,10 +225,11 @@ void relocate_side(RandomAccessIterator first, DifferenceType block_size,
     }
 }
 
-template <typename RandomAccessIterator, typename Compare, typename DifferenceType, typename PartialsType>
+template <typename RandomAccessIterator, typename Compare, typename DifferenceType, typename PartialsType, typename FinalPartition>
 RandomAccessIterator finalize_partition(RandomAccessIterator first, Compare comp, DifferenceType block_size,
                                         DifferenceType remainder_begin, DifferenceType remainder_end,
-                                        PartialsType& left_block_map, PartialsType& right_block_map)
+                                        PartialsType& left_block_map, PartialsType& right_block_map,
+                                        FinalPartition& final_partition)
 {
     PartialsType left_dirty_blocks, right_dirty_blocks;
     left_dirty_blocks.reserve(left_block_map.size());
@@ -258,7 +259,7 @@ RandomAccessIterator finalize_partition(RandomAccessIterator first, Compare comp
     relocate_side<side_kind::left >(first, block_size, left_slab_begin, left_slab_end, left_dirty_blocks);
     relocate_side<side_kind::right>(first, block_size, right_slab_begin, right_slab_end, right_dirty_blocks);
 
-    return std::partition(first + left_slab_begin, first + right_slab_end, comp);
+    return final_partition(first + left_slab_begin, first + right_slab_end, comp);
 }
 
 // First element is a pivot element
@@ -303,9 +304,14 @@ RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccess
 
     wait(wait_ctx, ctx);
 
+    auto serial_partition = [](RandomAccessIterator first, RandomAccessIterator last, Predicate& pred) {
+        return std::partition(first, last, pred);
+    };
+
     return finalize_partition(first, pred, diff_type(block_size),
                               g_head.load(std::memory_order_relaxed), g_tail.load(std::memory_order_relaxed),
-                              g_left_partials, g_right_partials);
+                              g_left_partials, g_right_partials,
+                              serial_partition);
 }
 
 template <typename RandomAccessIterator, typename Predicate>
@@ -430,9 +436,14 @@ RandomAccessIterator parallel_partition_new(RandomAccessIterator first, RandomAc
 
     wait(wait_ctx, ctx);
 
+    auto parallel_partition = [&ctx](RandomAccessIterator first, RandomAccessIterator last, Predicate& pred) {
+        return parallel_partition_new(first, last, pred, ctx);
+    };
+
     return finalize_partition(first, pred, diff_type(block_size),
                               g_head.load(std::memory_order_relaxed), g_tail.load(std::memory_order_relaxed),
-                              g_left_block_map, g_right_block_map);
+                              g_left_block_map, g_right_block_map,
+                              parallel_partition);
 }
 
 template <typename RandomAccessIterator, typename Compare>
