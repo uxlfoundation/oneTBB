@@ -49,11 +49,51 @@ void parallel_partition_task_body(std::size_t index, DiffType block_size, Predic
     bool have_left_block  = try_get_left_block(left_begin, block_size, g_distance, g_head);
     bool have_right_block = try_get_right_block(right_begin, block_size, g_distance, g_tail);
 
-    DiffType left_index = left_begin;
+    std::vector<DiffType> left_offsets(block_size);
+    std::vector<DiffType> right_offsets(block_size);
+    DiffType nleft_start = 0, nleft_count = 0;
+    DiffType nright_start = 0, nright_count = 0;
+
+    DiffType left_index  = left_begin;
+    DiffType right_index = right_begin;
     DiffType left_end   = left_begin + block_size;
     DiffType right_end  = right_begin + block_size;
 
     while (have_left_block && have_right_block) {
+#if BRANCHLESS
+        if (nleft_start == nleft_count) {
+            nleft_start = nleft_count = 0;
+            for (DiffType i = 0; i < block_size; ++i) {
+                left_offsets[nleft_count] = i;
+                nleft_count += DiffType(!pred(g_begin[left_index + i]));
+            }
+        }
+
+        if (nright_start == nright_count) {
+            nright_start = nright_count = 0;
+            for (DiffType i = 0; i < block_size; ++i) {
+                right_offsets[nright_count] = i;
+                nright_count += DiffType(pred(g_begin[right_index + i]));
+            }
+        }
+
+        DiffType m = std::min(nleft_count - nleft_start, nright_count - nright_start);
+        for (DiffType k = 0; k < m; ++k) {
+            std::iter_swap(g_begin + (left_index + left_offsets[nleft_start + k]),
+                           g_begin + (right_index + right_offsets[nright_start + k]));
+        }
+        nleft_start += m;
+        nright_start += m;
+
+        if (nleft_start == nleft_count) {
+            have_left_block = try_get_left_block(left_begin, block_size, g_distance, g_head);
+            if (have_left_block) left_index = left_begin;
+        }
+        if (nright_start == nright_count) {
+            have_right_block = try_get_right_block(right_begin, block_size, g_distance, g_tail);
+            if (have_right_block) right_index = right_begin;
+        }
+#else
         while (left_index < left_end &&  pred(g_begin[left_index])) {
             ++left_index;
         }
@@ -84,15 +124,32 @@ void parallel_partition_task_body(std::size_t index, DiffType block_size, Predic
                 right_end = right_begin + block_size;
             }
         }
+#endif
     }
 
     // Store dirty blocks
+#if BRANCHLESS
+    // Branchless classify leaves the leftover block in a scattered state, so the
+    // single-index partition point the Partial contract requires no longer holds.
+    // Re-establish it with one serial partition pass over the leftover block.
+    if (have_left_block) {
+        DiffType lend = left_begin + block_size;
+        DiffType pp = DiffType(std::partition(g_begin + left_begin, g_begin + lend, pred) - g_begin);
+        g_left_partitions[index]  = Partial<DiffType>{left_begin, pp, true};
+    }
+    if (have_right_block) {
+        DiffType rend = right_begin + block_size;
+        DiffType pp = DiffType(std::partition(g_begin + right_begin, g_begin + rend, pred) - g_begin);
+        g_right_partitions[index] = Partial<DiffType>{right_begin, pp, true};
+    }
+#else
     if (have_left_block) {
         g_left_partitions[index]  = Partial<DiffType>{left_begin, left_index, true};
     }
     if (have_right_block) {
         g_right_partitions[index] = Partial<DiffType>{right_begin, right_end, true};
     }
+#endif
 }
 
 template <typename RandomAccessIterator, typename Predicate>
