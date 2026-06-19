@@ -31,9 +31,11 @@ int main() {
 
     tbb::tick_count start_parallel = tbb::tick_count::now();
 
-    for (std::size_t i = 0; i < 200; ++i) {
+    for (std::size_t i = 0; i < 100; ++i) {
         std::vector<int> copy = v;
-        parallel_for_qsort_precheck(copy.begin(), copy.end(), std::less<int>{});
+        parallel_for_qsort_new(copy.begin(), copy.end(), std::less<int>{});
+
+        if (!std::is_sorted(copy.begin(), copy.end())) throw "aaa";
     }
 
     tbb::tick_count finish_parallel = tbb::tick_count::now();

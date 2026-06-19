@@ -308,6 +308,133 @@ RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccess
                               g_left_partials, g_right_partials);
 }
 
+template <typename RandomAccessIterator, typename Predicate>
+class ParallelPartitionTaskNew : public task {
+public:
+    using diff_type = typename std::iterator_traits<RandomAccessIterator>::difference_type;
+    using partial_type = Partial<diff_type>;
+private:
+    const std::size_t      m_index;
+    const diff_type        m_block_size;
+    const diff_type        m_spawn_threshold;
+    Predicate&             m_pred;
+    wait_context&          m_wait_ctx;
+    task_group_context&    m_ctx;
+    small_object_allocator m_allocator;
+
+    const RandomAccessIterator g_begin;
+    std::atomic<diff_type>&    g_distance;
+    std::atomic<diff_type>&    g_head;
+    std::atomic<diff_type>&    g_tail;
+    std::vector<partial_type>& g_left_block_map;
+    std::vector<partial_type>& g_right_block_map;
+
+public:
+    ParallelPartitionTaskNew(std::size_t index, diff_type block_size, diff_type spawn_threshold,
+                             Predicate& pred, wait_context& wait_ctx, task_group_context& ctx,
+                             small_object_allocator& allocator,
+                             RandomAccessIterator global_begin,
+                             std::atomic<diff_type>& global_distance,
+                             std::atomic<diff_type>& global_head, std::atomic<diff_type>& global_tail,
+                             std::vector<partial_type>& global_left_block_map,
+                             std::vector<partial_type>& global_right_block_map)
+        : m_index(index)
+        , m_block_size(block_size)
+        , m_spawn_threshold(spawn_threshold)
+        , m_pred(pred)
+        , m_wait_ctx(wait_ctx)
+        , m_ctx(ctx)
+        , m_allocator(allocator)
+        , g_begin(global_begin)
+        , g_distance(global_distance)
+        , g_head(global_head)
+        , g_tail(global_tail)
+        , g_left_block_map(global_left_block_map)
+        , g_right_block_map(global_right_block_map)
+    {
+        m_wait_ctx.reserve();
+    }
+
+    ~ParallelPartitionTaskNew() {
+        m_wait_ctx.release();
+    }
+
+    task* execute(execution_data& ed) override {
+        // Spawn new participant if there is enough work to share
+        if (m_index + 1 < g_left_block_map.size() &&
+            g_distance.load(std::memory_order_relaxed) > m_spawn_threshold)
+        {
+            spawn(*m_allocator.new_object<ParallelPartitionTaskNew>(m_index + 1, m_block_size, m_spawn_threshold,
+                                                                    m_pred, m_wait_ctx, m_ctx, m_allocator,
+                                                                    g_begin, g_distance, g_head, g_tail,
+                                                                    g_left_block_map, g_right_block_map),
+                  m_ctx);
+        }
+
+        parallel_partition_task_body(m_index, m_block_size, m_pred, g_begin, g_distance, g_head, g_tail,
+                                     g_left_block_map, g_right_block_map);
+
+        m_allocator.delete_object(this, ed);
+        return nullptr;
+    }
+
+    task* cancel(execution_data& ed) override {
+        m_allocator.delete_object(this, ed);
+        return nullptr;
+    }
+};
+
+template <typename RandomAccessIterator, typename Predicate>
+RandomAccessIterator parallel_partition_new(RandomAccessIterator first, RandomAccessIterator last, Predicate pred,
+                                            task_group_context& ctx)
+{
+    using traits = std::iterator_traits<RandomAccessIterator>;
+    using diff_type = typename traits::difference_type;
+    using task_type = ParallelPartitionTaskNew<RandomAccessIterator, Predicate>;
+    using partial_type = typename task_type::partial_type;
+
+    const diff_type n = std::distance(first, last);
+    const std::size_t block_size = choose_block_size(n);
+
+    if (n < diff_type(4 * block_size)) {
+        return std::partition(first, last, pred);
+    }
+
+    const std::size_t max_dirty_blocks_count = std::min<std::size_t>(this_task_arena::max_concurrency(),
+                                                                     std::size_t(n / (4 * block_size)));
+
+    if (max_dirty_blocks_count <= 1) {
+        return std::partition(first, last, pred);
+    }
+
+    alignas(64) std::atomic<diff_type> g_distance{n};
+    alignas(64) std::atomic<diff_type> g_head{0};
+    alignas(64) std::atomic<diff_type> g_tail{n};
+
+    std::vector<partial_type> g_left_block_map (max_dirty_blocks_count, partial_type{0, 0, false});
+    std::vector<partial_type> g_right_block_map(max_dirty_blocks_count, partial_type{0, 0, false});
+
+    small_object_allocator allocator;
+    wait_context wait_ctx{0};
+
+    const diff_type spawn_threshold = diff_type(2 * block_size);
+
+    spawn(*allocator.new_object<task_type>(/*index = */1, diff_type(block_size), spawn_threshold,
+                                           pred, wait_ctx, ctx, allocator,
+                                           first, g_distance, g_head, g_tail,
+                                           g_left_block_map, g_right_block_map),
+          ctx);
+
+    parallel_partition_task_body(0, diff_type(block_size), pred, first,
+                                 g_distance, g_head, g_tail, g_left_block_map, g_right_block_map);
+
+    wait(wait_ctx, ctx);
+
+    return finalize_partition(first, pred, diff_type(block_size),
+                              g_head.load(std::memory_order_relaxed), g_tail.load(std::memory_order_relaxed),
+                              g_left_block_map, g_right_block_map);
+}
+
 template <typename RandomAccessIterator, typename Compare>
 void parallel_quick_sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp,
                          wait_context& wait_ctx, task_group_context& ctx, std::size_t budget, bool leftmost);
@@ -663,6 +790,136 @@ void parallel_for_qsort_precheck(RandomAccessIterator first, RandomAccessIterato
 
             parallel_for_quick_sort(first, last, comp, ctx, parallel_partition_budget);
         }
+    }
+}
+
+template <typename RandomAccessIterator, typename Compare>
+struct qsort_range_new {
+    RandomAccessIterator m_first;
+    RandomAccessIterator m_last;
+    const Compare&       m_comp;
+    task_group_context&  m_ctx;
+    bool                 m_leftmost;
+
+    qsort_range_new(RandomAccessIterator first, RandomAccessIterator last, const Compare& comp,
+                    task_group_context& ctx)
+        : m_first(first)
+        , m_last(last)
+        , m_comp(comp)
+        , m_ctx(ctx)
+        , m_leftmost(true)
+    {}
+
+    qsort_range_new(qsort_range_new& range, split)
+        : m_comp(range.m_comp)
+        , m_ctx(range.m_ctx)
+    {
+        range.split_range(*this);
+    }
+
+    bool empty() const { return m_first == m_last; }
+    bool is_divisible() const { return (m_last - m_first) >= serial_sort_cutoff; }
+
+    void split_range(qsort_range_new& range) {
+        if (!is_divisible()) {  // Can happen during the recursive calls to split_range
+            range.m_first = m_last;
+            range.m_last = m_last;
+            range.m_leftmost = false;
+            return;
+        }
+
+        using traits = std::iterator_traits<RandomAccessIterator>;
+        using diff_type = typename traits::difference_type;
+        using value_type = typename traits::value_type;
+
+        diff_type pivot = pseudo_median_of_nine(m_first, m_last - m_first, m_comp);
+
+        if (pivot != 0) std::iter_swap(m_first, m_first + pivot);
+
+        if (!m_leftmost && !m_comp(*(m_first - 1), *m_first)) {
+            // Pivot is the same as the previous pivot
+            value_type pivot = *m_first;
+            auto leq = [&](const value_type& x) {
+                return !m_comp(pivot, x);
+            };
+
+            auto it = parallel_partition_new(m_first, m_last, leq, m_ctx);
+            m_first = it;
+            split_range(range);
+        } else {
+            value_type pivot = *m_first;
+
+            auto less = [&](const value_type& x) {
+                return m_comp(x, pivot);
+            };
+
+            auto it = parallel_partition_new(std::next(m_first), m_last, less, m_ctx);
+
+            RandomAccessIterator pivot_pos;
+            if (it == std::next(m_first)) {
+                pivot_pos = m_first;
+            } else {
+                std::iter_swap(std::prev(it), m_first);
+                pivot_pos = std::prev(it);
+            }
+
+            diff_type left_size = pivot_pos - m_first;
+            diff_type right_size = m_last - (pivot_pos + 1);
+
+            if (left_size == 0) {
+                m_first = pivot_pos + 1;
+                m_leftmost = false;
+                split_range(range);
+                return;
+            }
+
+            if (right_size == 0) {
+                m_last = pivot_pos;
+                split_range(range);
+                return;
+            }
+
+            if (left_size > right_size) {
+                range.m_first = m_first;
+                range.m_last = pivot_pos;
+                range.m_leftmost = m_leftmost;
+
+                m_first = pivot_pos + 1;
+                m_leftmost = false;
+            } else {
+                range.m_first = pivot_pos + 1;
+                range.m_last = m_last;
+                range.m_leftmost = false;
+
+                m_last = pivot_pos;
+            }
+        }
+    }
+};
+
+template <typename RandomAccessIterator, typename Compare>
+void parallel_for_quick_sort_new(RandomAccessIterator first, RandomAccessIterator last, Compare comp,
+                                 task_group_context& ctx)
+{
+    using range_type = qsort_range_new<RandomAccessIterator, Compare>;
+    range_type range(first, last, comp, ctx);
+
+    auto leaf_sort = [](const range_type& r) {
+        std::sort(r.m_first, r.m_last, r.m_comp);
+    };
+
+    parallel_for(range, leaf_sort, auto_partitioner{}, ctx);
+}
+
+template <typename RandomAccessIterator, typename Compare>
+void parallel_for_qsort_new(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
+    auto n = last - first;
+
+    if (n < serial_sort_cutoff) {
+        std::sort(first, last, comp);
+    } else {
+        task_group_context ctx;
+        parallel_for_quick_sort_new(first, last, comp, ctx);
     }
 }
 

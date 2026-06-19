@@ -450,14 +450,9 @@ void scalability_benchmark_psort(std::size_t problem_size) {
 }
 
 void scalability_benchmark() {
-    // Report serial
     using type_traits = uint32_traits;
     using distribution = uniform_distribution;
     std::size_t problem_size = 1e7;
-
-    // Report serial time
-    benchmark_psort_with_distribution<std_sorter, type_traits, distribution>(problem_size);
-
     scalability_benchmark_psort<tbb_parallel_sorter, type_traits, distribution>(problem_size);
     scalability_benchmark_psort<tbb_parallel_for_quick_checked_sorter, type_traits, distribution>(problem_size);
 #if TEST_ONEDPL
