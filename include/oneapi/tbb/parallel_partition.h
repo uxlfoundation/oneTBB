@@ -392,7 +392,7 @@ public:
 
 template <typename RandomAccessIterator, typename Predicate>
 RandomAccessIterator parallel_partition_new(RandomAccessIterator first, RandomAccessIterator last, Predicate pred,
-                                            task_group_context& ctx)
+                                            task_group_context& ctx, std::size_t block_size = 0)
 {
     using traits = std::iterator_traits<RandomAccessIterator>;
     using diff_type = typename traits::difference_type;
@@ -400,7 +400,7 @@ RandomAccessIterator parallel_partition_new(RandomAccessIterator first, RandomAc
     using partial_type = typename task_type::partial_type;
 
     const diff_type n = std::distance(first, last);
-    const std::size_t block_size = choose_block_size(n);
+    if (block_size == 0) block_size = choose_block_size(n);
 
     if (n < diff_type(4 * block_size)) {
         return std::partition(first, last, pred);
@@ -436,8 +436,9 @@ RandomAccessIterator parallel_partition_new(RandomAccessIterator first, RandomAc
 
     wait(wait_ctx, ctx);
 
-    auto parallel_partition = [&ctx](RandomAccessIterator first, RandomAccessIterator last, Predicate& pred) {
-        return parallel_partition_new(first, last, pred, ctx);
+    auto parallel_partition = [&ctx, block_size](RandomAccessIterator first, RandomAccessIterator last, Predicate& pred) {
+        std::size_t next_level_block_size = std::max<std::size_t>(block_size / 2, 128);
+        return parallel_partition_new(first, last, pred, ctx, next_level_block_size);
     };
 
     return finalize_partition(first, pred, diff_type(block_size),
