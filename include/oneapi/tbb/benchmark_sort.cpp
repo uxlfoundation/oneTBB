@@ -93,6 +93,19 @@ struct tbb_parallel_for_quick_checked_sorter : tbb_global_control_holder {
     }
 };
 
+struct tbb_parallel_for_quick_sorter_new : tbb_global_control_holder {
+    using tbb_global_control_holder::tbb_global_control_holder;
+
+    template <typename Iterator, typename Compare>
+    void sort(Iterator begin, Iterator end, Compare comp) {
+        tbb::detail::d1::parallel_for_qsort_new(begin, end, comp);
+    }
+
+    static const char* name() {
+        return "tbb_new_parallel_for_sort_new";
+    }
+};
+
 #if TEST_ONEDPL
 struct dpl_parallel_sorter : tbb_global_control_holder {
     using tbb_global_control_holder::tbb_global_control_holder;
@@ -389,6 +402,7 @@ void benchmark() {
     benchmark_psort<tbb_parallel_quick_sorter>();
     benchmark_psort<tbb_parallel_for_quick_sorter>();
     benchmark_psort<tbb_parallel_for_quick_checked_sorter>();
+    benchmark_psort<tbb_parallel_for_quick_sorter_new>();
 #if TEST_ONEDPL
     benchmark_psort<dpl_parallel_sorter>();
 #endif
@@ -464,6 +478,6 @@ void scalability_benchmark() {
 }
 
 int main() {
-    // benchmark();
-    scalability_benchmark();
+    benchmark();
+    // scalability_benchmark();
 }
