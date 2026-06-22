@@ -5,7 +5,6 @@
    SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 */
 
-#include "tcm/detail/_tcm_assert.h"
 #include "common_tests.h"
 #include "hwloc_test_utils.h"
 #include "test_utils.h"
@@ -47,9 +46,11 @@ public:
       mask = obj->cpuset;
       weight = hardware_concurrency(mask);
     }
-    __TCM_ASSERT(obj, "Failed to get the HWLOC object representing the first core. "
-                 "Has test been run on HW subset?");
-    __TCM_ASSERT(weight > 0, "Invalid mask of the first core. Has test been run on a HW subset?");
+    check(obj, /*msg*/"", /*num_indents*/0,
+          /*report_msg*/"Failed to get the HWLOC object representing the first core. "
+          "Has test been run on HW subset?");
+    check(weight > 0, /*msg*/"", /*num_indents*/0,
+          /*report_msg*/"Invalid mask of the first core. Has test been run on a HW subset?");
   }
 
   tcm_cpu_mask_t operator()() const {

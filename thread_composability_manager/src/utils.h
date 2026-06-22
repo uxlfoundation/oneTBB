@@ -16,7 +16,7 @@
 #include <map>
 
 #include "tcm/types.h"
-#include "tcm/detail/_tcm_assert.h"
+#include "detail/_tcm_assert.h"
 
 inline std::string to_string(void* ptr) {
     constexpr unsigned max_string_length = 32; // Sufficiently large size to hold 64-bit HEX pointer

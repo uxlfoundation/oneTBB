@@ -10,7 +10,6 @@
 
 #include "common_tests.h"
 
-#include "tcm/detail/_tcm_assert.h"
 #include "tcm.h"
 
 #include <atomic>

@@ -8,6 +8,7 @@
 #ifndef __TCM_ENVIRONMENT_HEADER
 #define __TCM_ENVIRONMENT_HEADER
 
+#include "tcm/detail/_config.h"
 #include "_tcm_assert.h"
 
 #include <cstdlib> // for std::atoi, std::atof

@@ -8,7 +8,7 @@
 #ifndef __TCM_CGROUP_INFO_HEADER
 #define __TCM_CGROUP_INFO_HEADER
 
-#include "tcm/detail/_tcm_assert.h"
+#include "detail/_tcm_assert.h"
 
 #include <cstdint>
 #include <cstdio>

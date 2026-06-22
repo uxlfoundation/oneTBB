@@ -5,9 +5,9 @@
    SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 */
 
-#include "tcm/detail/_tcm_assert.h"
-#include "tcm/detail/hwloc_utils.h"
-#include "tcm/detail/_environment.h"
+#include "detail/_tcm_assert.h"
+#include "detail/hwloc_utils.h"
+#include "detail/_environment.h"
 #include "tcm.h"
 #include "tcm_permit_rep.h"
 

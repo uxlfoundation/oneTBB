@@ -8,7 +8,7 @@
 #ifndef __TCM_ASSERT_HEADER
 #define __TCM_ASSERT_HEADER
 
-#include "_config.h"
+#include "tcm/detail/_config.h"
 
 #include <atomic>
 #include <cstdio>
@@ -51,19 +51,6 @@ static void report_failed_assert(const char* location, int line, const char* con
 #define __TCM_ASSERT(condition, message) ((void)0)
 #define __TCM_ASSERT_EX(condition, message) tcm::internal::suppress_unused_warning(condition)
 #endif  // TCM_USE_ASSERT
-
-#if _MSC_VER && !__INTEL_COMPILER
-#define __TCM_SUPPRESS_WARNING_PUSH __pragma(warning(push))
-#define __TCM_SUPPRESS_WARNING(w) __pragma(warning(disable : w))
-#define __TCM_SUPPRESS_WARNING_POP __pragma(warning(pop))
-#define __TCM_SUPPRESS_WARNING_WITH_PUSH(w)                             \
-    __TCM_SUPPRESS_WARNING_PUSH __TCM_SUPPRESS_WARNING(w)
-#else
-#define __TCM_SUPPRESS_WARNING_PUSH
-#define __TCM_SUPPRESS_WARNING(w)
-#define __TCM_SUPPRESS_WARNING_POP
-#define __TCM_SUPPRESS_WARNING_WITH_PUSH(w)
-#endif
 
 } // namespace internal
 } // namespace tcm

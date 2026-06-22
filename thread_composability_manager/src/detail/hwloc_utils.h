@@ -11,7 +11,7 @@
 #include <vector>
 #include <thread>               // std::this_thread::yield()
 
-#include "tcm/detail/_tcm_assert.h"
+#include "detail/_tcm_assert.h"
 
 #if _MSC_VER && !__INTEL_COMPILER && !__clang__
 #pragma warning( push )
