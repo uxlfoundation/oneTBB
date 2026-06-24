@@ -49,8 +49,10 @@ struct string_traits {
 
     static data_type make_value(int raw_number) {
         // strings with lower raw_number should be considered less then strings with higher raw_number
-        // Adding 0 padding before each number to align the strings length and preserve the ordering
-        static constexpr std::size_t key_width = std::numeric_limits<int>::digits10 + 1;
+        // Adding 0 padding before each number to align the strings length and preserve the ordering:
+        static constexpr std::size_t min_width = std::numeric_limits<int>::digits10 + 1;
+        static constexpr std::size_t key_width = 100;
+        static_assert(key_width >= min_width, "key_width must fit the widest raw_number to preserve ordering");
         std::string s = std::to_string(raw_number);
         return std::string(key_width - s.size(), '0') + s;
     }
