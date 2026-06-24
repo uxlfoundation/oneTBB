@@ -1051,9 +1051,12 @@ public:
                     (void*)this, (unsigned long long)id.get_unique_integer());
 #endif
         if (try_acquire_resources(id, req_data)) {
+            // All resources acquired - decrement pressure and report immediately
+            std::size_t prev_pressure = m_pressure.fetch_sub(1, std::memory_order_relaxed);
+            report_pressure(prev_pressure - 1);
 #if __TBB_DEBUG_RESOURCE_ACQUISITION
-            TBB_DEBUG_LOG("[ACQUIRED_ALL] body=%p id=%llu - All resources acquired, calling user body\n",
-                        (void*)this, (unsigned long long)id.get_unique_integer());
+            TBB_DEBUG_LOG("[ACQUIRED_ALL] body=%p id=%llu - All resources acquired, pressure decremented to %zu, calling user body\n",
+                        (void*)this, (unsigned long long)id.get_unique_integer(), prev_pressure - 1);
 #endif
             // Access to all resources is granted
             try_call([&] {
@@ -1089,9 +1092,7 @@ public:
     }
 
     void release_resources(request_id id, request_data_type& req_data) {
-        // Report pressure after decrementing (use return value for atomicity)
-        std::size_t prev_pressure = m_pressure.fetch_sub(1, std::memory_order_relaxed);
-        report_pressure(prev_pressure - 1);
+        // Pressure was already decremented after successful acquisition
         release_resources_helper<sizeof...(ResourceProviders)>::run(m_consumers, id, req_data);
     }
 
