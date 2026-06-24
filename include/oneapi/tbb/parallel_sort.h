@@ -18,6 +18,7 @@
 #define __TBB_parallel_sort_H
 
 #include "detail/_namespace_injection.h"
+#include "detail/_template_helpers.h"
 #include "parallel_for.h"
 #include "blocked_range.h"
 #include "profiling.h"
@@ -142,14 +143,16 @@ void relocate_side(RandomAccessIterator first, DifferenceType block_size,
     }
 }
 
-template <typename RandomAccessIterator, typename Predicate>
+template <typename RandomAccessIterator, typename Predicate, typename Branchless>
 RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccessIterator last, Predicate pred,
-                                        task_group_context& ctx, std::size_t block_size = 0);
+                                        task_group_context& ctx, Branchless, std::size_t block_size = 0);
 
-template <typename RandomAccessIterator, typename Predicate, typename DifferenceType, typename BlockMapType>
+template <typename RandomAccessIterator, typename Predicate, typename DifferenceType,
+          typename BlockMapType, typename IsBranchless>
 RandomAccessIterator finalize_parallel_partition(RandomAccessIterator first, Predicate pred, DifferenceType block_size,
                                                  task_group_context& ctx, DifferenceType remainder_begin, DifferenceType remainder_end,
-                                                 BlockMapType& left_block_map, BlockMapType& right_block_map)
+                                                 BlockMapType& left_block_map, BlockMapType& right_block_map,
+                                                 IsBranchless is_branchless)
 {
     // Some amount of dirty blocks is left after the first stage of parallel_partition
     // Also, some elements in the middle are left untouched by any participant
@@ -190,12 +193,9 @@ RandomAccessIterator finalize_parallel_partition(RandomAccessIterator first, Pre
     relocate_side<side::right>(first, block_size, right_slab_begin, right_slab_end, right_dirty_blocks);
 
     std::size_t next_level_block_size = std::max<std::size_t>(block_size / 2, 128);
-    return parallel_partition(first + left_slab_begin, first + right_slab_end, pred, ctx, next_level_block_size);
+    return parallel_partition(first + left_slab_begin, first + right_slab_end, pred, ctx,
+                              is_branchless, next_level_block_size);
 }
-
-// TODO: investigate if branchless partition should be used conditionally
-template <typename T>
-struct use_branchless_partition : std::true_type {};
 
 template <typename DifferenceType>
 bool try_get_left_block(DifferenceType& chunk_begin, DifferenceType block_size,
@@ -225,11 +225,11 @@ bool try_get_right_block(DifferenceType& chunk_begin, DifferenceType block_size,
 }
 
 template <typename DifferenceType, typename Predicate, typename RandomAccessIterator, typename BlockMap>
-void parallel_partition_task_body_impl(std::size_t index, DifferenceType block_size, Predicate& pred,
-                                       RandomAccessIterator g_begin, std::atomic<DifferenceType>& g_distance,
-                                       std::atomic<DifferenceType>& g_head, std::atomic<DifferenceType>& g_tail,
-                                       BlockMap& g_left_block_map, BlockMap& g_right_block_map,
-                                       /*use_branchless_partition = */std::true_type)
+void parallel_partition_task_body(std::size_t index, DifferenceType block_size, Predicate& pred,
+                                  RandomAccessIterator g_begin, std::atomic<DifferenceType>& g_distance,
+                                  std::atomic<DifferenceType>& g_head, std::atomic<DifferenceType>& g_tail,
+                                  BlockMap& g_left_block_map, BlockMap& g_right_block_map,
+                                  /*branchless = */std::true_type)
 {
     DifferenceType left_begin = 0, right_begin = 0;
     bool have_left_block = try_get_left_block(left_begin, block_size, g_distance, g_head);
@@ -296,11 +296,11 @@ void parallel_partition_task_body_impl(std::size_t index, DifferenceType block_s
 }                                    
 
 template <typename DifferenceType, typename Predicate, typename RandomAccessIterator, typename BlockMap>
-void parallel_partition_task_body_impl(std::size_t index, DifferenceType block_size, Predicate& pred,
-                                       RandomAccessIterator g_begin, std::atomic<DifferenceType>& g_distance,
-                                       std::atomic<DifferenceType>& g_head, std::atomic<DifferenceType>& g_tail,
-                                       BlockMap& g_left_block_map, BlockMap& g_right_block_map,
-                                       /*use_branchless_partition = */std::false_type)
+void parallel_partition_task_body(std::size_t index, DifferenceType block_size, Predicate& pred,
+                                  RandomAccessIterator g_begin, std::atomic<DifferenceType>& g_distance,
+                                  std::atomic<DifferenceType>& g_head, std::atomic<DifferenceType>& g_tail,
+                                  BlockMap& g_left_block_map, BlockMap& g_right_block_map,
+                                  /*branchless = */std::false_type)
 {
     DifferenceType left_begin = 0, right_begin = 0;
     bool have_left_block = try_get_left_block(left_begin, block_size, g_distance, g_head);
@@ -353,19 +353,7 @@ void parallel_partition_task_body_impl(std::size_t index, DifferenceType block_s
     }
 }
 
-template <typename DifferenceType, typename Predicate, typename RandomAccessIterator, typename BlockMap>
-void parallel_partition_task_body(std::size_t index, DifferenceType block_size, Predicate& pred,
-                                  RandomAccessIterator g_begin, std::atomic<DifferenceType>& g_distance,
-                                  std::atomic<DifferenceType>& g_head, std::atomic<DifferenceType>& g_tail,
-                                  BlockMap& g_left_block_map, BlockMap& g_right_block_map)
-{
-    using value_type = typename std::iterator_traits<RandomAccessIterator>::value_type;
-    parallel_partition_task_body_impl(index, block_size, pred, g_begin, g_distance, g_head, g_tail,
-                                      g_left_block_map, g_right_block_map,
-                                      use_branchless_partition<value_type>{});
-}
-
-template <typename RandomAccessIterator, typename Predicate>
+template <typename RandomAccessIterator, typename Predicate, typename IsBranchless>
 class ParallelPartitionTask : public task {
     using difference_type = typename std::iterator_traits<RandomAccessIterator>::difference_type;
 public:
@@ -424,7 +412,8 @@ public:
         }
 
         parallel_partition_task_body(m_index, m_block_size, m_pred, g_begin, g_distance, g_head, g_tail,
-                                     g_left_block_map, g_right_block_map);
+                                     g_left_block_map, g_right_block_map,
+                                     IsBranchless{});
 
         m_allocator.delete_object(this, ed);
         return nullptr;
@@ -436,9 +425,9 @@ public:
     }
 };
 
-template <typename RandomAccessIterator, typename Predicate>
+template <typename RandomAccessIterator, typename Predicate, typename IsBranchless>
 RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccessIterator last, Predicate pred,
-                                        task_group_context& ctx, std::size_t block_size)
+                                        task_group_context& ctx, IsBranchless is_branchless, std::size_t block_size)
 {
     using iterator_traits = std::iterator_traits<RandomAccessIterator>;
     using difference_type = typename iterator_traits::difference_type;
@@ -446,7 +435,7 @@ RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccess
     const difference_type n = std::distance(first, last);
     if (block_size == 0) block_size = partition_block_size(n);
 
-    using task_type = ParallelPartitionTask<RandomAccessIterator, Predicate>;
+    using task_type = ParallelPartitionTask<RandomAccessIterator, Predicate, IsBranchless>;
     using block_entry_type = typename task_type::block_entry_type;
 
     const std::size_t max_participants = std::min<std::size_t>(this_task_arena::max_concurrency(),
@@ -472,15 +461,30 @@ RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccess
 
     // Join the partition as a first participant
     parallel_partition_task_body(/*index = */0, difference_type(block_size), pred,
-                                 first, g_distance, g_head, g_tail, g_left_block_map, g_right_block_map);
+                                 first, g_distance, g_head, g_tail, g_left_block_map, g_right_block_map,
+                                 is_branchless);
 
     // Wait for all participants to complete processing the blocks
     wait(wait_ctx, ctx);
 
     return finalize_parallel_partition(first, pred, difference_type(block_size), ctx,
                                        g_head.load(std::memory_order_relaxed), g_tail.load(std::memory_order_relaxed),
-                                       g_left_block_map, g_right_block_map);
+                                       g_left_block_map, g_right_block_map,
+                                       is_branchless);
 }
+
+template <typename Compare>
+struct is_default_compare : std::false_type {};
+
+template <typename T>
+struct is_default_compare<std::less<T>> : std::true_type {};
+
+template <typename T>
+struct is_default_compare<std::greater<T>> : std::true_type {};
+
+template <typename T, typename Compare>
+struct use_branchless_partition
+    : tbb::detail::conjunction<std::is_arithmetic<T>, is_default_compare<Compare>> {};
 
 //! Range used in quicksort to split elements into subranges based on a value.
 /** The split operation selects a splitter and places all elements less than or equal
@@ -496,6 +500,8 @@ class quick_sort_range {
 
     using iterator_traits = std::iterator_traits<RandomAccessIterator>;
     using difference_type = typename iterator_traits::difference_type;
+    using value_type = typename iterator_traits::value_type;
+
 public:
     quick_sort_range(RandomAccessIterator first, RandomAccessIterator last, const Compare& comp, task_group_context& ctx)
         : m_first(first)
@@ -547,10 +553,15 @@ public:
         }
     }
 
+    template <typename Predicate>
+    static RandomAccessIterator do_parallel_partition(RandomAccessIterator first, RandomAccessIterator last,
+                                                      Predicate& pred, task_group_context& ctx)
+    {
+        return parallel_partition(first, last, pred, ctx, use_branchless_partition<value_type, Compare>{});
+    }
+
     void split_range_unchecked(quick_sort_range& range) {
         __TBB_ASSERT(is_divisible(), "Range that is split is not divisible");
-
-        using value_type = typename iterator_traits::value_type;
 
         // Choose the pivot
         difference_type pivot_index = pseudo_median_of_nine(m_first, m_last - m_first, m_comp);
@@ -571,7 +582,7 @@ public:
                 return !m_comp(pivot, x);
             };
 
-            m_first = parallel_partition(m_first, m_last, equal_to_pivot, m_ctx);
+            m_first = do_parallel_partition(m_first, m_last, equal_to_pivot, m_ctx);
             // Rerun the splitting with avoiding the elements equal to current pivot
             split_range_checked(range);
         } else { // The range is a leftmost range, or a pivot is different from the previous partition
@@ -579,7 +590,7 @@ public:
                 return m_comp(x, pivot);
             };
 
-            auto it = parallel_partition(std::next(m_first), m_last, less_then_pivot, m_ctx);
+            auto it = do_parallel_partition(std::next(m_first), m_last, less_then_pivot, m_ctx);
 
             // Put the pivot on it's correct place in the partitioned range
             RandomAccessIterator pivot_pos;
@@ -728,9 +739,10 @@ template<typename RandomAccessIterator, typename Compare>
                    compare<Compare, RandomAccessIterator> &&
                    std::movable<iter_value_type<RandomAccessIterator>>)
 void parallel_sort( RandomAccessIterator begin, RandomAccessIterator end, const Compare& comp ) {
-    constexpr int min_parallel_size = 500;
+    using difference_type = typename std::iterator_traits<RandomAccessIterator>::difference_type;
+
     if( end > begin ) {
-        if( end - begin < min_parallel_size ) {
+        if( end - begin < difference_type(serial_sort_cutoff()) ) {
             std::sort(begin, end, comp);
         } else {
             parallel_quick_sort(begin, end, comp);
