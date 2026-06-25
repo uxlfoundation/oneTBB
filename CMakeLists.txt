@@ -135,11 +135,6 @@ option(TBB_BUILD_APPLE_FRAMEWORKS "Build as Apple Frameworks" OFF)
 endif()
 
 
-# Thread Composability Manager (TCM) switches
-option(TCM_BUILD "Enable building of TCM" ON)
-option(TCM_TEST "Enable testing of TCM" ON)
-
-
 if (WIN32)
     if (TBB_VERIFY_DEPENDENCY_SIGNATURE)
         message(STATUS "Dependency signature verification during dynamic linking in run-time is ENABLED.")
@@ -419,7 +414,7 @@ if (TBB4PY_BUILD)
     add_subdirectory(python)
 endif()
 
-if (TCM_BUILD)
+if (NOT DEFINED TCM_BUILD OR TCM_BUILD)
   set(TCM_SUBDIR_NAME thread_composability_manager)
   if (IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${TCM_SUBDIR_NAME}")
     message(STATUS "Enabling build of Thread Composability Manager (TCM)")
@@ -432,6 +427,8 @@ if (TCM_BUILD)
 else()
   message(STATUS "Build of Thread Composability Manager (TCM) was explicitly disabled")
 endif()
+# Thread Composability Manager (TCM) switches
+option(TCM_BUILD "Enable building of TCM" ON)
 
 # Keep it the last instruction.
 add_subdirectory(cmake/post_install)
