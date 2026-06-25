@@ -1579,11 +1579,12 @@ void Block::initEmptyBlock(TLSData *tls, unsigned size)
 {
     // Having getIndex and getObjectSize called next to each other
     // allows better compiler optimization as they basically share the code.
-    unsigned int index = getIndex(size);
-    unsigned int objSz = getObjectSize(size);
+    const unsigned int index = getIndex(size);
+    const unsigned int objSz = getObjectSize(size);
 
     cleanBlockHeader();
-    MALLOC_ASSERT(objSz <= USHRT_MAX, "objSz must not be less 2^16-1");
+    MALLOC_ASSERT(index < numBlockBinLimit, "index must be within the array bounds");
+    MALLOC_ASSERT(objSz <= fittingSize5, "objSz is limited by fittingSize5.");
     objectSize = (uint16_t)objSz;
     markOwned(tls);
     // bump pointer should be prepared for first allocation - thus mode it down to objectSize

@@ -844,7 +844,8 @@ void LargeObjectCache::reset()
 template<typename Props>
 LargeMemoryBlock *LargeObjectCacheImpl<Props>::get(ExtMemoryPool *extMemoryPool, size_t size)
 {
-    unsigned idx = Props::sizeToIdx(size);
+    const unsigned idx = Props::sizeToIdx(size);
+    MALLOC_ASSERT(idx < numBins, "Array out of bounds access found.");
 
     LargeMemoryBlock *lmb = bin[idx].get(extMemoryPool, size, &bitMask, idx);
 
@@ -859,8 +860,8 @@ template<typename Props>
 void LargeObjectCacheImpl<Props>::updateCacheState(ExtMemoryPool *extMemPool, DecreaseOrIncrease op,
                                                    size_t size)
 {
-    unsigned idx = Props::sizeToIdx(size);
-    MALLOC_ASSERT(idx < numBins, ASSERT_TEXT);
+    const unsigned idx = Props::sizeToIdx(size);
+    MALLOC_ASSERT(idx < numBins, "Array out of bounds access found.");
     bin[idx].updateUsedSize(extMemPool, op==decrease? -size : size, &bitMask, idx);
 }
 
@@ -885,7 +886,8 @@ void LargeObjectCache::reportStat(FILE *f)
 template<typename Props>
 void LargeObjectCacheImpl<Props>::putList(ExtMemoryPool *extMemPool, LargeMemoryBlock *toCache)
 {
-    unsigned toBinIdx = Props::sizeToIdx(toCache->unalignedSize);
+    const unsigned toBinIdx = Props::sizeToIdx(toCache->unalignedSize);
+    MALLOC_ASSERT(toBinIdx < numBins, "Array out of bounds access found.");
 
     MALLOC_ITT_SYNC_RELEASING(bin+toBinIdx);
     bin[toBinIdx].putList(extMemPool, toCache, &bitMask, toBinIdx);
@@ -915,17 +917,16 @@ size_t LargeObjectCache::alignToBin(size_t size) {
     return size < maxLargeSize ? LargeCacheType::alignToBin(size) : HugeCacheType::alignToBin(size);
 }
 
-// Used for internal purpose
-unsigned LargeObjectCache::sizeToIdx(size_t size)
-{
-    MALLOC_ASSERT(size <= maxHugeSize, ASSERT_TEXT);
-    return size < maxLargeSize ?
-        LargeCacheType::sizeToIdx(size) :
-        LargeCacheType::numBins + HugeCacheType::sizeToIdx(size);
-}
-
 void LargeObjectCache::putList(LargeMemoryBlock *list)
 {
+    auto sizeToIdx = [](size_t size) -> unsigned {
+        // Returns artificial bin index, which is used only during sorting and never saved
+        MALLOC_ASSERT(size <= maxHugeSize, ASSERT_TEXT);
+        return size < maxLargeSize ?
+            LargeCacheType::sizeToIdx(size) :
+            LargeCacheType::numBins + HugeCacheType::sizeToIdx(size);
+    };
+
     LargeMemoryBlock *toProcess, *n;
 
     for (LargeMemoryBlock *curr = list; curr; curr = toProcess) {

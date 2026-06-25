@@ -35,7 +35,7 @@ jobs:
     runs-on: [ubuntu-latest]
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
@@ -51,7 +51,7 @@ jobs:
           export PATH="${PWD}/cov-linux64-tool/bin:${PATH}"
           mkdir build && cd build
           cmake -DCMAKE_CXX_STANDARD=20 -DCMAKE_BUILD_TYPE=relwithdebinfo \
-            -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc -DTBB_CPF=ON ..
+            -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc -DTBB_TEST_PREVIEW=ON ..
           cov-build --dir cov-int make VERBOSE=1 -j${{env.BUILD_CONCURRENCY}}
       - name: Archive Coverity build results
         run: |
@@ -73,7 +73,7 @@ jobs:
     runs-on: [windows-latest]
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d # v2.16.1
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
@@ -91,7 +91,7 @@ jobs:
         run: |
           export PATH="${PWD}/cov-win64-tool/bin:${PATH}"
           cmake -DCMAKE_CXX_STANDARD=14 -DCMAKE_BUILD_TYPE=relwithdebinfo \
-            -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DTBB_CPF=ON .
+            -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER=cl -DTBB_TEST_PREVIEW=ON .
           cov-configure --msvc
           cov-build --dir cov-int msbuild.exe ALL_BUILD.vcxproj -m -v:n
       - name: Archive Coverity build results

@@ -123,6 +123,10 @@ _ZN3tbb6detail2r131constraints_default_concurrencyERKNS0_2d111constraintsEi;
 _ZN3tbb6detail2r128constraints_threads_per_coreERKNS0_2d111constraintsEi;
 _ZN3tbb6detail2r124numa_default_concurrencyEi;
 
+/* Interleaved memory allocation (numa_allocation.cpp) */
+_ZN3tbb6detail2r120allocate_interleavedEjPKijj;
+_ZN3tbb6detail2r122deallocate_interleavedEPvj;
+
 /* Observer (observer_proxy.cpp) */
 _ZN3tbb6detail2r17observeERNS0_2d123task_scheduler_observerEb;
 

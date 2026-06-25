@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -686,16 +687,6 @@ void parallel_deterministic_reduce( const Range& range, Body& body, const static
 /** parallel_reduce overloads that work with anonymous function objects
     (see also \ref parallel_reduce_lambda_req "requirements on parallel_reduce anonymous function objects"). **/
 
-//! Parallel iteration with deterministic reduction and default simple partitioner.
-// TODO: consider making static_partitioner the default
-/** @ingroup algorithms **/
-template<typename Range, typename Value, typename RealBody, typename Reduction>
-    __TBB_requires(tbb_range<Range> && parallel_reduce_function<RealBody, Range, Value> &&
-                   parallel_reduce_combine<Reduction, Value>)
-Value parallel_deterministic_reduce( const Range& range, const Value& identity, const RealBody& real_body, const Reduction& reduction ) {
-    return parallel_deterministic_reduce(range, identity, real_body, reduction, simple_partitioner());
-}
-
 //! Parallel iteration with deterministic reduction and simple partitioner.
 /** @ingroup algorithms **/
 template<typename Range, typename Value, typename RealBody, typename Reduction>
@@ -754,6 +745,16 @@ Value parallel_deterministic_reduce( const Range& range, const Value& identity, 
     start_deterministic_reduce<Range, lambda_reduce_body<Range, Value, RealBody, Reduction>, const static_partitioner>
         ::run(range, body, partitioner, context);
     return std::move(body).result();
+}
+
+//! Parallel iteration with deterministic reduction and default simple partitioner.
+// TODO: consider making static_partitioner the default
+/** @ingroup algorithms **/
+template<typename Range, typename Value, typename RealBody, typename Reduction>
+    __TBB_requires(tbb_range<Range> && parallel_reduce_function<RealBody, Range, Value> &&
+                   parallel_reduce_combine<Reduction, Value>)
+Value parallel_deterministic_reduce( const Range& range, const Value& identity, const RealBody& real_body, const Reduction& reduction ) {
+    return parallel_deterministic_reduce(range, identity, real_body, reduction, simple_partitioner());
 }
 //@}
 
