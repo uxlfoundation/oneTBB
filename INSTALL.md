@@ -30,6 +30,8 @@ You may want to use some additional options for configuration:
 | `-G <generator>`                            | Specify project generator                                                     | For more information, run cmake `–help`.                                                                                                                                                                                     |
 | `-DCMAKE_BUILD_TYPE=Debug`                  | Specify for Debug build                                                       | Not applicable for multi-configuration generators such as Visual Studio generator.                                                                                                                                           |
 | `-DTBB_VERIFY_DEPENDENCY_SIGNATURE=ON\|OFF` | Controls signature verification of dynamic dependencies loaded during runtime | If set to ON, only the signed dynamic dependencies are loaded. This is the recommended behavior. By default, the value is unspecified. Therefore, the warning is printed. To suppress the warning, set the value explicitly. |
+| `-DTCM_BUILD=ON\|OFF`                       | Controls build of Thread Composability Manager (TCM)                          | By default the value is unspecified, which builds TCM only if its dependencies are satisfied. When set explicitly to ON, stops configuration process if TCM cannot be built.                                                 |
+
 
 ### Build oneTBB
  
