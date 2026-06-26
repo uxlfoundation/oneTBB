@@ -14,6 +14,16 @@ project(TCM LANGUAGES CXX VERSION ${_tcm_ver_major}.${_tcm_ver_minor}.${_tcm_ver
 
 set(TCM_SOURCE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
+# TODO: Use PROJECT_IS_TOP_LEVEL to determine whether TCM is a standalone project
+set(IS_TCM_STANDALONE FALSE) # Assume that TCM is a subdirectory of another project
+if(TCM_SOURCE_ROOT_DIR STREQUAL CMAKE_SOURCE_DIR)
+  set(IS_TCM_STANDALONE TRUE)   # TCM is turned out to be the top-level project
+endif()
+
+option(TCM_TEST "Enable testing" ON)
+option(TCM_STRICT "Treat compiler warnings as errors" ON)
+option(TCM_FUZZ_TESTING "Enable FUZZ testing of TCM" OFF)
+
 if (NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
 endif()
@@ -26,9 +36,27 @@ else()
     set(TCM_ARCH 64)
 endif()
 
-option(TCM_TEST "Enable testing" ON)
-option(TCM_STRICT "Treat compiler warnings as errors" ON)
-option(TCM_FUZZ_TESTING "Enable FUZZ testing of TCM" OFF)
+# Dealing with dependencies
+# --------------------------------------------------------------------------------------------------
+if (NOT DEFINED TCM_BUILD OR TCM_BUILD OR TCM_TEST)
+  # Find the HWLOC library
+  if (NOT TARGET HWLOC::hwloc)
+    list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
+    if (IS_TCM_STANDALONE OR TCM_BUILD)
+      find_package(HWLOC REQUIRED 2.5 VERSION)
+    else()
+      find_package(HWLOC 2.5 QUIET)
+    endif()
+    if (HWLOC_FOUND)
+      message(STATUS "Enabling build of Thread Composability Manager (TCM)")
+    else()
+      message(WARNING "Disabling build of Thread Composability Manager (TCM) "
+                      "since HWLOC cannot be found.")
+      return()
+    endif()
+  endif()
+endif()
+# --------------------------------------------------------------------------------------------------
 
 set(TCM_PROFILE ${TCM_PROFILE} CACHE STRING "Enable profiling of TCM functionality" FORCE)
 
@@ -40,7 +68,9 @@ else()
     message(WARNING "TCM compiler settings not found ${TCM_COMPILER_SETTINGS_FILE}")
 endif()
 
-set(CMAKE_DEBUG_POSTFIX _debug)
+if (IS_TCM_STANDALONE OR NOT DEFINED CMAKE_DEBUG_POSTFIX)
+  set(CMAKE_DEBUG_POSTFIX _debug)
+endif()
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
@@ -105,29 +135,8 @@ if (TCM_DIR)
   # Do not add main targets and installation instructions in that case.
   message(STATUS "Using external TCM for testing")
   find_package(TCM REQUIRED)
-else()
+elseif(IS_TCM_STANDALONE OR NOT DEFINED TCM_BUILD OR TCM_BUILD)
   add_subdirectory(src)
-  # Define common installation rules
-  install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-
-  install(EXPORT ${PROJECT_NAME}Targets
-    NAMESPACE TCM::
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
-  )
-  file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
-    "include(\${CMAKE_CURRENT_LIST_DIR}/${PROJECT_NAME}Targets.cmake)\n"
-  )
-
-  write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-    COMPATIBILITY AnyNewerVersion
-  )
-
-  install(
-    FILES "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-          "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
-  )
 endif()
 
 if (TCM_TEST)
