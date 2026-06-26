@@ -3,6 +3,23 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# --------------------------------------------------------------------------------------------------
+# Find the HWLOC library
+if (NOT TARGET HWLOC::hwloc)
+  list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake/modules)
+  find_package(HWLOC REQUIRED 2.5 VERSION)
+endif()
+# --------------------------------------------------------------------------------------------------
+
+# Find Threads library (for example, pthread)
+find_package(Threads REQUIRED)
+
+
+# Grouping TCM tests together
+set(TCM_TEST_SUITE_NAME "tcm_tests")
+add_custom_target(${TCM_TEST_SUITE_NAME})
+
+
 if (NOT MSVC) # no need to change options for MSVC
     # suppress extra warnings:
     # - suggest braces around initialization of subobject
@@ -10,18 +27,6 @@ if (NOT MSVC) # no need to change options for MSVC
     set(TCM_WARNING_LEVEL ${TCM_WARNING_LEVEL} -Wno-missing-braces)
 endif()
 
-# Find the HWLOC library
-if (NOT TARGET HWLOC::hwloc)
-  list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake/modules)
-  find_package(HWLOC REQUIRED 2.5 VERSION)
-endif()
-
-# Find Threads library (for example, pthread)
-find_package(Threads REQUIRED)
-
-# Grouping TCM tests together
-set(TCM_TEST_SUITE_NAME "tcm_tests")
-add_custom_target(${TCM_TEST_SUITE_NAME})
 
 function(add_tcm_test)
   set(oneValueArgs NAME)
