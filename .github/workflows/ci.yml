@@ -382,8 +382,17 @@ jobs:
           cmake -G "${{ matrix.generator }}" -A x64 -DCMAKE_CXX_STANDARD=${{ matrix.std }} ${{ matrix.cmake_static }} `
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} `
             -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST_PREVIEW=${{ matrix.preview }} ..
+          if (!$?) {
+              throw "CMake failed, exit code $LastExitCode"
+          }
           cmake --build . --config ${{ matrix.build_type }} -j -v
+          if (!$?) {
+              throw "CMake failed, exit code $LastExitCode"
+          }
           ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure
+          if (!$?) {
+              throw "CTest failed, exit code $LastExitCode"
+          }
 
   linux-examples-testing:
     name: examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_preview=${{ matrix.preview }}
