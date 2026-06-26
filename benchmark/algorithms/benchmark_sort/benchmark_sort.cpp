@@ -226,15 +226,24 @@ void benchmark_parallel_sort(benchmark::State& state, std::size_t problem_size) 
 
     typename TypeTraits::compare_type compare;
 
+    std::vector<data_type> data;
+
     for (auto _ : state) {
         state.PauseTiming();
-        std::vector<data_type> data = base;
+        data = base;
         state.ResumeTiming();
 
         Sorter::sort(data.begin(), data.end(), compare);
 
         benchmark::DoNotOptimize(data.data());
         benchmark::ClobberMemory();
+
+        // Destroy the working copy outside the timed region. Otherwise the per-element
+        // destructors (e.g. freeing std::string heap buffers) would be measured as part
+        // of the sort, dominating the result for already-sorted/cheap-sort cases.
+        state.PauseTiming();
+        data = std::vector<data_type>{};
+        state.ResumeTiming();
     }
 }
 

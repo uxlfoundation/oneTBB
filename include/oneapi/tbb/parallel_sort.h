@@ -29,6 +29,7 @@
 #include <cstddef>
 #include <atomic>
 #include <vector>
+#include <memory>
 
 namespace tbb {
 namespace detail {
@@ -235,8 +236,10 @@ void parallel_partition_task_body(std::size_t index, DifferenceType block_size, 
     bool have_left_block = try_get_left_block(left_begin, block_size, g_distance, g_head);
     bool have_right_block = try_get_right_block(right_begin, block_size, g_distance, g_tail);
 
-    std::vector<DifferenceType> left_offsets(block_size);
-    std::vector<DifferenceType> right_offsets(block_size);
+    std::unique_ptr<DifferenceType[]> left_offsets_storage(new DifferenceType[block_size]);
+    std::unique_ptr<DifferenceType[]> right_offsets_storage(new DifferenceType[block_size]);
+    DifferenceType* left_offsets = left_offsets_storage.get();
+    DifferenceType* right_offsets = right_offsets_storage.get();
 
     DifferenceType n_left_start = 0, n_left_count = 0;
     DifferenceType n_right_start = 0, n_right_count = 0;
