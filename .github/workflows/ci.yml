@@ -390,11 +390,11 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} `
             -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST_PREVIEW=${{ matrix.preview }} ..
           if (!$?) {
-              throw "CMake failed, exit code $LastExitCode"
+              throw "CMake configuration step failed, exit code $LastExitCode"
           }
           cmake --build . --config ${{ matrix.build_type }} -j -v
           if (!$?) {
-              throw "CMake failed, exit code $LastExitCode"
+              throw "CMake build step failed, exit code $LastExitCode"
           }
           ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure
           if (!$?) {
@@ -514,11 +514,11 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} `
             -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST_PREVIEW=${{ matrix.preview }} -DTBB_TEST=OFF -DTBB_EXAMPLES=ON ..
           if (!$?) {
-              throw "CMake failed, exit code $LastExitCode"
+              throw "CMake configuration step of examples failed, exit code $LastExitCode"
           }
           cmake --build . -v --target light_test_examples
           if (!$?) {
-              throw "CMake failed, exit code $LastExitCode"
+              throw "CMake build step of examples failed, exit code $LastExitCode"
           }
 
   linux-doc-examples-testing:
@@ -589,13 +589,13 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} `
             -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} ${{ matrix.cmake_extra }} -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON ..
           if (!$?) {
-              throw "CMake failed, exit code $LastExitCode"
+              throw "CMake configuration step of examples from documentation failed, exit code $LastExitCode"
           }
           cmake --build . --config ${{ matrix.build_type }} -v --parallel --target build-doc-examples
           if (!$?) {
-              throw "CMake failed, exit code $LastExitCode"
+              throw "CMake build step of examples from documentation failed, exit code $LastExitCode"
           }
           ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure -L doc-examples
           if (!$?) {
-              throw "CTest failed, exit code $LastExitCode"
+              throw "CTest of examples from documentation failed, exit code $LastExitCode"
           }
