@@ -23,7 +23,6 @@ add_custom_target(${TCM_TEST_SUITE_NAME})
 if (NOT MSVC) # no need to change options for MSVC
     # suppress extra warnings:
     # - suggest braces around initialization of subobject
-    # - missing field initializer
     set(TCM_WARNING_LEVEL ${TCM_WARNING_LEVEL} -Wno-missing-braces)
 endif()
 
