@@ -98,7 +98,6 @@ find_package_handle_standard_args(
     HWLOC
     REQUIRED_VARS HWLOC_VERSION _hwloc_include_dirs _hwloc_lib
     VERSION_VAR HWLOC_VERSION
-    FAIL_MESSAGE "Cannot find HWLOC: HWLOC >= 2.0 required."
 )
 
 unset(_hwloc_include_dirs CACHE)
