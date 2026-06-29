@@ -351,13 +351,13 @@ jobs:
       matrix:
         include:
           - os: windows-2025
-            generator: Visual Studio 17 2022
+            generator: Visual Studio 18 2026
             c_compiler: cl
             cxx_compiler: cl
             std: 14
             build_type: relwithdebinfo
             preview: 'ON'
-            job_name: windows_cl2022_cxx14_relwithdebinfo_preview=ON
+            job_name: windows_cl2026_cxx14_relwithdebinfo_preview=ON
           - os: windows-11-arm
             generator: Visual Studio 17 2022
             c_compiler: cl
