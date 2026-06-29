@@ -20,10 +20,6 @@ if(TCM_SOURCE_ROOT_DIR STREQUAL CMAKE_SOURCE_DIR)
   set(IS_TCM_STANDALONE TRUE)   # TCM is turned out to be the top-level project
 endif()
 
-option(TCM_TEST "Enable testing" ON)
-option(TCM_STRICT "Treat compiler warnings as errors" ON)
-option(TCM_FUZZ_TESTING "Enable FUZZ testing of TCM" OFF)
-
 if (NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
 endif()
@@ -57,6 +53,11 @@ if (NOT DEFINED TCM_BUILD OR TCM_BUILD OR TCM_TEST)
   endif()
 endif()
 # --------------------------------------------------------------------------------------------------
+
+# Assigning options their defaults after determining whether they were specified explicitly or not
+option(TCM_TEST "Enable testing" ON)
+option(TCM_STRICT "Treat compiler warnings as errors" ON)
+option(TCM_FUZZ_TESTING "Enable FUZZ testing of TCM" OFF)
 
 set(TCM_PROFILE ${TCM_PROFILE} CACHE STRING "Enable profiling of TCM functionality" FORCE)
 
