@@ -76,6 +76,17 @@ std::size_t partition_block_size(DifferenceType problem_size, int max_concurrenc
     return block_size_p2;
 }
 
+template <typename DifferenceType>
+std::size_t max_partition_participants(DifferenceType problem_size, std::size_t block_size, int max_concurrency) {
+    static constexpr double participants_constant = 1.0; // Why double?
+    std::size_t ideal = std::size_t(participants_constant * std::sqrt(double(n) / double(block_size)));
+    std::size_t hard_ceiling = n / (2 * block_size); // Why?
+
+    return std::min<std::size_t>({std::size_t(max_concurrency),
+                                  std::max<std::size_t>(ideal, 1),
+                                  std::max<std::size_t>(hard_ceiling, 1)});
+}
+
 inline constexpr std::size_t serial_partition_cutoff(std::size_t block_size) {
     return 4 * block_size;
 }
@@ -452,8 +463,7 @@ RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccess
     using task_type = ParallelPartitionTask<RandomAccessIterator, Predicate, IsBranchless>;
     using block_entry_type = typename task_type::block_entry_type;
 
-    const std::size_t max_participants = std::min<std::size_t>(max_concurrency,
-                                                               std::size_t(n / serial_partition_cutoff(block_size)));
+    const std::size_t max_participants = max_partition_participants(n, block_size, max_concurrency);
 
     if (n < difference_type(serial_partition_cutoff(block_size)) || max_participants <= 1) {
         return std::partition(first, last, pred);
