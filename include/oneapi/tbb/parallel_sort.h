@@ -60,7 +60,7 @@ inline constexpr std::size_t serial_sort_cutoff() {
 }
 
 template <typename DifferenceType>
-constexpr std::size_t partition_block_size(DifferenceType problem_size, int max_concurrency) {
+std::size_t partition_block_size(DifferenceType problem_size, int max_concurrency) {
     // return 1024;
     __TBB_ASSERT(max_concurrency >= 1, nullptr);
     static constexpr std::size_t constant = 4;
