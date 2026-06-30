@@ -59,10 +59,20 @@ inline constexpr std::size_t serial_sort_cutoff() {
     return 2000;
 }
 
-// TODO: should the block size depend on the problem size?
 template <typename DifferenceType>
-constexpr std::size_t partition_block_size(DifferenceType /*problem_size*/) {
-    return 1024;
+constexpr std::size_t partition_block_size(DifferenceType problem_size, int max_concurrency) {
+    // return 1024;
+    __TBB_ASSERT(max_concurrency >= 1, nullptr);
+    static constexpr std::size_t constant = 4;
+    static constexpr std::size_t min_block_size = 256;
+    static constexpr std::size_t max_block_size = 4096;
+
+    std::size_t block_size = std::size_t(constant * std::sqrt(double(problem_size) / double(max_concurrency)));
+    blocks = std::min<std::size_t>(std::max<std::size_t>(block_size, min_block_size), max_block_size);
+
+    std::size_t block_size_p2 = min_block_size;
+    while ((block_size_p2 << 1) <= block_size) block_size_p2 <<= 1;
+    return block_size_p2;
 }
 
 inline constexpr std::size_t serial_partition_cutoff(std::size_t block_size) {
@@ -146,7 +156,7 @@ void relocate_side(RandomAccessIterator first, DifferenceType block_size,
 
 template <typename RandomAccessIterator, typename Predicate, typename Branchless>
 RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccessIterator last, Predicate pred,
-                                        task_group_context& ctx, Branchless, std::size_t block_size = 0);
+                                        task_group_context& ctx, Branchless);
 
 template <typename RandomAccessIterator, typename Predicate, typename DifferenceType,
           typename BlockMapType, typename IsBranchless>
@@ -193,10 +203,8 @@ RandomAccessIterator finalize_parallel_partition(RandomAccessIterator first, Pre
     relocate_side<side::left >(first, block_size, left_slab_begin, left_slab_end, left_dirty_blocks);
     relocate_side<side::right>(first, block_size, right_slab_begin, right_slab_end, right_dirty_blocks);
 
-    return std::partition(first + left_slab_begin, first + right_slab_end, pred);
-    // std::size_t next_level_block_size = std::max<std::size_t>(block_size / 2, 128);
-    // return parallel_partition(first + left_slab_begin, first + right_slab_end, pred, ctx,
-    //                           is_branchless, next_level_block_size);
+    // return std::partition(first + left_slab_begin, first + right_slab_end, pred);
+    return parallel_partition(first + left_slab_begin, first + right_slab_end, pred, ctx, is_branchless);
 }
 
 template <typename DifferenceType>
@@ -431,18 +439,19 @@ public:
 
 template <typename RandomAccessIterator, typename Predicate, typename IsBranchless>
 RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccessIterator last, Predicate pred,
-                                        task_group_context& ctx, IsBranchless is_branchless, std::size_t block_size)
+                                        task_group_context& ctx, IsBranchless is_branchless)
 {
     using iterator_traits = std::iterator_traits<RandomAccessIterator>;
     using difference_type = typename iterator_traits::difference_type;
 
     const difference_type n = std::distance(first, last);
-    if (block_size == 0) block_size = partition_block_size(n);
+    const int max_concurrency = this_task_arena::max_concurrency();
+    const std::size_t block_size = partition_block_size(n, max_concurrency);
 
     using task_type = ParallelPartitionTask<RandomAccessIterator, Predicate, IsBranchless>;
     using block_entry_type = typename task_type::block_entry_type;
 
-    const std::size_t max_participants = std::min<std::size_t>(this_task_arena::max_concurrency(),
+    const std::size_t max_participants = std::min<std::size_t>(max_concurrency,
                                                                std::size_t(n / serial_partition_cutoff(block_size)));
 
     if (n < difference_type(serial_partition_cutoff(block_size)) || max_participants <= 1) {
@@ -488,7 +497,8 @@ struct is_default_compare<std::greater<T>> : std::true_type {};
 
 template <typename T, typename Compare>
 struct use_branchless_partition
-    : tbb::detail::conjunction<std::is_arithmetic<T>, is_default_compare<Compare>> {};
+    // : tbb::detail::conjunction<std::is_arithmetic<T>, is_default_compare<Compare>> {};
+    : std::true_type {};
 
 //! Range used in quicksort to split elements into subranges based on a value.
 /** The split operation selects a splitter and places all elements less than or equal
