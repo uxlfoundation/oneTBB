@@ -72,6 +72,7 @@ tbb_add_example(parallel_reduce primes)
 tbb_add_example(task_arena fractal)
 
 tbb_add_example(task_group sudoku)
+tbb_add_example(task_group nbody)
 
 tbb_add_example(test_all fibonacci)
 
