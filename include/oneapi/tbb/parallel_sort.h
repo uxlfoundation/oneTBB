@@ -30,6 +30,7 @@
 #include <atomic>
 #include <vector>
 #include <memory>
+#include <cmath>
 
 namespace tbb {
 namespace detail {
@@ -68,7 +69,7 @@ std::size_t partition_block_size(DifferenceType problem_size, int max_concurrenc
     static constexpr std::size_t max_block_size = 4096;
 
     std::size_t block_size = std::size_t(constant * std::sqrt(double(problem_size) / double(max_concurrency)));
-    blocks = std::min<std::size_t>(std::max<std::size_t>(block_size, min_block_size), max_block_size);
+    block_size = std::min<std::size_t>(std::max<std::size_t>(block_size, min_block_size), max_block_size);
 
     std::size_t block_size_p2 = min_block_size;
     while ((block_size_p2 << 1) <= block_size) block_size_p2 <<= 1;
