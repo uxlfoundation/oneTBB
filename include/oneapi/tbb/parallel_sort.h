@@ -215,8 +215,8 @@ RandomAccessIterator finalize_parallel_partition(RandomAccessIterator first, Pre
     relocate_side<side::left >(first, block_size, left_slab_begin, left_slab_end, left_dirty_blocks);
     relocate_side<side::right>(first, block_size, right_slab_begin, right_slab_end, right_dirty_blocks);
 
-    // return std::partition(first + left_slab_begin, first + right_slab_end, pred);
-    return parallel_partition(first + left_slab_begin, first + right_slab_end, pred, ctx, is_branchless);
+    return std::partition(first + left_slab_begin, first + right_slab_end, pred);
+    // return parallel_partition(first + left_slab_begin, first + right_slab_end, pred, ctx, is_branchless);
 }
 
 template <typename DifferenceType>
