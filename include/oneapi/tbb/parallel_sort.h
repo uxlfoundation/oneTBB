@@ -79,7 +79,7 @@ std::size_t partition_block_size(DifferenceType problem_size, int max_concurrenc
 template <typename DifferenceType>
 std::size_t max_partition_participants(DifferenceType problem_size, std::size_t block_size, int max_concurrency) {
     static constexpr double participants_constant = 1.0; // Why double?
-    std::size_t ideal = std::size_t(participants_constant * std::sqrt(double(n) / double(block_size)));
+    std::size_t ideal = std::size_t(participants_constant * std::sqrt(double(problem_size) / double(block_size)));
     std::size_t hard_ceiling = n / (2 * block_size); // Why?
 
     return std::min<std::size_t>({std::size_t(max_concurrency),
