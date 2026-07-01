@@ -64,9 +64,12 @@ size_t DefaultSystemPageSize() {
 #if _WIN32
     SYSTEM_INFO si;
     GetSystemInfo(&si);
+    __TBB_ASSERT_RELEASE(si.dwPageSize > 0, "Failed to get system page size");
     return si.dwPageSize;
 #else
-    return sysconf(_SC_PAGESIZE);
+    long page_size = sysconf(_SC_PAGESIZE);
+    __TBB_ASSERT_RELEASE(page_size > 0, "Failed to get system page size");
+    return page_size;
 #endif
 }
 
