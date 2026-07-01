@@ -69,7 +69,7 @@ size_t DefaultSystemPageSize() {
 #else
     long page_size = sysconf(_SC_PAGESIZE);
     __TBB_ASSERT_RELEASE(page_size > 0, "Failed to get system page size");
-    return page_size;
+    return static_cast<size_t>(page_size);
 #endif
 }
 
