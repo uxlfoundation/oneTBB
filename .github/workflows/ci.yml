@@ -239,7 +239,7 @@ jobs:
           ctest -R python_test --output-on-failure --timeout ${TEST_TIMEOUT}
 
   linux-testing:
-    name: ${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_preview=${{ matrix.preview }}${{ matrix.cmake_static }}
+    name: ${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_preview=${{ matrix.preview }}${{ matrix.cmake_static }}${{ matrix.tcm }}
     runs-on: ['${{ matrix.os }}']
     timeout-minutes: 45
     strategy:
@@ -258,6 +258,7 @@ jobs:
             std: 17
             build_type: release
             preview: 'ON'
+            tcm: -DTCM_BUILD=ON
           - os: ubuntu-24.04-arm
             c_compiler: gcc-14
             cxx_compiler: g++-14
@@ -294,7 +295,7 @@ jobs:
           set -e -x -o pipefail
           mkdir build && cd build
           cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} ${{ matrix.cmake_static }} \
-            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST_PREVIEW=${{ matrix.preview }} ..
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST_PREVIEW=${{ matrix.preview }} ${{ matrix.tcm }} ..
           make VERBOSE=1 -j${BUILD_CONCURRENCY}
           ctest --timeout ${TEST_TIMEOUT} --output-on-failure
 
