@@ -2244,3 +2244,22 @@ TEST_CASE("Test enqueue guarantees when task_arena is combined with task_group")
 }
 
 #endif // TBB_USE_EXCEPTIONS
+
+#if __TBB_CPP17_PRESENT
+int force_constant_odr_use(const int& value) {
+    volatile const int* addr = &value;
+    return *addr;
+}
+
+//! \brief \ref regression
+TEST_CASE("ODR-use task_arena constants") {
+    CHECK(force_constant_odr_use(tbb::task_arena::automatic) == tbb::task_arena::automatic);
+    CHECK(force_constant_odr_use(tbb::task_arena::not_initialized) == tbb::task_arena::not_initialized);
+#if __TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
+    CHECK(force_constant_odr_use(tbb::task_arena::selectable) == tbb::task_arena::selectable);
+#endif
+
+    auto task_arena_ptr = std::make_unique<tbb::task_arena>(tbb::task_arena::automatic);
+    CHECK(task_arena_ptr != nullptr);
+}
+#endif // __TBB_CPP17_PRESENT

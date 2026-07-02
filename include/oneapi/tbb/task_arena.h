@@ -244,12 +244,12 @@ protected:
 
 public:
     //! Typedef for number of threads that is automatic.
-    static const int automatic = -1;
+    static constexpr int automatic = -1;
     //! Typedef for current thread index in an uninitialized arena.
-    static const int not_initialized = -2;
+    static constexpr int not_initialized = -2;
 #if __TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
     //! Typedef for core type(s) to be specified by the provided selector.
-    static const int selectable = -2;
+    static constexpr int selectable = -2;
 #endif
 };
 
