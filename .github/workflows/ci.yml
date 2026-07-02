@@ -517,7 +517,6 @@ jobs:
         run: |
           mkdir build
           cd build
-          cat "${env:VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake"
           cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
             -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
             -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} `
@@ -569,7 +568,6 @@ jobs:
         run: |
           mkdir build
           cd build
-          cat "${env:VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake"
           cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
             -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
             -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} `
