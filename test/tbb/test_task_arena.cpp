@@ -42,6 +42,7 @@
 #include <stdexcept>
 #include <thread>
 #include <vector>
+#include <memory>
 
 //#include "harness_fp.h"
 
