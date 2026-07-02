@@ -517,11 +517,12 @@ jobs:
         run: |
           mkdir build
           cd build
+          cat "${env:VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
           cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
             -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
             -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} `
             -DTCM_BUILD=ON -DTBB_BUILD=OFF `
-            -DCMAKE_TOOLCHAIN_FILE=${env:VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake ..
+            -DCMAKE_TOOLCHAIN_FILE="${env:VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" ..
           if (!$?) {
               throw "CMake configuration step failed, exit code $LastExitCode"
           }
@@ -568,11 +569,12 @@ jobs:
         run: |
           mkdir build
           cd build
+          cat "${env:VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
           cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
             -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
             -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} `
             -DTCM_BUILD=ON -DTBB_TCM_TESTING=ON `
-            -DCMAKE_TOOLCHAIN_FILE=${env:VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake ..
+            -DCMAKE_TOOLCHAIN_FILE="${env:VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" ..
           if (!$?) {
               throw "CMake configuration step failed, exit code $LastExitCode"
           }
