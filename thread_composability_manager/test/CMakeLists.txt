@@ -95,6 +95,7 @@ set_tests_properties(test_tcm_environment_version_set PROPERTIES
 add_test(NAME test_tcm_environment_disable COMMAND test_tcm_environment
          WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 set_tests_properties(test_tcm_environment_disable PROPERTIES
+  ENVIRONMENT "TCM_ENABLE=0"
   PASS_REGULAR_EXPRESSION  "TCM: TCM *disabled"
   FAIL_REGULAR_EXPRESSION "ERROR"
   LABELS ${TCM_TEST_SUITE_NAME}
@@ -118,6 +119,7 @@ macro(add_tcm_disabling_test name environment expect_suggesting)
         --unset=TBBROOT
         --unset=ONEAPI_ROOT
         --unset=CMPLR_ROOT
+        --unset=TCM_ENABLE
         ${environment}
         $<TARGET_FILE:test_tcm_disabling>
         WORKING_DIRECTORY $<TARGET_FILE_DIR:test_tcm_disabling>
