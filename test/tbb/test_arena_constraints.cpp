@@ -136,6 +136,35 @@ TEST_CASE("Test constraints argument in create_numa_task_arenas") {
     }
   }
 }
+
+//! Test that initializing a constrained nested arena of smaller size does not cause out of range access in TBBBind
+//! \brief \ref regression
+TEST_CASE("Test constrained nested arena of smaller size") {
+    using namespace tbb::info;
+    system_info::initialize();
+
+    // On single-NUMA non-hybrid single-thread-per-core machines, the constraints cannot narrow the affinity mask.
+    if (numa_nodes().size() == 1 && core_types().size() == 1 && system_info::get_maximal_threads_per_core() == 1) {
+        return;
+    }
+
+    // parallel_for body runs in the implicit arena, which spans all available threads.
+    tbb::parallel_for(0, 1000, [](int) {
+        system_info::affinity_mask outer_affinity = system_info::allocate_current_affinity_mask();
+
+        tbb::task_arena::constraints c{numa_nodes().back()};
+        c.set_core_type(core_types().back());
+        c.set_max_threads_per_core(1);
+
+        // TBBBind changes thread affinity when entering the smaller constrained arena and restores it on exit.
+        // current_thread_index() exceeding the smaller arena size no longer causes out of range access in TBBBind.
+        tbb::task_arena{c}.execute([&outer_affinity] {
+            system_info::affinity_mask inner_affinity = system_info::allocate_current_affinity_mask();
+            REQUIRE_MESSAGE(hwloc_bitmap_weight(inner_affinity) < hwloc_bitmap_weight(outer_affinity),
+                "Nested constrained arena did not narrow the affinity mask.");
+        });
+    });
+}
 #endif /*__TBB_HWLOC_VALID_ENVIRONMENT && __HWLOC_CPUBIND_PRESENT */
 
 // The test cannot be stabilized with TBB malloc under Thread Sanitizer
