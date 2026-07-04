@@ -148,7 +148,7 @@ TEST_CASE("Test constrained nested arena of smaller size") {
     c.set_max_threads_per_core(1);
 
     if (default_concurrency() <= default_concurrency(c)) {
-        return; // The constraints do not narrow the affinity mask, so the test is not applicable.
+        return; // The constraints do not reduce the arena size, so the test is not applicable.
     }
 
     // parallel_for body runs in the implicit arena, which spans all available threads.
@@ -159,8 +159,8 @@ TEST_CASE("Test constrained nested arena of smaller size") {
         // current_thread_index() exceeding the smaller arena size no longer causes out of range access in TBBBind.
         tbb::task_arena{c}.execute([&outer_affinity] {
             system_info::affinity_mask inner_affinity = system_info::allocate_current_affinity_mask();
-            REQUIRE_MESSAGE(hwloc_bitmap_weight(inner_affinity) < hwloc_bitmap_weight(outer_affinity),
-                "Nested constrained arena did not narrow the affinity mask.");
+            REQUIRE_MESSAGE(hwloc_bitmap_isincluded(inner_affinity, outer_affinity),
+                "Nested constrained arena affinity mask is not a subset of the outer affinity mask.");
         });
     });
 }
