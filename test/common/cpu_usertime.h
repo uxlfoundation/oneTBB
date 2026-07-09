@@ -111,6 +111,7 @@ inline void TestCPUUserTime( std::size_t nthreads, std::size_t nactive = 1 ) {
     }
     double avg_worker_usrtime = (usrtime_delta-nactive*waittime_delta)/nworkers;
 
+    std::cout << "Stats: " << nworkers << " worker threads are spinning; waittime: " <<  waittime_delta << "; usrtime: " << usrtime_delta << "; avg worker usrtime: " << avg_worker_usrtime << std::endl;
     if ( avg_worker_usrtime > waittime_delta/2 )
         CHECK_MESSAGE( false, "ERROR: " << nworkers << " worker threads are spinning; waittime: " <<  waittime_delta << "; usrtime: " << usrtime_delta << "; avg worker usrtime: " << avg_worker_usrtime);
     else {
