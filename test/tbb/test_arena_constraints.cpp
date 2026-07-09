@@ -140,29 +140,31 @@ TEST_CASE("Test constraints argument in create_numa_task_arenas") {
 //! Test that initializing a constrained nested arena of smaller size does not cause out of range access in TBBBind
 //! \brief \ref regression
 TEST_CASE("Test constrained nested arena of smaller size") {
-    using namespace tbb::info;
     system_info::initialize();
 
-    tbb::task_arena::constraints c{numa_nodes().back()};
-    c.set_core_type(core_types().back());
-    c.set_max_threads_per_core(1);
-
-    if (default_concurrency() <= default_concurrency(c)) {
-        return; // The constraints do not reduce the arena size, so the test is not applicable.
+    int n = tbb::this_task_arena::max_concurrency();
+    if (n == 1) {
+        return; // Need the outer arena to be bigger than the nested arena.
     }
 
-    // parallel_for body runs in the implicit arena, which spans all available threads.
-    tbb::parallel_for(0, 1000, [c](int) {
-        system_info::affinity_mask outer_affinity = system_info::allocate_current_affinity_mask();
+    tbb::task_arena::constraints c;
+    c.set_max_concurrency(1);
+    c.set_max_threads_per_core(1); // Ensure TBBBind is used.
 
+    system_info::affinity_mask outer_affinity = system_info::allocate_current_affinity_mask();
+    utils::SpinBarrier barrier(n);
+
+    // parallel_for body runs in the implicit arena, which spans all available threads.
+    tbb::parallel_for(0, n, [&](int) {
         // TBBBind changes thread affinity when entering the smaller constrained arena and restores it on exit.
         // current_thread_index() exceeding the smaller arena size no longer causes out of range access in TBBBind.
-        tbb::task_arena{c}.execute([&outer_affinity] {
+        tbb::task_arena{c, 0}.execute([&] {
             system_info::affinity_mask inner_affinity = system_info::allocate_current_affinity_mask();
             REQUIRE_MESSAGE(hwloc_bitmap_isincluded(inner_affinity, outer_affinity),
                 "Nested constrained arena affinity mask is not a subset of the outer affinity mask.");
         });
-    });
+        barrier.wait();
+    }, tbb::static_partitioner{});
 }
 #endif /*__TBB_HWLOC_VALID_ENVIRONMENT && __HWLOC_CPUBIND_PRESENT */
 

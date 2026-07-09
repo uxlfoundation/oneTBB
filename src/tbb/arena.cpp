@@ -601,10 +601,13 @@ void task_arena_impl::initialize(d1::task_arena_base& ta) {
         static_cast<d1::task_arena*>(&ta), arena::num_arena_slots(ta.my_max_concurrency, ta.my_num_reserved_slots),
         ta.my_numa_id, ta.core_type(), ta.max_threads_per_core());
     // Apply the constraints to this thread and make it appear as slot 0 during arena initialization.
-    auto current_slot = td->my_arena_index;
+    const d1::slot_id current_slot = td->my_arena_index;
     if (observer) {
         // TODO: Consider lazy initialization for internal arena so
         // the direct calls to observer might be omitted until actual initialization.
+        // Early observer entry is used here to ensure that the thread allocating and initializing the arena
+        // has the same affinity as the future arena. While this violates the typical attach => notify protocol
+        // (see execute method), it may provide performance benefits (e.g., first-touch memory effects).
         td->my_arena_index = 0;
         observer->on_scheduler_entry(true);
     }
