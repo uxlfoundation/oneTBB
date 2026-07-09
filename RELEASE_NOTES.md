@@ -34,11 +34,11 @@
 > **_NOTE:_**  To see known limitations that impact all versions of oneTBB, refer to [oneTBB Documentation](https://uxlfoundation.github.io/oneTBB/main/intro/limitations.html).
 
 ## :hammer: Issues Fixed
-- Added IPO build support for modern Intel compilers with old cmake under Linux*.
+- Added IPO build support for modern Intel compilers with old CMake under Linux*.
 
 ## :octocat: Open-Source Contributions Integrated
-- Improved support for GNU Hurd. Contributed by Petter Reinholdtsen (https://github.com/uxlfoundation/oneTBB/pull/2028, https://github.com/uxlfoundation/oneTBB/pull/2038, https://github.com/uxlfoundation/oneTBB/pull/2026).
-- Fixed Windows* build on ARM64 when using MSVC. contributed by navvyswethgraphics (https://github.com/uxlfoundation/oneTBB/pull/2030).
+- Improved support for GNU* Hurd*. Contributed by Petter Reinholdtsen (https://github.com/uxlfoundation/oneTBB/pull/2028, https://github.com/uxlfoundation/oneTBB/pull/2038, https://github.com/uxlfoundation/oneTBB/pull/2026).
+- Fixed Windows* build on ARM64* when using MSVC. contributed by navvyswethgraphics (https://github.com/uxlfoundation/oneTBB/pull/2030).
 
 
 # oneTBB 2023.0 Release Notes
