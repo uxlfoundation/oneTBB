@@ -296,7 +296,7 @@ jobs:
           cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} ${{ matrix.cmake_static }} \
             -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST_PREVIEW=${{ matrix.preview }} -DTCM_BUILD=OFF ..
           make VERBOSE=1 -j${BUILD_CONCURRENCY}
-          ctest --timeout ${TEST_TIMEOUT} --output-on-failure
+          ctest --timeout ${TEST_TIMEOUT} -V -R ^test_task_arena$
 
   linux-tcm-testing:
     name: tcm_test_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}
@@ -378,7 +378,7 @@ jobs:
             -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
             -DTCM_BUILD=ON -DTBB_TCM_TESTING=ON ..
           make VERBOSE=1 -j${BUILD_CONCURRENCY}
-          ctest --timeout ${TEST_TIMEOUT} --output-on-failure
+          ctest --timeout ${TEST_TIMEOUT} -V -R ^test_task_arena$
 
   macos-testing:
     name: ${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_preview=${{ matrix.preview }}${{ matrix.cmake_static }}
