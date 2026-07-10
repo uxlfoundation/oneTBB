@@ -17,7 +17,7 @@
 # oneTBB 2023.1 Release Notes
 
 ## :rocket: Preview Features
-- NUMA Optimization: Use new interleaved memory allocation APIs to explicitly control memory placement across NUMA nodes. The ``allocate_numa_interleaved`` and ``deallocate_numa_interleaved`` functions enable allocating memory across multiple NUMA nodes, helping increase bandwidth and avoid bottlenecks from single-node allocation.
+- NUMA Optimization: Use new interleaved memory allocation APIs to explicitly control memory placement across NUMA nodes. The ``allocate_numa_interleaved`` and ``deallocate_numa_interleaved`` functions allocate and deallocate memory across multiple NUMA nodes, helping increase bandwidth and avoid bottlenecks from single-node allocation.
 - C++20 Modules: This release adds experimental support for C++20 modules with the introduction of ``include/oneapi/tbb.cppm``. Developers can use this instead of traditional headers to reduce compilation times and improve encapsulation.
 
 ## :tada: New Features
