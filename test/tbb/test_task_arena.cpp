@@ -2022,6 +2022,13 @@ TEST_CASE("Empty task_handle cannot be scheduled"
 //! \brief \ref error_guessing
 TEST_CASE("Test threads sleep") {
     for (auto concurrency_level : utils::concurrency_range()) {
+#if __TBB_TCM_TESTING_ENABLED
+        // On lower number of threads (e.g. 2), negotiation of resources from many dangling arenas
+        // left from previous test cases, might be a significant contributing factor to the CPU usr
+        // times this test tries to assess.
+        if (concurrency_level < 3)
+            continue;
+#endif
         int conc = int(concurrency_level);
         test_threads_sleep(conc, 0);
         test_threads_sleep(conc, 1);
