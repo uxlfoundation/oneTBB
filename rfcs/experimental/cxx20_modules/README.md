@@ -13,7 +13,7 @@ model. Modules offer several advantages over headers:
 As the C++ ecosystem gradually adopts modules, oneTBB should provide a module interface to
 allow users to use the library using `import tbb;` instead of `#include <oneapi/tbb.h>`.
 
-## Chosen Approach
+## Approach Used by Experimental Feature
 
 ### ABI non-breaking style with using-declaration
 
