@@ -80,6 +80,10 @@ The approach has several advantages over other alternatives:
 The disadvantage of this approach is an obligation to update the module interface unit each time
 new API is added.
 
+Unlike other preview or experimental features, there is no `TBB_PREVIEW_` macro for a user to define
+and no feature test `TBB_HAS_` defined by oneTBB for modules support. Instead consumers must 
+use the `.cppm` file in their builds as described in the next section.
+
 ### CMake integration
 
 The project policy requires C++11 as the minimum standard, hence the module source cannot
