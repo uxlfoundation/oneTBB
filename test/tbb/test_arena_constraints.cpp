@@ -172,7 +172,7 @@ TEST_CASE("Test constrained nested arena of smaller size") {
             }
         });
         barrier.wait();
-    }, tbb::static_partitioner{});
+    }, tbb::simple_partitioner{});
 }
 #endif /*__TBB_HWLOC_VALID_ENVIRONMENT && __HWLOC_CPUBIND_PRESENT */
 
