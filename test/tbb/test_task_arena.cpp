@@ -2024,7 +2024,7 @@ TEST_CASE("Test threads sleep") {
     for (auto concurrency_level : utils::concurrency_range()) {
 #if __TBB_TCM_TESTING_ENABLED
         // On lower number of threads (e.g. 2), negotiation of resources from many dangling arenas
-        // left from previous test cases, might be a significant contributing factor to the CPU usr
+        // left from previous test cases might be a significant contributing factor to the CPU usr
         // times this test tries to assess.
         if (concurrency_level < 3)
             continue;
