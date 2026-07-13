@@ -35,3 +35,22 @@ window.MathJax = {
     }
     }
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    var links = document.querySelectorAll('.wy-menu-vertical a');
+    links.forEach(function (link) {
+        if (link.querySelector('.status-label')) {
+            return;
+        }
+
+        var html = link.innerHTML;
+        if (!/\((experimental|preview)\)/i.test(html)) {
+            return;
+        }
+
+        link.innerHTML = html.replace(
+            /\((experimental|preview)\)/gi,
+            '<span class="status-label">$&</span>'
+        );
+    });
+});

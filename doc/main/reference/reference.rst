@@ -1,61 +1,35 @@
-.. _reference:
+.. _reference
 
 |short_name| API Reference
 ==========================
-
-.. only:: oss
-
-   For oneTBB API Reference, refer to the :doc:`oneTBB Specification </main/specification/source/index>`.
-
-.. only:: not oss
-
-   For oneTBB API Reference, refer to the `oneTBB Specification <https://uxlfoundation.github.io/oneTBB/main/specification/source/index.html>`_.
-
-Specification extensions
-************************
-
-|full_name| implements the oneTBB specification. This document provides additional details or restrictions beyond the specification.
-It also describes features that are not included in the oneTBB specification.
+**[reference]**
 
 .. toctree::
-    :titlesonly:
+    :maxdepth: 2
+    :caption: General Information:
 
-    feature_test_macros
-    scalable_memory_pools/malloc_replacement_log
-    assertion_handler
-
-Preview features
-****************
-
-A preview feature is a component of oneTBB introduced to receive early feedback from
-users.
-
-The key properties of a preview feature are:
-
-- It is off by default and must be explicitly enabled.
-- It is intended to have a high quality implementation.
-- There is no guarantee of future existence or compatibility.
-- It may have limited or no support in tools such as correctness analyzers, profilers and debuggers.
-
-
-.. caution::
-    A preview feature is subject to change in future. It might be removed or significantly
-    altered in future releases. Changes to a preview feature do NOT require
-    usual deprecation and removal process. Therefore, using preview features in production code
-    is strongly discouraged.
+    general/identifiers
+    general/thread_safety
+    general/headers_and_modules
+    general/preview_features
+    general/named_requirements
 
 .. toctree::
-    :titlesonly:
+    :maxdepth: 2
+    :caption: |short_name| Interfaces:
 
-    type_specified_message_keys
-    scalable_memory_pools
-    helpers_for_expressing_graphs
-    concurrent_lru_cache_cls
-    task_group_extensions
-    custom_mutex_chmap
-    try_put_and_wait
-    parallel_phase_for_task_arena
-    fg_resource_limiting
-    core_type_selector
-    numa_interleaved_allocation
-    ../tbb_userguide/cxx20_modules_support
+    interfaces/configuration
+    interfaces/algorithms
+    interfaces/flow_graph
+    interfaces/task_scheduler
+    interfaces/containers
+    interfaces/thread_local_storage
+
+.. toctree::
+    :maxdepth: 2
+    :caption: |short_name| Auxiliary Interfaces:
+
+    aux_interfaces/memory_allocation
+    aux_interfaces/mutual_exclusion
+    aux_interfaces/timing
+    aux_interfaces/info_namespace

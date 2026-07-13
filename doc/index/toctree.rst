@@ -41,11 +41,3 @@
    :caption: Developer Reference
 
    /main/reference/reference
-
-
-.. toctree::
-   :maxdepth: 3
-   :hidden:
-   :caption: Specification
-
-   /main/specification/source/index

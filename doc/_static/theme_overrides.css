@@ -11,3 +11,9 @@
       overflow: visible !important;
    }
 }
+
+/* Highlight '(experimental)' and '(preview)' markers in the left navigation only. */
+.wy-menu-vertical a .status-label {
+   color: #d97706;
+   font-weight: 600;
+}
