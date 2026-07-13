@@ -582,7 +582,8 @@ void __TBB_EXPORTED_FUNC exit_parallel_phase(d1::task_arena_base* ta, std::uintp
 
 void task_arena_impl::initialize(d1::task_arena_base& ta) {
     // Enforce global market initialization to properly initialize soft limit
-    (void)governor::get_thread_data();
+    thread_data* td = governor::get_thread_data();
+    assert_pointer_valid(td, "thread_data pointer should not be null");
     d1::constraints arena_constraints;
 
     arena_constraints = d1::constraints{}
@@ -599,9 +600,15 @@ void task_arena_impl::initialize(d1::task_arena_base& ta) {
     observer = construct_binding_observer(
         static_cast<d1::task_arena*>(&ta), arena::num_arena_slots(ta.my_max_concurrency, ta.my_num_reserved_slots),
         ta.my_numa_id, ta.core_type(), ta.max_threads_per_core());
+    // Apply the constraints to this thread and make it appear as slot 0 during arena initialization.
+    const d1::slot_id current_slot = td->my_arena_index;
     if (observer) {
         // TODO: Consider lazy initialization for internal arena so
         // the direct calls to observer might be omitted until actual initialization.
+        // Early observer entry is used here to ensure that the thread allocating and initializing the arena
+        // has the same affinity as the future arena. While this violates the typical attach => notify protocol
+        // (see execute method), it may provide performance benefits (e.g., first-touch memory effects).
+        td->my_arena_index = 0;
         observer->on_scheduler_entry(true);
     }
 #endif /*__TBB_CPUBIND_PRESENT*/
@@ -618,9 +625,11 @@ void task_arena_impl::initialize(d1::task_arena_base& ta) {
 
     ta.my_arena.store(&a, std::memory_order_release);
 #if __TBB_CPUBIND_PRESENT
+    // Restore the constraints and the current slot index.
     if (observer) {
         observer->on_scheduler_exit(true);
         observer->observe(true);
+        td->my_arena_index = current_slot;
     }
 #endif /*__TBB_CPUBIND_PRESENT*/
 }
