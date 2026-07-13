@@ -32,7 +32,7 @@
 // Update version
 #define TBB_VERSION_MINOR 13
 // "Patch" version for custom releases
-#define TBB_VERSION_PATCH 2
+#define TBB_VERSION_PATCH 3
 // Suffix string
 #define __TBB_VERSION_SUFFIX ""
 // Full official version string
