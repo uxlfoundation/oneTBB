@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2019-2023 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -86,6 +87,44 @@ TEST_CASE("Test constraints propagation during arenas copy construction") {
 
         test_constraints_affinity_and_concurrency(constraints, copied_affinity);
     }
+}
+
+//! Test that initializing a constrained nested arena of smaller size does not cause out of range access in TBBBind
+//! \brief \ref regression
+TEST_CASE("Test constrained nested arena of smaller size") {
+    int n = tbb::this_task_arena::max_concurrency();
+    if (n <= 1) {
+        return; // Need the outer arena to be bigger than the nested arena.
+    }
+
+    using namespace tbb::info;
+    system_info::initialize();
+
+    tbb::task_arena::constraints c{numa_nodes().back()};
+    c.set_core_type(core_types().back());
+    c.set_max_threads_per_core(1);
+    c.set_max_concurrency(1); // Make the constrained arena smaller than the outer arena, which has n > 1 threads.
+
+    system_info::affinity_mask outer_affinity = system_info::allocate_current_affinity_mask();
+    utils::SpinBarrier barrier(n);
+
+    // parallel_for body runs in the implicit arena, which spans all available threads.
+    tbb::parallel_for(0, n, [&](int) {
+        // TBBBind changes thread affinity when entering the smaller constrained arena and restores it on exit.
+        // current_thread_index() exceeding the smaller arena size no longer causes out of range access in TBBBind.
+        tbb::task_arena{c}.execute([&] {
+            system_info::affinity_mask inner_affinity = system_info::allocate_current_affinity_mask();
+            REQUIRE_MESSAGE(hwloc_bitmap_isincluded(inner_affinity, outer_affinity),
+                "Nested constrained arena affinity mask is not a subset of the outer affinity mask.");
+
+            // Indirectly verify that TBBBind applied the affinity for this arena.
+            if (tbb::detail::r1::constraints_default_concurrency(c) < n) { // affinity mask should be smaller
+                REQUIRE_MESSAGE(!hwloc_bitmap_isequal(inner_affinity, outer_affinity),
+                    "TBBBind did not apply affinity: the nested arena mask was not narrowed.");
+            }
+        });
+        barrier.wait();
+    }, tbb::simple_partitioner{});
 }
 #endif /*__TBB_HWLOC_VALID_ENVIRONMENT && __HWLOC_CPUBIND_PRESENT */
 
