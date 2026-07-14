@@ -11,3 +11,16 @@
       overflow: visible !important;
    }
 }
+
+.bd-sidebar-primary a.toc-preview,
+.bd-sidebar-primary a.toc-experimental {
+   color: #d97706;
+   font-weight: 600;
+}
+
+.bd-sidebar-primary a.toc-preview:hover,
+.bd-sidebar-primary a.toc-preview:focus,
+.bd-sidebar-primary a.toc-experimental:hover,
+.bd-sidebar-primary a.toc-experimental:focus {
+   color: #b45309;
+}
