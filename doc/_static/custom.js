@@ -40,14 +40,13 @@ function decorateSidebarTocEntries() {
     const sidebarLinks = document.querySelectorAll('.bd-sidebar-primary a');
 
     sidebarLinks.forEach((link) => {
-        const label = (link.textContent || '').trim().toLowerCase();
+        const text = link.textContent || '';
+        const highlightedText = text
+            .replace(/\(preview\)/gi, '<span class="toc-label-highlight">(preview)</span>')
+            .replace(/\(experimental\)/gi, '<span class="toc-label-highlight">(experimental)</span>');
 
-        if (label.includes('(preview)')) {
-            link.classList.add('toc-preview');
-        }
-
-        if (label.includes('(experimental)')) {
-            link.classList.add('toc-experimental');
+        if (highlightedText !== text) {
+            link.innerHTML = highlightedText;
         }
     });
 }

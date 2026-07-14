@@ -12,21 +12,12 @@
    }
 }
 
-.bd-sidebar-primary a.toc-preview,
-.bd-sidebar-primary a.toc-experimental,
-.bd-sidebar-primary .nav-link.toc-preview,
-.bd-sidebar-primary .nav-link.toc-experimental {
+.bd-sidebar-primary .toc-label-highlight {
    color: #d97706 !important;
    font-weight: 600;
 }
 
-.bd-sidebar-primary a.toc-preview:hover,
-.bd-sidebar-primary a.toc-preview:focus,
-.bd-sidebar-primary a.toc-experimental:hover,
-.bd-sidebar-primary a.toc-experimental:focus,
-.bd-sidebar-primary .nav-link.toc-preview:hover,
-.bd-sidebar-primary .nav-link.toc-preview:focus,
-.bd-sidebar-primary .nav-link.toc-experimental:hover,
-.bd-sidebar-primary .nav-link.toc-experimental:focus {
+.bd-sidebar-primary a:hover .toc-label-highlight,
+.bd-sidebar-primary a:focus .toc-label-highlight {
    color: #b45309 !important;
 }
