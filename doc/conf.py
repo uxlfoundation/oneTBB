@@ -171,6 +171,7 @@ if BUILD_TYPE == 'oneapi'  or BUILD_TYPE == 'dita':
         ],
     }
 
+html_css_files = ['theme_overrides.css']
 html_js_files = ['custom.js']
 
 html_theme_options["logo"] = {"text": "oneTBB Documentation"}
