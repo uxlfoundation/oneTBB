@@ -1549,7 +1549,7 @@ protected:
         std::unique_ptr<tcm_cpu_mask_t, cpu_mask_deleter_t> unique_result_mask(&per_constraint_union_mask);
         std::unique_ptr<tcm_cpu_mask_t, cpu_mask_deleter_t> unique_common_mask(&common_mask);
 
-        hwloc_bitmap_or(common_mask, common_mask, mask);
+        hwloc_bitmap_copy(common_mask, mask);
         uint32_t common_concurrency = 0;
 
         // min_required is the maximum among the amount of unavailable resources needed
@@ -1625,7 +1625,9 @@ protected:
                         hwloc_bitmap_or(per_constraint_union_mask, mask, cpu_mask);
                         const int mc = get_oversubscribed_mask_concurrency(per_constraint_union_mask);
                         __TCM_ASSERT(uint32_t(mc) >= granted, "Incorrectly granted permit detected.");
-                        const int available = mc - granted;
+                        // Avoid double counting of current grant of being satisfied permit when
+                        // caching available for immediate grant at the end
+                        const int available = mc - granted - int(current_concurrency);
                         available_min = std::min(available_min, available);
                         const auto fitting_result =
                             try_fit_concurrency(constraint_min, constraint_max, available);
@@ -1647,7 +1649,9 @@ protected:
                         common_concurrency += granted;
                         __TCM_ASSERT(uint32_t(mc) >= common_concurrency,
                                      "Incorrectly granted permit detected.");
-                        const int available = mc - common_concurrency;
+                        // Avoid double counting of current grant of being satisfied permit when
+                        // caching available for immediate grant at the end
+                        const int available = mc - common_concurrency - int(current_concurrency);
                         available_min = std::min(available_min, available);
                         const auto fitting_result =
                             try_fit_concurrency(constraint_min, constraint_max, available);
@@ -1698,7 +1702,9 @@ protected:
                     __TCM_ASSERT(uint32_t(mc) >= common_concurrency,
                                  "Incorrectly granted permit is detected.");
 
-                    const int available = mc - common_concurrency;
+                    // Avoid double counting of current grant of being satisfied permit when caching
+                    // available for immediate grant at the end
+                    const int available = mc - common_concurrency - int(current_concurrency);
                     available_min = std::min(available_min, available);
                     auto fitting_result = try_fit_concurrency(constraint_min, constraint_max, available);
                     if (!fitting_result.is_required_satisfied)
