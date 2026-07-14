@@ -42,6 +42,14 @@ are not related to the particular ``task_group``.
 
             task_group_status wait();
             void cancel();
+
+#if TBB_PREVIEW_TASK_GROUP_EXTENSIONS // Option 1
+
+            // Preview features // Option 2
+            static void set_task_order(task_handle& pred, task_handle& succ);
+            static void set_task_order(task_completion_handle& pred, task_handle& succ);
+            static void transfer_this_task_completion_to(task_handle& t);
+#endif
         };
 
         bool is_current_task_group_canceling();
