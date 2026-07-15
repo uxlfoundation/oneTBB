@@ -437,7 +437,9 @@ class resource_limited_body_leaf
 
 public:
     resource_limited_body_leaf(graph& g, std::tuple<ResourceProviders&...> resource_providers, const Body& body,
-                              resource_limited_input<Input, OutputPorts>* input_ptr)
+    resource_limited_body_leaf(graph& g, std::tuple<ResourceProviders&...> resource_providers,
+                               const Body& body,
+                               resource_limited_input<Input, OutputPorts>* input_ptr)
         : resource_limited_body_leaf(g, get_consumers_tuple(resource_providers), body, input_ptr)
     {}
 
