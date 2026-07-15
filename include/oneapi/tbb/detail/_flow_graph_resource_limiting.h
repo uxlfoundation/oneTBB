@@ -436,11 +436,12 @@ class resource_limited_body_leaf
     {}
 
 public:
-    resource_limited_body_leaf(graph& g, std::tuple<ResourceProviders&...> resource_providers, const Body& body,
     resource_limited_body_leaf(graph& g, std::tuple<ResourceProviders&...> resource_providers,
                                const Body& body,
                                resource_limited_input<Input, OutputPorts>* input_ptr)
-        : resource_limited_body_leaf(g, get_consumers_tuple(resource_providers), body, input_ptr)
+        : resource_limited_body_leaf(g, get_consumers_tuple(resource_providers)
+        , body
+        , input_ptr)
     {}
 
     consumers_tuple_type get_consumers_tuple(std::tuple<ResourceProviders&...> resource_providers) {
@@ -508,13 +509,12 @@ public:
     } 
 
     void release_concurrency_and_spawn_next(const Input& input_msg) {
-        if (m_input_ptr) {
-            // Call back to the input layer to release concurrency slot and get next task
-            // Only do this if concurrency is limited (not unlimited)
-            graph_task* next_task = m_input_ptr->release_concurrency_slot(input_msg);
-            if (next_task && next_task != SUCCESSFULLY_ENQUEUED) {
-                spawn_in_graph_arena(this->graph_reference(), *next_task);
-            }
+        __TBB_ASSERT(m_input_ptr != nullptr, "m_input_ptr should never be nullptr when releasing concurrency slot");
+        // Call back to the input layer to release concurrency slot and get next task
+        // Only do this if concurrency is limited (not unlimited)
+        graph_task* next_task = m_input_ptr->release_concurrency_slot(input_msg);
+        if (next_task && next_task != SUCCESSFULLY_ENQUEUED) {
+            spawn_in_graph_arena(this->graph_reference(), *next_task);
         }
     }
 
@@ -594,16 +594,17 @@ public:
     using class_type = resource_limited_input<input_type, output_ports_type>;
     using base_type = function_input_base<input_type, queueing, cache_aligned_allocator<input_type>, class_type>;
     using input_queue_type = function_input_queue<input_type, cache_aligned_allocator<input_type>>;
+    template <typename Body, typename... ResourceProviders>
+    using body_leaf = resource_limited_body_leaf<input_type, output_ports_type,
+                                                 Body, ResourceProviders...>;
 
     template <typename Body, typename... ResourceProviders>
     resource_limited_input(graph& g, std::size_t max_concurrency,
                            std::tuple<ResourceProviders&...> resource_providers,
                            Body& body)
         : base_type(g, max_concurrency, no_priority, is_body_noexcept(body, resource_providers))
-        , m_body(new body_leaf<input_type, output_ports_type, Body, ResourceProviders...>
-            (g, resource_providers, body, this))
-        , m_init_body(new body_leaf<input_type, output_ports_type, Body, ResourceProviders...>
-            (g, resource_providers, body, this))
+        , m_body(new body_leaf<Body, ResourceProviders...>(g, resource_providers, body, this))
+        , m_init_body(new body_leaf<Body, ResourceProviders...>(g, resource_providers, body, this))
         , m_output_ports(init_output_ports<output_ports_type>::call(g, m_output_ports))
     {}
 
