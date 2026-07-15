@@ -564,8 +564,7 @@ TEST_CASE("concurrency limit with multiple resources") {
                  "Concurrency limit was violated: max_observed=" << max_observed.load()
                  << " > max_concurrency=" << max_concurrency);
 
-    // We should have observed some concurrency (at least 2 concurrent executions)
-    CHECK_MESSAGE(max_observed.load() >= 2,
+    CHECK_MESSAGE((max_observed.load() >= 2 || tbb::this_task_arena::max_concurrency() < 2),
                  "Expected to observe concurrent execution but max_observed=" << max_observed.load());
 }
 
