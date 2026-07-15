@@ -427,7 +427,7 @@ class resource_limited_body_leaf
 
     template <typename ConsumersTuple>
     resource_limited_body_leaf(graph& g, ConsumersTuple&& consumers_tuple, const Body& body,
-                              resource_limited_input<Input, OutputPorts>* input_ptr)
+                               resource_limited_input<Input, OutputPorts>* input_ptr)
         : resource_limited_body<Input, OutputPorts>(g)
         , m_consumers(std::forward<ConsumersTuple>(consumers_tuple))
         , m_body(body)
