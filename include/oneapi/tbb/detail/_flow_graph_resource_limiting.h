@@ -600,8 +600,10 @@ public:
                            std::tuple<ResourceProviders&...> resource_providers,
                            Body& body)
         : base_type(g, max_concurrency, no_priority, is_body_noexcept(body, resource_providers))
-        , m_body(new resource_limited_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body, this))
-        , m_init_body(new resource_limited_body_leaf<input_type, output_ports_type, Body, ResourceProviders...>(g, resource_providers, body, this))
+        , m_body(new body_leaf<input_type, output_ports_type, Body, ResourceProviders...>
+            (g, resource_providers, body, this))
+        , m_init_body(new body_leaf<input_type, output_ports_type, Body, ResourceProviders...>
+            (g, resource_providers, body, this))
         , m_output_ports(init_output_ports<output_ports_type>::call(g, m_output_ports))
     {}
 
