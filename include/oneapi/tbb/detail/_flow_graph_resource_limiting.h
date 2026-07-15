@@ -554,7 +554,10 @@ public:
     }
 
     resource_limited_body_leaf* clone() override {
-        resource_limited_body_leaf* new_body = new resource_limited_body_leaf(this->graph_reference(), m_consumers, this->m_body, m_input_ptr);
+        resource_limited_body_leaf* new_body = new resource_limited_body_leaf(this->graph_reference(),
+                                                                              m_consumers,
+                                                                              this->m_body,
+                                                                              m_input_ptr);
         set_body_ptr_helper<sizeof...(ResourceProviders)>::run(new_body->m_consumers, new_body);
         return new_body;
     }
