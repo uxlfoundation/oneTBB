@@ -451,23 +451,23 @@ TEST("Two constrained requests oversubscribing first core") {
 void test_two_requests_not_oversubscribe_after_renegotiation(tcm_cpu_constraints_t constraints,
                                                              const int32_t constraints_capacity)
 {
-  tcm_client_id_t clidA = connect_new_client();
+  tcm_client_id_t client_id = connect_new_client();
 
   // A takes the whole shared region.
   tcm_permit_handle_t phA = request_permit(
-      clidA, make_request(tcm_automatic, constraints_capacity, &constraints, 1));
+      client_id, make_request(tcm_automatic, constraints_capacity, &constraints, 1));
   check(get_permit_data(phA).concurrency() == uint32_t(constraints_capacity),
         "Permit A occupies the whole shared region");
 
   // B requests the same region; A is negotiated down so that A and B together fit the region.
   tcm_permit_handle_t phB = request_permit(
-      clidA, make_request(tcm_automatic, constraints_capacity, &constraints, 1));
+      client_id, make_request(tcm_automatic, constraints_capacity, &constraints, 1));
   check(get_permit_data(phA).concurrency() + get_permit_data(phB).concurrency() ==
         uint32_t(constraints_capacity),
         "Permits A and B together fully but exactly subscribe the shared region");
 
   // C occupies the resources outside the shared region (the sibling hardware threads).
-  tcm_permit_handle_t phC = request_permit(clidA, make_request(1, platform_tcm_concurrency()));
+  tcm_permit_handle_t phC = request_permit(client_id, make_request(1, platform_tcm_concurrency()));
   check(get_permit_data(phC).concurrency() ==
         uint32_t(platform_tcm_concurrency() - constraints_capacity),
         "Permit C occupies the rest of resources, outside the region");
@@ -481,12 +481,12 @@ void test_two_requests_not_oversubscribe_after_renegotiation(tcm_cpu_constraints
   check(grantA + grantB <= uint32_t(constraints_capacity),
         "Shared region is not oversubscribed after renegotiation", /*num_indents*/0,
         /*report_msg*/"A grant=" + std::to_string(grantA) + ", B grant=" + std::to_string(grantB) +
-                      ", region capacity=" + std::to_string(constraints_capacity));
+        ", region capacity=" + std::to_string(constraints_capacity));
 
   release_permit(phA);
   release_permit(phB);
 
-  disconnect_client(clidA);
+  disconnect_client(client_id);
 }
 
 TEST("Two constrained requests do not oversubscribe a shared region after renegotiation") {
