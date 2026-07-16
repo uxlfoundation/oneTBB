@@ -451,8 +451,6 @@ TEST("Two constrained requests oversubscribing first core") {
 void test_two_requests_not_oversubscribe_after_renegotiation(tcm_cpu_constraints_t constraints,
                                                              const int32_t constraints_capacity)
 {
-  one_thread_per_core_mask region{};
-
   tcm_client_id_t clidA = connect_new_client();
 
   // A takes the whole shared region.
