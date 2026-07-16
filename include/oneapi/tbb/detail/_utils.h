@@ -326,15 +326,19 @@ enum class do_once_state {
     initialized = executed  ///< Convenience alias
 };
 
+#if _MSC_VER
+#pragma warning (push)
+#pragma warning (disable:4702)  /* suppress unreachable code */
+#endif
 // Run the initializer which can not fail
 template<typename Functor>
 void run_initializer(const Functor& f, std::atomic<do_once_state>& state ) {
     f();
-#pragma warning (push)
-#pragma warning (disable: 4702)  /* suppress unreachable code */
     state.store(do_once_state::executed, std::memory_order_release);
-#pragma warning (pop)
 }
+#if _MSC_VER
+#pragma warning (pop)
+#endif
 
 //! One-time initialization function
 /** /param initializer Pointer to function without arguments
