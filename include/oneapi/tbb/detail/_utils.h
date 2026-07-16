@@ -330,12 +330,10 @@ enum class do_once_state {
 template<typename Functor>
 void run_initializer(const Functor& f, std::atomic<do_once_state>& state ) {
     f();
-#if defined(_MSC_VER)
 #pragma warning (push)
 #pragma warning (disable: 4702)  /* suppress unreachable code */
 #endif
     state.store(do_once_state::executed, std::memory_order_release);
-#if defined(_MSC_VER)
 #pragma warning (pop)
 #endif
 }
