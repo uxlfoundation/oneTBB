@@ -332,10 +332,8 @@ void run_initializer(const Functor& f, std::atomic<do_once_state>& state ) {
     f();
 #pragma warning (push)
 #pragma warning (disable: 4702)  /* suppress unreachable code */
-#endif
     state.store(do_once_state::executed, std::memory_order_release);
 #pragma warning (pop)
-#endif
 }
 
 //! One-time initialization function
