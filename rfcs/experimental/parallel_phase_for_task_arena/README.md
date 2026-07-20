@@ -208,7 +208,8 @@ The same use case can be expressed using the `parallel_phase` object, assuming m
 
 ```cpp
 void handle_request(Request req) {
-    tbb::task_arena::parallel_phase phase{tbb::attach{}};
+    tbb::task_arena::parallel_phase phase{tbb::attach{},
+                                          tbb::task_arena::parallel_phase::end_flags::with_fast_leave};
     //
     // Some composition of parallel and serial computations
     //
