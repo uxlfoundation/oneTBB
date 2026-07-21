@@ -2854,7 +2854,7 @@ tcm_result_t tcmGetPermitData(tcm_permit_handle_t permit_handle, tcm_permit_t* p
   using tcm::theTCM;
 
   if (!permit_handle || !permit)
-    return TCM_RESULT_ERROR_UNKNOWN;
+    return TCM_RESULT_ERROR_INVALID_ARGUMENT;
 
   auto& mgr = theTCM::instance();
   return mgr.get_permit(permit_handle, permit);
