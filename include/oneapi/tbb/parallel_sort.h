@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -18,6 +19,7 @@
 #define __TBB_parallel_sort_H
 
 #include "detail/_namespace_injection.h"
+#include "detail/_parallel_partition.h"
 #include "parallel_for.h"
 #include "blocked_range.h"
 #include "profiling.h"
@@ -55,81 +57,149 @@ namespace d1 {
 /** The split operation selects a splitter and places all elements less than or equal
     to the value in the first range and the remaining elements in the second range.
     @ingroup algorithms */
-template<typename RandomAccessIterator, typename Compare>
+template <typename RandomAccessIterator, typename Compare>
 class quick_sort_range {
-    std::size_t median_of_three( const RandomAccessIterator& array, std::size_t l, std::size_t m, std::size_t r ) const {
-        return comp(array[l], array[m]) ? ( comp(array[m], array[r]) ? m : ( comp(array[l], array[r]) ? r : l ) )
-                                        : ( comp(array[r], array[m]) ? m : ( comp(array[r], array[l]) ? r : l ) );
-    }
-
-    std::size_t pseudo_median_of_nine( const RandomAccessIterator& array, const quick_sort_range& range ) const {
-        std::size_t offset = range.size / 8u;
-        return median_of_three(array,
-                               median_of_three(array, 0 , offset, offset * 2),
-                               median_of_three(array, offset * 3, offset * 4, offset * 5),
-                               median_of_three(array, offset * 6, offset * 7, range.size - 1));
-
-    }
-
-    std::size_t split_range( quick_sort_range& range ) {
-        RandomAccessIterator array = range.begin;
-        RandomAccessIterator first_element = range.begin;
-        std::size_t m = pseudo_median_of_nine(array, range);
-        if( m != 0 ) std::iter_swap(array, array + m);
-
-        std::size_t i = 0;
-        std::size_t j = range.size;
-        // Partition interval [i + 1,j - 1] with key *first_element.
-        for(;;) {
-            __TBB_ASSERT( i < j, nullptr );
-            // Loop must terminate since array[l] == *first_element.
-            do {
-                --j;
-                __TBB_ASSERT( i <= j, "bad ordering relation?" );
-            } while( comp(*first_element, array[j]) );
-            do {
-                __TBB_ASSERT( i <= j, nullptr );
-                if( i == j ) goto partition;
-                ++i;
-            } while( comp(array[i], *first_element) );
-            if( i == j ) goto partition;
-            std::iter_swap(array + i, array + j);
-        }
-partition:
-        // Put the partition key were it belongs
-        std::iter_swap(array + j, first_element);
-        // array[l..j) is less or equal to key.
-        // array(j..r) is greater or equal to key.
-        // array[j] is equal to key
-        i = j + 1;
-        std::size_t new_range_size = range.size - i;
-        range.size = j;
-        return new_range_size;
-    }
-
-public:
-    quick_sort_range() = default;
-    quick_sort_range( const quick_sort_range& ) = default;
-    void operator=( const quick_sort_range& ) = delete;
+    RandomAccessIterator m_first;
+    RandomAccessIterator m_last;
+    const Compare&       m_comp;
+    task_group_context&  m_ctx;
+    bool                 m_leftmost;
 
     static constexpr std::size_t grainsize = 500;
-    const Compare& comp;
-    std::size_t size;
-    RandomAccessIterator begin;
 
-    quick_sort_range( RandomAccessIterator begin_, std::size_t size_, const Compare& comp_ ) :
-        comp(comp_), size(size_), begin(begin_) {}
+    using iterator_traits = std::iterator_traits<RandomAccessIterator>;
+    using difference_type = typename iterator_traits::difference_type;
+    using value_type = typename iterator_traits::value_type;
+public:
+    quick_sort_range(RandomAccessIterator first, RandomAccessIterator last,
+                     const Compare& comp, task_group_context& ctx)
+        : m_first(first)
+        , m_last(last)
+        , m_comp(comp)
+        , m_ctx(ctx)
+        , m_leftmost(true)
+    {}
 
-    bool empty() const { return size == 0; }
-    bool is_divisible() const { return size >= grainsize; }
+    quick_sort_range(quick_sort_range& range, split)
+        : m_comp(range.m_comp)
+        , m_ctx(range.m_ctx)
+    {
+        range.split_unchecked(*this);
+    }
 
-    quick_sort_range( quick_sort_range& range, split )
-        : comp(range.comp)
-        , size(split_range(range))
-          // +1 accounts for the pivot element, which is at its correct place
-          // already and, therefore, is not included into subranges.
-        , begin(range.begin + range.size + 1) {}
-};
+    bool empty() const { return m_first == m_last; }
+    bool is_divisible() const { return (m_last - m_first) >= difference_type(grainsize); }
+
+    void leaf_sort() const {
+        std::sort(m_first, m_last, m_comp);
+    }
+
+    difference_type median_of_three(difference_type l, difference_type m, difference_type r) const {
+        return m_comp(m_first[l], m_first[m]) ? ( m_comp(m_first[m], m_first[r]) ? m : ( m_comp(m_first[l], m_first[r]) ? r : l ) )
+                                              : ( m_comp(m_first[r], m_first[m]) ? m : ( m_comp(m_first[r], m_first[l]) ? r : l ) );
+    }
+
+    difference_type pseudo_median_of_nine() const {
+        difference_type n = m_last - m_first;
+        std::size_t offset = n / 8u;
+        return median_of_three(median_of_three(0, offset, offset * 2),
+                               median_of_three(offset * 3, offset * 4, offset * 5),
+                               median_of_three(offset * 6, offset * 7, n - 1));
+    }
+
+    void split_checked(quick_sort_range& target_range) {
+        // Range can stop being divisible after partitioning
+        // Produce an empty range in this case
+        if (!is_divisible()) {
+            target_range.m_first = m_last;
+            target_range.m_last = m_last;
+            target_range.m_leftmost = false;
+        } else {
+            split_unchecked(target_range);
+        }
+    }
+
+    void split_unchecked(quick_sort_range& target_range) {
+        __TBB_ASSERT(is_divisible(), "Range that is split is not divisible");
+
+        // Choose the pivot
+        difference_type pivot_index = pseudo_median_of_nine();
+
+        // Place the pivot at the beginning of the range
+        if (pivot_index != 0) std::iter_swap(m_first, m_first + pivot_index);
+
+        // Move the pivot value out of the range to speed up the comparisons
+        value_type pivot = std::move(*m_first);
+
+        // Optimization for equivalent pivots
+        // If the partitioned range is not a leftmost range, the element before m_first is
+        // a pivot from the previous partition. If two pivots are equal, partition the range
+        // using the >= pivot predicate to place all elements equivalent to pivot at their
+        // final positions in the sorted range
+        if (!m_leftmost && !m_comp(*(m_first - 1), pivot)) {
+            auto equal_to_pivot = [&pivot, this](const value_type& x) {
+                // It is enough to run the predicate once since all elements in the
+                // range are guaranteed to be >= pivot by the previous partition
+                return !m_comp(pivot, x);
+            };
+
+            RandomAccessIterator equal_end = parallel_partition(std::next(m_first), m_last, equal_to_pivot, m_ctx);
+
+            // Move the pivot back to its place
+            *m_first = std::move(pivot);
+
+            // Skip the elements equal to pivot and rerun the splitting
+            m_first = equal_end;
+            split_checked(target_range);
+        } else { // The range is a leftmost range, or pivots are different
+            auto less_than_pivot = [&pivot, this](const value_type& x) {
+                return m_comp(x, pivot);
+            };
+
+            auto it = parallel_partition(std::next(m_first), m_last, less_than_pivot, m_ctx);
+
+            RandomAccessIterator pivot_pos;
+            *m_first = std::move(pivot);
+            if (it == std::next(m_first)) {
+                pivot_pos = m_first;
+            } else {
+                std::iter_swap(m_first, std::prev(it));
+                pivot_pos = std::prev(it);
+            }
+
+            difference_type left_size = pivot_pos - m_first;
+            difference_type right_size = m_last - (pivot_pos + 1);
+
+            // Rerun the splitting if no elements were partitioned
+            if (left_size == 0) {
+                m_first = pivot_pos + 1;
+                m_leftmost = false;
+                split_checked(target_range);
+            } else if (right_size == 0) {
+                m_last = pivot_pos;
+                split_checked(target_range);
+            } else {
+                // There are elements to feed both subranges
+                // Keep the smaller part in this range object
+                if (left_size > right_size) {
+                    target_range.m_first = m_first;
+                    target_range.m_last = pivot_pos;
+                    target_range.m_leftmost = m_leftmost;
+
+                    m_first = pivot_pos + 1;
+                    m_leftmost = false;
+                } else {
+                    target_range.m_first = pivot_pos + 1;
+                    target_range.m_last = m_last;
+                    target_range.m_leftmost = false;
+
+                    m_last = pivot_pos;
+                }
+            }
+        }
+    }
+
+}; // class quick_sort_range
 
 //! Body class used to test if elements in a range are presorted
 /** @ingroup algorithms */
@@ -162,22 +232,17 @@ public:
     }
 };
 
-//! Body class used to sort elements in a range that is smaller than the grainsize.
-/** @ingroup algorithms */
-template<typename RandomAccessIterator, typename Compare>
-struct quick_sort_body {
-    void operator()( const quick_sort_range<RandomAccessIterator,Compare>& range ) const {
-        std::sort(range.begin, range.begin + range.size, range.comp);
-    }
-};
-
 //! Method to perform parallel_for based quick sort.
 /** @ingroup algorithms */
 template<typename RandomAccessIterator, typename Compare>
-void do_parallel_quick_sort( RandomAccessIterator begin, RandomAccessIterator end, const Compare& comp ) {
-    parallel_for(quick_sort_range<RandomAccessIterator,Compare>(begin, end - begin, comp),
-                 quick_sort_body<RandomAccessIterator,Compare>(),
-                 auto_partitioner());
+void do_parallel_quick_sort( RandomAccessIterator begin, RandomAccessIterator end, const Compare& comp,
+                             task_group_context& ctx ) {
+    __TBB_ASSERT(!ctx.is_group_execution_cancelled(), "Running do_parallel_quick_sort on a cancelled context");
+    using range_type = quick_sort_range<RandomAccessIterator, Compare>;
+
+    parallel_for(range_type{begin, end, comp, ctx},
+                 [](const range_type& range) { range.leaf_sort(); },
+                 auto_partitioner(), ctx);
 }
 
 //! Wrapper method to initiate the sort by calling parallel_for.
@@ -191,7 +256,7 @@ void parallel_quick_sort( RandomAccessIterator begin, RandomAccessIterator end, 
     RandomAccessIterator k = begin;
     for( ; k != begin + serial_cutoff; ++k ) {
         if( comp(*(k + 1), *k) ) {
-            do_parallel_quick_sort(begin, end, comp);
+            do_parallel_quick_sort(begin, end, comp, my_context);
             return;
         }
     }
@@ -202,8 +267,10 @@ void parallel_quick_sort( RandomAccessIterator begin, RandomAccessIterator end, 
                  auto_partitioner(),
                  my_context);
 
-    if( my_context.is_group_execution_cancelled() )
-        do_parallel_quick_sort(begin, end, comp);
+    if( my_context.is_group_execution_cancelled() ) {
+        my_context.reset();
+        do_parallel_quick_sort(begin, end, comp, my_context);
+    }
 }
 
 /** \page parallel_sort_iter_req Requirements on iterators for parallel_sort
