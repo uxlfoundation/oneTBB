@@ -150,7 +150,7 @@ class start_time_collection_scoped_phase_wrapped
     friend base;
 
     std::size_t measure_impl() {
-        tbb::task_arena::scoped_parallel_phase phase{*arena};
+        tbb::task_arena::parallel_phase phase{*arena};
         auto median_start_time = measure_median_start_time(arena);
         return median_start_time;
     }
@@ -243,7 +243,7 @@ class start_time_collection_sequenced_scoped_phases
             [&] {
                 std::size_t num_threads = arena->max_concurrency();
                 {
-                    tbb::task_arena::scoped_parallel_phase phase{*arena, with_fast_leave};
+                    tbb::task_arena::parallel_phase phase{*arena, with_fast_leave};
                     arena->execute([&] {
                         for(std::size_t thr = 0; thr < num_threads-1; ++thr) {
                             tbb::this_task_arena::enqueue(body);
@@ -319,7 +319,7 @@ TEST_CASE("Check that workers leave faster with leave_policy::fast") {
         tbb::task_arena::priority::normal,
         tbb::task_arena::leave_policy::automatic
     };
-    tbb::task_arena ta_fast_leave { 
+    tbb::task_arena ta_fast_leave {
         tbb::task_arena::automatic, 1,
         tbb::task_arena::priority::normal,
         tbb::task_arena::leave_policy::fast
