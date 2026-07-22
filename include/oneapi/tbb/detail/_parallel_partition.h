@@ -47,7 +47,7 @@ namespace d1 {
 // and a false/true pair is neutralized by swapping, with any remainder
 // moved inward.
 //
-// After reduction, the surviving leftover determines the partition point. For add n,
+// After reduction, the surviving leftover determines the partition point. For odd n,
 // the uncovered middle element is placed separately.
 
 template <typename RandomAccessIterator, typename Predicate>
