@@ -509,7 +509,7 @@ public:
     } 
 
     void release_concurrency_and_spawn_next(const Input& input_msg) {
-        __TBB_ASSERT(m_input_ptr != nullptr, "m_input_ptr should never be nullptr when releasing concurrency slot");
+        __TBB_ASSERT(m_input_ptr, "m_input_ptr shouldn't be 0 when releasing concurrency slot");
         // Call back to the input layer to release concurrency slot and get next task
         // Only do this if concurrency is limited (not unlimited)
         graph_task* next_task = m_input_ptr->release_concurrency_slot(input_msg);
