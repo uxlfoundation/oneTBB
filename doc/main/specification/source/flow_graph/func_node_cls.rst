@@ -21,7 +21,7 @@ A node that executes a user-provided body on incoming messages.
         class function_node : public graph_node, public receiver<Input>, public sender<Output> {
         public:
             template<typename Body>
-            function_node( graph &g, size_t concurrency, Body body, Policy /*unspecified*/ = Policy(),
+            function_node( graph &g, size_t concurrency, Body body, Policy = Policy(),
                            node_priority_t priority = no_priority );
             template<typename Body>
             function_node( graph &g, size_t concurrency, Body body,
@@ -30,8 +30,17 @@ A node that executes a user-provided body on incoming messages.
 
             function_node( const function_node &src );
 
+            // Preview feature: Helper Functions for Expressing Graphs
+            template <typename Body>
+            function_node(decltype(follows(...)), std::size_t concurrency, Body body, Policy = Policy());
+            template <typename Body>
+            function_node(decltype(precedes(...)), std::size_t concurrency, Body body, Policy = Policy());
+
             bool try_put( const Input &v );
             bool try_get( Output &v );
+
+            // Preview feature: Waiting for Single Message
+            bool try_put_and_wait(const Input& input);
         };
 
     } // namespace flow
@@ -143,6 +152,16 @@ Where:
 
 * ``input_t`` is an alias to ``Body`` input argument type.
 * ``output_t`` is an alias to ``Body`` return type.
+
+Preview Features
+----------------
+
+The following preview features extend the ``function_node`` API:
+
+* :ref:`Helper Functions for Expressing Graphs<helpers_for_expressing_graphs>` -
+  allows ``function_node`` to be constructed as a successor or a predecessor of the set of nodes.
+* :ref:`Waiting for Single Message in Flow Graph<waiting_for_single_message_in_flow_graph>` -
+  allows to put messages to ``function_node`` and wait for all related work to complete.
 
 Example
 -------

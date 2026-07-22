@@ -165,8 +165,8 @@ Waiting for Single Messages in Flow Graph (preview)
 .. toctree::
     :maxdepth: 2
 
-    flow_graph/waiting_for_single_messages_in_flow_graph.rst
-
+    flow_graph/waiting_for_single_messages.rst
+    
 Examples
 --------
 

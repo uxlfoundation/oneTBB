@@ -25,7 +25,14 @@ in the incoming tuple.
             split_node( const split_node &other );
             ~split_node();
 
+            // Preview feature: Helper Functions for Expressing Graphs
+            explicit split_node(decltype(follows(...)));
+            explicit split_node(decltype(precedes(...)));
+
             bool try_put( const TupleType &v );
+
+            // Preview feature: Waiting for Single Message
+            bool try_put_and_wait(const TupleType& input);
 
             using output_ports_type = /*implementation-defined*/ ;
             output_ports_type& output_ports();
@@ -79,3 +86,13 @@ Member functions
 .. cpp:function:: output_ports_type& output_ports()
 
   **Returns**: a ``std::tuple`` of output ports.
+
+Preview Features
+----------------
+
+The following preview features extend the ``split_node`` API:
+
+* :ref:`Helper Functions for Expressing Graphs<helpers_for_expressing_graphs>` -
+  allows ``split_node`` to be constructed as a successor or a predecessor of the set of nodes.
+* :ref:`Waiting for Single Message in Flow Graph<waiting_for_single_message_in_flow_graph>` -
+  allows to put messages to ``broadcast_node`` and wait for all related work to complete.

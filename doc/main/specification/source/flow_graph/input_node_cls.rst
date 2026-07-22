@@ -26,6 +26,10 @@ result to all of its successors.
             input_node( const input_node &src );
             ~input_node();
 
+            // Preview feature: Helper Functions for Expressing Graphs
+            template <typename Body>
+            input_node(decltype(precedes(...)), Body body);
+
             void activate();
             bool try_get( Output &v );
         };
@@ -107,3 +111,11 @@ Deduction Guides
 Where:
 
 * ``input_t`` is an alias to ``Body`` input argument type.
+
+Preview Features
+----------------
+
+The following preview features extend the ``input_node`` API:
+
+* :ref:`Helper Functions for Expressing Graphs<helpers_for_expressing_graphs>` -
+  Allows ``input_node`` to be constructed as a predecessor of the set of nodes.

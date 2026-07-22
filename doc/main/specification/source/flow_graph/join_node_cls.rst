@@ -1,8 +1,5 @@
-.. SPDX-FileCopyrightText: 2019-2021 Intel Corporation
-..
-.. SPDX-License-Identifier: CC-BY-4.0
+.. _join_node_cls::
 
-=========
 join_node
 =========
 **[flow_graph.join_node]**
@@ -27,6 +24,10 @@ tuple to all of its successors.
             explicit join_node( graph &g );
             join_node( const join_node &src );
 
+            // Preview feature: Helper Functions for Expressing Graphs
+            explicit join_node(decltype(follows(...)), JoinPolicy = JoinPolicy());
+            explicit join_node(decltype(precedes(...)), JoinPolicy = JoinPolicy());
+
             input_ports_type &input_ports( );
 
             bool try_get( OutputTuple &v );
@@ -37,17 +38,27 @@ tuple to all of its successors.
         public:
             using input_ports_type = /*implementation-defined*/;
 
-            explicit join_node( graph &g );
+            explicit join_node( graph &g ); // Preview feature: Type-specified Keys
+
             join_node( const join_node &src );
 
             template <typename B0, typename... BN>
             join_node( graph &g, B0 b0, BN... bn );
+
+            // Preview feature: Helper Functions for Expressing Graphs
+            template <typename B0, typename... BN>
+            join_node(decltype(follows(...)), B0 b0, BN... bn);
+            template <typename B0, typename... BN>
+            join_node(decltype(precedes(...)), B0 b0, BN... bn);
 
             input_ports_type &input_ports( );
 
             bool try_get( OutputTuple &v );
         };
 
+        // Preview feature: type-specified keys
+        template <typename K, typename T>
+        K key_from_message(const T &t);
     } // namespace flow
     } // namespace tbb
     } // namespace oneapi
@@ -170,3 +181,14 @@ Where:
 
 * ``input_t`` is an alias to the input argument type of the passed function object.
 * ``output_t`` is an alias to the return type of the passed function object.
+
+Preview Features
+----------------
+
+The following preview features extend the ``join_node`` API:
+
+* :ref:`Type-Specified Message Keys <join_node_type_specified_message_keys>` -
+  Allows the ``key_matching`` specialization to obtain keys via type-associated
+  functions instead of explicit key extractor function objects.
+* :ref:`Helper Functions for Expressing Graphs<helpers_for_expressing_graphs>` -
+  Allows ``join_node`` to be constructed as a successor or a predecessor of the set of nodes.

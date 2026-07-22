@@ -41,15 +41,18 @@ are not related to the particular ``task_group``.
             task_group_status run_and_wait(task_handle&& h);
 
             task_group_status wait();
+
+            // Preview feature: Waiting a Single Task
+            task_group_status wait_for_task(task_completion_handle& comp_handle);
+            task_group_status run_and_wait_for_task(task_handle&& handle);
+            task_group_status get_status_of(task_completion_handle& comp_handle);
+
             void cancel();
 
-#if TBB_PREVIEW_TASK_GROUP_EXTENSIONS // Option 1
-
-            // Preview features // Option 2
+            // Preview feature: Dynamic Dependencies
             static void set_task_order(task_handle& pred, task_handle& succ);
             static void set_task_order(task_completion_handle& pred, task_handle& succ);
             static void transfer_this_task_completion_to(task_handle& t);
-#endif
         };
 
         bool is_current_task_group_canceling();
@@ -138,3 +141,16 @@ Non-member functions
 
     Returns true if an innermost ``task_group`` executing on this thread is cancelling its tasks.
 
+Preview Features
+----------------
+
+The following preview features extend the ``task_group`` API:
+
+* :ref:`Task Bypass Support<custom_mutex_chmap>` -
+  allows returning a ``task_handle`` from a task body as a hint on which task should be
+  executed next.
+* :ref:`Dynamic Dependencies<dynamic_dependencies>` -
+  allows setting execution dependencies between tasks in ``task_group``.
+* :ref:`Waiting for Individual tasks<wait_single_task>` -
+  allows waiting for an individual task to complete instead of waiting for all
+  tasks in ``task_group``.

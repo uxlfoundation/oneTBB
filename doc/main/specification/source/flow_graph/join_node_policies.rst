@@ -1,8 +1,5 @@
-.. SPDX-FileCopyrightText: 2019-2021 Intel Corporation
-..
-.. SPDX-License-Identifier: CC-BY-4.0
+.. _join_node_policies::
 
-==================
 join_node Policies
 ==================
 **[flow_graph.join_node_policies]**
@@ -49,3 +46,9 @@ join_node Policies
   constructs a tuple containing the matching messages and attempts to broadcast it to all successors.
   If no successor accepts the tuple, it is saved and will be forwarded on a subsequent ``try_get``.
 * ``tag_matching`` - A specialization of ``key_matching`` that accepts keys of type ``tag_value``.
+
+.. rubric:: See Also
+
+  :ref:`join_node Specification<join_node_cls>`
+  :ref:`Type-specified Message keys for join_node<_join_node_type_specified_message_keys>`
+  

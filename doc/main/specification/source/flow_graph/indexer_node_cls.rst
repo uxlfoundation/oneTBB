@@ -27,6 +27,10 @@ which the message was received.
             indexer_node(graph &g);
             indexer_node(const indexer_node &src);
 
+            // Preview feature: Helper Functions for Expressing Graphs
+            explicit indexer_node(decltype(follows(...)));
+            explicit indexer_node(decltype(precedes(...)));
+
             using input_ports_type = /*implementation_defined*/;
             input_ports_type &input_ports();
 
@@ -92,6 +96,14 @@ Member functions
     support gets.
 
     **Returns**: ``false``.
+
+Preview Features
+----------------
+
+The following preview features extend the ``indexer_node`` API:
+
+* :ref:`Helper Functions for Expressing Graphs<helpers_for_expressing_graphs>` -
+  Allows ``indexer_node`` to be constructed as a successor or a predecessor of the set of nodes.
 
 See also:
 

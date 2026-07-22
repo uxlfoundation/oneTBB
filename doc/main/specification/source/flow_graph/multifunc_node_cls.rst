@@ -31,6 +31,12 @@ one or more messages that are broadcast to successors.
             multifunction_node( const multifunction_node& other );
             ~multifunction_node();
 
+            // Preview feature: Helper Functions for Expressing Graphs
+            template <typename Body>
+            multifunction_node(decltype(follows(...)), std::size_t concurrency, Body body, Policy = Policy());
+            template <typename Body>
+            multifunction_node(decltype(precedes(...)), std::size_t concurrency, Body body, Policy = Policy());
+
             bool try_put( const Input &v );
 
             using output_ports_type = /*implementation-defined*/;
@@ -135,3 +141,11 @@ it.
     output_ports_type& output_ports();
 
 **Returns:** a ``std::tuple`` of output ports.
+
+Preview Features
+----------------
+
+The following preview features extend the ``multifunction_node`` API:
+
+* :ref:`Helper Functions for Expressing Graphs<helpers_for_expressing_graphs>` -
+  Allows ``multifunction_node`` to be constructed as a successor or a predecessor of the set of nodes.

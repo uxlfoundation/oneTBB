@@ -24,8 +24,15 @@ A class template that forwards messages in a priority order.
             priority_queue_node( const priority_queue_node &src );
             ~priority_queue_node();
 
+            // Preview feature: Helper Functions for Expressing Graphs
+            explicit priority_queue_node(decltype(follows(...)), const Compare& comp = Compare());
+            explicit priority_queue_node(decltype(precedes(...)), const Compare& comp = Compare());
+
             bool try_put( const T &v );
             bool try_get( T &v );
+
+            // Preview feature: Waiting for Single Message
+            bool try_put_and_wait(const T& input);
         };
 
     } // namespace flow
@@ -73,6 +80,16 @@ Member functions
     **Returns**: ``true`` if a message is available in the node and the node is not currently reserved.
     Otherwise, returns ``false``. If the node returns ``true``, the message with the largest
     priority is copied to ``v``.
+
+Preview Features
+----------------
+
+The following preview features extend the ``priority_queue_node`` API:
+
+* :ref:`Helper Functions for Expressing Graphs<helpers_for_expressing_graphs>` -
+  allows ``priority_queue_node`` to be constructed as a successor or a predecessor of the set of nodes.
+* :ref:`Waiting for Single Message in Flow Graph<waiting_for_single_message_in_flow_graph>` -
+  allows to put messages to ``priority_queue_node`` and wait for all related work to complete.
 
 Example
 -------

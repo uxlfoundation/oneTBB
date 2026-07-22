@@ -4,52 +4,28 @@ concurrent_lru_cache
 ====================
 
 .. note::
-   To enable this feature, define the ``TBB_PREVIEW_CONCURRENT_LRU_CACHE`` macro to 1.
+   To enable this feature, define the ``TBB_PREVIEW_CONCURRENT_LRU_CACHE`` macro to ``1``.
 
-A Class Template for Least Recently Used cache with concurrent operations.
+``concurrent_lru_cache`` is a container that implements a Least Recently Used (LRU) cache supporting concurrent access.
+It maps keys to values with the ability to limit the number of stored unused values. For each key, there is at most
+one item stored in the container.
 
-.. contents::
-    :local:
-    :depth: 1
+The container tracks which items are in use by returning a proxy ``concurrent_lru_cache::handle`` object that refers
+to an item instead of its value. Once there are no ``handle`` objects holding reference to an item, it is considered unused.
 
-Description
-***********
+The container stores all the items that are currently in use plus a limited number of unused items. Excessive unused items
+are erased according to Least Recently Used policy.
 
-A ``concurrent_lru_cache`` container maps keys to values with the ability
-to limit the number of stored unused values. For each key, there is at most one item
-stored in the container.
-
-The container permits multiple threads to concurrently retrieve items from it.
-
-The container tracks which items are in use by returning a proxy
-``concurrent_lru_cache::handle`` object that refers to an item instead of its value.
-Once there are no ``handle`` objects holding reference to an item, it is considered unused.
-
-The container stores all the items that are currently in use plus a limited
-number of unused items. Excessive unused items are erased according to
-least recently used policy.
-
-When no item is found for a given key, the container calls the user-specified
-``value_function_type`` object to construct a value for the key, and stores that value.
-The ``value_function_type`` object must be thread-safe.
-
-API
-***
-
-Header
-------
+When no item is found for a given key, the container invokes the user-specified ``value_function_type`` to construct and
+store a new value. The ``value_function_type`` object must be thread-safe.
 
 .. code:: cpp
 
-    #include "oneapi/tbb/concurrent_lru_cache.h"
-
-Synopsis
---------
-
-.. code:: cpp
+    // Defined in header <oneapi/tbb/concurrent_lru_cache.h>
 
     namespace oneapi {
         namespace tbb {
+
             template <typename Key, typename Value, typename ValueFunctionType = Value (*)(Key)>
             class concurrent_lru_cache {
             public:
@@ -79,42 +55,13 @@ Synopsis
                 ~concurrent_lru_cache();
 
                 handle operator[]( key_type key );
-            }; // class concurrent_lru_cache
+            };
+
         } // namespace tbb
     } // namespace oneapi
 
-Member Functions
+``handle`` Class
 ----------------
-
-.. cpp:function:: concurrent_lru_cache( value_function_type f, std::size_t number_of_lru_history_items );
-
-    **Effects**: Constructs an empty cache that can keep up to ``number_of_lru_history_items``
-    unused values, with a function object ``f`` for constructing new values.
-
--------------------------------------------------------
-
-.. cpp:function:: ~concurrent_lru_cache();
-
-    **Effects**: Destroys the ``concurrent_lru_cache``. Calls the destructors of the stored elements and
-    deallocates the used storage.
-
-The behavior is undefined in case of concurrent operations with ``*this``.
-
--------------------------------------------------------
-
-.. cpp:function:: handle operator[]( key_type k );
-
-    **Effects**: Searches the container for an item that corresponds to the given key.
-    If such an item is not found, the user-specified function object is called to
-    construct a value that is inserted into the container.
-
-    **Returns**: a ``handle`` object holding reference to the matching value.
-
-Member Objects
---------------
-
-``handle`` class
-^^^^^^^^^^^^^^^^
 
 **Member Functions**
 
@@ -136,7 +83,7 @@ Member Objects
 
     **Effects**: Releases the reference (if it exists) to a value stored in ``concurrent_lru_cache``.
 
-The behavior is undefined for concurrent operations with ``*this``.
+    The behavior is undefined for concurrent operations with ``*this``.
 
 ---------------------------------------------------
 
@@ -160,4 +107,35 @@ The behavior is undefined for concurrent operations with ``*this``.
 
     **Returns**: a reference to a ``value_type`` object stored in ``concurrent_lru_cache``.
 
-The behavior is undefined if ``*this`` does not refer to any value.
+    The behavior is undefined if ``*this`` does not refer to any value.
+
+Member Functions
+----------------
+
+.. cpp:function:: concurrent_lru_cache( value_function_type f, std::size_t number_of_lru_history_items );
+
+    **Effects**: Constructs an empty cache that can keep up to ``number_of_lru_history_items``
+    unused values, with ``f`` as the function object to call with a ``key_type`` argument to construct a new value.
+
+-------------------------------------------------------
+
+.. cpp:function:: ~concurrent_lru_cache();
+
+    **Effects**: Destroys the ``concurrent_lru_cache``. Calls the destructors of the stored elements and
+    deallocates the used storage.
+
+    The behavior is undefined in case of concurrent operations with ``*this``.
+
+-------------------------------------------------------
+
+.. cpp:function:: handle operator[]( key_type k );
+
+    **Effects**: Searches the container for an item that corresponds to the given key.
+    If such an item is not found, the user-specified function object is called to
+    construct a value that is inserted into the container.
+
+    **Returns**: a ``handle`` object holding reference to the matching value.
+
+.. rubric:: See Also
+
+    :ref:`Preview Features<preview_features>`
