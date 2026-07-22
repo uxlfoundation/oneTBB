@@ -157,7 +157,7 @@ public:
             while (left != real_chunk_end && m_pred(*left))
                 ++left;
             while (right != mirror_chunk_begin && !m_pred(*(right - 1)))
-                ++right;
+                --right;
 
             if (left != real_chunk_end && right != mirror_chunk_begin) {
                 std::iter_swap(left, std::prev(right));
