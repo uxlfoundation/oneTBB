@@ -24,6 +24,7 @@
 #include "../task_group.h"
 #include <algorithm>
 #include <iterator>
+#include <cstddef>
 
 namespace tbb {
 namespace detail {
@@ -63,7 +64,7 @@ class parallel_partition_body {
     RandomAccessIterator m_false_leftover;
     RandomAccessIterator m_true_leftover;
 
-    Predicate&           m_pred;
+    Predicate            m_pred;
     task_group_context&  m_ctx;
     RandomAccessIterator g_first;
     RandomAccessIterator g_last;

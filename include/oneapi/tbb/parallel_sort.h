@@ -101,7 +101,7 @@ public:
 
     difference_type pseudo_median_of_nine() const {
         difference_type n = m_last - m_first;
-        std::size_t offset = n / 8u;
+        difference_type offset = n / difference_type(8);
         return median_of_three(median_of_three(0, offset, offset * 2),
                                median_of_three(offset * 3, offset * 4, offset * 5),
                                median_of_three(offset * 6, offset * 7, n - 1));
