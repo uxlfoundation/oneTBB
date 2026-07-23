@@ -508,6 +508,12 @@ inline size_t NonZero(void *ptr, size_t size)
     return 0;
 }
 
+template <typename T>
+T force_constant_odr_use(const T& value) {
+    volatile const T* addr = &value;
+    return *addr;
+}
+
 } // namespace utils
 
 #endif // __TBB_test_common_utils_H

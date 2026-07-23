@@ -265,3 +265,13 @@ TEST_CASE("Using custom assertion handler to test failure on invalid constraints
         tbb::info::default_concurrency(tbb::task_arena::constraints{}.set_max_threads_per_core(0)),
         "Wrong max_threads_per_core constraints field value.");
 }
+
+#if __TBB_CPP17_PRESENT
+//! \brief \ref regression
+TEST_CASE("ODR-use task_arena::selectable") {
+    CHECK(utils::force_constant_odr_use(tbb::task_arena::selectable) == tbb::task_arena::selectable);
+
+    auto task_arena_ptr = std::make_unique<tbb::task_arena>(tbb::task_arena::automatic);
+    CHECK(task_arena_ptr != nullptr);
+}
+#endif // __TBB_CPP17_PRESENT
