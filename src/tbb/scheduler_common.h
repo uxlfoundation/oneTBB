@@ -267,6 +267,45 @@ inline void prolonged_pause() {
     prolonged_pause_impl();
 }
 
+class waitpkg_backoff {
+    static constexpr std::uint32_t max_ticks_multiplier = 16;
+    static constexpr std::uint64_t base_wait_ticks = 256;
+
+    const void* my_monitor_addr;
+    std::uint32_t my_ticks_multiplier;
+    atomic_backoff my_fallback_backoff;
+
+public:
+    waitpkg_backoff() : my_monitor_addr(nullptr), my_ticks_multiplier(1) {}
+
+    explicit waitpkg_backoff(const void* addr) : my_monitor_addr(addr), my_ticks_multiplier(1) {}
+
+    waitpkg_backoff(const waitpkg_backoff&) = delete;
+    waitpkg_backoff& operator=(const waitpkg_backoff&) = delete;
+
+    bool bounded_pause() {
+#if __TBB_WAITPKG_INTRINSICS_PRESENT
+        if (governor::wait_package_enabled()) {
+            if (my_monitor_addr) {
+                _umonitor(const_cast<void*>(my_monitor_addr));
+            }
+            std::uint64_t deadline = machine_time_stamp() + my_ticks_multiplier * base_wait_ticks;
+            if (my_monitor_addr) {
+                _umwait(0, deadline);
+            } else {
+                _tpause(0, deadline);
+            }
+            if (my_ticks_multiplier < max_ticks_multiplier) {
+                my_ticks_multiplier *= 2;
+                return true;
+            }
+            return false;
+        }
+#endif
+        return my_fallback_backoff.bounded_pause();
+    }
+};
+
 // TODO: investigate possibility to work with number of CPU cycles
 // because for different configurations this number of pauses + yields
 // will be calculated in different amount of CPU cycles
@@ -350,7 +389,7 @@ inline void handle_context_exception(d1::task_group_context& ctx, bool rethrow =
 
     tbb_exception_ptr* exception = ctx.my_exception.load(std::memory_order_acquire);
     if (exception) {
-        if (ctx.my_exception.compare_exchange_strong(exception, nullptr, 
+        if (ctx.my_exception.compare_exchange_strong(exception, nullptr,
                                                      std::memory_order_acq_rel)) {
             // TODO: An exception should not be captured and then not rethrown.
             //       Either add asserts or remove corner cases.

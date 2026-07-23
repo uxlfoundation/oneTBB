@@ -150,7 +150,7 @@ d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t
     constexpr int max_lock_attempts = 4;
     d1::task** victim_pool = nullptr;
     int attempts = 0;
-    atomic_backoff backoff;
+    waitpkg_backoff backoff(&task_pool);
     do {
         victim_pool = try_lock_task_pool();
         if (victim_pool != LockedTaskPool) {
@@ -159,7 +159,7 @@ d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t
         }
         __TBB_ASSERT(victim_pool == LockedTaskPool, nullptr);
         attempts++;
-    } while (attempts < max_lock_attempts && backoff.bounded_pause() );
+    } while (attempts < max_lock_attempts && backoff.bounded_pause());
 
     if (victim_pool == LockedTaskPool || victim_pool == EmptyTaskPool) {
         return nullptr;
