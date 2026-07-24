@@ -265,7 +265,7 @@
 
 #define __TBB_CPP17_MEMORY_RESOURCE_PRESENT             (_MSC_VER >= 1913 && (__TBB_LANG > 201402L) || \
                                                         __TBB_GLIBCXX_VERSION >= 90000 && __TBB_LANG >= 201703L)
-#define __TBB_CPP17_HW_INTERFERENCE_SIZE_PRESENT        (_MSC_VER >= 1911)
+#define __TBB_CPP17_HW_INTERFERENCE_SIZE_PRESENT        (_MSC_VER >= 1911 && !__clang__)
 #define __TBB_CPP17_LOGICAL_OPERATIONS_PRESENT          (__TBB_LANG >= 201703L)
 #define __TBB_CPP17_ALLOCATOR_IS_ALWAYS_EQUAL_PRESENT   (__TBB_LANG >= 201703L)
 #define __TBB_CPP17_IS_SWAPPABLE_PRESENT                (__TBB_LANG >= 201703L)
