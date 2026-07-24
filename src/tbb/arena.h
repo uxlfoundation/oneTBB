@@ -416,7 +416,8 @@ public:
     template<arena::new_work_type work_type> void advertise_new_work();
 
     //! Attempts to steal a task from a randomly chosen arena slot
-    d1::task* steal_task(unsigned arena_index, FastRandom& frnd, execution_data_ext& ed, isolation_type isolation);
+    d1::task* steal_task(unsigned arena_index, FastRandom& frnd, execution_data_ext& ed, isolation_type isolation,
+                         steal_attempt_outcome& outcome);
 
     //! Get a task from a global starvation resistant queue
     template<task_stream_accessor_type accessor>
@@ -528,7 +529,9 @@ void arena::advertise_new_work() {
     }
 }
 
-inline d1::task* arena::steal_task(unsigned arena_index, FastRandom& frnd, execution_data_ext& ed, isolation_type isolation) {
+inline d1::task* arena::steal_task(unsigned arena_index, FastRandom& frnd, execution_data_ext& ed, isolation_type isolation,
+                                   steal_attempt_outcome& outcome) {
+    __TBB_ASSERT(outcome == steal_attempt_outcome::no_task, nullptr);
     auto slot_num_limit = my_limit.load(std::memory_order_relaxed);
     if (slot_num_limit == 1) {
         // No slots to steal from
@@ -547,7 +550,7 @@ inline d1::task* arena::steal_task(unsigned arena_index, FastRandom& frnd, execu
     arena_slot* victim = &my_slots[k];
     d1::task **pool = victim->task_pool.load(std::memory_order_relaxed);
     d1::task *t = nullptr;
-    if (pool == EmptyTaskPool || !(t = victim->steal_task(*this, isolation, k))) {
+    if (pool == EmptyTaskPool || !(t = victim->steal_task(*this, isolation, k, outcome))) {
         return nullptr;
     }
     if (task_accessor::is_proxy_task(*t)) {

@@ -165,11 +165,12 @@ inline d1::task* task_dispatcher::get_stream_or_critical_task(
 
 inline d1::task* task_dispatcher::steal_or_get_critical(
     execution_data_ext& ed, arena& a, unsigned arena_index, FastRandom& random,
-    isolation_type isolation, bool critical_allowed)
+    isolation_type isolation, bool critical_allowed, steal_attempt_outcome& outcome)
 {
-    if (d1::task* t = a.steal_task(arena_index, random, ed, isolation)) {
+    if (d1::task* t = a.steal_task(arena_index, random, ed, isolation, outcome)) {
         ed.context = task_accessor::context(*t);
         ed.isolation = task_accessor::isolation(*t);
+        outcome = steal_attempt_outcome::success;
         return get_critical_task(t, ed, isolation, critical_allowed);
     }
     return nullptr;
@@ -212,6 +213,7 @@ d1::task* task_dispatcher::receive_or_steal_task(
             ctxguard.maybe_end_itt_task(waiter.pause_count());
         }
         // Start searching
+        steal_attempt_outcome steal_outcome = steal_attempt_outcome::no_task;
         if (t != nullptr) {
             // continue_execution returned a task
         }
@@ -226,7 +228,7 @@ d1::task* task_dispatcher::receive_or_steal_task(
             // Checked if there are tasks in starvation-resistant stream. Only allowed at the outermost dispatch level without isolation.
         }
         else if (stealing_is_allowed
-                 && (t = steal_or_get_critical(ed, a, arena_index, tls.my_random, isolation, critical_allowed))) {
+                 && (t = steal_or_get_critical(ed, a, arena_index, tls.my_random, isolation, critical_allowed, steal_outcome))) {
             // Stole a task from a random arena slot
         }
         else {
@@ -239,8 +241,9 @@ d1::task* task_dispatcher::receive_or_steal_task(
             a.my_observers.notify_entry_observers(tls.my_last_observer, tls.my_is_worker);
             break; // Stealing success, end of stealing attempt
         }
-        // Nothing to do, pause a little.
-        waiter.pause(slot);
+        if (steal_outcome != steal_attempt_outcome::lock_contended) {
+            waiter.pause(slot);
+        }
     } // end of nonlocal task retrieval loop
 
     __TBB_ASSERT(is_alive(a.my_guard), nullptr);

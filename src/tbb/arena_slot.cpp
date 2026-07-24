@@ -146,7 +146,7 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
     return result;
 }
 
-d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t slot_index) {
+d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t slot_index, steal_attempt_outcome& outcome) {
     constexpr int max_lock_attempts = 4;
     d1::task** victim_pool = nullptr;
     int attempts = 0;
@@ -161,7 +161,10 @@ d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t
         attempts++;
     } while (attempts < max_lock_attempts && backoff.bounded_pause() );
 
-    if (victim_pool == LockedTaskPool || victim_pool == EmptyTaskPool) {
+    if (victim_pool == EmptyTaskPool || victim_pool == LockedTaskPool) {
+        if (victim_pool == LockedTaskPool) {
+            outcome = steal_attempt_outcome::lock_contended;
+        }
         return nullptr;
     }
     d1::task* result = nullptr;
