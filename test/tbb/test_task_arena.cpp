@@ -42,6 +42,7 @@
 #include <stdexcept>
 #include <thread>
 #include <vector>
+#include <memory>
 
 //#include "harness_fp.h"
 
@@ -2251,3 +2252,14 @@ TEST_CASE("Test enqueue guarantees when task_arena is combined with task_group")
 }
 
 #endif // TBB_USE_EXCEPTIONS
+
+#if __TBB_CPP17_PRESENT
+//! \brief \ref regression
+TEST_CASE("ODR-use task_arena constants") {
+    CHECK(utils::force_constant_odr_use(tbb::task_arena::automatic) == tbb::task_arena::automatic);
+    CHECK(utils::force_constant_odr_use(tbb::task_arena::not_initialized) == tbb::task_arena::not_initialized);
+
+    auto task_arena_ptr = std::make_unique<tbb::task_arena>(tbb::task_arena::automatic);
+    CHECK(task_arena_ptr != nullptr);
+}
+#endif // __TBB_CPP17_PRESENT
