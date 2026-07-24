@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -105,9 +106,8 @@ void set(std::string& string_ref, KeyType key) {
 template <typename RandomAccessIterator, typename Compare>
 bool fill_ranges(RandomAccessIterator test_range_begin, RandomAccessIterator sorted_range_begin,
     std::size_t size, const Compare &compare) {
-
     static char test_case = 0;
-    const char num_cases = 3;
+    const char num_cases = 5;
 
     if (test_case < num_cases) {
         // switch on the current test case, filling the test_list and sorted_list appropriately
@@ -131,6 +131,25 @@ bool fill_ranges(RandomAccessIterator test_range_begin, RandomAccessIterator sor
                 for (std::size_t i = 0; i < size; i++) {
                     set(test_range_begin[i], size - i);
                     set(sorted_range_begin[i], size - i);
+                }
+                break;
+            case 3:
+                /* almost-equal list */
+                for (std::size_t i = 0; i < size; i++) {
+                    const std::size_t value = (i == 0 ? 1 : 0);
+                    set(test_range_begin[i], value);
+                    set(sorted_range_begin[i], value);
+                }
+                break;
+            case 4:
+                /* round-robin equal list*/
+                std::vector<std::size_t> values = {1, 2, 3, 4, 5};
+                std::size_t values_index = 0;
+
+                for (std::size_t i = 0; i < size; i++) {
+                    set(test_range_begin[i], values[values_index]);
+                    set(sorted_range_begin[i], values[values_index]);
+                    values_index = (values_index + 1) % values.size();
                 }
                 break;
         }
