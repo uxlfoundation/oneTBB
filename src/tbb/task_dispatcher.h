@@ -199,6 +199,8 @@ d1::task* task_dispatcher::receive_or_steal_task(
     inbox.set_is_idle(true);
 
     bool stealing_is_allowed = can_steal();
+    constexpr int max_consecutive_contended_attempts = 4;
+    int consecutive_contended_attempts = 0;
 
     // Stealing loop mailbox/enqueue/other_slots
     for (;;) {
@@ -241,9 +243,12 @@ d1::task* task_dispatcher::receive_or_steal_task(
             a.my_observers.notify_entry_observers(tls.my_last_observer, tls.my_is_worker);
             break; // Stealing success, end of stealing attempt
         }
-        if (steal_outcome != steal_attempt_outcome::lock_contended) {
-            waiter.pause(slot);
+        if (steal_outcome == steal_attempt_outcome::lock_contended &&
+            ++consecutive_contended_attempts <= max_consecutive_contended_attempts) {
+            continue;
         }
+        consecutive_contended_attempts = 0;
+        waiter.pause(slot);
     } // end of nonlocal task retrieval loop
 
     __TBB_ASSERT(is_alive(a.my_guard), nullptr);
