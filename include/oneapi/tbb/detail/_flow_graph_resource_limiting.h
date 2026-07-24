@@ -21,6 +21,8 @@
 #error Do not #include this internal file directly; use public TBB headers instead.
 #endif
 
+#include "_range_common.h"
+
 #include <unordered_map>
 #include <forward_list>
 #include <functional>
@@ -152,6 +154,11 @@ public:
     resource_limiter(Handle&& handle, Handles&&... handles) {
         emplace_handles(std::forward<Handle>(handle), std::forward<Handles>(handles)...);
     }
+
+    template <typename InputIterator>
+    resource_limiter(InputIterator first, InputIterator last)
+        : m_resource_handles(first, last)
+    {}
 
     void request(consumer_type& consumer, request_id id) override {
         // TODO: consider using an aggregator instead of mutex

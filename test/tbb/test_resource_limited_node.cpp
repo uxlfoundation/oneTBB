@@ -25,6 +25,8 @@
 
 #include "tbb/flow_graph.h"
 
+#include <array>
+
 //! \file test_resource_limited_node.cpp
 //! \brief Test for [preview] functionality
 
@@ -379,6 +381,47 @@ void test_cancellation_with_active_requests(bool same_graph, bool exception) {
     }
 }
 
+template <typename ArrayType, typename... ConstructorArgs>
+void test_resource_limiter_constructor(const ArrayType& resource_values, ConstructorArgs&&... constructor_args) {
+    using namespace oneapi::tbb::flow;
+    using resource_type = typename ArrayType::value_type;
+
+    resource_limiter<int> limiter(std::forward<ConstructorArgs>(constructor_args)...);
+
+    graph g;
+
+    using node_type = resource_limited_node<int, std::tuple<>>;
+    using ports_type = typename node_type::output_ports_type;
+    std::atomic<std::size_t> counter(0);
+
+    auto node_body = [&](int, ports_type&, int resource) {
+        auto is_equal = [=](const resource_type& value) { return value == resource; };
+        CHECK_MESSAGE(std::any_of(resource_values.begin(), resource_values.end(), is_equal),
+                      "Unexpected resource");
+                      
+        ++counter;
+        for (std::size_t i = 0; i < 1000; ++i) {
+            CHECK_MESSAGE(counter <= resource_values.size(), "Detected more resources than expected");
+        }
+        --counter;
+    };
+
+    node_type node(g, unlimited, std::tie(limiter), node_body);
+
+    for (std::size_t i = 0; i < 1000; ++i) {
+        node.try_put(0);
+    }
+    g.wait_for_all();
+    CHECK(counter == 0);
+}
+
+template <std::size_t... Idx, std::size_t N>
+void test_resource_limiter_handles_constructor(std::array<int, N>& resources,
+                                               std::index_sequence<Idx...>) {
+    CHECK(sizeof...(Idx) == N);
+    test_resource_limiter_constructor(resources, resources[Idx]...);
+}
+
 //! \brief \ref interface
 TEST_CASE("Feature test macro") {
     CHECK_MESSAGE(TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING == 202603, "Incorrect feature test macro");
@@ -568,3 +611,12 @@ TEST_CASE("concurrency limit with multiple resources") {
                  "Expected to observe concurrent execution but max_observed=" << max_observed.load());
 }
 
+//! \brief \ref interface \ref requirement
+TEST_CASE("resource_limiter constructors") {
+    std::array<int, 2> resources = {1, 2};
+    // test resource_limiter(Handle&& handle, Handles&&... handles)
+    test_resource_limiter_handles_constructor(resources, std::make_index_sequence<resources.size()>());
+
+    // test resource_limiter(InputIterator first, InputIterator last)
+    test_resource_limiter_constructor(resources, resources.begin(), resources.end());
+}
