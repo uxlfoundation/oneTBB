@@ -36,6 +36,10 @@ if "%TCM_TARGET_ARCH%" == "ia32" (
 set "TCM_BIN_DIR=@BINARY_PATH_PLACEHOLDER@"
 
 if exist "%TCM_BIN_DIR%" (
+    set "INCLUDE=%TCMROOT%\include;%INCLUDE%"
+    set "C_INCLUDE_PATH=%TCMROOT%\include;%C_INCLUDE_PATH%"
+    set "CPLUS_INCLUDE_PATH=%TCMROOT%\include;%CPLUS_INCLUDE_PATH%"
+    set "LIB=@LIBRARY_PATH_PLACEHOLDER@;%LIB%"
     set "PATH=%TCM_BIN_DIR%;%PATH%"
 ) else (
     echo:
@@ -43,11 +47,6 @@ if exist "%TCM_BIN_DIR%" (
     echo:
     exit /b 255
 )
-
-set "INCLUDE=%TCMROOT%\include;%INCLUDE%"
-set "C_INCLUDE_PATH=%TCMROOT%\include;%C_INCLUDE_PATH%"
-set "CPLUS_INCLUDE_PATH=%TCMROOT%\include;%CPLUS_INCLUDE_PATH%"
-set "LIB=@LIBRARY_PATH_PLACEHOLDER@;%LIB%"
 
 :End
 exit /B 0
