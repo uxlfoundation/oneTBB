@@ -416,7 +416,7 @@ public:
     template<arena::new_work_type work_type> void advertise_new_work();
 
     //! Attempts to steal a task from a randomly chosen arena slot
-    d1::task* steal_task(unsigned arena_index, FastRandom& frnd, execution_data_ext& ed, isolation_type isolation);
+    d1::task* steal_task(unsigned arena_index, FastRandom& frnd, execution_data_ext& ed, isolation_type isolation, unsigned& stealing_hint);
 
     //! Get a task from a global starvation resistant queue
     template<task_stream_accessor_type accessor>
@@ -528,26 +528,41 @@ void arena::advertise_new_work() {
     }
 }
 
-inline d1::task* arena::steal_task(unsigned arena_index, FastRandom& frnd, execution_data_ext& ed, isolation_type isolation) {
+inline d1::task* arena::steal_task(unsigned arena_index, FastRandom& frnd, execution_data_ext& ed, isolation_type isolation,
+                                   unsigned& stealing_hint) {
     auto slot_num_limit = my_limit.load(std::memory_order_relaxed);
     if (slot_num_limit == 1) {
         // No slots to steal from
         return nullptr;
     }
     // Try to steal a task from a random victim.
-    std::size_t k = frnd.get() % (slot_num_limit - 1);
-    // The following condition excludes the external thread that might have
-    // already taken our previous place in the arena from the list .
-    // of potential victims. But since such a situation can take
-    // place only in case of significant oversubscription, keeping
-    // the checks simple seems to be preferable to complicating the code.
-    if (k >= arena_index) {
-        ++k; // Adjusts random distribution to exclude self
+    std::size_t k;
+    if (stealing_hint == empty_hint || stealing_hint == dirty_hint) {
+        k = frnd.get() % (slot_num_limit - 1);
+        // The following condition excludes the external thread that might have
+        // already taken our previous place in the arena from the list .
+        // of potential victims. But since such a situation can take
+        // place only in case of significant oversubscription, keeping
+        // the checks simple seems to be preferable to complicating the code.
+        if (k >= arena_index) {
+            ++k; // Adjusts random distribution to exclude self
+        }
+    } else {
+        k = stealing_hint;
     }
+
     arena_slot* victim = &my_slots[k];
     d1::task **pool = victim->task_pool.load(std::memory_order_relaxed);
     d1::task *t = nullptr;
-    if (pool == EmptyTaskPool || !(t = victim->steal_task(*this, isolation, k))) {
+    unsigned local_hint = empty_hint;
+
+    if (pool == EmptyTaskPool) {
+        if (stealing_hint != empty_hint) stealing_hint = dirty_hint;
+        return nullptr;
+    }
+
+    if (!(t = victim->steal_task(*this, isolation, k, arena_index, local_hint))) {
+        stealing_hint = stealing_hint == empty_hint ? local_hint : dirty_hint;
         return nullptr;
     }
     if (task_accessor::is_proxy_task(*t)) {

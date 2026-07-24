@@ -42,8 +42,23 @@ class task_group_context;
 // Arena Slot
 //--------------------------------------------------------------------------------------------------------
 
+static constexpr std::uintptr_t lock_bit    = std::uintptr_t(1) << 0;
+static constexpr std::uintptr_t owner_bit   = std::uintptr_t(1) << 1;
+static constexpr unsigned       index_shift = 2;
+
 static d1::task** const EmptyTaskPool  = nullptr;
-static d1::task** const LockedTaskPool = reinterpret_cast<d1::task**>(~std::intptr_t(0));
+static d1::task** const TaskPoolLockedByOwner = reinterpret_cast<d1::task**>(lock_bit | owner_bit);
+
+static d1::task** stealer_lock_value(unsigned index) {
+    return reinterpret_cast<d1::task**>((std::uintptr_t(index) << index_shift) | lock_bit);
+}
+
+static bool is_locked(d1::task** pool) {
+    return (reinterpret_cast<std::uintptr_t>(pool) & lock_bit) != 0;
+}
+
+static constexpr unsigned empty_hint = ~0u;
+static constexpr unsigned dirty_hint = empty_hint - 1;
 
 struct alignas(max_nfs_size) arena_slot_shared_state {
     //! Scheduler of the thread attached to the slot
@@ -136,7 +151,7 @@ public:
     d1::task* get_task(execution_data_ext&, isolation_type);
 
     //! Steal task from slot's ready pool
-    d1::task* steal_task(arena&, isolation_type, std::size_t);
+    d1::task* steal_task(arena&, isolation_type, std::size_t, unsigned, unsigned&);
 
     //! Some thread is now the owner of this slot
     void occupy() {
@@ -295,11 +310,11 @@ private:
             // Local copy of the arena slot task pool pointer is necessary for the next
             // assertion to work correctly to exclude asynchronous state transition effect.
             d1::task** tp = task_pool.load(std::memory_order_relaxed);
-            __TBB_ASSERT( tp == LockedTaskPool || tp == task_pool_ptr, "slot ownership corrupt?" );
+            __TBB_ASSERT( is_locked(tp) || tp == task_pool_ptr, "slot ownership corrupt?" );
 #endif
             d1::task** expected = task_pool_ptr;
-            if( task_pool.load(std::memory_order_relaxed) != LockedTaskPool &&
-                task_pool.compare_exchange_strong(expected, LockedTaskPool ) ) {
+            if ( !is_locked(task_pool.load(std::memory_order_relaxed)) &&
+                   task_pool.compare_exchange_strong(expected, TaskPoolLockedByOwner)) {
                 // We acquired our own slot
                 break;
             } else if( !sync_prepare_done ) {
@@ -308,7 +323,7 @@ private:
             }
             // Someone else acquired a lock, so pause and do exponential backoff.
         }
-        __TBB_ASSERT( task_pool.load(std::memory_order_relaxed) == LockedTaskPool, "not really acquired task pool" );
+        __TBB_ASSERT( is_locked(task_pool.load(std::memory_order_relaxed)), "not really acquired task pool" );
     }
 
     //! Unlocks the local task pool
@@ -317,13 +332,13 @@ private:
     void release_task_pool() {
         if ( !(task_pool.load(std::memory_order_relaxed) != EmptyTaskPool) )
             return; // we are not in arena - nothing to unlock
-        __TBB_ASSERT( task_pool.load(std::memory_order_relaxed) == LockedTaskPool, "arena slot is not locked" );
+        __TBB_ASSERT( is_locked(task_pool.load(std::memory_order_relaxed)), "arena slot is not locked" );
         task_pool.store( task_pool_ptr, std::memory_order_release );
     }
 
     //! Locks victim's task pool, and returns pointer to it. The pointer can be nullptr.
     /** Garbles victim_arena_slot->task_pool for the duration of the lock. **/
-    d1::task** lock_task_pool() {
+    d1::task** lock_task_pool(unsigned locker_index) {
         d1::task** victim_task_pool;
         for ( atomic_backoff backoff;; /*backoff pause embedded in the loop*/) {
             victim_task_pool = task_pool.load(std::memory_order_relaxed);
@@ -336,47 +351,52 @@ private:
                 break;
             }
             d1::task** expected = victim_task_pool;
-            if (victim_task_pool != LockedTaskPool && task_pool.compare_exchange_strong(expected, LockedTaskPool) ) {
+            d1::task** locker_value = stealer_lock_value(locker_index);
+            if (!is_locked(victim_task_pool) && task_pool.compare_exchange_strong(expected, locker_value)) {
                 // We've locked victim's task pool
                 break;
-            } 
+            }
             // Someone else acquired a lock, so pause and do exponential backoff.
             backoff.pause();
         }
         __TBB_ASSERT(victim_task_pool == EmptyTaskPool ||
-                    (task_pool.load(std::memory_order_relaxed) == LockedTaskPool &&
-                    victim_task_pool != LockedTaskPool), "not really locked victim's task pool?");
+                     (is_locked(task_pool.load(std::memory_order_relaxed)) && !is_locked(victim_task_pool)),
+                     "not really locked victim's task pool?");
         return victim_task_pool;
     }
 
     //! Tries to lock victim's task pool without blocking.
-    d1::task** try_lock_task_pool() {
+    d1::task** try_lock_task_pool(unsigned locker_index) {
         d1::task** victim_task_pool = task_pool.load(std::memory_order_relaxed);
-        if (victim_task_pool == EmptyTaskPool || victim_task_pool == LockedTaskPool) {
+        if (victim_task_pool == EmptyTaskPool || is_locked(victim_task_pool)) {
             return victim_task_pool;
         }
+
         d1::task** expected = victim_task_pool;
-        if (task_pool.compare_exchange_strong(expected, LockedTaskPool)) {
+        d1::task** locker_value = stealer_lock_value(locker_index);
+        if (task_pool.compare_exchange_strong(expected, locker_value)) {
             // Successfully locked the victim's task pool.
-            __TBB_ASSERT(task_pool.load(std::memory_order_relaxed) == LockedTaskPool,
+            __TBB_ASSERT(is_locked(task_pool.load(std::memory_order_relaxed)),
                          "not really locked victim's task pool?");
             return victim_task_pool;
         }
-        return LockedTaskPool;
+
+        // expected is updated by the failed compare_exchange_strong
+        return expected;
     }
 
     //! Unlocks victim's task pool
     /** Restores victim_arena_slot->task_pool munged by lock_task_pool. **/
     void unlock_task_pool(d1::task** victim_task_pool) {
-        __TBB_ASSERT(task_pool.load(std::memory_order_relaxed) == LockedTaskPool, "victim arena slot is not locked");
-        __TBB_ASSERT(victim_task_pool != LockedTaskPool, nullptr);
+        __TBB_ASSERT(is_locked(task_pool.load(std::memory_order_relaxed)), "victim arena slot is not locked");
+        __TBB_ASSERT(!is_locked(victim_task_pool), nullptr);
         task_pool.store(victim_task_pool, std::memory_order_release);
     }
 
 #if TBB_USE_ASSERT
     bool is_local_task_pool_quiescent() const {
         d1::task** tp = task_pool.load(std::memory_order_relaxed);
-        return tp == EmptyTaskPool || tp == LockedTaskPool;
+        return tp == EmptyTaskPool || is_locked(tp);
     }
 
     bool is_quiescent_local_task_pool_empty() const {
@@ -395,7 +415,7 @@ private:
     void leave_task_pool() {
         __TBB_ASSERT(is_task_pool_published(), "Not in arena");
         // Do not reset my_arena_index. It will be used to (attempt to) re-acquire the slot next time
-        __TBB_ASSERT(task_pool.load(std::memory_order_relaxed) == LockedTaskPool, "Task pool must be locked when leaving arena");
+        __TBB_ASSERT(is_locked(task_pool.load(std::memory_order_relaxed)), "Task pool must be locked when leaving arena");
         __TBB_ASSERT(is_quiescent_local_task_pool_empty(), "Cannot leave arena when the task pool is not empty");
         // No release fence is necessary here as this assignment precludes external
         // accesses to the local task pool when becomes visible. Thus it is harmless
@@ -406,7 +426,7 @@ private:
     //! Resets head and tail indices to 0, and leaves task pool
     /** The task pool must be locked by the owner (via acquire_task_pool).**/
     void reset_task_pool_and_leave() {
-        __TBB_ASSERT(task_pool.load(std::memory_order_relaxed) == LockedTaskPool, "Task pool must be locked when resetting task pool");
+        __TBB_ASSERT(is_locked(task_pool.load(std::memory_order_relaxed)), "Task pool must be locked when resetting task pool");
         tail.store(0, std::memory_order_relaxed);
         head.store(0, std::memory_order_relaxed);
         leave_task_pool();

@@ -146,24 +146,47 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
     return result;
 }
 
-d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t slot_index) {
+static unsigned locker_arena_index(d1::task** pool) {
+    return unsigned(reinterpret_cast<std::uintptr_t>(pool) >> index_shift);
+}
+
+static bool is_locked_by_owner(d1::task** pool) {
+    return (reinterpret_cast<std::uintptr_t>(pool) & owner_bit) != 0;
+}
+
+d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t slot_index,
+                                 unsigned self_index, unsigned& follow_hint) {
+    follow_hint = empty_hint;
+    
     constexpr int max_lock_attempts = 2;
     d1::task** victim_pool = nullptr;
     int attempts = 0;
     do {
-        victim_pool = try_lock_task_pool();
-        if (victim_pool != LockedTaskPool) {
+        victim_pool = try_lock_task_pool(self_index);
+
+        if (!is_locked(victim_pool)) {
             // We either successfully locked the victim's task pool or it is empty.
             break;
         }
-        __TBB_ASSERT(victim_pool == LockedTaskPool, nullptr);
         attempts++;
         machine_pause(1);
     } while (attempts < max_lock_attempts);
 
-    if (victim_pool == LockedTaskPool || victim_pool == EmptyTaskPool) {
+    if (is_locked(victim_pool)) {
+        // Lock failed after the bounded attempts
+        if (!is_locked_by_owner(victim_pool)) {
+            unsigned locker = locker_arena_index(victim_pool);
+            __TBB_ASSERT(locker != self_index, nullptr);
+            __TBB_ASSERT(locker != slot_index, nullptr);
+            follow_hint = locker;
+        }
         return nullptr;
     }
+
+    if (victim_pool == EmptyTaskPool) {
+        return nullptr;
+    }
+
     d1::task* result = nullptr;
     std::size_t H = head.load(std::memory_order_relaxed); // mirror
     std::size_t H0 = H;
