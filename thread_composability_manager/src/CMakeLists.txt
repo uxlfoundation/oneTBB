@@ -128,5 +128,7 @@ install(
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}
 )
 
-
-tcm_generate_vars(tcm)
+# Assume outer project generates vars properly
+if (IS_TCM_STANDALONE)
+  tcm_generate_vars(tcm)
+endif()
