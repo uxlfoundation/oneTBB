@@ -1,12 +1,12 @@
 # Resource-Limited Node API for the Flow Graph
 
-Note: This document is a sub-RFC for the [Resource-limited Nodes RFC](./README.md).
+Note: This document is a sub-RFC for the [Resource-limited Nodes RFC](../../proposed/flow_graph_serializers/README.md).
 
 ## Table of Contents
 
 * 1 [Feature Design](#feature-design)
   * 1.1 [Terminology](#terminology)
-  * 1.2 [Proposed Design](#proposed-design)
+  * 1.2 [Preview Feature High-level Design](#preview-feature-high-level-design)
   * 1.3 [API Details](#api-details)
   * 1.4 [API Specification](#api-specification)
     * 1.4.1 [`oneapi::tbb::flow::resource_limiter` Class](#oneapitbbflowresource_limiter-class)
@@ -20,7 +20,7 @@ Note: This document is a sub-RFC for the [Resource-limited Nodes RFC](./README.m
 
 ## Feature Design
 
-As described in the [parent RFC](./README.md),
+As described in the [parent RFC](../../proposed/flow_graph_serializers/README.md),
 the current Flow Graph functional nodes API provides only a mechanism for limiting the number of bodies executed in parallel.
 However, since limiting only the concurrency of a single node does not satisfy
 some use cases, the API should be extended to support limiting access to shared resources across several nodes in the graph.
@@ -35,10 +35,10 @@ some use cases, the API should be extended to support limiting access to shared 
 
 *Protocol* - a set of rules and actions that define the relationship between a consumer and a provider.
 
-### Proposed Design
+### Preview Feature High-level Design
 
-It is proposed to extend the current Flow Graph API with two entities representing a *Provider* and a *Consumer* of one or several
-*Resources* and to implement a *Protocol* with unspecified details.
+The preview feature extends the Flow Graph API with two entities representing a *Provider* and a *Consumer* of one or several
+*Resources* and is implementing a *Protocol* with unspecified details.
 
 ```cpp
 namespace oneapi {
@@ -338,8 +338,8 @@ auto node_body = [](input i, auto& ports, void* resource_handle_ptr1, void* reso
     * `rc_multifunction_node`
     * `resource_limited_multifunction_node`
     * `resource_consumer_multifunction_node`
-2. Should a Resource-Limited alternative for `function_node` be provided?
-3. Should the experimental version of `resource_limited_node` support node priorities?
+2. Should a Resource-Limited alternative for other node types be provided?
+3. How `resource_limited_node` should support node priorities?
 4. Should the `output_ports()` member function be provided by `resource_limited_node`?
 5. Should the `rejecting` alternative be provided for `resource_limited_node`?
 6. Instead of a separate node type, should `resource_limited` be considered as a policy for existing functional nodes?
@@ -351,7 +351,8 @@ auto node_body = [](input i, auto& ports, void* resource_handle_ptr1, void* reso
 
 ### ROOT, GENIE and DB Example
 
-Consider implementing the flow graph described in the [parent RFC](./README.md#implementation-experience).
+Consider implementing the flow graph described in the
+[parent RFC](../../proposed/flow_graph_serializers/README.md#implementation-experience).
 Below is an example of how to implement it using proposed API.
 
 ```cpp
