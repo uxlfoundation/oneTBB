@@ -294,7 +294,89 @@ jobs:
           set -e -x -o pipefail
           mkdir build && cd build
           cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} ${{ matrix.cmake_static }} \
-            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST_PREVIEW=${{ matrix.preview }} ..
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST_PREVIEW=${{ matrix.preview }} -DTCM_BUILD=OFF ..
+          make VERBOSE=1 -j${BUILD_CONCURRENCY}
+          ctest --timeout ${TEST_TIMEOUT} --output-on-failure
+
+  linux-tcm-testing:
+    name: tcm_test_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}
+    runs-on: ['${{ matrix.os }}']
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            c_compiler: clang
+            cxx_compiler: clang++
+            std: 20
+            build_type: relwithdebinfo
+          - os: ubuntu-24.04
+            c_compiler: gcc
+            cxx_compiler: g++
+            std: 17
+            build_type: debug
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install dependencies
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y pkg-config libhwloc-dev hwloc
+      - name: Run testing
+        shell: bash
+        run: |
+          set -e -x -o pipefail
+          mkdir build && cd build
+          cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}  \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
+            -DTCM_BUILD=ON -DTBB_BUILD=OFF ..
+          make VERBOSE=1 -j${BUILD_CONCURRENCY}
+          ctest --timeout ${TEST_TIMEOUT} --output-on-failure
+
+  linux-tcm-integration-testing:
+    name: tcm_integration_test_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}
+    runs-on: ['${{ matrix.os }}']
+    timeout-minutes: 45
+    env:
+      TCM_ENABLE: 1
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            c_compiler: clang
+            cxx_compiler: clang++
+            std: 23
+            build_type: debug
+          - os: ubuntu-24.04
+            c_compiler: gcc
+            cxx_compiler: g++
+            std: 20
+            build_type: relwithdebinfo
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install dependencies
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y pkg-config libhwloc-dev hwloc
+      - name: Run testing
+        shell: bash
+        run: |
+          set -e -x -o pipefail
+          mkdir build && cd build
+          cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}  \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
+            -DTCM_BUILD=ON -DTBB_TCM_TESTING=ON ..
           make VERBOSE=1 -j${BUILD_CONCURRENCY}
           ctest --timeout ${TEST_TIMEOUT} --output-on-failure
 
@@ -393,6 +475,108 @@ jobs:
               throw "CMake configuration step failed, exit code $LastExitCode"
           }
           cmake --build . --config ${{ matrix.build_type }} -j -v
+          if (!$?) {
+              throw "CMake build step failed, exit code $LastExitCode"
+          }
+          ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure
+          if (!$?) {
+              throw "CTest failed, exit code $LastExitCode"
+          }
+
+  windows-tcm-testing:
+    name: tcm_test_${{ matrix.job_name }}
+    runs-on: ['${{ matrix.os }}']
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            c_compiler: cl
+            cxx_compiler: cl
+            std: 23
+            build_type: debug
+            job_name: windows_cl2026_cxx14_debug
+          - os: windows-2022
+            c_compiler: cl
+            cxx_compiler: cl
+            std: 17
+            build_type: relwithdebinfo
+            job_name: windows_cl2022_cxx17_relwithdebinfo
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install Dependencies
+        run: |
+          vcpkg install hwloc
+      - name: Run testing
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+            -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} `
+            -DTCM_BUILD=ON -DTBB_BUILD=OFF `
+            -DCMAKE_TOOLCHAIN_FILE="${env:VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" ..
+          if (!$?) {
+              throw "CMake configuration step failed, exit code $LastExitCode"
+          }
+          cmake --build . --config ${{ matrix.build_type }} --parallel -v
+          if (!$?) {
+              throw "CMake build step failed, exit code $LastExitCode"
+          }
+          ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure
+          if (!$?) {
+              throw "CTest failed, exit code $LastExitCode"
+          }
+
+  windows-tcm-integration_testing:
+    name: tcm_integration_test_${{ matrix.job_name }}
+    runs-on: ['${{ matrix.os }}']
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            c_compiler: cl
+            cxx_compiler: cl
+            std: 20
+            build_type: relwithdebinfo
+            job_name: windows_cl2026_cxx14_relwithdebinfo
+          - os: windows-2022
+            c_compiler: cl
+            cxx_compiler: cl
+            std: 17
+            build_type: debug
+            job_name: windows_cl2022_cxx17_debug
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install Dependencies
+        run: |
+          vcpkg install hwloc
+      - name: Run testing
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+            -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} `
+            -DTCM_BUILD=ON -DTBB_TCM_TESTING=ON `
+            -DCMAKE_TOOLCHAIN_FILE="${env:VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" ..
+          if (!$?) {
+              throw "CMake configuration step failed, exit code $LastExitCode"
+          }
+          cmake --build . --config ${{ matrix.build_type }} --parallel -v
           if (!$?) {
               throw "CMake build step failed, exit code $LastExitCode"
           }
