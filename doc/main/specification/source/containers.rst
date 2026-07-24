@@ -35,6 +35,7 @@ Unordered associative containers
     :maxdepth: 1
 
     containers/concurrent_hash_map_cls.rst
+    containers/custom_mutex_type_chmap.rst
     containers/concurrent_unordered_map_cls.rst
     containers/concurrent_unordered_multimap.rst
     containers/concurrent_unordered_set_cls.rst
@@ -50,6 +51,14 @@ Ordered associative containers
     containers/concurrent_multimap_cls.rst
     containers/concurrent_set_cls.rst
     containers/concurrent_multiset_cls.rst
+
+LRU cache (preview)
+-------------------
+
+.. toctree::
+    :maxdepth: 1
+
+    containers/concurrent_lru_cache_cls.rst
 
 Auxiliary classes
 -----------------

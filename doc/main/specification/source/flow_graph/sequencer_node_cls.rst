@@ -24,8 +24,17 @@ A node that forwards messages in a sequence order.
             sequencer_node( graph &g, const Sequencer &s );
             sequencer_node( const sequencer_node &src );
 
+            // Preview feature: Helper Functions for Expressing Graphs
+            template <typename Sequencer>
+            sequencer_node(decltype(follows(...)), const Sequencer& s);
+            template <typename Sequencer>
+            sequencer_node(decltype(precedes(...)), const Sequencer& s);
+
             bool try_put( const T &v );
             bool try_get( output_type &v );
+
+            // Preview feature: Waiting for Single Message
+            bool try_put_and_wait(const T& input);
         };
 
     } // namespace flow
@@ -102,6 +111,16 @@ Deduction Guides
 Where:
 
 * ``input_t`` is an alias to ``Body`` input argument type.
+
+Preview Features
+----------------
+
+The following preview features extend the ``sequencer_node`` API:
+
+* :ref:`Helper Functions for Expressing Graphs<helpers_for_expressing_graphs>` -
+  allows ``sequencer_node`` to be constructed as a successor or a predecessor of the set of nodes.
+* :ref:`Waiting for Single Message in Flow Graph<waiting_for_single_message_in_flow_graph>` -
+  allows to put messages to ``sequencer_node`` and wait for all related work to complete.
 
 Example
 -------

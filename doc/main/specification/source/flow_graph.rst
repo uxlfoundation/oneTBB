@@ -112,6 +112,7 @@ messages, as well as for creating reusable custom nodes.
     flow_graph/limiter_node_cls.rst
     flow_graph/broadcast_node_cls.rst
     flow_graph/join_node_cls.rst
+    flow_graph/type_specified_message_keys.rst
     flow_graph/split_node_cls.rst
     flow_graph/indexer_node_cls.rst
     flow_graph/composite_node_cls.rst
@@ -142,7 +143,30 @@ Flow Graph supports a set of specific message types.
     flow_graph/continue_msg_cls.rst
     flow_graph/tagged_msg_cls.rst
 
+Resource-Limiting (preview)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. toctree::
+    :maxdepth: 2
+
+    flow_graph/resource_limiting.rst
+
+Helper Functions for Expressing Graphs (preview)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. toctree::
+    :maxdepth: 2
+
+    flow_graph/helper_functions_for_expressing_graphs.rst
+
+Waiting for Single Messages in Flow Graph (preview)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. toctree::
+    :maxdepth: 2
+
+    flow_graph/waiting_for_single_messages.rst
+    
 Examples
 --------
 

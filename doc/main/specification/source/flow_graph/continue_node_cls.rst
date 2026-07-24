@@ -23,7 +23,7 @@ A node that executes a specified body object when triggered.
             template<typename Body>
             continue_node( graph &g, Body body, node_priority_t priority = no_priority );
             template<typename Body>
-            continue_node( graph &g, Body body, Policy /*unspecified*/ = Policy(),
+            continue_node( graph &g, Body body, Policy = Policy(),
                           node_priority_t priority = no_priority );
 
             template<typename Body>
@@ -31,13 +31,27 @@ A node that executes a specified body object when triggered.
                            node_priority_t priority = no_priority );
             template<typename Body>
             continue_node( graph &g, int number_of_predecessors, Body body,
-                           Policy /*unspecified*/ = Policy(), node_priority_t priority = no_priority );
+                           Policy = Policy(), node_priority_t priority = no_priority );
 
             continue_node( const continue_node &src );
+
+            // Preview feature: Helper Functions for Expressing Graphs
+            template <typename Body>
+            continue_node(decltype(follows(...)), Body body, Policy = Policy());
+            template <typename Body>
+            continue_node(decltype(precedes(...)), Body body, Policy = Policy());
+            template <typename Body>
+            continue_node(decltype(follows(...)), int number_of_predecessors, Body body, Policy = Policy());
+            template <typename Body>
+            continue_node(decltype(precedes(...)), int number_of_predecessors, Body body, Policy = Policy());
+
             ~continue_node();
 
             bool try_put( const input_type &v );
             bool try_get( output_type &v );
+
+            // Preview feature: Waiting for Single Message
+            bool try_put_and_wait(const continue_msg& input);
         };
 
     } // namespace flow
@@ -195,6 +209,16 @@ Where:
 
 * ``continue_output_t<Output>`` is an alias to `Output` template argument type. If `Output` specified
   as ``void``, ``continue_output_t<Output>`` is an alias to ``continue_msg`` type.
+
+Preview Features
+----------------
+
+The following preview features extend the ``continue_node`` API:
+
+* :ref:`Helper Functions for Expressing Graphs<helpers_for_expressing_graphs>` -
+  allows ``continue_node`` to be constructed as a successor or a predecessor of the set of nodes.
+* :ref:`Waiting for Single Message in Flow Graph<waiting_for_single_message_in_flow_graph>` -
+  allows to put messages to ``continue_node`` and wait for all related work to complete.
 
 Example
 -------

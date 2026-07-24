@@ -24,8 +24,15 @@ A node that forwards messages in a first-in first-out (FIFO) order.
             queue_node( const queue_node &src );
             ~queue_node();
 
+            // Preview feature: Helper Functions for Expressing Graphs
+            explicit queue_node(decltype(follows(...)));
+            explicit queue_node(decltype(precedes(...)));
+
             bool try_put( const T &v );
             bool try_get( T &v );
+
+            // Preview feature: Waiting for Single Message
+            bool try_put_and_wait(const T& input);
         };
 
     } // namespace flow
@@ -69,6 +76,16 @@ Member functions
 
     **Returns**: ``true`` if an item can be taken from the node and assigned to ``v``. Returns
     ``false`` if there is no item currently in the ``queue_node`` or if the node is reserved.
+
+Preview Features
+----------------
+
+The following preview features extend the ``queue_node`` API:
+
+* :ref:`Helper Functions for Expressing Graphs<helpers_for_expressing_graphs>` -
+  allows ``queue_node`` to be constructed as a successor or a predecessor of the set of nodes.
+* :ref:`Waiting for Single Message in Flow Graph<waiting_for_single_message_in_flow_graph>` -
+  allows to put messages to ``queue_node`` and wait for all related work to complete.
 
 Example
 -------

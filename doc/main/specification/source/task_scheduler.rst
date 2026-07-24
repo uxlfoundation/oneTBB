@@ -48,6 +48,11 @@ Task Group
    task_scheduler/task_group/task_group_cls.rst
    task_scheduler/task_group/task_group_status_enum.rst
    task_scheduler/task_group/task_handle.rst
+   task_scheduler/task_group/task_completion_handle.rst
+   task_scheduler/task_group/task_bypass.rst
+   task_scheduler/task_group/dynamic_dependencies.rst
+   task_scheduler/task_group/waiting_single_task.rst
+   task_scheduler/task_group/isolated_task_group_cls.rst
 
 Task Arena
 ----------

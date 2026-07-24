@@ -1,10 +1,10 @@
 .. _resource_limiter_cls:
 
-``resource_limiter`` Class
-==========================
+``resource_limiter`` Class (preview)
+====================================
 
-Description
-***********
+.. note::
+    To enable this feature, define the ``TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING`` or the ``TBB_PREVIEW_FLOW_GRAPH_FEATURES`` macro to ``1``.
 
 The class ``resource_limiter<ResourceHandle>`` represents a *Provider* that manages one or more
 resource handles of type ``ResourceHandle``.
@@ -27,24 +27,8 @@ handle to a resource of type ``Database``.
 All the resource handles managed by the ``resource_limiter`` are considered equivalent, and the order in which the access
 to resources is granted to consumers is unspecified.
 
-API
-***
-
-Header
-------
-
 .. code:: cpp
-
-    #define TBB_PREVIEW_FLOW_GRAPH_FEATURES 1
-    // or
-    #define TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING 1
-
-    #include <oneapi/tbb/flow_graph.h>
-
-Synopsis
---------
-
-.. code:: cpp
+    // Defined in header <oneapi/tbb/flow_graph.h>
 
     namespace oneapi {
         namespace tbb {
@@ -104,3 +88,7 @@ Each resource is constructed from the corresponding argument in ``handle`` or ``
 Destroys the ``resource_limiter``. 
 
 If there are consumers that still reference the limiter, the behavior is undefined.
+
+.. rubric:: See Also
+
+    :ref:`Preview Features<preview_features>`

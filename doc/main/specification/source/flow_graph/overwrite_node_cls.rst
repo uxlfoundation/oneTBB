@@ -24,8 +24,15 @@ A node that is a buffer of a single item that can be overwritten.
             overwrite_node( const overwrite_node &src );
             ~overwrite_node();
 
+            // Preview feature: Helper Functions for Expressing Graphs
+            explicit overwrite_node(decltype(follows(...)));
+            explicit overwrite_node(decltype(precedes(...)));
+
             bool try_put( const T &v );
             bool try_get( T &v );
+
+            // Preview feature: Waiting for Single Message
+            bool try_put_and_wait(const T& input);
 
             bool is_valid( );
             void clear( );
@@ -87,6 +94,16 @@ Member functions
 .. cpp:function:: void clear( )
 
     Invalidates the value held in the buffer.
+
+Preview Features
+----------------
+
+The following preview features extend the ``overwrite_node`` API:
+
+* :ref:`Helper Functions for Expressing Graphs<helpers_for_expressing_graphs>` -
+  allows ``overwrite_node`` to be constructed as a successor or a predecessor of the set of nodes.
+* :ref:`Waiting for Single Message in Flow Graph<waiting_for_single_message_in_flow_graph>` -
+  allows to put messages to ``overwrite_node`` and wait for all related work to complete.
 
 Examples
 --------

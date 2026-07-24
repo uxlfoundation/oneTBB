@@ -13,181 +13,184 @@ that holds key-value pairs with unique keys and supports concurrent insertion, l
 Class Template Synopsis
 -----------------------
 
-   .. code:: cpp
+.. code:: cpp
 
-      // Defined in header <oneapi/tbb/concurrent_hash_map.h>
+    // Defined in header <oneapi/tbb/concurrent_hash_map.h>
 
-      namespace oneapi {
-          namespace tbb {
+    namespace oneapi {
+        namespace tbb {
 
-             template <typename Key, typename T,
-                       typename HashCompare = tbb_hash_compare<Key>,
-                       typename Allocator = tbb_allocator<std::pair<const Key, T>>>
-             class concurrent_hash_map {
-             public:
-                   using key_type = Key;
-                   using mapped_type = T;
-                   using value_type = std::pair<const Key, T>;
+            template <typename Key, typename T,
+                typename HashCompare = tbb_hash_compare<Key>,
+                typename Allocator = tbb_allocator<std::pair<const Key, T>>,
+                typename Mutex = spin_rw_mutex> // Preview feature: Customizing the Mutex Type
+            class concurrent_hash_map {
+            public:
+                using key_type = Key;
+                using mapped_type = T;
+                using value_type = std::pair<const Key, T>;
 
-                   using reference = value_type&;
-                   using const_reference = const value_type&;
-                   using pointer = typename std::allocator_traits<Allocator>::pointer;
-                   using const_pointer = typename std::allocator_traits<Allocator>::const_pointer;
+                using reference = value_type&;
+                using const_reference = const value_type&;
+                using pointer = typename std::allocator_traits<Allocator>::pointer;
+                using const_pointer = typename std::allocator_traits<Allocator>::const_pointer;
 
-                   using hash_compare_type = HashCompare;
-                   using allocator_type = Allocator;
+                using hash_compare_type = HashCompare;
+                using allocator_type = Allocator;
 
-                   using size_type = <implementation-defined unsigned integer type>;
-                   using difference_type = <implementation-defined signed integer type>;
+                using size_type = <implementation-defined unsigned integer type>;
+                using difference_type = <implementation-defined signed integer type>;
 
-                   using iterator = <implementation-defined ForwardIterator>;
-                   using const_iterator = <implementation-defined constant ForwardIterator>;
+                using iterator = <implementation-defined ForwardIterator>;
+                using const_iterator = <implementation-defined constant ForwardIterator>;
 
-                   using range_type = <implementation-defined ContainerRange>;
-                   using const_range_type = <implementation-defined constant ContainerRange>;
+                using range_type = <implementation-defined ContainerRange>;
+                using const_range_type = <implementation-defined constant ContainerRange>;
 
-                   class accessor;
-                   class const_accessor;
+                using mutex_type = Mutex; // Preview feature: Customizing the Mutex Type
 
-                   // Construction, destruction, copying
-                   concurrent_hash_map();
+                class accessor;
+                class const_accessor;
 
-                   explicit concurrent_hash_map( const hash_compare_type& compare,
-                                                 const allocator_type& alloc = allocator_type() );
+                // Construction, destruction, copying
+                concurrent_hash_map();
 
-                   explicit concurrent_hash_map( const allocator_type& alloc );
+                explicit concurrent_hash_map( const hash_compare_type& compare,
+                                                const allocator_type& alloc = allocator_type() );
 
-                   concurrent_hash_map( size_type n, const hash_compare_type& compare,
-                                        const allocator_type& alloc = allocator_type() );
+                explicit concurrent_hash_map( const allocator_type& alloc );
 
-                   concurrent_hash_map( size_type n, const allocator_type& alloc = allocator_type() );
+                concurrent_hash_map( size_type n, const hash_compare_type& compare,
+                                    const allocator_type& alloc = allocator_type() );
 
-                   template <typename InputIterator>
-                   concurrent_hash_map( InputIterator first, InputIterator last,
-                                        const hash_compare_type& compare,
-                                        const allocator_type& alloc = allocator_type() );
+                concurrent_hash_map( size_type n, const allocator_type& alloc = allocator_type() );
 
-                   template <typename InputIterator>
-                   concurrent_hash_map( InputIterator first, InputIterator last,
-                                        const allocator_type& alloc = allocator_type() );
+                template <typename InputIterator>
+                concurrent_hash_map( InputIterator first, InputIterator last,
+                                    const hash_compare_type& compare,
+                                    const allocator_type& alloc = allocator_type() );
 
-                   concurrent_hash_map( std::initializer_list<value_type> init,
-                                        const hash_compare_type& compare = hash_compare_type(),
-                                        const allocator_type& alloc = allocator_type() );
+                template <typename InputIterator>
+                concurrent_hash_map( InputIterator first, InputIterator last,
+                                    const allocator_type& alloc = allocator_type() );
 
-                   concurrent_hash_map( std::initializer_list<value_type> init,
-                                        const allocator_type& alloc );
+                concurrent_hash_map( std::initializer_list<value_type> init,
+                                    const hash_compare_type& compare = hash_compare_type(),
+                                    const allocator_type& alloc = allocator_type() );
 
-                   concurrent_hash_map( const concurrent_hash_map& other );
-                   concurrent_hash_map( const concurrent_hash_map& other,
-                                        const allocator_type& alloc );
+                concurrent_hash_map( std::initializer_list<value_type> init,
+                                    const allocator_type& alloc );
 
-                   concurrent_hash_map( concurrent_hash_map&& other );
-                   concurrent_hash_map( concurrent_hash_map&& other,
-                                        const allocator_type& alloc );
+                concurrent_hash_map( const concurrent_hash_map& other );
+                concurrent_hash_map( const concurrent_hash_map& other,
+                                    const allocator_type& alloc );
 
-                   ~concurrent_hash_map();
+                concurrent_hash_map( concurrent_hash_map&& other );
+                concurrent_hash_map( concurrent_hash_map&& other,
+                                    const allocator_type& alloc );
 
-                   concurrent_hash_map& operator=( const concurrent_hash_map& other );
-                   concurrent_hash_map& operator=( concurrent_hash_map&& other );
-                   concurrent_hash_map& operator=( std::initializer_list<value_type> init );
+                ~concurrent_hash_map();
 
-                   allocator_type get_allocator() const;
+                concurrent_hash_map& operator=( const concurrent_hash_map& other );
+                concurrent_hash_map& operator=( concurrent_hash_map&& other );
+                concurrent_hash_map& operator=( std::initializer_list<value_type> init );
 
-                   // Concurrently unsafe modifiers
-                   void clear();
+                allocator_type get_allocator() const;
 
-                   void swap( concurrent_hash_map& other );
+                // Concurrently unsafe modifiers
+                void clear();
 
-                   // Hash policy
-                   void rehash( size_type sz = 0 );
-                   size_type bucket_count() const;
+                void swap( concurrent_hash_map& other );
 
-                   // Size and capacity
-                   size_type size() const;
-                   bool empty() const;
-                   size_type max_size() const;
+                // Hash policy
+                void rehash( size_type sz = 0 );
+                size_type bucket_count() const;
 
-                   // Lookup
-                   bool find( const_accessor& result, const key_type& key ) const;
-                   bool find( accessor& result, const key_type& key );
+                // Size and capacity
+                size_type size() const;
+                bool empty() const;
+                size_type max_size() const;
 
-                   template <typename K>
-                   bool find( const_accessor& result, const K& key ) const;
+                // Lookup
+                bool find( const_accessor& result, const key_type& key ) const;
+                bool find( accessor& result, const key_type& key );
 
-                   template <typename K>
-                   bool find( accessor& result, const K& key );
+                template <typename K>
+                bool find( const_accessor& result, const K& key ) const;
 
-                   size_type count( const key_type& key ) const;
+                template <typename K>
+                bool find( accessor& result, const K& key );
 
-                   template <typename K>
-                   size_type count( const K& key ) const;
+                size_type count( const key_type& key ) const;
 
-                   // Modifiers
-                   bool insert( const_accessor& result, const key_type& key );
-                   bool insert( accessor& result, const key_type& key );
+                template <typename K>
+                size_type count( const K& key ) const;
 
-                   template <typename K>
-                   bool insert( const_accessor& result, const K& key );
+                // Modifiers
+                bool insert( const_accessor& result, const key_type& key );
+                bool insert( accessor& result, const key_type& key );
 
-                   template <typename K>
-                   bool insert( accessor& result, const K& key );
+                template <typename K>
+                bool insert( const_accessor& result, const K& key );
 
-                   bool insert( const_accessor& result, const value_type& value );
-                   bool insert( accessor& result, const value_type& value );
-                   bool insert( const_accessor& result, value_type&& value );
-                   bool insert( accessor& result, value_type&& value );
+                template <typename K>
+                bool insert( accessor& result, const K& key );
 
-                   bool insert( const value_type& value );
-                   bool insert( value_type&& value );
+                bool insert( const_accessor& result, const value_type& value );
+                bool insert( accessor& result, const value_type& value );
+                bool insert( const_accessor& result, value_type&& value );
+                bool insert( accessor& result, value_type&& value );
 
-                   template <typename InputIterator>
-                   void insert( InputIterator first, InputIterator last );
+                bool insert( const value_type& value );
+                bool insert( value_type&& value );
 
-                   void insert( std::initializer_list<value_type> init );
+                template <typename InputIterator>
+                void insert( InputIterator first, InputIterator last );
 
-                   template <typename... Args>
-                   bool emplace( const_accessor& result, Args&&... args );
+                void insert( std::initializer_list<value_type> init );
 
-                   template <typename... Args>
-                   bool emplace( accessor& result, Args&&... args );
+                template <typename... Args>
+                bool emplace( const_accessor& result, Args&&... args );
 
-                   template <typename... Args>
-                   bool emplace( Args&&... args );
+                template <typename... Args>
+                bool emplace( accessor& result, Args&&... args );
 
-                   bool erase( const key_type& key );
+                template <typename... Args>
+                bool emplace( Args&&... args );
 
-                   template <typename K>
-                   bool erase( const K& key );
+                bool erase( const key_type& key );
 
-                   bool erase( const_accessor& item_accessor );
-                   bool erase( accessor& item_accessor );
+                template <typename K>
+                bool erase( const K& key );
 
-                   // Iterators
-                   iterator begin();
-                   const_iterator begin() const;
-                   const_iterator cbegin() const;
+                bool erase( const_accessor& item_accessor );
+                bool erase( accessor& item_accessor );
 
-                   iterator end();
-                   const_iterator end() const;
-                   const_iterator cend() const;
+                // Iterators
+                iterator begin();
+                const_iterator begin() const;
+                const_iterator cbegin() const;
 
-                   std::pair<iterator, iterator> equal_range( const key_type& key );
-                   std::pair<const_iterator, const_iterator> equal_range( const key_type& key ) const;
+                iterator end();
+                const_iterator end() const;
+                const_iterator cend() const;
 
-                   template <typename K>
-                   std::pair<iterator, iterator> equal_range( const K& key );
+                std::pair<iterator, iterator> equal_range( const key_type& key );
+                std::pair<const_iterator, const_iterator> equal_range( const key_type& key ) const;
 
-                   template <typename K>
-                   std::pair<const_iterator, const_iterator> equal_range( const K& key ) const;
+                template <typename K>
+                std::pair<iterator, iterator> equal_range( const K& key );
 
-                   // Parallel iteration
-                   range_type range( std::size_t grainsize = 1 );
-                   const_range_type range( std::size_t grainsize = 1 ) const;
-             }; // class concurrent_hash_map
+                template <typename K>
+                std::pair<const_iterator, const_iterator> equal_range( const K& key ) const;
 
-          } // namespace tbb
-      } // namespace oneapi
+                // Parallel iteration
+                range_type range( std::size_t grainsize = 1 );
+                const_range_type range( std::size_t grainsize = 1 ) const;
+            }; // class concurrent_hash_map
+
+        } // namespace tbb
+    } // namespace oneapi
 
 Requirements:
 
@@ -259,3 +262,12 @@ Other
     :maxdepth: 1
 
     concurrent_hash_map_cls/deduction_guides.rst
+
+Preview Features
+----------------
+
+The following preview features extend the ``concurrent_hash_map`` API:
+
+* :ref:`Customizing the Mutex Type for concurrent_hash_map<custom_mutex_chmap>` -
+  allows customizing the reader-writer mutex used by ``concurrent_hash_map`` to protect insertion,
+  lookup and erasure.

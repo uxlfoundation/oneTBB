@@ -1,7 +1,11 @@
-.. _resource_limited_node_body_named_requirement:
+.. _resource_limited_node_body::
 
-``ResourceLimitedNodeBody`` Named Requirement
-=============================================
+ResourceLimitedNodeBody (preview)
+=================================
+**[req.resource_limited_node_body]**
+
+.. note::
+    To enable this feature, define the ``TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING`` or the ``TBB_PREVIEW_FLOW_GRAPH_FEATURES`` macro to ``1``.
 
 The type ``Body`` satisfies ``ResourceLimitedNodeBody`` if it
 satisfies the following requirements:
@@ -41,3 +45,4 @@ is passed during construction, and ``rl_node_type`` is its type.
 
 Processes the input message.
 May call ``try_put`` on any of the output ports, possibly multiple times per port.
+

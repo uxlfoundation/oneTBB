@@ -148,3 +148,4 @@ Flow Graph
    named_requirements/flow_graph/input_node_body.rst
    named_requirements/flow_graph/multifunction_node_body.rst
    named_requirements/flow_graph/sequencer.rst
+   named_requirements/flow_graph/resource_limited_node_body.rst

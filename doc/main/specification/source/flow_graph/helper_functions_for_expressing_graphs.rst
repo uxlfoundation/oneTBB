@@ -1,38 +1,28 @@
 .. _helpers_for_expressing_graphs:
 
-Helper Functions for Expressing Graphs
-======================================
+Helper Functions for Expressing Graphs (preview)
+================================================
+**[flow_graph.helper_functions]**
 
 .. note::
-   To enable this feature, define the ``TBB_PREVIEW_FLOW_GRAPH_FEATURES`` macro to 1.
+    To enable this feature, define the ``TBB_PREVIEW_FLOW_GRAPH_FEATURES`` macro to ``1``.
 
-Helper functions are intended to make creation of the flow graphs less verbose.
+This feature adds ``make_edges``, ``make_node_set``, ``follows`` and ``precedes`` functions to
+``oneapi::tbb::flow`` namespace.
 
-.. contents::
-    :local:
-    :depth: 1
-
-Description
-***********
-
-This feature adds ``make_edges``, ``make_node_set``,
-``follows`` and ``precedes`` functions to ``oneapi::tbb::flow`` namespace.
-These functions simplify the process of building flow graphs by allowing to gather nodes
+These functions simplify the process of building flow graphs by gathering nodes
 into sets and connect them to other nodes in the graph.
-
-API
-***
 
 .. toctree::
     :titlesonly:
 
-    constructors_for_nodes
-    follows_and_precedes_functions
-    make_node_set_function
-    make_edges_function
+    helper_functions/follows_and_precedes_functions
+    helper_functions/constructors_for_nodes
+    helper_functions/make_node_set_function
+    helper_functions/make_edges_function
 
 Example
-*******
+-------
 
 Consider the graph depicted below.
 
@@ -55,3 +45,7 @@ to avoid template parameter specification where possible.
     :language: c++
     :start-after: /*begin_helpers_for_expressing_graphs_preview_api_example*/
     :end-before: /*end_helpers_for_expressing_graphs_preview_api_example*/
+
+.. rubric:: See Also
+
+    :ref:`Preview Features<preview_features>`

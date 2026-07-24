@@ -1,13 +1,10 @@
-.. SPDX-FileCopyrightText: 2019-2020 Intel Corporation
-..
-.. SPDX-License-Identifier: CC-BY-4.0
+.. _configuration::
 
-=============
 Configuration
 =============
 **[configuration]**
 
-This section describes the most general features of oneAPI Threading Building Blocks (oneTBB) such as namespaces, versioning, and macros.
+This section describes the most general features of |full_name| (|short_name|) such as namespaces, versioning, and macros.
 
 .. toctree::
     :titlesonly:
@@ -16,3 +13,4 @@ This section describes the most general features of oneAPI Threading Building B
     configuration/version_information.rst
     configuration/enabling_debugging_features.rst
     configuration/feature_macros.rst
+    configuration/feature_test_macros.rst

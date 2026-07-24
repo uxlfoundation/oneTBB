@@ -3,19 +3,19 @@
 ..
 .. SPDX-License-Identifier: CC-BY-4.0
 
-==============================================
-oneAPI Threading Building Blocks Specification
-==============================================
+==========================================
+oneAPI Threading Building Blocks Reference
+==========================================
 
 .. toctree::
    :maxdepth: 2
    :caption: General Information:
 
-   intro.rst
-   notation.rst
    identifiers.rst
-   named_requirements.rst
    thread_safety.rst
+   headers_and_modules.rst
+   preview_features.rst
+   named_requirements.rst
 
 .. toctree::
    :maxdepth: 2
@@ -36,6 +36,7 @@ oneAPI Threading Building Blocks Specification
    mutual_exclusion.rst
    timing.rst
    info_namespace.rst
+   custom_assertion_handler.rst
 
 .. toctree::
    :maxdepth: 2

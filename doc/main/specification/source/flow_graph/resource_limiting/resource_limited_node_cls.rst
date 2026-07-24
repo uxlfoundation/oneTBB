@@ -1,10 +1,10 @@
 .. _resource_limited_node_cls:
 
-``resource_limited_node`` Class
-===============================
+``resource_limited_node`` Class (preview)
+=========================================
 
-Description
-***********
+.. note::
+    To enable this feature, define the ``TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING`` or the ``TBB_PREVIEW_FLOW_GRAPH_FEATURES`` macro to ``1``.
 
 The ``resource_limited_node<Input, OutputTuple>`` receives messages at a single input port
 and requests access to resources provided by one or several resource providers before processing
@@ -33,25 +33,9 @@ It has a tuple of ``sender<Output>`` output ports, where ``Output`` is a type of
 ``resource_limited_node`` has the *discarding* and *broadcast-push*
 `properties <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/flow_graph/forwarding_and_buffering>`_.
 
-
-API
-***
-
-Header
-------
-
 .. code:: cpp
 
-    #define TBB_PREVIEW_FLOW_GRAPH_FEATURES 1
-    // or
-    #define TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING 1
-
-    #include <oneapi/tbb/flow_graph.h>
-
-Synopsis
---------
-
-.. code:: cpp
+    // Defined in header <oneapi/tbb/flow_graph.h>
 
     namespace oneapi {
         namespace tbb {
@@ -162,3 +146,7 @@ Passes the incoming message ``input`` to the node. Once the concurrency threshol
 access to all required resources is granted, the node executes the user-provided body on ``input``.
 
 **Returns**: ``true``.
+
+.. rubric:: See Also
+
+    :ref:`Preview Features<preview_features>`

@@ -30,6 +30,12 @@ the user or another runtime.
             async_node( const async_node& src );
             ~async_node();
 
+            // Preview feature: Helper Functions for Expressing Graphs
+            template <typename Body>
+            async_node(decltype(follows(...)), std::size_t concurrency, Body body, Policy = Policy());
+            template <typename Body>
+            async_node(decltype(precedes(...)), std::size_t concurrency, Body body, Policy = Policy());
+
             using gateway_type = /*implementation-defined*/;
             gateway_type& gateway();
 
@@ -140,3 +146,11 @@ it.
     bool try_get( output_type& v )
 
 **Returns**: ``false``
+
+Preview Features
+----------------
+
+The following preview features extend the ``async_node`` API:
+
+* :ref:`Helper Functions for Expressing Graphs<helpers_for_expressing_graphs>` -
+  Allows ``async_node`` to be constructed as a successor or a predecessor of the set of nodes.
