@@ -60,6 +60,8 @@ public:
     };
 }; // class request_id
 
+struct in_place_t {};
+
 template <typename ResourceHandle>
 class resource_handle_optional {
     union {
@@ -72,8 +74,6 @@ class resource_handle_optional {
         ::new(&m_resource_handle) ResourceHandle(std::forward<Args>(args)...);
     }
 public:
-    struct in_place_t {};
-
     resource_handle_optional()
         : m_has_value(false)
     {}
@@ -150,14 +150,23 @@ public:
     using consumer_type = typename resource_provider_base<ResourceHandle>::consumer_type;
     using optional_type = typename resource_provider_base<ResourceHandle>::optional_type;
 
-    template <typename Handle, typename... Handles>
-    resource_limiter(Handle&& handle, Handles&&... handles) {
-        emplace_handles(std::forward<Handle>(handle), std::forward<Handles>(handles)...);
+    template <typename Tuple, typename... Tuples>
+    resource_limiter(std::piecewise_construct_t, Tuple&& tuple, Tuples&&... tuples) {
+        emplace_handles(std::forward<Tuple>(tuple), std::forward<Tuples>(tuples)...);
     }
 
     template <typename InputIterator>
     resource_limiter(InputIterator first, InputIterator last)
         : m_resource_handles(first, last)
+    {}
+
+    template <typename ContainerBasedSequence>
+    resource_limiter(ContainerBasedSequence&& sequence)
+        : resource_limiter(std::begin(sequence), std::end(sequence))
+    {}
+
+    resource_limiter(std::initializer_list<ResourceHandle> init)
+        : resource_limiter(init.begin(), init.end())
     {}
 
     void request(consumer_type& consumer, request_id id) override {
@@ -182,7 +191,7 @@ public:
         } else {
             ResourceHandle handle = std::move(m_resource_handles.front());
             m_resource_handles.pop_front();
-            return {typename optional_type::in_place_t{}, std::move(handle)};
+            return {in_place_t{}, std::move(handle)};
         }
     }
 
@@ -206,10 +215,16 @@ public:
     using consumer_data = std::pair<request_id, resource_consumer_base<ResourceHandle>*>;
 
 private:
-    template <typename Handle, typename... Handles>
-    void emplace_handles(Handle&& handle, Handles&&... handles) {
-        m_resource_handles.emplace_front(std::forward<Handle>(handle));
-        emplace_handles(std::forward<Handles>(handles)...);
+    template <typename Tuple, std::size_t... Idx>
+    void emplace_single_handle(Tuple&& tuple, tbb::detail::index_sequence<Idx...>) {
+        m_resource_handles.emplace_front(std::get<Idx>(std::forward<Tuple>(tuple))...);
+    }
+
+    template <typename Tuple, typename... Tuples>
+    void emplace_handles(Tuple&& tuple, Tuples&&... tuples) {
+        emplace_single_handle(std::forward<Tuple>(tuple),
+                              tbb::detail::make_index_sequence<std::tuple_size<Tuple>::value>());
+        emplace_handles(std::forward<Tuples>(tuples)...);
     }
 
     void emplace_handles() {}
