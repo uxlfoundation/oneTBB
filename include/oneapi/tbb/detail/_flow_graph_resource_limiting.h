@@ -60,20 +60,20 @@ public:
     };
 }; // class request_id
 
-struct in_place_t {};
-
 template <typename ResourceHandle>
 class resource_handle_optional {
     union {
         ResourceHandle m_resource_handle;
     };
     bool m_has_value;
-
+    
     template <typename... Args>
     void construct(Args&&... args) {
         ::new(&m_resource_handle) ResourceHandle(std::forward<Args>(args)...);
     }
 public:
+    struct in_place_t {};
+
     resource_handle_optional()
         : m_has_value(false)
     {}
@@ -191,7 +191,7 @@ public:
         } else {
             ResourceHandle handle = std::move(m_resource_handles.front());
             m_resource_handles.pop_front();
-            return {in_place_t{}, std::move(handle)};
+            return {typename optional_type::in_place_t{}, std::move(handle)};
         }
     }
 
