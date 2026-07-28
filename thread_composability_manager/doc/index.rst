@@ -131,47 +131,6 @@ Sequential with Nested
         }
     });
 
-Version Information
-===================
-
-TCM includes macros, an environment variable, and a function that helps determining version and
-runtime information of the library used.
-
-Version Macros
---------------
-
-TCM defines the following macros related to versioning.
-
-+---------------------------+---------------------------------------------------------------------------------------+
-| Name                      | Description                                                                           |
-+===========================+=======================================================================================+
-| :code:`TCM_VERSION_MAJOR` | Macro defined to integral value representing major version of the library.            |
-+---------------------------+---------------------------------------------------------------------------------------+
-| :code:`TCM_VERSION_MINOR` | Macro defined to integral value representing minor version of the library.            |
-+---------------------------+---------------------------------------------------------------------------------------+
-| :code:`TCM_VERSION_PATCH` | Macro defined to integral value representing patch version of the library.            |
-+---------------------------+---------------------------------------------------------------------------------------+
-| :code:`TCM_VERSION`       | Macro defined to integral value combining major, minor, and patch version together.   |
-+---------------------------+---------------------------------------------------------------------------------------+
-
-TCM Runtime Version
--------------------
-
-Runtime version information can be obtained using the :code:`tcmGetVersion`:
-
-.. code:: cpp
-
-    unsigned tcmGetVersion()
-
-Returns the value of :code:`TCM_VERSION` macro.
-
-Environment Variable
---------------------
-
-When the environment variable :code:`TCM_VERSION` is set to :code:`1`, TCM prints additional
-information in :code:`stderr`. The lines start with :code:`"TCM: <value>"`, and may change from
-version to version.
-
 The Thread Composability Manager Protocol
 =========================================
 
