@@ -28,7 +28,11 @@ with the ``task_arena`` currently used by the calling thread.
             template<typename F> void enqueue(F&& f);
             template<typename F> void enqueue(F&& f, task_group& tg);
             void enqueue(task_handle&& h);
-        }
+
+            // Preview feature: parallel_phase Interface
+            void start_parallel_phase();
+            void end_parallel_phase(bool with_fast_leave = false);
+        } // namespace this_task_arena
     } // namespace tbb
     } // namespace oneapi 
 
@@ -97,3 +101,9 @@ with the ``task_arena`` currently used by the calling thread.
 
     .. note:: 
         ``h`` should not be empty to avoid an undefined behavior.
+
+Preview Features
+----------------
+
+:ref:`parallel_phase Interface<parallel_phase>` - extends ``this_task_arena``
+namespace with the API to provide a hint where the parallel region starts and ends.

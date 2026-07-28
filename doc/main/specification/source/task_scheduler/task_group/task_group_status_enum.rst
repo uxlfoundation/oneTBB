@@ -10,14 +10,17 @@ task_group_status
 A ``task_group_status`` type represents the status of a ``task_group``.
 
 .. code:: cpp
+    // Defined in header <oneapi/tbb/task_group.h>
+    // Defined in header <oneapi/tbb/task_arena.h>
 
     namespace oneapi {
     namespace tbb {
         enum task_group_status {
-            not_complete,
-            complete,
-            canceled
-        };
+            not_complete,
+            complete,
+            canceled,
+            task_completed // Preview feature: Waiting an Individual Task
+        };
     } // namespace tbb
     } // namespace oneapi
 
@@ -36,3 +39,8 @@ Member constants
 
     Task group received cancellation request.
 
+Preview Features
+----------------
+
+:ref:`Waiting for Individual tasks<wait_single_task>` extends the ``task_group_status`` API
+to allow waiting for an individual task to complete in ``task_group``.

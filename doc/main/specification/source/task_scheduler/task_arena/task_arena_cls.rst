@@ -27,6 +27,12 @@ A class that represents an explicit, user-managed task scheduler arena.
                     high = /* unspecified */
                 };
 
+                // Preview feature: parallel_phase Interface
+                enum class leave_policy : /* unspecified type */ {
+                    automatic = /* unspecified */,
+                    fast = /* unspecified */
+                };
+
                 struct constraints {
                     constraints(numa_node_id numa_node_       = task_arena::automatic,
                                 int          max_concurrency_ = task_arena::automatic);
@@ -44,8 +50,23 @@ A class that represents an explicit, user-managed task scheduler arena.
 
                 task_arena(int max_concurrency = automatic, unsigned reserved_slots = 1,
                            priority a_priority = priority::normal);
-                task_arena(constraints constraints_, unsigned reserved_slots = 1,
+                task_arena(const constraints& constraints_, unsigned reserved_slots = 1,
                            priority a_priority = priority::normal);
+
+                // Preview feature: parallel_phase Interface
+                task_arena(int max_concurrency = automatic, unsigned reserved_slots = 1,
+                           priority a_priority = priority::normal,
+                           leave_policy a_leave_policy = leave_policy::automatic);
+                task_arena(const constraints& constraints_, unsigned reserved_slots = 1,
+                           priority a_priority = priority::normal,
+                           leave_policy a_leave_policy = leave_policy::automatic);
+            
+                // Preview feature: Core Type Selectors
+                template <typename Selector>
+                task_arena(const constraints& constraints_, Selector a_selector,
+                           unsigned reserved_slots = 1,
+                           priority a_priority = priority::normal);
+
                 task_arena(const task_arena &s);
                 explicit task_arena(oneapi::tbb::attach);
                 ~task_arena();
@@ -53,9 +74,23 @@ A class that represents an explicit, user-managed task scheduler arena.
                 void initialize();
                 void initialize(int max_concurrency, unsigned reserved_slots = 1,
                                 priority a_priority = priority::normal);
-                void initialize(constraints constraints_, unsigned reserved_slots = 1,
+                void initialize(const constraints& constraints_, unsigned reserved_slots = 1,
                                 priority a_priority = priority::normal);
                 void initialize(oneapi::tbb::attach);
+
+                // Preview feature: parallel_phase Interface
+                void initialize(int max_concurrency, unsigned reserved_slots = 1,
+                                priority a_priority = priority::normal,
+                                leave_policy a_leave_policy = leave_policy::automatic);
+                void initialize(const constraints& constraints_, unsigned reserved_slots = 1,
+                                priority a_priority = priority::normal,
+                                leave_policy a_leave_policy = leave_policy::automatic);
+
+                // Preview feature: Core Type Selectors
+                template <typename Selector>
+                void initialize(const constraints& constraints_, Selector a_selector,
+                                unsigned reserved_slots = 1,
+                                priority a_priority = priority::normal);
 
                 void terminate();
 
@@ -69,6 +104,18 @@ A class that represents an explicit, user-managed task scheduler arena.
                 void enqueue(task_handle&& h);
 
                 task_group_status task_arena::wait_for(task_group& tg);
+                // Preview feature: Waiting an Individual Task in task_group
+                task_group_status task_arena::wait_for(task_completion_handle& tch);
+
+                // Preview feature: parallel_phase Interface
+                void start_parallel_phase();
+                void end_parallel_phase(bool with_fast_leave = false);
+                
+                // Preview feature: parallel_phase Interface
+                class scoped_parallel_phase {
+                public:
+                    scoped_parallel_phase(task_arena& ta, bool with_fast_leave = false);
+                };
             };
 
             std::vector<task_arena> create_numa_task_arenas(task_arena::constraints constraints_ = {},
@@ -351,6 +398,19 @@ Non-member Functions
     
     The ``reserved_slots`` argument allows reserving a specified number of slots in
     each ``task_arena`` object for application threads. By default, no slots are reserved.
+
+Preview Features
+----------------
+
+The following preview features extend the ``task_arena`` API:
+
+* :ref:`Waiting for Individual tasks in task_group<wait_single_task>` -
+  allows waiting for an individual task to complete in ``task_group``.
+* :ref:`parallel_phase Interface<parallel_phase>` - extends ``task_arena``
+  with the API to set explicit thread ``leave_policy`` and to provide a lint
+  where the parallel region starts and ends.
+* :ref:`Core Type Selectors<core_type_selector>` allows to set scores
+  for preferred core types while creating or initializing the ``task_arena``.
 
 Example
 -------

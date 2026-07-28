@@ -7,7 +7,6 @@ Task Bypass Support for ``task_group`` (preview)
 
     To enable this extension, define the ``TBB_PREVIEW_TASK_GROUP_EXTENSIONS`` macro to ``1``.
 
-
 The |full_name| implementation extends the requirements for user-provided function object from
 :ref:`tbb::task_group<../task_group_cls>` to allow them to return a ``task_handle`` object.
 
@@ -80,3 +79,7 @@ The example below demonstrates how to process a sequence in parallel using ``tas
     :language: c++
     :start-after: /*begin_task_group_extensions_bypassing_example*/
     :end-before: /*end_task_group_extensions_bypassing_example*/
+
+.. rubric:: See Also
+
+    :ref:`Preview Features<preview_features>`

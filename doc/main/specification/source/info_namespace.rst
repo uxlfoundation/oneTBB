@@ -24,6 +24,10 @@ Interfaces to query information about execution environment.
 
             int default_concurrency(task_arena::constraints c);
             int default_concurrency(numa_node_id id = oneapi::tbb::task_arena::automatic);
+
+            // Preview feature: Core Type Selector for task_arena
+            template <typename Selector>
+            int default_concurrency(task_arena::constraints c, Selector a_selector);
         }
     } // namespace tbb
     } // namespace oneapi
@@ -61,3 +65,9 @@ Functions
 
     Returns concurrency level of the given NUMA node. If argument is not specified, returns default
     concurrency level for current library configuration.
+
+Preview Features
+----------------
+
+:ref:`Core Type Selector for task_arena feature<core_type_selector>` -
+extends ``info::default_concurrency`` with an overload accepting the selector.

@@ -42,12 +42,12 @@ are not related to the particular ``task_group``.
 
             task_group_status wait();
 
-            // Preview feature: Waiting a Single Task
+            void cancel();
+
+            // Preview feature: Waiting an Individual Task
             task_group_status wait_for_task(task_completion_handle& comp_handle);
             task_group_status run_and_wait_for_task(task_handle&& handle);
             task_group_status get_status_of(task_completion_handle& comp_handle);
-
-            void cancel();
 
             // Preview feature: Dynamic Dependencies
             static void set_task_order(task_handle& pred, task_handle& succ);
@@ -152,5 +152,4 @@ The following preview features extend the ``task_group`` API:
 * :ref:`Dynamic Dependencies<dynamic_dependencies>` -
   allows setting execution dependencies between tasks in ``task_group``.
 * :ref:`Waiting for Individual tasks<wait_single_task>` -
-  allows waiting for an individual task to complete instead of waiting for all
-  tasks in ``task_group``.
+  allows waiting for an individual task to complete in ``task_group``.

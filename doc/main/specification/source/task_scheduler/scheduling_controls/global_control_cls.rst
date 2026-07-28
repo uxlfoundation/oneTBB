@@ -31,7 +31,8 @@ This value is selected from all currently existing control variables by applying
             enum parameter {
                 max_allowed_parallelism,
                 thread_stack_size,
-                terminate_on_exception
+                terminate_on_exception,
+                leave_policy // Preview feature: parallel_phase for task_arena
             };
 
             global_control(parameter p, size_t value);
@@ -85,6 +86,13 @@ Member functions
 .. cpp:function:: static size_t active_value(parameter param)
 
     Returns the currently active value of the setting defined by ``param``.
+
+Preview Features
+----------------
+
+:ref:`parallel_phase Interface<parallel_phase>` - extends ``global_control``
+with the API to provide the application-wide control over the ``leave_policy``
+of ``task_arena``.
 
 See also:
 
