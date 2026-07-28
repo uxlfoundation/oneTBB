@@ -86,9 +86,8 @@ and the TCM library when building and linking the project.
     tcm_permit_request_t request = TCM_PERMIT_REQUEST_INITIALIZER;
 
    *Note*: To describe a portion of platform resources adjust the fields of
-   :code:`tcm_permit_request_t` object accordingly. Refer to description of `tcm_permit_request_t
-   <>`_ for more info.
-TODO: Update the link above.
+   :code:`tcm_permit_request_t` object accordingly. Refer to description of
+   :ref:`tcm_permit_request_t <tcm_permit_request_t>`_ data structure for more info.
 
 #. Request a resources permit.
 
