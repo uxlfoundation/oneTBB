@@ -41,9 +41,13 @@ providing a global override mechanism.
 This proposal introduces a new `global_control` parameter called `leave_policy` that, when set to "fast",
 would override the default behavior for arenas that are initialized with `leave_policy::automatic`.
 Setting the parameter would not affect arenas that are already initialized or initialized with an
-explicit `leave_policy`. After initialization, the parallel phase API can independently modify the
-arena's leave behavior at runtime, allowing workers to be retained during active parallel phases
-regardless of the initial state set by the global control.
+explicit `leave_policy`. This follows the decision made in the
+[Completely disable new behavior](../parallel_phase_for_task_arena/README.md#completely-disable-new-behavior)
+section of the parallel phase RFC to keep the arena leave policy static for the lifetime of the arena,
+since there are no use cases for dynamic transition between the states yet. 
+After initialization, the parallel phase API can independently modify the arena's leave behavior
+at runtime, allowing workers to be retained during active parallel phases regardless of
+the initial state set by the global control.
 
 ### New Public API
 
@@ -96,7 +100,10 @@ The `leave_policy` parameter would control whether arenas are initialized with a
 | `task_arena::leave_policy::fast` | Workers leave immediately (fast leave enabled) |
 
 When multiple `global_control` objects exist for `leave_policy`, their logical disjunction would be
-used (consistent with the `terminate_on_exception` parameter). This means if any
+used (consistent with the `terminate_on_exception` parameter). For `leave_policy`, the request for
+`fast` is the restrictive one, since it asks the library to give up threads sooner, so it wins over
+the absence of such a request. As more leave policies appear, new strategy of choosing the next
+`leave_policy` can be implemented. At this point, it means that if any
 `global_control(leave_policy, task_arena::leave_policy::fast)` is active, fast leave would be enabled globally.
 
 ### Proposed Implementation Strategy
@@ -327,20 +334,6 @@ The default behavior could be changed to fast leave, making delayed leave opt-in
 
 **Cons:**
 - Fixes performance regression for some customers while causing it for others
-
-## Open Questions
-
-1. **Naming**: Should it convey "default override" semantics?
-   - Current proposal: parameter name matches `task_arena::leave_policy` for consistency
-   - Alternative: e.g., `override_default_leave_policy` to clarify no effect on already initialized arenas
-
-2. **Scope and Granularity**
-   - Current proposal: only affect arenas initialized after the `global_control` is set
-   - Alternative: allow retroactive effect on existing arenas
-   - Alternative: allow per worker control (e.g., via observers) to enable/disable fast leave on a per-thread basis
-
-3. **Composition**: Should the global control be a logical disjunction, first-registered wins, last-set wins, etc.?
-   - Current proposal: disjunction
 
 ## Exit Criteria
 

@@ -147,20 +147,24 @@ class task_arena {
                     leave_policy a_leave_policy = leave_policy::automatic);
 
     class parallel_phase {
-        enum class end_flags : /* unspecified type */ {
-            with_fast_leave = /* unspecified */
+        // Available only when each type in Flags is a parallel phase flag
+        class flags {
+            template <typename... Flags>
+            flags(Flags... f);
         };
-        parallel_phase(attach, end_flags e_flags = {});
-        parallel_phase(task_arena& ta, end_flags e_flags = {});
+        class end_with_fast_leave;
+        parallel_phase(attach, flags f = {});
+        parallel_phase(task_arena& ta, flags f = {});
+        void end();
     };
     
-    void start_parallel_phase();
-    void end_parallel_phase(parallel_phase::end_flags e_flags = {});
+    void start_parallel_phase(parallel_phase::flags f = {});
+    void end_parallel_phase(parallel_phase::flags f = {});
 };
 
 namespace this_task_arena {
-    void start_parallel_phase();
-    void end_parallel_phase(task_arena::parallel_phase::end_flags e_flags = {});
+    void start_parallel_phase(task_arena::parallel_phase::flags f = {});
+    void end_parallel_phase(task_arena::parallel_phase::flags f = {});
 }
 ```
 The _parallel phase_ continues until each previous `start_parallel_phase` call
@@ -168,13 +172,30 @@ to the same arena has a matching `end_parallel_phase` call.
 Let's also introduce RAII object `parallel_phase` that will help to manage the contract.
 Rather than introducing a separate RAII type in the `this_task_arena` namespace,
 `task_arena::parallel_phase` can be constructed with the `tbb::attach` tag to map the phase to
-the implicit arena associated with the calling thread.
+the implicit arena associated with the calling thread. The alternative would be, instead of
+passing `tbb::attach`, to have a factory function that returns a `pararlel_phase` object:
+```cpp
+class task_arena {
+    parallel_phase create_parallel_phase(parallel_phase::flags f = {});
+};
 
-Note that `end_parallel_phase` and the `parallel_phase` constructor accept an `end_flags`
-argument rather than a boolean flag even though `end_flags` has a single flag. Since _parallel phase_
-is a high-level hint to the scheduler, it makes sense that other scheduling hints could be tied to
-it as well, so the API is designed to be configurable. A symmetric `start_flags` parameter
-could be added to `start_parallel_phase` in the future if needed.
+namespace this_task_arena {
+    task_arena::parallel_phase create_parallel_phase(task_arena::parallel_phase::flags f = {});
+}
+```
+The approach is more consistent with the rest of task arena API.
+
+Note that all the entry points accept a single `parallel_phase::flags` argument rather than a
+boolean flag, even though only one flag is defined for now. Since _parallel phase_ is a high-level
+hint to the scheduler, it makes sense that other scheduling hints could be tied to it as well, so
+the API is designed to be configurable. Each flag is a distinct tag type, and several of them can
+be combined into a single `flags` object.
+
+Some flags are only applicable to the start of a parallel phase, and others only to its end, which
+can be reflected in their names (e.g. `end_with_fast_leave`). The `parallel_phase` object accepts flags
+for both boundaries at once and applies each of them at the corresponding point, while the explicit
+functions only take into account the flags applicable to them. A flag passed to an operation it
+does not apply to is ignored. 
 
 If the end of the parallel phase is not indicated by the user, it will be done automatically when
 the last public reference is removed from the arena (i.e., task_arena has been destroyed or,
@@ -199,7 +220,8 @@ void handle_request(Request req) {
     //
     tbb::this_task_arena::enqueue([req]() {
         process(req);
-        tbb::this_task_arena::end_parallel_phase(tbb::task_arena::parallel_phase::end_flags::with_fast_leave);
+        tbb::this_task_arena::end_parallel_phase(
+            tbb::task_arena::parallel_phase::end_with_fast_leave{});
     });
 }
 ```
@@ -209,7 +231,9 @@ The same use case can be expressed using the `parallel_phase` object, assuming m
 ```cpp
 void handle_request(Request req) {
     tbb::task_arena::parallel_phase phase{tbb::attach{},
-                                          tbb::task_arena::parallel_phase::end_flags::with_fast_leave};
+                                          tbb::task_arena::parallel_phase::end_with_fast_leave{}};
+    // or
+    // auto phase = tbb::this_task_arena::create_parallel_phase(tbb::task_arena::parallel_phase::end_with_fast_leave{});
     //
     // Some composition of parallel and serial computations
     //
@@ -246,11 +270,13 @@ This use case can also be expressed using the `parallel_phase` object:
 ```cpp
 class Service {
     tbb::task_arena ta;
-    std::optional<tbb::task_arena::parallel_phase> phase;
+    std::unique_ptr<tbb::task_arena::parallel_phase> phase;
 
     void on_request() {
         if (!phase) {
-            phase.emplace(ta);
+            phase = std::make_unique<tbb::task_arena::parallel_phase>(ta);
+            // or
+            // phase = std::make_unique<tbb::task_arena::parallel_phase>(ta.create_parallel_phase());
         }
         ta.execute([]() { /* work */ });
         reset_idle_timer();
@@ -299,7 +325,8 @@ void parallel_phase_example() {
     tbb::parallel_for(0, work_size, [] (int idx) {
         // User defined body
     });
-    tbb::this_task_arena::end_parallel_phase(tbb::task_arena::parallel_phase::end_flags::with_fast_leave);
+    tbb::this_task_arena::end_parallel_phase(
+        tbb::task_arena::parallel_phase::end_with_fast_leave{});
 
     // Different parallel runtime (for example, OpenMP) is used
     // so it is preferred that worker threads won't be retained
@@ -315,7 +342,7 @@ void parallel_phase_raii_example() {
     {
         // Start of the parallel phase
         tbb::task_arena::parallel_phase phase{ta,
-            tbb::task_arena::parallel_phase::end_flags::with_fast_leave};
+            tbb::task_arena::parallel_phase::end_with_fast_leave{}};
         ta.execute([]() {
             // Parallel computation
         });
