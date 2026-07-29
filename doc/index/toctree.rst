@@ -30,16 +30,27 @@
 
 
 .. toctree::
-   :maxdepth: 3
-   :hidden:
    :caption: Developer Guide
+   :hidden:
+   :maxdepth: 3
 
    /main/tbb_userguide/title
 
 
 .. toctree::
-   :maxdepth: 3
-   :hidden:
    :caption: Developer Reference
+   :hidden:
+   :maxdepth: 3
 
    /main/reference/source/index
+
+
+.. toctree::
+   :caption: Thread Composability Manager
+   :hidden:
+   :maxdepth: 3
+
+   /tcm/intro
+   /tcm/get_started
+   /tcm/developer_guide
+   /tcm/api_reference
