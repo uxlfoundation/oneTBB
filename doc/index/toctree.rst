@@ -49,3 +49,14 @@
    :caption: Specification
 
    /main/specification/source/index
+
+
+.. toctree::
+   :maxdepth: 3
+   :hidden:
+   :caption: Thread Composability Manager
+
+   /tcm/intro
+   /tcm/get_started
+   /tcm/developer_guide
+   /tcm/api_reference
