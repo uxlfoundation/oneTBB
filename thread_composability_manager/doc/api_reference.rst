@@ -29,6 +29,9 @@ using:
 If the client does not expect to request or release resources anymore, it should close the
 connection by calling:
 
+*Warning*: Function returns :code:`TCM_RESULT_ERROR_UNKNOWN` status if :code:`TCM_ENABLE`
+ environment variable is not set to :code:`1`.
+
 .. code:: cpp
 
     tcm_result_t tcmDisconnect(tcm_client_id_t client_id)
