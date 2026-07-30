@@ -183,7 +183,7 @@ namespace this_task_arena {
     task_arena::parallel_phase create_parallel_phase(task_arena::parallel_phase::flags f = {});
 }
 ```
-The approach is more consistent with the rest of task arena API.
+The factory function approach seems more consistent with the rest of task arena API.
 
 Note that all the entry points accept a single `parallel_phase::flags` argument rather than a
 boolean flag, even though only one flag is defined for now. Since _parallel phase_ is a high-level
