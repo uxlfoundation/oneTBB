@@ -45,4 +45,20 @@ Library Functions
     :titlesonly:
 
     memory_allocation/c_interface_to_scalable_allocator.rst
+    memory_allocation/numa_interleaved_allocation.rst
 
+Scalable Memory Pools (preview)
+-------------------------------
+
+.. toctree::
+    :titlesonly:
+
+    memory_allocation/scalable_memory_pools.rst
+
+Automatic Dynamic Memory Interface Replacement
+----------------------------------------------
+
+.. toctree::
+    :titlesonly:
+
+    memory_allocation/malloc_replacement.rst

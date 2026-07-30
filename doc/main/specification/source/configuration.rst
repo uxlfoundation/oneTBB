@@ -14,3 +14,4 @@ This section describes the most general features of |full_name| (|short_name|) s
     configuration/enabling_debugging_features.rst
     configuration/feature_macros.rst
     configuration/feature_test_macros.rst
+    configuration/custom_assertion_handler.rst
