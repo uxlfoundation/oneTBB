@@ -8,8 +8,102 @@ Developer Guide
    * Draw a state machine diagram.
    * Give an example of concurrent thread pool from tests.
 
-Resource Requests Use Cases
-===========================
+Usage Model
+===========
+
+Below is a simple example of a usage model a parallel runtime should follow to successfully use TCM.
+
+#. Include :code:`tcm.h` header file and link the TCM library with the project.
+
+   .. code-block:: cpp
+
+       #include "tcm.h"
+
+   *Note*: If necessary, adjust project settings so that the compiler can find :code:`tcm.h` header
+   file and the TCM library when building and linking the project.
+
+#. Register a client.
+
+   .. code-block:: cpp
+
+       tcm_client_id_t client_id;
+       tcmConnect(client_callback, &client_id);
+
+#. Describe the resources needed using the :code:`tcm_permit_request_t` data structure.
+
+   .. code-block:: cpp
+
+       tcm_permit_request_t request = TCM_PERMIT_REQUEST_INITIALIZER;
+
+   *Note*: To describe a portion of platform resources adjust the fields of
+   :code:`tcm_permit_request_t` object accordingly. Refer to description of
+   :ref:`tcm_permit_request_t <tcm_permit_request_t>` data structure for more info.
+
+#. Request a resources permit.
+
+   .. code-block:: cpp
+
+       uint32_t concurrency{};
+       tcm_permit_t permit(&concurrency);
+       tcm_permit_handle_t permit_handle = nullptr;
+       tcmRequestPermit(client_id, request, &permit_handle, permit_handle, &permit);
+
+   *Note*: The :code:`tcmRequestPermit` function might result in permit switched to :code:`PENDING`
+   state, meaning that the requested resources are being used by another permit, and the requesting
+   side should wait until TCM is able to satisfy the permit, hence activating it and notifying the
+   client through invocation of a client callback.
+
+#. Once the permit is activated, register that number of threads that were suggested by TCM.
+
+   .. code-block:: cpp
+
+       uint32_t suggested_concurrency = permit.concurrencies[0];
+
+       // Wake up suggested_concurrency number of threads and register them with the permit
+       tcmRegisterThread(permit_handle); // Invoked by each participating thread
+
+#. Deactivate and activate the permit dependending on the resources usage model.
+
+   .. code-block:: cpp
+
+       // Once processing block ends, deactivate the permit
+       tcmDeactivatePermit(permit_handle);
+
+       // Activate permit when processing begins again
+       tcmActivatePermit(permit_handle);
+
+   *Note*: The activation of a permit might result in permit switched to :code:`PENDING` state,
+   meaning that the requested resources are being used by another permit, and the requesting side
+   should wait until TCM is able to satisfy the permit, hence activating it and notifying the
+   client through invocation of a client callback.
+
+#. Unregister threads and release permit once its resources are no longer needed.
+
+   .. code-block:: cpp
+
+       // By each thread, which was previously registered with the permit, run
+       tcmUnregisterThread();
+
+       // Invoke once
+       tcmReleasePermit(permit_handle);
+
+#. Disconnect from TCM when resources usage is no longer planned.
+
+   .. code-block:: cpp
+
+       tcmDisconnect(client_id);
+
+
+**Warning**: When running application that uses TCM, set :code:`TCM_ENABLE=1` environment variable
+to actually enable its use.
+
+Refer to :doc:`api_reference` to find more information on TCM usage scenarios.
+
+Composition Scenarios
+=====================
+
+The section describes various composition scenarios of parallel runtimes that can occur in runtime
+providing details on transition of CPU resources between them.
 
 Sequential Requests
 -------------------
