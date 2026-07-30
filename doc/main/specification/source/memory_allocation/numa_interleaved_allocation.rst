@@ -33,21 +33,9 @@ versions of Microsoft* Windows*, the allocation functions also fall back to stan
     By default, Docker environment blocks ``move_pages`` system call, which is used for interleaved memory
     allocation. For successful allocation, this syscall must be unblocked.
 
-API
-***
-
-Header
-------
-
 .. code:: cpp
 
-    #define TBB_PREVIEW_NUMA_ALLOCATION 1
-    #include <oneapi/tbb/numa_allocation.h>
-
-Synopsis
---------
-
-.. code:: cpp
+    // Defined in header <oneapi/tbb/numa_allocation.h>
 
     namespace oneapi {
         namespace tbb {
@@ -63,6 +51,8 @@ Synopsis
 
 Functions
 ---------
+
+.. cpp:namespace:: oneapi::tbb::numa_interleaved_allocation
 
 .. cpp:function:: void* allocate_numa_interleaved(size_t bytes, const std::vector<tbb::numa_node_id>& nodes, \
                   size_t bytes_per_chunk = 0)

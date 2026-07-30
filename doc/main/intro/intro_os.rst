@@ -4,7 +4,7 @@ Introduction
 ============
 **[intro]**
 
-|full_name|(|short_name|) is a library that supports scalable parallel programming using standard ISO C++ code.
+|full_name|\ (|short_name|) is a library that supports scalable parallel programming using standard ISO C++ code.
 
 A program uses |short_name| to specify logical parallelism in algorithms, while |short_name| maps that parallelism
 onto execution threads.

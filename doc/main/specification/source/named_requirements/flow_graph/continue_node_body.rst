@@ -13,7 +13,7 @@ A type `Body` satisfies `ContinueNodeBody` if it meets the following requirement
 
 **ContinueNodeBody Requirements: Pseudo-Signature, Semantics**
 
-.. namespace:: ContinueNodeBody
+.. cpp:namespace:: ContinueNodeBody
 	       
 .. cpp:function:: Body::Body( const Body& )
 

@@ -70,7 +70,7 @@ The utility function ``flatten2d`` creates a ``flattened2d`` object from a speci
 Member functions
 ----------------
 
-.. namespace:: oneapi::tbb::flatten2d
+.. cpp:namespace:: oneapi::tbb::flatten2d
 	       
 .. cpp:function:: explicit flattened2d( const Container& c )
 

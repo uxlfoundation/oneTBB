@@ -63,7 +63,7 @@ are not related to the particular ``task_group``.
 Member functions
 ----------------
 
-.. namespace:: oneapi::tbb::task_group
+.. cpp:namespace:: oneapi::tbb::task_group
 
 .. cpp:function:: task_group()
 

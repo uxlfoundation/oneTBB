@@ -48,7 +48,7 @@ A ``combinable`` provides each thread with its own instance of type ``T``.
 Member functions
 ----------------
 
-.. namespace:: oneapi::tbb::combinable
+.. cpp:namespace:: oneapi::tbb::combinable
 	       
 .. cpp:function:: combinable()
 

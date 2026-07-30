@@ -36,7 +36,7 @@ The ``queuing_mutex`` is fair, threads acquire a lock on a mutex in the order th
 Member classes
 --------------
 
-.. namespace:: oneapi::tbb::queueing_mutex
+.. cpp:namespace:: oneapi::tbb::queueing_mutex
 	       
 .. cpp:class:: scoped_lock
 

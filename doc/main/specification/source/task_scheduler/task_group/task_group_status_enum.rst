@@ -10,6 +10,7 @@ task_group_status
 A ``task_group_status`` type represents the status of a ``task_group``.
 
 .. code:: cpp
+
     // Defined in header <oneapi/tbb/task_group.h>
     // Defined in header <oneapi/tbb/task_arena.h>
 

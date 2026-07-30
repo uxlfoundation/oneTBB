@@ -41,6 +41,7 @@ Header
 ------
 
 .. code:: cpp
+
     // Defined in header <oneapi/tbb/task_arena.h>
 
     namespace oneapi {

@@ -6,7 +6,7 @@
 Size and capacity
 =================
 
-.. namespace:: oneapi::tbb::enumerable_thread_specific
+.. cpp:namespace:: oneapi::tbb::enumerable_thread_specific
 	       
 .. cpp:function:: size_type size() const
 

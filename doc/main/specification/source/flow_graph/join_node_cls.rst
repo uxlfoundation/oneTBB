@@ -1,4 +1,4 @@
-.. _join_node_cls::
+.. _join_node_cls:
 
 join_node
 =========

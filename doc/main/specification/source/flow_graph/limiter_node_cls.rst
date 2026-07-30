@@ -78,7 +78,7 @@ successors. If it cannot obtain a message from a predecessor, it decrements the 
 Member functions
 ----------------
 
-.. namespace:: oneapi::tbb::flow::limiter_node
+.. cpp:namespace:: oneapi::tbb::flow::limiter_node
 	       
 .. cpp:function:: limiter_node( graph &g, size_t threshold )
 

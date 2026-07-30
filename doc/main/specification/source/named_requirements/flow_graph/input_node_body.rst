@@ -13,7 +13,7 @@ A type `Body` satisfies `InputNodeBody` if it meets the following requirements:
 
 **InputNodeBody Requirements: Pseudo-Signature, Semantics**
 
-.. namespace:: InputNodeBody
+.. cpp:namespace:: InputNodeBody
 	       
 .. cpp:function:: Body::Body( const Body& )
 

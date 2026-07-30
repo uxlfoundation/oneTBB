@@ -13,7 +13,7 @@ A type `Body` satisfies `FunctionNodeBody` if it meets the following requirement
 
 **FunctionNodeBody Requirements: Pseudo-Signature, Semantics**
 
-.. namespace:: FunctionNodeBody
+.. cpp:namespace:: FunctionNodeBody
 
 .. cpp:function:: Body::Body( const Body& )
 

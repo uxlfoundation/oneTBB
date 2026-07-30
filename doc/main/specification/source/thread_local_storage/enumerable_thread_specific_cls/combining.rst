@@ -8,7 +8,7 @@ Combining
 
 The member functions in this section iterate across the entire container sequentially in the calling thread.
 
-.. namespace:: oneapi::tbb::enumerable_thread_specific
+.. cpp:namespace:: oneapi::tbb::enumerable_thread_specific
 
 .. cpp:function:: template<typename BinaryFunc> T combine(BinaryFunc f)
 

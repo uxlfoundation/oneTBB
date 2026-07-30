@@ -59,7 +59,7 @@ are non-destructive.
 Member functions
 ----------------
 
-.. namespace:: oneapi::tbb::flow::write_once_mode
+.. cpp:namespace:: oneapi::tbb::flow::write_once_mode
 
 .. cpp:function:: explicit write_once_node( graph &g )
 

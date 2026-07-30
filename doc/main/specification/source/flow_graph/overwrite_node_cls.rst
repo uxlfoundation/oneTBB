@@ -59,7 +59,7 @@ non-destructive.
 Member functions
 ----------------
 
-.. namespace:: oneapi::tbb::flow::overwrite_node
+.. cpp:namespace:: oneapi::tbb::flow::overwrite_node
 	       
 .. cpp:function:: explicit overwrite_node( graph &g )
 

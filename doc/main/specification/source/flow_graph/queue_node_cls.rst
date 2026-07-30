@@ -54,7 +54,7 @@ its successor set.
 Member functions
 ----------------
 
-.. namespace:: oneapi::tbb::flow::queue_node
+.. cpp:namespace:: oneapi::tbb::flow::queue_node
 
 .. cpp:function:: explicit queue_node( graph &g )
 

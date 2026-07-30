@@ -28,6 +28,7 @@ All the resource handles managed by the ``resource_limiter`` are considered equi
 to resources is granted to consumers is unspecified.
 
 .. code:: cpp
+
     // Defined in header <oneapi/tbb/flow_graph.h>
 
     namespace oneapi {
@@ -91,4 +92,4 @@ If there are consumers that still reference the limiter, the behavior is undefin
 
 .. rubric:: See Also
 
-    :ref:`Preview Features<preview_features>`
+:ref:`Preview Features<preview_features>`

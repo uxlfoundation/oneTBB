@@ -46,7 +46,7 @@ Otherwise, it performs like a ``spin_mutex``, possibly with worse throughput.
 Member classes
 --------------
 
-.. namespace:: oneapi::tbb::speculative_spin_mutex
+.. cpp:namespace:: oneapi::tbb::speculative_spin_mutex
 	       
 .. cpp:class:: scoped_lock
 

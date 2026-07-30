@@ -1,4 +1,4 @@
-.. _join_node_type_specified_message_keys::
+.. _join_node_type_specified_message_keys:
 
 Type-Specified Message Keys for ``join_node`` (preview)
 =======================================================
@@ -13,6 +13,7 @@ type either via a built-in ``key()`` method or a custom ``key_from_message`` fun
 argument-dependent lookup.
 
 .. code:: cpp
+
     // Defined in header <oneapi/tbb/flow_graph.h>
 
     namespace oneapi {
@@ -37,6 +38,7 @@ argument-dependent lookup.
 -------------------------
 
 .. code:: cpp
+
     join_node(graph &g);
 
 The extension adds a special constructor to the ``join_node`` class when ``key_matching`` policy
@@ -52,6 +54,7 @@ extract the key from the ``I``-th tuple element, then matches by key as usual.
 -----------------------------
 
 .. code:: cpp
+
     template <typename K, typename T>
     K key_from_message(const T &t);
 
@@ -83,6 +86,6 @@ a single tuple containing both.
 
 .. rubric:: See Also
 
-    :ref:`join_node Specification<join_node_cls>`
-    :ref:`join_node Policies<join_node_policies>`
-    :ref:`Preview Features<preview_features>`
+:ref:`join_node Specification<join_node_cls>`
+:ref:`join_node Policies<join_node_policies>`
+:ref:`Preview Features<preview_features>`

@@ -45,7 +45,7 @@ It is useful for instantiating a template that expects a ReaderWriterMutex, but 
 Member classes
 --------------
 
-.. namespace:: oneapi::tbb::null_rw_mutex
+.. cpp:namespace:: oneapi::tbb::null_rw_mutex
 
 .. cpp:class:: scoped_lock
 

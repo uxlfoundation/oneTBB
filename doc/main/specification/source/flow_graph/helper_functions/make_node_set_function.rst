@@ -27,4 +27,4 @@ that can be passed to ``make_edges``, ``follows`` and ``precedes`` functions.
 
 .. rubric:: See Also
 
-    :ref:`Preview Features<preview_features>`
+:ref:`Preview Features<preview_features>`

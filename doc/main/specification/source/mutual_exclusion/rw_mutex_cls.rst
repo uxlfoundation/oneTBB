@@ -48,7 +48,7 @@ The ``rw_mutex`` class is an unfair reader-writer lock with a writer preference.
 Member classes
 --------------
 
-.. namespace:: oneapi::tbb::rw_mutex
+.. cpp:namespace:: oneapi::tbb::rw_mutex
 	       
 .. cpp:class:: scoped_lock
 

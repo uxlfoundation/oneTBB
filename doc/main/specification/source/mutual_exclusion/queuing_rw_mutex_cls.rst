@@ -36,7 +36,7 @@ The ``queuing_rw_mutex`` is not recursive. The ``queuing_rw_mutex`` is fair, thr
 Member classes
 --------------
 
-.. namespace:: oneapi::tbb::queueing_rw_mutex
+.. cpp:namespace:: oneapi::tbb::queueing_rw_mutex
 	       
 .. cpp:class:: scoped_lock
 

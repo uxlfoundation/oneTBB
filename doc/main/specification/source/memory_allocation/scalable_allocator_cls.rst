@@ -43,7 +43,7 @@ Memory allocated by a ``scalable_allocator`` should be freed by a ``scalable_all
 Member Functions
 ----------------
 
-.. namespace:: oneapi::tbb::scalable_allocator
+.. cpp:namespace:: oneapi::tbb::scalable_allocator
 
 .. cpp:function:: value_type* allocate(size_type n)
 

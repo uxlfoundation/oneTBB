@@ -45,7 +45,7 @@ otherwise, it reverts to using ``std::malloc`` and ``std::free``.
 Member Functions
 ----------------
 
-.. namespace:: oneapi::tbb::tbb_allocator
+.. cpp:namespace:: oneapi::tbb::tbb_allocator
 	       
 .. cpp:function:: T* allocate(size_type n)
 

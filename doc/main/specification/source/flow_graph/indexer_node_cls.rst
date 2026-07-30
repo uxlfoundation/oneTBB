@@ -72,7 +72,7 @@ Member types
 Member functions
 ----------------
 
-.. namespace:: oneapi::tbb::flow::indexer_node
+.. cpp:namespace:: oneapi::tbb::flow::indexer_node
 	       
 .. cpp:function:: indexer_node(graph &g)
 

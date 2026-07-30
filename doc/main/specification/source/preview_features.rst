@@ -13,11 +13,11 @@ The key properties of a preview feature are:
 - It aims to provide high implementation quality.
 - There is no guarantee of future existence or compatibility.
 - It may have limited or no support in tools such as correctness
-analyzers, profilers, and debuggers.
+  analyzers, profilers, and debuggers.
 - ABI compatibility between translation units is guaranteed only
-when all are built with the same version of the library and the same
-set of enabled preview features, including the case where all preview
-features are disabled in all translation units.
+  when all are built with the same version of the library and the same
+  set of enabled preview features, including the case where all preview
+  features are disabled in all translation units.
 
 .. caution::
     A preview feature is subject to change in the future. It might
@@ -40,7 +40,7 @@ Flow Graph
 
     flow_graph/type_specified_message_keys.rst
     flow_graph/helpers_for_expressing_graphs.rst
-    flow_graph/try_put_and_wait.rst
+    flow_graph/waiting_for_single_message.rst
     flow_graph/resource_limiting.rst
 
 Task Scheduler
@@ -49,10 +49,13 @@ Task Scheduler
 .. toctree::
     :titlesonly:
 
-    task_scheduler/task_group_extensions.rst
-    task_scheduler/isolated_task_group.rst
-    task_scheduler/parallel_phase_for_task_arena.rst
-    task_scheduler/core_type_selector.rst
+    task_scheduler/task_group/task_bypass.rst
+    task_scheduler/task_group/task_completion_handle.rst
+    task_scheduler/task_group/dynamic_dependencies.rst
+    task_scheduler/task_group/wait_single_task.rst
+    task_scheduler/task_group/isolated_task_group.rst
+    task_scheduler/task_arena/parallel_phase.rst
+    task_scheduler/task_arena/core_type_selector.rst
 
 Containers
 ----------
@@ -60,7 +63,7 @@ Containers
 .. toctree::
     :titlesonly:
 
-    containers/custom_mutex_chmap.rst
+    containers/custom_mutex_type_chmap.rst
     containers/concurrent_lru_cache.rst
 
 Memory Allocation

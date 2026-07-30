@@ -42,7 +42,7 @@ The ``mutex`` class is not fair or recursive.
 Member classes
 --------------
 
-.. namespace:: oneapi::tbb::mutex
+.. cpp:namespace:: oneapi::tbb::mutex
 	       
 .. cpp:class:: scoped_lock
 

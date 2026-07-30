@@ -52,7 +52,7 @@ For processors that support hardware transactional memory, ``speculative_spin_rw
 Member classes
 --------------
 
-.. namespace:: oneapi::tbb::speculative_spin_rw_mutex
+.. cpp:namespace:: oneapi::tbb::speculative_spin_rw_mutex
 	       
 .. cpp:class:: scoped_lock
 

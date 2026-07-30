@@ -1,4 +1,4 @@
-.. _join_node_policies::
+.. _join_node_policies:
 
 join_node Policies
 ==================
@@ -49,6 +49,6 @@ join_node Policies
 
 .. rubric:: See Also
 
-  :ref:`join_node Specification<join_node_cls>`
-  :ref:`Type-specified Message keys for join_node<_join_node_type_specified_message_keys>`
+:ref:`join_node Specification<join_node_cls>`
+:ref:`Type-specified Message keys for join_node<_join_node_type_specified_message_keys>`
   

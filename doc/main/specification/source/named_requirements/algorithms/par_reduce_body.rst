@@ -13,7 +13,7 @@ A type `Body` satisfies `ParallelReduceBody` if it meets the following requireme
 
 **ParallelReduceBody Requirements: Pseudo-Signature, Semantics**
 
-.. namespace:: ParallelReduceBody
+.. cpp:namespace:: ParallelReduceBody
 	       
 .. cpp:function:: Body::Body( Body&, split )
 

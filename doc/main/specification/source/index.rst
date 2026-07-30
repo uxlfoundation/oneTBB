@@ -36,7 +36,6 @@ oneAPI Threading Building Blocks Reference
    mutual_exclusion.rst
    timing.rst
    info_namespace.rst
-   custom_assertion_handler.rst
 
 .. toctree::
    :maxdepth: 2

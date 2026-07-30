@@ -36,7 +36,7 @@ with the ``task_arena`` currently used by the calling thread.
     } // namespace tbb
     } // namespace oneapi 
 
-.. namespace:: tbb::this_task_arena
+.. cpp:namespace:: tbb::this_task_arena
 
 .. cpp:function:: int current_thread_index()
 

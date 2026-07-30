@@ -44,7 +44,7 @@ They form a superset of the :doc:`Mutex requirements <mutex>`.
 
     Corresponding scoped-lock type.
 
-.. namespace:: RWM::scoped_lock
+.. cpp:namespace:: RWM::scoped_lock
 	       
 .. cpp:function:: RWM::scoped_lock()
 

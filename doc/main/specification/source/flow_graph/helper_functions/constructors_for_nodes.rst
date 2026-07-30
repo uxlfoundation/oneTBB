@@ -31,6 +31,7 @@ The synopsis below uses ``decltype(follows(...))`` to indicate that the node can
 and ``decltype(precedes(...))`` to indicate that the node can be constructed as a predecessor.
 
 .. code:: cpp
+
     // Defined in header <oneapi/tbb/flow_graph.h>
 
     namespace oneapi {
@@ -193,4 +194,4 @@ and ``decltype(precedes(...))`` to indicate that the node can be constructed as 
 
 .. rubric:: See Also
 
-    :ref:`Preview Features<preview_features>`
+:ref:`Preview Features<preview_features>`

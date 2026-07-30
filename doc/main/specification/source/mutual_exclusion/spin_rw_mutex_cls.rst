@@ -48,7 +48,7 @@ The ``spin_rw_mutex`` class is unfair spinning reader-writer lock with backoff a
 Member classes
 --------------
 
-.. namespace:: oneapi::tbb::spin_rw_mutex
+.. cpp:namespace:: oneapi::tbb::spin_rw_mutex
 	       
 .. cpp:class:: scoped_lock
 

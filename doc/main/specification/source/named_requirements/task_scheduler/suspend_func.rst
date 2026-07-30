@@ -13,7 +13,7 @@ A type `Func` satisfies `SuspendFunc` if it meets the following requirements:
 
 **SuspendFunc Requirements: Pseudo-Signature, Semantics**
 
-.. namespace:: SuspendFunc
+.. cpp:namespace:: SuspendFunc
 	       
 .. cpp:function:: Func::Func( const Func& )
 

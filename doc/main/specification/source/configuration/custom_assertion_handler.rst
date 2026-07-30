@@ -23,7 +23,8 @@ semantically similar to the standard ``std::set_terminate`` and ``std::get_termi
 .. code:: cpp
     // Defined in header <oneapi/tbb/global_control.h>
 
-    #define TBB_EXT_CUSTOM_ASSERTION_HANDLER 202510 // TODO: remove??
+    // TODO: should it be removed?
+    #define TBB_EXT_CUSTOM_ASSERTION_HANDLER 202510
 
     namespace oneapi {
     namespace tbb {

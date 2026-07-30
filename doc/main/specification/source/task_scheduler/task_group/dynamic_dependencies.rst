@@ -219,4 +219,4 @@ The following example demonstrates how to perform parallel reduction over a rang
 
 .. rubric:: See Also
 
-    :ref:`Preview Features<preview_features>`
+:ref:`Preview Features<preview_features>`

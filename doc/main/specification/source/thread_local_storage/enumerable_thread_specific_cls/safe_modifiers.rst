@@ -8,7 +8,7 @@ Concurrently safe modifiers
 
 All member functions in this section can be performed concurrently with each other.
 
-.. namespace:: oneapi::tbb::enumerable_thread_specific
+.. cpp:namespace:: oneapi::tbb::enumerable_thread_specific
 	       
 .. cpp:function:: reference local()
 

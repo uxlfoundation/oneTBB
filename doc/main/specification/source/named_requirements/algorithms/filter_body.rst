@@ -13,7 +13,7 @@ A type `Body` should meet one of the following requirements depending on the fil
 
 **MiddleFilterBody Requirements: Pseudo-Signature, Semantics**
 
-.. namespace:: MiddleFilterBody
+.. cpp:namespace:: MiddleFilterBody
 
 .. cpp:function:: OutputType Body::operator()( InputType item ) const
 
@@ -23,7 +23,7 @@ A type `Body` should meet one of the following requirements depending on the fil
 
 **FirstFilterBody Requirements: Pseudo-Signature, Semantics**
 
-.. namespace:: FirstFilterBody
+.. cpp:namespace:: FirstFilterBody
 
 .. cpp:function:: OutputType Body::operator()( oneapi::tbb::flow_control& fc ) const
 
@@ -33,7 +33,7 @@ A type `Body` should meet one of the following requirements depending on the fil
 
 **LastFilterBody Requirements: Pseudo-Signature, Semantics**
 
-.. namespace:: LastFilterBody
+.. cpp:namespace:: LastFilterBody
 
 .. cpp:function:: void Body::operator()( InputType item ) const
 
@@ -43,7 +43,7 @@ A type `Body` should meet one of the following requirements depending on the fil
 
 **SingleFilterBody Requirements: Pseudo-Signature, Semantics**
 
-.. namespace:: SingleFilterBody
+.. cpp:namespace:: SingleFilterBody
 
 .. cpp:function:: void Body::operator()( oneapi::tbb::flow_control& fc ) const
 

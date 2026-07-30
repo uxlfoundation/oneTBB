@@ -41,7 +41,7 @@ The ``spin_mutex`` class is not fair or recursive.
 Member classes
 --------------
 
-.. namespace:: oneapi::tbb::spin_mutex
+.. cpp:namespace:: oneapi::tbb::spin_mutex
 	       
 .. cpp:class:: scoped_lock
 

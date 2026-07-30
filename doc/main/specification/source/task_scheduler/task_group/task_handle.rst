@@ -39,7 +39,7 @@ An instance of ``task_handle`` type owns a deferred task object.
 Member Functions
 ----------------
 
-.. namespace:: tbb::task_handle
+.. cpp:namespace:: tbb::task_handle
 
 .. cpp:function:: task_handle()
 

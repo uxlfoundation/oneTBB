@@ -21,7 +21,7 @@ API
 .. toctree::
     :titlesonly:
 
-    named_requirements/flow_graph/resource_limited_node_body.rst
+    /named_requirements/flow_graph/resource_limited_node_body.rst
     resource_limiting/resource_limiter_cls.rst
     resource_limiting/resource_limited_node_cls.rst
 
@@ -41,4 +41,4 @@ are never invoked at the same time - even though both nodes allow ``unlimited`` 
 
 .. rubric:: See Also
 
-    :ref:`Preview Features<preview_features>`
+:ref:`Preview Features<preview_features>`

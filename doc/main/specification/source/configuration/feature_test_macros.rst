@@ -1,4 +1,4 @@
-.. _feature_test_macros::
+.. _feature_test_macros:
 
 Feature-test Macros
 ===================

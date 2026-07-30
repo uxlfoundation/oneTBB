@@ -55,7 +55,7 @@ The next message to be forwarded has the largest priority as determined by the `
 Member functions
 ----------------
 
-.. namespace:: oneapi::tbb::flow::priority_node_queue
+.. cpp:namespace:: oneapi::tbb::flow::priority_node_queue
 	       
 .. cpp:function:: explicit priority_queue_node( graph &g )
 

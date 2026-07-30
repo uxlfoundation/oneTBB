@@ -57,7 +57,7 @@ port and generates a message from each element of the tuple, passing each to the
 Member functions
 ----------------
 
-.. namespace:: oneapi::tbb::flow::split_node
+.. cpp:namespace:: oneapi::tbb::flow::split_node
 
 .. cpp:function:: explicit split_node( graph &g )
 

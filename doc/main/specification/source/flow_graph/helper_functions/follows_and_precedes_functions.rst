@@ -20,6 +20,7 @@ The constructed node inherits its graph from the nodes passed to these functions
 If the nodes passed to ``follows`` and ``precedes`` belong to different graphs, the behavior is undefined.
 
 .. code:: cpp
+
     // Defined in header <oneapi/tbb/flow_graph.h>
 
     namespace oneapi {
@@ -64,4 +65,4 @@ The following expressions are equivalent:
 
 .. rubric:: See Also
 
-    :ref:`Preview Features<preview_features>`
+:ref:`Preview Features<preview_features>`
