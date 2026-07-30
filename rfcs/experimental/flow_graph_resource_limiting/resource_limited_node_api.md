@@ -339,7 +339,7 @@ auto node_body = [](input i, auto& ports, void* resource_handle_ptr1, void* reso
     * `resource_limited_multifunction_node`
     * `resource_consumer_multifunction_node`
 2. Should a Resource-Limited alternative for other node types be provided?
-3. How `resource_limited_node` should support node priorities?
+3. Should ``resource_limited_node`` support node priorities, and if so, how?
 4. Should the `output_ports()` member function be provided by `resource_limited_node`?
 5. Should the `rejecting` alternative be provided for `resource_limited_node`?
 6. Instead of a separate node type, should `resource_limited` be considered as a policy for existing functional nodes?
