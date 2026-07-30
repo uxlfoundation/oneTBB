@@ -169,7 +169,7 @@ namespace this_task_arena {
 ```
 The _parallel phase_ continues until each previous `start_parallel_phase` call
 to the same arena has a matching `end_parallel_phase` call.
-Let's also introduce RAII object `parallel_phase` that will help to manage the contract.
+Let's also introduce an RAII object `parallel_phase` that will help to manage the contract.
 Rather than introducing a separate RAII type in the `this_task_arena` namespace,
 `task_arena::parallel_phase` can be constructed with the `tbb::attach` tag to map the phase to
 the implicit arena associated with the calling thread. The alternative would be, instead of

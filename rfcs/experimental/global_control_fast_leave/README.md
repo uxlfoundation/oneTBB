@@ -44,7 +44,7 @@ Setting the parameter would not affect arenas that are already initialized or in
 explicit `leave_policy`. This follows the decision made in the
 [Completely disable new behavior](../parallel_phase_for_task_arena/README.md#completely-disable-new-behavior)
 section of the parallel phase RFC to keep the arena leave policy static for the lifetime of the arena,
-since there are no use cases for dynamic transition between the states yet. 
+since we are not aware of practical use cases for dynamic transition between the states. 
 After initialization, the parallel phase API can independently modify the arena's leave behavior
 at runtime, allowing workers to be retained during active parallel phases regardless of
 the initial state set by the global control.
@@ -99,12 +99,12 @@ The `leave_policy` parameter would control whether arenas are initialized with a
 | `task_arena::leave_policy::automatic` (default) | Workers follow the default system-specific policy (may spin before leaving) |
 | `task_arena::leave_policy::fast` | Workers leave immediately (fast leave enabled) |
 
-When multiple `global_control` objects exist for `leave_policy`, their logical disjunction would be
+When multiple `global_control` objects exist for `leave_policy`, their logical disjunction is
 used (consistent with the `terminate_on_exception` parameter). For `leave_policy`, the request for
-`fast` is the restrictive one, since it asks the library to give up threads sooner, so it wins over
-the absence of such a request. As more leave policies appear, new strategy of choosing the next
+`fast` is the restrictive one, since `automatic` leaves the choice up to the library, so it wins over
+the absence of such a request. If more leave policies appear, a new strategy of choosing the
 `leave_policy` can be implemented. At this point, it means that if any
-`global_control(leave_policy, task_arena::leave_policy::fast)` is active, fast leave would be enabled globally.
+`global_control(leave_policy, task_arena::leave_policy::fast)` is active, fast leave is enabled globally.
 
 ### Proposed Implementation Strategy
 
