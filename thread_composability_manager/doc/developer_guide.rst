@@ -1,5 +1,5 @@
 Developer Guide
-===============
+###############
 
 ..
    * Composition Scenarios
@@ -9,7 +9,7 @@ Developer Guide
    * Give an example of concurrent thread pool from tests.
 
 Usage Model
-===========
+***********
 
 Below is a simple example of a usage model a parallel runtime should follow to successfully use TCM.
 
@@ -99,14 +99,65 @@ to actually enable its use.
 
 Refer to :doc:`api_reference` to find more information on TCM usage scenarios.
 
+Permit State Transitions
+************************
+
+The diagram below shows possible transitions of a permit state.
+
+.. image:: ./resources/state_transitions.png
+   :width: 400px
+   :height: 200px
+   :scale: 100 %
+   :alt: State transitions of a resource permit
+   :align: center
+
+
+Resource Permits and Teams of Threads
+*************************************
+
+The table below shows relation between permit state, team of threads, and whether the resources
+described by a permit are allowed to be used or not.
+
+Resource permit:
+
+- Requested by language RT
+- Granted by TCM
+- Includes maximum concurrency and CPU mask (if :code:`tcm_cpu_constraints_t` was specified)
+- The CPU mask may be different from concurrency
+
+Team of threads
+
+- Managed by language RT
+- Can only be active with a valid resource permit
+
+
+|----------------+------------------+-----------------------------------------------------------+------------------------------------|
+| Permit State   | Resource usage   | Thread Team State                                         | Reactivation Speed                 |
+|----------------+------------------+-----------------------------------------------------------+------------------------------------|
+| Void/No permit | Not allowed      | **Cold**: Team sleeping or disbanded.                     | Slow - same as new request         |
+|                |                  | No Language RT configuration maintained.                  |                                    |
+|----------------+------------------+-----------------------------------------------------------+------------------------------------|
+| Inactive       | Not allowed      | **Warm**: Team not actively consuming CPU resources.      | Fast - if reclaimed by Language RT |
+|                |                  | Some configuration for Language RT is maintained.         |                                    |
+|----------------+------------------+-----------------------------------------------------------+------------------------------------|
+| Pending        | Not allowed      | **Warm** or **Cold**.                                     |                                    |
+|                |                  | Language RT waits for the permit to be granted.           |                                    |
+|----------------+------------------+-----------------------------------------------------------+------------------------------------|
+| Idle           | Allowed          | **Hot**: Team is at quiescent point, might actively spin. | Fastest                            |
+|                |                  | Highly configured for Language RT.                        |                                    |
+|----------------+------------------+-----------------------------------------------------------+------------------------------------|
+| Active         | Allowed          | **Active**: Team is executing tasks for Language RT.      | (Already Active)                   |
+|                | (permit granted) | Highly configured for Language RT.                        |                                    |
+|----------------+------------------+-----------------------------------------------------------+------------------------------------|
+
 Composition Scenarios
-=====================
+*********************
 
 The section describes various composition scenarios of parallel runtimes that can occur in runtime
 providing details on transition of CPU resources between them.
 
 Sequential Requests
--------------------
+===================
 
 **Use Case:** One or more clients request resources one after the other.
 
@@ -130,10 +181,16 @@ Example:
         /*OpenMP threads working again*/
     }
 
-At every moment of time there is only one active request from one of the clients.
+At every moment of time the resources are meant to be used by only one parallel runtime.
+
+Although, this represents the simplest composition scenario, it is still can benefit from using
+Thread Composability Manager. This is because usually resources are not released immediately after a
+parallel region, but remain being used for some time anticipating new parallel work to appear soon.
+It is important to notify TCM about such situation through a call to :code:`tcmIdlePermit` so that
+permit resources can be re-used by subsequent requests from another runtime.
 
 Concurrent Requests
--------------------
+===================
 
 **Use Case:** Two or more clients request resources concurrently and independently. No client makes
 new requests while holding one.
@@ -176,7 +233,7 @@ resources, the other - for :math:`P_{2}`.*
    example, each request is done for cores in a separate NUMA domain.
 
 Nested Requests
----------------
+===============
 
 **Use Case:** One or more clients request resources while using the permit from one of the previous
 requests.
@@ -211,12 +268,12 @@ Possible scenarios:
    (e.g. all cores in a socket).
 
 Combined Use Cases
-------------------
+==================
 
 The combined use cases include sequential, concurrent, and nested use cases mixed in the code.
 
 Sequential with Nested
-~~~~~~~~~~~~~~~~~~~~~~
+----------------------
 
 *Listing 4: Example of sequential with nested calls.*
 
@@ -234,3 +291,4 @@ Sequential with Nested
             /*OpenMP threads working again*/
         }
     });
+
