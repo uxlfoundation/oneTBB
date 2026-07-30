@@ -38,7 +38,7 @@ some use cases, the API should be extended to support limiting access to shared 
 ### Preview Feature High-level Design
 
 The preview feature extends the Flow Graph API with two entities representing a *Provider* and a *Consumer* of one or several
-*Resources* and is implementing a *Protocol* with unspecified details.
+*Resources* and implements a *Protocol* with unspecified details.
 
 ```cpp
 namespace oneapi {
