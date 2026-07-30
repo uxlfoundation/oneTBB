@@ -21,6 +21,7 @@ mechanism extends this by allowing developers to implement their own assertion h
 semantically similar to the standard ``std::set_terminate`` and ``std::get_terminate`` functions.
 
 .. code:: cpp
+
     // Defined in header <oneapi/tbb/global_control.h>
 
     // TODO: should it be removed?
