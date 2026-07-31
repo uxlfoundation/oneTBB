@@ -27,6 +27,7 @@
 #include "detail/_small_object_pool.h"
 #include "detail/_task.h"
 #include "detail/_task_handle.h"
+#include "detail/_parallel_phase.h"
 #include "info.h"
 #include "task_group.h"
 
@@ -526,52 +527,62 @@ public:
 
     class parallel_phase : no_copy {
     public:
-        enum class end_flags : unsigned {
-            with_fast_leave = 1
+        class flags {
+            friend class parallel_phase;
+            friend class task_arena;
+            friend void start_parallel_phase(flags);
+            friend void end_parallel_phase(flags);
+
+            std::uint32_t my_start;
+            std::uint32_t my_end;
+        public:
+            flags() : my_start(0), my_end(0) {};
+            template <typename... Flags>
+            flags(Flags...) : my_start(phase::combine_tags<phase::start, Flags...>::value),
+                  my_end(phase::combine_tags<phase::end, Flags...>::value) {}
         };
-        parallel_phase(d1::attach, end_flags e_flags = {}) : my_end_flags(e_flags) {
+        class end_with_fast_leave : public phase::tag<phase::end, phase::end_fast_leave> {};
+
+        parallel_phase(d1::attach, flags f = {}) : my_flags(f) {
             r1::enter_parallel_phase(nullptr, /*reserved*/0);
         }
-        parallel_phase(task_arena& ta, end_flags e_flags = {})
-            : my_arena(&ta), my_end_flags(e_flags)
+        parallel_phase(task_arena& ta, flags f = {})
+            : my_arena(&ta), my_flags(f)
         {
-            suppress_unused_warning(reserved, my_start_flags_reserved);
             r1::enter_parallel_phase(my_arena, /*reserved*/0);
         }
-        parallel_phase(parallel_phase&& other) : my_arena(other.my_arena), my_end_flags(other.my_end_flags) {
+        parallel_phase(parallel_phase&& other) : my_arena(other.my_arena), my_flags(other.my_flags) {
             other.my_owns = false;
         }
         parallel_phase& operator=(parallel_phase&& other) {
             my_arena = other.my_arena;
-            my_end_flags = other.my_end_flags;
+            my_flags = other.my_flags;
             other.my_owns = false;
             return *this;
         }
         ~parallel_phase() {
             if (my_owns)
-                r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_end_flags));
+                r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end));
         }
 
-        void end(end_flags e_flags = {}) {
-            my_end_flags = std::uintptr_t(e_flags) ? e_flags : my_end_flags;
+        void end() {
             my_owns = false;
-            r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_end_flags));
+            r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end));
         }
     private:
         task_arena* my_arena{nullptr};
-        end_flags my_end_flags;
-        unsigned my_start_flags_reserved;
+        flags my_flags;
         bool my_owns{true};
         std::uintptr_t reserved;
     };
 
-    void start_parallel_phase() {
+    void start_parallel_phase(parallel_phase::flags = {}) {
         initialize();
         r1::enter_parallel_phase(this, /*reserved*/0);
     }
-    void end_parallel_phase(parallel_phase::end_flags e_flags = {}) {
+    void end_parallel_phase(parallel_phase::flags flags = {}) {
         __TBB_ASSERT(my_initialization_state.load(std::memory_order_relaxed) == do_once_state::initialized, nullptr);
-        r1::exit_parallel_phase(this, static_cast<std::uintptr_t>(e_flags));
+        r1::exit_parallel_phase(this, static_cast<std::uintptr_t>(flags.my_end));
     }
 
 #if __TBB_EXTRA_DEBUG
@@ -651,8 +662,8 @@ inline void start_parallel_phase() {
     r1::enter_parallel_phase(nullptr, /*reserved*/0);
 }
 
-inline void end_parallel_phase(task_arena::parallel_phase::end_flags e_flags = {}) {
-    r1::exit_parallel_phase(nullptr, static_cast<std::uintptr_t>(e_flags));
+inline void end_parallel_phase(task_arena::parallel_phase::flags f = {}) {
+    r1::exit_parallel_phase(nullptr, static_cast<std::uintptr_t>(f.my_end));
 }
 
 inline std::vector<d1::task_arena> create_numa_task_arenas(d1::constraints c = {},

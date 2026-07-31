@@ -18,8 +18,6 @@
 //! \file test_parallel_phase.cpp
 //! \brief Test for [preview] functionality
 
-#define TBB_PREVIEW_PARALLEL_PHASE 1
-
 #include <chrono>
 #include <utility>
 
@@ -30,6 +28,9 @@
 
 #include "tbb/global_control.h"
 #include "tbb/task_arena.h"
+
+using phase_flags = tbb::task_arena::parallel_phase::flags;
+using end_with_fast_leave = tbb::task_arena::parallel_phase::end_with_fast_leave;
 
 void active_wait_for(std::chrono::microseconds duration) {
     for (auto t1 = std::chrono::steady_clock::now(), t2 = t1;
@@ -137,7 +138,7 @@ class start_time_collection_phase_wrapped
     std::size_t measure_impl() {
         arena->start_parallel_phase();
         auto median_start_time = measure_median_start_time(arena);
-        arena->end_parallel_phase(/*with_fast_leave*/true);
+        arena->end_parallel_phase(end_with_fast_leave{});
         return median_start_time;
     }
 };
@@ -162,7 +163,7 @@ class start_time_collection_sequenced_phases
     using base = start_time_collection_base<start_time_collection_sequenced_phases>;
     friend base;
 
-    std::pair<bool, bool> with_fast_leave {false, false};
+    phase_flags end_flags{};
 
     std::size_t measure_impl() {
         std::size_t median_start_time;
@@ -182,10 +183,7 @@ class start_time_collection_sequenced_phases
                         }
                         barrier.wait();
                     });
-                    if (with_fast_leave.first)
-                        arena->end_parallel_phase(with_fast_leave.second);
-                    else
-                        arena->end_parallel_phase();
+                    arena->end_parallel_phase(end_flags);
                 }
             );
         } else {
@@ -198,10 +196,7 @@ class start_time_collection_sequenced_phases
                         tbb::this_task_arena::enqueue(body);
                     }
                     barrier.wait();
-                    if (with_fast_leave.first)
-                        tbb::this_task_arena::end_parallel_phase(with_fast_leave.second);
-                    else
-                        tbb::this_task_arena::end_parallel_phase();
+                    tbb::this_task_arena::end_parallel_phase(end_flags);
                 }
             );
         }
@@ -209,20 +204,12 @@ class start_time_collection_sequenced_phases
     }
 
 public:
-    explicit start_time_collection_sequenced_phases(std::size_t ntrials) :
-        base(ntrials)
+    explicit start_time_collection_sequenced_phases(std::size_t ntrials, phase_flags f = {}) :
+        base(ntrials), end_flags(f)
     {}
 
-    start_time_collection_sequenced_phases(tbb::task_arena& ta, std::size_t ntrials) :
-        base(ta, ntrials)
-    {}
-
-    start_time_collection_sequenced_phases(tbb::task_arena& ta, std::size_t ntrials, bool fast_leave) :
-        base(ta, ntrials), with_fast_leave(/*is_set*/true, fast_leave)
-    {}
-
-    explicit start_time_collection_sequenced_phases(std::size_t ntrials, bool fast_leave) :
-        base(ntrials), with_fast_leave(/*is_set*/true, fast_leave)
+    start_time_collection_sequenced_phases(tbb::task_arena& ta, std::size_t ntrials, phase_flags f = {}) :
+        base(ta, ntrials), end_flags(f)
     {}
 };
 
@@ -232,24 +219,32 @@ class start_time_collection_sequenced_scoped_phases
     using base = start_time_collection_base<start_time_collection_sequenced_scoped_phases>;
     friend base;
 
-    bool with_fast_leave;
+    phase_flags end_flags;
 
     std::size_t measure_impl() {
-        utils::SpinBarrier barrier{static_cast<std::size_t>(arena->max_concurrency())};
+        std::size_t num_threads = arena ? arena->max_concurrency()
+                                        : tbb::this_task_arena::max_concurrency();
+        utils::SpinBarrier barrier{static_cast<std::size_t>(num_threads)};
         auto body = [&] {
             barrier.wait();
         };
         auto median_start_time = measure_median_start_time(arena,
             [&] {
-                std::size_t num_threads = arena->max_concurrency();
-                {
-                    tbb::task_arena::parallel_phase phase{*arena, with_fast_leave};
+                if (arena) {
+                    tbb::task_arena::parallel_phase phase{*arena, end_flags};
                     arena->execute([&] {
                         for(std::size_t thr = 0; thr < num_threads-1; ++thr) {
                             tbb::this_task_arena::enqueue(body);
                         }
                         barrier.wait();
                     });
+                } else {
+                    // Attaches to the arena of the calling thread
+                    tbb::task_arena::parallel_phase phase{tbb::attach{}, end_flags};
+                    for(std::size_t thr = 0; thr < num_threads-1; ++thr) {
+                        tbb::this_task_arena::enqueue(body);
+                    }
+                    barrier.wait();
                 }
             }
         );
@@ -257,12 +252,13 @@ class start_time_collection_sequenced_scoped_phases
     }
 
 public:
-    start_time_collection_sequenced_scoped_phases(tbb::task_arena& ta, std::size_t ntrials, bool fast_leave = false) :
-        base(ta, ntrials), with_fast_leave(fast_leave)
+    start_time_collection_sequenced_scoped_phases(tbb::task_arena& ta, std::size_t ntrials,
+                                                  phase_flags f = {}) :
+        base(ta, ntrials), end_flags(f)
     {}
 
-    explicit start_time_collection_sequenced_scoped_phases(std::size_t ntrials, bool fast_leave = false) :
-        base(ntrials), with_fast_leave(fast_leave)
+    explicit start_time_collection_sequenced_scoped_phases(std::size_t ntrials, phase_flags f = {}) :
+        base(ntrials), end_flags(f)
     {}
 };
 
@@ -407,8 +403,8 @@ TEST_CASE("Test one-time fast leave") {
     tbb::task_arena ta1{};
     tbb::task_arena ta2{};
     start_time_collection_sequenced_phases st_collector1{ta1, /*num_trials=*/10};
-    start_time_collection_sequenced_phases st_collector2{ta2, /*num_trials=*/10, /*fast_leave*/true};
-    start_time_collection_sequenced_scoped_phases st_collector_scoped{ta2, /*num_trials=*/10, /*fast_leave*/true};
+    start_time_collection_sequenced_phases st_collector2{ta2, /*num_trials=*/10, end_with_fast_leave{}};
+    start_time_collection_sequenced_scoped_phases st_collector_scoped{ta2, /*num_trials=*/10, end_with_fast_leave{}};
 
     auto times1 = st_collector1.measure();
     auto times2 = st_collector2.measure();
@@ -431,16 +427,23 @@ TEST_CASE("Test parallel phase with this_task_arena") {
         return;
     }
     start_time_collection_sequenced_phases st_collector1{/*num_trials=*/10};
-    start_time_collection_sequenced_phases st_collector2{/*num_trials=*/10, /*fast_leave*/true};
+    start_time_collection_sequenced_phases st_collector2{/*num_trials=*/10, end_with_fast_leave{}};
+    start_time_collection_sequenced_scoped_phases st_collector_scoped{/*num_trials=*/10, end_with_fast_leave{}};
 
     auto times1 = st_collector1.measure();
     auto times2 = st_collector2.measure();
+    auto times_scoped = st_collector_scoped.measure();
 
     auto median1 = utils::median(times1.begin(), times1.end());
     auto median2 = utils::median(times2.begin(), times2.end());
+    auto median_scoped = utils::median(times_scoped.begin(), times_scoped.end());
 
     WARN_MESSAGE(median1 < median2,
         "Expected one-time fast leave setting to slow workers to start new work");
+
+    WARN_MESSAGE(median1 < median_scoped,
+        "Expected one-time fast leave setting to slow workers to start new work "
+        "when attaching to the arena of the calling thread");
 }
 
 //! \brief \ref interface

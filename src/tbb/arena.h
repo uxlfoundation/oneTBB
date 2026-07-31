@@ -227,7 +227,7 @@ public:
     void unregister_parallel_phase(std::uintptr_t flags) {
         std::uintptr_t prev = my_state.load(std::memory_order_relaxed);
         __TBB_ASSERT(prev != UINTPTR_MAX, "The initial state was not set");
-        bool enable_fast_leave = flags & std::uintptr_t(tbb::task_arena::parallel_phase::end_flags::with_fast_leave);
+        bool enable_fast_leave = flags & std::uintptr_t(d0::phase::end_fast_leave);
 
         std::uintptr_t desired{};
         do {
