@@ -34,11 +34,11 @@ endif()
 
 # Dealing with dependencies
 # --------------------------------------------------------------------------------------------------
-if (NOT DEFINED TCM_BUILD OR TCM_BUILD OR TCM_TEST)
+if (TCM_BUILD OR TCM_TEST)
   # Find the HWLOC library
   if (NOT TARGET HWLOC::hwloc)
     list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
-    if (IS_TCM_STANDALONE OR TCM_BUILD)
+    if (IS_TCM_STANDALONE OR TCM_BUILD_OPTION_EXPLICITLY_SET)
       find_package(HWLOC REQUIRED 2.5 VERSION)
     else()
       find_package(HWLOC 2.5 QUIET)
@@ -136,7 +136,7 @@ if (TCM_DIR)
   # Do not add main targets and installation instructions in that case.
   message(STATUS "Using external TCM for testing")
   find_package(TCM REQUIRED)
-elseif(IS_TCM_STANDALONE OR NOT DEFINED TCM_BUILD OR TCM_BUILD)
+elseif(IS_TCM_STANDALONE OR TCM_BUILD)
   add_subdirectory(src)
 endif()
 
