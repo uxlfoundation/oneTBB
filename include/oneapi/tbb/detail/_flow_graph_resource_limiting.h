@@ -1029,10 +1029,11 @@ public:
 
     // Every message accepted by the node adds to the backlog reported to the providers as
     // the pressure, whether it is executed immediately or postponed by the concurrency limit.
-    graph_task* try_put_task(const input_type& t) override {
-        m_body->note_try_put();
-        return base_type::try_put_task(t);
-    }
+graph_task* try_put_task(const input_type& t) override {
+    graph_task* task = base_type::try_put_task(t);
+    if (task) m_body->note_try_put();
+    return task;
+}
 
 #if __TBB_PREVIEW_FLOW_GRAPH_TRY_PUT_AND_WAIT
     graph_task* try_put_task(const input_type& t, const message_metainfo& metainfo) override {
