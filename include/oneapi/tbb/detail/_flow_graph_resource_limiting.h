@@ -178,10 +178,10 @@ public:
 //   m_pending  - requested, but not yet notified.
 //   m_notified - notified, i.e. the consumer has been told to come back and call acquire().
 //
-// The invariant maintained is that at most as many requests are notified as there are
-// available handles, and that those are the highest priority requests known at the time.
-// Requests that cannot be notified wait in m_pending until a release or a change in
-// pressure makes them competitive.
+// Notifications are limited by the number of currently available handles when selecting
+// new requests to notify (see notify_pending), but notifications cannot be revoked.
+// Therefore m_notified may temporarily contain more entries than available handles, and
+// low-priority notified requests can be denied in acquire() and must re-request.
 template <typename ResourceHandle>
 class resource_limiter : public resource_provider_base<ResourceHandle> {
 public:
