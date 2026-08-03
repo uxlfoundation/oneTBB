@@ -18,9 +18,9 @@ function.
 ## Error returning policy should match existing practices
 
 The common error-handling practice for `operator new` is to throw exceptions or, when explicitly
-requested, return `nullptr`. Combining that with the high-level principle that requirements of
-exotic customers should not worsen quality of life for ordinary customers, we get a function family
-that throwing exceptions as the default, and a function family that returns `nullptr` plus a failure
+requested, return `nullptr`. Combining that with the high-level principle that the requirements of
+exotic customers should not worsen the quality of life for ordinary customers, we get one function
+family that throws exceptions by default and another that returns `nullptr` plus a failure
 description when explicitly requested.
 
 ## Which exception?
@@ -68,9 +68,9 @@ void *allocate_numa_interleaved_nothrow(size_t bytes, size_t bytes_per_chunk, st
 
 ## Implementation notes
 
-TBB has 3 modes of exception support: default, terminate_on_exception enabled, and library build with
-`TBB_USE_EXCEPTIONS=0` (the later is unsupported). For throwing functions, the last two modes call `abort`
-when an exception is thrown, there is no need to turn them into non-throwing functions.
+TBB has 3 modes of exception support: default, terminate_on_exception enabled, and library build
+with `TBB_USE_EXCEPTIONS=0` (the latter is unsupported). For throwing functions, the last two modes
+call `abort` when an exception is thrown, there is no need to turn them into non-throwing functions.
 
 `throw` generates a lot of code, so it should not be used in the functions inlined to user code
 without strong justification.
