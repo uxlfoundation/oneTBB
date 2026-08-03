@@ -25,7 +25,10 @@
 
 #include "tbb/flow_graph.h"
 
+#include <algorithm>
 #include <array>
+#include <mutex>
+#include <vector>
 
 //! \file test_resource_limited_node.cpp
 //! \brief Test for [preview] functionality
@@ -229,10 +232,20 @@ void test_root_genie() {
 
     broadcast_node<int> start(g);
 
+    // Records the order in which the three nodes are served, so that the node needing both
+    // resources can be checked for starvation against the two nodes needing only one.
+    std::mutex order_mutex;
+    std::vector<int> service_order;
+    auto note_service = [&](int node_index) {
+        std::lock_guard<std::mutex> lock(order_mutex);
+        service_order.push_back(node_index);
+    };
+
     node_type root_node(g, unlimited, std::tie(root_limiter),
         [&](int input, ports_type& ports, counting_resource* root) {
             CHECK(root == &root_resource);
             root->use();
+            note_service(0);
             std::get<0>(ports).try_put(input);
         });
 
@@ -240,6 +253,7 @@ void test_root_genie() {
         [&](int input, ports_type& ports, counting_resource* genie) {
             CHECK(genie == &genie_resource);
             genie->use();
+            note_service(1);
             std::get<0>(ports).try_put(input);
         });
 
@@ -249,6 +263,7 @@ void test_root_genie() {
             CHECK(genie == &genie_resource);
             root->use();
             genie->use();
+            note_service(2);
             std::get<0>(ports).try_put(input);
         });
 
@@ -298,7 +313,221 @@ void test_root_genie() {
     }
     CHECK(inputs.empty());
 
-    // TODO: add fairness checks
+    CHECK_MESSAGE(service_order.size() == std::size_t(3 * num_inputs),
+                  "Not every body run was recorded");
+    CHECK_MESSAGE(std::count(service_order.begin(), service_order.end(), 2) == num_inputs,
+                  "The node needing both resources was not served for every message");
+    CHECK_MESSAGE(root_resource.counter.load() == 0, "The root resource was left in use");
+    CHECK_MESSAGE(genie_resource.counter.load() == 0, "The genie resource was left in use");
+}
+
+// Verifies the priority policy directly against the provider, without a graph in the way.
+// The consumer records the order it is notified in and reports pressures on demand, so the
+// arbitration order is observable exactly rather than statistically.
+class recording_consumer : public tbb::detail::d2::resource_consumer_base<int> {
+    using base_type = tbb::detail::d2::resource_consumer_base<int>;
+public:
+    using request_id = tbb::detail::d2::request_id;
+
+    recording_consumer(tbb::flow::resource_limiter<int>& limiter, int name)
+        : m_limiter(limiter), m_name(name)
+    {}
+
+    void notify(typename base_type::provider_type& provider, request_id id) override {
+        CHECK(&provider == &m_limiter);
+        m_notifications.push_back(id);
+    }
+
+    request_id request(std::uint64_t counter_value) {
+        request_id id{counter_value};
+        m_limiter.request(*this, id);
+        return id;
+    }
+
+    void report_pressure(std::size_t pressure) { m_limiter.report_pressure(*this, pressure); }
+
+    tbb::detail::d2::resource_handle_optional<int> acquire(request_id id) {
+        return m_limiter.acquire(*this, id);
+    }
+
+    void release(request_id id, tbb::detail::d2::resource_handle_optional<int>&& handle) {
+        m_limiter.release(*this, id, std::move(handle));
+    }
+
+    void withdraw(request_id id) { m_limiter.withdraw(*this, id); }
+
+    std::size_t num_notifications() const { return m_notifications.size(); }
+    bool notified(request_id id) const {
+        return std::find(m_notifications.begin(), m_notifications.end(), id) != m_notifications.end();
+    }
+    void clear_notifications() { m_notifications.clear(); }
+
+    int name() const { return m_name; }
+
+private:
+    tbb::flow::resource_limiter<int>&      m_limiter;
+    int                                    m_name;
+    std::vector<request_id>                m_notifications;
+};
+
+void test_priority_order() {
+    tbb::flow::resource_limiter<int> limiter{42};
+
+    recording_consumer low(limiter, 0);
+    recording_consumer high(limiter, 1);
+
+    // The single handle goes to the first request, which is notified immediately.
+    auto low_first = low.request(1);
+    CHECK_MESSAGE(low.num_notifications() == 1, "The first request was not notified");
+    CHECK_MESSAGE(low.notified(low_first), "The wrong request was notified");
+
+    // While it holds the handle, three more requests queue up behind it.
+    auto handle = low.acquire(low_first);
+    CHECK_MESSAGE(handle.has_value(), "The only request did not get the only handle");
+
+    auto low_second = low.request(2);
+    auto low_third = low.request(3);
+    auto high_first = high.request(1);
+    CHECK_MESSAGE(low.num_notifications() == 1, "A request was notified with no handle available");
+    CHECK_MESSAGE(high.num_notifications() == 0, "A request was notified with no handle available");
+
+    // make high have high pressure, so it is prioritized over the low pressure requests
+    high.report_pressure(4);
+    CHECK_MESSAGE(high.num_notifications() == 0,
+                  "A request was notified on a pressure report with no handle available");
+
+    low.release(low_first, std::move(handle));
+    CHECK_MESSAGE(high.num_notifications() == 1, "The backlogged consumer was not notified first");
+    CHECK_MESSAGE(high.notified(high_first), "The wrong request was notified");
+    CHECK_MESSAGE(low.num_notifications() == 1,
+                  "A lower priority request was notified while a higher priority one was pending");
+
+    handle = high.acquire(high_first);
+    CHECK_MESSAGE(handle.has_value(), "The highest priority request was denied the handle");
+
+    // With the backlog gone, the remaining requests are served in request order.
+    high.report_pressure(0);
+    high.release(high_first, std::move(handle));
+    CHECK_MESSAGE(low.num_notifications() == 2, "The next request in order was not notified");
+    CHECK_MESSAGE(low.notified(low_second), "Requests of equal pressure were not served in order");
+
+    handle = low.acquire(low_second);
+    CHECK_MESSAGE(handle.has_value(), "The notified request was denied the handle");
+    low.release(low_second, std::move(handle));
+
+    CHECK_MESSAGE(low.num_notifications() == 3, "The last request was not notified");
+    CHECK_MESSAGE(low.notified(low_third), "The last request was not the one notified");
+    handle = low.acquire(low_third);
+    CHECK_MESSAGE(handle.has_value(), "The notified request was denied the handle");
+    low.release(low_third, std::move(handle));
+}
+
+void test_withdraw() {
+    tbb::flow::resource_limiter<int> limiter{42};
+
+    recording_consumer consumer(limiter, 0);
+
+    // Withdrawing a notified request must free up the notification slot it occupied, or the
+    // requests behind it never get notified.
+    auto notified = consumer.request(1);
+    CHECK_MESSAGE(consumer.num_notifications() == 1, "The first request was not notified");
+
+    auto pending = consumer.request(2);
+    CHECK_MESSAGE(consumer.num_notifications() == 1, "Both requests were notified for one handle");
+
+    consumer.withdraw(notified);
+    CHECK_MESSAGE(consumer.num_notifications() == 2,
+                  "Withdrawing a notified request did not release its notification slot");
+    CHECK_MESSAGE(consumer.notified(pending), "The pending request was not the one notified");
+
+    auto handle = consumer.acquire(pending);
+    CHECK_MESSAGE(handle.has_value(), "The notified request was denied the handle");
+    consumer.release(pending, std::move(handle));
+
+    // Withdrawing a pending request drops it, and withdrawing an unknown request is a no-op.
+    consumer.clear_notifications();
+    auto held = consumer.request(3);
+    handle = consumer.acquire(held);
+    CHECK_MESSAGE(handle.has_value(), "The only request did not get the only handle");
+
+    auto to_withdraw = consumer.request(4);
+    consumer.withdraw(to_withdraw);
+    consumer.withdraw(to_withdraw); // already withdrawn, must not disturb anything
+
+    consumer.release(held, std::move(handle));
+    CHECK_MESSAGE(consumer.num_notifications() == 1,
+                  "A withdrawn request was notified after the handle was released");
+}
+
+// A ring of N nodes, each needing the two resources it shares with its neighbours, so that
+// every limiter is contended by two nodes and every node contends for two limiters.
+void test_dining_ring() {
+    using namespace oneapi::tbb::flow;
+
+    constexpr std::size_t num_philosophers = 5;
+    constexpr int num_meals = 20;
+
+    using node_type = resource_limited_node<int, std::tuple<int>>;
+    using ports_type = typename node_type::output_ports_type;
+
+    std::vector<counting_resource> chopsticks(num_philosophers);
+    std::vector<std::unique_ptr<resource_limiter<counting_resource*>>> limiters;
+    limiters.reserve(num_philosophers);
+    for (std::size_t i = 0; i < num_philosophers; ++i) {
+        limiters.emplace_back(new resource_limiter<counting_resource*>({&chopsticks[i]}));
+    }
+
+    graph g;
+
+    std::vector<std::atomic<int>> meals_eaten(num_philosophers);
+    for (std::size_t i = 0; i < num_philosophers; ++i) {
+        meals_eaten[i].store(0);
+    }
+
+    // think_nodes hold no resources; eat_nodes hold the left and right chopstick. Each meal
+    // loops back through the think node, so a philosopher only ever has one message in
+    // flight and the ring cannot be satisfied by buffering.
+    std::vector<std::unique_ptr<function_node<int, int>>> think_nodes;
+    std::vector<std::unique_ptr<node_type>> eat_nodes;
+    think_nodes.reserve(num_philosophers);
+    eat_nodes.reserve(num_philosophers);
+
+    for (std::size_t i = 0; i < num_philosophers; ++i) {
+        think_nodes.emplace_back(new function_node<int, int>(g, unlimited,
+            [](int meal) { return meal; }));
+
+        std::size_t left = i;
+        std::size_t right = (i + 1) % num_philosophers;
+
+        eat_nodes.emplace_back(new node_type(g, unlimited,
+            std::tie(*limiters[left], *limiters[right]),
+            [&meals_eaten, i, num_meals](int meal, ports_type& ports,
+                              counting_resource* left_chopstick, counting_resource* right_chopstick) {
+                left_chopstick->use();
+                right_chopstick->use();
+                ++meals_eaten[i];
+                if (meal + 1 < num_meals) {
+                    std::get<0>(ports).try_put(meal + 1);
+                }
+            }));
+    }
+
+    for (std::size_t i = 0; i < num_philosophers; ++i) {
+        make_edge(*think_nodes[i], *eat_nodes[i]);
+        make_edge(output_port<0>(*eat_nodes[i]), *think_nodes[i]);
+    }
+
+    for (std::size_t i = 0; i < num_philosophers; ++i) {
+        think_nodes[i]->try_put(0);
+    }
+
+    g.wait_for_all();
+
+    for (std::size_t i = 0; i < num_philosophers; ++i) {
+        CHECK_MESSAGE(meals_eaten[i].load() == num_meals,
+                      "Philosopher " << i << " ate " << meals_eaten[i].load()
+                      << " of " << num_meals << " meals");
+    }
 }
 
 void test_cancellation_with_active_requests(bool same_graph, bool exception) {
@@ -527,6 +756,21 @@ TEST_CASE("resource_limited_node broadcast") {
 //! \brief \ref error_guessing
 TEST_CASE("root-genie test for resource_limited_node") {
     test_root_genie();
+}
+
+//! \brief \ref requirement
+TEST_CASE("resource_limiter priority order") {
+    test_priority_order();
+}
+
+//! \brief \ref error_guessing
+TEST_CASE("resource_limiter withdraw") {
+    test_withdraw();
+}
+
+//! \brief \ref error_guessing
+TEST_CASE("resource_limited_node in a cycle contending for shared resources") {
+    test_dining_ring();
 }
 
 #if __TBB_CPP17_INVOKE_PRESENT

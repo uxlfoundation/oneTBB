@@ -23,6 +23,11 @@ The feature consists of two components:
 * ``flow::resource_limited_node`` class - a *consumer* node whose body is invoked only after the node
   acquires access to a resource from each associated ``resource_limiter``.
 
+A node that must hold resources from several limiters at once can make little progress if the limiters keep
+granting access to nodes that need only one resource. To avoid such starvation, a ``resource_limiter`` grants
+access on a best-effort priority basis - preferring the consumer with the larger backlog of waiting messages, and
+the earlier request when backlogs are equal - rather than in a strict first-come, first-served order.
+
 API
 ***
 
