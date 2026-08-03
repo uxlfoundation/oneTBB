@@ -1,4 +1,4 @@
-/*
+﻿/*
     Copyright (c) 2005-2022 Intel Corporation
     Copyright (c) 2026 UXL Foundation Contributors
 
@@ -22,6 +22,7 @@
 #include "detail/_namespace_injection.h"
 #include <cstdlib>
 #include <utility>
+#include <new>
 
 #if __TBB_CPP17_MEMORY_RESOURCE_PRESENT
 #include <memory_resource>
