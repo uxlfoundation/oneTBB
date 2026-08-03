@@ -11,8 +11,8 @@ mappings. Therefore, returning an error is a valid error-handling policy.
 
 For deallocation, there is no reasonable fallback, and at least passing an invalid address to
 `munmap()` is serious enough to justify terminating the application. This termination behavior
-matches `free()`. The termination must be processed in a way customizable via custom assertion
-handler. Advatage over `std::terminate_handler` is possibility to report parameters of a failed
+matches `free()`. The termination must be processed in a way customizable via a custom assertion
+handler. Advantage over `std::terminate_handler` is the possibility to report parameters of a failed
 function.
 
 ## Error returning policy should match existing practices
