@@ -44,7 +44,8 @@ if (TCM_BUILD OR TCM_TEST)
       find_package(HWLOC 2.5 QUIET)
     endif()
     if (HWLOC_FOUND)
-      message(STATUS "Enabling build of Thread Composability Manager (TCM)")
+      message(STATUS "Enabling build of Thread Composability Manager (TCM). "
+                     "Specify -DTCM_BUILD=OFF to disable.")
     else()
       message(WARNING "Disabling build of Thread Composability Manager (TCM) "
                       "since HWLOC cannot be found.")
