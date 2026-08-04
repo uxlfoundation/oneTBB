@@ -29,6 +29,7 @@
 #include "detail/_task_handle.h"
 #include "detail/_parallel_phase.h"
 #include "info.h"
+#include "oneapi/tbb/detail/_utils.h"
 #include "task_group.h"
 
 #include <vector>
@@ -537,7 +538,7 @@ public:
             std::uint32_t my_end;
         public:
             flags() : my_start(0), my_end(0) {};
-            template <typename... Flags>
+            template <typename... Flags, typename = typename std::enable_if<phase::valid_flags<Flags...>::value>::type>
             flags(Flags...) : my_start(phase::combine_tags<phase::start, Flags...>::value),
                   my_end(phase::combine_tags<phase::end, Flags...>::value) {}
         };
@@ -549,12 +550,15 @@ public:
         parallel_phase(task_arena& ta, flags f = {})
             : my_arena(&ta), my_flags(f)
         {
+            suppress_unused_warning(reserved);
             r1::enter_parallel_phase(my_arena, /*reserved*/0);
         }
         parallel_phase(parallel_phase&& other) : my_arena(other.my_arena), my_flags(other.my_flags) {
             other.my_owns = false;
         }
         parallel_phase& operator=(parallel_phase&& other) {
+            if (my_owns)
+                r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end));
             my_arena = other.my_arena;
             my_flags = other.my_flags;
             other.my_owns = false;

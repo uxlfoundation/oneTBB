@@ -157,10 +157,8 @@ export namespace tbb {
         using tbb::v1::this_task_arena::max_concurrency;
         using tbb::v1::this_task_arena::isolate;
         using tbb::v1::this_task_arena::enqueue;
-#if __TBB_PREVIEW_PARALLEL_PHASE
         using tbb::v1::this_task_arena::start_parallel_phase;
         using tbb::v1::this_task_arena::end_parallel_phase;
-#endif
     } // namespace this_task_arena
 
     using tbb::v1::task_group_context;

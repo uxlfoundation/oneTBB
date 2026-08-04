@@ -216,12 +216,12 @@ static void TestPreviewNames() {
     TestTypeDefinitionPresence( task_completion_handle );
     TestFuncDefinitionPresence( is_inside_task, (), bool );
 #endif
-#if __TBB_PREVIEW_PARALLEL_PHASE
     TestTypeDefinitionPresence( task_arena::leave_policy );
-    TestTypeDefinitionPresence( task_arena::scoped_parallel_phase );
+    TestTypeDefinitionPresence( task_arena::parallel_phase );
+    TestTypeDefinitionPresence( task_arena::parallel_phase::flags );
+    TestTypeDefinitionPresence( task_arena::parallel_phase::end_with_fast_leave );
     TestFuncDefinitionPresence( this_task_arena::start_parallel_phase, (), void );
-    TestFuncDefinitionPresence( this_task_arena::end_parallel_phase, (bool), void );
-#endif
+    TestFuncDefinitionPresence( this_task_arena::end_parallel_phase, (tbb::task_arena::parallel_phase::flags), void );
 #if __TBB_PREVIEW_NUMA_ALLOCATION
     TestFuncDefinitionPresence( allocate_numa_interleaved, (size_t, size_t), void* );
     TestFuncDefinitionPresence( deallocate_numa_interleaved, (void*, size_t), void );

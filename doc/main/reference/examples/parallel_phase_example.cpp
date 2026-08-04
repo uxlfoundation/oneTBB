@@ -36,7 +36,7 @@ int main() {
     std::vector<int> data(1000);
 
     {
-        oneapi::tbb::task_arena::scoped_parallel_phase phase{ta};
+        oneapi::tbb::task_arena::parallel_phase phase{ta};
         ta.execute([&data]() {
             oneapi::tbb::parallel_for(std::size_t(0), data.size(), [&data](std::size_t i) {
                 data[i] = static_cast<int>(i*i);
