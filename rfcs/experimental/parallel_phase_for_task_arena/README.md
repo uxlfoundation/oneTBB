@@ -42,10 +42,10 @@ Let’s consider both “Delayed leave” and “Fast leave” as 2 different st
 
 <img src="completely_disable_new_behavior.png" width=800>
 
-The question is whether we should allow the arena to dynamically transition from one state to
-another. At this point, there are no use cases for this, hence the proposal is to keep
-the state static for the lifetime of the arena. If we see a value in the future, the current
-implementation should be flexible enough to support this (see [technical details](#technical-details)).
+One question was whether we should allow the arena to dynamically transition from one state to
+another. Due to the lack of use cases that would justify this, the decision is to keep the state
+static for the lifetime of the arena. The current implementation is flexible enough to support such
+extension (see [technical details](#technical-details)).
 
 ### When threads should leave?
 
@@ -169,6 +169,9 @@ namespace this_task_arena {
 ```
 The _parallel phase_ continues until each previous `start_parallel_phase` call
 to the same arena has a matching `end_parallel_phase` call.
+
+#### Using RAII to manage parallel phase
+
 Let's also introduce an RAII object `parallel_phase` that will help to manage the contract.
 Rather than introducing a separate RAII type in the `this_task_arena` namespace,
 `task_arena::parallel_phase` can be constructed with the `tbb::attach` tag to map the phase to
@@ -185,6 +188,8 @@ namespace this_task_arena {
 ```
 The factory function approach seems more consistent with the rest of task arena API.
 
+#### Flags
+
 Note that all the entry points accept a single `parallel_phase::flags` argument rather than a
 boolean flag, even though only one flag is defined for now. Since _parallel phase_ is a high-level
 hint to the scheduler, it makes sense that other scheduling hints could be tied to it as well, so
@@ -197,10 +202,20 @@ for both boundaries at once and applies each of them at the corresponding point,
 functions only take into account the flags applicable to them. A flag passed to an operation it
 does not apply to is ignored. 
 
+#### Starting and ending a parallel phase
+
+The start of _parallel phase_ can also be used as a warm-up hint for the workers to enter
+the arena in advance, therefore the arena (including the implicit arena bound to the external thread)
+must be initialized during the first call to `start_parallel_phase`. It means that if a calling thread has
+no associated arena yet, the invocation of `this_task_arena::start_parallel_phase` will initialize
+an arena and bind it to the calling thread.
+
 If the end of the parallel phase is not indicated by the user, it will be done automatically when
 the last public reference is removed from the arena (i.e., task_arena has been destroyed or,
 for an implicitly created arena, the thread that owns it has completed).
 This ensures correctness is preserved (threads will not be retained forever).
+
+#### RAII vs explicit calls
 
 Introduction of the explicit functions `start_parallel_phase` and `end_parallel_phase` opens
 a possibility of misuse: either forgetting to pair phase starts with ends, which is not a
@@ -288,12 +303,6 @@ class Service {
 };
 ```
 If the friction of dealing with the RAII object is considered too high, then it makes sense to provide the explicit functions as well.
-
-The start of _parallel phase_ can also be used as a warm-up hint for the workers to enter
-the arena in advance, therefore the arena (including the implicit arena bound to the external thread)
-must be initialized during the first call to `start_parallel_phase`. It means that if a calling thread has
-no associated arena yet, the invocation of `this_task_arena::start_parallel_phase` will initialize
-an arena and bind it to the calling thread.
 
 ### Examples
 
@@ -411,15 +420,22 @@ the `thread_leave_manager` during the execution of parallel phases. It shows how
 
 <img src="parallel_phase_sequence_diagram.png" width=1000>
 
-## Open Questions in Design
+## Performance testing
 
-Some open questions that remain:
-* Are there additional use cases that should be considered that we missed in our analysis?
-  So far, no additional use cases have been raised through the RFC review process.
+The [seismic example](../../../examples/parallel_for/seismic) can be a good candidate for measuring
+the impact of _parallel phase_, since each frame invokes two `parallel_for` loops in sequence
+(stress update, then velocity update), so worker threads may leave the arena prematurely
+between updates or between frames instead of staying resident for the whole simulation.
+Wrapping the per-frame loops with `start/end_parallel_phase` should retain workers across frames
+and thus reduce the arena join/leave overhead.
+
+The example can also showcase the `end_with_fast_leave` flag: if one of the two per-frame loops
+were rewritten with a different runtime (e.g. OpenMP), calling `end_parallel_phase` with
+`end_with_fast_leave` before that loop would release oneTBB workers promptly, avoiding
+oversubscription/interference with the OpenMP threads.
 
 ## Conditions to become fully supported
 
 Following conditions need to be met for the feature to move from experimental to fully supported:
 * Open questions regarding API should be resolved.
-* The feature should demonstrate performance improvements in scenarios mentioned.
 * oneTBB specification needs to be updated to reflect the new feature.
