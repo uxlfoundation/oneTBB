@@ -562,7 +562,7 @@ private:
     void internal_push( Args&&... args ) {
         unsigned old_abort_counter = my_abort_counter.load(std::memory_order_relaxed);
         ticket_type ticket = my_queue_representation->tail_counter++;
-        std::ptrdiff_t target = (std::ptrdiff_t)(ticket - my_capacity);
+        std::ptrdiff_t target = static_cast<std::ptrdiff_t>(ticket - my_capacity);
 
         if (static_cast<std::ptrdiff_t>(my_queue_representation->head_counter.load(std::memory_order_relaxed)) <= target) { // queue is full
             auto pred = [&] {
