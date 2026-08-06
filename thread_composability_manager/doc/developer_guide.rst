@@ -1,5 +1,5 @@
-Developer Guide
-###############
+TCM Developer Guide
+###################
 
 ..
    * Composition Scenarios
@@ -105,8 +105,8 @@ Permit State Transitions
 The diagram below shows possible transitions of a permit state.
 
 .. image:: ./resources/state_transitions.png
-   :width: 400px
-   :height: 200px
+   :width: 800px
+   :height: 400px
    :scale: 100 %
    :alt: State transitions of a resource permit
    :align: center

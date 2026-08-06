@@ -52,11 +52,8 @@
 
 
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 2
    :hidden:
    :caption: Thread Composability Manager
 
-   /tcm/intro
-   /tcm/get_started
-   /tcm/developer_guide
-   /tcm/api_reference
+   /tcm/index
