@@ -1,5 +1,8 @@
-The Thread Composability Manager Protocol
-=========================================
+TCM API Reference
+#################
+
+Protocol
+********
 
 Clients request for and release permits using the Thread Composability Manager API. Each permit
 contains info about resources a client can use. Clients can have multiple requests at the same time,
@@ -8,8 +11,8 @@ upon connecting to it.
 
 It is expected that clients follow TCM recommendations on the resource usage and does not misbehave.
 
-Connecting to and disconnecting from the Thread Composability Manager
----------------------------------------------------------------------
+Connecting to and disconnecting from TCM
+****************************************
 
 Before asking for a permit every client should register itself with the Thread Composability Manager
 using:
@@ -29,7 +32,7 @@ using:
 If the client does not expect to request or release resources anymore, it should close the
 connection by calling:
 
-*Warning*: Function returns :code:`TCM_RESULT_ERROR_UNKNOWN` status if :code:`TCM_ENABLE`
+**Warning**: Function returns :code:`TCM_RESULT_ERROR_UNKNOWN` status if :code:`TCM_ENABLE`
  environment variable is not set to :code:`1`.
 
 .. code:: cpp
@@ -43,7 +46,7 @@ connection by calling:
 +-------------------+--------+---------------------------+
 
 Requesting a permit
--------------------
+*******************
 
 Clients request for a resources permit using:
 
@@ -91,7 +94,7 @@ The parameters of a permit request that can be changed are:
 - Permit properties (see `Properties of Permits <#properties-of-permits>`__)
 
 Reading Latest Permit Data
---------------------------
+**************************
 
 To get the latest values from the Thread Composability Manager on resources allotted to a particular
 permit, the client may use the following API:
@@ -120,10 +123,10 @@ side.
 
 **Note:** :code:`tcmGetPermitData` is designed to be lightweight, lock-free function.
 
-Threads of the client
----------------------
+Threads of a client
+*******************
 
-The client utilizes granted CPU resources by running one or more software threads.
+A TCM client utilizes granted CPU resources by running one or more software threads.
 
 To register a thread that will be working as part of a resource permit, user calls:
 
@@ -148,7 +151,7 @@ This API is meant to be called by every thread that is going to be a part of the
 the thread that requested the permit.
 
 Idling, Activating and Deactivating a Permit
---------------------------------------------
+********************************************
 
 There might be situations when a client having an active permit has just finished work and does not
 have anything else to process right away. Though, new work may appear soon. In this case, the client
@@ -203,7 +206,7 @@ to succeed as its resources might be in use by another client. Therefore, the ca
 the permit state and fields to ensure resource usage is allowed.
 
 Releasing a permit
-------------------
+******************
 
 When the resources allocated as part of the permit are not required anymore, the client releases the
 permit by calling :code:`tcmReleasePermit`:
@@ -218,11 +221,11 @@ permit by calling :code:`tcmReleasePermit`:
 | :code:`permit_handle` | In     | Descriptor of the resources to release back to the Thread Composability Manager.   |
 +-----------------------+--------+------------------------------------------------------------------------------------+
 
-Data Structures of the Thread Composability Manager
-===================================================
+TCM Data Structures
+*******************
 
-Result of the Thread Composability Manager Function Invocation
---------------------------------------------------------------
+TCM Function Result
+===================
 
 :code:`tcm_result_t` enum defines a set of possible return codes that the API may use.
 
@@ -244,8 +247,8 @@ Result of the Thread Composability Manager Function Invocation
 | :code:`TCM_RESULT_ERROR_UNKNOWN`          | Indicates erroneous situation during the function execution.|
 +-------------------------------------------+-------------------------------------------------------------+
 
-States of Permits
------------------
+Permit State
+============
 
 The :code:`tcm_permit_state_t` structure describes various states of a permit that the Thread
 Composability Manager uses to indicate ownership of resources described by a permit.
@@ -276,8 +279,8 @@ Composability Manager uses to indicate ownership of resources described by a per
 | :code:`TCM_PERMIT_STATE_ACTIVE`    | Resources are owned by client, and they are used for payload processing.                                                                                        |
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
-Properties of Permits
----------------------
+Permit Properties
+=================
 
 The :code:`tcm_permit_flags_t` describes the properties of permits.
 
@@ -300,7 +303,7 @@ The :code:`tcm_permit_flags_t` describes the properties of permits.
 +-----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 Callback Type
--------------
+=============
 
 The type of a function to pass into :code:`tcmConnect`. The callback is called each time permit of a
 client has been changed due to API calls either from same or different client. It is not called when
@@ -326,7 +329,7 @@ the latest permit data.
 +-----------------------+---------------------------------------------------------------------------------+
 
 Callback Invocation Reasons
----------------------------
+===========================
 
 The :code:`tcm_callbacks_flags_t` describes the reasons client callbacks were invoked by the Thread
 Composability Manager.
@@ -347,7 +350,7 @@ Composability Manager.
 +-------------------------+----------------------------------------------------------+
 
 Permits
--------
+=======
 
 The :code:`tcm_permit_t` structure represents the permit data that is filled in by the Thread
 Composability Manager. The client is responsible for allocating and deallocating memory for objects
@@ -381,8 +384,8 @@ of this structure, including the arrays of necessary size.
 :code:`tcm_cpu_constraints_t` structure during permit request. In this case, the array of
 :code:`concurrencies` contains single element and :code:`size` equals to :code:`1`.
 
-Constraints of Permits
-----------------------
+Permit Constraints
+==================
 
 Constraints describe subset of CPU resources where the requested number of software threads execute.
 
@@ -465,7 +468,7 @@ core types, the specified values should correspond to logical indices used by HW
 which Thread Composability Manager is linked.
 
 Permit Requests
----------------
+===============
 .. _tcm_permit_request_t:
 
 The :code:`tcm_permit_request_t` structure is the data structure that describes resources to be
