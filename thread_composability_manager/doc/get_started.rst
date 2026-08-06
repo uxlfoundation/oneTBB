@@ -53,7 +53,7 @@ Additionally, the following configuration options can be specified to the :code:
 |                             | errors.                                                                                   |
 +-----------------------------+-------------------------------------------------------------------------------------------+
 
-To buid TCM project, invoke :code:`cmake --build .` from the directory where the project was
+To build TCM project, invoke :code:`cmake --build .` from the directory where the project was
 configured.
 
 Installing the project
