@@ -501,7 +501,7 @@ void test_dining_ring() {
 
         eat_nodes.emplace_back(new node_type(g, unlimited,
             std::tie(*limiters[left], *limiters[right]),
-            [&meals_eaten, i, num_meals](int meal, ports_type& ports,
+            [&, i](int meal, ports_type& ports,
                               counting_resource* left_chopstick, counting_resource* right_chopstick) {
                 left_chopstick->use();
                 right_chopstick->use();
