@@ -50,7 +50,4 @@
    :hidden:
    :maxdepth: 3
 
-   /tcm/intro
-   /tcm/get_started
-   /tcm/developer_guide
-   /tcm/api_reference
+   /tcm/index
