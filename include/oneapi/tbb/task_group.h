@@ -472,10 +472,9 @@ class function_stack_task
 #endif
 {
     const F& m_func;
-    d1::wait_tree_vertex_interface* m_wait_tree_vertex;
 
     void finalize() {
-        m_wait_tree_vertex->release();
+        if (m_wait_tree_vertex) m_wait_tree_vertex->release();
     }
     task* execute(d1::execution_data&) override {
         task* res = d2::task_ptr_or_nullptr(m_func);
@@ -559,8 +558,10 @@ protected:
     template<typename F>
     d1::task* prepare_task(F&& f) {
         d1::small_object_allocator alloc{};
-        return alloc.new_object<function_task<typename std::decay<F>::type>>(std::forward<F>(f),
+        d1::task* task =  alloc.new_object<function_task<typename std::decay<F>::type>>(std::forward<F>(f),
             r1::get_thread_reference_vertex(&m_wait_vertex), context(), alloc);
+        d1::set_task_group(task, this);
+        return task;
     }
 
     d1::task_group_context& context() noexcept {
@@ -570,9 +571,24 @@ protected:
     template<typename F>
     d2::task_handle prepare_task_handle(F&& f) {
         d1::small_object_allocator alloc{};
+
+        d1::task* current_task = d1::current_task_ptr();
+
+        d1::wait_tree_vertex_interface new_task_vertex = nullptr;
+        
+        // If the task is deferred from a task body in the same group, defer assigning the reference
+        bool is_subtask_in_current_group = (current_task != nullptr && d1::get_task_group(current_task) == this);
+
+        if (!is_subtask_in_current_group) new_task_vertex = r1::get_thread_reference_vertex(&m_wait_vertex);
+
         using function_task_t =  d2::function_task<typename std::decay<F>::type>;
         d2::task_handle_task* function_task_p =  alloc.new_object<function_task_t>(std::forward<F>(f),
-            r1::get_thread_reference_vertex(&m_wait_vertex), context(), alloc);
+            new_task_vertex, context(), alloc);
+        d1::set_task_group(task, this);
+
+        if (is_subtask_in_current_group) {
+            static_cast<dynamic_state_task*>(current_task)->add_pending_subtask(function_task_p);
+        }
 
         return d2::task_handle_accessor::construct(function_task_p);
     }
@@ -628,7 +644,17 @@ public:
     void cancel() {
         context().cancel_group_execution();
     }
+
+    friend class task_handle_task;
 }; // class task_group_base
+
+void task_handle_task::assign_wait_vertex(task_group_base* group) {
+    __TBB_ASSERT(group != nullptr, nullptr);
+    __TBB_ASSERT(m_wait_tree_vertex == nullptr, nullptr);
+    m_wait_tree_vertex = r1::get_thread_reference_vertex(&group->m_wait_vertex);
+    __TBB_ASSERT(m_wait_tree_vertex != nullptr, nullptr);
+    m_wait_tree_vertex->reserve();
+}
 
 class task_group : public task_group_base {
 public:
@@ -687,6 +713,8 @@ public:
         __TBB_ASSERT(succ != nullptr, "empty successor handle is not allowed for set_task_order");
         task_dynamic_state* pred_state = task_handle_accessor::get_task_dynamic_state(pred);
         pred_state->add_successor(succ);
+
+        task_handle_accessor::remove_current_pending_subtask(pred);
     }
 
     static void set_task_order(d2::task_completion_handle& pred, d2::task_handle& succ) {

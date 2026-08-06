@@ -222,14 +222,29 @@ inline std::pair<task_handle_task*, bool> notify_successor_node::notify_common()
 
 class dynamic_state_task : public d1::task {
     std::atomic<task_dynamic_state*> m_dynamic_state;
+protected:
+    d1::wait_tree_vertex_interface* m_wait_tree_vertex;
+    std::unordered_set<task_handle_task*> m_pending_subtasks;
 public:
-    dynamic_state_task() : m_dynamic_state(nullptr) {}
+    dynamic_state_task(d1::wait_tree_vertex_interface* vertex)
+        : m_dynamic_state(nullptr)
+        , m_wait_tree_vertex(vertex)
+    {}
 
     ~dynamic_state_task() {
         task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_relaxed);
         if (current_state != nullptr) {
             current_state->release();
         }
+    }
+
+    void add_pending_subtask(task_handle_task* task) {
+        auto result = m_pending_subtasks.insert(task);
+        __TBB_ASSERT(result.second, nullptr);
+    }
+
+    void remove_pending_subtask(task_handle_task* task) {
+        m_pending_subtasks.erase(task);
     }
 
     // Returns the dynamic state associated with the task. If the state has not been initialized, initializes it.
@@ -288,7 +303,6 @@ class task_handle_task
     static_assert(sizeof(destroy_func_type) <= sizeof(std::uint64_t), "Cannot fit destroy pointer into std::uint64_t");
     std::uint64_t m_destroy_func;
 
-    d1::wait_tree_vertex_interface* m_wait_tree_vertex;
     d1::task_group_context& m_ctx;
     d1::small_object_allocator m_allocator;
 public:
@@ -307,17 +321,26 @@ public:
 
     task_handle_task(d1::wait_tree_vertex_interface* vertex, d1::task_group_context& ctx,
                      d1::small_object_allocator& alloc, destroy_func_type destroy_func)
-        : m_destroy_func(reinterpret_cast<std::uint64_t>(destroy_func))
-        , m_wait_tree_vertex(vertex)
+        : dynamic_state_task(vertex)
+        , m_destroy_func(reinterpret_cast<std::uint64_t>(destroy_func))
         , m_ctx(ctx)
         , m_allocator(alloc)
     {
-        m_wait_tree_vertex->reserve();
+        if (m_wait_tree_vertex) { m_wait_tree_vertex->reserve(); }
     }
 
     ~task_handle_task() override {
+        __TBB_ASSERT(m_wait_tree_vertex != nullptr, nullptr);
         m_wait_tree_vertex->release();
+
+        for (task_handle_task* task : m_pending_subtasks) {
+            task_group_base* this_group = d1::get_task_group(this);
+            __TBB_ASSERT(this_group != nullptr, nullptr);
+            task->assign_wait_vertex(this_group);
+        }
     }
+
+    void assign_wait_vertex(task_group_base* group);
 
     d1::task_group_context& ctx() const { return m_ctx; }
 };
@@ -393,6 +416,18 @@ struct task_handle_accessor {
         return th.m_handle->get_dynamic_state();
     }
 #endif
+    static void remove_current_pending_subtask(task_handle& th) {
+        d1::task* current_task = d1::current_task_ptr();
+        auto task = th.m_handle.get();
+
+        if (current_task != nullptr && d1::get_task_group(current_task) == d1::get_task_group(task)) {
+            static_cast<dynamic_state_task*>(current_task)->remove_pending_subtask(task);
+        }
+    }
+
+    static void transfer_wait_tree_vertex(task_handle& th) {
+
+    }
 };
 
 inline bool operator==(task_handle const& th, std::nullptr_t) noexcept {
@@ -600,6 +635,12 @@ inline void dynamic_state_task::transfer_completion_to(task_handle& receiving_ta
     if (current_state != nullptr) {
         current_state->transfer_completion_to(task_handle_accessor::get_task_dynamic_state(receiving_task));
     }
+
+    // Transfer wait_tree_vertex
+    task_handle_accessor::assign_wait_tree_vertex(receiving_task, m_wait_tree_vertex);
+    m_wait_tree_vertex = nullptr;
+
+    task_handle_accessor::remove_current_pending_subtask(receiving_task);
 }
 
 class task_completion_handle {

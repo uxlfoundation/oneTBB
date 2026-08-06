@@ -251,6 +251,12 @@ class task_traits {
     friend struct r1::task_accessor;
 };
 
+} // namespace d1
+namespace d2 {
+class task_group_base;
+} // namespace d2
+namespace d1 {
+
 //! Alignment for a task object
 __TBB_GLOBAL_VAR constexpr std::size_t task_alignment = 64;
 
@@ -267,6 +273,16 @@ public:
 private:
     std::uint64_t m_reserved[6]{};
     friend struct r1::task_accessor;
+
+    friend void set_task_group(task* task, d2::task_group_base* group) {
+        __TBB_ASSERT(task != nullptr && group != nullptr, nullptr);
+        task->m_reserved[3] = reinterpret_cast<std::uint64_t>(group);
+    }
+
+    friend d2::task_group_base* get_task_group(task* task) {
+        __TBB_ASSERT(task != nullptr, nullptr);
+        return reinterpret_cast<d2::task_group_base*>(task->m_reserved[3]);
+    }
 };
 static_assert(sizeof(task) == task_alignment, "task size is broken");
 
