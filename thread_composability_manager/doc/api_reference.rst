@@ -61,7 +61,7 @@ Clients request for a resources permit using:
 +-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | Parameter             | Type     | Description                                                                                                                                                                                                                                                     |
 +=======================+==========+=================================================================================================================================================================================================================================================================+
-| :code:`client_id`     | In       | Client ID obtained by tcmConnect.                                                                                                                                                                                                                               |
+| :code:`client_id`     | In       | Client ID obtained by :code:`tcmConnect`.                                                                                                                                                                                                                       |
 +-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | :code:`request`       | In       | Specification of resources requested.                                                                                                                                                                                                                           |
 +-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -520,12 +520,15 @@ The compatibility rule:
 
 Or using inequality notation, the compatibility rule can be written as:
 
-.. math:: \sum_{i = 1}^{N}m_{i} \leq m \leq M \leq \sum_{i = 1}^{N}M_{i}
+.. math::
+
+   \sum_{i = 1}^{N}m_{i} \leq m \leq M \leq \sum_{i = 1}^{N}M_{i}
+
 
 where:
 
-- :math:`m_{i}` is the :code:`min_concurrency` values from the :code:`cpu_constraints` array
-- :math:`M_{i}` is the :code:`max_concurrency` values from the :code:`cpu_constraints` array
-- :math:`N` - the value of :code:`constraints_size` field
-- :math:`m` - the value of :code:`min_sw_threads` field
-- :math:`M` - the value of :code:`max_sw_threads` field
+- .. math:: `m_{i}` is the :code:`min_concurrency` values from the :code:`cpu_constraints` array
+- .. math:: `M_{i}` is the :code:`max_concurrency` values from the :code:`cpu_constraints` array
+- .. math:: `N` - the value of :code:`constraints_size` field
+- .. math:: `m` - the value of :code:`min_sw_threads` field
+- .. math:: `M` - the value of :code:`max_sw_threads` field
