@@ -6,12 +6,12 @@ In oneTBB, there has never been an API that allows users to block worker threads
 This design choice was made to preserve the composability of the application.
 Before PR#1352, workers moved to the thread pool to sleep once there were no arenas with active
 demand. However, PR#1352 introduced a delayed leave behavior to the library that
-results in blocking threads for an _implementation-defined_ duration inside an arena
+results in blocking threads for an _implementation-specific_ duration inside an arena
 if there is no active demand arcoss all arenas. This change significantly
 improved performance for various applications on high thread count systems.
 The main idea is that usually, after one parallel computation ends,
 another will start after some time. The delayed leave behavior is a heuristic to utilize this,
-covering most cases within _implementation-defined_ duration.
+covering most cases within _implementation-specific_ duration.
 
 However, the new behavior is not the perfect match for all the scenarios:
 * The heuristic of delayed leave is unsuitable for the tasks that are submitted
@@ -44,8 +44,8 @@ Let’s consider both “Delayed leave” and “Fast leave” as 2 different st
 
 One question was whether we should allow the arena to dynamically transition from one state to
 another. Due to the lack of use cases that would justify this, the decision is to keep the state
-static for the lifetime of the arena. The current implementation is flexible enough to support such
-extension (see [technical details](#technical-details)).
+static for the lifetime of the arena. The underlying implementation is already flexible enough
+that dynamic state transitions could be added later without a redesign (see [technical details](#technical-details)).
 
 ### When threads should leave?
 
@@ -147,8 +147,8 @@ class task_arena {
                     leave_policy a_leave_policy = leave_policy::automatic);
 
     class parallel_phase {
-        // Available only when each type in Flags is a parallel phase flag
         class flags {
+            // Available only when each type in Flags is a parallel phase flag
             template <typename... Flags>
             flags(Flags... f);
         };
@@ -186,7 +186,9 @@ namespace this_task_arena {
     task_arena::parallel_phase create_parallel_phase(task_arena::parallel_phase::flags f = {});
 }
 ```
-The factory function approach seems more consistent with the rest of task arena API.
+The factory function approach might seem more consistent with the rest of task arena API.
+As there are no clear advantages of factory function, the proposal is to stick to the constructor approach
+since it is an already established pattern of the feature during experimental stage.
 
 #### Flags
 
@@ -210,19 +212,19 @@ must be initialized during the first call to `start_parallel_phase`. It means th
 no associated arena yet, the invocation of `this_task_arena::start_parallel_phase` will initialize
 an arena and bind it to the calling thread.
 
-If the end of the parallel phase is not indicated by the user, it will be done automatically when
-the last public reference is removed from the arena (i.e., task_arena has been destroyed or,
-for an implicitly created arena, the thread that owns it has completed).
-This ensures correctness is preserved (threads will not be retained forever).
+The arena lifetime must not end while a parallel phase is still active. It is the user's
+responsibility to call `end_parallel_phase` for every outstanding `start_parallel_phase` 
+(or destroy the corresponding `parallel_phase` object) before the arena is destroyed (or, for an implicitly
+created arena, before the owning thread completes). Otherwise, the behavior is undefined.
 
 #### RAII vs explicit calls
 
 Introduction of the explicit functions `start_parallel_phase` and `end_parallel_phase` opens
-a possibility of misuse: either forgetting to pair phase starts with ends, which is not a
-correctness issue per se as described above, or doing more phase ends than starts
+a possibility of misuse: either forgetting to pair phase starts with ends, which results in
+undefined behavior as described above, or doing more phase ends than starts
 (e.g. by using RAII class interchangeably with explicit calls).
 That raises a question of whether the parallel phase API should be limited only to the RAII style.
-To answer this question, we need to consider the use cases where explicit calls might be more preferable.
+To answer this question, we considered the use cases where explicit calls are more preferable.
 
 One such use case is asynchronous handoff, where the start and the end of a parallel phase happen
 in different scopes, potentially executed on different threads, so there is no single scope
@@ -247,9 +249,6 @@ The same use case can be expressed using the `parallel_phase` object, assuming m
 void handle_request(Request req) {
     tbb::task_arena::parallel_phase phase{tbb::attach{},
                                           tbb::task_arena::parallel_phase::end_with_fast_leave{}};
-    // or
-    // auto phase = tbb::this_task_arena::create_parallel_phase(tbb::task_arena::parallel_phase::end_with_fast_leave{});
-    //
     // Some composition of parallel and serial computations
     //
     tbb::this_task_arena::enqueue([req, phs = std::move(phase)]() {
@@ -290,8 +289,6 @@ class Service {
     void on_request() {
         if (!phase) {
             phase = std::make_unique<tbb::task_arena::parallel_phase>(ta);
-            // or
-            // phase = std::make_unique<tbb::task_arena::parallel_phase>(ta.create_parallel_phase());
         }
         ta.execute([]() { /* work */ });
         reset_idle_timer();
@@ -302,7 +299,9 @@ class Service {
     }
 };
 ```
-If the friction of dealing with the RAII object is considered too high, then it makes sense to provide the explicit functions as well.
+The friction of dealing with the RAII object in these cases can be considered too high, so the decision
+is to provide the explicit `start_parallel_phase`/`end_parallel_phase` functions in addition to the
+RAII `parallel_phase` class.
 
 ### Examples
 
