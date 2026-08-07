@@ -102,7 +102,10 @@ Refer to :doc:`api_reference` to find more information on TCM usage scenarios.
 Permit State Transitions
 ************************
 
-The diagram below shows possible transitions of a permit state.
+The diagram below shows possible transitions of a permit state. Black arrows show state transitions
+when TCM API is invoked by a client, while red arrows show state transitions initiated by TCM.
+Whenever change is not initiated by a client itself, this client is notified through invocation of a
+callback function that was registered during the call to :code:`tcmConnect`.
 
 .. image:: ./resources/state_transitions.png
    :width: 800px
