@@ -146,8 +146,18 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
 }
 
 d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t slot_index) {
-    d1::task** victim_pool = lock_task_pool();
-    if (!victim_pool) {
+    d1::task** victim_pool = nullptr;
+    atomic_backoff backoff;
+    do {
+        victim_pool = try_lock_task_pool();
+        if (victim_pool != LockedTaskPool) {
+            // We either successfully locked the victim's task pool or it is empty.
+            break;
+        }
+        __TBB_ASSERT(victim_pool == LockedTaskPool, nullptr);
+    } while (backoff.bounded_pause());
+
+    if (victim_pool == LockedTaskPool || victim_pool == EmptyTaskPool) {
         return nullptr;
     }
     d1::task* result = nullptr;
