@@ -301,38 +301,46 @@ Example of Usage
 
 .. code:: cpp
 
-   // TODO: Adjust the thread pool and its usage in the main
+   #include "tcm.h"
 
+   #include <algorithm>
+   #include <functional>
+   #include <future>
+   #include <iostream>
+   #include <thread>
+   #include <vector>
+   #include <deque>
+
+   tcm_result_t renegotiation_callback(tcm_permit_handle_t permit_handle, void* arg,
+                                       tcm_callback_flags_t invocation_reason);
    class client_thread_pool {
    public:
        template <typename Func>
-       void parallel_for(int start, int end, const Func & f, const tcm_permit_t &expected_permit) {
-           uint32_t concurrency;
-           tcm_permit_t permit = make_void_permit(&concurrency);
-           request_permit(permit, expected_permit);
+       void parallel_for(int start, int end, const Func & f) {
+           const int grant = request_permit();
            thread_pool_cv.notify_all();
 
            // parallel_for preparation
-           int granted_concurrency = get_permit_concurrency(permit);
-           int work_size = end - start;
-           int base_task_size = std::max(1, work_size / granted_concurrency);
-           int task_size_remainder = std::max(0, work_size - granted_concurrency * base_task_size);
-           int s = start + base_task_size;
+           const int work_size = end - start;
+           const int common_size = std::max(1, work_size / grant);
+           int size_remainder = std::max(0, work_size - grant * common_size);
+           int s = start + common_size;
 
            // Submit work to workers
            std::vector<std::future<void>> task_futures;
-           task_futures.reserve(granted_concurrency);
-           for (int id = 1; id < granted_concurrency && s != end; ++id) {
-               int task_size = task_size_remainder-- > 0 ? base_task_size + 1 : base_task_size;
-               int e = s + task_size;
+           task_futures.reserve(grant);
+           for (int id = 1; id < grant && s != end; ++id) {
+               const int subsize = size_remainder-- > 0 ? common_size + 1 : common_size;
+               const int e = s + subsize;
                task_futures.emplace_back(enqueue(f, s, e));
                s = e;
            }
+
            // External thread joins
-           register_thread();
-           f(start, start + base_task_size);
+           tcmRegisterThread(ph);
+           f(start, start + common_size);
            wait(task_futures);
-           unregister_thread();
+           tcmUnregisterThread();
 
            deactivate_permit();
        }
@@ -340,19 +348,21 @@ Example of Usage
        template<typename F, typename... Args>
        std::future<void> enqueue(const F& func, Args&&... args) {
            task_t task{std::bind(func, std::forward<Args>(args)...)};
-           auto future = task.get_future();
+           std::future<void> future = task.get_future();
            {
                std::lock_guard<std::mutex> lock(task_deque_mutex);
                tasks.push_back(std::move(task));
            }
-           task_deque_cv.notify_all();
+           task_deque_cv.notify_one();
            return future;
        }
 
-       client_thread_pool(std::string rname, uint32_t min_threads, uint32_t max_threads)
-           : runtime_name(rname), min_concurrency(min_threads), max_concurrency(max_threads)
-       {
-           client = connect_new_client(client_renegotiate, "", "tcmConnect " + runtime_name);
+       client_thread_pool() {
+           tcm_result_t result = tcmConnect(renegotiation_callback, &client_id);
+           if (result != TCM_RESULT_SUCCESS) {
+               std::cerr << "tcmConnect was unsuccessful. Check 'TCM_ENABLE' is set to 1\n";
+               std::abort();
+           }
            initialize_thread_pool();
        }
 
@@ -363,74 +373,73 @@ Example of Usage
            }
            {
                std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-               max_joinable = -1;
+               max_threads = -1;
            }
            thread_pool_cv.notify_all();
            task_deque_cv.notify_all();
-           release_permit(ph, "", "tcmReleasePermit " + runtime_name);
-           for (auto &worker : workers) {
+
+           tcmReleasePermit(ph);
+
+           for (auto &worker : workers)
                worker.join();
-               g_num_created_threads -= 1;
-           }
-           disconnect_client(client, "", "tcmDisconnect " + runtime_name);
+
+           tcmDisconnect(client_id);
        }
 
    private:
        using task_t = std::packaged_task<void()>;
        void wait(std::vector<std::future<void>>& futures) {
-           for (auto&& future : futures) {
+           for (auto&& future : futures)
                future.get();
-           }
-           std::lock_guard<std::mutex> lock(exception_mutex);
-           if (pool_exception) {
-               std::rethrow_exception(pool_exception);
-           }
        }
 
-       void request_permit(tcm_permit_t &permit, const tcm_permit_t &expected_permit) {
+       uint32_t request_permit() {
+           tcm_permit_t permit{};
+           uint32_t grant = 0;
+           permit.concurrencies = &grant;
+           permit.size = 1;
+
            tcm_permit_request_t request = TCM_PERMIT_REQUEST_INITIALIZER;
-           request.min_sw_threads = min_concurrency;
-           request.max_sw_threads = max_concurrency;
-           auto r = tcmRequestPermit(client, request, &ph, &ph, &permit);
-           if (!(check_success(r, "tcmRequestPermit " + runtime_name) && check_permit(expected_permit, permit))) {
-               throw tcm_request_permit_error{};
+           request.min_sw_threads = 1; // Minimum of one thread is required to perform work
+           permit_changed = false;
+           tcm_result_t r = tcmRequestPermit(client_id, request, /*callback_arg*/this, &ph,
+                                             &permit);
+           if (r != TCM_RESULT_SUCCESS) {
+               std::cerr << "tcmRequestPermit returned error status: " << r << std::endl;
+               std::abort();
            }
-           if (permit.state == TCM_PERMIT_STATE_PENDING) {
-               while (permit.state == TCM_PERMIT_STATE_PENDING) {
-                   std::this_thread::yield();
-                   get_permit_data(ph, permit, "", "tcmGetPermitData for ph=" + to_string(ph) + " by "
-                                                   + runtime_name);
-               }
+
+           while (permit.state == TCM_PERMIT_STATE_PENDING || permit.flags.stale) {
+               // In case of requested permit oversubscribes or stale data is read, wait for
+               // notification from TCM
+               std::unique_lock<std::mutex> permit_lock(permit_mutex);
+               permit_cv.wait(permit_lock, [this]{ return permit_changed; });
+
+               tcmGetPermitData(ph, &permit);
+               permit_changed = false;
            }
            std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-           max_joinable = get_permit_concurrency(permit)-1;
+           max_threads = grant - /*num external threads*/1;
+           return grant;
        }
 
        void deactivate_permit() {
-           ::deactivate_permit(ph, "" ,"tcmDeactivatePermit " + runtime_name);
+           tcmDeactivatePermit(ph);
            std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-           max_joinable = 0;
-       }
-
-       void register_thread() {
-           ::register_thread(ph, "", "tcmRegisterThread " + runtime_name);
-       }
-
-       void unregister_thread() {
-           ::unregister_thread("", "tcmUnregisterThread " + runtime_name);
+           max_threads = 0;
        }
 
        enum pool_state {thread_exit, thread_continue, thread_join};
        pool_state try_join_thread_pool() {
            std::unique_lock<std::mutex> join_lock(thread_pool_mutex);
-           thread_pool_cv.wait(join_lock, [this]
-                               { return max_joinable == -1 || joined_threads < max_joinable; });
-           if (max_joinable == -1) {
+           thread_pool_cv.wait(join_lock,
+               [this]{ return max_threads == -1 || joined_threads < max_threads; });
+
+           if (max_threads == -1)
                return pool_state::thread_exit;
-           }
-           if (joined_threads >= max_joinable) {
+           else if (joined_threads >= max_threads)
                return pool_state::thread_continue;
-           }
+
            joined_threads += 1;
            return thread_join;
        }
@@ -442,8 +451,8 @@ Example of Usage
 
        bool receive_task(task_t& task) {
            std::unique_lock<std::mutex> lock{task_deque_mutex};
-           task_deque_cv.wait_for(lock, std::chrono::milliseconds{200} , [this]
-                       { return !tasks.empty() || is_execution_canceled; });
+           task_deque_cv.wait_for(lock, std::chrono::milliseconds{200},
+                                  [this] { return !tasks.empty() || is_execution_canceled; });
            if (is_execution_canceled || tasks.empty()) {
                return false;
            }
@@ -454,118 +463,94 @@ Example of Usage
 
        bool need_to_leave() {
            std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-           return max_joinable == -1;
+           return max_threads == -1;
        }
 
        void initialize_thread_pool() {
-           std::call_once(thread_pool_initilized, [this] {
+           std::call_once(thread_pool_initialized, [this] {
                auto thread_routine = [this] {
                    while (true) {
-                       try {
-                           pool_state state = try_join_thread_pool();
-                           if (state == pool_state::thread_exit) {
-                               return;
-                           } else if (state == pool_state::thread_continue) {
-                               continue;
-                           }
-                           register_thread();
-                           // Task execution loop
-                           while (true) {
-                               task_t task;
-                               if (receive_task(task)) {
-                                   task();
-                               } else {
-                                   break;
-                               }
-                           }
-                           unregister_thread();
-                           exit_thread_pool();
-                           if (need_to_leave()) {
-                               return;
-                           }
+                       pool_state state = try_join_thread_pool();
+                       if (state == pool_state::thread_exit)
+                           return;
+                       else if (state == pool_state::thread_continue)
+                           continue;
+
+                       tcmRegisterThread(ph);
+                       // Task execution loop
+                       while (true) {
+                           task_t task;
+                           if (receive_task(task))
+                               task();
+                           else
+                               break;
                        }
-                       catch (...) {
-                           {
-                               std::lock_guard<std::mutex> exception_lock(exception_mutex);
-                               if (!pool_exception) {
-                                   pool_exception = std::current_exception();
-                               }
-                           }
-                           {
-                               std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-                               max_joinable = -1;
-                           }
-                           {
-                               std::lock_guard<std::mutex> task_lock{task_deque_mutex};
-                               is_execution_canceled = true;
-                           }
-                           thread_pool_cv.notify_all();
-                           task_deque_cv.notify_all();
+                       tcmUnregisterThread();
+
+                       exit_thread_pool();
+                       if (need_to_leave()) {
                            return;
                        }
                    }
                };
 
-               for (uint32_t i = 0;
-                   i < max_concurrency - 1 && g_num_created_threads < g_max_threads;
-                   ++i)
-               {
-                   if (g_num_created_threads.fetch_add(1) >= g_max_threads) {
-                       g_num_created_threads -= 1;
-                   }
+               for (unsigned int i = 0; i < std::thread::hardware_concurrency() - 1; ++i)
                    workers.emplace_back(thread_routine);
-               }
            });
        }
-       // Auxiliary
-       std::string runtime_name;
-       // Details for permit request
-       uint32_t min_concurrency;
-       uint32_t max_concurrency;
-       // Thread pool's internals
-       std::once_flag thread_pool_initilized;
+
+       // Thread pool internals
+       std::once_flag thread_pool_initialized;
        std::vector<std::thread> workers;
        std::mutex thread_pool_mutex;
        std::condition_variable thread_pool_cv;
-       int max_joinable{};
+       int max_threads{};
        int joined_threads{};
        bool is_execution_canceled{false};
+
        // Tasking internals
        std::deque<task_t> tasks;
        std::condition_variable task_deque_cv;
        std::mutex task_deque_mutex;
-       std::mutex exception_mutex;
-       std::exception_ptr pool_exception;
+
        // TCM related internals
-       tcm_client_id_t client{};
+       tcm_client_id_t client_id{};
        tcm_permit_handle_t ph{nullptr};
-       static std::atomic_int g_num_created_threads;
-       static constexpr int g_max_threads = 256;
+       std::condition_variable permit_cv;
+       std::mutex permit_mutex;
+       bool permit_changed{false};
+       friend tcm_result_t renegotiation_callback(tcm_permit_handle_t permit_handle, void* arg,
+                                                  tcm_callback_flags_t invocation_reason);
    };
 
-   std::atomic_int client_thread_pool::g_num_created_threads{0};
+   tcm_result_t renegotiation_callback(tcm_permit_handle_t /*ph*/, void* arg,
+                                       tcm_callback_flags_t invocation_reason)
+   {
+       if (invocation_reason.new_state) {
+           client_thread_pool& myself = *(client_thread_pool*)arg;
+           {
+               std::lock_guard<std::mutex> lock(myself.permit_mutex);
+               myself.permit_changed = true;
+           }
+           myself.permit_cv.notify_one();
+       }
+
+       return TCM_RESULT_SUCCESS;
+   }
 
    int main() {
-    std::string runtime_name = "outer client";
-    uint32_t min_sw_threads = 1; uint32_t max_sw_threads = platform_tcm_concurrency();
-    uint32_t expected_outer_concurrency = max_sw_threads;
-    client_thread_pool outer{runtime_name, min_sw_threads, max_sw_threads};
+       const int data_size = 10 * std::thread::hardware_concurrency();
+       std::vector<int> data(data_size, 0);
 
-    int data_size = platform_tcm_concurrency() * 10;
-    std::vector<int> data(data_size, 0);
+       client_thread_pool outer;
+       outer.parallel_for(0, data_size, [&data](int begin, int end) {
+           client_thread_pool inner{};
+           inner.parallel_for(begin, end, [&data] (int s, int e) {
+               for (int i = s; i < e; ++ i)
+                   data[i] += 1;
+           });
+       });
 
-    tcm_permit_t expected_outer_permit = make_active_permit(&expected_outer_concurrency);
-    outer.parallel_for(0, data_size, [&data, min_sw_threads, max_sw_threads](int begin, int end) {
-      client_thread_pool inner{"inner client " + std::to_string(begin), min_sw_threads, max_sw_threads};
-      uint32_t expected_inner_concurrency = 1;
-      tcm_permit_t expected_inner_permit = make_active_permit(&expected_inner_concurrency);
-      inner.parallel_for(begin, end, [&data] (int s, int e) {
-        for (int i = s; i < e; ++ i) {
-          data[i] += 1;
-        }
-      }, expected_inner_permit);
-    }, expected_outer_permit);
-
-    bool is_data_valid = std::all_of(data.begin(), data.end(), [](int x) { return x == 1; });
-    check(is_data_valid, "Data is valid");
-  }
+       bool is_valid = std::all_of(data.begin(), data.end(), [](int x){ return x == 1; });
+       return is_valid ? /*success*/ 0 : /*failure*/-1;
+   }
