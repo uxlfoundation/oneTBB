@@ -264,7 +264,7 @@ defined in HWLOC as the following:
 - :code:`ulongs_allocated` is the size of allocated elements of an array.
 - :code:`ulongs` is an array that holds the mask bits.
 - :code:`infinite` is used as a flag to indicate whether bits not represented by :code:`ulongs`
-array are set or not.
+  array are set or not.
 
 .. note:: :code:`hwloc_bitmap_s` is one of the main data structures that HWLOC uses when it
           describes platform entities such as NUMA node, core type, or even CPUs that share certain
@@ -515,8 +515,8 @@ Besides natural numbers, these fields can be assigned to special values. Special
 +--------------------------+-------------------------------------------------------------------------------------------------------------------+
 
 .. note:: To avoid issues with interpretation of logical indices used to enumerate NUMA nodes and
-core types, the specified values should correspond to logical indices used by HWLOC library with
-which Thread Composability Manager is linked.
+          core types, the specified values should correspond to logical indices used by HWLOC
+          library with which Thread Composability Manager is linked.
 
 Permit Requests
 ***************
