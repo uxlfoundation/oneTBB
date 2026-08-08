@@ -224,8 +224,43 @@ permit by calling :code:`tcmReleasePermit`:
 TCM Data Structures
 *******************
 
+Dependency on HWLOC
+-------------------
+
+TCM uses :ref:`HWLOC library <https://www.open-mpi.org/projects/hwloc/>` to parse platform topology
+and obtain process concurrency, process CPU mask, NUMA node, and core type indices.
+
+To make sure CPU masks, NUMA node and core type indices are interpreted by HWLOC library correctly,
+TCM client can either link with compatible version of HWLOC or write adapters for CPU masks.
+
+.. warning:: Even compatible versions of HWLOC might have different results of parsing of platform
+             topology. Therefore, to have parsing results identical it is recommended to ensure that
+             single HWLOC library is used within the process.
+
+CPU Mask Adapter
+~~~~~~~~~~~~~~~~
+
+.. note:: While NUMA node and core type indices are logical and thus may not correspond to physical
+          indices provided by an operating system, CPU masks represented using
+          :code:`tcm_cpu_mask_t` are always filled with physical indices of an operating system,
+          which can be used to bind software threads to specified in a mask hardware CPUs.
+
+:code:`tcm_cpu_mask_t` is a typedef-declaration of a pointer to :code:`hwloc_bitmap_s`.
+
+.. code-block:: cpp
+
+     struct hwloc_bitmap_s {
+         unsigned ulongs_count; /* how many ulong bitmasks are valid, >= 1 */
+         unsigned ulongs_allocated; /* how many ulong bitmasks are allocated, >= ulongs_count */
+         unsigned long *ulongs;
+         int infinite; /* set to 1 if all bits beyond ulongs are set */
+     #ifdef HWLOC_DEBUG
+         int magic;
+     #endif
+     };
+
 TCM Function Result
-~~~~~~~~~~~~~~~~~~~
+-------------------
 
 :code:`tcm_result_t` enum defines a set of possible return codes that the API may use.
 
@@ -248,7 +283,7 @@ TCM Function Result
 +-------------------------------------------+-------------------------------------------------------------+
 
 Permit State
-~~~~~~~~~~~~
+------------
 
 The :code:`tcm_permit_state_t` structure describes various states of a permit that the Thread
 Composability Manager uses to indicate ownership of resources described by a permit.
@@ -280,7 +315,7 @@ Composability Manager uses to indicate ownership of resources described by a per
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 Permit Properties
-~~~~~~~~~~~~~~~~~
+-----------------
 
 The :code:`tcm_permit_flags_t` describes the properties of permits.
 
@@ -303,7 +338,7 @@ The :code:`tcm_permit_flags_t` describes the properties of permits.
 +-----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 Callback Type
-~~~~~~~~~~~~~
+-------------
 
 The type of a function to pass into :code:`tcmConnect`. The callback is called each time permit of a
 client has been changed due to API calls either from same or different client. It is not called when
@@ -329,7 +364,7 @@ the latest permit data.
 +-----------------------+---------------------------------------------------------------------------------+
 
 Callback Invocation Reasons
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---------------------------
 
 The :code:`tcm_callbacks_flags_t` describes the reasons client callbacks were invoked by the Thread
 Composability Manager.
@@ -350,7 +385,7 @@ Composability Manager.
 +-------------------------+----------------------------------------------------------+
 
 Permits
-~~~~~~~
+-------
 
 The :code:`tcm_permit_t` structure represents the permit data that is filled in by the Thread
 Composability Manager. The client is responsible for allocating and deallocating memory for objects
@@ -385,7 +420,7 @@ of this structure, including the arrays of necessary size.
 :code:`concurrencies` contains single element and :code:`size` equals to :code:`1`.
 
 Permit Constraints
-~~~~~~~~~~~~~~~~~~
+------------------
 
 Constraints describe subset of CPU resources where the requested number of software threads execute.
 
@@ -463,12 +498,12 @@ Besides natural numbers, these fields can be assigned to special values. Special
 | :code:`threads_per_core` | High-level mask description. The number of threads per core to consider while searching for resources.            |
 +--------------------------+-------------------------------------------------------------------------------------------------------------------+
 
-**Note**: To avoid issues with interpretation of logical indices used to enumerate NUMA nodes and
+.. note:: To avoid issues with interpretation of logical indices used to enumerate NUMA nodes and
 core types, the specified values should correspond to logical indices used by HWLOC library with
 which Thread Composability Manager is linked.
 
 Permit Requests
-~~~~~~~~~~~~~~~
+---------------
 .. _tcm_permit_request_t:
 
 The :code:`tcm_permit_request_t` structure is the data structure that describes resources to be
