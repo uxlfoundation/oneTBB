@@ -222,10 +222,10 @@ permit by calling :code:`tcmReleasePermit`:
 +-----------------------+--------+------------------------------------------------------------------------------------+
 
 TCM Data Structures
-*******************
+###################
 
 Dependency on HWLOC
--------------------
+*******************
 
 TCM uses :ref:`HWLOC library <https://www.open-mpi.org/projects/hwloc/>` to parse platform topology
 and obtain process concurrency, process CPU mask, NUMA node, and core type indices.
@@ -245,7 +245,8 @@ CPU Mask Adapter
           :code:`tcm_cpu_mask_t` are always filled with physical indices of an operating system,
           which can be used to bind software threads to specified in a mask hardware CPUs.
 
-:code:`tcm_cpu_mask_t` is a typedef-declaration of a pointer to :code:`hwloc_bitmap_s`.
+:code:`tcm_cpu_mask_t` is a typedef-declaration of a pointer to :code:`hwloc_bitmap_s`, which is
+defined in HWLOC as the following:
 
 .. code-block:: cpp
 
@@ -254,13 +255,28 @@ CPU Mask Adapter
          unsigned ulongs_allocated; /* how many ulong bitmasks are allocated, >= ulongs_count */
          unsigned long *ulongs;
          int infinite; /* set to 1 if all bits beyond ulongs are set */
-     #ifdef HWLOC_DEBUG
-         int magic;
-     #endif
      };
 
+, where:
+
+- :code:`ulongs_count` is the number of :code:`unsigned long` elements used for bitmask
+  representation.
+- :code:`ulongs_allocated` is the size of allocated elements of an array.
+- :code:`ulongs` is an array that holds the mask bits.
+- :code:`infinite` is used as a flag to indicate whether bits not represented by :code:`ulongs`
+array are set or not.
+
+.. note:: :code:`hwloc_bitmap_s` is one of the main data structures that HWLOC uses when it
+          describes platform entities such as NUMA node, core type, or even CPUs that share certain
+          level of a cache in terms of a CPU mask, it is unlikely that its layout changes in
+          backward incompatible way.
+
+Since :code:`hwloc_bitmap_s` is filled with physical, operating system indices, the conversion
+between :code:`hwloc_bitmap_s` and CPU masks used in operating system involves going over mask set
+bits in a loop and setting corresponding bits in a platform-specific mask representation.
+
 TCM Function Result
--------------------
+*******************
 
 :code:`tcm_result_t` enum defines a set of possible return codes that the API may use.
 
@@ -283,7 +299,7 @@ TCM Function Result
 +-------------------------------------------+-------------------------------------------------------------+
 
 Permit State
-------------
+************
 
 The :code:`tcm_permit_state_t` structure describes various states of a permit that the Thread
 Composability Manager uses to indicate ownership of resources described by a permit.
@@ -315,7 +331,7 @@ Composability Manager uses to indicate ownership of resources described by a per
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 Permit Properties
------------------
+*****************
 
 The :code:`tcm_permit_flags_t` describes the properties of permits.
 
@@ -338,7 +354,7 @@ The :code:`tcm_permit_flags_t` describes the properties of permits.
 +-----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 Callback Type
--------------
+*************
 
 The type of a function to pass into :code:`tcmConnect`. The callback is called each time permit of a
 client has been changed due to API calls either from same or different client. It is not called when
@@ -364,7 +380,7 @@ the latest permit data.
 +-----------------------+---------------------------------------------------------------------------------+
 
 Callback Invocation Reasons
----------------------------
+***************************
 
 The :code:`tcm_callbacks_flags_t` describes the reasons client callbacks were invoked by the Thread
 Composability Manager.
@@ -385,7 +401,7 @@ Composability Manager.
 +-------------------------+----------------------------------------------------------+
 
 Permits
--------
+*******
 
 The :code:`tcm_permit_t` structure represents the permit data that is filled in by the Thread
 Composability Manager. The client is responsible for allocating and deallocating memory for objects
@@ -420,7 +436,7 @@ of this structure, including the arrays of necessary size.
 :code:`concurrencies` contains single element and :code:`size` equals to :code:`1`.
 
 Permit Constraints
-------------------
+******************
 
 Constraints describe subset of CPU resources where the requested number of software threads execute.
 
@@ -503,7 +519,7 @@ core types, the specified values should correspond to logical indices used by HW
 which Thread Composability Manager is linked.
 
 Permit Requests
----------------
+***************
 .. _tcm_permit_request_t:
 
 The :code:`tcm_permit_request_t` structure is the data structure that describes resources to be
