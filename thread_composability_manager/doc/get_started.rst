@@ -26,7 +26,8 @@ Prerequisites
 ~~~~~~~~~~~~~
 
 - CMake version 3.5 (or newer).
-- Standard-compliant C++ compiler.
+- Standard-compliant C++ compiler. The minimum supported version of C++ standard is C++17.
+- HWLOC version 2.5 (or newer).
 
 Configuring and building TCM
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
