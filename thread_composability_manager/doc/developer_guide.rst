@@ -22,7 +22,7 @@ Below is a simple example of a usage model a parallel runtime should follow to s
    *Note*: If necessary, adjust project settings so that the compiler can find :code:`tcm.h` header
    file and the TCM library when building and linking the project.
 
-#. Register a client.
+#. Register a client, providing a callback function to react on changes in permit.
 
    .. code-block:: cpp
 
@@ -94,10 +94,12 @@ Below is a simple example of a usage model a parallel runtime should follow to s
        tcmDisconnect(client_id);
 
 
-**Warning**: When running application that uses TCM, set :code:`TCM_ENABLE=1` environment variable
-to actually enable its use.
+.. note:: When running application that uses TCM, set :code:`TCM_ENABLE=1` environment variable to
+actually enable its use.
 
 Refer to :doc:`api_reference` to find more information on TCM usage scenarios.
+
+See also :ref:`complete TCM usage example <tcm_usage_example>`.
 
 Permit State Transitions
 ************************
@@ -206,8 +208,8 @@ Possible scenarios:
 
 Example:
 
-*Listing 2: Independent requests happening concurrently: one client requests for :math:`P_{1}`
-resources, the other - for :math:`P_{2}`.*
+*Listing 2: Independent requests happening concurrently: one client requests for :math:`P_1`
+resources, the other - for :math:`P_2`.*
 
 .. code:: cpp
 
@@ -275,9 +277,6 @@ Combined Use Cases
 
 The combined use cases include sequential, concurrent, and nested use cases mixed in the code.
 
-Sequential with Nested
-----------------------
-
 *Listing 4: Example of sequential with nested calls.*
 
 .. code:: cpp
@@ -298,6 +297,14 @@ Sequential with Nested
 
 Example of Usage
 ****************
+.. _tcm_usage_example:
+
+Below is a complete example that demonstrates usage of TCM by a :code:`client_thread_pool` class
+that represents a pool of threads. It allows invoking an arbitrary function in parallel. The
+parallel iteration space is described by :code:`start` and :code:`end` values.
+
+By using TCM, this client thread pool allows composition of itself or similar thread pools in
+various combinations without oversubscribing of a system.
 
 .. code:: cpp
 
