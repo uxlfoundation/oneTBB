@@ -295,9 +295,9 @@ The combined use cases include sequential, concurrent, and nested use cases mixe
     });
 
 
+.. _tcm_usage_example:
 Example of Usage
 ****************
-.. _tcm_usage_example:
 
 Below is a complete example that demonstrates usage of TCM by a :code:`client_thread_pool` class
 that represents a pool of threads. It allows invoking an arbitrary function in parallel. The
