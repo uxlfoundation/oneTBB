@@ -205,7 +205,7 @@ public:
             __TBB_ASSERT(!has_true_leftover(), "Broken MRP algorithm invariant");
             if (src.has_false_leftover()) {
                 __TBB_ASSERT(!src.has_true_leftover(), "Broken MRP algorithm invariant");
-                
+
                 // Two false leftovers in the real side
                 // Move *this false leftover closer to the middle
                 false_leftover = move_right(m_false_leftover, m_real_chunk_end,
@@ -229,7 +229,7 @@ public:
 
                     // Move the remaining part of the false leftover closer to the middle
                     false_leftover = move_right(swap_end, m_real_chunk_end,
-                                                /*target_region_end =*/src.m_real_chunk_end);
+                                                /*target_region_end = */src.m_real_chunk_end);
                 }
             }
         } else if (has_true_leftover()) {
@@ -245,7 +245,12 @@ public:
                 difference_type false_leftover_size = src.m_real_chunk_end - src.m_false_leftover;
                 difference_type true_leftover_size = m_true_leftover - m_mirror_chunk_begin;
 
-                if (false_leftover_size < true_leftover_size) {
+                if (true_leftover_size <= false_leftover_size) {
+                    // True leftover is smaller and will be consumed by the swap
+                    // Remaining false leftover (if any) is already in place
+                    false_leftover = src.m_false_leftover + true_leftover_size;
+                    parallel_swap_ranges(src.m_false_leftover, false_leftover, m_mirror_chunk_begin);
+                } else {
                     // False leftover is smaller and will be consumed by swap
                     RandomAccessIterator swap_begin = m_true_leftover - false_leftover_size;
                     parallel_swap_ranges(src.m_false_leftover, src.m_real_chunk_end, swap_begin);
@@ -255,11 +260,6 @@ public:
                     // Move remaining part of the true leftover closer to the middle
                     true_leftover = move_right(src.m_mirror_chunk_begin, m_mirror_chunk_begin,
                                                /*target_region_end = */swap_begin);
-                } else {
-                    // True leftover is smaller and will be consumed by the swap
-                    // Remaining false leftover (if any) is already in place
-                    false_leftover = src.m_false_leftover + true_leftover_size;
-                    parallel_swap_ranges(src.m_false_leftover, false_leftover, m_mirror_chunk_begin);
                 }
             }
         }

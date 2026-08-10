@@ -55,8 +55,8 @@ namespace d1 {
 
 //! Range used in quicksort to split elements into subranges based on a value.
 /** The split operation selects a splitter and places all elements less than
-    to the value in the first range, equal to the value at the final positions
-    between two ranges, and the remaining elements in the second range.
+    the value in the first range, elements equal to the value at their final positions
+    between the two ranges, and the remaining elements in the second range.
     @ingroup algorithms */
 template <typename RandomAccessIterator, typename Compare>
 class quick_sort_range {
@@ -85,6 +85,7 @@ public:
         : m_comp(range.m_comp)
         , m_ctx(range.m_ctx)
     {
+        // split_unchecked will assign m_first, m_last and m_leftmost
         range.split_unchecked(*this);
     }
 
@@ -121,7 +122,7 @@ public:
     }
 
     void split_unchecked(quick_sort_range& target_range) {
-        __TBB_ASSERT(is_divisible(), "Range that is split is not divisible");
+        __TBB_ASSERT(is_divisible(), "Range being split is not divisible");
 
         // Choose the pivot
         difference_type pivot_index = pseudo_median_of_nine();
