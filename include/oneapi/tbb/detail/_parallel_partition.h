@@ -238,8 +238,8 @@ public:
 
                 // Two true leftovers in the mirror side
                 // Move this range's true leftover closer to the middle
-                true_leftover = move_right(src.m_true_leftover, m_mirror_chunk_begin,
-                                           /*target_region_end = */true_leftover);
+true_leftover = move_right(src.m_true_leftover, m_mirror_chunk_begin,
+                           /*target_region_end = */m_true_leftover);
             } else {
                 // True leftover in *this, false leftover (or none) in src
                 difference_type false_leftover_size = src.m_real_chunk_end - src.m_false_leftover;
