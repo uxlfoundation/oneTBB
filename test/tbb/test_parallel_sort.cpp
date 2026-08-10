@@ -143,13 +143,13 @@ bool fill_ranges(RandomAccessIterator test_range_begin, RandomAccessIterator sor
                 break;
             case 4:
                 /* round-robin equal list*/
-                std::vector<std::size_t> values = {1, 2, 3, 4, 5};
+                static constexpr std::size_t values[] = {1, 2, 3, 4, 5};
                 std::size_t values_index = 0;
 
                 for (std::size_t i = 0; i < size; i++) {
                     set(test_range_begin[i], values[values_index]);
                     set(sorted_range_begin[i], values[values_index]);
-                    values_index = (values_index + 1) % values.size();
+                    values_index = (values_index + 1) % (sizeof(values) / sizeof(values[0]));
                 }
                 break;
         }
