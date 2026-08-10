@@ -54,8 +54,9 @@ concept less_than_comparable = requires( const std::remove_reference_t<T>& lhs,
 namespace d1 {
 
 //! Range used in quicksort to split elements into subranges based on a value.
-/** The split operation selects a splitter and places all elements less than or equal
-    to the value in the first range and the remaining elements in the second range.
+/** The split operation selects a splitter and places all elements less than
+    to the value in the first range, equal to the value at the final positions
+    between two ranges, and the remaining elements in the second range.
     @ingroup algorithms */
 template <typename RandomAccessIterator, typename Compare>
 class quick_sort_range {

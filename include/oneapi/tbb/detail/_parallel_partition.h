@@ -34,7 +34,7 @@ namespace d1 {
 // ---------------------------------
 // The input [first, last) is interpreted as two mirrored halves:
 // - a real half [first, first + n / 2)
-// - a mirror half [last - n / 2, last)
+// - a mirror half [first + n / 2, last)
 // Parallel reduction runs over the real half.
 // Each leaf pairs a real chunk with its mirror chunk and partitions
 // the pair by swapping the misplaced elements. Once one side is exhausted,
@@ -48,8 +48,7 @@ namespace d1 {
 // and a false/true pair is neutralized by swapping, with any remainder
 // moved inward.
 //
-// After reduction, the surviving leftover determines the partition point. For odd n,
-// the uncovered middle element is placed separately.
+// After reduction, the surviving leftover determines the partition point.
 
 template <typename RandomAccessIterator, typename Predicate>
 class parallel_partition_body {
@@ -85,23 +84,6 @@ class parallel_partition_body {
         }
     }
 
-    RandomAccessIterator move_left(RandomAccessIterator first, RandomAccessIterator last,
-                                   RandomAccessIterator target_region_begin) {
-        difference_type block_size = last - first;
-        difference_type gap = first - target_region_begin;
-
-        RandomAccessIterator result;
-
-        if (block_size <= gap) {
-            result = target_region_begin + block_size;
-            parallel_swap_ranges(first, last, target_region_begin);
-        } else {
-            result = last - gap;
-            parallel_swap_ranges(target_region_begin, first, last - gap);
-        }
-        return result;
-    }
-
     RandomAccessIterator move_right(RandomAccessIterator first, RandomAccessIterator last,
                                     RandomAccessIterator target_region_end) {
         difference_type block_size = last - first;
@@ -119,6 +101,17 @@ class parallel_partition_body {
         return result;
     }
 
+    void assign_chunks_and_leftovers(RandomAccessIterator real_chunk_begin, RandomAccessIterator real_chunk_end,
+                                     RandomAccessIterator mirror_chunk_begin, RandomAccessIterator mirror_chunk_end,
+                                     RandomAccessIterator false_leftover, RandomAccessIterator true_leftover)
+    {
+        m_real_chunk_begin = real_chunk_begin;
+        m_real_chunk_end = real_chunk_end;
+        m_mirror_chunk_begin = mirror_chunk_begin;
+        m_mirror_chunk_end = mirror_chunk_end;
+        m_false_leftover = false_leftover;
+        m_true_leftover = true_leftover;
+    }
 public:
     bool has_false_leftover() const { return m_false_leftover != m_real_chunk_end; }
     bool has_true_leftover() const { return m_true_leftover != m_mirror_chunk_begin; }
@@ -147,7 +140,13 @@ public:
         RandomAccessIterator real_chunk_begin = range.begin();
         RandomAccessIterator real_chunk_end = range.end();
 
-        RandomAccessIterator mirror_chunk_begin = g_last - (real_chunk_end - g_first);
+        // If the real chunk is the last chunk of the reduction, shift mirror_chunk_begin to its
+        // end to include the possibly uncovered exact middle element
+        RandomAccessIterator mid = g_first + (g_last - g_first) / 2;
+        RandomAccessIterator mirror_chunk_begin = real_chunk_end == mid
+                                                  ? mid
+                                                  : g_last - (real_chunk_end - g_first);
+
         RandomAccessIterator mirror_chunk_end = g_last - (real_chunk_begin - g_first);
 
         // Partition the pair of chunks
@@ -181,21 +180,14 @@ public:
         // Store the result
         if (m_real_chunk_begin == m_real_chunk_end) {
             // First sub-range assignment to this body
-            m_real_chunk_begin = real_chunk_begin;
-            m_real_chunk_end = real_chunk_end;
-            m_mirror_chunk_begin = mirror_chunk_begin;
-            m_mirror_chunk_end = mirror_chunk_end;
-            m_false_leftover = false_leftover;
-            m_true_leftover = true_leftover;
+            assign_chunks_and_leftovers(real_chunk_begin, real_chunk_end, mirror_chunk_begin, mirror_chunk_end,
+                                        false_leftover, true_leftover);
         } else {
             // operator() was re-executed on the same body instance
+            // Copy globals and context, reassign chunks and leftovers
             parallel_partition_body tmp(*this, split{});
-            tmp.m_real_chunk_begin = real_chunk_begin;
-            tmp.m_real_chunk_end = real_chunk_end;
-            tmp.m_mirror_chunk_begin = mirror_chunk_begin;
-            tmp.m_mirror_chunk_end = mirror_chunk_end;
-            tmp.m_false_leftover = false_leftover;
-            tmp.m_true_leftover = true_leftover;
+            tmp.assign_chunks_and_leftovers(real_chunk_begin, real_chunk_end, mirror_chunk_begin, mirror_chunk_end,
+                                            false_leftover, true_leftover);
             join(tmp);
         }
     }
@@ -246,8 +238,8 @@ public:
 
                 // Two true leftovers in the mirror side
                 // Move this range's true leftover closer to the middle
-                true_leftover = move_left(m_mirror_chunk_begin, m_true_leftover,
-                                          /*target_region_begin = */src.m_true_leftover);
+                true_leftover = move_right(src.m_true_leftover, m_mirror_chunk_begin,
+                                           /*target_region_end = */true_leftover);
             } else {
                 // True leftover in *this, false leftover (or none) in src
                 difference_type false_leftover_size = src.m_real_chunk_end - src.m_false_leftover;
@@ -261,8 +253,8 @@ public:
                     false_leftover = src.m_real_chunk_end;
 
                     // Move remaining part of the true leftover closer to the middle
-                    true_leftover = move_left(m_mirror_chunk_begin, swap_begin,
-                                              /*target_region_begin = */src.m_mirror_chunk_begin);
+                    true_leftover = move_right(src.m_mirror_chunk_begin, m_mirror_chunk_begin,
+                                               /*target_region_end = */swap_begin);
                 } else {
                     // True leftover is smaller and will be consumed by the swap
                     // Remaining false leftover (if any) is already in place
@@ -299,25 +291,7 @@ RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccess
     __TBB_ASSERT(!(body.has_true_leftover() && body.has_false_leftover()),
                  "At most one leftover can remain after the reduction phase");
 
-    RandomAccessIterator partition = body.has_true_leftover() ? body.get_true_leftover()
-                                                              : body.get_false_leftover();
-
-    // For odd number of elements, the exact middle one is not covered by mirror-reduce
-    if (n % 2 != 0) {
-        if (body.has_true_leftover()) {
-            if (!pred(first[mid])) {
-                --partition;
-                std::iter_swap(first + mid, partition);
-            }
-        } else {
-            if (pred(first[mid])) {
-                std::iter_swap(partition, first + mid);
-                ++partition;
-            }
-        }
-    }
-
-    return partition;
+    return body.has_true_leftover() ? body.get_true_leftover() : body.get_false_leftover();
 }
 
 } // namespace d1
