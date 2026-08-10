@@ -26,6 +26,7 @@ TBB_FILE_TRIM - Enable __FILE__ trim, replace a build-time full path with a rela
            reproducible location-independent builds (ON by default)
 TBB_VERIFY_DEPENDENCY_SIGNATURE - On Windows* enable verification of signatures for dependencies linked at run-time. (ON by default)
 TBB_FUZZ_TESTING:BOOL - Enable fuzz testing (OFF by default)
+TCM_BUILD - Enable Thread Composability Manager (TCM) build (ON by default)
 ```
 
 ## Configure, Build, and Test

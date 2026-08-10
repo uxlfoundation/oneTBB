@@ -31,6 +31,9 @@ You may want to use some additional options for configuration:
 | `-DCMAKE_BUILD_TYPE=Debug`                  | Specify for Debug build                                                       | Not applicable for multi-configuration generators such as Visual Studio generator.                                                                                                                                           |
 | `-DTBB_VERIFY_DEPENDENCY_SIGNATURE=ON\|OFF` | Controls signature verification of dynamic dependencies loaded during runtime | If set to ON, only the signed dynamic dependencies are loaded. This is the recommended behavior. By default, the value is unspecified. Therefore, the warning is printed. To suppress the warning, set the value explicitly. |
 
+For a more detailed list of available CMake configuration options see [Build System
+Description](./cmake/README.md)
+
 ### Build oneTBB
  
 To build the system, run:

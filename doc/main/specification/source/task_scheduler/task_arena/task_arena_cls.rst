@@ -19,8 +19,8 @@ A class that represents an explicit, user-managed task scheduler arena.
 
             class task_arena {
             public:
-                static const int automatic = /* unspecified */;
-                static const int not_initialized = /* unspecified */;
+                static constexpr int automatic = /* unspecified */;
+                static constexpr int not_initialized = /* unspecified */;
                 enum class priority : /* unspecified type */ {
                     low = /* unspecified */,
                     normal = /* unspecified */,

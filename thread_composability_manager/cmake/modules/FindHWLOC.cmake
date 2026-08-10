@@ -69,6 +69,14 @@ if (HWLOC_VERSION VERSION_GREATER_EQUAL "2.0")
         if (WIN32)
             find_library(_hwloc_lib libhwloc HINTS ENV HWLOCROOT PATHS ${_additional_lib_dirs} PATH_SUFFIXES "lib")
             find_file(_hwloc_dll libhwloc-15.dll HINTS ENV HWLOCROOT PATHS ${_additional_lib_dirs} PATH_SUFFIXES "bin")
+            if (NOT _hwloc_lib OR NOT _hwloc_dll)
+              # Try searching without 'lib' prefix as some package managers do not use it. E.g.
+              # vcpkg, conda.
+              find_library(_hwloc_lib hwloc HINTS ENV HWLOCROOT PATHS ${_additional_lib_dirs}
+                PATH_SUFFIXES "lib")
+              find_file(_hwloc_dll hwloc-15.dll HINTS ENV HWLOCROOT PATHS ${_additional_lib_dirs}
+                PATH_SUFFIXES "bin")
+            endif()
             if (_hwloc_lib AND _hwloc_dll)
                 set_target_properties(
                     HWLOC::hwloc PROPERTIES
@@ -98,7 +106,6 @@ find_package_handle_standard_args(
     HWLOC
     REQUIRED_VARS HWLOC_VERSION _hwloc_include_dirs _hwloc_lib
     VERSION_VAR HWLOC_VERSION
-    FAIL_MESSAGE "Cannot find HWLOC: HWLOC >= 2.0 required."
 )
 
 unset(_hwloc_include_dirs CACHE)
