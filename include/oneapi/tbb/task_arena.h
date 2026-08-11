@@ -551,6 +551,7 @@ public:
             : my_arena(&ta), my_flags(f)
         {
             suppress_unused_warning(reserved);
+            my_arena->initialize();
             r1::enter_parallel_phase(my_arena, /*reserved*/0);
         }
         parallel_phase(parallel_phase&& other) : my_arena(other.my_arena), my_flags(other.my_flags) {
