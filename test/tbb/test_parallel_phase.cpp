@@ -324,7 +324,7 @@ TEST_CASE("Test thread_leave_manager state machine with global_control leave_pol
     {
         tbb::global_control gc(tbb::global_control::leave_policy, tbb::task_arena::leave_policy::fast);
 
-        // ta is initiliazed only at this point, so the leave policy is set to fast
+        // ta is initialized only at this point, so the leave policy is set to fast
         auto& tlm = ta.get_thread_leave_manager();
         REQUIRE(!tlm.is_retention_allowed());
 
