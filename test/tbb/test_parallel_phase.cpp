@@ -78,10 +78,10 @@ TEST_CASE("Test thread_leave_manager under contention") {
     thread_leave_manager tlm;
     tlm.set_initial_state(tbb::task_arena::leave_policy::fast);
 
-    const unsigned num_threads = utils::get_platform_max_threads();
+    const utils::thread_num_type num_threads = utils::get_platform_max_threads();
     constexpr int iters = 1000;
 
-    utils::NativeParallelFor(num_threads, [&](unsigned idx) {
+    utils::NativeParallelFor(num_threads, [&](utils::thread_num_type idx) {
         for (int i = 0; i < iters; ++i) {
             tlm.register_parallel_phase();
             REQUIRE(tlm.is_retention_allowed());
