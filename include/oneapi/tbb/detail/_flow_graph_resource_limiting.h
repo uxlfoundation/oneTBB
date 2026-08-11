@@ -150,17 +150,24 @@ public:
     using consumer_type = typename resource_provider_base<ResourceHandle>::consumer_type;
     using optional_type = typename resource_provider_base<ResourceHandle>::optional_type;
 
+    resource_limiter() = delete;
+
     template <typename Tuple, typename... Tuples>
     resource_limiter(std::piecewise_construct_t, Tuple&& tuple, Tuples&&... tuples) {
         emplace_handles(std::forward<Tuple>(tuple), std::forward<Tuples>(tuples)...);
     }
 
-    template <typename InputIterator>
+    template <typename InputIterator,
+              typename = typename std::iterator_traits<InputIterator>::iterator_category>
     resource_limiter(InputIterator first, InputIterator last)
         : m_resource_handles(first, last)
-    {}
+    {
+        __TBB_ASSERT(std::distance(first, last) != 0, "Attempt to create a resource_limiter with 0 resource handles");
+    }
 
-    template <typename ContainerBasedSequence>
+    template <typename ContainerBasedSequence,
+              typename = decltype(std::begin(std::declval<ContainerBasedSequence&>())),
+              typename = decltype(std::end(std::declval<ContainerBasedSequence&>()))>
     resource_limiter(ContainerBasedSequence&& sequence)
         : resource_limiter(std::begin(sequence), std::end(sequence))
     {}
@@ -222,8 +229,10 @@ private:
 
     template <typename Tuple, typename... Tuples>
     void emplace_handles(Tuple&& tuple, Tuples&&... tuples) {
+        using decayed_tuple = typename std::decay<Tuple>::type;
+
         emplace_single_handle(std::forward<Tuple>(tuple),
-                              tbb::detail::make_index_sequence<std::tuple_size<Tuple>::value>());
+                              tbb::detail::make_index_sequence<std::tuple_size<decayed_tuple>::value>());
         emplace_handles(std::forward<Tuples>(tuples)...);
     }
 

@@ -194,6 +194,11 @@ resource_limiter<int> limiter3{vector}; // Same as above
 Constructor (2) creates a ``resource_limiter`` containing all the resources in a range ``[first, last)``. Constructor (3) is just a syntactic sugar over
 the constructor (2) - it is equivalent to ``resource_limiter(std::begin(sequence), std::end(sequence))``.
 
+The only limitation that cannot be enforced at compile time is that the number of resources in a range ``[first, last)`` must not be ``0``.
+Constructor (1) enforces this by requiring at least one argument. For constructors (2) and (3), the number of resources is runtime information, so it can
+only be checked at runtime, for example via an assert (in debug mode), an exception, or a similar mechanism. The current proposal is to document the empty
+range as undefined behavior and add an assert in debug mode.
+
 However, adding constructors (2) and (3) introduces an overload ambiguity when 1 or 2 resources are passed directly to the limiter constructor:
 
 ```cpp
