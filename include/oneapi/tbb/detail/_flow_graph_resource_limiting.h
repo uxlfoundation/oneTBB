@@ -284,9 +284,7 @@ public:
         }
     }
 
-    // A resource_limiter orders requests by request id alone and deliberately ignores the
-    // reported pressure. The reporting path is kept so that a future provider can use it; see
-    // consumer_data::operator< for why this one must not.
+    // A resource_limiter orders requests by request id alone
     void report_pressure(consumer_type&, std::size_t) override {}
 
 private:
