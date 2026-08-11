@@ -438,6 +438,7 @@ void test_resource_limiter_constructors(std::array<T, N>& resources) {
     auto index_sequence = tbb::detail::make_index_sequence<N>();
 
     // Test resource_limiter(std::piecewise_construct_t, Tuple&& tuple, Tuples&&... tuples)
+    test_resource_limiter_handles_constructor(resources, index_sequence);
 
     // Test resource_limiter(std::initializer_list<ResourceHandle> init)
     test_resource_limiter_initializer_list_constructor(resources, index_sequence);
