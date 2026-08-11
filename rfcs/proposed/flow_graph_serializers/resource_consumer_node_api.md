@@ -164,7 +164,7 @@ The concern with this constructor is that the number of resources should be know
 The current implementation of ``resource_limiter`` uses ``std::forward_list`` container which already provides the necessary runtime semantics, so the
 only concern is the ``resource_limiter`` constructor itself.
 
-The idea is to extend the set of constructors to accept arbitrary containers (or ranges) to define the number of resources and its values in runtime.
+The idea is to extend the set of constructors to accept arbitrary containers (or ranges) to define the number of resources and their values at runtime.
 
 ```cpp
 template <typename ResourceHandle>
