@@ -159,7 +159,7 @@ resource_limiter<int> limiter(1, 2, 3, 4, 5);
 ```
 
 In the code above, ``limiter`` manages 5 resources of type ``int``. Instances of resources are constructed in-place while constructing the limiter.
-The concern with this constructor is that the number of resources should be known at compile-time, while some workflows only knows it in runtime.
+The concern with this constructor is that the number of resources should be known at compile-time, while some workflows only know it in runtime.
 
 The current implementation of ``resource_limiter`` uses ``std::forward_list`` container which already provides the necessary runtime semantics, so the
 only concern is the ``resource_limiter`` constructor itself.

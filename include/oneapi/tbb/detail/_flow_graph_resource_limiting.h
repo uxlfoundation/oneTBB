@@ -162,7 +162,8 @@ public:
     resource_limiter(InputIterator first, InputIterator last)
         : m_resource_handles(first, last)
     {
-        __TBB_ASSERT(std::distance(first, last) != 0, "Attempt to create a resource_limiter with 0 resource handles");
+        __TBB_ASSERT(std::distance(m_resource_handles.begin(), m_resource_handles.end()),
+                     "Attempt to create a resource_limiter with 0 resource handles");
     }
 
     template <typename ContainerBasedSequence,
