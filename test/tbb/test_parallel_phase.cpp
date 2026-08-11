@@ -17,6 +17,11 @@
 
 //! \file test_parallel_phase.cpp
 //! \brief Test for [scheduler.task_arena scheduler.parallel_phase] functionality
+//!
+#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
+#pragma warning(push)
+#pragma warning(disable: 4324) // warning C4324: structure was padded due to alignment specifier
+#endif
 
 #include <utility>
 
@@ -31,6 +36,10 @@
 // For thread_leave_manager
 #include "../src/tbb/misc.cpp"
 #include "../src/tbb/arena.h"
+
+#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
+#pragma warning(pop)
+#endif
 
 using end_with_fast_leave = tbb::task_arena::parallel_phase::end_with_fast_leave;
 
