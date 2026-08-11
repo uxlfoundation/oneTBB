@@ -321,9 +321,9 @@ void test_root_genie() {
     CHECK_MESSAGE(genie_resource.counter.load() == 0, "The genie resource was left in use");
 }
 
-// Verifies the priority policy directly against the provider, without a graph in the way.
-// The consumer records the order it is notified in and reports pressures on demand, so the
-// arbitration order is observable exactly rather than statistically.
+// Verifies the arbitration policy directly against the provider, without a graph in the way.
+// The consumer records the order it is notified in, so the arbitration order is observable
+// exactly rather than statistically.
 class recording_consumer : public tbb::detail::d2::resource_consumer_base<int> {
     using base_type = tbb::detail::d2::resource_consumer_base<int>;
 public:
@@ -344,8 +344,6 @@ public:
         return id;
     }
 
-    void report_pressure(std::size_t pressure) { m_limiter.report_pressure(*this, pressure); }
-
     tbb::detail::d2::resource_handle_optional<int> acquire(request_id id) {
         return m_limiter.acquire(*this, id);
     }
@@ -355,6 +353,8 @@ public:
     }
 
     void withdraw(request_id id) { m_limiter.withdraw(*this, id); }
+
+    void report_pressure(std::size_t pressure) { m_limiter.report_pressure(*this, pressure); }
 
     std::size_t num_notifications() const { return m_notifications.size(); }
     bool notified(request_id id) const {
@@ -370,56 +370,103 @@ private:
     std::vector<request_id>                m_notifications;
 };
 
-void test_priority_order() {
+void test_request_order() {
     tbb::flow::resource_limiter<int> limiter{42};
 
-    recording_consumer low(limiter, 0);
-    recording_consumer high(limiter, 1);
+    // The two consumers are given disjoint counter ranges so that the expected order is the
+    // same whether or not the requests land on the same clock tick: a request_id orders by
+    // timestamp and then by counter value, and the observed clock granularity is coarse
+    // mostly likely have the same timestamp.
+    recording_consumer early(limiter, 0);
+    recording_consumer late(limiter, 1);
 
     // The single handle goes to the first request, which is notified immediately.
-    auto low_first = low.request(1);
-    CHECK_MESSAGE(low.num_notifications() == 1, "The first request was not notified");
-    CHECK_MESSAGE(low.notified(low_first), "The wrong request was notified");
+    auto early_first = early.request(1);
+    CHECK_MESSAGE(early.num_notifications() == 1, "The first request was not notified");
+    CHECK_MESSAGE(early.notified(early_first), "The wrong request was notified");
 
     // While it holds the handle, three more requests queue up behind it.
-    auto handle = low.acquire(low_first);
+    auto handle = early.acquire(early_first);
     CHECK_MESSAGE(handle.has_value(), "The only request did not get the only handle");
 
-    auto low_second = low.request(2);
-    auto low_third = low.request(3);
-    auto high_first = high.request(1);
-    CHECK_MESSAGE(low.num_notifications() == 1, "A request was notified with no handle available");
-    CHECK_MESSAGE(high.num_notifications() == 0, "A request was notified with no handle available");
+    auto early_second = early.request(2);
+    auto early_third = early.request(3);
+    auto late_first = late.request(10);
+    CHECK_MESSAGE(early.num_notifications() == 1, "A request was notified with no handle available");
+    CHECK_MESSAGE(late.num_notifications() == 0, "A request was notified with no handle available");
 
-    // make high have high pressure, so it is prioritized over the low pressure requests
-    high.report_pressure(4);
-    CHECK_MESSAGE(high.num_notifications() == 0,
-                  "A request was notified on a pressure report with no handle available");
+    // Each release notifies exactly one request, the earliest of those still waiting.
+    early.release(early_first, std::move(handle));
+    CHECK_MESSAGE(early.num_notifications() == 2, "The next request in order was not notified");
+    CHECK_MESSAGE(early.notified(early_second), "Requests were not served in request order");
+    CHECK_MESSAGE(late.num_notifications() == 0,
+                  "A later request was notified while an earlier one was pending");
 
-    low.release(low_first, std::move(handle));
-    CHECK_MESSAGE(high.num_notifications() == 1, "The backlogged consumer was not notified first");
-    CHECK_MESSAGE(high.notified(high_first), "The wrong request was notified");
-    CHECK_MESSAGE(low.num_notifications() == 1,
-                  "A lower priority request was notified while a higher priority one was pending");
+    handle = early.acquire(early_second);
+    CHECK_MESSAGE(handle.has_value(), "The earliest request was denied the handle");
+    early.release(early_second, std::move(handle));
 
-    handle = high.acquire(high_first);
-    CHECK_MESSAGE(handle.has_value(), "The highest priority request was denied the handle");
+    CHECK_MESSAGE(early.num_notifications() == 3, "The next request in order was not notified");
+    CHECK_MESSAGE(early.notified(early_third), "Requests were not served in request order");
+    CHECK_MESSAGE(late.num_notifications() == 0,
+                  "A later request was notified while an earlier one was pending");
 
-    // With the backlog gone, the remaining requests are served in request order.
-    high.report_pressure(0);
-    high.release(high_first, std::move(handle));
-    CHECK_MESSAGE(low.num_notifications() == 2, "The next request in order was not notified");
-    CHECK_MESSAGE(low.notified(low_second), "Requests of equal pressure were not served in order");
-
-    handle = low.acquire(low_second);
+    handle = early.acquire(early_third);
     CHECK_MESSAGE(handle.has_value(), "The notified request was denied the handle");
-    low.release(low_second, std::move(handle));
+    early.release(early_third, std::move(handle));
 
-    CHECK_MESSAGE(low.num_notifications() == 3, "The last request was not notified");
-    CHECK_MESSAGE(low.notified(low_third), "The last request was not the one notified");
-    handle = low.acquire(low_third);
+    // Only once the earlier consumer is drained does the later one get its turn.
+    CHECK_MESSAGE(late.num_notifications() == 1, "The last request was not notified");
+    CHECK_MESSAGE(late.notified(late_first), "The last request was not the one notified");
+    handle = late.acquire(late_first);
     CHECK_MESSAGE(handle.has_value(), "The notified request was denied the handle");
-    low.release(low_third, std::move(handle));
+    late.release(late_first, std::move(handle));
+}
+
+// Pressure reporting is plumbed through to the providers, but a resource_limiter deliberately
+// ignores it for now.
+void test_pressure_does_not_affect_order() {
+    tbb::flow::resource_limiter<int> limiter{42};
+
+    recording_consumer early(limiter, 0);
+    recording_consumer late(limiter, 1);
+    recording_consumer idle(limiter, 2);
+
+    // Reporting for a consumer that has no outstanding request must be a harmless no-op.
+    idle.report_pressure(std::size_t{1000});
+    CHECK_MESSAGE(idle.num_notifications() == 0, "Reporting pressure notified an idle consumer");
+
+    auto early_first = early.request(1);
+    auto handle = early.acquire(early_first);
+    CHECK_MESSAGE(handle.has_value(), "The first request did not get the only handle");
+
+    auto early_second = early.request(2);
+    auto late_first = late.request(10);
+
+    // The later request claims a large backlog and the earlier one claims none. An ordering that
+    // used the pressure would invert the two here; under request-id ordering nothing changes.
+    late.report_pressure(std::size_t{1000});
+    early.report_pressure(std::size_t{0});
+    CHECK_MESSAGE(early.num_notifications() == 1, "Reporting pressure notified a waiting request");
+    CHECK_MESSAGE(late.num_notifications() == 0, "Reporting pressure notified a waiting request");
+
+    early.release(early_first, std::move(handle));
+    CHECK_MESSAGE(early.notified(early_second),
+                  "The earlier request lost its place after a pressure report");
+    CHECK_MESSAGE(late.num_notifications() == 0,
+                  "A later request was notified ahead of an earlier one after reporting pressure");
+
+    // Drain, reporting again along the way, and confirm the order still holds.
+    handle = early.acquire(early_second);
+    CHECK_MESSAGE(handle.has_value(), "The earliest request was denied the handle");
+    late.report_pressure(std::size_t{2000});
+    early.release(early_second, std::move(handle));
+
+    CHECK_MESSAGE(late.num_notifications() == 1, "The last request was not notified once it was earliest");
+    CHECK_MESSAGE(late.notified(late_first), "The last request was not the one notified");
+    handle = late.acquire(late_first);
+    CHECK_MESSAGE(handle.has_value(), "The notified request was denied the handle");
+    late.release(late_first, std::move(handle));
 }
 
 void test_withdraw() {
@@ -457,6 +504,102 @@ void test_withdraw() {
     consumer.release(held, std::move(handle));
     CHECK_MESSAGE(consumer.num_notifications() == 1,
                   "A withdrawn request was notified after the handle was released");
+}
+
+// Drives requests at two providers and records which provider notified it, so that the
+// cross-provider agreement the protocol depends on is observable directly.
+class two_provider_consumer : public tbb::detail::d2::resource_consumer_base<int> {
+    using base_type = tbb::detail::d2::resource_consumer_base<int>;
+public:
+    using request_id = tbb::detail::d2::request_id;
+    using limiter_type = tbb::flow::resource_limiter<int>;
+    using handle_type = tbb::detail::d2::resource_handle_optional<int>;
+
+    two_provider_consumer(limiter_type& first, limiter_type& second)
+        : m_limiters{&first, &second}
+        , m_notifications{0, 0}
+    {}
+
+    void notify(typename base_type::provider_type& provider, request_id) override {
+        for (std::size_t i = 0; i < 2; ++i) {
+            if (&provider == m_limiters[i]) {
+                ++m_notifications[i];
+                return;
+            }
+        }
+        CHECK_MESSAGE(false, "Notification from an unknown provider");
+    }
+
+    request_id request(std::size_t which, std::uint64_t counter_value) {
+        request_id id{counter_value};
+        m_limiters[which]->request(*this, id);
+        return id;
+    }
+
+    // Requests the same id at another provider, as a request needing several resources does
+    void request_again(std::size_t which, request_id id) { m_limiters[which]->request(*this, id); }
+
+    handle_type acquire(std::size_t which, request_id id) {
+        return m_limiters[which]->acquire(*this, id);
+    }
+
+    void release(std::size_t which, request_id id, handle_type&& handle) {
+        m_limiters[which]->release(*this, id, std::move(handle));
+    }
+
+    std::size_t num_notifications(std::size_t which) const { return m_notifications[which]; }
+
+private:
+    limiter_type* m_limiters[2];
+    std::size_t   m_notifications[2];
+};
+
+// The minimal shape that deadlocks if the providers can disagree about which request
+// outranks the other.
+void test_cross_provider_agreement() {
+    tbb::flow::resource_limiter<int> first{1};
+    tbb::flow::resource_limiter<int> second{2};
+
+    two_provider_consumer earlier(first, second);
+    two_provider_consumer later(first, second);
+
+    // earlier_id requests at first, and later_id requests at second
+    auto earlier_id = earlier.request(0, 1);
+    CHECK_MESSAGE(earlier.num_notifications(0) == 1, "The first request was not notified");
+
+    auto later_id = later.request(1, 10);
+    CHECK_MESSAGE(later.num_notifications(1) == 1, "The first request was not notified");
+
+    // Now request the same id at the other provider, as a request needing several resources does.
+    earlier.request_again(1, earlier_id);
+    CHECK_MESSAGE(earlier.num_notifications(1) == 1,
+                  "The higher priority lost to a lower priority one");
+
+    later.request_again(0, later_id);
+    CHECK_MESSAGE(later.num_notifications(0) == 0,
+                  "A lower priority request displaced a higher priority notification");
+
+    // Notified at both providers, the earlier consumer can acquire both handles.
+    auto first_handle = earlier.acquire(0, earlier_id);
+    auto second_handle = earlier.acquire(1, earlier_id);
+    CHECK_MESSAGE(first_handle.has_value(),
+                  "The highest priority request was denied the first handle");
+    CHECK_MESSAGE(second_handle.has_value(),
+                  "The highest priority request was denied the second handle");
+
+    earlier.release(0, earlier_id, std::move(first_handle));
+    CHECK_MESSAGE(later.num_notifications(0) == 1,
+                  "The waiting request was not notified once the handle was released");
+    earlier.release(1, earlier_id, std::move(second_handle));
+    CHECK_MESSAGE(later.num_notifications(1) == 1, "The waiting request was not notified once the handle was released");
+
+    // And the later consumer now finishes too, so nothing was left blocked.
+    auto later_first = later.acquire(0, later_id);
+    auto later_second = later.acquire(1, later_id);
+    CHECK_MESSAGE(later_first.has_value(), "The remaining request was denied the first handle");
+    CHECK_MESSAGE(later_second.has_value(), "The remaining request was denied the second handle");
+    later.release(0, later_id, std::move(later_first));
+    later.release(1, later_id, std::move(later_second));
 }
 
 // A ring of N nodes, each needing the two resources it shares with its neighbours, so that
@@ -681,7 +824,7 @@ void test_resource_limiter_constructors(std::array<T, N>& resources) {
 
 //! \brief \ref interface
 TEST_CASE("Feature test macro") {
-    CHECK_MESSAGE(TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING == 202603, "Incorrect feature test macro");
+    CHECK_MESSAGE(TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING == 202608, "Incorrect feature test macro");
 }
 
 //! \brief \ref interface
@@ -759,13 +902,23 @@ TEST_CASE("root-genie test for resource_limited_node") {
 }
 
 //! \brief \ref requirement
-TEST_CASE("resource_limiter priority order") {
-    test_priority_order();
+TEST_CASE("resource_limiter request order") {
+    test_request_order();
+}
+
+//! \brief \ref requirement
+TEST_CASE("resource_limiter pressure does not affect order") {
+    test_pressure_does_not_affect_order();
 }
 
 //! \brief \ref error_guessing
 TEST_CASE("resource_limiter withdraw") {
     test_withdraw();
+}
+
+//! \brief \ref requirement
+TEST_CASE("resource_limiter cross-provider agreement") {
+    test_cross_provider_agreement();
 }
 
 //! \brief \ref error_guessing

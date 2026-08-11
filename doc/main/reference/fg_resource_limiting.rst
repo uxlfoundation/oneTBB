@@ -24,9 +24,11 @@ The feature consists of two components:
   acquires access to a resource from each associated ``resource_limiter``.
 
 A node that must hold resources from several limiters at once can make little progress if the limiters keep
-granting access to nodes that need only one resource. To avoid such starvation, a ``resource_limiter`` grants
-access on a best-effort priority basis - preferring the consumer with the larger backlog of waiting messages, and
-the earlier request when backlogs are equal - rather than in a strict first-come, first-served order.
+granting access to nodes that need only one resource. To avoid such starvation, a ``resource_limiter``
+arbitrates between competing consumers on a best-effort priority basis, preferring the consumer whose request
+was made earlier, rather than granting access in an unspecified order. A request that cannot be satisfied
+retains its position, so a consumer waiting for several resources becomes preferred over later requests as it
+waits.
 
 API
 ***
