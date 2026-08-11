@@ -99,12 +99,11 @@ The `leave_policy` parameter would control whether arenas are initialized with a
 | `task_arena::leave_policy::automatic` (default) | Workers follow the default system-specific policy (may spin before leaving) |
 | `task_arena::leave_policy::fast` | Workers leave immediately (fast leave enabled) |
 
-When multiple `global_control` objects exist for `leave_policy`, their logical disjunction is
-used (consistent with the `terminate_on_exception` parameter). For `leave_policy`, the request for
-`fast` is the restrictive one, since `automatic` leaves the choice up to the library, so it wins over
-the absence of such a request. If more leave policies appear, a new strategy of choosing the
-`leave_policy` can be implemented. At this point, it means that if any
-`global_control(leave_policy, task_arena::leave_policy::fast)` is active, fast leave is enabled globally.
+When multiple `global_control` objects request `leave_policy`, the first active
+request for `fast` determines the globally active policy, and it stays in effect until the
+corresponding `global_control` object is destroyed. The effect of any other `leave_policy` requests
+made while it is active is not guaranteed at this point. If more leave policies appear, a new
+strategy of choosing the `leave_policy` can be implemented.
 
 ### Proposed Implementation Strategy
 
@@ -171,7 +170,7 @@ While the feature is in preview state, the
 would need to be extended with documentation for the `global_control::leave_policy` parameter:
 - Add a new section "Global Control Integration" describing the `leave_policy` parameter
 - Update the Synopsis to include the `global_control` header and `leave_policy` parameter
-- Add a description of the parameter semantics and selection rule (logical disjunction)
+- Add a description of the parameter semantics and selection rule
 - Document the interaction between `global_control::leave_policy` and per-arena `leave_policy`
 - Add usage examples showing how to combine global fast leave with parallel phases
 - Include a note explaining that `global_control::leave_policy` provides application-wide control
@@ -236,7 +235,7 @@ int main() {
 }
 ```
 
-#### Global Control Scope, Initialization Order, and Disjunction
+#### Global Control Scope, Initialization Order, and Active Value Selection Rule
 
 ```cpp
 // No global_control is active yet; this call lazily initializes the implicit arena with automatic (the default).
@@ -255,7 +254,7 @@ tbb::parallel_for(0, 1000000, [](int i) { do_parallel_work(i); });
     {
         tbb::global_control gc2(tbb::global_control::leave_policy, tbb::task_arena::leave_policy::automatic);
         tbb::task_arena arena2;
-        // Both gc1 (fast) and gc2 (automatic) are active. Disjunction rule: any fast value present => fast wins.
+        // gc1 (fast) became active first, so it stays in effect; the effect of gc2 is not guaranteed.
         arena2.execute([&] { /* ... */ });
     }
 }
@@ -339,6 +338,4 @@ The default behavior could be changed to fast leave, making delayed leave opt-in
 
 The following conditions need to be met to move the feature from experimental to fully supported:
 - Open questions regarding the API should be resolved.
-- User feedback should confirm usability and performance improvements in mentioned scenarios and that no unforeseen
-  issues arise.
 - The feature must be added to the oneTBB specification and accepted.
