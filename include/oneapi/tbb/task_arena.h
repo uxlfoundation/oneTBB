@@ -563,6 +563,7 @@ public:
                 r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end));
             my_arena = other.my_arena;
             my_flags = other.my_flags;
+            my_owns = other.my_owns;
             other.my_owns = false;
             return *this;
         }
@@ -572,8 +573,10 @@ public:
         }
 
         void end() {
-            my_owns = false;
-            r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end));
+            if (my_owns) {
+                my_owns = false;
+                r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end));
+            }
         }
     private:
         task_arena* my_arena{nullptr};
