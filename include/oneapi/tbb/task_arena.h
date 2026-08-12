@@ -554,7 +554,8 @@ public:
             my_arena->initialize();
             r1::enter_parallel_phase(my_arena, /*reserved*/0);
         }
-        parallel_phase(parallel_phase&& other) : my_arena(other.my_arena), my_flags(other.my_flags) {
+        parallel_phase(parallel_phase&& other)
+            : my_arena(other.my_arena), my_flags(other.my_flags), my_owns(other.my_owns) {
             other.my_owns = false;
         }
         parallel_phase& operator=(parallel_phase&& other) {
