@@ -545,7 +545,7 @@ public:
         class end_with_fast_leave : public phase::tag<phase::end, phase::end_fast_leave> {};
 
         parallel_phase(d1::attach, flags f = {}) : my_flags(f) {
-            this_task_arena::start_parallel_phase(my_flags);
+            r1::enter_parallel_phase(nullptr, /*reserved*/0);
         }
         parallel_phase(task_arena& ta, flags f = {})
             : my_arena(&ta), my_flags(f)
@@ -666,7 +666,7 @@ inline void enqueue(F&& f, d2::task_group& tg) {
     d2::enqueue_impl(tg.defer(std::forward<F>(f)), nullptr);
 }
 
-inline void start_parallel_phase() {
+inline void start_parallel_phase(task_arena::parallel_phase::flags = {}) {
     r1::enter_parallel_phase(nullptr, /*reserved*/0);
 }
 
