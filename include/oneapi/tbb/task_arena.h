@@ -534,13 +534,13 @@ public:
             friend void start_parallel_phase(flags);
             friend void end_parallel_phase(flags);
 
-            std::uint32_t my_start;
-            std::uint32_t my_end;
+            std::uint32_t my_start_flags;
+            std::uint32_t my_end_flags;
         public:
-            flags() : my_start(0), my_end(0) {};
+            flags() : my_start_flags(0), my_end_flags(0) {};
             template <typename... Flags, typename = typename std::enable_if<phase::valid_flags<Flags...>::value>::type>
-            flags(Flags...) : my_start(phase::combine_tags<phase::start, Flags...>::value),
-                  my_end(phase::combine_tags<phase::end, Flags...>::value) {}
+            flags(Flags...) : my_start_flags(phase::combine_tags<phase::start, Flags...>::value),
+                  my_end_flags(phase::combine_tags<phase::end, Flags...>::value) {}
         };
         class end_with_fast_leave : public phase::tag<phase::end, phase::end_fast_leave> {};
 
@@ -559,7 +559,7 @@ public:
         }
         parallel_phase& operator=(parallel_phase&& other) {
             if (my_owns)
-                r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end));
+                r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end_flags));
             my_arena = other.my_arena;
             my_flags = other.my_flags;
             my_owns = other.my_owns;
@@ -568,13 +568,13 @@ public:
         }
         ~parallel_phase() {
             if (my_owns)
-                r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end));
+                r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end_flags));
         }
 
         void end() {
             if (my_owns) {
                 my_owns = false;
-                r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end));
+                r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end_flags));
             }
         }
     private:
@@ -584,13 +584,13 @@ public:
         std::uintptr_t reserved;
     };
 
-    void start_parallel_phase(parallel_phase::flags = {}) {
+    void start_parallel_phase(parallel_phase::flags f = {}) {
         initialize();
-        r1::enter_parallel_phase(this, /*reserved*/0);
+        r1::enter_parallel_phase(this, static_cast<std::uintptr_t>(f.my_start_flags));
     }
-    void end_parallel_phase(parallel_phase::flags flags = {}) {
+    void end_parallel_phase(parallel_phase::flags f = {}) {
         __TBB_ASSERT(my_initialization_state.load(std::memory_order_relaxed) == do_once_state::initialized, nullptr);
-        r1::exit_parallel_phase(this, static_cast<std::uintptr_t>(flags.my_end));
+        r1::exit_parallel_phase(this, static_cast<std::uintptr_t>(f.my_end_flags));
     }
 
 #if __TBB_EXTRA_DEBUG
@@ -666,12 +666,12 @@ inline void enqueue(F&& f, d2::task_group& tg) {
     d2::enqueue_impl(tg.defer(std::forward<F>(f)), nullptr);
 }
 
-inline void start_parallel_phase(task_arena::parallel_phase::flags = {}) {
-    r1::enter_parallel_phase(nullptr, /*reserved*/0);
+inline void start_parallel_phase(task_arena::parallel_phase::flags f = {}) {
+    r1::enter_parallel_phase(nullptr, static_cast<std::uintptr_t>(f.my_start_flags));
 }
 
 inline void end_parallel_phase(task_arena::parallel_phase::flags f = {}) {
-    r1::exit_parallel_phase(nullptr, static_cast<std::uintptr_t>(f.my_end));
+    r1::exit_parallel_phase(nullptr, static_cast<std::uintptr_t>(f.my_end_flags));
 }
 
 inline std::vector<d1::task_arena> create_numa_task_arenas(d1::constraints c = {},
