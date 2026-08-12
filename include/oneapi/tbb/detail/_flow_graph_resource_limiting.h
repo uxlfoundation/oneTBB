@@ -228,38 +228,28 @@ public:
         tbb::spin_mutex::scoped_lock lock(m_mutex);
 
         consumer_data acquisition_data(id, &consumer);
+        bool was_notified = remove_from_notified_list(acquisition_data);
+        __TBB_ASSERT(was_notified, "Acquisition attempted without notification");
+
         std::size_t num_handles = m_resource_handles.size();
 
-        if (num_handles == 0) {
-            // No resource available right now. The consumer must request again to be
-            // notified when resources become available.
-            remove_from_notified_list(acquisition_data);
+        // Nothing available or was not notified, so the request is denied.
+        // Must request to be notified when a resource becomes available
+        if (num_handles == 0 || was_notified == false) {
             return optional_type{};
         }
 
-        if (m_notified.size() <= num_handles) {
-            // There are at least as many resources available as notified requests, so every
-            // notified request can be served and there is no need to compare priorities.
-            if (remove_from_notified_list(acquisition_data)) {
-                return extract_handle();
-            }
-            // Not in the notified list - the notification was already consumed
+        // Remaining notifications are at least equal in number to the available resources
+        // and this request does not have a high enough priority to be served.
+        // Must re-request to be notified when a resource becomes available
+        if (m_notified.size() >= num_handles
+            && acquisition_data < select_lowest_priority_to_serve(num_handles))
+        {
             return optional_type{};
         }
 
-        bool should_not_acquire = acquisition_data < select_lowest_priority_to_serve(num_handles);
-
-        // Remove from the notified list whether or not the acquisition is allowed; the
-        // consumer must make a new request if it wants to try again.
-        if (remove_from_notified_list(acquisition_data)) {
-            if (should_not_acquire) {
-                // Priority too low - deny the acquisition
-                return optional_type{};
-            }
-            return extract_handle();
-        }
-        // Not in the notified list - the notification was already consumed
-        return optional_type{};
+        // The request should be served, so extract and return a resource handle
+        return extract_handle();
     }
 
     void release(consumer_type&, request_id, optional_type&& handle) override {
@@ -274,13 +264,13 @@ public:
         tbb::spin_mutex::scoped_lock lock(m_mutex);
 
         consumer_data withdrawn(id, &consumer);
-        bool found = remove_from_notified_list(withdrawn)
-                     || remove_from_list(m_pending, withdrawn);
 
-        if (found) {
-            // A withdrawn notification frees up room under the notification limit, so a
-            // pending request may now be able to take its place.
-            notify_pending(lock); // the lock may be released
+        if (remove_from_notified_list(withdrawn)) {
+            // A withdrawn notification may allow a pending request to be notified
+            notify_pending(lock);
+        } else {
+            // A withdrawn pending request does not affect the notification of other requests
+            remove_from_list(m_pending, withdrawn);
         }
     }
 
@@ -775,13 +765,10 @@ public:
     }
 
     void release_concurrency_and_spawn_next(const Input& input_msg) {
-        if (m_input_ptr) {
-            // Call back to the input layer to release concurrency slot and get next task
-            // Only do this if concurrency is limited (not unlimited)
-            graph_task* next_task = m_input_ptr->release_concurrency_slot(input_msg);
-            if (next_task && next_task != SUCCESSFULLY_ENQUEUED) {
-                spawn_in_graph_arena(this->graph_reference(), *next_task);
-            }
+        __TBB_ASSERT(m_input_ptr != nullptr, "Input pointer is not set");
+        graph_task* next_task = m_input_ptr->release_concurrency_slot(input_msg);
+        if (next_task && next_task != SUCCESSFULLY_ENQUEUED) {
+            spawn_in_graph_arena(this->graph_reference(), *next_task);
         }
     }
 
