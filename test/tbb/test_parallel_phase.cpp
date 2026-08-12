@@ -304,6 +304,38 @@ TEST_CASE("RAII parallel_phase move assignment transfers ownership across arenas
 }
 
 //! \brief \ref error_guessing
+TEST_CASE("RAII parallel_phase moved from already ended phase") {
+    arena_with_leave_manager ta{tbb::task_arena::automatic, 1, tbb::task_arena::priority::normal,
+                                tbb::task_arena::leave_policy::fast};
+    auto& tlm = ta.get_thread_leave_manager();
+    REQUIRE(!tlm.is_retention_allowed());
+
+    {
+        // Move constructor
+        tbb::task_arena::parallel_phase phase{ta};
+        REQUIRE(tlm.is_retention_allowed());
+        phase.end();
+        REQUIRE(!tlm.is_retention_allowed());
+
+        // The source object owns nothing, so the moved-to object must not own anything
+        tbb::task_arena::parallel_phase moved{std::move(phase)};
+        REQUIRE(!tlm.is_retention_allowed());
+    }
+    {
+        // Move assignment
+        tbb::task_arena::parallel_phase src{ta};
+        src.end();
+
+        tbb::task_arena::parallel_phase dst{ta};
+        REQUIRE(tlm.is_retention_allowed());
+
+        // Move assignment ends the phase owned by dst and takes over the ownership from src
+        dst = std::move(src);
+        REQUIRE(!tlm.is_retention_allowed());
+    }
+}
+
+//! \brief \ref error_guessing
 TEST_CASE("RAII parallel_phase with attach is bound to the arena it started in" * doctest::skip(true)) {
     // Make the implicit arena of the calling thread observable through a task_arena
     tbb::this_task_arena::start_parallel_phase();

@@ -901,14 +901,14 @@ int task_arena_impl::max_concurrency(const d1::task_arena_base *ta) {
 
 void task_arena_impl::enter_parallel_phase(d1::task_arena_base* ta, std::uintptr_t /*reserved*/) {
     arena* a = ta ? ta->my_arena.load(std::memory_order_relaxed) : governor::get_thread_data()->my_arena;
-    __TBB_ASSERT(a, nullptr);
+    __TBB_ASSERT(a, "arena should be initialized before entering parallel phase");
     a->my_thread_leave.register_parallel_phase();
     a->advertise_new_work<arena::work_enqueued>();
 }
 
 void task_arena_impl::exit_parallel_phase(d1::task_arena_base* ta, std::uintptr_t flags) {
     arena* a = ta ? ta->my_arena.load(std::memory_order_relaxed) : governor::get_thread_data()->my_arena;
-    __TBB_ASSERT(a, nullptr);
+    __TBB_ASSERT(a, "arena should be already initialized during active parallel phase");
     a->my_thread_leave.unregister_parallel_phase(flags);
 }
 
