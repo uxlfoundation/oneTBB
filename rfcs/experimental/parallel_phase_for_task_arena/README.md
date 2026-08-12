@@ -155,6 +155,8 @@ class task_arena {
         class end_with_fast_leave;
         parallel_phase(attach, flags f = {});
         parallel_phase(task_arena& ta, flags f = {});
+        parallel_phase(parallel_phase&& other);
+        parallel_phase& operator=(parallel_phase&& other);
         void end();
     };
     
@@ -190,6 +192,11 @@ The factory function approach might seem more consistent with the rest of task a
 As there are no clear advantages of factory function, the proposal is to stick to the constructor approach
 since it is an already established pattern of the feature during experimental stage.
 
+The RAII object is move-constructible and move-assignable, but not copyable. For a `parallel_phase`
+bound to an explicit arena, the requirement is that the arena itself must not be destroyed
+while the phase is still active. A `parallel_phase` created with `tbb::attach` is bound to the
+implicit arena of the creating thread, so it must not end outside of that same implicit arena.
+
 #### Flags
 
 Note that all the entry points accept a single `parallel_phase::flags` argument rather than a
@@ -212,8 +219,8 @@ must be initialized during the first call to `start_parallel_phase`. It means th
 no associated arena yet, the invocation of `this_task_arena::start_parallel_phase` will initialize
 an arena and bind it to the calling thread.
 
-The arena lifetime must not end while a parallel phase is still active. It is the user's
-responsibility to call `end_parallel_phase` for every outstanding `start_parallel_phase` 
+As mentioned above, the arena lifetime must not end while a parallel phase is still active.
+It is the user's responsibility to call `end_parallel_phase` for every outstanding `start_parallel_phase`
 (or destroy the corresponding `parallel_phase` object) before the arena is destroyed (or, for an implicitly
 created arena, before the owning thread completes). Otherwise, the behavior is undefined.
 
@@ -243,7 +250,7 @@ void handle_request(Request req) {
 }
 ```
 
-The same use case can be expressed using the `parallel_phase` object, assuming move construction is supported:
+The same use case can be expressed using the `parallel_phase` object:
 
 ```cpp
 void handle_request(Request req) {
