@@ -54,7 +54,7 @@ struct combine_tags<Boundary, Tag, Tags...> {
 };
 
 template <typename... Tags>
-struct valid_flags : tbb::detail::conjunction<std::is_base_of<tag_base, Tag>...> {};
+struct valid_flags : tbb::detail::conjunction<std::is_base_of<tag_base, Tags>...> {};
 
 } // namespace phase
 } // namespace d1
