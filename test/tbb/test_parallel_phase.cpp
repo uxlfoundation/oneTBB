@@ -429,5 +429,5 @@ TEST_CASE("Test global_control leave_policy active_value") {
 
 //! \brief \ref interface
 TEST_CASE("Feature test macro") {
-    CHECK_MESSAGE(TBB_HAS_PARALLEL_PHASE == 202603, "Incorrect feature test macro");
+    CHECK_MESSAGE(TBB_HAS_PARALLEL_PHASE == 202608, "Incorrect feature test macro");
 }
