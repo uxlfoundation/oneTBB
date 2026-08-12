@@ -28,8 +28,8 @@
 #include "detail/_task.h"
 #include "detail/_task_handle.h"
 #include "detail/_parallel_phase.h"
+#include "detail/_utils.h"
 #include "info.h"
-#include "oneapi/tbb/detail/_utils.h"
 #include "task_group.h"
 
 #include <vector>
@@ -545,14 +545,13 @@ public:
         class end_with_fast_leave : public phase::tag<phase::end, phase::end_fast_leave> {};
 
         parallel_phase(d1::attach, flags f = {}) : my_flags(f) {
-            r1::enter_parallel_phase(nullptr, /*reserved*/0);
+            this_task_arena::start_parallel_phase(my_flags);
         }
         parallel_phase(task_arena& ta, flags f = {})
             : my_arena(&ta), my_flags(f)
         {
             suppress_unused_warning(reserved);
-            my_arena->initialize();
-            r1::enter_parallel_phase(my_arena, /*reserved*/0);
+            my_arena.start_parallel_phase(my_flags);
         }
         parallel_phase(parallel_phase&& other)
             : my_arena(other.my_arena), my_flags(other.my_flags), my_owns(other.my_owns) {

@@ -53,18 +53,8 @@ struct combine_tags<Boundary, Tag, Tags...> {
        (std::is_same<typename Tag::boundary_type, Boundary>::value ? Tag::value : 0) | combine_tags<Boundary, Tags...>::value;
 };
 
-template<typename... Tags>
-struct valid_flags;
-
-template<>
-struct valid_flags<> {
-    static constexpr bool value = true;
-};
-
-template<typename Tag, typename... Tags>
-struct valid_flags<Tag, Tags...> {
-    static constexpr bool value = std::is_base_of<tag_base, Tag>::value && valid_flags<Tags...>::value;
-};
+template <typename... Tags>
+struct valid_flags : tbb::detail::conjunction<std::is_base_of<tag_base, Tag>...> {};
 
 } // namespace phase
 } // namespace d1
