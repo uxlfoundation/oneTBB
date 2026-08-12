@@ -332,7 +332,7 @@ TEST_CASE("RAII parallel_phase moved from already ended phase") {
         // Move assignment ends the phase owned by dst and takes over the ownership from src
         dst = std::move(src);
         REQUIRE(!tlm.is_retention_allowed());
-        // Delibarately ending the phase must be a no-op
+        // Deliberately ending the phase must be a no-op
         dst.end();
     }
 }
