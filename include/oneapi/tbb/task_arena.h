@@ -537,7 +537,7 @@ public:
             std::uint32_t my_start_flags;
             std::uint32_t my_end_flags;
         public:
-            flags() : my_start_flags(0), my_end_flags(0) {};
+            flags() : my_start_flags(0), my_end_flags(0) {}
             template <typename... Flags, typename = typename std::enable_if<phase::valid_flags<Flags...>::value>::type>
             flags(Flags...) : my_start_flags(phase::combine_tags<phase::start, Flags...>::value),
                   my_end_flags(phase::combine_tags<phase::end, Flags...>::value) {}
@@ -581,7 +581,7 @@ public:
         task_arena* my_arena{nullptr};
         flags my_flags;
         bool my_owns{true};
-        std::uintptr_t reserved;
+        std::uintptr_t m_reserved{};
     };
 
     void start_parallel_phase(parallel_phase::flags f = {}) {
