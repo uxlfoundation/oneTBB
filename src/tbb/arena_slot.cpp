@@ -146,12 +146,7 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
     return result;
 }
 
-<<<<<<< HEAD
 d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t slot_index) {
-    constexpr int max_lock_attempts = 4;
-=======
-d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t slot_index, steal_attempt_outcome& outcome) {
->>>>>>> 54202772 (Use more tries)
     d1::task** victim_pool = nullptr;
     atomic_backoff backoff;
     do {
