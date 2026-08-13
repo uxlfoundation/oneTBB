@@ -550,38 +550,38 @@ public:
         parallel_phase(task_arena& ta, flags f = {})
             : my_arena(&ta), my_flags(f)
         {
-            suppress_unused_warning(reserved);
+            suppress_unused_warning(my_reserved);
             my_arena->start_parallel_phase(my_flags);
         }
         parallel_phase(parallel_phase&& other)
-            : my_arena(other.my_arena), my_flags(other.my_flags), my_owns(other.my_owns) {
-            other.my_owns = false;
+            : my_arena(other.my_arena), my_flags(other.my_flags), my_active(other.my_active) {
+            other.my_active = false;
         }
         parallel_phase& operator=(parallel_phase&& other) {
-            if (my_owns)
+            if (my_active)
                 r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end_flags));
             my_arena = other.my_arena;
             my_flags = other.my_flags;
-            my_owns = other.my_owns;
-            other.my_owns = false;
+            my_active = other.my_active;
+            other.my_active = false;
             return *this;
         }
         ~parallel_phase() {
-            if (my_owns)
+            if (my_active)
                 r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end_flags));
         }
 
         void end() {
-            if (my_owns) {
-                my_owns = false;
+            if (my_active) {
+                my_active = false;
                 r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end_flags));
             }
         }
     private:
         task_arena* my_arena{nullptr};
         flags my_flags;
-        bool my_owns{true};
-        std::uintptr_t m_reserved{};
+        bool my_active{true};
+        std::uintptr_t my_reserved{};
     };
 
     void start_parallel_phase(parallel_phase::flags f = {}) {
