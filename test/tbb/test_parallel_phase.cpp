@@ -110,6 +110,86 @@ struct arena_with_leave_manager : public tbb::task_arena {
 };
 
 //! \brief \ref interface \ref requirement
+TEST_CASE("Test task_arena leavy policy settings") {
+    using leave_policy = tbb::task_arena::leave_policy;
+
+    {
+        // The default leave policy is automatic
+        arena_with_leave_manager ta{};
+        REQUIRE(ta.get_leave_policy() == leave_policy::automatic);
+    }
+    {
+        // The leave policy set by the constructor is reflected by the arena
+        arena_with_leave_manager ta{tbb::task_arena::automatic, 1, tbb::task_arena::priority::normal,
+                                    leave_policy::fast};
+        REQUIRE(ta.get_leave_policy() == leave_policy::fast);
+        REQUIRE(!ta.get_thread_leave_manager().is_retention_allowed());
+    }
+    {
+        arena_with_leave_manager ta{tbb::task_arena::automatic, 1, tbb::task_arena::priority::normal,
+                                    leave_policy::automatic};
+        REQUIRE(ta.get_leave_policy() == leave_policy::automatic);
+    }
+    {
+        // The same holds for the constructor taking constraints
+        arena_with_leave_manager ta{tbb::task_arena::constraints{}, 1, tbb::task_arena::priority::normal,
+                                    leave_policy::fast};
+        REQUIRE(ta.get_leave_policy() == leave_policy::fast);
+        REQUIRE(!ta.get_thread_leave_manager().is_retention_allowed());
+    }
+    {
+        // The leave policy of a arena is set by the initialize method
+        arena_with_leave_manager ta{};
+        REQUIRE(!ta.is_active());
+
+        ta.initialize(tbb::task_arena::automatic, 1, tbb::task_arena::priority::normal, leave_policy::fast);
+        REQUIRE(ta.is_active());
+        REQUIRE(ta.get_leave_policy() == leave_policy::fast);
+        REQUIRE(!ta.get_thread_leave_manager().is_retention_allowed());
+    }
+    {
+        // The same holds for the initialize method taking constraints
+        arena_with_leave_manager ta{};
+        ta.initialize(tbb::task_arena::constraints{}, 1, tbb::task_arena::priority::normal,
+                      leave_policy::fast);
+        REQUIRE(ta.is_active());
+        REQUIRE(ta.get_leave_policy() == leave_policy::fast);
+        REQUIRE(!ta.get_thread_leave_manager().is_retention_allowed());
+    }
+    {
+        // The leave policy set by the constructor survives the initialization and termination
+        arena_with_leave_manager ta{tbb::task_arena::automatic, 1, tbb::task_arena::priority::normal,
+                                    leave_policy::fast};
+        ta.initialize();
+        REQUIRE(ta.get_leave_policy() == leave_policy::fast);
+        REQUIRE(!ta.get_thread_leave_manager().is_retention_allowed());
+
+        ta.terminate();
+        REQUIRE(!ta.is_active());
+        REQUIRE(ta.get_leave_policy() == leave_policy::fast);
+
+        ta.initialize();
+        REQUIRE(ta.get_leave_policy() == leave_policy::fast);
+        REQUIRE(!ta.get_thread_leave_manager().is_retention_allowed());
+
+        // The settings that are not passed to the repeated initialization are reset
+        ta.terminate();
+        ta.initialize(tbb::task_arena::automatic, 1, tbb::task_arena::priority::normal);
+        REQUIRE(ta.get_leave_policy() == leave_policy::automatic);
+    }
+    {
+        // The same holds for the initialize method taking constraints
+        arena_with_leave_manager ta{tbb::task_arena::constraints{}, 1, tbb::task_arena::priority::normal,
+                                    leave_policy::fast};
+        REQUIRE(!ta.get_thread_leave_manager().is_retention_allowed());
+
+        ta.terminate();
+        ta.initialize(tbb::task_arena::constraints{}, 1, tbb::task_arena::priority::normal);
+        REQUIRE(ta.get_leave_policy() == leave_policy::automatic);
+    }
+}
+
+//! \brief \ref interface \ref requirement
 TEST_CASE("Test thread_leave_manager state machine via explicit parallel_phase API") {
     arena_with_leave_manager ta_fast{tbb::task_arena::automatic, 1, tbb::task_arena::priority::normal,
                              tbb::task_arena::leave_policy::fast};

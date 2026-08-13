@@ -189,7 +189,8 @@ protected:
     }
 
     void set_leave_policy(leave_policy lp) {
-        my_version_and_traits |= leave_policy_trait(lp);
+        my_version_and_traits = (my_version_and_traits & ~intptr_t(fast_leave_policy_flag)) |
+                                leave_policy_trait(lp);
     }
 
     enum {
