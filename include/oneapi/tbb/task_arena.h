@@ -542,7 +542,7 @@ public:
             flags(Flags...) : my_start_flags(phase::combine_tags<phase::start, Flags...>::value),
                   my_end_flags(phase::combine_tags<phase::end, Flags...>::value) {}
         };
-        class end_with_fast_leave : public phase::tag<phase::end, phase::end_fast_leave> {};
+        class end_flag_fast_leave : public phase::tag<phase::end, phase::end_fast_leave> {};
 
         parallel_phase(d1::attach, flags f = {}) : my_flags(f) {
             r1::enter_parallel_phase(nullptr, /*reserved*/0);

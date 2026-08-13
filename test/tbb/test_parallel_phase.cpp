@@ -41,7 +41,7 @@
 #pragma warning(pop)
 #endif
 
-using end_with_fast_leave = tbb::task_arena::parallel_phase::end_with_fast_leave;
+using end_flag_fast_leave = tbb::task_arena::parallel_phase::end_flag_fast_leave;
 
 using tbb::detail::r1::thread_leave_manager;
 
@@ -99,6 +99,7 @@ TEST_CASE("Test thread_leave_manager under contention") {
 
 struct arena_with_leave_manager : public tbb::task_arena {
     using tbb::task_arena::task_arena;
+    using tbb::task_arena::get_leave_policy;
 
     thread_leave_manager& get_thread_leave_manager() {
         initialize();
@@ -132,7 +133,7 @@ TEST_CASE("Test thread_leave_manager state machine via explicit parallel_phase A
     ta_auto.start_parallel_phase();
     REQUIRE(tlm_auto.is_retention_allowed());
 
-    ta_auto.end_parallel_phase(end_with_fast_leave{});
+    ta_auto.end_parallel_phase(end_flag_fast_leave{});
     REQUIRE(!tlm_auto.is_retention_allowed());
 
     ta_auto.start_parallel_phase();
@@ -157,7 +158,7 @@ TEST_CASE("Test thread_leave_manager state machine via RAII parallel_phase API")
     REQUIRE(tlm.is_retention_allowed() == default_state);
 
     {
-        tbb::task_arena::parallel_phase phase{ta, end_with_fast_leave{}};
+        tbb::task_arena::parallel_phase phase{ta, end_flag_fast_leave{}};
         REQUIRE(tlm.is_retention_allowed());
     }
     REQUIRE(!tlm.is_retention_allowed());
@@ -178,7 +179,7 @@ TEST_CASE("Test thread_leave_manager state machine via RAII parallel_phase API")
     REQUIRE(tlm.is_retention_allowed() == default_state);
 
     {
-        tbb::task_arena::parallel_phase phase{ta, end_with_fast_leave{}};
+        tbb::task_arena::parallel_phase phase{ta, end_flag_fast_leave{}};
         REQUIRE(tlm.is_retention_allowed());
         phase.end();
         REQUIRE(!tlm.is_retention_allowed());
@@ -202,7 +203,7 @@ TEST_CASE("Test thread_leave_manager state machine via explicit parallel_phase A
 
     tbb::this_task_arena::start_parallel_phase();
     REQUIRE(tlm.is_retention_allowed());
-    tbb::this_task_arena::end_parallel_phase(end_with_fast_leave{});
+    tbb::this_task_arena::end_parallel_phase(end_flag_fast_leave{});
     REQUIRE(!tlm.is_retention_allowed());
 
     tbb::this_task_arena::start_parallel_phase();
@@ -226,7 +227,7 @@ TEST_CASE("Test thread_leave_manager state machine via RAII parallel_phase API f
     REQUIRE(tlm.is_retention_allowed() == default_state);
 
     {
-        tbb::task_arena::parallel_phase phase{tbb::attach{}, end_with_fast_leave{}};
+        tbb::task_arena::parallel_phase phase{tbb::attach{}, end_flag_fast_leave{}};
         REQUIRE(tlm.is_retention_allowed());
     }
     REQUIRE(!tlm.is_retention_allowed());
@@ -240,7 +241,7 @@ TEST_CASE("Test thread_leave_manager state machine via RAII parallel_phase API f
     }
     REQUIRE(tlm.is_retention_allowed() == default_state);
     {
-        tbb::task_arena::parallel_phase phase{tbb::attach{}, end_with_fast_leave{}};
+        tbb::task_arena::parallel_phase phase{tbb::attach{}, end_flag_fast_leave{}};
         REQUIRE(tlm.is_retention_allowed());
         phase.end();
         REQUIRE(!tlm.is_retention_allowed());
@@ -256,7 +257,7 @@ TEST_CASE("RAII parallel_phase move construction transfers ownership") {
     bool default_state = tlm.is_retention_allowed();
 
     {
-        tbb::task_arena::parallel_phase phase1{ta, end_with_fast_leave{}};
+        tbb::task_arena::parallel_phase phase1{ta, end_flag_fast_leave{}};
         REQUIRE(tlm.is_retention_allowed());
 
         tbb::task_arena::parallel_phase phase2{std::move(phase1)};
@@ -288,7 +289,7 @@ TEST_CASE("RAII parallel_phase move assignment transfers ownership across arenas
 
     {
         tbb::task_arena::parallel_phase phase1{ta1};
-        tbb::task_arena::parallel_phase phase2{ta2, end_with_fast_leave{}};
+        tbb::task_arena::parallel_phase phase2{ta2, end_flag_fast_leave{}};
         REQUIRE(tlm1.is_retention_allowed());
         REQUIRE(tlm2.is_retention_allowed());
 
@@ -337,29 +338,6 @@ TEST_CASE("RAII parallel_phase moved from already ended phase") {
     }
 }
 
-//! \brief \ref error_guessing
-TEST_CASE("RAII parallel_phase with attach is bound to the arena it started in" * doctest::skip(true)) {
-    // Make the implicit arena of the calling thread observable through a task_arena
-    tbb::this_task_arena::start_parallel_phase();
-    arena_with_leave_manager implicit_arena{tbb::attach{}};
-    auto& tlm_implicit = implicit_arena.get_thread_leave_manager();
-    tbb::this_task_arena::end_parallel_phase();
-
-    arena_with_leave_manager ta_other{tbb::task_arena::automatic, 1, tbb::task_arena::priority::normal,
-                                   tbb::task_arena::leave_policy::automatic};
-    {
-        tbb::task_arena::parallel_phase phase{tbb::attach{}, end_with_fast_leave{}};
-        REQUIRE(tlm_implicit.is_retention_allowed());
-
-        ta_other.execute([&] {
-            tbb::task_arena::parallel_phase moved{std::move(phase)};
-            REQUIRE(tlm_implicit.is_retention_allowed());
-        });
-        REQUIRE(!tlm_implicit.is_retention_allowed());
-    }
-    REQUIRE(!tlm_implicit.is_retention_allowed());
-}
-
 //! \brief \ref interface \ref requirement
 TEST_CASE("Test thread_leave_manager state machine with global_control leave_policy") {
     arena_with_leave_manager ta{tbb::task_arena::automatic, 1, tbb::task_arena::priority::normal,
@@ -379,7 +357,7 @@ TEST_CASE("Test thread_leave_manager state machine with global_control leave_pol
 
         ta.start_parallel_phase();
         REQUIRE(tlm.is_retention_allowed());
-        ta.end_parallel_phase(end_with_fast_leave{});
+        ta.end_parallel_phase(end_flag_fast_leave{});
         REQUIRE(!tlm.is_retention_allowed());
     }
     // Leave policy remains fast even after global_control is destroyed

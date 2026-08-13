@@ -347,7 +347,7 @@ static void DefinitionPresence() {
     TestTypeDefinitionPresence( task_arena::leave_policy );
     TestTypeDefinitionPresence( task_arena::parallel_phase );
     TestTypeDefinitionPresence( task_arena::parallel_phase::flags );
-    TestTypeDefinitionPresence( task_arena::parallel_phase::end_with_fast_leave );
+    TestTypeDefinitionPresence( task_arena::parallel_phase::end_flag_fast_leave );
     TestFuncDefinitionPresence( this_task_arena::start_parallel_phase, (tbb::task_arena::parallel_phase::flags), void );
     TestFuncDefinitionPresence( this_task_arena::end_parallel_phase, (tbb::task_arena::parallel_phase::flags), void );
     TestFuncDefinitionPresence( create_numa_task_arenas, (tbb::task_arena::constraints, unsigned), std::vector<tbb::task_arena> );
