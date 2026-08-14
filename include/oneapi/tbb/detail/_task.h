@@ -286,6 +286,11 @@ private:
 };
 static_assert(sizeof(task) == task_alignment, "task size is broken");
 
+// Namespace-scope declarations so the hidden-friend definitions above are
+// reachable through qualified lookup (e.g. d1::set_task_group(...)).
+void set_task_group(task* task, d2::task_group_base* group);
+d2::task_group_base* get_task_group(task* task);
+
 } // namespace d1
 } // namespace detail
 } // namespace tbb

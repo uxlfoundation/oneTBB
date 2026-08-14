@@ -24,6 +24,7 @@
 #include "_small_object_pool.h"
 #include "_utils.h"
 #include <memory>
+#include <unordered_map>
 
 namespace tbb {
 namespace detail {
@@ -201,12 +202,15 @@ public:
 
     task_handle_task* get_task() { return m_task; }
 
+    bool mark_non_pending() { return m_is_pending.exchange(false) == true; }
+
 private:
     task_handle_task* m_task;
     std::atomic<notify_list_node*> m_notify_list_head;
     std::atomic<task_dynamic_state*> m_new_completion_point;
     std::atomic<std::size_t> m_num_dependencies;
     std::atomic<std::size_t> m_num_references;
+    std::atomic<bool>        m_is_pending{true};
     d1::small_object_allocator m_allocator;
 };
 
@@ -220,11 +224,13 @@ inline std::pair<task_handle_task*, bool> notify_successor_node::notify_common()
     return {successor_task, true};
 }
 
+class task_completion_handle;
+
 class dynamic_state_task : public d1::task {
     std::atomic<task_dynamic_state*> m_dynamic_state;
 protected:
     d1::wait_tree_vertex_interface* m_wait_tree_vertex;
-    std::unordered_set<task_handle_task*> m_pending_subtasks;
+    std::unordered_map<task_dynamic_state*, task_completion_handle> m_pending_subtasks;
 public:
     dynamic_state_task(d1::wait_tree_vertex_interface* vertex)
         : m_dynamic_state(nullptr)
@@ -232,20 +238,24 @@ public:
     {}
 
     ~dynamic_state_task() {
+        handle_pending_subtasks();
+
         task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_relaxed);
         if (current_state != nullptr) {
             current_state->release();
         }
     }
 
-    void add_pending_subtask(task_handle_task* task) {
-        auto result = m_pending_subtasks.insert(task);
-        __TBB_ASSERT(result.second, nullptr);
+    bool mark_non_pending() {
+        task_dynamic_state* current_state = m_dynamic_state.load(std::memory_order_relaxed);
+        return current_state != nullptr ? current_state->mark_non_pending() : false;
     }
 
-    void remove_pending_subtask(task_handle_task* task) {
-        m_pending_subtasks.erase(task);
-    }
+    void add_pending_subtask(task_completion_handle&& comp_handle);
+
+    bool remove_pending_subtask(task_handle_task* task);
+
+    void handle_pending_subtasks();
 
     // Returns the dynamic state associated with the task. If the state has not been initialized, initializes it.
     task_dynamic_state* get_dynamic_state();
@@ -306,6 +316,7 @@ class task_handle_task
     d1::task_group_context& m_ctx;
     d1::small_object_allocator m_allocator;
 public:
+
     void destroy(const d1::execution_data* ed = nullptr) {
         destroy_func_type destroy_func = reinterpret_cast<destroy_func_type>(m_destroy_func);
         if (destroy_func != nullptr) {
@@ -330,17 +341,16 @@ public:
     }
 
     ~task_handle_task() override {
-        __TBB_ASSERT(m_wait_tree_vertex != nullptr, nullptr);
-        m_wait_tree_vertex->release();
-
-        for (task_handle_task* task : m_pending_subtasks) {
-            task_group_base* this_group = d1::get_task_group(this);
-            __TBB_ASSERT(this_group != nullptr, nullptr);
-            task->assign_wait_vertex(this_group);
+        if (m_wait_tree_vertex != nullptr) {
+            m_wait_tree_vertex->release();
         }
     }
 
     void assign_wait_vertex(task_group_base* group);
+
+    void set_wait_vertex(d1::wait_tree_vertex_interface* vertex) { m_wait_tree_vertex = vertex; }
+
+    bool has_wait_vertex() const { return m_wait_tree_vertex != nullptr; }
 
     d1::task_group_context& ctx() const { return m_ctx; }
 };
@@ -356,6 +366,11 @@ inline task_dynamic_state* dynamic_state_task::get_dynamic_state() {
         d1::small_object_allocator alloc;
 
         task_dynamic_state* new_state = alloc.new_object<task_dynamic_state>(static_cast<task_handle_task*>(this), alloc);
+
+        // A task that already owns a wait vertex (e.g. created outside a task body) is not pending
+        if (m_wait_tree_vertex != nullptr) {
+            new_state->mark_non_pending();
+        }
 
         if (m_dynamic_state.compare_exchange_strong(current_state, new_state)) {
             current_state = new_state;
@@ -399,6 +414,33 @@ private:
     task_handle(task_handle_task* t) : m_handle {t}{}
 };
 
+inline bool remove_current_pending_subtask(task_handle_task* task) {
+    d1::task* current_task = d1::current_task_ptr();
+    bool result = false;
+
+    if (current_task != nullptr && d1::get_task_group(current_task) == d1::get_task_group(task)) {
+        dynamic_state_task* current_dynamic_state_task = static_cast<dynamic_state_task*>(current_task);
+
+        // Mark the subtask (not the current task) as non-pending so it is not
+        // assigned a redundant wait vertex when it is later submitted.
+        task->mark_non_pending();
+        result = current_dynamic_state_task->remove_pending_subtask(task);
+    }
+    return result;
+}
+
+// Assigns a pending subtask its wait vertex synchronously at submission time and removes
+// it from the submitting task's pending list. This must run on the submitting task's
+// thread, before that task is destroyed (and its pending list flushed), so that a task
+// made runnable via bypass or dependency resolution already owns its wait vertex. Doing
+// this lazily in the parent's flush would race with the task being spawned and completed.
+inline void commit_pending_task(task_handle_task* task_ptr) {
+    if (task_ptr->mark_non_pending()) {
+        task_ptr->assign_wait_vertex(d1::get_task_group(task_ptr));
+    }
+    remove_current_pending_subtask(task_ptr);
+}
+
 struct task_handle_accessor {
     static task_handle construct(task_handle_task* t) { return {t}; }
 
@@ -416,17 +458,16 @@ struct task_handle_accessor {
         return th.m_handle->get_dynamic_state();
     }
 #endif
-    static void remove_current_pending_subtask(task_handle& th) {
-        d1::task* current_task = d1::current_task_ptr();
-        auto task = th.m_handle.get();
-
-        if (current_task != nullptr && d1::get_task_group(current_task) == d1::get_task_group(task)) {
-            static_cast<dynamic_state_task*>(current_task)->remove_pending_subtask(task);
-        }
+    static bool remove_current_pending_subtask(task_handle& th) {
+        return d2::remove_current_pending_subtask(th.m_handle.get());
     }
 
-    static void transfer_wait_tree_vertex(task_handle& th) {
+    static void assign_wait_tree_vertex(task_handle& th, d1::wait_tree_vertex_interface* vertex) {
+        th.m_handle->set_wait_vertex(vertex);
+    }
 
+    static bool has_wait_vertex(task_handle& th) {
+        return th.m_handle->has_wait_vertex();
     }
 };
 
@@ -636,14 +677,16 @@ inline void dynamic_state_task::transfer_completion_to(task_handle& receiving_ta
         current_state->transfer_completion_to(task_handle_accessor::get_task_dynamic_state(receiving_task));
     }
 
-    // Transfer wait_tree_vertex
-    task_handle_accessor::assign_wait_tree_vertex(receiving_task, m_wait_tree_vertex);
-    m_wait_tree_vertex = nullptr;
+    if (!task_handle_accessor::has_wait_vertex(receiving_task)) {
+        task_handle_accessor::assign_wait_tree_vertex(receiving_task, m_wait_tree_vertex);
+        m_wait_tree_vertex = nullptr;
+    }
 
     task_handle_accessor::remove_current_pending_subtask(receiving_task);
 }
 
 class task_completion_handle {
+    friend class dynamic_state_task;
 public:
     task_completion_handle() : m_task_state(nullptr) {}
 
@@ -750,6 +793,31 @@ struct task_completion_handle_accessor {
         return tracker.m_task_state;
     }
 };
+
+inline void dynamic_state_task::add_pending_subtask(task_completion_handle&& comp_handle) {
+    task_dynamic_state* state = task_completion_handle_accessor::get_task_dynamic_state(comp_handle);
+    __TBB_ASSERT(state != nullptr, nullptr);
+    auto result = m_pending_subtasks.emplace(state, std::move(comp_handle));
+    __TBB_ASSERT(result.second, nullptr);
+    (void)result;
+}
+
+inline bool dynamic_state_task::remove_pending_subtask(task_handle_task* t) {
+    __TBB_ASSERT(t != nullptr, nullptr);
+    task_dynamic_state* state = t->m_dynamic_state.load(std::memory_order_relaxed);
+    __TBB_ASSERT(state != nullptr, nullptr);
+    return m_pending_subtasks.erase(state) != 0;
+}
+
+inline void dynamic_state_task::handle_pending_subtasks() {
+    for (auto& subtask : m_pending_subtasks) {
+        task_dynamic_state* state = subtask.first;
+        if (state->mark_non_pending()) {
+            task_group_base* this_task_group = d1::get_task_group(this);
+            state->get_task()->assign_wait_vertex(this_task_group);
+        }
+    }
+}
 #endif
 
 } // namespace d2

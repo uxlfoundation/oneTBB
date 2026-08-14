@@ -110,9 +110,10 @@ inline void enqueue_impl(task_handle&& th, d1::task_arena_base* ta) {
     __TBB_ASSERT(th != nullptr, "Attempt to schedule empty task_handle");
 
     auto& ctx = task_handle_accessor::ctx_of(th);
-
+    
     // Do not access th after release
     task_handle_task* task_ptr = task_handle_accessor::release(th);
+    commit_pending_task(task_ptr);
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
     if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
         return;

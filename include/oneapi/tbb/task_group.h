@@ -133,6 +133,11 @@ public:
     d1::task* task_ptr_or_nullptr_impl(std::false_type, F&& f){
         task_handle th = std::forward<F>(f)();
         task_handle_task* task_ptr = task_handle_accessor::release(th);
+        if (task_ptr != nullptr) {
+            // Assign the wait vertex synchronously here (before this task is destroyed),
+            // so a bypassed or dependency-resolved task already owns its reference.
+            commit_pending_task(task_ptr);
+        }
         // If task has unresolved dependencies, it can't be bypassed
         if (task_ptr && task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
             task_ptr = nullptr;
@@ -486,7 +491,13 @@ class function_stack_task
         return nullptr;
     }
 public:
-    function_stack_task(const F& f, d1::wait_tree_vertex_interface* vertex) : m_func(f), m_wait_tree_vertex(vertex) {
+    function_stack_task(const F& f, d1::wait_tree_vertex_interface* vertex)
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        : dynamic_state_task(vertex), m_func(f)
+#else
+        : m_func(f), m_wait_tree_vertex(vertex)
+#endif
+    {
         m_wait_tree_vertex->reserve();
     }
 };
@@ -499,6 +510,11 @@ protected:
     template<typename F>
     task_group_status internal_run_and_wait(const F& f) {
         function_stack_task<F> t{ f, r1::get_thread_reference_vertex(&m_wait_vertex) };
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        // Mark the stack task with its group so tasks deferred within its body are
+        // recognized as pending subtasks (consistent with function_task).
+        d1::set_task_group(&t, this);
+#endif
 
         bool cancellation_status = false;
         try_call([&] {
@@ -574,8 +590,8 @@ protected:
 
         d1::task* current_task = d1::current_task_ptr();
 
-        d1::wait_tree_vertex_interface new_task_vertex = nullptr;
-        
+        d1::wait_tree_vertex_interface* new_task_vertex = nullptr;
+
         // If the task is deferred from a task body in the same group, defer assigning the reference
         bool is_subtask_in_current_group = (current_task != nullptr && d1::get_task_group(current_task) == this);
 
@@ -584,13 +600,15 @@ protected:
         using function_task_t =  d2::function_task<typename std::decay<F>::type>;
         d2::task_handle_task* function_task_p =  alloc.new_object<function_task_t>(std::forward<F>(f),
             new_task_vertex, context(), alloc);
-        d1::set_task_group(task, this);
+        d1::set_task_group(function_task_p, this);
+
+        d2::task_handle handle = d2::task_handle_accessor::construct(function_task_p);
 
         if (is_subtask_in_current_group) {
-            static_cast<dynamic_state_task*>(current_task)->add_pending_subtask(function_task_p);
+            static_cast<dynamic_state_task*>(current_task)->add_pending_subtask(d2::task_completion_handle(handle));
         }
 
-        return d2::task_handle_accessor::construct(function_task_p);
+        return handle;
     }
 
 public:
@@ -648,7 +666,7 @@ public:
     friend class task_handle_task;
 }; // class task_group_base
 
-void task_handle_task::assign_wait_vertex(task_group_base* group) {
+inline void task_handle_task::assign_wait_vertex(task_group_base* group) {
     __TBB_ASSERT(group != nullptr, nullptr);
     __TBB_ASSERT(m_wait_tree_vertex == nullptr, nullptr);
     m_wait_tree_vertex = r1::get_thread_reference_vertex(&group->m_wait_vertex);
@@ -673,6 +691,9 @@ public:
         __TBB_ASSERT(&acs::ctx_of(h) == &context(), "Attempt to schedule task_handle into different task_group");
 
         task_handle_task* task_ptr = acs::release(h);
+
+        commit_pending_task(task_ptr);
+
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
         // If the task has dependencies and the task_handle is not the last dependency
         if (task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
