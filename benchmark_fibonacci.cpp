@@ -1,7 +1,11 @@
 #define TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
 #include <oneapi/tbb/task_group.h>
 #include <oneapi/tbb/tick_count.h>
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <iostream>
+#include <vector>
 
 using fibonacci_int_type = std::uint64_t;
 
@@ -47,18 +51,54 @@ tbb::task_handle parallel_fibonacci(tbb::task_group& tg, std::size_t n, fibonacc
 }
 
 int main() {
-    std::size_t n = 40;
+    const std::size_t n = 40;
+    const int warmup_runs = 3;
+    const int timed_runs = 15;
+
     fibonacci_int_type result = 0;
 
-    tbb::tick_count start = tbb::tick_count::now();
+    auto run_once = [&] {
+        result = 0;
+        tbb::task_group tg;
+        tg.run_and_wait([&tg, n, &result] {
+            return parallel_fibonacci(tg, n, &result);
+        });
+    };
 
-    tbb::task_group tg;
-    tg.run_and_wait([&tg, n, &result] {
-        return parallel_fibonacci(tg, n, &result);
-    });
+    // Warmup: spin up worker threads and warm caches/allocator so the timed
+    // region does not pay one-time TBB thread-pool startup costs.
+    for (int i = 0; i < warmup_runs; ++i) {
+        run_once();
+    }
 
-    tbb::tick_count finish = tbb::tick_count::now();
+    std::vector<double> samples;
+    samples.reserve(timed_runs);
+    for (int i = 0; i < timed_runs; ++i) {
+        tbb::tick_count start = tbb::tick_count::now();
+        run_once();
+        tbb::tick_count finish = tbb::tick_count::now();
+        samples.push_back((finish - start).seconds());
+    }
+
+    std::sort(samples.begin(), samples.end());
+    const double min_time = samples.front();
+    const double median_time = samples[samples.size() / 2];
+
+    double sum = 0.0;
+    for (double s : samples) sum += s;
+    const double mean_time = sum / samples.size();
+
+    double variance = 0.0;
+    for (double s : samples) variance += (s - mean_time) * (s - mean_time);
+    variance /= samples.size();
+    const double stddev = std::sqrt(variance);
+    const double cv = mean_time > 0.0 ? stddev / mean_time : 0.0;
 
     std::cout << "Nth Fibonacci Number: " << result << std::endl;
-    std::cout << "Elapsed time: " << (finish - start).seconds() << std::endl;
+    std::cout << "runs=" << timed_runs
+              << " min=" << min_time
+              << " median=" << median_time
+              << " mean=" << mean_time
+              << " stddev=" << stddev
+              << " cv=" << cv << std::endl;
 }
