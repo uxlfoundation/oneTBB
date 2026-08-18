@@ -41,7 +41,7 @@ def _read_tbb_version():
             if match:
                 macros[match.group(1)] = match.group(2)
 
-    for (name in ('TBB_VERSION_MAJOR', 'TBB_VERSION_MINOR', 'TBB_VERSION_PATCH')):
+    for name in ('TBB_VERSION_MAJOR', 'TBB_VERSION_MINOR', 'TBB_VERSION_PATCH'):
         if name not in macros:
             raise RuntimeError('Could not find version macro {} in {}'.format(name, VERSION_FILE))
 
