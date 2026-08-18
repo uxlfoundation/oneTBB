@@ -21,6 +21,39 @@ SOURCE_DIR = os.path.dirname(__file__)
 LATEX_DIR = os.path.join(SOURCE_DIR, '_latex')
 PREAMBLE_FILE = os.path.join(LATEX_DIR, 'preamble.tex')
 TITLE_PAGE_FILE = os.path.join(LATEX_DIR, 'title_page.tex')
+VERSION_FILE = os.path.join(SOURCE_DIR, '..', 'include', 'oneapi', 'tbb', 'version.h')
+
+
+def _read_tbb_version():
+    """Extract the oneTBB version from include/oneapi/tbb/version.h.
+
+    Returns a version string TBB_VERSION_MAJOR.TBB_VERSION_MINOR.TBB_VERSION_STRING, e.g. "2023.1.0"
+    """
+    import re
+
+    macros = {}
+    with open(VERSION_FILE, 'r', encoding='utf-8') as version_file:
+        for line in version_file:
+            match = re.match(
+                r'\s*#define\s+(TBB_VERSION_(?:MAJOR|MINOR|PATCH))\s+(\d+)',
+                line,
+            )
+            if match:
+                macros[match.group(1)] = match.group(2)
+
+    for (name in ('TBB_VERSION_MAJOR', 'TBB_VERSION_MINOR', 'TBB_VERSION_PATCH')):
+        if name not in macros:
+            raise RuntimeError('Could not find version macro {} in {}'.format(name, VERSION_FILE))
+
+    major = macros['TBB_VERSION_MAJOR']
+    minor = macros['TBB_VERSION_MINOR']
+    patch = macros['TBB_VERSION_PATCH']
+
+    tbb_version = '{}.{}.{}'.format(major, minor, patch)
+    return tbb_version
+
+
+TBB_VERSION = _read_tbb_version()
 
 BUILD_TYPE = os.getenv("BUILD_TYPE")
 
@@ -39,9 +72,9 @@ copyright = u'UXL Foundation Contributors'
 author = u''
 
 # The short X.Y version
-version = u''
+version = TBB_VERSION
 # The full version, including alpha/beta/rc tags
-release = u''
+release = TBB_VERSION
 
 
 # -- General configuration ---------------------------------------------------
@@ -173,7 +206,7 @@ if BUILD_TYPE == 'oneapi'  or BUILD_TYPE == 'dita':
 else:
     html_js_files = ['custom.js']
 
-html_theme_options["logo"] = {"text": "oneTBB Documentation"}
+html_theme_options["logo"] = {"text": "oneTBB {} Documentation".format(TBB_VERSION)}
     
 html_logo = '_static/oneAPI-rgb-rev-100.png'
 html_favicon = '_static/favicons.png'
