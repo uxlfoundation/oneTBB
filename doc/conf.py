@@ -195,14 +195,8 @@ else:
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
-if BUILD_TYPE == 'oneapi'  or BUILD_TYPE == 'dita':
-    html_context = {
-        'css_files': [
-            '_static/theme_overrides.css',  # override wide tables in RTD theme
-        ],
-    }
-else:
-    html_js_files = ['custom.js']
+html_css_files = ['theme_overrides.css']
+html_js_files = ['custom.js']
 
 html_theme_options["logo"] = {"text": "oneTBB {} Documentation".format(TBB_VERSION)}
     
