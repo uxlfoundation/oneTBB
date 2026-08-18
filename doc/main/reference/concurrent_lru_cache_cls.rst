@@ -1,7 +1,7 @@
 .. _concurrent_lru_cache:
 
-concurrent_lru_cache
-====================
+concurrent_lru_cache (preview)
+==============================
 
 .. note::
    To enable this feature, define the ``TBB_PREVIEW_CONCURRENT_LRU_CACHE`` macro to 1.

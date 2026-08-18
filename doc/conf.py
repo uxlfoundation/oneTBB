@@ -23,7 +23,6 @@ PREAMBLE_FILE = os.path.join(LATEX_DIR, 'preamble.tex')
 TITLE_PAGE_FILE = os.path.join(LATEX_DIR, 'title_page.tex')
 VERSION_FILE = os.path.join(SOURCE_DIR, '..', 'include', 'oneapi', 'tbb', 'version.h')
 
-
 def _read_tbb_version():
     """Extract the oneTBB version from include/oneapi/tbb/version.h.
 
@@ -51,7 +50,6 @@ def _read_tbb_version():
 
     tbb_version = '{}.{}.{}'.format(major, minor, patch)
     return tbb_version
-
 
 TBB_VERSION = _read_tbb_version()
 
