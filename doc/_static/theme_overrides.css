@@ -11,3 +11,13 @@
       overflow: visible !important;
    }
 }
+
+.bd-sidebar-primary .toc-label-highlight {
+   color: #d97706 !important;
+   font-weight: 600;
+}
+
+.bd-sidebar-primary a:hover .toc-label-highlight,
+.bd-sidebar-primary a:focus .toc-label-highlight {
+   color: #b45309 !important;
+}
