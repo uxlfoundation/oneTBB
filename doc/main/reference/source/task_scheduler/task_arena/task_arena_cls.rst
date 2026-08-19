@@ -53,13 +53,13 @@ A class that represents an explicit, user-managed task scheduler arena.
                 };
 
                 task_arena(int max_concurrency = automatic, unsigned reserved_slots = 1,
-                           priority a_priority = priority::normal,
-                           leave_policy a_leave_policy = leave_policy::automatic // Preview feature: parallel_phase Interface
-                           );
+                    priority a_priority = priority::normal,
+                    leave_policy a_leave_policy = leave_policy::automatic // Preview feature: parallel_phase Interface
+                );
                 task_arena(const constraints& constraints_, unsigned reserved_slots = 1,
-                           priority a_priority = priority::normal,
-                           leave_policy a_leave_policy = leave_policy::automatic // Preview feature: parallel_phase Interface
-                           );
+                    priority a_priority = priority::normal,
+                    leave_policy a_leave_policy = leave_policy::automatic // Preview feature: parallel_phase Interface
+                );
                 task_arena(const task_arena &s);
                 explicit task_arena(oneapi::tbb::attach);
                 ~task_arena();
@@ -67,18 +67,18 @@ A class that represents an explicit, user-managed task scheduler arena.
                 // Preview feature: Core Type Selectors
                 template <typename Selector>
                 task_arena(const constraints& constraints_, Selector a_selector,
-                           unsigned reserved_slots = 1,
-                           priority a_priority = priority::normal);
+                    unsigned reserved_slots = 1,
+                    priority a_priority = priority::normal);
 
                 void initialize();
                 void initialize(int max_concurrency, unsigned reserved_slots = 1,
-                                priority a_priority = priority::normal,
-                                leave_policy a_leave_policy = leave_policy::automatic // Preview feature: parallel_phase Interface
-                                );
+                    priority a_priority = priority::normal,
+                    leave_policy a_leave_policy = leave_policy::automatic // Preview feature: parallel_phase Interface
+                );
                 void initialize(const constraints& constraints_, unsigned reserved_slots = 1,
-                                priority a_priority = priority::normal,
-                                leave_policy a_leave_policy = leave_policy::automatic // Preview feature: parallel_phase Interface
-                                );
+                    priority a_priority = priority::normal,
+                    leave_policy a_leave_policy = leave_policy::automatic // Preview feature: parallel_phase Interface
+                );
                 void initialize(oneapi::tbb::attach);
 
                 // Preview feature: Core Type Selectors

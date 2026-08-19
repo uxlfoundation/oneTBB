@@ -35,7 +35,7 @@ Unordered associative containers
     :maxdepth: 1
 
     containers/concurrent_hash_map_cls.rst
-    containers/custom_mutex_chmap.rst
+    Customizing the Mutex Type for concurrent_hash_map (preview) <containers/custom_mutex_chmap.rst>
     containers/concurrent_unordered_map_cls.rst
     containers/concurrent_unordered_multimap.rst
     containers/concurrent_unordered_set_cls.rst
