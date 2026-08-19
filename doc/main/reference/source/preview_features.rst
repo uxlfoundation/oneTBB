@@ -62,7 +62,7 @@ Containers
 .. toctree::
     :titlesonly:
 
-    containers/custom_mutex_type_chmap.rst
+    containers/custom_mutex_chmap.rst
 
 Memory Allocation
 -----------------

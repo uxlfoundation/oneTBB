@@ -3,16 +3,14 @@
 ..
 .. SPDX-License-Identifier: CC-BY-4.0
 
-==============================================
-oneAPI Threading Building Blocks API Reference
-==============================================
+==========================
+|short_name| API Reference
+==========================
 
 .. toctree::
    :maxdepth: 2
    :caption: General Information:
 
-   intro.rst
-   notation.rst
    identifiers.rst
    thread_safety.rst
    headers_and_modules.rst

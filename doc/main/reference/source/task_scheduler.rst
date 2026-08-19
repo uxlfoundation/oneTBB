@@ -51,7 +51,7 @@ Task Group
    task_scheduler/task_group/task_completion_handle.rst
    task_scheduler/task_group/task_bypass.rst
    task_scheduler/task_group/dynamic_dependencies.rst
-   task_scheduler/task_group/waiting_single_task.rst
+   task_scheduler/task_group/wait_single_task.rst
 
 Task Arena
 ----------

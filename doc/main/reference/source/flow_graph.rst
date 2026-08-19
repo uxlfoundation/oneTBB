@@ -157,7 +157,7 @@ Helper Functions for Expressing Graphs (preview)
 .. toctree::
     :maxdepth: 2
 
-    flow_graph/helper_functions_for_expressing_graphs.rst
+    flow_graph/helpers_for_expressing_graphs.rst
 
 Waiting for Single Messages in Flow Graph (preview)
 ---------------------------------------------------
