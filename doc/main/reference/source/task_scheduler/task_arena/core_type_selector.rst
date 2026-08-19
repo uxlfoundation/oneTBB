@@ -1,8 +1,8 @@
 .. _core_type_selector:
 
-=======================================================
-Core Type Selector for Task Arena Constraints (preview)
-=======================================================
+=============================================
+Core Type Selector for Task Arena Constraints
+=============================================
 **[scheduler.task_arena.core_type_selector]**
 
 .. note::

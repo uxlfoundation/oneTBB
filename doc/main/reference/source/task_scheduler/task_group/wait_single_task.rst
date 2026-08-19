@@ -1,8 +1,8 @@
 .. _wait_single_task:
 
-========================================================
-Waiting for Individual Tasks in ``task_group`` (preview)
-========================================================
+==============================================
+Waiting for Individual Tasks in ``task_group``
+==============================================
 **[scheduler.task_group.wait_individual_tasks]**
 
 .. note::

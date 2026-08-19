@@ -1,8 +1,8 @@
 .. _constructors_for_fg_nodes:
 
-===========================================
-Constructors for Flow Graph nodes (preview)
-===========================================
+=================================
+Constructors for Flow Graph nodes
+=================================
 **[flow_graph.helper_functions.constructors]**
 
 .. note::

@@ -1,8 +1,8 @@
 .. _task_completion_handle_cls:
 
-==========================================
-``task_completion_handle`` Class (preview)
-==========================================
+================================
+``task_completion_handle`` Class
+================================
 **[scheduler.task_handle]**
 
 .. note::

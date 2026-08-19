@@ -1,8 +1,8 @@
 .. _concurrent_lru_cache:
 
-==============================
-concurrent_lru_cache (preview)
-==============================
+====================
+concurrent_lru_cache
+====================
 **[containers.concurrent_lru_cache]**
 
 .. note::

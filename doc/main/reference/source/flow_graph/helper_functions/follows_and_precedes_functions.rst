@@ -1,8 +1,8 @@
 .. _follows_precedes:
 
-================================================
-``follows`` and ``precedes`` functions (preview)
-================================================
+======================================
+``follows`` and ``precedes`` functions
+======================================
 **[flow_graph.helper_functions.follows_and_precedes]**
 
 .. note::

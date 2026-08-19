@@ -1,8 +1,8 @@
 .. _make_node_set:
 
-====================================
-``make_node_set`` function (preview)
-====================================
+==========================
+``make_node_set`` function
+==========================
 **[flow_graph.helper_functions.make_node_set]**
 
 .. note::

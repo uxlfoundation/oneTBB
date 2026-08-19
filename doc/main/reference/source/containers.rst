@@ -52,13 +52,13 @@ Ordered associative containers
     containers/concurrent_set_cls.rst
     containers/concurrent_multiset_cls.rst
 
-LRU cache (preview)
--------------------
+LRU cache
+---------
 
 .. toctree::
     :maxdepth: 1
 
-    containers/concurrent_lru_cache.rst
+    concurrent_lru_cache (preview) <containers/concurrent_lru_cache>
 
 Auxiliary classes
 -----------------

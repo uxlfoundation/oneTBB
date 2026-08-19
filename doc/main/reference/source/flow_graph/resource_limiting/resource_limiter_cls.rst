@@ -1,8 +1,8 @@
 .. _resource_limiter_cls:
 
-====================================
-``resource_limiter`` Class (preview)
-====================================
+==========================
+``resource_limiter`` Class
+==========================
 **[flow_graph.resource_limiter]**
 
 .. note::

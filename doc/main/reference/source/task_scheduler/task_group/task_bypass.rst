@@ -1,8 +1,8 @@
 .. _task_bypass_support:
 
-================================================
-Task Bypass Support for ``task_group`` (preview)
-================================================
+======================================
+Task Bypass Support for ``task_group``
+======================================
 **[scheduler.task_group.task_bypass]**
 
 .. note::

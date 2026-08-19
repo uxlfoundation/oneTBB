@@ -1,8 +1,8 @@
 .. _parallel_phase_for_task_arena:
 
-=====================================================
-``parallel_phase`` Interface for Task Arena (preview)
-=====================================================
+===========================================
+``parallel_phase`` Interface for Task Arena
+===========================================
 **[scheduler.task_arena.parallel_phase]**
 
 .. note::

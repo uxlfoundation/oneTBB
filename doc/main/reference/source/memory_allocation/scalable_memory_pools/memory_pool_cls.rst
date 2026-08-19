@@ -1,8 +1,8 @@
 .. _memory_pool_cls:
 
-=====================
-memory_pool (preview)
-=====================
+===========
+memory_pool
+===========
 **[memory_allocation.memory_pools.memory_pool]**
 
 .. note::

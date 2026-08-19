@@ -1,8 +1,8 @@
 .. _custom_mutex_chmap:
 
-============================================================
-Customizing the Mutex Type for concurrent_hash_map (preview)
-============================================================
+==================================================
+Customizing the Mutex Type for concurrent_hash_map
+==================================================
 **[containers.concurrent_hash_map.custom_mutex]**
 
 .. note::

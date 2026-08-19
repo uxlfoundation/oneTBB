@@ -45,15 +45,15 @@ Library Functions
     :titlesonly:
 
     memory_allocation/c_interface_to_scalable_allocator.rst
-    memory_allocation/numa_interleaved_allocation.rst
+    Allocate Memory Interleaved between NUMA Nodes (preview) <memory_allocation/numa_interleaved_allocation>
 
-Scalable Memory Pools (preview)
--------------------------------
+Scalable Memory Pools
+---------------------
 
 .. toctree::
     :titlesonly:
 
-    memory_allocation/scalable_memory_pools.rst
+    Scalable Memory Pools (preview) <memory_allocation/scalable_memory_pools>
 
 Automatic Dynamic Memory Interface Replacement
 ----------------------------------------------

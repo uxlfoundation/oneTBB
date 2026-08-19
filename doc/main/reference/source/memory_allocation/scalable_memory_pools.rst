@@ -1,8 +1,8 @@
 .. _scalable_memory_pools_reference:
 
-===============================
-Scalable Memory Pools (preview)
-===============================
+=====================
+Scalable Memory Pools
+=====================
 **[memory_allocation.memory_pools]**
 
 .. note::

@@ -1,8 +1,8 @@
 .. _class_join_node_extension:
 
-===================================================
-Type-specified message keys for join_node (preview)
-===================================================
+=========================================
+Type-specified message keys for join_node
+=========================================
 **[flow_graph.join_node.type_specified_message_keys]**
 
 .. note::

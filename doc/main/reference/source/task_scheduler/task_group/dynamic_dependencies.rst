@@ -1,8 +1,8 @@
 .. _dynamic_dependencies:
 
-=============================================
-``task_group`` Dynamic Dependencies (preview)
-=============================================
+===================================
+``task_group`` Dynamic Dependencies
+===================================
 **[scheduler.task_group.dynamic_dependencies]**
 
 .. note::

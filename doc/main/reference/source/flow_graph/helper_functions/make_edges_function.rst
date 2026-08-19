@@ -1,8 +1,8 @@
 .. _make_edges:
 
-=================================
-``make_edges`` function (preview)
-=================================
+=======================
+``make_edges`` function
+=======================
 **[flow_graph.helper_functions.make_edges]**
 
 .. note::

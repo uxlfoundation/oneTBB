@@ -1,8 +1,8 @@
 .. _numa_interleaved_allocation:
 
-========================================================
-Allocate Memory Interleaved between NUMA Nodes (preview)
-========================================================
+==============================================
+Allocate Memory Interleaved between NUMA Nodes
+==============================================
 **[memory_allocation.numa_interleaved_allocation]**
 
 .. note::

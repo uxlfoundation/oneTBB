@@ -1,8 +1,8 @@
 .. _helpers_for_expressing_graphs:
 
-================================================
-Helper Functions for Expressing Graphs (preview)
-================================================
+======================================
+Helper Functions for Expressing Graphs
+======================================
 **[flow_graph.helper_functions]**
 
 .. note::

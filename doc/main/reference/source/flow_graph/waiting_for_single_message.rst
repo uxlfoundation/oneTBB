@@ -1,8 +1,8 @@
 .. _try_put_and_wait:
 
-===================================================
-Waiting for Single Messages in Flow Graph (preview)
-===================================================
+=========================================
+Waiting for Single Messages in Flow Graph
+=========================================
 **[flow_graph.wait_for_single_message]**
 
 .. note::

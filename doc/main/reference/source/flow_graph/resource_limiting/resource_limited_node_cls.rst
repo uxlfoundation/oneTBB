@@ -1,8 +1,8 @@
 .. _resource_limited_node_cls:
 
-=========================================
-``resource_limited_node`` Class (preview)
-=========================================
+===============================
+``resource_limited_node`` Class
+===============================
 **[flow_graph.resource_limited_node]**
 
 .. note::

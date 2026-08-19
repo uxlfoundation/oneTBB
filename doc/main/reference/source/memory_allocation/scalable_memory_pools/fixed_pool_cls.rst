@@ -1,8 +1,8 @@
 .. _fixed_pool_cls:
 
-====================
-fixed_pool (preview)
-====================
+==========
+fixed_pool
+==========
 **[memory_allocation.memory_pools.fixed_pool]**
 
 .. note::

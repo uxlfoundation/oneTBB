@@ -48,10 +48,10 @@ Task Group
    task_scheduler/task_group/task_group_cls.rst
    task_scheduler/task_group/task_group_status_enum.rst
    task_scheduler/task_group/task_handle.rst
-   task_scheduler/task_group/task_completion_handle.rst
-   task_scheduler/task_group/task_bypass.rst
-   task_scheduler/task_group/dynamic_dependencies.rst
-   task_scheduler/task_group/wait_single_task.rst
+   task_completion_handle Class (preview) <task_scheduler/task_group/task_completion_handle>
+   Task Bypass Support for task_group (preview) <task_scheduler/task_group/task_bypass>
+   task_group Dynamic Dependencies (preview) <task_scheduler/task_group/dynamic_dependencies>
+   Waiting for Individual Tasks in task_group (preview) <task_scheduler/task_group/wait_single_task>
 
 Task Arena
 ----------
@@ -62,8 +62,8 @@ Task Arena
    task_scheduler/task_arena/task_arena_cls.rst
    task_scheduler/task_arena/this_task_arena_ns.rst
    task_scheduler/task_arena/task_scheduler_observer_cls.rst
-   task_scheduler/task_arena/parallel_phase.rst
-   task_scheduler/task_arena/core_type_selector.rst
+   parallel_phase Interface for Task Arena (preview) <task_scheduler/task_arena/parallel_phase>
+   Core Type Selector for Task Arena Constraints (preview) <task_scheduler/task_arena/core_type_selector>
 
 Helper types
 ------------
