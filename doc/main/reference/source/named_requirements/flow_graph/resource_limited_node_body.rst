@@ -1,8 +1,8 @@
 .. _resource_limited_node_body_named_requirement:
 
-===========================
-``ResourceLimitedNodeBody``
-===========================
+=======================
+ResourceLimitedNodeBody
+=======================
 **[req.resource_limited_node_body]**
 
 .. note::
