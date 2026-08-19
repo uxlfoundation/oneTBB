@@ -72,5 +72,5 @@ lookup and used in place of the default implementation.
 
 .. rubtic:: See Also
 
-:ref:`join_node Specification<flow_graph/join_node_cls>`
+:ref:`join_node Specification<join_node_cls>`
 

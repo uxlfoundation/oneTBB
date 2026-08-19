@@ -3,7 +3,7 @@
 ===============================
 ``resource_limited_node`` Class
 ===============================
-**[flow_graph.resource_limited_node]**
+**[flow_graph.resource_limiting.resource_limited_node]**
 
 .. note::
    To enable this :ref:`preview feature<preview_features>`, define the

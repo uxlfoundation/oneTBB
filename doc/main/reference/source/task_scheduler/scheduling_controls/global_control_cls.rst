@@ -94,6 +94,6 @@ See also:
 Preview Features
 ----------------
 
-:ref:`parallel_phase Interface<parallel_phase>` - extends ``global_control``
+:ref:`parallel_phase Interface<parallel_phase_for_task_arena>` - extends ``global_control``
 with the API to provide the application-wide control over the ``leave_policy``
 of ``task_arena``.

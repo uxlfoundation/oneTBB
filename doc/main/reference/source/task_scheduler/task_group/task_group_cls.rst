@@ -2,6 +2,8 @@
 ..
 .. SPDX-License-Identifier: CC-BY-4.0
 
+.. _task_group_cls:
+
 ==========
 task_group
 ==========
@@ -145,7 +147,7 @@ Preview Features
 
 The following :ref:`preview features<preview_features>` extend the ``task_group`` API:
 
-* :ref:`Task Bypass Support<task_bypass>` - allows returning a ``task_handle`` from a task body as
+* :ref:`Task Bypass Support<task_bypass_support>` - allows returning a ``task_handle`` from a task body as
   a hint on which task should be executed next.
 * :ref:`Dynamic Dependencies<dynamic_dependencies>` - allows setting execution dependencies between tasks in
   ``task_group``.

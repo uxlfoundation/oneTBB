@@ -37,7 +37,7 @@ Type requirements
 -----------------
 
 The type of the mutex passed as a template argument for ``concurrent_hash_map`` should
-meet the requirements of :ref:`ReaderWriterMutex<named_requirements/mutexes/rw_mutex>`.
+meet the requirements of :ref:`ReaderWriterMutex<rw_mutex>`.
 
 It should also provide the following API:
 

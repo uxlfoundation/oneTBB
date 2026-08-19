@@ -2,6 +2,8 @@
 ..
 .. SPDX-License-Identifier: CC-BY-4.0
 
+.. _join_node_cls:
+
 =========
 join_node
 =========
@@ -192,7 +194,7 @@ Preview Features
 
 The following :ref:`preview features<preview_features>` extend the ``join_node`` API:
 
-* :ref:`Type-Specified Message Keys<type_specified_message_keys>` - allows the
+* :ref:`Type-Specified Message Keys<class_join_node_extension>` - allows the
   ``key_matching`` specialization to obtain keys via type-associated functions instead
   of explicit key extractor function objects.
 * :ref:`Helper Functions for Expressing Graphs<helpers_for_expressing_graphs>` - allows ``join_node``

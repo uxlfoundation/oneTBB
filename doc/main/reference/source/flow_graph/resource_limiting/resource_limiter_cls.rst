@@ -3,7 +3,7 @@
 ==========================
 ``resource_limiter`` Class
 ==========================
-**[flow_graph.resource_limiter]**
+**[flow_graph.resource_limiting.resource_limiter]**
 
 .. note::
    To enable this :ref:`preview feature<preview_features>`, define the

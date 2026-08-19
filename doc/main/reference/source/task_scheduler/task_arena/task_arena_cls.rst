@@ -3,6 +3,8 @@
 ..
 .. SPDX-License-Identifier: CC-BY-4.0
 
+.. _task_arena_cls:
+
 ==========
 task_arena
 ==========
@@ -398,11 +400,11 @@ Preview Features
 
 The following :ref:`preview features<preview_features>` extend the ``task_arena`` API:
 
-* :ref:`parallel_phase Interface<parallel_phase>` - extends ``task_arena`` with the API to set
+* :ref:`parallel_phase Interface<parallel_phase_for_task_arena>` - extends ``task_arena`` with the API to set
   explicit thread ``leave_policy`` and to provide a hint where the parallel region starts and ends.
 * :ref:`Core Type Selectors<core_type_selector>` - allows to set scores for preferred core types
   while creating or initializing the ``task_arena``.
-* :ref:`Waiting for Individual Tasks in task_group<../task_group/wait_single_task>` - allows waiting for an individual task to complete
+* :ref:`Waiting for Individual Tasks in task_group<wait_single_task>` - allows waiting for an individual task to complete
   in ``task_group``.
 
 Example

@@ -110,5 +110,5 @@ Preview Features
 
 The following :ref:`preview features<preview_features>` extend the ``this_task_arena`` API:
 
-* :ref:`parallel_phase Interface<parallel_phase>` - extends ``this_task_arena`` with the API to
+* :ref:`parallel_phase Interface<parallel_phase_for_task_arena>` - extends ``this_task_arena`` with the API to
   provide a hint where the parallel region starts and ends.
