@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -310,9 +311,13 @@ int main()
 
                         ASSERT(0, "Hang after fork");
                     }
-                    // clean pending signals (if any occurs since sigwait)
+                    // clean pending signals (if any occurs since
+                    // sigwait).  Should be at most one SIGALRM and
+                    // one SIGCHILD, so 5 iterations should be more
+                    // than enough
                     sigset_t p_mask;
-                    for (;;) {
+                    int loop = 0;
+                    for (; loop < 5; loop++) {
                         sigemptyset(&p_mask);
                         sigpending(&p_mask);
                         if (sigismember(&p_mask, SIGALRM)
@@ -321,7 +326,10 @@ int main()
                                 ASSERT(0, "sigwait failed");
                         } else
                             break;
+                        sleep(1);
                     }
+                    if (5 == loop)
+                        ASSERT(0, "sigpending never emptied");
                 }
             }
 #endif // _WIN32||_WIN64
