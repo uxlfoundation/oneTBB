@@ -315,7 +315,9 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
 
     // Infinite exception loop
     for (;;) {
+#if TBB_USE_EXCEPTIONS
         try {
+#endif
             // Main execution loop
             do {
                 // We assume that bypass tasks are from the same task group.
@@ -382,6 +384,7 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
                 );
             } while (t != nullptr); // main dispatch loop
             break; // Exit exception loop;
+#if TBB_USE_EXCEPTIONS
         } catch (...) {
             if (global_control::active_value(global_control::terminate_on_exception) == 1) {
                 do_throw_noexcept([] { throw; });
@@ -397,6 +400,7 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
                 }
             }
         }
+#endif /* TBB_USE_EXCEPTIONS */
     } // Infinite exception loop
     __TBB_ASSERT(t == nullptr, nullptr);
 
