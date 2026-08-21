@@ -212,12 +212,12 @@ TEST_CASE("only calls once - move only argument") {
 TEST_CASE("only calls once - stress test") {
 #if TBB_TEST_LOW_WORKLOAD
     constexpr std::size_t N = 32;
-#elif __TBB_x86_32 || __arm__  || __ANDROID__
+#elif SIZE_MAX <= 4294967295 // 32-bit targets
     // Some C++ implementations allocate 8MB stacks for std::thread on 32 bit platforms
     // that makes impossible to create more than ~500 threads.
     // Android has been added to decrease testing time.
     constexpr std::size_t N = tbb::detail::d0::max_nfs_size * 2;
-#elif __TBB_USE_THREAD_SANITIZER
+#elif __TBB_USE_THREAD_SANITIZER // 64-bit targets
     // Reduce execution time under Thread Sanitizer
     constexpr std::size_t N = tbb::detail::d0::max_nfs_size + 64;
 #else 
@@ -286,12 +286,12 @@ TEST_CASE("handles exceptions - state reset") {
 TEST_CASE("handles exceptions - stress test") {
 #if TBB_TEST_LOW_WORKLOAD
     constexpr std::size_t N = 32;
-#elif __TBB_x86_32 || __arm__ || __ANDROID__
+#elif SIZE_MAX <= 4294967295 // 32-bit targets
     // Some C++ implementations allocate 8MB stacks for std::thread on 32 bit platforms
     // that makes impossible to create more than ~500 threads.
     // Android has been added to decrease testing time.
     constexpr std::size_t N = tbb::detail::d0::max_nfs_size * 2;
-#else 
+#else // 64-bit targets
     constexpr std::size_t N = tbb::detail::d0::max_nfs_size * 4;
 #endif
 
