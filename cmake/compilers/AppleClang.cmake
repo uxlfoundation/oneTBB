@@ -38,7 +38,18 @@ else()
     set(_tbb_target_architectures "${CMAKE_SYSTEM_PROCESSOR}")
 endif()
 if ("${_tbb_target_architectures}" MATCHES "(x86_64|amd64|AMD64)") # OSX systems are 64-bit only
-    set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} -mrtm $<$<NOT:$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},12.0>>:-mwaitpkg>)
+    if(CMAKE_GENERATOR STREQUAL "Xcode")
+        # Note: Must be a string with whitespaces, because it gets passed to
+        # the .pbxproj file directly.
+        # These flags need to be set on a per-target basis (see the relevant
+        # CMakeLists.txt).
+        set(TBB_X86_XCODE_COMPILE_FLAGS "-mrtm $<$<NOT:$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},12.0>>:-mwaitpkg>")
+    else()
+        # Can be inserted directly, generators other than Xcode have a single
+        # compiler invocation and silently ignore flags that do not apply to
+        # the target architecture
+        set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} -mrtm $<$<NOT:$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},12.0>>:-mwaitpkg>)
+    endif()
 endif()
 unset(_tbb_target_architectures)
 
