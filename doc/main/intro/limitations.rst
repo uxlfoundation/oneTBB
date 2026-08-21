@@ -6,7 +6,7 @@ Known Limitations
 This page outlines the known limitations of oneTBB to help you better understand its capabilities. 
 
 Debug TBB In The SYCL Program
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Limitation:** The application may crash when using the Debug version of oneTBB in a SYCL program compiled with Intel(R) oneAPI DPC++/C++ Compiler. This happens because both ``tbb`` (Release version) and ``tbb_debug`` (Debug version) libraries load simultaneously, causing conflicts.
 
@@ -14,6 +14,15 @@ Debug TBB In The SYCL Program
 
 * Link the application with the Release version ``tbb`` instead of ``tbb_debug``.
 * Use the ``qtbb`` flag provided by the Intel(R) oneAPI DPC++/C++ Compiler.
+
+Static Linking Possible But Not Recommended
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Limitation:** Building and using oneTBB as a static library reduces the benefits of the shared thread pool and limits library functionality.
+
+**Risks:** See :ref:`Static Linking of oneTBB <static_linking>` for why the shared library is the preferred form, which features are unavailable in a static library, and the risks of having more than one copy of oneTBB in a process.
+
+**Solution**: Prefer the shared library. If a static library is required, follow :ref:`Recommendations If You Must Link Statically <static_linking_recommendations>` and see `Building oneTBB as a Static Library <https://github.com/uxlfoundation/oneTBB/blob/master/cmake/README.md#building-onetbb-as-a-static-library>`_ for build instructions.
 
 Freestanding Compilation Mode
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
