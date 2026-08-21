@@ -51,9 +51,13 @@ public:
     template <typename CombineFunc>
     T combine(CombineFunc f_combine) { return my_ets.combine(f_combine); }
 
-    // combine_func_t has signature void(T) or void(const T&)
+    // combine_func_t has signature void(T)
     template <typename CombineFunc>
     void combine_each(CombineFunc f_combine) { my_ets.combine_each(f_combine); }
+
+    // combine_func_t has signature void(const T&)
+    template <typename CombineFunc>
+    void combine_each(CombineFunc f_combine) const { my_ets.combine_each(f_combine); }
 };
 
 } // namespace d1
