@@ -2253,6 +2253,27 @@ TEST_CASE("Test enqueue guarantees when task_arena is combined with task_group")
 
 #endif // TBB_USE_EXCEPTIONS
 
+//! \brief \ref regression
+TEST_CASE("FIFO task enqueued during local_wait_for_all is consumed in single-slot arena") {
+    tbb::task_arena ta{1, 0};
+    tbb::task_group outer;
+    std::atomic<bool> inner_ran{false};
+
+    ta.enqueue([&] {
+        tbb::task_group inner;
+
+        ta.enqueue([&] {
+            inner_ran.store(true, std::memory_order_release);
+        }, inner);
+
+        inner.wait();
+    }, outer);
+
+    ta.wait_for(outer);
+
+    REQUIRE(inner_ran.load(std::memory_order_acquire));
+}
+
 #if __TBB_CPP17_PRESENT
 //! \brief \ref regression
 TEST_CASE("ODR-use task_arena constants") {
