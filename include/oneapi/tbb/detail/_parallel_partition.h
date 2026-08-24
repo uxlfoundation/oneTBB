@@ -84,21 +84,23 @@ class parallel_partition_body {
         }
     }
 
-    RandomAccessIterator move_right(RandomAccessIterator first, RandomAccessIterator last,
-                                    RandomAccessIterator target_region_end) {
-        difference_type block_size = last - first;
-        difference_type gap = target_region_end - last;
+    // Swap as many elements as possible and returns how many elements were swapped
+    difference_type partial_swap(RandomAccessIterator false_begin, RandomAccessIterator false_end,
+                                 RandomAccessIterator true_begin, RandomAccessIterator true_end) {
+        difference_type false_size = false_end - false_begin;
+        difference_type true_size = true_end - true_begin;
+        difference_type swap_size = std::min(false_size, true_size);
 
-        RandomAccessIterator result;
+        parallel_swap_ranges(false_begin, false_begin + swap_size, /*target_begin = */true_end - swap_size);
+        return swap_size;
+    }
 
-        if (block_size <= gap) {
-            result = target_region_end - block_size;
-            parallel_swap_ranges(first, last, result);
-        } else {
-            result = first + gap;
-            parallel_swap_ranges(first, result, last);
-        }
-        return result;
+    RandomAccessIterator flip_partition(RandomAccessIterator false_begin,
+                                        RandomAccessIterator false_end, // == true_begin
+                                        RandomAccessIterator true_end) {
+        partial_swap(false_begin, false_end, false_end, true_end);
+        // Returns the new partition point
+        return true_end - (false_end - false_begin);
     }
 
     void assign_chunks_and_leftovers(RandomAccessIterator real_chunk_begin, RandomAccessIterator real_chunk_end,
@@ -152,22 +154,24 @@ public:
         // Partition the pair of chunks
         RandomAccessIterator left = real_chunk_begin;
         RandomAccessIterator right = mirror_chunk_end;
+        bool both_valid = false;
 
-        while (true) {
+        do {
             while (left != real_chunk_end && m_pred(*left))
                 ++left;
             while (right != mirror_chunk_begin && !m_pred(*(right - 1)))
                 --right;
 
-            if (left != real_chunk_end && right != mirror_chunk_begin) {
+            both_valid = left != real_chunk_end && right != mirror_chunk_begin;
+
+            if (both_valid) {
                 std::iter_swap(left, std::prev(right));
                 ++left;
                 --right;
-            } else {
-                break;
             }
-        } // while (true)
+        } while (both_valid);
 
+        // Partition the remainder and calculate leftover boundaries
         RandomAccessIterator false_leftover = real_chunk_end;
         RandomAccessIterator true_leftover = mirror_chunk_begin;
 
@@ -203,71 +207,36 @@ public:
 
         if (has_false_leftover()) {
             __TBB_ASSERT(!has_true_leftover(), "Broken MRP algorithm invariant");
-            if (src.has_false_leftover()) {
-                __TBB_ASSERT(!src.has_true_leftover(), "Broken MRP algorithm invariant");
-
-                // Two false leftovers in the real side
-                // Move *this false leftover closer to the middle
-                false_leftover = move_right(m_false_leftover, m_real_chunk_end,
-                                            /*target_region_end = */src.m_false_leftover);
-            } else {
-                // False leftover in *this, true leftover (or none) in src
-                difference_type false_leftover_size = m_real_chunk_end - m_false_leftover;
-                difference_type true_leftover_size = src.m_true_leftover - src.m_mirror_chunk_begin;
-
-                if (false_leftover_size <= true_leftover_size) {
-                    // False leftover is smaller and will be consumed by the swap
-                    // Remaining true leftover (if any) is already in place
-                    true_leftover = src.m_true_leftover - false_leftover_size;
-                    parallel_swap_ranges(m_false_leftover, m_real_chunk_end, true_leftover);
-                } else {
-                    // True leftover is smaller and will be consumed by the swap
-                    RandomAccessIterator swap_end = m_false_leftover + true_leftover_size;
-                    parallel_swap_ranges(m_false_leftover, swap_end, src.m_mirror_chunk_begin);
-
-                    true_leftover = m_mirror_chunk_begin;
-
-                    // Move the remaining part of the false leftover closer to the middle
-                    false_leftover = move_right(swap_end, m_real_chunk_end,
-                                                /*target_region_end = */src.m_real_chunk_end);
-                }
-            }
-        } else if (has_true_leftover()) {
             if (src.has_true_leftover()) {
                 __TBB_ASSERT(!src.has_false_leftover(), "Broken MRP algorithm invariant");
-
-                // Two true leftovers in the mirror side
-                // Move this range's true leftover closer to the middle
-                true_leftover = move_right(src.m_true_leftover, m_mirror_chunk_begin,
-                                        /*target_region_end = */m_true_leftover);
-            } else {
-                // True leftover in *this, false leftover (or none) in src
-                difference_type false_leftover_size = src.m_real_chunk_end - src.m_false_leftover;
-                difference_type true_leftover_size = m_true_leftover - m_mirror_chunk_begin;
-
-                if (true_leftover_size <= false_leftover_size) {
-                    // True leftover is smaller and will be consumed by the swap
-                    // Remaining false leftover (if any) is already in place
-                    false_leftover = src.m_false_leftover + true_leftover_size;
-                    parallel_swap_ranges(src.m_false_leftover, false_leftover, m_mirror_chunk_begin);
-                } else {
-                    // False leftover is smaller and will be consumed by swap
-                    RandomAccessIterator swap_begin = m_true_leftover - false_leftover_size;
-                    parallel_swap_ranges(src.m_false_leftover, src.m_real_chunk_end, swap_begin);
-
-                    false_leftover = src.m_real_chunk_end;
-
-                    // Move remaining part of the true leftover closer to the middle
-                    true_leftover = move_right(src.m_mirror_chunk_begin, m_mirror_chunk_begin,
-                                               /*target_region_end = */swap_begin);
-                }
+                // Opposite-side leftovers: swap as many elements as possible
+                difference_type swap_size = partial_swap(m_false_leftover, m_real_chunk_end,
+                                                         src.m_mirror_chunk_begin, src.m_true_leftover);
+                m_false_leftover += swap_size;
+                true_leftover = src.m_true_leftover - swap_size;
             }
+
+            // Move the remaining false leftover toward the src false leftover that is adjacent to the middle
+            false_leftover = flip_partition(m_false_leftover, m_real_chunk_end, src.m_false_leftover);
+        } else {
+            if (src.has_false_leftover()) {
+                __TBB_ASSERT(!src.has_true_leftover(), "Broken MRP algorithm invariant");
+                // Opposite-side leftovers: swap as many elements as possible
+                difference_type swap_size = partial_swap(src.m_false_leftover, src.m_real_chunk_end,
+                                                         m_mirror_chunk_begin, m_true_leftover);
+                m_true_leftover -= swap_size;
+                false_leftover = src.m_false_leftover + swap_size;
+            }
+
+            // Move the remaining true leftover toward the src true leftover that is adjacent to the middle
+            true_leftover = flip_partition(src.m_true_leftover, m_mirror_chunk_begin, m_true_leftover);
         }
 
         m_real_chunk_end = src.m_real_chunk_end;
         m_mirror_chunk_begin = src.m_mirror_chunk_begin;
         m_false_leftover = false_leftover;
         m_true_leftover = true_leftover;
+        __TBB_ASSERT(!(has_true_leftover() && has_false_leftover()), "Broken MRP algorithm invariant");
     }
 };
 
@@ -284,13 +253,12 @@ RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccess
     }
 
     parallel_partition_body<RandomAccessIterator, Predicate> body(first, last, pred, ctx);
-    difference_type mid = n / 2;
-
-    parallel_reduce(blocked_range<RandomAccessIterator>(first, first + mid), body, ctx);
+    parallel_reduce(blocked_range<RandomAccessIterator>(first, first + n / 2), body, ctx);
 
     __TBB_ASSERT(!(body.has_true_leftover() && body.has_false_leftover()),
                  "At most one leftover can remain after the reduction phase");
 
+    // The partition point is the start of the surviving leftover
     return body.has_true_leftover() ? body.get_true_leftover() : body.get_false_leftover();
 }
 
