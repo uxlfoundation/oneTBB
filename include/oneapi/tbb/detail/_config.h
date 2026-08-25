@@ -560,9 +560,10 @@
 #define __TBB_PREVIEW_NUMA_ALLOCATION 1
 #endif
 
-#if !__TBB_DISABLE_SPEC_EXTENSIONS
+// EXT macro is kept for compatibility with code built against
+// older oneTBB releases, where the custom assertion handler was
+// available only via the extension API
 #define TBB_EXT_CUSTOM_ASSERTION_HANDLER 202510
-#endif
 
 // Feature-test macros
 #if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
@@ -586,5 +587,7 @@
 #if __TBB_PREVIEW_NUMA_ALLOCATION
 #define TBB_HAS_NUMA_ALLOCATION 202605
 #endif
+
+#define TBB_HAS_CUSTOM_ASSERTION_HANDLER 202608
 
 #endif // __TBB_detail__config_H
