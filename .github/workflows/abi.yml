@@ -1,0 +1,285 @@
+# Copyright (c) 2026 UXL Foundation Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: ABI compatibility check
+
+on:
+  push:
+    branches: [master]
+
+  pull_request:
+    branches: [master]
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ !contains(github.ref, 'refs/heads/master') }}
+
+jobs:
+  build-libraries-linux:
+    name: build-libraries-${{ matrix.platform }}
+    runs-on: [ubuntu-26.04]
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-64
+          - platform: linux-32
+            cmake_extra_args: -DCMAKE_CXX_FLAGS=-m32 -DCMAKE_C_FLAGS=-m32
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -e -x -o pipefail
+
+          if [ "${{ matrix.platform }}" = "linux-32" ]; then
+            sudo dpkg --add-architecture i386
+          fi
+
+          sudo apt-get update
+          sudo apt-get install -y pkg-config hwloc libhwloc-dev
+
+          if [ "${{ matrix.platform }}" = "linux-32" ]; then
+            sudo apt-get install -y g++-multilib gcc-multilib libhwloc-dev:i386
+            echo "PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig" >> "${GITHUB_ENV}"
+          fi
+
+      - name: Build libraries
+        shell: bash
+        run: |
+          set -e -x -o pipefail
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=release -DTBB_TEST=OFF -DTCM_TEST=OFF \
+            ${{ matrix.cmake_extra_args }}
+          cmake --build build --target package -j$(nproc)
+
+      - name: Upload the package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-${{ matrix.platform }}
+          path: build/*.zip
+          retention-days: 4
+
+  build-libraries-macos:
+    name: build-libraries-macos-64
+    runs-on: [macos-15]
+    timeout-minutes: 45
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build libraries
+        shell: bash
+        run: |
+          set -e -x -o pipefail
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=release -DTBB_TEST=OFF
+          cmake --build build --target package -j$(sysctl -n hw.ncpu)
+
+      - name: Upload the package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-macos-64
+          path: build/*.zip
+          retention-days: 4
+
+  build-libraries-windows:
+    name: build-libraries-${{ matrix.platform }}
+    runs-on: [windows-2022]
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-64
+            arch: x64
+            vcpkg_arch: x64-windows
+          - platform: windows-32
+            arch: Win32
+            vcpkg_arch: x86-windows
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install dependencies
+        run: |
+          vcpkg install hwloc:${{ matrix.vcpkg_arch }} pkgconf
+          if (!$?) {
+              throw "Failed to install the dependencies, exit code $LastExitCode"
+          }
+
+          $installed = "${env:VCPKG_INSTALLATION_ROOT}/installed/${{ matrix.vcpkg_arch }}"
+
+          $pkgconf = "${env:VCPKG_INSTALLATION_ROOT}/installed/x64-windows/tools/pkgconf/pkgconf.exe"
+          $pkgconfig_search_path = "${installed}/lib/pkgconfig"
+
+          "PKG_CONFIG=${pkgconf}" >> ${env:GITHUB_ENV}
+          "PKG_CONFIG_PATH=${pkgconfig_search_path}" >> ${env:GITHUB_ENV}
+
+      - name: Build libraries
+        run: |
+          cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }} `
+            -DTBB_TEST=OFF -DTCM_TEST=OFF `
+            -DPKG_CONFIG_EXECUTABLE="${env:PKG_CONFIG}" `
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_arch }} `
+            -DCMAKE_TOOLCHAIN_FILE="${env:VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake"
+          if (!$?) {
+              throw "CMake configuration step failed, exit code $LastExitCode"
+          }
+          cmake --build build --config release --target package -j ${env:NUMBER_OF_PROCESSORS}
+          if (!$?) {
+              throw "CMake build step failed, exit code $LastExitCode"
+          }
+
+      - name: Upload the package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-${{ matrix.platform }}
+          path: build/*.zip
+          retention-days: 4
+
+  check-abi:
+    needs: [build-libraries-linux, build-libraries-macos, build-libraries-windows]
+    runs-on: [ubuntu-latest]
+    timeout-minutes: 15
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download the packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: package-*
+          path: packages
+      - name: Unpack the packages
+        shell: bash
+        run: |
+          set -e -x -o pipefail
+
+          for archive in packages/package-*/*.zip; do
+            platform="$(basename "$(dirname "${archive}")")"
+            destination="libraries/${platform#package-}"
+            staging="$(mktemp -d)"
+            unzip -q "${archive}" -d "${staging}"
+            mkdir -p "${destination}"
+            mv "${staging}"/*/* "${destination}/"
+          done
+      - name: Check oneTBB
+        continue-on-error: true
+        uses: ./.github/actions/abi-check
+        with:
+          project: oneTBB
+          baseline-dir: test/abi
+          binary: >-
+            libraries/*/lib/libtbb*
+            libraries/*/bin/tbb*.dll
+          output-dir: abi-artifacts/onetbb
+      - name: Check TCM
+        continue-on-error: true
+        uses: ./.github/actions/abi-check
+        with:
+          project: Thread Composability Manager
+          baseline-dir: thread_composability_manager/test/abi
+          binary: >-
+            libraries/*/lib/libtcm*
+            libraries/*/bin/tcm*.dll
+          output-dir: abi-artifacts/tcm
+      - name: Prepare the upgraded baseline as a patch
+        shell: bash
+        run: |
+          set -e -o pipefail
+
+          platform_dirs=()
+          for baseline in abi-artifacts/*/baseline; do
+            [ -d "${baseline}" ] || continue
+            while IFS= read -r dir; do
+              platform_dirs+=("${dir#"${baseline}/"}")
+            done < <(find "${baseline}" -name '*.txt' -printf '%h\n' | sort -u)
+          done
+
+          if [ "${#platform_dirs[@]}" -eq 0 ]; then
+            echo "No regenerated baselines found, nothing to diff."
+            exit 0
+          fi
+
+          for dir in "${platform_dirs[@]}"; do
+            rm -rf "${dir}"
+          done
+
+          for baseline in abi-artifacts/*/baseline; do
+            [ -d "${baseline}" ] || continue
+            cp -a "${baseline}/." .
+          done
+
+          git add --intent-to-add -- "${platform_dirs[@]}"
+          git diff HEAD -- "${platform_dirs[@]}" > abi.patch
+      - name: Upload the upgraded baseline patch
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: baseline-patch
+          path: abi.patch
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Report the summary
+        shell: bash
+        run: |
+          set -e -o pipefail
+
+          {
+            echo "## ABI report"
+            echo
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          deltas_found=false
+          for delta in abi-artifacts/*/delta.md; do
+            [ -e "${delta}" ] || continue
+            # An empty delta.md means the platform matches its baseline exactly
+            if [ -s "${delta}" ]; then
+              {
+                cat "${delta}"
+                echo
+              } >> "${GITHUB_STEP_SUMMARY}"
+              deltas_found=true
+            fi
+          done
+
+          if [ "${deltas_found}" = false ]; then
+            echo "No exported symbol changes detected."
+          else
+            echo "::error::The exported symbols differ from the checked in baselines." \
+                "Download the 'baseline-patch' artifact and apply it with 'git apply abi.patch'" \
+                "to record the change."
+            exit 1
+          fi
