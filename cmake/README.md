@@ -200,11 +200,18 @@ cmake --build . --target test # currently does not work on Windows* OS
 ## Building oneTBB as a Static Library
 
 ---
-**NOTE**
+**CAUTION**
 
-Static linking of oneTBB is highly discouraged. oneTBB manages a resource that is owned by the whole program - the machine's hardware threads - so its task scheduler and worker thread pool are intended to be a process-wide singleton. See [Static Linking of oneTBB](https://uxlfoundation.github.io/oneTBB/main/intro/static_linking.html) for the rationale, the features that become unavailable, and the risks of ending up with more than one copy of oneTBB in a process. If you choose this configuration, validating your application is your responsibility.
+Static linking of oneTBB is highly discouraged and has limited support.
 
 ---
+**IMPORTANT**
+
+oneTBB manages a resource that is owned by the whole program - the machine's hardware threads - so its task scheduler and worker thread pool are intended to be a process-wide singleton.
+
+---
+
+See [Static Linking of oneTBB](https://uxlfoundation.github.io/oneTBB/main/intro/static_linking.html) for the rationale, the features that become unavailable, and the risks of ending up with more than one copy of oneTBB in a process. If you choose this configuration, validating your application is your responsibility.
 
 oneTBB is built as a shared library by default. To build static archives instead, set `BUILD_SHARED_LIBS` to `OFF` during the configuration:
 
@@ -213,14 +220,6 @@ mkdir build && cd build
 cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=<install_dir> ..
 cmake --build . --parallel
 cmake --install .
-```
-
-With a multi-configuration generator, such as the Visual Studio* generator, choose the configuration during the build and install steps instead:
-
-```bash
-cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=<install_dir> ..
-cmake --build . --config Release
-cmake --install . --config Release
 ```
 
 The configuration step prints the following warning, which is expected:
@@ -278,12 +277,11 @@ target_link_libraries(my_app PRIVATE TBB::tbb)
 See [TBBConfig - Integration of Binary Packages](#tbbconfig---integration-of-binary-packages) for details about the configuration module.
 
 ---
-**NOTE**
+**WARNING**
 
 Static builds receive only light validation coverage. The tests that depend on HWLOC or on `tbbmalloc_proxy` are excluded automatically, so a passing `ctest` run does not indicate the same coverage as it does for a shared build.
 
 ---
-
 
 ## Sanitizers - Configure, Build, and Run
 
