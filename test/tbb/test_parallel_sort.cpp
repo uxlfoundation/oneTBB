@@ -198,11 +198,12 @@ void parallel_sort_test_suite() {
     Comparator comp;
     for (auto concurrency_level : utils::concurrency_range()) {
         tbb::global_control control(tbb::global_control::max_allowed_parallelism, concurrency_level);
-        parallel_sort_test<ContainerType, /*Size*/0    >::run(comp);
-        parallel_sort_test<ContainerType, /*Size*/1    >::run(comp);
-        parallel_sort_test<ContainerType, /*Size*/10   >::run(comp);
-        parallel_sort_test<ContainerType, /*Size*/9999 >::run(comp);
-        parallel_sort_test<ContainerType, /*Size*/50000>::run(comp);
+        parallel_sort_test<ContainerType, /*Size*/0     >::run(comp);
+        parallel_sort_test<ContainerType, /*Size*/1     >::run(comp);
+        parallel_sort_test<ContainerType, /*Size*/10    >::run(comp);
+        parallel_sort_test<ContainerType, /*Size*/9999  >::run(comp);
+        parallel_sort_test<ContainerType, /*Size*/50000 >::run(comp);
+        parallel_sort_test<ContainerType, /*Size*/200000>::run(comp);
     }
 }
 
@@ -210,11 +211,12 @@ template<typename ContainerType>
 void parallel_sort_test_suite() {
     for (auto concurrency_level : utils::concurrency_range()) {
         tbb::global_control control(tbb::global_control::max_allowed_parallelism, concurrency_level);
-        parallel_sort_test<ContainerType, /*Size*/0    >::run();
-        parallel_sort_test<ContainerType, /*Size*/1    >::run();
-        parallel_sort_test<ContainerType, /*Size*/10   >::run();
-        parallel_sort_test<ContainerType, /*Size*/9999 >::run();
-        parallel_sort_test<ContainerType, /*Size*/50000>::run();
+        parallel_sort_test<ContainerType, /*Size*/0     >::run();
+        parallel_sort_test<ContainerType, /*Size*/1     >::run();
+        parallel_sort_test<ContainerType, /*Size*/10    >::run();
+        parallel_sort_test<ContainerType, /*Size*/9999  >::run();
+        parallel_sort_test<ContainerType, /*Size*/50000 >::run();
+        parallel_sort_test<ContainerType, /*Size*/200000>::run();
     }
 }
 
