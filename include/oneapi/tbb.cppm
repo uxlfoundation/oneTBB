@@ -132,11 +132,6 @@ export namespace tbb {
     using tbb::v1::assertion_handler_type;
     using tbb::v1::set_assertion_handler;
     using tbb::v1::get_assertion_handler;
-    namespace ext {
-        using tbb::ext::v1::assertion_handler_type;
-        using tbb::ext::v1::set_assertion_handler;
-        using tbb::ext::v1::get_assertion_handler;
-    } // namespace ext
 
     namespace task {
 #if __TBB_RESUMABLE_TASKS
