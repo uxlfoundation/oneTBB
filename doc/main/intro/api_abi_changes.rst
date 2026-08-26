@@ -195,7 +195,7 @@ across compilation units built against headers with the older layout.
 **API Changes:**
 
 - :onetbb-spec:`task_arena::enqueue and task_arena::wait_for to enqueue to and wait for specific task_group <task_scheduler/task_arena/task_arena_cls>`
-- :doc:`custom assertion handler support <../reference/assertion_handler>`
+- :doc:`custom assertion handler support <../reference/configuration/custom_assertion_handler>`
 - :doc:`Preview Feature: dynamic task graph <../reference/task_group_dynamic_dependencies>`
 
 **ABI Changes:**

@@ -18,8 +18,8 @@ Compatibility Headers
 
 ``<install-prefix>/include/tbb`` directory provides the same set of headers as
 ``<install-prefix>/include/oneapi/tbb`` for compatibility with old TBB releases.
-For any header ``X.h``, including ``<tbb/X.h>`` is equivalent to
-including ``<oneapi/tbb/X.h>``.
+For any header ``X.h``, including ``<oneapi/tbb/X.h>`` is equivalent to
+including ``<tbb/X.h>``.
 
 Umbrella Headers
 ----------------

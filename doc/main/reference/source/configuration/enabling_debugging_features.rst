@@ -37,7 +37,7 @@ header files. Define ``TBB_USE_ASSERT`` as ``1`` to enable error checking.
 
 If an error is detected, the library executes the currently set assertion handler.
 The default handler prints an error message on ``stderr`` and calls ``std::abort``.
-To change this behavior, use the :ref:`Custom Assertion Handler feature <assertion_handler>`.
+To change this behavior, use the :ref:`Custom Assertion Handler feature <custom_assertion_handler>`.
 
 TBB_USE_PROFILING_TOOLS Macro
 -----------------------------

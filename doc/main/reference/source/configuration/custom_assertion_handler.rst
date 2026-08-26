@@ -1,4 +1,4 @@
-.. _assertion_handler:
+.. _custom_assertion_handler:
 
 ========================
 Custom Assertion Handler
