@@ -168,14 +168,14 @@ Release Details
 
 **API Changes:**
 
-- :onetbb-spec:`Function create_numa_task_arenas introduced to create a set of NUMA bound arenas <task_scheduler/task_arena/task_arena_cls>`
-- :doc:`Additional deduction guides for flow graph <../tbb_userguide/fg_ctad>`
-- :onetbb-spec:`Additional deduction guides for blocked_range_nd <algorithms/blocked_ranges/blocked_nd_range_cls>`
-- flow graph :onetbb-spec:`indexer_node <flow_graph/indexer_node_cls>` and :onetbb-spec:`join_node <flow_graph/join_node_cls>` now support 10 or more input ports 
-- :doc:`Preview Feature: wait for single task in task_group <../reference/task_group_ext/wait_single_task>`
-- :doc:`Preview Feature: resource_limited_node and resource_limiter classes <../reference/fg_resource_limiting>`
-- :doc:`Preview Feature: advanced core-type selection <../reference/core_type_selector>`
-- :doc:`Preview Feature: global control parameter for default block time behavior <../reference/parallel_phase_for_task_arena>`
+- `Function create_numa_task_arenas introduced to create a set of NUMA bound arenas <https://github.com/uxlfoundation/oneTBB/blob/v2023.0.0/doc/main/specification/source/task_scheduler/task_arena/task_arena_cls.rst>`_
+- `Additional deduction guides for flow graph <https://github.com/uxlfoundation/oneTBB/blob/v2023.0.0/doc/main/tbb_userguide/fg_ctad.rst>`_
+- `Additional deduction guides for blocked_range_nd <https://github.com/uxlfoundation/oneTBB/blob/v2023.0.0/doc/main/specification/source/algorithms/blocked_ranges/blocked_nd_range_cls.rst>`_
+- flow graph `indexer_node <https://github.com/uxlfoundation/oneTBB/blob/v2023.0.0/doc/main/specification/source/flow_graph/indexer_node_cls.rst>`_ and `join_node <https://github.com/uxlfoundation/oneTBB/blob/v2023.0.0/doc/main/specification/source/flow_graph/join_node_cls.rst>`_ now support 10 or more input ports 
+- `Preview Feature: wait for single task in task_group <https://github.com/uxlfoundation/oneTBB/blob/v2023.0.0/doc/main/reference/task_group_ext/wait_single_task.rst>`_
+- `Preview Feature: resource_limited_node and resource_limiter classes <https://github.com/uxlfoundation/oneTBB/blob/v2023.0.0/doc/main/reference/fg_resource_limiting.rst>`_
+- `Preview Feature: advanced core-type selection <https://github.com/uxlfoundation/oneTBB/blob/v2023.0.0/doc/main/reference/core_type_selector.rst>`_
+- `Preview Feature: global control parameter for default block time behavior <https://github.com/uxlfoundation/oneTBB/blob/v2023.0.0/doc/main/reference/parallel_phase_for_task_arena.rst>`_
 
 **ABI Changes:**
 
@@ -194,9 +194,9 @@ across compilation units built against headers with the older layout.
 
 **API Changes:**
 
-- :onetbb-spec:`task_arena::enqueue and task_arena::wait_for to enqueue to and wait for specific task_group <task_scheduler/task_arena/task_arena_cls>`
-- :doc:`custom assertion handler support <../reference/configuration/custom_assertion_handler>`
-- :doc:`Preview Feature: dynamic task graph <../reference/task_group_dynamic_dependencies>`
+- `task_arena::enqueue and task_arena::wait_for to enqueue to and wait for specific task_group <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_arena/task_arena_cls>`_
+- `custom assertion handler support <https://github.com/uxlfoundation/oneTBB/blob/v2022.3.0/doc/main/reference/assertion_handler.rst>`_
+- `Preview Feature: dynamic task graph <https://github.com/uxlfoundation/oneTBB/blob/v2022.3.0/doc/main/reference/task_group_dynamic_dependencies.rst>`_
 
 **ABI Changes:**
 
