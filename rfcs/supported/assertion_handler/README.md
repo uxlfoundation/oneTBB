@@ -72,14 +72,7 @@ namespace tbb {
 }}
 ```
 
-Applications that used the custom assertion handler in TBB 2020 can migrate to this proposal with minimal changes
-by adding names to `namespace tbb`:
-```cpp
-namespace tbb {
-    using oneapi::tbb::set_assertion_handler;
-    using oneapi::tbb::assertion_handler_type;
-}
-```
+Applications that used the custom assertion handler in TBB 2020 can migrate to this proposal with no changes.
 
 ### Proposed Implementation Strategy
 
