@@ -309,7 +309,13 @@ void TestCleanupMaster() {
     std::atomic<int> iter_spawned;
     std::atomic<int> iter_executed;
 
-    for (int i = 0; i < 100; i++) {
+#if __TBB_USE_SANITIZERS
+    constexpr int max_iters = 25;
+#else
+    constexpr int max_iters = 100;
+#endif
+
+    for (int i = 0; i < max_iters; i++) {
         iter_spawned = 0;
         iter_executed = 0;
 
