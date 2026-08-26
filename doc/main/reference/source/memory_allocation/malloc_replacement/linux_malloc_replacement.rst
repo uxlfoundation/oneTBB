@@ -3,7 +3,7 @@
 =====================================================
 Linux\* OS C/C++ Dynamic Memory Interface Replacement
 =====================================================
-**[memory_allocation.malloc_replacement.windows]**
+**[memory_allocation.malloc_replacement.linux]**
 
 
 Release version of the proxy library is ``libtbbmalloc_proxy.so``,
