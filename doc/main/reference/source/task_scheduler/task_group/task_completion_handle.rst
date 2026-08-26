@@ -3,7 +3,7 @@
 ================================
 ``task_completion_handle`` Class
 ================================
-**[scheduler.task_handle]**
+**[scheduler.task_completion_handle]**
 
 .. note::
    To enable this :ref:`preview feature<preview_features>`, define the

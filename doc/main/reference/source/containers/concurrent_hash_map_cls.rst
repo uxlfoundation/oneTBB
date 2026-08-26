@@ -22,7 +22,7 @@ Class Template Synopsis
 
              template <typename Key, typename T,
                        typename HashCompare = tbb_hash_compare<Key>,
-                       typename Allocator = tbb_allocator<std::pair<const Key, T>>
+                       typename Allocator = tbb_allocator<std::pair<const Key, T>>,
                        typename Mutex = spin_rw_mutex> // Preview feature: Customizing the Mutex Type
              class concurrent_hash_map {
              public:

@@ -105,8 +105,6 @@ with the ``task_arena`` currently used by the calling thread.
 Preview Features
 ----------------
 
-Preview Features
-----------------
 
 The following :ref:`preview features<preview_features>` extend the ``this_task_arena`` API:
 
