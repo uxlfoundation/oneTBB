@@ -96,6 +96,7 @@ recommendations:
 
 Building oneTBB as a Static Library
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 The CMake build system supports static library builds.
 
 Configure the build with ``BUILD_SHARED_LIBS=OFF``. The configure step prints a warning
