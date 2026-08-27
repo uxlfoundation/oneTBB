@@ -72,23 +72,6 @@ void wait_on_address(void* address, d1::delegate_base& predicate, std::uintptr_t
 }
 
 void notify_by_address(void* address, std::uintptr_t target_context) {
-    // The concurrent_monitor protocol requires a full fence between the store that satisfies
-    // a waiter's predicate and the (relaxed) read of the waitset inside notify_*_relaxed():
-    // the waiter side issues one at the end of prepare_wait() ("Prepare wait guarantees
-    // Write Read memory barrier"), and the notifier side must match it, as the non-relaxed
-    // concurrent_monitor::notify_one()/notify_all() do.
-    // The notify_by_address entry points are called by d1::mutex::unlock(),
-    // d1::rw_mutex::unlock(), and waitable_atomic, which only perform an atomic RMW on the
-    // waited address before calling here. An RMW operation is not a two-sided fence: on
-    // architectures with weak memory ordering (e.g. AArch64), the subsequent relaxed
-    // my_waitset.empty() check may read a stale (empty) value before a concurrent waiter's
-    // insertion becomes visible, while that waiter's predicate re-check read the pre-RMW
-    // state. Both threads then observe the old values (store-buffer pattern), the notifier
-    // takes the empty() early exit, and the wakeup is lost: the waiter sleeps forever on an
-    // already-satisfied predicate (e.g. a writer blocked on a free rw_mutex).
-    // Issue the fence here, on the notifier side, to restore the protocol.
-    atomic_fence_seq_cst();
-
     address_waiter& waiter = get_address_waiter(address);
 
     auto predicate = [address, target_context] (address_context ctx) {
@@ -99,9 +82,6 @@ void notify_by_address(void* address, std::uintptr_t target_context) {
 }
 
 void notify_by_address_one(void* address) {
-    // See the comment in notify_by_address about the memory ordering requirements.
-    atomic_fence_seq_cst();
-
     address_waiter& waiter = get_address_waiter(address);
 
     auto predicate = [address] (address_context ctx) {
@@ -112,9 +92,6 @@ void notify_by_address_one(void* address) {
 }
 
 void notify_by_address_all(void* address) {
-    // See the comment in notify_by_address about the memory ordering requirements.
-    atomic_fence_seq_cst();
-
     address_waiter& waiter = get_address_waiter(address);
 
     auto predicate = [address] (address_context ctx) {
