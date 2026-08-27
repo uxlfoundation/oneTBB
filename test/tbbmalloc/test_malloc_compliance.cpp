@@ -413,27 +413,6 @@ void CheckReallocLeak()
     REQUIRE_MESSAGE(i < ITER_TO_STABILITY, "Can't stabilize memory consumption.");
 }
 
-// if non-zero byte found, returns bad value address plus 1
-size_t NonZero(void *ptr, size_t size)
-{
-    size_t words = size / sizeof(intptr_t);
-    size_t tailSz = size % sizeof(intptr_t);
-    intptr_t *buf =(intptr_t*)ptr;
-    char *bufTail =(char*)(buf+words);
-
-    for (size_t i=0; i<words; i++)
-        if (buf[i]) {
-            for (unsigned b=0; b<sizeof(intptr_t); b++)
-                if (((char*)(buf+i))[b])
-                    return sizeof(intptr_t)*i + b + 1;
-        }
-    for (size_t i=0; i<tailSz; i++)
-        if (bufTail[i]) {
-            return words*sizeof(intptr_t)+i+1;
-        }
-    return 0;
-}
-
 struct TestStruct
 {
     DWORD field1:2;
@@ -596,7 +575,7 @@ void CMemTest::Zerofilling()
             continue;
         for (size_t j=0; j<CountElement; j++)
         {
-            if (NonZero(TSMas+j, sizeof(TestStruct)))
+            if (utils::NonZero(TSMas+j, sizeof(TestStruct)))
             {
                 CountErrors++;
                 if (ShouldReportError()) REPORT("detect nonzero element at TestStruct\n");
@@ -793,7 +772,7 @@ void CMemTest::NULLReturn(UINT MinSize, UINT MaxSize, int total_threads)
                         if (ShouldReportError()) REPORT("nullptr returned, error: errno(%d) != ENOMEM\n", errno);
                     }
                     // check data integrity
-                    if (NonZero(PointerList[i].Pointer, PointerList[i].Size)) {
+                    if (utils::NonZero(PointerList[i].Pointer, PointerList[i].Size)) {
                         CountErrors++;
                         if (ShouldReportError()) REPORT("nullptr returned, error: data changed\n");
                     }
@@ -836,7 +815,7 @@ void CMemTest::UniquePointer()
     if (FullLog) REPORT("malloc....");
     for (UINT i=0; i<COUNT_ELEM-1; i++)
     {
-        if (size_t badOff = NonZero(MasPointer[i], sizeof(int)*MasCountElem[i])) {
+        if (size_t badOff = utils::NonZero(MasPointer[i], sizeof(int)*MasCountElem[i])) {
             CountErrors++;
             if (ShouldReportError())
                 REPORT("error, detect non-zero at %p\n", (char*)MasPointer[i]+badOff-1);
@@ -859,7 +838,7 @@ void CMemTest::UniquePointer()
     if (FullLog) REPORT("calloc....");
     for (int i=0; i<COUNT_ELEM-1; i++)
     {
-        if (size_t badOff = NonZero(MasPointer[i], sizeof(int)*MasCountElem[i])) {
+        if (size_t badOff = utils::NonZero(MasPointer[i], sizeof(int)*MasCountElem[i])) {
             CountErrors++;
             if (ShouldReportError())
                 REPORT("error, detect non-zero at %p\n", (char*)MasPointer[i]+badOff-1);
@@ -883,7 +862,7 @@ void CMemTest::UniquePointer()
     if (FullLog) REPORT("realloc....");
     for (int i=0; i<COUNT_ELEM-1; i++)
     {
-        if (NonZero(MasPointer[i], sizeof(int)*MasCountElem[i]))
+        if (utils::NonZero(MasPointer[i], sizeof(int)*MasCountElem[i]))
             CountErrors++;
         memset(MasPointer[i], 1, sizeof(int)*MasCountElem[i]);
     }

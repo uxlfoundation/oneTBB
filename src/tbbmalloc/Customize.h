@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2023 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -47,8 +48,9 @@
 #define MALLOC_ITT_RELEASE_RESOURCES()  ((void)0)
 #endif
 
-inline intptr_t BitScanRev(uintptr_t x) {
-    return x == 0 ? -1 : static_cast<intptr_t>(tbb::detail::log2(x));
+// TODO: Consider conforming to _BitScanReverse interface, an MSVC intrinsic
+inline int BitScanRev(uintptr_t x) {
+    return x == 0 ? -1 : static_cast<int>(tbb::detail::log2(x));
 }
 
 template<typename T>

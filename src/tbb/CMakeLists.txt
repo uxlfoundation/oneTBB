@@ -26,6 +26,7 @@ add_library(tbb
     itt_notify.cpp
     main.cpp
     market.cpp
+    numa_allocation.cpp
     tcm_adaptor.cpp
     misc.cpp
     misc_ex.cpp

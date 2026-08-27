@@ -120,6 +120,17 @@ class arena_slot : private arena_slot_shared_state, private arena_slot_private_s
         fill_with_canary_pattern( 0, my_task_pool_size );
     }
 
+    struct pool_bounded_wait{};
+    struct pool_unbounded_wait{};
+
+    bool wait_for_lock(atomic_backoff& backoff, pool_unbounded_wait) {
+        backoff.pause();
+        return true;
+    }
+
+    bool wait_for_lock(atomic_backoff& backoff, pool_bounded_wait) {
+        return backoff.bounded_pause();
+    }
 public:
     //! Deallocate task pool that was allocated by means of allocate_task_pool.
     void free_task_pool( ) {
@@ -179,7 +190,7 @@ public:
         if ( the_task_pool == EmptyTaskPool ) {
             return false;
         }
-        std::size_t hd = head.load(std::memory_order_relaxed), tl = tail.load(std::memory_order_relaxed); 
+        std::size_t hd = head.load(std::memory_order_relaxed), tl = tail.load(std::memory_order_relaxed);
         if ( (std::intptr_t)hd >= (std::intptr_t)tl ) {
             // Since some tasks might be temporary out of the visible pool bounds, lock the pool to examine closely
             bool tail_stable = true;
@@ -332,14 +343,14 @@ private:
         task_pool.store( task_pool_ptr, std::memory_order_release );
     }
 
-    //! Locks victim's task pool, and returns pointer to it. The pointer can be nullptr.
+    //! Locks victim's task pool, and returns pointer to it. The pointer can be nullptr
+    //! or LockedTaskPool if bounded wait is chosen.
     /** Garbles victim_arena_slot->task_pool for the duration of the lock. **/
+    template<typename WaitTag = pool_unbounded_wait>
     d1::task** lock_task_pool() {
         d1::task** victim_task_pool;
         for ( atomic_backoff backoff;; /*backoff pause embedded in the loop*/) {
             victim_task_pool = task_pool.load(std::memory_order_relaxed);
-            // Microbenchmarks demonstrated that aborting stealing attempt when the
-            // victim's task pool is locked degrade performance.
             // NOTE: Do not use comparison of head and tail indices to check for
             // the presence of work in the victim's task pool, as they may give
             // incorrect indication because of task pool relocations and resizes.
@@ -350,9 +361,12 @@ private:
             if (victim_task_pool != LockedTaskPool && task_pool.compare_exchange_strong(expected, LockedTaskPool) ) {
                 // We've locked victim's task pool
                 break;
-            } 
-            // Someone else acquired the lock, so pause and do exponential backoff.
-            backoff.pause();
+            }
+            // Someone else acquired a lock, so pause and do exponential backoff.
+            if (!wait_for_lock(backoff, WaitTag{})) {
+                // The backoff has been saturated, return LockedTaskPool to indicate the contention
+                return LockedTaskPool;
+            }
         }
         __TBB_ASSERT(victim_task_pool == EmptyTaskPool ||
                     (task_pool.load(std::memory_order_relaxed) == LockedTaskPool &&

@@ -116,7 +116,7 @@ if BUILD_TYPE == 'oneapi' or BUILD_TYPE == 'dita':
 .. |product| replace:: oneTBB
 .. |reg| unicode:: U+000AE
 .. |copy| unicode:: U+000A9
-.. |base_tk| replace:: Intel\ |reg|\  oneAPI Base Toolkit
+.. |toolkit| replace:: Intel\ |reg|\  oneAPI Toolkit (oneAPI Kit)
 .. |dpcpp| replace:: Intel\ |reg|\  oneAPI DPC++/C++ Compiler
     """
 else:
@@ -126,7 +126,7 @@ else:
 .. |product| replace:: oneTBB
 .. |reg| unicode:: U+000AE
 .. |copy| unicode:: U+000A9
-.. |base_tk| replace:: Intel\ |reg|\  oneAPI Base Toolkit
+.. |toolkit| replace:: Intel\ |reg|\  oneAPI Toolkit (oneAPI Kit)
 .. |dpcpp| replace:: Intel\ |reg|\  oneAPI DPC++/C++ Compiler
     """
 

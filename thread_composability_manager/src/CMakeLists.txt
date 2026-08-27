@@ -1,0 +1,107 @@
+# Copyright (c) 2023 Intel Corporation
+# Copyright (c) 2026 UXL Foundation Contributors
+#
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# --------------------------------------------------------------------------------------------------
+# Find the HWLOC library
+if (NOT TARGET HWLOC::hwloc)
+  list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../cmake/modules)
+  find_package(HWLOC REQUIRED 2.5 VERSION)
+endif()
+# --------------------------------------------------------------------------------------------------
+
+add_library(tcm SHARED
+  tcm.cpp
+  version.cpp
+)
+
+if (WIN32)
+    string(TIMESTAMP tcm_build_year "%Y" UTC)
+    if (NOT tcm_build_year)
+        message(FATAL_ERROR "Cannot determine the current year to substitute it in resource file.")
+    endif()
+    # Copy resource file template tcm.rc.in to CMAKE_CURRENT_BINARY_DIR substituting defined
+    # variables
+    configure_file(tcm.rc.in tcm.rc)
+    unset(tcm_build_year)
+    target_sources(tcm PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/tcm.rc)
+endif()
+
+add_library(TCM::tcm ALIAS tcm)
+
+if (TCM_PROFILE MATCHES ",*api-durations,*")
+  set(TCM_PROFILE_FLAGS ${TCM_PROFILE_FLAGS} -D__TCM_ENABLE_CALLSTACK_TRACER=1)
+endif()
+if (TCM_PROFILE MATCHES ",*permits,*")
+  set(TCM_PROFILE_FLAGS ${TCM_PROFILE_FLAGS} -D__TCM_ENABLE_PERMIT_TRACER=1)
+endif()
+if (TCM_PROFILE_FLAGS)
+  message(STATUS "Internal profiling is enabled for ${TCM_PROFILE}")
+endif()
+
+target_compile_options(tcm
+  PRIVATE
+  ${TCM_WARNING_LEVEL}
+  ${TCM_WARNING_SUPPRESS}
+  ${TCM_LIB_COMPILE_FLAGS}
+  ${TCM_MMD_FLAG}
+  ${TCM_DSE_FLAG}
+  ${TCM_COMMON_COMPILE_FLAGS}
+  ${TCM_VISIBILITY_INLINES_HIDDEN_FLAG}
+  ${TCM_PROFILE_FLAGS}
+)
+
+string(TIMESTAMP tcm_build_time "%Y-%m-%d %H:%M:%S UTC" UTC)
+target_compile_definitions(tcm PRIVATE
+  ${TCM_COMPILE_DEFINITIONS}
+  __TCM_BUILD_TIME="${tcm_build_time}"
+  $<$<BOOL:${TCM_COMMIT_ID}>:__TCM_COMMIT_ID="${TCM_COMMIT_ID}">
+)
+
+target_include_directories(tcm PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+
+# Prefer using target_link_options instead of target_link_libraries to specify link options because
+# target_link_libraries may incorrectly handle some options (on Windows, for example).
+if (COMMAND target_link_options)
+    target_link_options(tcm
+        PRIVATE
+        ${TCM_LIB_LINK_FLAGS}
+    )
+else()
+    target_link_libraries(tcm
+        PRIVATE
+        ${TCM_LIB_LINK_FLAGS}
+    )
+endif()
+
+target_link_libraries(tcm
+  PRIVATE
+  HWLOC::hwloc
+  ${TCM_COMMON_LINK_LIBS}
+)
+target_compile_definitions(tcm PUBLIC $<$<CONFIG:DEBUG>:TCM_DEBUG>)
+
+set_target_properties(tcm PROPERTIES
+  VERSION ${_tcm_ver_major}.${_tcm_ver_minor}.${_tcm_ver_patch}
+  SOVERSION ${_tcm_ver_major}
+  CXX_VISIBILITY_PRESET hidden
+  VISIBILITY_INLINES_HIDDEN ON
+)
+
+install(TARGETS tcm
+  EXPORT ${PROJECT_NAME}Targets
+  LIBRARY
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+  ARCHIVE
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  PUBLIC_HEADER
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+tcm_generate_vars(tcm)
