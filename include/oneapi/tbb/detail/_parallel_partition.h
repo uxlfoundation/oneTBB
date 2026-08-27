@@ -22,6 +22,7 @@
 #include "../parallel_reduce.h"
 #include "../blocked_range.h"
 #include "../task_group.h"
+#include "../task_arena.h"
 #include <algorithm>
 #include <iterator>
 #include <cstddef>
@@ -243,7 +244,7 @@ public:
 template <typename RandomAccessIterator, typename Predicate>
 RandomAccessIterator parallel_partition(RandomAccessIterator first, RandomAccessIterator last,
                                         Predicate pred, task_group_context& ctx) {
-    static constexpr std::size_t serial_partition_cutoff = 100000;
+    const std::size_t serial_partition_cutoff = 500 * this_task_arena::max_concurrency();
 
     using difference_type = typename std::iterator_traits<RandomAccessIterator>::difference_type;
 
