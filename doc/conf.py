@@ -13,7 +13,6 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 import os
-from docutils import nodes
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
@@ -21,6 +20,37 @@ SOURCE_DIR = os.path.dirname(__file__)
 LATEX_DIR = os.path.join(SOURCE_DIR, '_latex')
 PREAMBLE_FILE = os.path.join(LATEX_DIR, 'preamble.tex')
 TITLE_PAGE_FILE = os.path.join(LATEX_DIR, 'title_page.tex')
+VERSION_FILE = os.path.join(SOURCE_DIR, '..', 'include', 'oneapi', 'tbb', 'version.h')
+
+def _read_tbb_version():
+    """Extract the oneTBB version from include/oneapi/tbb/version.h.
+
+    Returns a version string TBB_VERSION_MAJOR.TBB_VERSION_MINOR.TBB_VERSION_STRING, e.g. "2023.1.0"
+    """
+    import re
+
+    macros = {}
+    with open(VERSION_FILE, 'r', encoding='utf-8') as version_file:
+        for line in version_file:
+            match = re.match(
+                r'\s*#define\s+(TBB_VERSION_(?:MAJOR|MINOR|PATCH))\s+(\d+)',
+                line,
+            )
+            if match:
+                macros[match.group(1)] = match.group(2)
+
+    for name in ('TBB_VERSION_MAJOR', 'TBB_VERSION_MINOR', 'TBB_VERSION_PATCH'):
+        if name not in macros:
+            raise RuntimeError('Could not find version macro {} in {}'.format(name, VERSION_FILE))
+
+    major = macros['TBB_VERSION_MAJOR']
+    minor = macros['TBB_VERSION_MINOR']
+    patch = macros['TBB_VERSION_PATCH']
+
+    tbb_version = '{}.{}.{}'.format(major, minor, patch)
+    return tbb_version
+
+TBB_VERSION = _read_tbb_version()
 
 BUILD_TYPE = os.getenv("BUILD_TYPE")
 
@@ -39,9 +69,9 @@ copyright = u'UXL Foundation Contributors'
 author = u''
 
 # The short X.Y version
-version = u''
+version = TBB_VERSION
 # The full version, including alpha/beta/rc tags
-release = u''
+release = TBB_VERSION
 
 
 # -- General configuration ---------------------------------------------------
@@ -89,19 +119,14 @@ language = 'en'
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-# Base exclude patterns - specification files that should never be built
+# Base exclude patterns - reference files that should never be built
 exclude_patterns = [
-    'main/specification/source/nested-*.rst',
-    'main/specification/source/uncategorized.rst',
-    'main/specification/source/uncategorized/**',
-    'main/specification/source/low_level_task_api.rst',
-    'main/specification/source/low_level_tasking/**',
+    'main/reference/source/nested-*.rst',
+    'main/reference/source/uncategorized.rst',
+    'main/reference/source/uncategorized/**',
+    'main/reference/source/low_level_task_api.rst',
+    'main/reference/source/low_level_tasking/**',
 ]
-
-# Specification is only included in OSS builds (GitHub Pages)
-# Intel builds (oneapi/dita) automatically exclude the entire specification directory
-if BUILD_TYPE == 'oneapi' or BUILD_TYPE == 'dita':
-    exclude_patterns.append('main/specification/**')
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = None
@@ -164,16 +189,10 @@ else:
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
-if BUILD_TYPE == 'oneapi'  or BUILD_TYPE == 'dita':
-    html_context = {
-        'css_files': [
-            '_static/theme_overrides.css',  # override wide tables in RTD theme
-        ],
-    }
-else:
-    html_js_files = ['custom.js']
+html_css_files = ['theme_overrides.css']
+html_js_files = ['custom.js']
 
-html_theme_options["logo"] = {"text": "oneTBB Documentation"}
+html_theme_options["logo"] = {"text": "oneTBB {} Documentation".format(TBB_VERSION)}
     
 html_logo = '_static/oneAPI-rgb-rev-100.png'
 html_favicon = '_static/favicons.png'
@@ -320,48 +339,3 @@ intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
-
-
-# -- Custom role for oneTBB specification links ------------------------------
-
-def onetbb_spec_role(name, rawtext, text, lineno, inliner, options={}, content=[]):
-    """
-    Custom role that generates internal :doc: links for OSS builds,
-    and external links for oneAPI/DITA builds.
-
-    Usage: :onetbb-spec:`link text <path>`
-    """
-    from sphinx.util.nodes import split_explicit_title
-
-    # Parse the role syntax
-    has_explicit_title, title, target = split_explicit_title(text)
-
-    if BUILD_TYPE == 'oneapi' or BUILD_TYPE == 'dita':
-        # Generate external link for oneAPI/DITA builds
-        url = f'https://uxlfoundation.github.io/oneTBB/main/specification/source/{target}.html'
-        node = nodes.reference(rawtext, title, refuri=url, **options)
-        return [node], []
-    else:
-        # Generate internal :doc: link for OSS builds
-        doc_path = f'/main/specification/source/{target}'
-
-        # Create a pending_xref node that Sphinx will resolve
-        from sphinx.addnodes import pending_xref
-
-        refnode = pending_xref(
-            rawtext,
-            refdomain='std',
-            reftype='doc',
-            reftarget=doc_path,
-            refexplicit=has_explicit_title,
-            refwarn=True
-        )
-        refnode += nodes.inline(rawtext, title)
-
-        return [refnode], []
-
-
-def setup(app):
-    """Setup function to register the custom role"""
-    app.add_role('onetbb-spec', onetbb_spec_role)
-    return {'version': '0.1', 'parallel_read_safe': True, 'parallel_write_safe': True}
