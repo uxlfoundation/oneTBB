@@ -22,7 +22,7 @@ Static Linking Possible But Not Recommended
 
 **Risks:** See :ref:`Static Linking of oneTBB <static_linking>` for why the shared library is the preferred form, which features are unavailable in a static library, and the risks of having more than one copy of oneTBB in a process.
 
-**Solution**: Prefer the shared library. If a static library is required, follow :ref:`Recommendations If You Must Link Statically <static_linking_recommendations>` and see `Building oneTBB as a Static Library <https://github.com/uxlfoundation/oneTBB/blob/master/cmake/README.md#building-onetbb-as-a-static-library>`_ for build instructions.
+**Solution:** Prefer the shared library. If a static library is required, follow :ref:`Recommendations If You Must Link Statically <static_linking_recommendations>` and see `Building oneTBB as a Static Library <https://github.com/uxlfoundation/oneTBB/blob/master/cmake/README.md#building-onetbb-as-a-static-library>`_ for build instructions.
 
 Freestanding Compilation Mode
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
