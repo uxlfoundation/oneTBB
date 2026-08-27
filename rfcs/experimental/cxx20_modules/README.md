@@ -13,11 +13,11 @@ model. Modules offer several advantages over headers:
 As the C++ ecosystem gradually adopts modules, oneTBB should provide a module interface to
 allow users to use the library using `import tbb;` instead of `#include <oneapi/tbb.h>`.
 
-## Proposal
+## Approach Used by Experimental Feature
 
 ### ABI non-breaking style with using-declaration
 
-The proposed approach is to provide a wrapper module that includes the existing headers in
+The approach is to provide a wrapper module that includes the existing headers in
 the global module fragment and re-exports public symbols as suggested in
 [LLVM documentation](https://clang.llvm.org/docs/StandardCPlusPlusModules.html#export-using-style).
 
@@ -68,7 +68,7 @@ int main() {
 }
 ```
 
-The proposed approach has several advantages over other alternatives:
+The approach has several advantages over other alternatives:
 
 - It does not require the modification of existing headers, as the module includes them as
   part of a global module fragment and then selectively exports the necessary `using`
@@ -79,6 +79,10 @@ The proposed approach has several advantages over other alternatives:
 
 The disadvantage of this approach is an obligation to update the module interface unit each time
 new API is added.
+
+Unlike other preview or experimental features, there is no `TBB_PREVIEW_` macro for a user to define
+and no feature test `TBB_HAS_` defined by oneTBB for modules support. Instead consumers must 
+use the `.cppm` file in their builds as described in the next section.
 
 ### CMake integration
 
@@ -121,7 +125,7 @@ module and header based TBB usage across multiple translation units, can also be
 Running the whole TBB test suite with `import tbb;` seems to provide little value, since the module
 unit is implemented as a wrapper around headers. It may help catch some missing exported API, but
 implementing and maintaining such an "import" mode can be challenging and costly. Hence,
-the proposed testing approach seems to be a good balance between coverage and maintainability.
+the current testing approach seems to be a good balance between coverage and maintainability.
 
 ## Alternatives Considered
 

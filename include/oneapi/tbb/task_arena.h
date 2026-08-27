@@ -27,6 +27,8 @@
 #include "detail/_small_object_pool.h"
 #include "detail/_task.h"
 #include "detail/_task_handle.h"
+#include "detail/_parallel_phase.h"
+#include "detail/_utils.h"
 #include "info.h"
 #include "task_group.h"
 
@@ -96,10 +98,8 @@ TBB_EXPORT void __TBB_EXPORTED_FUNC enqueue(d1::task&, d1::task_arena_base*);
 TBB_EXPORT void __TBB_EXPORTED_FUNC enqueue(d1::task&, d1::task_group_context&, d1::task_arena_base*);
 TBB_EXPORT void __TBB_EXPORTED_FUNC submit(d1::task&, d1::task_group_context&, arena*, std::uintptr_t);
 
-#if __TBB_PREVIEW_PARALLEL_PHASE
 TBB_EXPORT void __TBB_EXPORTED_FUNC enter_parallel_phase(d1::task_arena_base*, std::uintptr_t);
 TBB_EXPORT void __TBB_EXPORTED_FUNC exit_parallel_phase(d1::task_arena_base*, std::uintptr_t);
-#endif
 
 // Maintained for backwards compatibility
 TBB_EXPORT d1::slot_id __TBB_EXPORTED_FUNC execution_slot(const d1::task_arena_base&);
@@ -137,12 +137,10 @@ public:
         high   = 3 * priority_stride
     };
 
-#if __TBB_PREVIEW_PARALLEL_PHASE
     enum class leave_policy : int {
         automatic = 0,
         fast      = 1
     };
-#endif
 
     using constraints = tbb::detail::d1::constraints;
 protected:
@@ -182,7 +180,6 @@ protected:
         return (my_version_and_traits & core_type_support_flag) == core_type_support_flag ? my_max_threads_per_core : automatic;
     }
 
-#if __TBB_PREVIEW_PARALLEL_PHASE
     leave_policy get_leave_policy() const {
         return (my_version_and_traits & fast_leave_policy_flag) ? leave_policy::fast : leave_policy::automatic;
     }
@@ -192,9 +189,9 @@ protected:
     }
 
     void set_leave_policy(leave_policy lp) {
-        my_version_and_traits |= leave_policy_trait(lp);
+        my_version_and_traits = (my_version_and_traits & ~intptr_t(fast_leave_policy_flag)) |
+                                leave_policy_trait(lp);
     }
-#endif
 
     enum {
         default_flags               = 0,
@@ -202,15 +199,9 @@ protected:
         fast_leave_policy_flag      = 1 << 1
     };
 
-    task_arena_base(int max_concurrency, unsigned reserved_slots, priority a_priority
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                    , leave_policy lp
-#endif
+    task_arena_base(int max_concurrency, unsigned reserved_slots, priority a_priority , leave_policy lp
     )
-        : my_version_and_traits(default_flags | core_type_support_flag
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                | leave_policy_trait(lp)
-#endif
+        : my_version_and_traits(default_flags | core_type_support_flag | leave_policy_trait(lp)
         )
         , my_initialization_state(do_once_state::uninitialized)
         , my_arena(nullptr)
@@ -222,15 +213,9 @@ protected:
         , my_max_threads_per_core(automatic)
         {}
 
-    task_arena_base(const constraints& constraints_, unsigned reserved_slots, priority a_priority
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                    , leave_policy lp
-#endif
+    task_arena_base(const constraints& constraints_, unsigned reserved_slots, priority a_priority, leave_policy lp
     )
-        : my_version_and_traits(default_flags | core_type_support_flag 
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                | leave_policy_trait(lp)
-#endif
+        : my_version_and_traits(default_flags | core_type_support_flag  | leave_policy_trait(lp)
                 )
         , my_initialization_state(do_once_state::uninitialized)
         , my_arena(nullptr)
@@ -244,12 +229,12 @@ protected:
 
 public:
     //! Typedef for number of threads that is automatic.
-    static const int automatic = -1;
+    static constexpr int automatic = -1;
     //! Typedef for current thread index in an uninitialized arena.
-    static const int not_initialized = -2;
+    static constexpr int not_initialized = -2;
 #if __TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
     //! Typedef for core type(s) to be specified by the provided selector.
-    static const int selectable = -2;
+    static constexpr int selectable = -2;
 #endif
 };
 
@@ -334,30 +319,16 @@ public:
      *       Value of 1 is default and reflects behavior of implicit arenas.
      **/
     task_arena(int max_concurrency_ = automatic, unsigned reserved_slots = 1,
-               priority a_priority = priority::normal
-#if __TBB_PREVIEW_PARALLEL_PHASE
-               , leave_policy lp = leave_policy::automatic
-#endif
+               priority a_priority = priority::normal, leave_policy lp = leave_policy::automatic
     )
-        : task_arena_base(max_concurrency_, reserved_slots, a_priority
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                         , lp
-#endif
-          )
+        : task_arena_base(max_concurrency_, reserved_slots, a_priority , lp)
     {}
 
     //! Creates task arena pinned to certain NUMA node
     task_arena(const constraints& constraints_, unsigned reserved_slots = 1,
-               priority a_priority = priority::normal
-#if __TBB_PREVIEW_PARALLEL_PHASE
-               , leave_policy lp = leave_policy::automatic
-#endif
+               priority a_priority = priority::normal, leave_policy lp = leave_policy::automatic
     )
-        : task_arena_base(constraints_, reserved_slots, a_priority
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                         , lp
-#endif
-          )
+        : task_arena_base(constraints_, reserved_slots, a_priority, lp)
     {}
 
 #if __TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
@@ -365,16 +336,10 @@ public:
     template <typename Selector,
               typename = decltype(static_cast<int>(std::declval<Selector>()(std::declval<std::tuple<int, size_t, size_t>>())))>
     task_arena(const constraints& constraints_, Selector selector_,
-               unsigned reserved_for_masters = 1, priority a_priority = priority::normal
-#if __TBB_PREVIEW_PARALLEL_PHASE
-               , leave_policy lp = leave_policy::automatic
-#endif
+               unsigned reserved_for_masters = 1, priority a_priority = priority::normal,
+               leave_policy lp = leave_policy::automatic
     )
-        : task_arena_base(constraints_, reserved_for_masters, a_priority
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                         , lp
-#endif
-          )
+        : task_arena_base(constraints_, reserved_for_masters, a_priority, lp)
     {
         if (my_core_type == selectable) {
             my_core_type = apply_core_type_selector(selector_);
@@ -390,12 +355,9 @@ public:
                 .set_max_concurrency(a.my_max_concurrency)
                 .set_core_type(a.my_core_type)
                 .set_max_threads_per_core(a.my_max_threads_per_core)
-            , a.my_num_reserved_slots, a.my_priority
-#if __TBB_PREVIEW_PARALLEL_PHASE
-            , a.get_leave_policy()
-#endif
+            , a.my_num_reserved_slots, a.my_priority, a.get_leave_policy()
         )
-    
+
     {}
 
     //! Tag class used to indicate the "attaching" constructor
@@ -403,11 +365,7 @@ public:
 
     //! Creates an instance of task_arena attached to the current arena of the thread
     explicit task_arena( attach )
-        : task_arena_base(automatic, 1, priority::normal
-#if __TBB_PREVIEW_PARALLEL_PHASE
-        , leave_policy::automatic
-#endif
-        ) // use default settings if attach fails
+        : task_arena_base(automatic, 1, priority::normal, leave_policy::automatic ) // use default settings if attach fails
     {
         if (r1::attach(*this)) {
             mark_initialized();
@@ -426,20 +384,14 @@ public:
 
     //! Overrides concurrency level and forces initialization of internal representation
     void initialize(int max_concurrency_, unsigned reserved_slots = 1,
-                    priority a_priority = priority::normal
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                    , leave_policy lp = leave_policy::automatic
-#endif
-    )
+                    priority a_priority = priority::normal, leave_policy lp = leave_policy::automatic)
     {
         __TBB_ASSERT(!my_arena.load(std::memory_order_relaxed), "Impossible to modify settings of an already initialized task_arena");
         if( !is_active() ) {
             my_max_concurrency = max_concurrency_;
             my_num_reserved_slots = reserved_slots;
             my_priority = a_priority;
-#if __TBB_PREVIEW_PARALLEL_PHASE
             set_leave_policy(lp);
-#endif
             r1::initialize(*this);
             mark_initialized();
         }
@@ -447,11 +399,7 @@ public:
 
     //! Overrides constraints and forces initialization of internal representation
     void initialize(constraints constraints_, unsigned reserved_slots = 1,
-                    priority a_priority = priority::normal
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                    , leave_policy lp = leave_policy::automatic
-#endif
-    )
+                    priority a_priority = priority::normal, leave_policy lp = leave_policy::automatic)
     {
         __TBB_ASSERT(!my_arena.load(std::memory_order_relaxed), "Impossible to modify settings of an already initialized task_arena");
         if( !is_active() ) {
@@ -461,9 +409,7 @@ public:
             my_max_threads_per_core = constraints_.max_threads_per_core;
             my_num_reserved_slots = reserved_slots;
             my_priority = a_priority;
-#if __TBB_PREVIEW_PARALLEL_PHASE
             set_leave_policy(lp);
-#endif
             r1::initialize(*this);
             mark_initialized();
         }
@@ -474,10 +420,7 @@ public:
     template<typename Selector,
              typename = decltype(static_cast<int>(std::declval<Selector>()(std::declval<std::tuple<int, size_t, size_t>>())))>
     void initialize(constraints constraints_, Selector selector_,
-                    unsigned reserved_for_masters = 1, priority a_priority = priority::normal
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                    , leave_policy lp = leave_policy::automatic
-#endif
+                    unsigned reserved_for_masters = 1, priority a_priority = priority::normal, leave_policy lp = leave_policy::automatic
     )
     {
         __TBB_ASSERT(!my_arena.load(std::memory_order_relaxed), "Impossible to modify settings of an already initialized task_arena");
@@ -488,9 +431,7 @@ public:
             my_max_threads_per_core = constraints_.max_threads_per_core;
             my_num_reserved_slots = reserved_for_masters;
             my_priority = a_priority;
-#if __TBB_PREVIEW_PARALLEL_PHASE
             set_leave_policy(lp);
-#endif
             if (my_core_type == selectable) {
                 my_core_type = apply_core_type_selector(selector_);
             }
@@ -586,31 +527,72 @@ public:
         return execute_impl<decltype(f())>(f);
     }
 
-#if __TBB_PREVIEW_PARALLEL_PHASE
-    void start_parallel_phase() {
-        initialize();
-        r1::enter_parallel_phase(this, /*reserved*/0);
-    }
-    void end_parallel_phase(bool with_fast_leave = false) {
-        __TBB_ASSERT(my_initialization_state.load(std::memory_order_relaxed) == do_once_state::initialized, nullptr);
-        // It is guaranteed by the standard that conversion of boolean to integral type will result in either 0 or 1
-        r1::exit_parallel_phase(this, static_cast<std::uintptr_t>(with_fast_leave));
-    }
-
-    class scoped_parallel_phase : no_copy {
-        task_arena& arena;
-        bool one_time_fast_leave;
+    class parallel_phase : no_copy {
     public:
-        scoped_parallel_phase(task_arena& ta, bool with_fast_leave = false)
-            : arena(ta), one_time_fast_leave(with_fast_leave)
+        class flags {
+            friend class parallel_phase;
+            friend class task_arena;
+            friend void start_parallel_phase(flags);
+            friend void end_parallel_phase(flags);
+
+            std::uint32_t my_start_flags;
+            std::uint32_t my_end_flags;
+        public:
+            flags() : my_start_flags(0), my_end_flags(0) {}
+            template <typename... Flags, typename = typename std::enable_if<phase::valid_flags<Flags...>::value>::type>
+            flags(Flags...) : my_start_flags(phase::combine_tags<phase::start, Flags...>::value),
+                  my_end_flags(phase::combine_tags<phase::end, Flags...>::value) {}
+        };
+        class end_flag_fast_leave : public phase::tag<phase::end, phase::end_fast_leave> {};
+
+        parallel_phase(d1::attach, flags f = {}) : my_flags(f) {
+            r1::enter_parallel_phase(nullptr, /*reserved*/0);
+        }
+        parallel_phase(task_arena& ta, flags f = {})
+            : my_arena(&ta), my_flags(f)
         {
-            arena.start_parallel_phase();
+            suppress_unused_warning(my_reserved);
+            my_arena->start_parallel_phase(my_flags);
         }
-        ~scoped_parallel_phase() {
-            arena.end_parallel_phase(one_time_fast_leave);
+        parallel_phase(parallel_phase&& other)
+            : my_arena(other.my_arena), my_flags(other.my_flags), my_active(other.my_active) {
+            other.my_active = false;
         }
+        parallel_phase& operator=(parallel_phase&& other) {
+            if (my_active)
+                r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end_flags));
+            my_arena = other.my_arena;
+            my_flags = other.my_flags;
+            my_active = other.my_active;
+            other.my_active = false;
+            return *this;
+        }
+        ~parallel_phase() {
+            if (my_active)
+                r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end_flags));
+        }
+
+        void end() {
+            if (my_active) {
+                my_active = false;
+                r1::exit_parallel_phase(my_arena, static_cast<std::uintptr_t>(my_flags.my_end_flags));
+            }
+        }
+    private:
+        task_arena* my_arena{nullptr};
+        flags my_flags;
+        bool my_active{true};
+        std::uintptr_t my_reserved{};
     };
-#endif
+
+    void start_parallel_phase(parallel_phase::flags f = {}) {
+        initialize();
+        r1::enter_parallel_phase(this, static_cast<std::uintptr_t>(f.my_start_flags));
+    }
+    void end_parallel_phase(parallel_phase::flags f = {}) {
+        __TBB_ASSERT(my_initialization_state.load(std::memory_order_relaxed) == do_once_state::initialized, nullptr);
+        r1::exit_parallel_phase(this, static_cast<std::uintptr_t>(f.my_end_flags));
+    }
 
 #if __TBB_EXTRA_DEBUG
     //! Returns my_num_reserved_slots
@@ -685,16 +667,13 @@ inline void enqueue(F&& f, d2::task_group& tg) {
     d2::enqueue_impl(tg.defer(std::forward<F>(f)), nullptr);
 }
 
-#if __TBB_PREVIEW_PARALLEL_PHASE
-inline void start_parallel_phase() {
-    r1::enter_parallel_phase(nullptr, /*reserved*/0);
+inline void start_parallel_phase(task_arena::parallel_phase::flags f = {}) {
+    r1::enter_parallel_phase(nullptr, static_cast<std::uintptr_t>(f.my_start_flags));
 }
 
-inline void end_parallel_phase(bool with_fast_leave = false) {
-    // It is guaranteed by the standard that conversion of boolean to integral type will result in either 0 or 1
-    r1::exit_parallel_phase(nullptr, static_cast<std::uintptr_t>(with_fast_leave));
+inline void end_parallel_phase(task_arena::parallel_phase::flags f = {}) {
+    r1::exit_parallel_phase(nullptr, static_cast<std::uintptr_t>(f.my_end_flags));
 }
-#endif
 
 inline std::vector<d1::task_arena> create_numa_task_arenas(d1::constraints c = {},
                                                            unsigned reserved_slots = 0)
@@ -729,10 +708,8 @@ using detail::d1::isolate;
 
 using detail::d1::enqueue;
 
-#if __TBB_PREVIEW_PARALLEL_PHASE
 using detail::d1::start_parallel_phase;
 using detail::d1::end_parallel_phase;
-#endif
 } // namespace this_task_arena
 
 } // inline namespace v1

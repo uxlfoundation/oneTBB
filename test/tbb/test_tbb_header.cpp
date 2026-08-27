@@ -216,12 +216,6 @@ static void TestPreviewNames() {
     TestTypeDefinitionPresence( task_completion_handle );
     TestFuncDefinitionPresence( is_inside_task, (), bool );
 #endif
-#if __TBB_PREVIEW_PARALLEL_PHASE
-    TestTypeDefinitionPresence( task_arena::leave_policy );
-    TestTypeDefinitionPresence( task_arena::scoped_parallel_phase );
-    TestFuncDefinitionPresence( this_task_arena::start_parallel_phase, (), void );
-    TestFuncDefinitionPresence( this_task_arena::end_parallel_phase, (bool), void );
-#endif
 #if __TBB_PREVIEW_NUMA_ALLOCATION
     TestFuncDefinitionPresence( allocate_numa_interleaved, (size_t, size_t), void* );
     TestFuncDefinitionPresence( deallocate_numa_interleaved, (void*, size_t), void );
@@ -350,6 +344,12 @@ static void DefinitionPresence() {
     TestFuncDefinitionPresence( this_task_arena::enqueue, (tbb::task_handle&&), void );
     TestFuncDefinitionPresence( this_task_arena::enqueue, (Body&&), void );
     TestFuncDefinitionPresence( this_task_arena::enqueue, (Body&&, tbb::task_group&), void );
+    TestTypeDefinitionPresence( task_arena::leave_policy );
+    TestTypeDefinitionPresence( task_arena::parallel_phase );
+    TestTypeDefinitionPresence( task_arena::parallel_phase::flags );
+    TestTypeDefinitionPresence( task_arena::parallel_phase::end_flag_fast_leave );
+    TestFuncDefinitionPresence( this_task_arena::start_parallel_phase, (tbb::task_arena::parallel_phase::flags), void );
+    TestFuncDefinitionPresence( this_task_arena::end_parallel_phase, (tbb::task_arena::parallel_phase::flags), void );
     TestFuncDefinitionPresence( create_numa_task_arenas, (tbb::task_arena::constraints, unsigned), std::vector<tbb::task_arena> );
     TestTypeDefinitionPresence( core_type_id );
     TestFuncDefinitionPresence( info::core_types, (), std::vector<tbb::core_type_id> );

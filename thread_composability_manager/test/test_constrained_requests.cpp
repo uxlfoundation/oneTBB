@@ -96,6 +96,28 @@ public:
   int32_t id() { return numa_id; }
 };
 
+class one_thread_per_core_mask {
+  int32_t weight;
+  tcm_cpu_mask_t cpu_mask;
+
+public:
+  one_thread_per_core_mask() : weight(0), cpu_mask(allocate_cpu_mask()) {
+    auto& topology = tcm_test::system_topology::instance();
+    topology.fill_constraints_affinity_mask(cpu_mask,
+                                            /*numa_id*/tcm_automatic,
+                                            /*core_type_id*/tcm_automatic,
+                                            /*max_threads_per_core*/1);
+    weight = tcm_concurrency(cpu_mask);
+  }
+  ~one_thread_per_core_mask() { free_cpu_mask(cpu_mask); }
+
+  one_thread_per_core_mask(const one_thread_per_core_mask&) = delete;
+  one_thread_per_core_mask& operator=(const one_thread_per_core_mask&) = delete;
+
+  tcm_cpu_mask_t mask() const { return cpu_mask;}
+  int32_t capacity() const { return weight; }
+};
+
 TEST("test_allow_mask_omitting_during_permit_copy") {
     tcm_client_id_t client_id = connect_new_client();
 
@@ -424,6 +446,81 @@ TEST("Two constrained requests oversubscribing first core") {
   test_config.new_stateB = TCM_PERMIT_STATE_ACTIVE;
 
   test_two_requests<first_core_mask, first_core_mask>{test_config}();
+}
+
+void test_two_requests_not_oversubscribe_after_renegotiation(tcm_cpu_constraints_t constraints,
+                                                             const int32_t constraints_capacity)
+{
+  tcm_client_id_t client_id = connect_new_client();
+
+  // A takes the whole shared region.
+  tcm_permit_handle_t phA = request_permit(
+      client_id, make_request(tcm_automatic, constraints_capacity, &constraints, 1));
+  check(get_permit_data(phA).concurrency() == uint32_t(constraints_capacity),
+        "Permit A occupies the whole shared region");
+
+  // B requests the same region; A is negotiated down so that A and B together fit the region.
+  tcm_permit_handle_t phB = request_permit(
+      client_id, make_request(tcm_automatic, constraints_capacity, &constraints, 1));
+  check(get_permit_data(phA).concurrency() + get_permit_data(phB).concurrency() ==
+        uint32_t(constraints_capacity),
+        "Permits A and B together fully but exactly subscribe the shared region");
+
+  // C occupies the resources outside the shared region (the sibling hardware threads).
+  tcm_permit_handle_t phC = request_permit(client_id, make_request(1, platform_tcm_concurrency()));
+  check(get_permit_data(phC).concurrency() ==
+        uint32_t(platform_tcm_concurrency() - constraints_capacity),
+        "Permit C occupies the rest of resources, outside the region");
+
+  // Releasing C frees resources and triggers renegotiation of the still-active A and B. The freed
+  // resources are outside the shared region, so they must not be granted inside the full region.
+  release_permit(phC);
+
+  const uint32_t grantA = get_permit_data(phA).concurrency();
+  const uint32_t grantB = get_permit_data(phB).concurrency();
+  check(grantA + grantB <= uint32_t(constraints_capacity),
+        "Shared region is not oversubscribed after renegotiation", /*num_indents*/0,
+        /*report_msg*/"A grant=" + std::to_string(grantA) + ", B grant=" + std::to_string(grantB) +
+        ", region capacity=" + std::to_string(constraints_capacity));
+
+  release_permit(phA);
+  release_permit(phB);
+
+  disconnect_client(client_id);
+}
+
+TEST("Two constrained requests do not oversubscribe a shared region after renegotiation") {
+    one_thread_per_core_mask region{};
+
+    // The over-subscription can only manifest when the shared region has room for more than one
+    // resource (so that two permits can co-exist in it) and there are sibling threads outside of it
+    // (so that a third, unrelated permit can hold resources whose release triggers renegotiation).
+    const int32_t region_capacity = region.capacity();
+    if (region_capacity < 2 || platform_tcm_concurrency() <= region_capacity) {
+        test_log("Skipping: the platform lacks an SMT-enabled multi-core region required by this test "
+                 "(region capacity=" + std::to_string(region_capacity) +
+                 ", process concurrency=" + std::to_string(platform_tcm_concurrency()) + ").");
+        return;
+    }
+
+    {
+        test_log("\nSUBCASE START: Using low level constraints");
+        tcm_cpu_constraints_t low_level_constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+        low_level_constraints.mask = region.mask();
+        low_level_constraints.min_concurrency = 1;
+        test_two_requests_not_oversubscribe_after_renegotiation(low_level_constraints,
+                                                                region_capacity);
+        test_log("SUBCASE END: Using low level constraints\n");
+    }
+    {
+        test_log("\nSUBCASE START: Using high level constraints");
+        tcm_cpu_constraints_t high_level_constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
+        high_level_constraints.threads_per_core = 1;
+        high_level_constraints.min_concurrency = 1;
+        test_two_requests_not_oversubscribe_after_renegotiation(high_level_constraints,
+                                                                region_capacity);
+        test_log("SUBCASE END: Using high level constraints\n");
+    }
 }
 
 // ============================================================================

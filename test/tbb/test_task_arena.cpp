@@ -42,6 +42,7 @@
 #include <stdexcept>
 #include <thread>
 #include <vector>
+#include <memory>
 
 //#include "harness_fp.h"
 
@@ -2022,6 +2023,13 @@ TEST_CASE("Empty task_handle cannot be scheduled"
 //! \brief \ref error_guessing
 TEST_CASE("Test threads sleep") {
     for (auto concurrency_level : utils::concurrency_range()) {
+#if __TBB_TCM_TESTING_ENABLED
+        // On lower number of threads (e.g. 2), negotiation of resources from many dangling arenas
+        // left from previous test cases might be a significant contributing factor to the CPU usr
+        // times this test tries to assess.
+        if (concurrency_level < 3)
+            continue;
+#endif
         int conc = int(concurrency_level);
         test_threads_sleep(conc, 0);
         test_threads_sleep(conc, 1);
@@ -2244,3 +2252,14 @@ TEST_CASE("Test enqueue guarantees when task_arena is combined with task_group")
 }
 
 #endif // TBB_USE_EXCEPTIONS
+
+#if __TBB_CPP17_PRESENT
+//! \brief \ref regression
+TEST_CASE("ODR-use task_arena constants") {
+    CHECK(utils::force_constant_odr_use(tbb::task_arena::automatic) == tbb::task_arena::automatic);
+    CHECK(utils::force_constant_odr_use(tbb::task_arena::not_initialized) == tbb::task_arena::not_initialized);
+
+    auto task_arena_ptr = std::make_unique<tbb::task_arena>(tbb::task_arena::automatic);
+    CHECK(task_arena_ptr != nullptr);
+}
+#endif // __TBB_CPP17_PRESENT

@@ -6,12 +6,12 @@ In oneTBB, there has never been an API that allows users to block worker threads
 This design choice was made to preserve the composability of the application.
 Before PR#1352, workers moved to the thread pool to sleep once there were no arenas with active
 demand. However, PR#1352 introduced a delayed leave behavior to the library that
-results in blocking threads for an _implementation-defined_ duration inside an arena
+results in blocking threads for an _implementation-specific_ duration inside an arena
 if there is no active demand arcoss all arenas. This change significantly
 improved performance for various applications on high thread count systems.
 The main idea is that usually, after one parallel computation ends,
 another will start after some time. The delayed leave behavior is a heuristic to utilize this,
-covering most cases within _implementation-defined_ duration.
+covering most cases within _implementation-specific_ duration.
 
 However, the new behavior is not the perfect match for all the scenarios:
 * The heuristic of delayed leave is unsuitable for the tasks that are submitted
@@ -42,12 +42,10 @@ Let’s consider both “Delayed leave” and “Fast leave” as 2 different st
 
 <img src="completely_disable_new_behavior.png" width=800>
 
-There will be a question that we need to answer:
-* Do we see any value if arena potentially can transition from one to another state?
-
-To answer this question, the following scenarios should be considered:
-* What if different types of workloads are mixed in one application?
-* Different types of arenas can be used for different types of workloads.
+One question was whether we should allow the arena to dynamically transition from one state to
+another. Due to the lack of use cases that would justify this, the decision is to keep the state
+static for the lifetime of the arena. The underlying implementation is already flexible enough
+that dynamic state transitions could be added later without a redesign (see [technical details](#technical-details)).
 
 ### When threads should leave?
 
@@ -123,7 +121,7 @@ Summary of API changes:
 defaulted to "automatic".
 * Add functions to start and end the parallel phase to the `task_arena` class
 and the `this_task_arena` namespace.
-* Add RAII class to map a parallel phase to a code scope.
+* Add a `task_arena::parallel_phase` RAII class to map a parallel phase to a code scope.
 
 ```cpp
 class task_arena {
@@ -148,27 +146,169 @@ class task_arena {
                     priority a_priority = priority::normal,
                     leave_policy a_leave_policy = leave_policy::automatic);
 
-    void start_parallel_phase();
-    void end_parallel_phase(bool with_fast_leave = false);
-
-    class scoped_parallel_phase {
-        scoped_parallel_phase(task_arena& ta, bool with_fast_leave = false);
+    class parallel_phase {
+        class flags {
+            // Available only when each type in Flags is a parallel phase flag
+            template <typename... Flags>
+            flags(Flags... f);
+        };
+        class end_with_fast_leave;
+        parallel_phase(attach, flags f = {});
+        parallel_phase(task_arena& ta, flags f = {});
+        parallel_phase(parallel_phase&& other);
+        parallel_phase& operator=(parallel_phase&& other);
+        void end();
     };
+    
+    void start_parallel_phase(parallel_phase::flags f = {});
+    void end_parallel_phase(parallel_phase::flags f = {});
 };
 
 namespace this_task_arena {
-    void start_parallel_phase();
-    void end_parallel_phase(bool with_fast_leave = false);
+    void start_parallel_phase(task_arena::parallel_phase::flags f = {});
+    void end_parallel_phase(task_arena::parallel_phase::flags f = {});
 }
 ```
 The _parallel phase_ continues until each previous `start_parallel_phase` call
-to the same arena has a matching `end_parallel_phase` call.<br>
-Let's introduce RAII scoped object that will help to manage the contract.
+to the same arena has a matching `end_parallel_phase` call.
 
-If the end of the parallel phase is not indicated by the user, it will be done automatically when
-the last public reference is removed from the arena (i.e., task_arena has been destroyed or,
-for an implicitly created arena, the thread that owns it has completed).
-This ensures correctness is preserved (threads will not be retained forever).
+#### Using RAII to manage parallel phase
+
+Let's also introduce an RAII object `parallel_phase` that will help to manage the contract.
+Rather than introducing a separate RAII type in the `this_task_arena` namespace,
+`task_arena::parallel_phase` can be constructed with the `tbb::attach` tag to map the phase to
+the implicit arena associated with the calling thread. The alternative would be, instead of
+passing `tbb::attach`, to have a factory function that returns a `pararlel_phase` object:
+```cpp
+class task_arena {
+    parallel_phase create_parallel_phase(parallel_phase::flags f = {});
+};
+
+namespace this_task_arena {
+    task_arena::parallel_phase create_parallel_phase(task_arena::parallel_phase::flags f = {});
+}
+```
+The factory function approach might seem more consistent with the rest of task arena API.
+As there are no clear advantages of factory function, the proposal is to stick to the constructor approach
+since it is an already established pattern of the feature during experimental stage.
+
+The RAII object is move-constructible and move-assignable, but not copyable. For a `parallel_phase`
+bound to an explicit arena, the requirement is that the arena itself must not be destroyed
+while the phase is still active. A `parallel_phase` created with `tbb::attach` is bound to the
+implicit arena of the creating thread, so it must not end outside of that same implicit arena.
+
+#### Flags
+
+Note that all the entry points accept a single `parallel_phase::flags` argument rather than a
+boolean flag, even though only one flag is defined for now. Since _parallel phase_ is a high-level
+hint to the scheduler, it makes sense that other scheduling hints could be tied to it as well, so
+the API is designed to be configurable. Each flag is a distinct tag type, and several of them can
+be combined into a single `flags` object.
+
+Some flags are only applicable to the start of a parallel phase, and others only to its end, which
+can be reflected in their names (e.g. `end_with_fast_leave`). The `parallel_phase` object accepts flags
+for both boundaries at once and applies each of them at the corresponding point, while the explicit
+functions only take into account the flags applicable to them. A flag passed to an operation it
+does not apply to is ignored. 
+
+#### Starting and ending a parallel phase
+
+The start of _parallel phase_ can also be used as a warm-up hint for the workers to enter
+the arena in advance, therefore the arena (including the implicit arena bound to the external thread)
+must be initialized during the first call to `start_parallel_phase`. It means that if a calling thread has
+no associated arena yet, the invocation of `this_task_arena::start_parallel_phase` will initialize
+an arena and bind it to the calling thread.
+
+As mentioned above, the arena lifetime must not end while a parallel phase is still active.
+It is the user's responsibility to call `end_parallel_phase` for every outstanding `start_parallel_phase`
+(or destroy the corresponding `parallel_phase` object) before the arena is destroyed (or, for an implicitly
+created arena, before the owning thread completes). Otherwise, the behavior is undefined.
+
+#### RAII vs explicit calls
+
+Introduction of the explicit functions `start_parallel_phase` and `end_parallel_phase` opens
+a possibility of misuse: either forgetting to pair phase starts with ends, which results in
+undefined behavior as described above, or doing more phase ends than starts
+(e.g. by using RAII class interchangeably with explicit calls).
+That raises a question of whether the parallel phase API should be limited only to the RAII style.
+To answer this question, we considered the use cases where explicit calls are more preferable.
+
+One such use case is asynchronous handoff, where the start and the end of a parallel phase happen
+in different scopes, potentially executed on different threads, so there is no single scope
+to attach an RAII guard to:
+```cpp
+void handle_request(Request req) {
+    tbb::this_task_arena::start_parallel_phase();
+    //
+    // Some composition of parallel and serial computations
+    //
+    tbb::this_task_arena::enqueue([req]() {
+        process(req);
+        tbb::this_task_arena::end_parallel_phase(
+            tbb::task_arena::parallel_phase::end_with_fast_leave{});
+    });
+}
+```
+
+The same use case can be expressed using the `parallel_phase` object:
+
+```cpp
+void handle_request(Request req) {
+    tbb::task_arena::parallel_phase phase{tbb::attach{},
+                                          tbb::task_arena::parallel_phase::end_with_fast_leave{}};
+    // Some composition of parallel and serial computations
+    //
+    tbb::this_task_arena::enqueue([req, phs = std::move(phase)]() {
+        process(req);
+        // phs destructor will indicate the end of the parallel phase
+    });
+}
+```
+Another use case is a long-lived service where the parallel phase is meant to span multiple,
+unrelated requests and should only end after a period of inactivity, e.g. driven by an idle timer
+rather than the destruction of a scope:
+```cpp
+class Service {
+    tbb::task_arena ta;
+    bool phase_started = false;
+
+    void on_request() {
+        if (!phase_started) {
+            ta.start_parallel_phase();
+            phase_started = true;
+        }
+        ta.execute([]() { /* work */ });
+        reset_idle_timer();
+    }
+
+    void on_idle_timeout() {
+        ta.end_parallel_phase();
+        phase_started = false;
+    }
+};
+```
+This use case can also be expressed using the `parallel_phase` object:
+```cpp
+class Service {
+    tbb::task_arena ta;
+    std::unique_ptr<tbb::task_arena::parallel_phase> phase;
+
+    void on_request() {
+        if (!phase) {
+            phase = std::make_unique<tbb::task_arena::parallel_phase>(ta);
+        }
+        ta.execute([]() { /* work */ });
+        reset_idle_timer();
+    }
+
+    void on_idle_timeout() {
+        phase.reset();
+    }
+};
+```
+The friction of dealing with the RAII object in these cases can be considered too high, so the decision
+is to provide the explicit `start_parallel_phase`/`end_parallel_phase` functions in addition to the
+RAII `parallel_phase` class.
 
 ### Examples
 
@@ -200,7 +340,8 @@ void parallel_phase_example() {
     tbb::parallel_for(0, work_size, [] (int idx) {
         // User defined body
     });
-    tbb::this_task_arena::end_parallel_phase(/*with_fast_leave=*/true);
+    tbb::this_task_arena::end_parallel_phase(
+        tbb::task_arena::parallel_phase::end_with_fast_leave{});
 
     // Different parallel runtime (for example, OpenMP) is used
     // so it is preferred that worker threads won't be retained
@@ -211,11 +352,12 @@ void parallel_phase_example() {
     }
 }
 
-void scoped_parallel_phase_example() {
+void parallel_phase_raii_example() {
     tbb::task_arena ta{/*arena constraints*/};
     {
         // Start of the parallel phase
-        tbb::task_arena::scoped_parallel_phase phase{ta, /*with_fast_leave=*/true};
+        tbb::task_arena::parallel_phase phase{ta,
+            tbb::task_arena::parallel_phase::end_with_fast_leave{}};
         ta.execute([]() {
             // Parallel computation
         });
@@ -272,6 +414,8 @@ To implement the proposed feature, the following changes were made:
 Specifically, it controls when worker threads are allowed to be retained in the arena.
 `thread_leave_manager` is initialized with a state that determines the default
 behavior for workers leaving the arena.
+If the dynamic leave policy change is required, new entry points can be added to control the state of
+`thread_leave_manager` at runtime.
 
 To support `start/end_parallel_phase` API, it provides functionality to override the default
 state with a "Parallel Phase" state. It also keeps track of the number of active parallel phases.
@@ -282,25 +426,22 @@ the `thread_leave_manager` during the execution of parallel phases. It shows how
 
 <img src="parallel_phase_sequence_diagram.png" width=1000>
 
-## Open Questions in Design
+## Performance testing
 
-Some open questions that remain:
-* Are the suggested APIs sufficient?
-  * In the current version of proposed API, the `scoped_parallel_phase` object can be created
-    only for already existing `task_arena`. Should it be possible for `this_task_arena` as well?
-  * What should be expected from "Parallel Phase" API for `this_task_arena` when a calling thread
-    doesn't yet have any associated arena?
-  * Should parallel phase API be limited only to RAII-only style?
-    * Are there any scenarios where inconvenience of handling `scoped_parallel_phase` object is
-      not acceptable?
-* Are there additional use cases that should be considered that we missed in our analysis?
-* Do we see any value if arena potentially can transition from one to another state?
-  * What if different types of workloads are mixed in one application?
-  * What if there concurrent calls to this API?
+The [seismic example](../../../examples/parallel_for/seismic) can be a good candidate for measuring
+the impact of _parallel phase_, since each frame invokes two `parallel_for` loops in sequence
+(stress update, then velocity update), so worker threads may leave the arena prematurely
+between updates or between frames instead of staying resident for the whole simulation.
+Wrapping the per-frame loops with `start/end_parallel_phase` should retain workers across frames
+and thus reduce the arena join/leave overhead.
+
+The example can also showcase the `end_with_fast_leave` flag: if one of the two per-frame loops
+were rewritten with a different runtime (e.g. OpenMP), calling `end_parallel_phase` with
+`end_with_fast_leave` before that loop would release oneTBB workers promptly, avoiding
+oversubscription/interference with the OpenMP threads.
 
 ## Conditions to become fully supported
 
 Following conditions need to be met for the feature to move from experimental to fully supported:
 * Open questions regarding API should be resolved.
-* The feature should demonstrate performance improvements in scenarios mentioned.
 * oneTBB specification needs to be updated to reflect the new feature.

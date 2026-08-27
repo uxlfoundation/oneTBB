@@ -66,9 +66,7 @@ public:
         thread_stack_size,
         terminate_on_exception,
         scheduler_handle, // not a public parameter
-#if __TBB_PREVIEW_PARALLEL_PHASE
         leave_policy,
-#endif
         parameter_max // insert new parameters above this point
     };
 
@@ -89,13 +87,11 @@ public:
         r1::create(*this);
     }
 
-#if __TBB_PREVIEW_PARALLEL_PHASE
     //! Overload the constructor for enum types to avoid forcing users to cast them to size_t
     template<typename T, typename = typename std::enable_if<std::is_enum<T>::value>::type>
     global_control(parameter p, T value)
         : global_control(p, static_cast<std::size_t>(value))
     {}
-#endif
 
     ~global_control() {
         __TBB_ASSERT(my_param < parameter_max, "Invalid parameter");
@@ -186,7 +182,7 @@ inline void finalize(task_scheduler_handle& handle) {
         if (handle.m_ctl != nullptr) {
             bool finalized = r1::finalize(handle, finalize_throwing);
             __TBB_ASSERT_EX(finalized, "r1::finalize did not respect finalize_throwing ?");
-            
+
         }
     }).on_completion([&] {
         __TBB_ASSERT(!handle, "The handle should be empty after finalize");

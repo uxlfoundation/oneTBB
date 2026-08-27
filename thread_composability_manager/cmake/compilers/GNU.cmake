@@ -27,7 +27,12 @@ endif()
 set(TCM_COMMON_COMPILE_FLAGS ${TCM_COMMON_COMPILE_FLAGS} -fno-strict-overflow -fno-delete-null-pointer-checks -fwrapv
     -Wformat -Wformat-security -Werror=format-security -fstack-protector-strong $<$<NOT:$<CONFIG:Debug>>:-D_FORTIFY_SOURCE=2>)
 
-set(TCM_LIB_COMPILE_FLAGS $<$<NOT:$<CONFIG:Debug>>:-flto> $<$<NOT:$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},8.0>>:-fcf-protection=full>)
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "(AMD64|amd64|i.86|x86)")
+    set(TCM_LIB_COMPILE_FLAGS
+      $<$<NOT:$<CONFIG:Debug>>:-flto>
+      $<$<NOT:$<VERSION_LESS:${CMAKE_CXX_COMPILER_VERSION},8.0>>:-fcf-protection=full>
+    )
+endif()
 
 set(TCM_LIB_LINK_FLAGS ${TCM_LIB_LINK_FLAGS} $<$<NOT:$<CONFIG:Debug>>:-flto>  -Wl,-z,relro,-z,now,-z,noexecstack)
 set(TCM_COMPILE_DEFINITIONS "")

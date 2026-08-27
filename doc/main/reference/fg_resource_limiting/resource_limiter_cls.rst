@@ -24,8 +24,17 @@ For some resource types, the ``ResourceHandle`` represents the resource itself. 
 In the example above, ``int_limiter`` manages three resources of type ``int``, and ``db_limiter`` manages a single
 handle to a resource of type ``Database``.
 
-All the resource handles managed by the ``resource_limiter`` are considered equivalent, and the order in which the access
-to resources is granted to consumers is unspecified.
+All the resource handles managed by the ``resource_limiter`` are considered equivalent, so which particular handle a
+consumer receives is unspecified.
+
+The order in which access is granted attempts to avoid starving consumers that need several resources at once.
+The ``resource_limiter`` prefers the consumer whose request was made earlier. A request retains its position in
+this order for as long as it is outstanding, including while it waits for the other resources it needs and if an
+attempted acquisition is denied, so a consumer waiting for several resources becomes preferred over later
+requests as it waits.
+
+This is a best-effort policy rather than a guarantee: requests are arbitrated as they are observed, so a grant
+may be made before a higher-priority request becomes visible to the limiter.
 
 API
 ***

@@ -179,7 +179,6 @@ public:
     }
 };
 
-#if __TBB_PREVIEW_PARALLEL_PHASE
 class thread_leave_manager {
     static const std::uintptr_t DELAYED_LEAVE       = 0;
     static const std::uintptr_t FAST_LEAVE          = 1;
@@ -224,9 +223,10 @@ public:
     }
 
     // Indicate the end of parallel phase in the state machine
-    void unregister_parallel_phase(bool enable_fast_leave) {
+    void unregister_parallel_phase(std::uintptr_t flags) {
         std::uintptr_t prev = my_state.load(std::memory_order_relaxed);
         __TBB_ASSERT(prev != UINTPTR_MAX, "The initial state was not set");
+        bool enable_fast_leave = flags & std::uintptr_t(d1::phase::end_fast_leave);
 
         std::uintptr_t desired{};
         do {
@@ -245,7 +245,6 @@ public:
         return curr != FAST_LEAVE && curr != ONE_TIME_FAST_LEAVE;
     }
 };
-#endif /* __TBB_PREVIEW_PARALLEL_PHASE */
 
 //! The structure of an arena, except the array of slots.
 /** Separated in order to simplify padding.
@@ -311,10 +310,8 @@ struct arena_base : padded<intrusive_list_node> {
     //! Waiting object for external threads that cannot join the arena.
     concurrent_monitor my_exit_monitors;
 
-#if __TBB_PREVIEW_PARALLEL_PHASE
     //! Manages state of thread_leave state machine
     thread_leave_manager my_thread_leave;
-#endif
 
     //! Coroutines (task_dispathers) cache buffer
     arena_co_cache my_co_cache;
@@ -352,27 +349,20 @@ public:
     };
 
     //! Constructor
-    arena(threading_control* control, unsigned max_num_workers, unsigned num_reserved_slots, unsigned priority_level
-#if __TBB_PREVIEW_PARALLEL_PHASE
-          , tbb::task_arena::leave_policy lp
-#endif
+    arena(threading_control* control, unsigned max_num_workers, unsigned num_reserved_slots, unsigned priority_level,
+          tbb::task_arena::leave_policy lp
     );
 
     //! Allocate an instance of arena.
     static arena& allocate_arena(threading_control* control, unsigned num_slots, unsigned num_reserved_slots,
-                                 unsigned priority_level
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                                 , tbb::task_arena::leave_policy lp
-#endif
+                                 unsigned priority_level, tbb::task_arena::leave_policy lp
     );
 
     static arena& create(threading_control* control, unsigned num_slots, unsigned num_reserved_slots,
                          unsigned arena_priority_level,
                          d1::constraints constraints = d1::constraints{},
-                         numa_binding_observer* observer = nullptr
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                         , tbb::task_arena::leave_policy lp = tbb::task_arena::leave_policy::automatic
-#endif
+                         numa_binding_observer* observer = nullptr,
+                         tbb::task_arena::leave_policy lp = tbb::task_arena::leave_policy::automatic
     );
 
     static int unsigned num_arena_slots ( unsigned num_slots, unsigned num_reserved_slots ) {
@@ -521,9 +511,7 @@ void arena::advertise_new_work() {
             workers_delta = 1;
         }
 
-#if __TBB_PREVIEW_PARALLEL_PHASE
         my_thread_leave.reset_if_needed();
-#endif
         request_workers(mandatory_delta, workers_delta, /* wakeup_threads = */ true);
     }
 }
