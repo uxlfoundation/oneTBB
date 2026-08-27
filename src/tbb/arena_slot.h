@@ -194,7 +194,7 @@ public:
         if ( (std::intptr_t)hd >= (std::intptr_t)tl ) {
             // Since some tasks might be temporary out of the visible pool bounds, lock the pool to examine closely
             bool tail_stable = true;
-            the_task_pool = lock_task_pool(); // Synchronize with task thieves
+            the_task_pool = lock_task_pool<pool_unbounded_wait>(); // Synchronize with task thieves
             if ( the_task_pool == EmptyTaskPool ) {
                 return false;
             }
