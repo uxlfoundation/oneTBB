@@ -48,8 +48,9 @@ std::nothrow_t is used to implement an overload of `operator new`. There is no c
 disadvantage of overloading `allocate_numa_interleaved` vs adding
 `allocate_numa_interleaved_nothrow`, because allocate_numa_interleaved is not an operator. 
 
-Below is a possible set of overloads. The number of overloads could be reduced by not placing
-`error_msg` at the end, but keeping the output parameter last is natural.
+Every overload should contain a `bytes` argument. Any combination of the list of NUMA nodes,
+`bytes_per_chunk`, and `error_msg` is possible. We may want to put `error_msg` at the end, since
+that's an output parameter. Below is a possible set of overloads.
 ```c++
 void *allocate_numa_interleaved_nothrow(size_t bytes,
                                         const std::vector<tbb::numa_node_id>& nodes,
@@ -64,6 +65,22 @@ void *allocate_numa_interleaved_nothrow(size_t bytes,
 void *allocate_numa_interleaved_nothrow(size_t bytes, size_t bytes_per_chunk = 0);
 void *allocate_numa_interleaved_nothrow(size_t bytes, std::string &error_msg);
 void *allocate_numa_interleaved_nothrow(size_t bytes, size_t bytes_per_chunk, std::string &error_msg);
+```
+Below there are all 8 combinations of arguments.
+```c++
+    size_t obj_size = ...;
+    const std::vector<tbb::numa_node_id> nodes = ...;
+    size_t bytes_per_chunk = ...;
+    std::string error_msg;
+
+    tbb::allocate_numa_interleaved_nothrow(obj_size, nodes, bytes_per_chunk);
+    tbb::allocate_numa_interleaved_nothrow(obj_size, nodes, bytes_per_chunk, error_msg);
+    tbb::allocate_numa_interleaved_nothrow(obj_size, nodes);
+    tbb::allocate_numa_interleaved_nothrow(obj_size, nodes, error_msg);
+    tbb::allocate_numa_interleaved_nothrow(obj_size, bytes_per_chunk);
+    tbb::allocate_numa_interleaved_nothrow(obj_size, bytes_per_chunk, error_msg);
+    tbb::allocate_numa_interleaved_nothrow(obj_size);
+    tbb::allocate_numa_interleaved_nothrow(obj_size, error_msg);
 ```
 
 ## Implementation notes
