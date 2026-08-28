@@ -244,8 +244,8 @@ void arena::process(thread_data& tls) {
     __TBB_ASSERT(tls.my_arena == this, "my_arena is used as a hint when searching the arena to join");
 }
 
-arena::arena(threading_control* control, unsigned num_slots, unsigned num_reserved_slots, unsigned priority_level
-             , tbb::task_arena::leave_policy lp)
+arena::arena(threading_control* control, unsigned num_slots, unsigned num_reserved_slots, unsigned priority_level,
+            d1::constraints constraints, tbb::task_arena::leave_policy lp)
 {
     __TBB_ASSERT( !my_guard, "improperly allocated arena?" );
     __TBB_ASSERT( sizeof(my_slots[0]) % cache_line_size()==0, "arena::slot size not multiple of cache line size" );
@@ -283,11 +283,16 @@ arena::arena(threading_control* control, unsigned num_slots, unsigned num_reserv
 #endif
     my_mandatory_requests = 0;
 
+    my_numa_id = constraints.numa_id;
+    my_core_type = constraints.core_type;
+    my_max_threads_per_core = constraints.max_threads_per_core;
+    my_leave_policy = lp;
+
     my_thread_leave.set_initial_state(lp);
 }
 
 arena& arena::allocate_arena(threading_control* control, unsigned num_slots, unsigned num_reserved_slots,
-                             unsigned priority_level, tbb::task_arena::leave_policy lp)
+                             unsigned priority_level, d1::constraints constraints, tbb::task_arena::leave_policy lp)
 {
     __TBB_ASSERT( sizeof(base_type) + sizeof(arena_slot) == sizeof(arena), "All arena data fields must go to arena_base" );
     __TBB_ASSERT( sizeof(base_type) % cache_line_size() == 0, "arena slots area misaligned: wrong padding" );
@@ -298,7 +303,7 @@ arena& arena::allocate_arena(threading_control* control, unsigned num_slots, uns
     std::memset( storage, 0, n );
 
     return *new( storage + num_arena_slots(num_slots, num_reserved_slots) * sizeof(mail_outbox) )
-        arena(control, num_slots, num_reserved_slots, priority_level, lp);
+        arena(control, num_slots, num_reserved_slots, priority_level, constraints, lp);
 }
 
 void arena::free_arena () {
@@ -462,7 +467,7 @@ arena &arena::create(threading_control *control, unsigned num_slots,
 {
     __TBB_ASSERT(num_slots > 0, NULL);
     // Add public market reference for an external thread/task_arena (that adds an internal reference in exchange).
-    arena& a = arena::allocate_arena(control, num_slots, num_reserved_slots, arena_priority_level, lp);
+    arena& a = arena::allocate_arena(control, num_slots, num_reserved_slots, arena_priority_level, constraints, lp);
     __TBB_ASSERT(a.my_num_reserved_slots <= a.my_num_slots, NULL);
     a.my_numa_binding_observer = observer;
     a.my_tc_client = control->create_client(a);
@@ -632,6 +637,10 @@ bool task_arena_impl::attach(d1::task_arena_base& ta) {
         ta.my_priority = arena_priority(a->my_priority_level);
         ta.my_max_concurrency = ta.my_num_reserved_slots + a->my_max_num_workers;
         __TBB_ASSERT(arena::num_arena_slots(ta.my_max_concurrency, ta.my_num_reserved_slots) == a->my_num_slots, nullptr);
+        ta.my_numa_id = a->my_numa_id;
+        ta.my_core_type = a->my_core_type;
+        ta.my_max_threads_per_core = a->my_max_threads_per_core;
+        ta.set_leave_policy(a->my_leave_policy);
         ta.my_arena.store(a, std::memory_order_release);
         // increases threading_control's ref count for task_arena
         threading_control::register_public_reference();
