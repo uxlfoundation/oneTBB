@@ -220,7 +220,8 @@ Member functions
 
 .. cpp:function:: explicit task_arena(oneapi::tbb::attach)
 
-    Creates an instance of ``task_arena`` that is connected to the internal task arena representation currently used by the calling thread.
+    Creates an instance of ``task_arena`` that is connected to the internal task arena representation currently used by the calling thread
+    and copies its settings.
     If no such arena exists yet, creates a ``task_arena`` with default parameters.
 
     .. note::
@@ -316,13 +317,13 @@ Member functions
 
     The behavior of this function is equivalent to ``this->enqueue( tg.defer(std::forward<F>(f)) )``.
 
-.. cpp:function:: void enqueue(task_handle&& h)   
-     
-    Enqueues a task owned by ``h`` into the ``task_arena`` for processing. 
- 
-    The behavior of this function is equivalent to the generic version (``template<typename F> void task_arena::enqueue(F&& f)``), except parameter type. 
+.. cpp:function:: void enqueue(task_handle&& h)
 
-    .. note:: 
+    Enqueues a task owned by ``h`` into the ``task_arena`` for processing.
+
+    The behavior of this function is equivalent to the generic version (``template<typename F> void task_arena::enqueue(F&& f)``), except parameter type.
+
+    .. note::
        ``h`` should not be empty to avoid an undefined behavior.
 
 .. cpp:function:: task_group_status task_arena::wait_for(task_group& tg)
@@ -340,15 +341,15 @@ Non-member Functions
     Returns a ``std::vector`` of non-initialized ``task_arena`` objects, each bound to a separate NUMA node.
     The number of created ``task_arena`` instances is equal to the number of NUMA nodes on the system,
     as determined by ``tbb::info::numa_nodes()``.
-    
+
     If an error occurs during system information discovery,
-    returns a ``std::vector`` containing a single ``task_arena`` object created as 
+    returns a ``std::vector`` containing a single ``task_arena`` object created as
     ``task_arena(constraints_.set_numa_id(task_arena::automatic), reserved_slots)``.
 
     The ``constraints_`` argument can be specified to apply additional limitations to threads in
     the ``task_arena`` objects. For each created arena, the ``numa_id`` value in ``constraints_``
     is automatically set to the corresponding NUMA node ID from ``tbb::info::numa_nodes()``.
-    
+
     The ``reserved_slots`` argument allows reserving a specified number of slots in
     each ``task_arena`` object for application threads. By default, no slots are reserved.
 

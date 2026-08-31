@@ -330,6 +330,14 @@ struct arena_base : padded<intrusive_list_node> {
 
     threading_control_client my_tc_client;
 
+    tbb::task_arena::leave_policy my_leave_policy;
+
+    d1::numa_node_id my_numa_id;
+
+    d1::core_type_id my_core_type;
+
+    int my_max_threads_per_core;
+
 #if TBB_USE_ASSERT
     //! Used to trap accesses to the object after its destruction.
     std::uintptr_t my_guard;
@@ -350,12 +358,12 @@ public:
 
     //! Constructor
     arena(threading_control* control, unsigned max_num_workers, unsigned num_reserved_slots, unsigned priority_level,
-          tbb::task_arena::leave_policy lp
+          d1::constraints constraints, tbb::task_arena::leave_policy lp
     );
 
     //! Allocate an instance of arena.
     static arena& allocate_arena(threading_control* control, unsigned num_slots, unsigned num_reserved_slots,
-                                 unsigned priority_level, tbb::task_arena::leave_policy lp
+                                 unsigned priority_level, d1::constraints constraints, tbb::task_arena::leave_policy lp
     );
 
     static arena& create(threading_control* control, unsigned num_slots, unsigned num_reserved_slots,

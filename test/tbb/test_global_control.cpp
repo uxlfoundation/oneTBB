@@ -287,7 +287,7 @@ TEST_CASE("test concurrent task_scheduler_handle destruction") {
 TEST_CASE("Assertion handler type") {
     using documented = void(*)(const char* /* location */, int /* line */,
                                const char* /* expression */, const char* /* comment */);
-    static_assert(std::is_same<oneapi::tbb::ext::assertion_handler_type, documented>::value,
+    static_assert(std::is_same<oneapi::tbb::assertion_handler_type, documented>::value,
                   "Incorrect assertion handler type");
 }
 
@@ -299,11 +299,6 @@ TEST_CASE("Using custom assertion handler to test failure on invalid max_allowed
         "max_allowed_parallelism cannot be 0.");
 }
 
-namespace tbb {
-    using oneapi::tbb::ext::set_assertion_handler;
-    using oneapi::tbb::ext::assertion_handler_type;
-}
-
 //! Check that namespace injection allows to provide TBB 2020 source compatibility
 //! \brief \ref interface
 TEST_CASE("Check that namespace injection allows to provide TBB 2020 source compatibility") {
@@ -311,4 +306,17 @@ TEST_CASE("Check that namespace injection allows to provide TBB 2020 source comp
 
     tbb::assertion_handler_type old_handler = tbb::set_assertion_handler(new_handler);
     REQUIRE(old_handler != new_handler);
+}
+
+//! \brief \ref interface
+TEST_CASE("Assertion handler feature-test macro") {
+    CHECK_MESSAGE(TBB_HAS_CUSTOM_ASSERTION_HANDLER == 202608, "Incorrect assertion handler feature-test macro");
+}
+
+//! \brief \ref interface
+TEST_CASE("Assertion handler compatibility API") {
+    CHECK_MESSAGE((std::is_same<tbb::assertion_handler_type, tbb::ext::assertion_handler_type>::value),
+                  "Incorrect compat assertion_handler_type");
+    CHECK_MESSAGE(&tbb::get_assertion_handler == &tbb::ext::get_assertion_handler, "Incorrect compat get_assertion_handler");
+    CHECK_MESSAGE(&tbb::set_assertion_handler == &tbb::ext::set_assertion_handler, "Incorrect compat set_assertion_handler");
 }
