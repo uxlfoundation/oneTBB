@@ -73,6 +73,7 @@ jobs:
         run: |
           set -e -x -o pipefail
           cmake -S . -B build -DCMAKE_BUILD_TYPE=release -DTBB_TEST=OFF -DTCM_TEST=OFF \
+            -DTBB_ENABLE_IPO=OFF \
             ${{ matrix.cmake_extra_args }}
           cmake --build build --target package -j$(nproc)
 
@@ -81,6 +82,7 @@ jobs:
         run: |
           set -e -x -o pipefail
           cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=debug -DTBB_TEST=OFF -DTCM_TEST=OFF \
+            -DTBB_ENABLE_IPO=OFF \
             ${{ matrix.cmake_extra_args }}
           cmake --build build-debug --target package -j$(nproc)
 
@@ -114,14 +116,14 @@ jobs:
         shell: bash
         run: |
           set -e -x -o pipefail
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=release -DTBB_TEST=OFF
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=release -DTBB_TEST=OFF -DTBB_ENABLE_IPO=OFF
           cmake --build build --target package -j$(sysctl -n hw.ncpu)
 
       - name: Build debug libraries
         shell: bash
         run: |
           set -e -x -o pipefail
-          cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=debug -DTBB_TEST=OFF
+          cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=debug -DTBB_TEST=OFF -DTBB_ENABLE_IPO=OFF
           cmake --build build-debug --target package -j$(sysctl -n hw.ncpu)
 
       - name: Upload the release package
@@ -178,7 +180,7 @@ jobs:
       - name: Build release libraries
         run: |
           cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }} `
-            -DTBB_TEST=OFF -DTCM_TEST=OFF `
+            -DTBB_TEST=OFF -DTCM_TEST=OFF -DTBB_ENABLE_IPO=OFF `
             -DPKG_CONFIG_EXECUTABLE="${env:PKG_CONFIG}" `
             -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_arch }} `
             -DCMAKE_TOOLCHAIN_FILE="${env:VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake"
@@ -193,7 +195,7 @@ jobs:
       - name: Build debug libraries
         run: |
           cmake -S . -B build-debug -G "Visual Studio 17 2022" -A ${{ matrix.arch }} `
-            -DCMAKE_BUILD_TYPE=debug -DTBB_TEST=OFF -DTCM_TEST=OFF `
+            -DCMAKE_BUILD_TYPE=debug -DTBB_TEST=OFF -DTCM_TEST=OFF -DTBB_ENABLE_IPO=OFF `
             -DPKG_CONFIG_EXECUTABLE="${env:PKG_CONFIG}" `
             -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_arch }} `
             -DCMAKE_TOOLCHAIN_FILE="${env:VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake"
