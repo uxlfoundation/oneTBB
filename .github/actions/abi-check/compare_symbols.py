@@ -29,10 +29,13 @@ OPERATING_SYSTEMS = {
     lief.Binary.FORMATS.MACHO: "macos",
 }
 
+DEBUG_SUFFIX = "_debug"
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(
         description="Compare the exported symbols of the built shared libraries "
-                    "against the checked-in ABI baselines."
+        "against the checked-in ABI baselines."
     )
     parser.add_argument(
         "--binary",
@@ -42,24 +45,24 @@ def parse_arguments():
         default=[],
         metavar="PATH",
         dest="binaries",
-        help="Shared library to check. Repeat to check more than one"
+        help="Shared library to check. Repeat to check more than one",
     )
     parser.add_argument(
         "--baseline-dir",
         type=pathlib.Path,
         required=True,
-        help="Directory holding the <platform>/<library>.txt baselines."
+        help="Directory holding the <platform>/<library>.txt baselines.",
     )
     parser.add_argument(
         "--project",
         required=True,
-        help="Name of the checked project, used as the heading of the report."
+        help="Name of the checked project, used as the heading of the report.",
     )
     parser.add_argument(
         "--output-dir",
         type=pathlib.Path,
         required=True,
-        help="Directory to write delta.md and the regenerated baselines to."
+        help="Directory to write delta.md and the regenerated baselines to.",
     )
 
     arguments = parser.parse_args()
@@ -98,29 +101,32 @@ def exported_symbol_names(binary):
 
 
 def library_name(path):
-    # Remove the lib prefix if any and strip the version from the name.
-    # E.g. libtbb -> tbb, tbb12 -> tbb, libtbbbind_2_5 -> tbbbind.
+    # Remove the lib prefix if any and strip the version and the debug suffix
+    # E.g. libtbb -> tbb, tbb12 -> tbb, tbbbind_2_5_debug -> tbbbind.
     name = path.name.removeprefix("lib").partition(".")[0]
+    name = name.removesuffix(DEBUG_SUFFIX)
+
     return re.sub(r"_?\d+(_\d+)*$", "", name)
 
 
 def parse_binaries(paths):
-    binaries = {}
-    parsed = set()
+    symbols_by_platform = {}
+    seen = set()
     for path in paths:
         # Resolve if the path is a symlink
         real_path = path.resolve()
-        if real_path in parsed:
+        if real_path in seen:
             continue
-        parsed.add(real_path)
+        seen.add(real_path)
 
-        binary = lief.parse(str(path))
-        if binary is None:
+        parsed = lief.parse(str(path))
+        if parsed is None:
             raise RuntimeError(f"'{path}' is not a supported binary")
-        platform = binary_platform(binary)
-        binaries.setdefault(platform, {})
-        binaries[platform][library_name(path)] = sorted(exported_symbol_names(binary))
-    return binaries
+
+        libraries = symbols_by_platform.setdefault(binary_platform(parsed), {})
+        binaries = libraries.setdefault(library_name(path), {})
+        binaries[real_path.name] = sorted(exported_symbol_names(parsed))
+    return symbols_by_platform
 
 
 def get_baselines(baseline_dir, platform):
@@ -139,39 +145,63 @@ def get_baselines(baseline_dir, platform):
     return baselines
 
 
-def baseline_text(name, symbols, platform):
-    lines = [f"# Exported symbols of {name} on {platform}.",
-             "# Generated automatically, do not edit by hand.",
-             ""]
+def baseline_text(library, symbols, platform):
+    lines = [
+        f"# Exported symbols of {library} on {platform}.",
+        "# Generated automatically, do not edit by hand.",
+        "",
+    ]
     lines.extend(symbols)
     return "\n".join(lines) + "\n"
 
 
-def write_new_baselines(binaries, destination, platform):
-    for name, symbols in binaries.items():
+def write_new_baselines(libraries, destination, platform):
+    for library, binaries in libraries.items():
+        # The variants of a library (release or debug) are expected to export the same symbols
+        symbols = sorted(set().union(*binaries.values()))
+
         if not symbols:
             continue
 
         destination.mkdir(parents=True, exist_ok=True)
-        (destination / f"{name}.txt").write_text(baseline_text(name, symbols, platform),
-                                                 newline="\n")
+        (destination / f"{library}.txt").write_text(
+            baseline_text(library, symbols, platform), newline="\n"
+        )
 
 
-def compare_with_baseline(binaries, baselines):
-    deltas = {}
-    for name in sorted(set(binaries) | set(baselines)):
-        current = set(binaries.get(name, []))
-        baseline = set(baselines.get(name, []))
-        added = sorted(current - baseline)
-        removed = sorted(baseline - current)
+def compare_with_baseline(libraries, baselines):
+    deltas = []
+    for library in sorted(set(libraries) | set(baselines)):
+        baseline = set(baselines.get(library, []))
+        binaries = libraries.get(library, {})
 
-        if added or removed:
-            deltas[name] = {
-                "added": added,
-                "removed": removed,
-                "missing_binary": name not in binaries,
-                "missing_baseline": name not in baselines
-            }
+        # A baseline no binary was given for means the library is gone
+        if not binaries:
+            deltas.append(
+                {
+                    "name": library,
+                    "added": [],
+                    "removed": sorted(baseline),
+                    "missing_binary": True,
+                    "missing_baseline": False,
+                }
+            )
+            continue
+
+        for binary, symbols in sorted(binaries.items()):
+            added = sorted(set(symbols) - baseline)
+            removed = sorted(baseline - set(symbols))
+
+            if added or removed:
+                deltas.append(
+                    {
+                        "name": binary,
+                        "added": added,
+                        "removed": removed,
+                        "missing_binary": False,
+                        "missing_baseline": library not in baselines,
+                    }
+                )
     return deltas
 
 
@@ -192,10 +222,15 @@ def format_delta(deltas, platform):
         return ""
 
     lines = [f"#### {platform}", ""]
-    for name, delta in deltas.items():
-        lines.extend([f"<details><summary><code>{name}</code>: "
-                      f"{len(delta['added'])} added, {len(delta['removed'])} removed"
-                      f"</summary>", ""])
+    for delta in deltas:
+        lines.extend(
+            [
+                f"<details><summary><code>{delta['name']}</code>: "
+                f"{len(delta['added'])} added, {len(delta['removed'])} removed"
+                f"</summary>",
+                "",
+            ]
+        )
 
         if delta["missing_binary"]:
             lines.extend(["No binary of the library was given for the check.", ""])
@@ -213,27 +248,32 @@ def format_delta(deltas, platform):
 if __name__ == "__main__":
     arguments = parse_arguments()
 
-    binaries = parse_binaries(arguments.binaries)
+    symbols_by_platform = parse_binaries(arguments.binaries)
 
     arguments.output_dir.mkdir(parents=True, exist_ok=True)
 
     report = ""
-    for platform, libraries in sorted(binaries.items()):
+    for platform, libraries in sorted(symbols_by_platform.items()):
         baselines = get_baselines(arguments.baseline_dir, platform)
-        write_new_baselines(libraries,
-                        arguments.output_dir / "baseline" / arguments.baseline_dir / platform,
-                        platform)
+        write_new_baselines(
+            libraries,
+            arguments.output_dir / "baseline" / arguments.baseline_dir / platform,
+            platform,
+        )
         report += format_delta(compare_with_baseline(libraries, baselines), platform)
 
     (arguments.output_dir / "delta.md").write_text(
-        f"### {arguments.project}\n\n{report}" if report else "", newline="\n")
+        f"### {arguments.project}\n\n{report}" if report else "", newline="\n"
+    )
 
-    checked = ", ".join(sorted(binaries))
+    checked = ", ".join(sorted(symbols_by_platform))
     if report:
         print(report)
-        print(f"The exported symbols differ from the baselines of {checked}. "
+        print(
+            f"The exported symbols differ from the baselines of {checked}. "
             f"Removing an entry point breaks backward compatibility, adding one has "
-            f"to be recorded by updating the baselines.")
+            f"to be recorded by updating the baselines."
+        )
         sys.exit(1)
     else:
         print(f"The exported symbols match the baselines of {checked}.")

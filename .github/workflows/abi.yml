@@ -68,7 +68,7 @@ jobs:
             echo "PKG_CONFIG_PATH=/usr/lib/i386-linux-gnu/pkgconfig" >> "${GITHUB_ENV}"
           fi
 
-      - name: Build libraries
+      - name: Build release libraries
         shell: bash
         run: |
           set -e -x -o pipefail
@@ -76,11 +76,26 @@ jobs:
             ${{ matrix.cmake_extra_args }}
           cmake --build build --target package -j$(nproc)
 
-      - name: Upload the package
+      - name: Build debug libraries
+        shell: bash
+        run: |
+          set -e -x -o pipefail
+          cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=debug -DTBB_TEST=OFF -DTCM_TEST=OFF \
+            ${{ matrix.cmake_extra_args }}
+          cmake --build build-debug --target package -j$(nproc)
+
+      - name: Upload the release package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: package-${{ matrix.platform }}
+          name: package-${{ matrix.platform }}-release
           path: build/*.zip
+          retention-days: 4
+
+      - name: Upload the debug package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-${{ matrix.platform }}-debug
+          path: build-debug/*.zip
           retention-days: 4
 
   build-libraries-macos:
@@ -95,18 +110,32 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Build libraries
+      - name: Build release libraries
         shell: bash
         run: |
           set -e -x -o pipefail
           cmake -S . -B build -DCMAKE_BUILD_TYPE=release -DTBB_TEST=OFF
           cmake --build build --target package -j$(sysctl -n hw.ncpu)
 
-      - name: Upload the package
+      - name: Build debug libraries
+        shell: bash
+        run: |
+          set -e -x -o pipefail
+          cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=debug -DTBB_TEST=OFF
+          cmake --build build-debug --target package -j$(sysctl -n hw.ncpu)
+
+      - name: Upload the release package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: package-macos-64
+          name: package-macos-64-release
           path: build/*.zip
+          retention-days: 4
+
+      - name: Upload the debug package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-macos-64-debug
+          path: build-debug/*.zip
           retention-days: 4
 
   build-libraries-windows:
@@ -146,7 +175,7 @@ jobs:
           "PKG_CONFIG=${pkgconf}" >> ${env:GITHUB_ENV}
           "PKG_CONFIG_PATH=${pkgconfig_search_path}" >> ${env:GITHUB_ENV}
 
-      - name: Build libraries
+      - name: Build release libraries
         run: |
           cmake -S . -B build -G "Visual Studio 17 2022" -A ${{ matrix.arch }} `
             -DTBB_TEST=OFF -DTCM_TEST=OFF `
@@ -161,11 +190,33 @@ jobs:
               throw "CMake build step failed, exit code $LastExitCode"
           }
 
-      - name: Upload the package
+      - name: Build debug libraries
+        run: |
+          cmake -S . -B build-debug -G "Visual Studio 17 2022" -A ${{ matrix.arch }} `
+            -DCMAKE_BUILD_TYPE=debug -DTBB_TEST=OFF -DTCM_TEST=OFF `
+            -DPKG_CONFIG_EXECUTABLE="${env:PKG_CONFIG}" `
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_arch }} `
+            -DCMAKE_TOOLCHAIN_FILE="${env:VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake"
+          if (!$?) {
+              throw "CMake configuration step failed, exit code $LastExitCode"
+          }
+          cmake --build build-debug --config debug --target package -j ${env:NUMBER_OF_PROCESSORS}
+          if (!$?) {
+              throw "CMake build step failed, exit code $LastExitCode"
+          }
+
+      - name: Upload the release package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: package-${{ matrix.platform }}
+          name: package-${{ matrix.platform }}-release
           path: build/*.zip
+          retention-days: 4
+
+      - name: Upload the debug package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-${{ matrix.platform }}-debug
+          path: build-debug/*.zip
           retention-days: 4
 
   check-abi:
