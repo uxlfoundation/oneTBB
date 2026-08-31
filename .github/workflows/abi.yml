@@ -248,6 +248,7 @@ jobs:
             mv "${staging}"/*/* "${destination}/"
           done
       - name: Check oneTBB
+        id: check-onetbb
         continue-on-error: true
         uses: ./.github/actions/abi-check
         with:
@@ -258,6 +259,7 @@ jobs:
             libraries/*/bin/tbb*.dll
           output-dir: abi-artifacts/onetbb
       - name: Check TCM
+        id: check-tcm
         continue-on-error: true
         uses: ./.github/actions/abi-check
         with:
@@ -314,17 +316,32 @@ jobs:
           } >> "${GITHUB_STEP_SUMMARY}"
 
           deltas_found=false
-          for delta in abi-artifacts/*/delta.md; do
-            [ -e "${delta}" ] || continue
-            # An empty delta.md means the platform matches its baseline exactly
+          check_failed=false
+
+          projects=("oneTBB" "TCM")
+          outcomes=("${{ steps.check-onetbb.outcome }}" "${{ steps.check-tcm.outcome }}")
+          deltas=("abi-artifacts/onetbb/delta.md" "abi-artifacts/tcm/delta.md")
+
+          for index in "${!projects[@]}"; do
+            delta="${deltas[index]}"
+
+            # An empty delta.md means the exported symbols match the baselines,
+            # a missing one that the check did not get to report anything
             if [ -s "${delta}" ]; then
               {
                 cat "${delta}"
                 echo
               } >> "${GITHUB_STEP_SUMMARY}"
               deltas_found=true
+            elif [ ! -f "${delta}" ] || [ "${outcomes[index]}" = "failure" ]; then
+              echo "::error::The ABI check of ${projects[index]} did not complete"
+              check_failed=true
             fi
           done
+
+          if [ "${check_failed}" = true ]; then
+            exit 1
+          fi
 
           if [ "${deltas_found}" = false ]; then
             echo "No exported symbol changes detected."

@@ -59,6 +59,12 @@ def parse_arguments():
         help="Name of the checked project, used as the heading of the report.",
     )
     parser.add_argument(
+        "--allow-missing-platforms",
+        action="store_true",
+        help="Skip the platforms no binary was given for instead of reporting "
+        "their baselines as removed. Use it to check a subset of the platforms.",
+    )
+    parser.add_argument(
         "--output-dir",
         type=pathlib.Path,
         required=True,
@@ -127,6 +133,10 @@ def parse_binaries(paths):
         binaries = libraries.setdefault(library_name(path), {})
         binaries[real_path.name] = sorted(exported_symbol_names(parsed))
     return symbols_by_platform
+
+
+def baseline_platforms(baseline_dir):
+    return {path.parent.name for path in baseline_dir.glob("*/*.txt")}
 
 
 def get_baselines(baseline_dir, platform):
@@ -253,7 +263,18 @@ if __name__ == "__main__":
     arguments.output_dir.mkdir(parents=True, exist_ok=True)
 
     report = ""
-    for platform, libraries in sorted(symbols_by_platform.items()):
+    checked = []
+    skipped = []
+    for platform in sorted(
+        set(symbols_by_platform) | baseline_platforms(arguments.baseline_dir)
+    ):
+        libraries = symbols_by_platform.get(platform, {})
+
+        if not libraries and arguments.allow_missing_platforms:
+            skipped.append(platform)
+            continue
+
+        checked.append(platform)
         baselines = get_baselines(arguments.baseline_dir, platform)
         write_new_baselines(
             libraries,
@@ -266,7 +287,10 @@ if __name__ == "__main__":
         f"### {arguments.project}\n\n{report}" if report else "", newline="\n"
     )
 
-    checked = ", ".join(sorted(symbols_by_platform))
+    if skipped:
+        print(f"Skipped {', '.join(skipped)}: no binary was given for the platform.")
+
+    checked = ", ".join(checked)
     if report:
         print(report)
         print(
