@@ -95,7 +95,7 @@ set_target_properties(tcm PROPERTIES
 )
 
 set(TCM_DEF_FILE_PREFIX "")
-if (WIN32)
+if (WIN32 AND NOT MINGW)
     set(TCM_LINK_DEF_FILE_FLAG ${CMAKE_LINK_DEF_FILE_FLAG})
     set(TCM_DEF_FILE_PREFIX win)
 elseif (UNIX)
