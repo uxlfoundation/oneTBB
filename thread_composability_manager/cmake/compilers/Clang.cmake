@@ -3,6 +3,22 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+if (MINGW)
+    set(TCM_LINK_DEF_FILE_FLAG "")
+    set(TCM_DEF_FILE_PREFIX "")
+elseif (MSVC)
+    include(${CMAKE_CURRENT_LIST_DIR}/MSVC.cmake)
+    return()
+else()
+    if (WIN32)
+        set(TCM_LINK_DEF_FILE_FLAG ${CMAKE_LINK_DEF_FILE_FLAG})
+        set(TCM_DEF_FILE_PREFIX win)
+    else()
+        set(TCM_LINK_DEF_FILE_FLAG -Wl,--version-script=)
+        set(TCM_DEF_FILE_PREFIX lin)
+    endif()
+endif()
+
 # Depfile options (e.g. -MD) are inserted automatically in some cases.
 # Don't add -MMD to avoid conflicts in such cases.
 if (NOT CMAKE_GENERATOR MATCHES "Ninja" AND NOT CMAKE_CXX_DEPENDS_USE_COMPILER)

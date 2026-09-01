@@ -3,6 +3,9 @@
 #
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+set(TCM_LINK_DEF_FILE_FLAG ${CMAKE_LINK_DEF_FILE_FLAG})
+set(TCM_DEF_FILE_PREFIX win)
+
 # Workaround for CMake issue https://gitlab.kitware.com/cmake/cmake/issues/18317.
 # TODO: consider use of CMP0092 CMake policy.
 string(REGEX REPLACE "/W[0-4]" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
