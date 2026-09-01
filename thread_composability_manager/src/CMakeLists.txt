@@ -94,6 +94,14 @@ set_target_properties(tcm PROPERTIES
   VISIBILITY_INLINES_HIDDEN ON
 )
 
+set(TCM_DEF_FILE_PREFIX "")
+if (WIN32)
+    set(TCM_LINK_DEF_FILE_FLAG ${CMAKE_LINK_DEF_FILE_FLAG})
+    set(TCM_DEF_FILE_PREFIX win)
+elseif (UNIX)
+    set(TCM_LINK_DEF_FILE_FLAG -Wl,--version-script=)
+    set(TCM_DEF_FILE_PREFIX lin)
+endif()
 if (TCM_DEF_FILE_PREFIX)
     set_target_properties(tcm PROPERTIES
         LINK_FLAGS "${TCM_LINK_DEF_FILE_FLAG}\"${CMAKE_CURRENT_SOURCE_DIR}/def/${TCM_DEF_FILE_PREFIX}.def\""
