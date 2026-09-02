@@ -69,8 +69,8 @@ A static build disables oneTBB's run-time dynamic loading, which several feature
   explicit interfaces, such as ``tbb::scalable_allocator``, ``tbb::cache_aligned_allocator``,
   and ``scalable_malloc``.
 
-  * oneTBB will not load the Thread Composability Manager (TCM) library at run time, 
-  so coordination with other threading runtimes through TCM is unavailable.
+* oneTBB will not load the Thread Composability Manager (TCM) library at run time, 
+so coordination with other threading runtimes through TCM is unavailable.
 
 * IPO is enabled only for shared library builds, so a static oneTBB may be slower than
   the shared one even in the single-copy case.
