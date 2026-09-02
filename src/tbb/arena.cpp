@@ -638,8 +638,12 @@ bool task_arena_impl::attach(d1::task_arena_base& ta) {
         ta.my_max_concurrency = ta.my_num_reserved_slots + a->my_max_num_workers;
         __TBB_ASSERT(arena::num_arena_slots(ta.my_max_concurrency, ta.my_num_reserved_slots) == a->my_num_slots, nullptr);
         ta.my_numa_id = a->my_numa_id;
-        ta.my_core_type = a->my_core_type;
-        ta.my_max_threads_per_core = a->my_max_threads_per_core;
+        // Older task_arena_base layouts do not include my_core_type and my_max_threads_per_core
+        // Check the trait before accessing them to preserve backward compatibility
+        if (ta.my_version_and_traits & d1::task_arena_base::core_type_support_flag) {
+            ta.my_core_type = a->my_core_type;
+            ta.my_max_threads_per_core = a->my_max_threads_per_core;
+        }
         ta.set_leave_policy(a->my_leave_policy);
         ta.my_arena.store(a, std::memory_order_release);
         // increases threading_control's ref count for task_arena
