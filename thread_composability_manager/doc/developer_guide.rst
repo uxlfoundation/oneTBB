@@ -44,9 +44,9 @@ Below is a simple example of a usage model a parallel runtime should follow to s
    .. code-block:: cpp
 
        uint32_t concurrency{};
-       tcm_permit_t permit(&concurrency);
+       tcm_permit_t permit{&concurrency, /*cpu_masks*/nullptr, /*size*/1, /*state*/{}, /*flags*/{}};
        tcm_permit_handle_t permit_handle = nullptr;
-       tcmRequestPermit(client_id, request, &permit_handle, permit_handle, &permit);
+       tcmRequestPermit(client_id, request, /*callback_arg*/nullptr, &permit_handle, &permit);
 
    *Note*: The :code:`tcmRequestPermit` function might result in permit switched to :code:`PENDING`
    state, meaning that the requested resources are being used by another permit, and the requesting
