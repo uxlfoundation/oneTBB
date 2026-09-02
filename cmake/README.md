@@ -10,6 +10,9 @@ TBB_STRICT:BOOL - Treat compiler warnings as errors (ON by default)
 TBB_SANITIZE:STRING - Sanitizer parameter, passed to compiler/linker
 TBB_SIGNTOOL:FILEPATH - Tool for digital signing, used in post-install step for libraries if provided.
 TBB_SIGNTOOL_ARGS:STRING - Additional arguments for TBB_SIGNTOOL, used if TBB_SIGNTOOL is set.
+BUILD_SHARED_LIBS:BOOL - Standard CMake variable controlling whether oneTBB is built as shared libraries (ON by default).
+           Setting it to OFF produces static archives; this configuration is highly discouraged and is not
+           supported. See "Building oneTBB as a Static Library" below.
 TBB_BUILD:BOOL - Enable Intel(R) oneAPI Threading Building Blocks (oneTBB) build (ON by default)
 TBB_FIND_PACKAGE - Enable search for external oneTBB using find_package instead of build from sources (OFF by default)
 TBBMALLOC_BUILD:BOOL - Enable Intel(R) oneAPI Threading Building Blocks (oneTBB) memory allocator build (ON by default)
@@ -193,6 +196,92 @@ Or by using the ``test`` target:
 cmake --build . --target test # currently does not work on Windows* OS
 ```
 
+
+## Building oneTBB as a Static Library
+
+---
+**CAUTION**
+
+Static linking of oneTBB is highly discouraged and has limited support.
+
+---
+**IMPORTANT**
+
+oneTBB manages a resource that is owned by the whole program - the machine's hardware threads - so its task scheduler and worker thread pool are intended to be a process-wide singleton.
+
+---
+
+See [Static Linking of oneTBB](https://uxlfoundation.github.io/oneTBB/main/intro/static_linking.html) for the rationale, the features that become unavailable, and the risks of ending up with more than one copy of oneTBB in a process. If you choose this configuration, validating your application is your responsibility.
+
+oneTBB is built as a shared library by default. To build static archives instead, set `BUILD_SHARED_LIBS` to `OFF` during the configuration:
+
+```bash
+mkdir build && cd build
+cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=<install_dir> ..
+cmake --build . --parallel
+cmake --install .
+```
+
+The configuration step prints the following warning, which is expected:
+
+```
+You are building oneTBB as a static library. This is highly discouraged and such
+configuration is not supported. Consider building a dynamic library to avoid
+unforeseen issues.
+```
+
+The build produces archives instead of shared libraries:
+
+Platform | Release | Debug
+--- | --- | ---
+Linux* OS, macOS* | `libtbb.a`, `libtbbmalloc.a` | `libtbb_debug.a`, `libtbbmalloc_debug.a`
+Windows* OS | `tbb12.lib`, `tbbmalloc.lib` | `tbb12_debug.lib`, `tbbmalloc_debug.lib`
+
+### Effects on the Build Configuration
+
+Setting `BUILD_SHARED_LIBS` to `OFF` also changes the following:
+
+`CMAKE_POSITION_INDEPENDENT_CODE` is set to `ON` so that the archive can be linked into a shared object.
+It is only defaulted, so an explicit value specified during the configuration is respected.
+
+The `tbbbind` proxy libraries are loaded at run time, which a static build does not support, so they
+are skipped and the configuration step reports `TBBBind build targets are disabled due to
+unsupported environment`. As a result, `tbb::info` and `tbb::task_arena::constraints` cannot
+report or apply topology-based constraints. See [TBBBind Library Configuration](#tbbbind-library-configuration).
+
+`tbbmalloc_proxy` is not built even though `TBBMALLOC_PROXY_BUILD` is `ON` by default.
+The proxy replaces the memory allocation functions of the C library, which requires a
+shared library. The scalable allocator is still available through the explicit interfaces,
+such as `tbb::scalable_allocator` and `scalable_malloc`.
+
+oneTBB loads the TCM library dynamically, so a static build cannot coordinate with
+other threading runtimes through it, regardless of `TCM_BUILD` or the `TCM_ENABLE`
+environment variable.
+
+IPO is applied only to shared library builds, so `TBB_ENABLE_IPO=ON` has no effect and a
+static oneTBB may be marginally slower than the shared one.
+
+On Windows* OS, `BUILD_SHARED_LIBS` controls how oneTBB itself is linked, not how oneTBB
+links the CRT. To link the CRT statically as well, set `CMAKE_MSVC_RUNTIME_LIBRARY`.
+See [Windows* OS-Specific Builds](#windows-os-specific-builds).
+
+### Consuming a Static Build
+
+Consuming a static build works the same way as a shared one. The generated `TBBConfig.cmake` adds a `Threads` dependency for static builds, so the platform thread library is linked transitively:
+
+```cmake
+find_package(TBB REQUIRED)
+target_link_libraries(my_app PRIVATE TBB::tbb)
+```
+
+See [TBBConfig - Integration of Binary Packages](#tbbconfig---integration-of-binary-packages) for details about the configuration module.
+
+---
+**WARNING**
+
+Static builds receive only light validation coverage. The tests that depend on HWLOC or on `tbbmalloc_proxy` are excluded automatically, so a passing `ctest` run does not indicate the same coverage as it does for a shared build.
+
+---
 
 ## Sanitizers - Configure, Build, and Run
 
