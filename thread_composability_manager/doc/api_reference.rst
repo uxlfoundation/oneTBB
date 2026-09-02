@@ -9,7 +9,7 @@ contains info about resources a client can use. Clients can have multiple reques
 grouping them together using unique client IDs that are assigned by the Thread Composability Manager
 upon connecting to it.
 
-It is expected that clients follow TCM recommendations on the resource usage and does not misbehave.
+It is expected that clients follow TCM recommendations on the resource usage and do not misbehave.
 
 Connecting to and disconnecting from TCM
 ****************************************
@@ -29,11 +29,11 @@ using:
 | :code:`client_id` | Out    | Client ID assigned by the Thread Composability Manager for further relation.   |
 +-------------------+--------+--------------------------------------------------------------------------------+
 
-If the client does not expect to request or release resources anymore, it should close the
-connection by calling:
-
 **Warning**: Function returns :code:`TCM_RESULT_ERROR_UNKNOWN` status if :code:`TCM_ENABLE`
  environment variable is not set to :code:`1`.
+
+If the client does not expect to request or release resources anymore, it should close the
+connection by calling:
 
 .. code:: cpp
 
@@ -101,7 +101,7 @@ permit, the client may use the following API:
 
 .. code:: cpp
 
-    tcm_result_t tcmGetPermitData(tcm_permit_handle_t* permit_handle,
+    tcm_result_t tcmGetPermitData(tcm_permit_handle_t permit_handle,
                                   tcm_permit_t* permit)
 
 +-----------------------+----------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
@@ -227,8 +227,8 @@ TCM Data Structures
 Dependency on HWLOC
 *******************
 
-TCM uses :ref:`HWLOC library <https://www.open-mpi.org/projects/hwloc/>` to parse platform topology
-and obtain process concurrency, process CPU mask, NUMA node, and core type indices.
+TCM uses `HWLOC library <https://www.open-mpi.org/projects/hwloc/>`_ to parse platform topology and
+obtain process concurrency, process CPU mask, NUMA node, and core type indices.
 
 To make sure CPU masks, NUMA node and core type indices are interpreted by HWLOC library correctly,
 TCM client can either link with compatible version of HWLOC or write adapters for CPU masks.
@@ -447,7 +447,7 @@ opportunities to balance resources between conflicting permit requests.
 
 The subset of resources can be specified either using high-level or low-level description. For
 high-level description client specifies values for :code:`numa_id`, :code:`core_type_id`, and
-:code:`threads_per_core` struct fields. For low-level client speicifies the mask. In case both
+:code:`threads_per_core` struct fields. For low-level client specifies the mask. In case both
 low-level and high-level description are specified, Thread Composability Manager uses low-level
 mask.
 
