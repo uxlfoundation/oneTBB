@@ -2,7 +2,7 @@ Introduction
 ============
 
 Thread Composability Manager (TCM) is a project that helps different threading runtimes such as
-oneTBB and OpenMP to co-exist by limiting platform oversubscription that could occur otherwise.
+oneTBB and OpenMP co-exist by limiting platform oversubscription that could occur otherwise.
 
 Design Principles
 -----------------
