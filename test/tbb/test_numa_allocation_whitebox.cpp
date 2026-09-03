@@ -24,41 +24,56 @@
 
 #if __linux__
 
-static bool overrided_madvise_called = false;
-static bool overrided_move_pages_called = false;
+#include <sys/mman.h>
+
+static bool mock_madvise_called = false;
+static bool mock_move_pages_called = false;
 static bool madvise_should_fail = true;
 
-#define madvise(addr, length, advice) failed_madvise(addr, length, advice)
+static bool mock_mmap_called = false;
+static bool mmap_should_fail = false;
+
+// Defined before the macro below so it can dispatch to the real mmap when not failing.
+static void* mock_mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) {
+    mock_mmap_called = true;
+    if (mmap_should_fail)
+        return MAP_FAILED;
+    return mmap(addr, length, prot, flags, fd, offset);
+}
+
+#define madvise(addr, length, advice) mock_madvise(addr, length, advice)
+#define mmap(addr, length, prot, flags, fd, offset) mock_mmap(addr, length, prot, flags, fd, offset)
 
 extern "C" {
-static int failed_madvise(void*, size_t, int) noexcept (true) {
-    overrided_madvise_called = true;
+static int mock_madvise(void*, size_t, int) noexcept (true) {
+    mock_madvise_called = true;
     return madvise_should_fail ? -1 : 0;
 }
 }
 #elif _WIN32 || _WIN64
 
-static bool overrided_VirtualAlloc2_ptr_failed = false;
-static bool overrided_VirtualFree_failed = false;
+static bool mock_VirtualAlloc2_ptr_failed = false;
+static bool mock_VirtualFree_failed = false;
 
-BOOL failed_VirtualFree(LPVOID lpAddress, SIZE_T dwSize, DWORD  dwFreeType) {
+BOOL mock_VirtualFree(LPVOID lpAddress, SIZE_T dwSize, DWORD  dwFreeType) {
     static int cnt;
 
     if (++cnt % 2) {
         return VirtualFree(lpAddress, dwSize, dwFreeType);
     } else {
-        overrided_VirtualFree_failed = true;
+        mock_VirtualFree_failed = true;
         return FALSE;
     }
 }
 
-#define VirtualFree failed_VirtualFree
+#define VirtualFree mock_VirtualFree
 
 #endif
 
 #include "../../src/tbb/numa_allocation.cpp"
 
 #undef madvise
+#undef mmap
 #undef VirtualFree
 
 namespace tbb {
@@ -67,30 +82,30 @@ namespace r1 {
 
 #if __linux__
 
-static long dummy_move_pages(int, unsigned long, void**, const int*, int*, int) {
-    overrided_move_pages_called = true;
+static long mock_move_pages(int, unsigned long, void**, const int*, int*, int) {
+    mock_move_pages_called = true;
     return -1;
 }
 
-static struct bitmask* dummy_numa_bitmask_alloc(unsigned int) {
+static struct bitmask* mock_numa_bitmask_alloc(unsigned int) {
     return nullptr;
 }
 
-static void dummy_numa_bitmask_free(struct bitmask*) {}
+static void mock_numa_bitmask_free(struct bitmask*) {}
 
-static int dummy_numa_bitmask_isbitset(const struct bitmask*, unsigned int) {
+static int mock_numa_bitmask_isbitset(const struct bitmask*, unsigned int) {
     return 1;
 }
 
-static struct bitmask* dummy_numa_bitmask_setbit(struct bitmask* m, unsigned int) {
+static struct bitmask* mock_numa_bitmask_setbit(struct bitmask* m, unsigned int) {
     return m;
 }
 
-static void dummy_numa_interleave_memory(void*, size_t, struct bitmask*) {}
+static void mock_numa_interleave_memory(void*, size_t, struct bitmask*) {}
 
 #elif _WIN32 || _WIN64
 
-static void* dummy_VirtualAlloc2_ptr(HANDLE, PVOID, SIZE_T Size,
+static void* mock_VirtualAlloc2_ptr(HANDLE, PVOID, SIZE_T Size,
                                      ULONG, ULONG,
                                      MEM_EXTENDED_PARAMETER *, ULONG) {
     static int cnt;
@@ -99,7 +114,7 @@ static void* dummy_VirtualAlloc2_ptr(HANDLE, PVOID, SIZE_T Size,
         return VirtualAllocEx(GetCurrentProcess(), /*BaseAddress=*/nullptr, Size,
                               MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
     } else {
-        overrided_VirtualAlloc2_ptr_failed = true;
+        mock_VirtualAlloc2_ptr_failed = true;
         return nullptr;
     }
 }
@@ -116,14 +131,14 @@ bool dynamic_link( const char* ,
                    tbb::detail::r1::dynamic_link_handle*,
                    int) {
 #if __linux__
-    move_pages_ptr = dummy_move_pages;
-    numa_bitmask_alloc_ptr = dummy_numa_bitmask_alloc;
-    numa_bitmask_free_ptr = dummy_numa_bitmask_free;
-    numa_bitmask_isbitset_ptr = dummy_numa_bitmask_isbitset;
-    numa_bitmask_setbit_ptr = dummy_numa_bitmask_setbit;
-    numa_interleave_memory_ptr = dummy_numa_interleave_memory;
+    move_pages_ptr = mock_move_pages;
+    numa_bitmask_alloc_ptr = mock_numa_bitmask_alloc;
+    numa_bitmask_free_ptr = mock_numa_bitmask_free;
+    numa_bitmask_isbitset_ptr = mock_numa_bitmask_isbitset;
+    numa_bitmask_setbit_ptr = mock_numa_bitmask_setbit;
+    numa_interleave_memory_ptr = mock_numa_interleave_memory;
 #elif _WIN32 || _WIN64
-    VirtualAlloc2_ptr = dummy_VirtualAlloc2_ptr;
+    VirtualAlloc2_ptr = mock_VirtualAlloc2_ptr;
 #endif
     return true;
 }
@@ -145,9 +160,9 @@ size_t DefaultSystemPageSize() {
 } // namespace tbb
 
 #if __linux__ || _WIN32 || _WIN64
-//! Testing correct behavior if syscall fails
+//! Testing correct behavior of allocate_interleaved if syscall fails
 //! \brief \ref error_guessing
-TEST_CASE("test failed syscall") {
+TEST_CASE("allocate_interleaved with failed syscall") {
     // use non-default value to not call numa_interleave_memory under Linux
     size_t per_chunk = 2*4*1024;
     tbb::detail::d1::numa_node_id nodes_ids_array[] = {0, 0};
@@ -159,28 +174,36 @@ TEST_CASE("test failed syscall") {
     madvise_should_fail = true;
     void *ptr = tbb::detail::r1::allocate_interleaved(size, nodes_ids, 2, per_chunk);
     REQUIRE(ptr == nullptr);
-    REQUIRE_MESSAGE(overrided_madvise_called, "Failed madvise syscall was not called");
+    REQUIRE_MESSAGE(mock_madvise_called, "Failed madvise syscall was not called");
 
     // madvise is expected to not fail, move_pages_ptr is failing
     madvise_should_fail = false;
-    overrided_move_pages_called = false;
+    mock_move_pages_called = false;
     ptr = tbb::detail::r1::allocate_interleaved(size, nodes_ids, 2, per_chunk);
     REQUIRE(ptr == nullptr);
-    REQUIRE_MESSAGE(overrided_move_pages_called, "Failed move_pages syscall was not called");
+    REQUIRE_MESSAGE(mock_move_pages_called, "Failed move_pages syscall was not called");
+
+    // mmap is expected to fail
+    mock_mmap_called = false;
+    mmap_should_fail = true;
+    ptr = tbb::detail::r1::allocate_interleaved(size, nodes_ids, 2, per_chunk);
+    REQUIRE(ptr == nullptr);
+    REQUIRE_MESSAGE(mock_mmap_called, "Failed mmap syscall was not called");
+    mmap_should_fail = false;
 #elif _WIN32 || _WIN64
     // VirtualAlloc2_ptr is expected to fail, must use less than chunk size to start with call of
     // VirtualAlloc2_ptr in the committing loop
     void *ptr = tbb::detail::r1::allocate_interleaved(tbb::detail::r1::DefaultSystemPageSize() / 2,
                                                       nodes_ids, 2, per_chunk);
     REQUIRE(ptr == nullptr);
-    REQUIRE_MESSAGE(overrided_VirtualAlloc2_ptr_failed, "Failed VirtualAlloc2 syscall was not called");
+    REQUIRE_MESSAGE(mock_VirtualAlloc2_ptr_failed, "Failed VirtualAlloc2 syscall was not called");
 
     // VirtualAlloc2_ptr is expected not to fail, VirtualFree in the committing loop is failing
-    overrided_VirtualFree_failed = false;
+    mock_VirtualFree_failed = false;
     // must allocate more than chunk size to use VirtualFree in the committing loop
     ptr = tbb::detail::r1::allocate_interleaved(2*per_chunk, nodes_ids, 2, per_chunk);
     REQUIRE(ptr == nullptr);
-    REQUIRE_MESSAGE(overrided_VirtualFree_failed, "Failed VirtualFree syscall was not called");
+    REQUIRE_MESSAGE(mock_VirtualFree_failed, "Failed VirtualFree syscall was not called");
 #endif
 }
 #endif
