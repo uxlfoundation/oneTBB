@@ -55,6 +55,9 @@ static int mock_madvise(void*, size_t, int) noexcept (true) {
 static bool mock_VirtualAlloc2_ptr_failed = false;
 static bool mock_VirtualFree_failed = false;
 
+static bool mock_VirtualAllocEx_called = false;
+static bool VirtualAllocEx_should_fail = false;
+
 BOOL mock_VirtualFree(LPVOID lpAddress, SIZE_T dwSize, DWORD  dwFreeType) {
     static int cnt;
 
@@ -66,7 +69,16 @@ BOOL mock_VirtualFree(LPVOID lpAddress, SIZE_T dwSize, DWORD  dwFreeType) {
     }
 }
 
+LPVOID mock_VirtualAllocEx(HANDLE hProcess, LPVOID lpAddress, SIZE_T dwSize,
+                           DWORD flAllocationType, DWORD flProtect) {
+    mock_VirtualAllocEx_called = true;
+    if (VirtualAllocEx_should_fail)
+        return nullptr;
+    return VirtualAllocEx(hProcess, lpAddress, dwSize, flAllocationType, flProtect);
+}
+
 #define VirtualFree mock_VirtualFree
+#define VirtualAllocEx mock_VirtualAllocEx
 
 #endif
 
@@ -75,6 +87,7 @@ BOOL mock_VirtualFree(LPVOID lpAddress, SIZE_T dwSize, DWORD  dwFreeType) {
 #undef madvise
 #undef mmap
 #undef VirtualFree
+#undef VirtualAllocEx
 
 namespace tbb {
 namespace detail {
@@ -193,7 +206,7 @@ TEST_CASE("allocate_interleaved with failed syscall") {
 #elif _WIN32 || _WIN64
     // VirtualAlloc2_ptr is expected to fail, must use less than chunk size to start with call of
     // VirtualAlloc2_ptr in the committing loop
-    void *ptr = tbb::detail::r1::allocate_interleaved(tbb::detail::r1::DefaultSystemPageSize() / 2,
+    void *ptr = tbb::detail::r1::allocate_interleaved(per_chunk / 2,
                                                       nodes_ids, 2, per_chunk);
     REQUIRE(ptr == nullptr);
     REQUIRE_MESSAGE(mock_VirtualAlloc2_ptr_failed, "Failed VirtualAlloc2 syscall was not called");
@@ -204,6 +217,14 @@ TEST_CASE("allocate_interleaved with failed syscall") {
     ptr = tbb::detail::r1::allocate_interleaved(2*per_chunk, nodes_ids, 2, per_chunk);
     REQUIRE(ptr == nullptr);
     REQUIRE_MESSAGE(mock_VirtualFree_failed, "Failed VirtualFree syscall was not called");
+
+    VirtualAllocEx_should_fail = true;
+    mock_VirtualAllocEx_called = false;
+    // make it null to use VirtualAllocEx
+    tbb::detail::r1::VirtualAlloc2_ptr = nullptr;
+    ptr = tbb::detail::r1::allocate_interleaved(per_chunk / 2, nodes_ids, 1, per_chunk);
+    REQUIRE(ptr == nullptr);
+    REQUIRE_MESSAGE(mock_VirtualAllocEx_called, "Failed VirtualAllocEx syscall was not called");
 #endif
 }
 #endif
