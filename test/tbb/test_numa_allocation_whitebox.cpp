@@ -148,7 +148,7 @@ size_t DefaultSystemPageSize() {
 //! Testing correct behavior if syscall fails
 //! \brief \ref error_guessing
 TEST_CASE("test failed syscall") {
-    // use non-defaul value to not call numa_interleave_memory under Linux
+    // use non-default value to not call numa_interleave_memory under Linux
     size_t per_chunk = 2*4*1024;
     tbb::detail::d1::numa_node_id nodes_ids_array[] = {0};
     tbb::detail::d1::numa_node_id *nodes_ids = nodes_ids_array;
