@@ -153,7 +153,7 @@ TEST_CASE("test failed syscall") {
     tbb::detail::d1::numa_node_id nodes_ids_array[] = {0};
     tbb::detail::d1::numa_node_id *nodes_ids = nodes_ids_array;
 
-    // under Windows, must use < page size to call VirtualAlloc2_ptr in the commit loop
+    // under Windows, must use < page size to call VirtualAlloc2_ptr in the committing loop
     void *ptr = tbb::detail::r1::allocate_interleaved(tbb::detail::r1::DefaultSystemPageSize() / 2,
                                                       nodes_ids, 2, per_chunk);
     REQUIRE(ptr == nullptr);
@@ -169,9 +169,9 @@ TEST_CASE("test failed syscall") {
 #elif _WIN32 || _WIN64
     REQUIRE_MESSAGE(overrided_VirtualAlloc2_ptr_failed, "Failed VirtualAlloc2 syscall was not called");
 
-    // VirtualFree in the commiting loop is expected to fail
+    // VirtualFree in the committing loop is expected to fail
     overrided_VirtualFree_failed = false;
-    // must allocate more then chunk size to use VirtualFree in the commit loop
+    // must allocate more then chunk size to use VirtualFree in the committing loop
     ptr = tbb::detail::r1::allocate_interleaved(2*per_chunk, nodes_ids, 2, per_chunk);
     REQUIRE(ptr == nullptr);
     REQUIRE_MESSAGE(overrided_VirtualFree_failed, "Failed VirtualFree syscall was not called");
