@@ -171,7 +171,7 @@ TEST_CASE("test failed syscall") {
 
     // VirtualFree in the committing loop is expected to fail
     overrided_VirtualFree_failed = false;
-    // must allocate more then chunk size to use VirtualFree in the committing loop
+    // must allocate more than chunk size to use VirtualFree in the committing loop
     ptr = tbb::detail::r1::allocate_interleaved(2*per_chunk, nodes_ids, 2, per_chunk);
     REQUIRE(ptr == nullptr);
     REQUIRE_MESSAGE(overrided_VirtualFree_failed, "Failed VirtualFree syscall was not called");
