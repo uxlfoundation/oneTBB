@@ -150,7 +150,7 @@ size_t DefaultSystemPageSize() {
 TEST_CASE("test failed syscall") {
     // use non-default value to not call numa_interleave_memory under Linux
     size_t per_chunk = 2*4*1024;
-    tbb::detail::d1::numa_node_id nodes_ids_array[] = {0};
+    tbb::detail::d1::numa_node_id nodes_ids_array[] = {0, 0};
     tbb::detail::d1::numa_node_id *nodes_ids = nodes_ids_array;
 
     // under Windows, must use < page size to call VirtualAlloc2_ptr in the committing loop
