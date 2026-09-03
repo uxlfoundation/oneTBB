@@ -153,23 +153,29 @@ TEST_CASE("test failed syscall") {
     tbb::detail::d1::numa_node_id nodes_ids_array[] = {0, 0};
     tbb::detail::d1::numa_node_id *nodes_ids = nodes_ids_array;
 
-    // under Windows, must use < page size to call VirtualAlloc2_ptr in the committing loop
-    void *ptr = tbb::detail::r1::allocate_interleaved(tbb::detail::r1::DefaultSystemPageSize() / 2,
-                                                      nodes_ids, 2, per_chunk);
-    REQUIRE(ptr == nullptr);
 #if __linux__
+    size_t size = 1024;
+    // make madvise failed
+    madvise_should_fail = true;
+    void *ptr = tbb::detail::r1::allocate_interleaved(size, nodes_ids, 2, per_chunk);
+    REQUIRE(ptr == nullptr);
     REQUIRE_MESSAGE(overrided_madvise_called, "Failed madvise syscall was not called");
 
-    // madvise is expected to not fail, move_pages_ptr failed
+    // madvise is expected to not fail, move_pages_ptr is failing
     madvise_should_fail = false;
     overrided_move_pages_called = false;
-    ptr = tbb::detail::r1::allocate_interleaved(1024, nodes_ids, 2, per_chunk);
+    ptr = tbb::detail::r1::allocate_interleaved(size, nodes_ids, 2, per_chunk);
     REQUIRE(ptr == nullptr);
     REQUIRE_MESSAGE(overrided_move_pages_called, "Failed move_pages syscall was not called");
 #elif _WIN32 || _WIN64
+    // VirtualAlloc2_ptr is expected to fail, must use < page size to call VirtualAlloc2_ptr in the
+    // committing loop
+    void *ptr = tbb::detail::r1::allocate_interleaved(tbb::detail::r1::DefaultSystemPageSize() / 2,
+                                                      nodes_ids, 2, per_chunk);
+    REQUIRE(ptr == nullptr);
     REQUIRE_MESSAGE(overrided_VirtualAlloc2_ptr_failed, "Failed VirtualAlloc2 syscall was not called");
 
-    // VirtualFree in the committing loop is expected to fail
+    // VirtualAlloc2_ptr is expected not to fail, VirtualFree in the committing loop is failing
     overrided_VirtualFree_failed = false;
     // must allocate more than chunk size to use VirtualFree in the committing loop
     ptr = tbb::detail::r1::allocate_interleaved(2*per_chunk, nodes_ids, 2, per_chunk);
