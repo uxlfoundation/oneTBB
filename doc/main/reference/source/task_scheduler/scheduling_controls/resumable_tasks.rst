@@ -27,10 +27,8 @@ The user-specified callable object is executed by the calling thread. An excepti
 caller of the ``oneapi::tbb::task::suspend`` function.
 
 The ``oneapi::tbb::task::suspend_point`` context tag must be passed to the ``oneapi::tbb::task::resume`` function to trigger a program execution at the suspended point.
-The ``oneapi::tbb::task::resume`` function can be called at any point of an application, even on a separate thread.
+The ``oneapi::tbb::task::resume`` function can be called at any point of an application, including on a separate thread or directly from the user callable object passed to the ``oneapi::tbb::task::suspend`` function.
 In this regard, this function acts as a signal for the task scheduler.
-The ``oneapi::tbb::task::resume`` function can be called from within the user callable object passed to the ``oneapi::tbb::task::suspend`` function to cancel
-the suspension of the task execution.
 
 .. note::
 
