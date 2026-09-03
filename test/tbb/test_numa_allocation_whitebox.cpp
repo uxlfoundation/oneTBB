@@ -168,8 +168,8 @@ TEST_CASE("test failed syscall") {
     REQUIRE(ptr == nullptr);
     REQUIRE_MESSAGE(overrided_move_pages_called, "Failed move_pages syscall was not called");
 #elif _WIN32 || _WIN64
-    // VirtualAlloc2_ptr is expected to fail, must use < page size to call VirtualAlloc2_ptr in the
-    // committing loop
+    // VirtualAlloc2_ptr is expected to fail, must use less than chunk size to start with call of
+    // VirtualAlloc2_ptr in the committing loop
     void *ptr = tbb::detail::r1::allocate_interleaved(tbb::detail::r1::DefaultSystemPageSize() / 2,
                                                       nodes_ids, 2, per_chunk);
     REQUIRE(ptr == nullptr);
