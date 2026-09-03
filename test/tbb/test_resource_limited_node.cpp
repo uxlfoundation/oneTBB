@@ -1073,7 +1073,7 @@ public:
     optional_type acquire(consumer_type&, request_id id) override {
         lock_type lock(m_mutex);
         auto request = m_requests.find(id);
-        CHECK_MESSAGE(request != m_requests.end(), "Acquire without prior notification");
+        REQUIRE_MESSAGE(request != m_requests.end(), "Acquire without prior notification");
 
         if (request->second++ < num_denials) {
             return {};
