@@ -36,13 +36,30 @@ static int failed_madvise(void*, size_t, int) noexcept (true) {
     return madvise_should_fail ? -1 : 0;
 }
 }
-#elif !(_WIN32 || _WIN64)
+#elif _WIN32 || _WIN64
+
+static bool overrided_VirtualAlloc2_ptr_failed = false;
+static bool overrided_VirtualFree_failed = false;
+
+BOOL failed_VirtualFree(LPVOID lpAddress, SIZE_T dwSize, DWORD  dwFreeType) {
+    static int cnt;
+
+    if (++cnt % 2) {
+        return VirtualFree(lpAddress, dwSize, dwFreeType);
+    } else {
+        overrided_VirtualFree_failed = true;
+        return FALSE;
+    }
+}
+
+#define VirtualFree failed_VirtualFree
 
 #endif
 
 #include "../../src/tbb/numa_allocation.cpp"
 
 #undef madvise
+#undef VirtualFree
 
 namespace tbb {
 namespace detail {
@@ -71,7 +88,21 @@ static struct bitmask* dummy_numa_bitmask_setbit(struct bitmask* m, unsigned int
 
 static void dummy_numa_interleave_memory(void*, size_t, struct bitmask*) {}
 
-#elif !(_WIN32 || _WIN64)
+#elif _WIN32 || _WIN64
+
+static void* dummy_VirtualAlloc2_ptr(HANDLE, PVOID, SIZE_T Size,
+                                     ULONG, ULONG,
+                                     MEM_EXTENDED_PARAMETER *, ULONG) {
+    static int cnt;
+
+    if (++cnt % 2) {
+        return VirtualAllocEx(GetCurrentProcess(), /*BaseAddress=*/nullptr, Size,
+                              MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    } else {
+        overrided_VirtualAlloc2_ptr_failed = true;
+        return nullptr;
+    }
+}
 
 #endif
 
@@ -91,8 +122,8 @@ bool dynamic_link( const char* ,
     numa_bitmask_isbitset_ptr = dummy_numa_bitmask_isbitset;
     numa_bitmask_setbit_ptr = dummy_numa_bitmask_setbit;
     numa_interleave_memory_ptr = dummy_numa_interleave_memory;
-#elif !(_WIN32 || _WIN64)
-
+#elif _WIN32 || _WIN64
+    VirtualAlloc2_ptr = dummy_VirtualAlloc2_ptr;
 #endif
     return true;
 }
@@ -117,24 +148,33 @@ size_t DefaultSystemPageSize() {
 //! Testing correct behavior if syscall fails
 //! \brief \ref error_guessing
 TEST_CASE("test failed syscall") {
+    // use non-defaul value to not call numa_interleave_memory under Linux
+    size_t per_chunk = 2*4*1024;
     tbb::detail::d1::numa_node_id nodes_ids_array[] = {0};
     tbb::detail::d1::numa_node_id *nodes_ids = nodes_ids_array;
 
-    // madvise is expected to fail
-    void *ptr = tbb::detail::r1::allocate_interleaved(1024, nodes_ids, 2, 2*4*1024);
+    // under Windows, must use < page size to call VirtualAlloc2_ptr in the commit loop
+    void *ptr = tbb::detail::r1::allocate_interleaved(tbb::detail::r1::DefaultSystemPageSize() / 2,
+                                                      nodes_ids, 2, per_chunk);
     REQUIRE(ptr == nullptr);
 #if __linux__
     REQUIRE_MESSAGE(overrided_madvise_called, "Failed madvise syscall was not called");
-#endif
 
     // madvise is expected to not fail, move_pages_ptr failed
     madvise_should_fail = false;
     overrided_move_pages_called = false;
-    ptr = tbb::detail::r1::allocate_interleaved(1024, nodes_ids, 2, 2*4*1024);
+    ptr = tbb::detail::r1::allocate_interleaved(1024, nodes_ids, 2, per_chunk);
     REQUIRE(ptr == nullptr);
-#if __linux__
     REQUIRE_MESSAGE(overrided_move_pages_called, "Failed move_pages syscall was not called");
+#elif _WIN32 || _WIN64
+    REQUIRE_MESSAGE(overrided_VirtualAlloc2_ptr_failed, "Failed VirtualAlloc2 syscall was not called");
+
+    // VirtualFree in the commiting loop is expected to fail
+    overrided_VirtualFree_failed = false;
+    // must allocate more then chunk size to use VirtualFree in the commit loop
+    ptr = tbb::detail::r1::allocate_interleaved(2*per_chunk, nodes_ids, 2, per_chunk);
+    REQUIRE(ptr == nullptr);
+    REQUIRE_MESSAGE(overrided_VirtualFree_failed, "Failed VirtualFree syscall was not called");
 #endif
 }
 #endif
-

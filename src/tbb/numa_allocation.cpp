@@ -255,7 +255,8 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
         return nullptr;
 
      auto unmap = [](char* base_addr) {
-        VirtualFree(base_addr, /*dwSize=*/0, MEM_RELEASE);
+        BOOL ret = VirtualFree(base_addr, /*dwSize=*/0, MEM_RELEASE);
+        __TBB_ASSERT_RELEASE(ret, "VirtualFree failed");
     };
     std::unique_ptr<char, decltype(unmap)> data_holder(base_addr, unmap);
 
