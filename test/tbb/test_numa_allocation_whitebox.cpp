@@ -107,7 +107,7 @@ static void* dummy_VirtualAlloc2_ptr(HANDLE, PVOID, SIZE_T Size,
 #endif
 
 void assertion_failure(const char*, int, const char*, const char*) {
-    REQUIRE_MESSAGE(false, "Can't be called");
+    REQUIRE_MESSAGE(false, "Triggering TBB asserts during this test run is unexpected.");
 }
 
 bool dynamic_link( const char* ,
