@@ -185,6 +185,7 @@ TEST_CASE("allocate_interleaved with failed syscall") {
     size_t size = 1024;
     // make madvise failed
     madvise_should_fail = true;
+    mock_madvise_called = false;
     void *ptr = tbb::detail::r1::allocate_interleaved(size, nodes_ids, 2, per_chunk);
     REQUIRE(ptr == nullptr);
     REQUIRE_MESSAGE(mock_madvise_called, "Failed madvise syscall was not called");
