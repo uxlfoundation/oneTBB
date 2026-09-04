@@ -470,6 +470,11 @@ if (TARGET TBB::tbb)
         # The linker may not detect a dependency on pthread in static variable constructors.
         target_link_libraries(test_dynamic_link PRIVATE "-Wl,--no-as-needed")
     endif()
+
+    tbb_add_test(SUBDIR tbb NAME test_numa_allocation_whitebox)
+    target_include_directories(test_numa_allocation_whitebox PRIVATE
+        $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>)
+
     if (APPLE OR ANDROID_PLATFORM)
         target_link_libraries(test_dynamic_link PRIVATE -rdynamic)
     endif()
