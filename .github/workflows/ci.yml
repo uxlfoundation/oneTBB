@@ -96,6 +96,7 @@ jobs:
       - name: Build documentation
         run: |
           set -e -x -o pipefail
+          mv -f thread_composability_manager/doc/* doc/tcm
           export BUILD_TYPE=${BUILD_TYPE} && sphinx-build doc html
           tar -czvf html.tar.gz html/
       - name: Save docs
