@@ -1099,8 +1099,8 @@ public:
 constexpr int denying_resource_provider::resource_value;
 constexpr std::size_t denying_resource_provider::num_denials;
 
-// Test that if one of the required resource providers denied the access to the resource
-// The resource_limited_node correctly releases and re-requests the successfully acquired resources
+// Test that if one of the required resource providers denied the access to the resource,
+// the resource_limited_node correctly releases and re-requests the successfully acquired resources
 //! \brief \ref error_guessing
 TEST_CASE("Test re-requesting the resources when acquisition fails") {
     using namespace tbb::flow;
