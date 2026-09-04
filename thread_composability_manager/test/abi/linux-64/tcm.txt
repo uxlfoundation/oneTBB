@@ -1,0 +1,17 @@
+# Exported symbols of tcm on linux-64.
+# Generated automatically, do not edit by hand.
+
+tcmActivatePermit
+tcmConnect
+tcmDeactivatePermit
+tcmDisconnect
+tcmGetPermitData
+tcmGetVersion
+tcmGetVersionInfo
+tcmIdlePermit
+tcmRegisterThread
+tcmReleasePermit
+tcmRequestPermit
+tcmRuntimeInterfaceVersion
+tcmRuntimeVersion
+tcmUnregisterThread
