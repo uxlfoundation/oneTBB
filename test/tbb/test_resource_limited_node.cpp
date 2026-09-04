@@ -1112,8 +1112,8 @@ TEST_CASE("Test re-requesting the resources when acquisition fails") {
     resource_limiter<int> second_provider{second_resource_value};
     denying_resource_provider third_provider;
 
-    static constexpr int input_value = 0;
-    static constexpr std::size_t num_inputs = 100;
+    constexpr int input_value = 0;
+    constexpr std::size_t num_inputs = 100;
     using node_type = resource_limited_node<int, std::tuple<>>;
 
     std::atomic<std::size_t> count{0};
