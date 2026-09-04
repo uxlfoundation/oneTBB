@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2021 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -88,11 +89,11 @@ public:
         state_type curr_state = (m_state &= READERS | WRITER_PENDING); // Returns current state
 
         if (curr_state & WRITER_PENDING) {
-            r1::notify_by_address(this, WRITER_CONTEXT);
+            notify(WRITER_CONTEXT);
         } else {
             // It's possible that WRITER sleeps without WRITER_PENDING,
             // because other thread might clear this bit at upgrade()
-            r1::notify_by_address_all(this);
+            notify_all();
         }
     }
 
@@ -116,7 +117,7 @@ public:
         if (!(m_state.load(std::memory_order_relaxed) & has_writer)) {
             if (m_state.fetch_add(ONE_READER) & has_writer) {
                 m_state -= ONE_READER;
-                r1::notify_by_address(this, WRITER_CONTEXT);
+                notify(WRITER_CONTEXT);
             } else {
                 call_itt_notify(acquired, this);
                 return true; // successfully stored increased number of readers
@@ -133,11 +134,11 @@ public:
         state_type curr_state = (m_state -= ONE_READER); // Returns current state
 
         if (curr_state & (WRITER_PENDING)) {
-            r1::notify_by_address(this, WRITER_CONTEXT);
+            notify(WRITER_CONTEXT);
         } else {
             // It's possible that WRITER sleeps without WRITER_PENDING,
             // because other thread might clear this bit at upgrade()
-            r1::notify_by_address_all(this);
+            notify_all();
         }
     }
 
@@ -180,10 +181,32 @@ private:
         m_state += (ONE_READER - WRITER);
 
         if (!(m_state & WRITER_PENDING)) {
-            r1::notify_by_address(this, READER_CONTEXT);
+            notify(READER_CONTEXT);
         }
 
         __TBB_ASSERT(m_state.load(std::memory_order_relaxed) & READERS, "invalid state after downgrade: no readers");
+    }
+
+    using context_type = std::uintptr_t;
+
+    //! Notify waiting threads with the given context
+    void notify(context_type target_context) {
+#if !(__TBB_x86_64 || __TBB_x86_32)
+        // RMW on x86 works as a full fence,
+        // but on other platforms we need to issue a seq_cst fence explicitly
+        atomic_fence_seq_cst();
+#endif
+        r1::notify_by_address(this, target_context);
+    }
+
+    //! Notify all waiting threads
+    void notify_all() {
+#if !(__TBB_x86_64 || __TBB_x86_32)
+        // RMW on x86 works as a full fence,
+        // but on other platforms we need to issue a seq_cst fence explicitly
+        atomic_fence_seq_cst();
+#endif
+        r1::notify_by_address_all(this);
     }
 
     using state_type = std::intptr_t;
@@ -193,7 +216,6 @@ private:
     static constexpr state_type ONE_READER = 4;
     static constexpr state_type BUSY = WRITER | READERS;
 
-    using context_type = std::uintptr_t;
     static constexpr context_type WRITER_CONTEXT = 0;
     static constexpr context_type READER_CONTEXT = 1;
     friend scoped_lock;
