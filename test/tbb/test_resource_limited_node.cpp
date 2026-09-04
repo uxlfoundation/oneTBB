@@ -1105,8 +1105,8 @@ constexpr std::size_t denying_resource_provider::num_denials;
 TEST_CASE("Test re-requesting the resources when acquisition fails") {
     using namespace tbb::flow;
 
-    static constexpr int first_resource_value = 500;
-    static constexpr int second_resource_value = 501;
+    constexpr int first_resource_value = 500;
+    constexpr int second_resource_value = 501;
 
     resource_limiter<int> first_provider{first_resource_value};
     resource_limiter<int> second_provider{second_resource_value};
