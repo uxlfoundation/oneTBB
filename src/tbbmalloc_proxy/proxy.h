@@ -17,7 +17,7 @@
 #ifndef _TBB_malloc_proxy_H_
 #define _TBB_malloc_proxy_H_
 
-#define MALLOC_UNIXLIKE_OVERLOAD_ENABLED __linux__
+#define MALLOC_UNIXLIKE_OVERLOAD_ENABLED (__linux__ && __GLIBC__)
 #define MALLOC_ZONE_OVERLOAD_ENABLED __APPLE__
 
 // MALLOC_UNIXLIKE_OVERLOAD_ENABLED depends on MALLOC_CHECK_RECURSION stuff
