@@ -26,6 +26,7 @@
 #include "common/utils_concurrency_limit.h"
 
 #include "tbb/task_arena.h"
+#include "tbb/info.h"
 #include "tbb/task_scheduler_observer.h"
 #include "tbb/enumerable_thread_specific.h"
 #include "tbb/parallel_for.h"
@@ -36,12 +37,14 @@
 #include "tbb/task_group.h"
 
 #include <atomic>
+#include <algorithm>
 #include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
 #include <stdexcept>
 #include <thread>
 #include <vector>
+#include <memory>
 
 //#include "harness_fp.h"
 
@@ -593,6 +596,9 @@ struct TaskArenaValidator {
     // Inspect the internal state
     int concurrency() { return my_arena.debug_max_concurrency(); }
     int reserved_for_masters() { return my_arena.debug_reserved_slots(); }
+    tbb::task_arena::priority priority() { return my_arena.debug_priority(); }
+    tbb::task_arena::leave_policy leave_policy() { return my_arena.debug_leave_policy(); }
+    tbb::task_arena::constraints constraints() { return my_arena.debug_constraints(); }
 
     // This method should be called in task_arena::execute() for a captured arena
     // by the same thread that created the validator.
@@ -674,11 +680,70 @@ struct TestAttachBody : utils::NoAssign {
 
 thread_local int TestAttachBody::my_idx;
 
+void ValidateArenaSettings( const tbb::task_arena& arena, const tbb::task_arena::constraints& expected_constraints,
+                            int expected_masters, tbb::task_arena::priority expected_priority,
+                            tbb::task_arena::leave_policy expected_leave_policy ) {
+    TaskArenaValidator validator( arena );
+    tbb::task_arena::constraints actual_constraints = validator.constraints();
+    CHECK_MESSAGE( actual_constraints.max_concurrency == expected_constraints.max_concurrency,
+            "Unexpected arena size" );
+    CHECK_MESSAGE( actual_constraints.numa_id == expected_constraints.numa_id,
+            "Unexpected NUMA node id" );
+    CHECK_MESSAGE( actual_constraints.core_type == expected_constraints.core_type,
+            "Unexpected core type id" );
+    CHECK_MESSAGE( actual_constraints.max_threads_per_core == expected_constraints.max_threads_per_core,
+            "Unexpected number of threads per core" );
+
+    CHECK_MESSAGE( validator.reserved_for_masters() == expected_masters,
+            "Unexpected number of reserved slots" );
+    CHECK_MESSAGE( validator.priority() == expected_priority, "Unexpected priority" );
+    CHECK_MESSAGE( validator.leave_policy() == expected_leave_policy, "Unexpected leave policy" );
+}
+
+void TestArenaPreservedSettings() {
+    const int reserved_slots = 2;
+    const auto arena_priority = tbb::task_arena::priority::high;
+    const auto arena_leave_policy = tbb::task_arena::leave_policy::fast;
+
+    tbb::task_arena::constraints arena_constraints{};
+    arena_constraints.set_numa_id( tbb::info::numa_nodes().front() )
+                     .set_core_type( tbb::info::core_types().front() )
+                     .set_max_threads_per_core( 1 );
+    arena_constraints.set_max_concurrency(
+        std::max( reserved_slots, tbb::info::default_concurrency(arena_constraints) ) );
+
+    tbb::task_arena arena( arena_constraints, reserved_slots, arena_priority, arena_leave_policy );
+    ValidateArenaSettings( arena, arena_constraints, reserved_slots, arena_priority, arena_leave_policy );
+
+    tbb::task_arena copied_arena( arena );
+    ValidateArenaSettings( copied_arena, arena_constraints, reserved_slots, arena_priority, arena_leave_policy );
+
+    arena.execute( [&] {
+        tbb::task_arena attached_arena{ tbb::task_arena::attach{} };
+        CHECK_MESSAGE( attached_arena.is_active(), "The arena was not attached" );
+        ValidateArenaSettings( attached_arena, arena_constraints, reserved_slots, arena_priority,
+                               arena_leave_policy );
+
+        // Copying an attached arena copies the settings but not the reference
+        tbb::task_arena copied_from_attached_arena( attached_arena );
+        CHECK_MESSAGE( !copied_from_attached_arena.is_active(), "A copy of an arena should not be initialized" );
+        ValidateArenaSettings( copied_from_attached_arena, arena_constraints, reserved_slots, arena_priority,
+                               arena_leave_policy );
+
+        copied_from_attached_arena.initialize();
+        ValidateArenaSettings( copied_from_attached_arena, arena_constraints, reserved_slots, arena_priority,
+                               arena_leave_policy );
+    } );
+}
+
 void TestAttach( int maxthread ) {
     // Externally concurrent, but no concurrency within a thread
     utils::NativeParallelFor( std::max(maxthread,4), TestAttachBody( maxthread ) );
     // Concurrent within the current arena; may also serve as a stress test
     tbb::parallel_for( Range(0,10000*maxthread), TestAttachBody( maxthread ) );
+    // Checks that all the settings of an explicitly created arena survive both
+    // the attach to it and the copying
+    TestArenaPreservedSettings();
 }
 
 //--------------------------------------------------//
@@ -2022,6 +2087,13 @@ TEST_CASE("Empty task_handle cannot be scheduled"
 //! \brief \ref error_guessing
 TEST_CASE("Test threads sleep") {
     for (auto concurrency_level : utils::concurrency_range()) {
+#if __TBB_TCM_TESTING_ENABLED
+        // On lower number of threads (e.g. 2), negotiation of resources from many dangling arenas
+        // left from previous test cases might be a significant contributing factor to the CPU usr
+        // times this test tries to assess.
+        if (concurrency_level < 3)
+            continue;
+#endif
         int conc = int(concurrency_level);
         test_threads_sleep(conc, 0);
         test_threads_sleep(conc, 1);
@@ -2244,3 +2316,14 @@ TEST_CASE("Test enqueue guarantees when task_arena is combined with task_group")
 }
 
 #endif // TBB_USE_EXCEPTIONS
+
+#if __TBB_CPP17_PRESENT
+//! \brief \ref regression
+TEST_CASE("ODR-use task_arena constants") {
+    CHECK(utils::force_constant_odr_use(tbb::task_arena::automatic) == tbb::task_arena::automatic);
+    CHECK(utils::force_constant_odr_use(tbb::task_arena::not_initialized) == tbb::task_arena::not_initialized);
+
+    auto task_arena_ptr = std::make_unique<tbb::task_arena>(tbb::task_arena::automatic);
+    CHECK(task_arena_ptr != nullptr);
+}
+#endif // __TBB_CPP17_PRESENT

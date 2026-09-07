@@ -42,6 +42,9 @@ For the purpose of spreading memory access for better throughput it is sufficien
 only the allocation size. In this case, `interleaving step` defaults to the page size (in bytes)
 and the memory is spread across all NUMA nodes.
 
+Due to operating system limitations, interleaving is implemented on a best-effort basis. It's only
+desired memory placement rather than mandatory.
+
 ## API proposal
 
 ### Header file

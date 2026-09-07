@@ -74,7 +74,8 @@ private:
             }
 
             path_start = std::strchr(path_start + 3, ':') + 1;
-            __TCM_ASSERT(path_start <= last_char, "Too long path?");
+            check(path_start <= last_char, /*msg*/"", /*num_indents*/0, /*report_msg*/"Buffer length"
+                  " seems to be too small to store the path of CPU controller.");
             break;
         }
         return path_start;
@@ -191,7 +192,8 @@ private:
             return num_cpus;
         }
 
-        __TCM_ASSERT(std::strncmp(mnt_type, "cgroup", 6) == 0, "Unexpected cgroup type");
+        check(std::strncmp(mnt_type, "cgroup", 6) == 0, /*msg*/"", /*num_indents*/0,
+              /*report_msg*/"Unexpected cgroup type");
 
         if (try_read_cgroup_v1_num_cpus_from(mnt_dir, num_cpus))
             return num_cpus; // Successfully read number of CPUs for cgroup v1

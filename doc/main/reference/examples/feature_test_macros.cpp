@@ -50,7 +50,7 @@ int main() {
                       parallel_loop2_body{});
 
 #if TBB_HAS_PARALLEL_PHASE
-    tbb::this_task_arena::end_parallel_phase(/*with_fast_leave=*/true);
+    tbb::this_task_arena::end_parallel_phase(tbb::task_arena::parallel_phase::end_flag_fast_leave{});
 #endif
 }
 

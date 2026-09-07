@@ -11,8 +11,6 @@
 #include <vector>
 #include <thread>               // for std::thread::hardware_concurrency
 
-#include "tcm/detail/_tcm_assert.h"
-
 #if _MSC_VER && !__INTEL_COMPILER && !__clang__
 #pragma warning( push )
 #pragma warning( disable : 4100 )
@@ -123,7 +121,7 @@ private:
             process_node_affinity_mask = hwloc_bitmap_alloc();
 
             auto r = hwloc_get_cpubind(topology, process_cpu_affinity_mask, 0);
-            __TCM_ASSERT_EX(r >= 0, "HWLOC get CPU bind error.");
+            check(r >= 0, /*msg*/"", /*num_indents*/0, /*report_msg*/"HWLOC get CPU bind error.");
             hwloc_cpuset_to_nodeset(topology, process_cpu_affinity_mask, process_node_affinity_mask);
         }
 
@@ -167,7 +165,8 @@ private:
 
                 counter++;
             } hwloc_bitmap_foreach_end();
-            __TCM_ASSERT(max_numa_index >= 0, "Maximal NUMA index must not be negative");
+            check(max_numa_index >= 0, /*msg*/"", /*num_indents*/0,
+                  /*report_msg*/"Maximal NUMA index must not be negative");
 
             // Fill concurrency and affinity masks lists
             numa_affinity_masks_list.resize(max_numa_index + 1);
@@ -180,7 +179,8 @@ private:
                 current_mask = hwloc_bitmap_dup(node_buffer->cpuset);
 
                 hwloc_bitmap_and(current_mask, current_mask, process_cpu_affinity_mask);
-                __TCM_ASSERT(!hwloc_bitmap_iszero(current_mask), "hwloc detected unavailable NUMA node");
+                check(!hwloc_bitmap_iszero(current_mask), /*msg*/"", /*num_indents*/0,
+                      /*report_msg*/"HWLOC detected unavailable NUMA node");
             } hwloc_bitmap_foreach_end();
         }
     }
@@ -192,7 +192,8 @@ private:
             return;
         }
 #if __TCM_HWLOC_HYBRID_CPUS_INTERFACES_PRESENT
-        __TCM_ASSERT(hwloc_get_api_version() >= 0x20400, "Hybrid CPUs support interfaces required HWLOC >= 2.4");
+        check(hwloc_get_api_version() >= 0x20400, /*msg*/"", /*num_indents*/0,
+              /*report_msg*/"Hybrid CPUs support interfaces required HWLOC >= 2.4");
         // Parsing the hybrid CPU topology
         int core_types_number = hwloc_cpukinds_get_nr(topology, 0);
         bool core_types_parsing_broken = core_types_number <= 0;
@@ -212,7 +213,8 @@ private:
                     if (hwloc_bitmap_weight(current_mask) > 0) {
                         core_types_indexes_list.push_back(core_type);
                     }
-                    __TCM_ASSERT(hwloc_bitmap_weight(current_mask) >= 0, "Infinivitely filled core type mask");
+                    check(hwloc_bitmap_weight(current_mask) >= 0, /*msg*/"", /*num_indents*/0,
+                          /*report_msg*/"Infinitely filled core type mask");
                 } else {
                     core_types_parsing_broken = true;
                     break;
@@ -284,18 +286,20 @@ public:
     }
 
     static system_topology& instance() {
-        __TCM_ASSERT(instance_ptr != nullptr, "Getting instance of non-constructed topology");
+        check(instance_ptr != nullptr, /*msg*/"", /*num_indents*/0,
+              /*report_msg*/"Getting instance of non-constructed topology");
         return *instance_ptr;
     }
 
     static void destroy() {
-        __TCM_ASSERT(instance_ptr != nullptr, "Destroying non-constructed topology");
+        check(instance_ptr != nullptr, /*msg*/"", /*num_indents*/0,
+              /*report_msg*/"Destroying non-constructed topology");
         delete instance_ptr;
         instance_ptr = nullptr;
     }
 
     system_topology() = default;
-    system_topology(const system_topology&) = delete; 
+    system_topology(const system_topology&) = delete;
     system_topology& operator=(const system_topology&) = delete;
 
     ~system_topology() {
@@ -320,7 +324,8 @@ public:
     }
 
     const hwloc_topology_t& get_topology() {
-        __TCM_ASSERT(instance_ptr != nullptr, "Getting of non-constructed topology");
+        check(instance_ptr != nullptr, /*msg*/"", /*num_indents*/0,
+              /*report_msg*/"Getting of non-constructed topology");
         return topology;
     }
 
@@ -328,7 +333,8 @@ public:
         int& _numa_nodes_count, int*& _numa_indexes_list,
         int& _core_types_count, int*& _core_types_indexes_list
     ) {
-        __TCM_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized system_topology");
+        check(is_topology_parsed(), /*msg*/"", /*num_indents*/0,
+              /*report_msg*/"Trying to get access to uninitialized system_topology");
         _numa_nodes_count = numa_nodes_count;
         _numa_indexes_list = numa_indexes_list.data();
 
@@ -339,10 +345,14 @@ public:
     void fill_constraints_affinity_mask(affinity_mask input_mask, int numa_node_index,
                                         int core_type_index, int max_threads_per_core)
     {
-        __TCM_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized system_topology");
-        __TCM_ASSERT(numa_node_index < (int)numa_affinity_masks_list.size(), "Wrong NUMA node id");
-        __TCM_ASSERT(core_type_index < (int)core_types_affinity_masks_list.size(), "Wrong core type id");
-        __TCM_ASSERT(max_threads_per_core == -1 || max_threads_per_core > 0, "Wrong max_threads_per_core");
+        check(is_topology_parsed(), /*msg*/"", /*num_indents*/0,
+              /*report_msg*/ "Trying to get access to uninitialized system_topology");
+        check(numa_node_index < (int)numa_affinity_masks_list.size(), /*msg*/"", /*num_indents*/0,
+              /*report_msg*/ "Wrong NUMA node id");
+        check(core_type_index < (int)core_types_affinity_masks_list.size(), /*msg*/"", /*num_indents*/0,
+              /*report_msg*/ "Wrong core type id");
+        check(max_threads_per_core == -1 || max_threads_per_core > 0, /*msg*/"", /*num_indents*/0,
+              /*report_msg*/ "Wrong max_threads_per_core");
 
         hwloc_cpuset_t constraints_mask = hwloc_bitmap_alloc();
         hwloc_cpuset_t core_mask = hwloc_bitmap_alloc();
@@ -392,7 +402,8 @@ public:
     }
 
     int get_default_concurrency(int numa_node_index, int core_type_index, int max_threads_per_core) {
-        __TCM_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized system_topology");
+        check(is_topology_parsed(), /*msg*/"", /*num_indents*/0,
+              /*report_msg*/"Trying to get access to uninitialized system_topology");
 
         hwloc_cpuset_t constraints_mask = hwloc_bitmap_alloc();
         fill_constraints_affinity_mask(constraints_mask, numa_node_index, core_type_index, max_threads_per_core);
@@ -403,7 +414,8 @@ public:
     }
 
     unsigned get_process_concurrency() const {
-        __TCM_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized system_topology");
+        check(is_topology_parsed(), /*msg*/"", /*num_indents*/0,
+              /*report_msg*/"Trying to get access to uninitialized system_topology");
 
         int process_concurrency = hwloc_bitmap_weight(process_cpu_affinity_mask);
         if (process_concurrency <= 0) {
@@ -417,12 +429,14 @@ public:
     }
 
     const_affinity_mask process_affinity_mask() {
-        __TCM_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized system_topology");
+        check(is_topology_parsed(), /*msg*/"", /*num_indents*/0,
+              /*report_msg*/"Trying to get access to uninitialized system_topology");
         return process_cpu_affinity_mask;
     }
 
     affinity_mask allocate_process_affinity_mask() {
-        __TCM_ASSERT(is_topology_parsed(), "Trying to get access to uninitialized system_topology");
+        check(is_topology_parsed(), /*msg*/"", /*num_indents*/0,
+              /*report_msg*/"Trying to get access to uninitialized system_topology");
         return hwloc_bitmap_dup(process_cpu_affinity_mask);
     }
 
@@ -432,17 +446,17 @@ public:
 
     void store_current_affinity_mask( affinity_mask current_mask ) {
         auto result = hwloc_get_cpubind(topology, current_mask, HWLOC_CPUBIND_THREAD);
-        __TCM_ASSERT_EX(result >= 0, "hwloc_get_cpubind failed.");
+        check(result >= 0, /*msg*/"", /*num_indents*/0, /*report_msg*/"hwloc_get_cpubind failed.");
 
         hwloc_bitmap_and(current_mask, current_mask, process_cpu_affinity_mask);
-        __TCM_ASSERT(!hwloc_bitmap_iszero(current_mask),
-            "Current affinity mask must intersects with process affinity mask");
+        check(!hwloc_bitmap_iszero(current_mask), /*msg*/"", /*num_indents*/0,
+              /*report_msg*/"Current affinity mask does not intersect with process affinity mask");
     }
 
     void set_affinity_mask( const_affinity_mask mask ) {
         if (hwloc_bitmap_weight(mask) > 0) {
           auto result = hwloc_set_cpubind(topology, mask, HWLOC_CPUBIND_THREAD);
-          __TCM_ASSERT_EX(result >= 0, "hwloc_set_cpubind failed.");
+          check(result >= 0, /*msg*/"", /*num_indents*/0, /*report_msg*/"hwloc_set_cpubind failed.");
         }
     }
 };

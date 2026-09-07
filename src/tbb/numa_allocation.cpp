@@ -25,12 +25,20 @@
 
 #if __linux__
 
+#include <algorithm> // for std::any_of
 #include <sys/mman.h>
-
-// TBB build must be done without numaif.h, but we need signature of move_pages()
+// TBB build must be done without numaif.h, but we need signatures of those functions
 // for dynamic loading, so declare it here.
-extern "C" long move_pages(int pid, unsigned long count,
-                           void **pages, const int *nodes, int *status, int flags);
+extern "C" {
+long move_pages(int pid, unsigned long count,
+                void **pages, const int *nodes, int *status, int flags);
+struct bitmask *numa_bitmask_alloc(unsigned int);
+void numa_bitmask_free(struct bitmask *);
+int numa_bitmask_isbitset(const struct bitmask *, unsigned int);
+struct bitmask *numa_bitmask_setbit(struct bitmask *, unsigned int);
+void numa_interleave_memory(void *mem, size_t size, struct bitmask *mask);
+
+} // extern "C"
 
 #elif !(_WIN32 || _WIN64)
 
@@ -46,13 +54,28 @@ namespace r1 {
 
 #if __TBB_WEAK_SYMBOLS_PRESENT
 #pragma weak move_pages
+#pragma weak numa_bitmask_alloc
+#pragma weak numa_bitmask_free
+#pragma weak numa_bitmask_isbitset
+#pragma weak numa_bitmask_setbit
+#pragma weak numa_interleave_memory
 #endif
 
 static long (*move_pages_ptr)(int pid, unsigned long count,
              void **pages, const int *nodes, int *status, int flags);
+static struct bitmask *(*numa_bitmask_alloc_ptr)(unsigned int);
+static void (*numa_bitmask_free_ptr)(struct bitmask *);
+static int (*numa_bitmask_isbitset_ptr)(const struct bitmask *, unsigned int);
+static struct bitmask *(*numa_bitmask_setbit_ptr)(struct bitmask *, unsigned int);
+static void (*numa_interleave_memory_ptr)(void *mem, size_t size, struct bitmask *mask);
 
 static const dynamic_link_descriptor LibnumaLinkTable[] = {
-    DLD(move_pages, move_pages_ptr)
+    DLD(move_pages, move_pages_ptr),
+    DLD(numa_bitmask_alloc, numa_bitmask_alloc_ptr),
+    DLD(numa_bitmask_free, numa_bitmask_free_ptr),
+    DLD(numa_bitmask_isbitset, numa_bitmask_isbitset_ptr),
+    DLD(numa_bitmask_setbit, numa_bitmask_setbit_ptr),
+    DLD(numa_interleave_memory, numa_interleave_memory_ptr)
 };
 #elif _WIN32 || _WIN64
 static PVOID (*VirtualAlloc2_ptr)(HANDLE Process,
@@ -112,6 +135,15 @@ static const int *common_init(size_t bytes, const tbb::detail::d1::numa_node_id 
     return nodes;
 }
 
+static bool is_numa_funcs_found() {
+#if __linux__
+    return move_pages_ptr && numa_bitmask_alloc_ptr && numa_bitmask_free_ptr &&
+           numa_bitmask_isbitset_ptr && numa_bitmask_setbit_ptr && numa_interleave_memory_ptr;
+#elif _WIN32 || _WIN64
+    return VirtualAlloc2_ptr;
+ #endif
+}
+
 #if __linux__
 void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
                         const tbb::detail::d1::numa_node_id *nodes_ids, size_t nodes_count,
@@ -125,21 +157,57 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     if (base_addr == MAP_FAILED)
         return nullptr;
 
+    // no NUMA nodes or move_pages() not available, just return the memory as is
+    if (numa_node_count() == 1 || !is_numa_funcs_found())
+        return base_addr;
+
     auto unmap = [bytes](void *ptr) {
         munmap(ptr, bytes);
     };
     std::unique_ptr<void, decltype(unmap)> data_holder(base_addr, unmap);
 
-    // no NUMA nodes or move_pages() not available, just return the memory as is
-    if (numa_node_count() == 1 || !move_pages_ptr)
-        return data_holder.release();
+    // For chunk size equal to page size and all nodes being different we can place memory right to
+    // the appropriate NUMA nodes with a single system call, otherwise we need to touch each page
+    // from current thread and only then move them.
+    // Another case is allocation from a single NUMA node, in this case bytes_per_chunk is irrelevant.
+    if ((bytes_per_chunk == governor::default_page_size() && nodes_count <= numa_node_count())
+         || nodes_count == 1) {
+        auto bitmask_free = [](struct bitmask *m) {
+            numa_bitmask_free_ptr(m);
+        };
+        std::unique_ptr<struct bitmask, decltype(bitmask_free)>
+            bitmask_holder(numa_bitmask_alloc_ptr(numa_node_count()), bitmask_free);
+
+        size_t i = 0;
+        for (; i < nodes_count; ++i) {
+            // numa_interleave_memory doesn't support repeated nodes, fallback to move_pages()
+            if (numa_bitmask_isbitset_ptr(bitmask_holder.get(), nodes[i]))
+                break;
+            numa_bitmask_setbit_ptr(bitmask_holder.get(), nodes[i]);
+        }
+        if (i == nodes_count) {
+            numa_interleave_memory_ptr(base_addr, bytes, bitmask_holder.get());
+
+            return data_holder.release();
+        }
+    }
+    // process non-standard chunk size or repeated nodes
+
+    // If /sys/kernel/mm/transparent_hugepage/enabled is set to "always", allocations of objects
+    // > 2MB with non-default bytes_per_chunk (say, 8K) fail, because move_pages() can't fulfill
+    // the request. MADV_NOHUGEPAGE prevents this. Cover smaller sizes as well, because several
+    // allocations with smaller sizes can be potentially joined by Transparent Huge Pages (THP).
+    // Expecting that madvise() is aligning bytes to page size.
+    int r = madvise(base_addr, bytes, MADV_NOHUGEPAGE);
+    if (r != 0)
+        return nullptr;
 
     // touch each page, otherwise move_pages() will fail with EFAULT
     for (size_t i = 0; i < bytes; i += governor::default_page_size())
         base_addr[i] = 0;
 
     size_t count_pages = (bytes + governor::default_page_size() - 1) / governor::default_page_size();
-    std::unique_ptr<void*[]> pages(new void*[count_pages]);
+    std::unique_ptr<void *[]> pages(new void *[count_pages]);
     std::unique_ptr<int[]> nodes_per_page(new int[count_pages]);
     std::unique_ptr<int[]> status(new int[count_pages]);
 
@@ -156,10 +224,8 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     if (ret < 0)
         return nullptr;
 
-    for (size_t i = 0; i < count_pages; ++i)
-        if (status[i] < 0)
-            return nullptr;
-    return data_holder.release();
+    return std::any_of(status.get(), status.get() + count_pages, [](int s) { return s < 0; }) ?
+        nullptr : data_holder.release();
 }
 
 #elif _WIN32 || _WIN64
@@ -172,7 +238,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
         return nullptr;
 
     // no NUMA nodes or no VirtualAlloc2, just return the memory as is
-    if (numa_node_count() == 1 || !VirtualAlloc2_ptr)
+    if (numa_node_count() == 1 || !is_numa_funcs_found())
         // do not use VirtualAlloc(), because it compiled incorrectly by MSVC 2017 with
         // -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug -DTBB_WINDOWS_DRIVER=ON
         return VirtualAllocEx(GetCurrentProcess(), /*BaseAddress=*/nullptr, bytes, MEM_RESERVE | MEM_COMMIT,
@@ -233,7 +299,7 @@ void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t bytes) {
 #if __linux__
     munmap(ptr, bytes);
 #elif _WIN32 || _WIN64
-    (void)bytes;
+    suppress_unused_warning(bytes);
     VirtualFree(ptr, /*dwSize=*/0, MEM_RELEASE);
 #endif
 }
@@ -248,8 +314,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
         calloc(bytes, 1) : nullptr;
 }
 
-void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t bytes) {
-    (void)bytes;
+void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t /*bytes*/) {
     free(ptr);
 }
 

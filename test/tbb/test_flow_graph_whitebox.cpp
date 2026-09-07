@@ -645,7 +645,7 @@ void TestResourceLimitedNode() {
     using policy_type = tbb::flow::queueing;
     using multinode_type = tbb::flow::resource_limited_node<int, std::tuple<int, int>>;
 
-    tbb::flow::resource_limiter<int> limiter(1);
+    tbb::flow::resource_limiter<int> limiter{1};
     TestMultiNode<multinode_type, policy_type>("Testing resource_limited_node", std::tie(limiter));
 }
 #endif

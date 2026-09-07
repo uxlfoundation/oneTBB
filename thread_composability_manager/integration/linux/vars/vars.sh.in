@@ -157,6 +157,9 @@ if [ -e "$TCM_LIB_DIR" ]; then
   export TCMROOT
 
   LD_LIBRARY_PATH=$(prepend_path "${TCM_LIB_DIR}" "${LD_LIBRARY_PATH:-}") ; export LD_LIBRARY_PATH
+  LIBRARY_PATH=$(prepend_path "${TCM_LIB_DIR}" "${LIBRARY_PATH:-}") ; export LIBRARY_PATH
+  C_INCLUDE_PATH=$(prepend_path "${TCMROOT}/include" "${C_INCLUDE_PATH:-}"); export C_INCLUDE_PATH
+  CPLUS_INCLUDE_PATH=$(prepend_path "${TCMROOT}/include" "${CPLUS_INCLUDE_PATH:-}"); export CPLUS_INCLUDE_PATH
 else
   >&2 echo "ERROR: TCM library directory ${TCM_LIB_DIR} does not exist."
   return 255 2>/dev/null || exit 255

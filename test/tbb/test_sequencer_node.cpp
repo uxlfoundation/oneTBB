@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -24,6 +25,7 @@
 #include "common/utils_assert.h"
 #include "common/test_follows_and_precedes_api.h"
 #include "common/concepts_common.h"
+#include "common/graph_utils.h"
 
 #include <cstdio>
 #include <atomic>
@@ -46,11 +48,6 @@ template< typename T >
 bool wait_try_get( tbb::flow::graph &g, tbb::flow::sequencer_node<T> &q, T &value ) {
     g.wait_for_all();
     return q.try_get(value);
-}
-
-template< typename T >
-void spin_try_get( tbb::flow::queue_node<T> &q, T &value ) {
-    while ( q.try_get(value) != true ) ;
 }
 
 template< typename T >

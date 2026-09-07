@@ -13,8 +13,7 @@
  * and OS API
  **************************************************************************************************/
 
-#include "tcm/detail/_tcm_assert.h"
-
+#include "tcm/detail/_config.h"
 #include "tcm.h"
 
 #include "test_exceptions.h"
@@ -29,89 +28,36 @@
 #include <thread>
 #include <vector>
 
-// MSVC Warning: Args can be incorrect: this does not match function name specification
-__TCM_SUPPRESS_WARNING_WITH_PUSH(6387)
-inline int SetEnv( const char *envname, const char *envval ) {
-    __TCM_ASSERT( (envname && envval), "SetEnv requires two valid C strings" );
-#if !(_MSC_VER || __MINGW32__ || __MINGW64__)
-    // On POSIX systems use setenv
-    return setenv(envname, envval, /*overwrite=*/1);
-#elif __STDC_SECURE_LIB__>=200411
-    // this macro is set in VC & MinGW if secure API functions are present
-    return _putenv_s(envname, envval);
-#else
-    // If no secure API on Windows, use _putenv
-    size_t namelen = strlen(envname), valuelen = strlen(envval);
-    char* buf = new char[namelen+valuelen+2];
-    strncpy(buf, envname, namelen);
-    buf[namelen] = '=';
-    strncpy(buf+namelen+1, envval, valuelen);
-    buf[namelen+1+valuelen] = char(0);
-    int status = _putenv(buf);
-    delete[] buf;
-    return status;
-#endif
-}
-
-char* GetEnv(const char* envname) {
-    __TCM_ASSERT(envname, "GetEnv requires valid C string");
-    return std::getenv(envname);
-}
-__TCM_SUPPRESS_WARNING_POP
-
-
 /***************************************************************************************************
- * TCM-specific helpers
+ * Testing and reporting functions
  **************************************************************************************************/
+template <bool skip_out_stream = false, bool skip_err_stream = false>
+class tcm_test_logger_t {
+public:
+    tcm_test_logger_t() = default;
 
-tcm_permit_request_t make_request(int min_sw_threads = tcm_automatic,
-                                  int max_sw_threads = tcm_automatic,
-                                  tcm_cpu_constraints_t* constraints = nullptr, uint32_t size = 0,
-                                  tcm_request_priority_t priority = TCM_REQUEST_PRIORITY_NORMAL,
-                                  tcm_permit_flags_t flags = {})
-{
-    __TCM_ASSERT(!(!constraints ^ !size), "Inconsistent request.");
+    template <typename T> void log(T&& msg) const {
+        if constexpr (!skip_out_stream)
+            log_to(out_stream(), std::forward<T>(msg));
+    }
 
-    tcm_permit_request_t req = TCM_PERMIT_REQUEST_INITIALIZER;
+    template <typename T> void log_error(T&& msg) const {
+        if constexpr (!skip_err_stream)
+            log_to(err_stream(), std::forward<T>(msg));
+    }
 
-    req.min_sw_threads = min_sw_threads; req.max_sw_threads = max_sw_threads;
-    req.cpu_constraints = constraints; req.constraints_size = size;
-    req.priority = priority; req.flags = flags;
+    template <typename T> void log_to(std::ostream& os, T&& msg) const {
+        os << msg << std::endl;
+    }
+private:
+    static std::ostream& out_stream() { return std::cout; }
+    static std::ostream& err_stream() { return std::cerr; }
 
-    return req;
-}
+    tcm_test_logger_t(const tcm_test_logger_t&) = delete;
+    tcm_test_logger_t& operator=(const tcm_test_logger_t&) = delete;
+};
 
-tcm_permit_t make_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
-                         uint32_t size = 1, tcm_permit_state_t state = TCM_PERMIT_STATE_VOID,
-                         tcm_permit_flags_t flags = {})
-{
-  __TCM_ASSERT(concurrencies, "Array of concurrencies cannot be nullptr.");
-  return tcm_permit_t{concurrencies, cpu_masks, size, state, flags};
-}
-
-tcm_permit_t make_void_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
-                               uint32_t size = 1, tcm_permit_flags_t flags = {})
-{
-    return make_permit(concurrencies, cpu_masks, size, TCM_PERMIT_STATE_VOID, flags);
-}
-
-tcm_permit_t make_active_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
-                                 uint32_t size = 1, tcm_permit_flags_t flags = {})
-{
-  return make_permit(concurrencies, cpu_masks, size, TCM_PERMIT_STATE_ACTIVE, flags);
-}
-
-tcm_permit_t make_inactive_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
-                                  uint32_t size = 1, tcm_permit_flags_t flags = {})
-{
-  return make_permit(concurrencies, cpu_masks, size, TCM_PERMIT_STATE_INACTIVE, flags);
-}
-
-tcm_permit_t make_pending_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
-                                  uint32_t size = 1, tcm_permit_flags_t flags = {})
-{
-  return make_permit(concurrencies, cpu_masks, size, TCM_PERMIT_STATE_PENDING, flags);
-}
+static tcm_test_logger_t</*skip_out_stream*/false, /*skip_err_stream*/false> logger;
 
 
 /***************************************************************************************************
@@ -157,37 +103,6 @@ private:
     std::vector<tcm_client_id_t> tcm_clients;
 };
 
-/***************************************************************************************************
- * Testing and reporting functions
- **************************************************************************************************/
-template <bool skip_out_stream = false, bool skip_err_stream = false>
-class tcm_test_logger_t {
-public:
-    tcm_test_logger_t() = default;
-
-    template <typename T> void log(T&& msg) const {
-        if constexpr (!skip_out_stream)
-            log_to(out_stream(), std::forward<T>(msg));
-    }
-
-    template <typename T> void log_error(T&& msg) const {
-        if constexpr (!skip_err_stream)
-            log_to(err_stream(), std::forward<T>(msg));
-    }
-
-    template <typename T> void log_to(std::ostream& os, T&& msg) const {
-        os << msg << std::endl;
-    }
-private:
-    static std::ostream& out_stream() { return std::cout; }
-    static std::ostream& err_stream() { return std::cerr; }
-
-    tcm_test_logger_t(const tcm_test_logger_t&) = delete;
-    tcm_test_logger_t& operator=(const tcm_test_logger_t&) = delete;
-};
-
-/* Global objects */
-static tcm_test_logger_t</*skip_out_stream*/false, /*skip_err_stream*/false> logger;
 static tcm_tests_data tcm_tests;
 
 #define TEST_PREFACE(name, filename, linenumber)                                                   \
@@ -202,6 +117,9 @@ static tcm_tests_data tcm_tests;
 #define TEST(name) TEST_AUX((name), __FILE__, __LINE__)
 
 
+/***************************************************************************************************
+ * Basic helpers for a test
+ ***************************************************************************************************/
 bool check(bool b, const std::string& msg, unsigned num_indents = 0,
            const std::string& report_msg = "")
 {
@@ -247,6 +165,97 @@ inline bool check_fail(tcm_result_t res, const std::string& msg = "",
 }
 
 /***************************************************************************************************
+ * Setting and getting value of an environment variable
+ ***************************************************************************************************/
+
+// MSVC Warning: Args can be incorrect: this does not match function name specification
+__TCM_SUPPRESS_WARNING_WITH_PUSH(6387)
+inline int SetEnv( const char *envname, const char *envval ) {
+    check( (envname && envval), /*msg*/"", /*num_indents*/0,
+           /*report_msg*/"SetEnv requires two valid C strings" );
+#if !(_MSC_VER || __MINGW32__ || __MINGW64__)
+    // On POSIX systems use setenv
+    return setenv(envname, envval, /*overwrite=*/1);
+#elif __STDC_SECURE_LIB__>=200411
+    // this macro is set in VC & MinGW if secure API functions are present
+    return _putenv_s(envname, envval);
+#else
+    // If no secure API on Windows, use _putenv
+    size_t namelen = strlen(envname), valuelen = strlen(envval);
+    char* buf = new char[namelen+valuelen+2];
+    strncpy(buf, envname, namelen);
+    buf[namelen] = '=';
+    strncpy(buf+namelen+1, envval, valuelen);
+    buf[namelen+1+valuelen] = char(0);
+    int status = _putenv(buf);
+    delete[] buf;
+    return status;
+#endif
+}
+
+char* GetEnv(const char* envname) {
+    check(envname, /*msg*/"", /*num_indents*/0, /*report_msg*/"GetEnv requires valid C string");
+    return std::getenv(envname);
+}
+__TCM_SUPPRESS_WARNING_POP
+
+
+/***************************************************************************************************
+ * TCM-specific helpers
+ **************************************************************************************************/
+
+tcm_permit_request_t make_request(int min_sw_threads = tcm_automatic,
+                                  int max_sw_threads = tcm_automatic,
+                                  tcm_cpu_constraints_t* constraints = nullptr, uint32_t size = 0,
+                                  tcm_request_priority_t priority = TCM_REQUEST_PRIORITY_NORMAL,
+                                  tcm_permit_flags_t flags = {})
+{
+    check(!(!constraints ^ !size), /*msg*/"", /*num_indents*/0,
+          /*report_msg*/"Inconsistent request.");
+
+    tcm_permit_request_t req = TCM_PERMIT_REQUEST_INITIALIZER;
+
+    req.min_sw_threads = min_sw_threads; req.max_sw_threads = max_sw_threads;
+    req.cpu_constraints = constraints; req.constraints_size = size;
+    req.priority = priority; req.flags = flags;
+
+    return req;
+}
+
+tcm_permit_t make_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
+                         uint32_t size = 1, tcm_permit_state_t state = TCM_PERMIT_STATE_VOID,
+                         tcm_permit_flags_t flags = {})
+{
+  check(concurrencies, /*msg*/"", /*num_indents*/0,
+        /*report_msg*/"Array of concurrencies is nullptr.");
+  return tcm_permit_t{concurrencies, cpu_masks, size, state, flags};
+}
+
+tcm_permit_t make_void_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
+                               uint32_t size = 1, tcm_permit_flags_t flags = {})
+{
+    return make_permit(concurrencies, cpu_masks, size, TCM_PERMIT_STATE_VOID, flags);
+}
+
+tcm_permit_t make_active_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
+                                 uint32_t size = 1, tcm_permit_flags_t flags = {})
+{
+  return make_permit(concurrencies, cpu_masks, size, TCM_PERMIT_STATE_ACTIVE, flags);
+}
+
+tcm_permit_t make_inactive_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
+                                  uint32_t size = 1, tcm_permit_flags_t flags = {})
+{
+  return make_permit(concurrencies, cpu_masks, size, TCM_PERMIT_STATE_INACTIVE, flags);
+}
+
+tcm_permit_t make_pending_permit(uint32_t* concurrencies, tcm_cpu_mask_t* cpu_masks = nullptr,
+                                  uint32_t size = 1, tcm_permit_flags_t flags = {})
+{
+  return make_permit(concurrencies, cpu_masks, size, TCM_PERMIT_STATE_PENDING, flags);
+}
+
+/***************************************************************************************************
  * Implementation of tcm_test_global_state's member functions
  **************************************************************************************************/
 inline void tcm_tests_data::add_client(tcm_client_id_t client_id) {
@@ -259,8 +268,10 @@ inline void tcm_tests_data::remove_client(tcm_client_id_t client_id) {
     std::vector<tcm_client_id_t>::iterator new_end =
         std::remove_if(tcm_clients.begin(), tcm_clients.end(),
                        [client_id](tcm_client_id_t const& cid) { return cid == client_id; });
-    __TCM_ASSERT(new_end != tcm_clients.end(), "Not all clients were added");
-    __TCM_ASSERT(tcm_clients.end() - new_end == 1, "More than one client with same ID removed");
+    check(new_end != tcm_clients.end(), /*msg*/"", /*num_indents*/0,
+          /*report_msg*/"Not all clients were added");
+    check(tcm_clients.end() - new_end == 1, /*msg*/"", /*num_indents*/0,
+          /*report_msg*/"More than one client with same ID removed");
     tcm_clients.erase(new_end, tcm_clients.end());
 }
 

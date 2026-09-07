@@ -136,6 +136,39 @@ TEST_CASE("Test constraints argument in create_numa_task_arenas") {
     }
   }
 }
+
+//! Test that initializing a constrained nested arena of smaller size does not cause out of range access in TBBBind
+//! \brief \ref regression
+TEST_CASE("Test constrained nested arena of smaller size") {
+    int n = tbb::this_task_arena::max_concurrency();
+    if (n <= 1) {
+        return; // Need the outer arena to be bigger than the nested arena.
+    }
+
+    using namespace tbb::info;
+
+    tbb::task_arena::constraints c{numa_nodes().back()};
+    c.set_core_type(core_types().back());
+    c.set_max_threads_per_core(1);
+    c.set_max_concurrency(1); // Make the constrained arena smaller than the outer arena, which has n > 1 threads.
+
+    std::atomic<bool> current_thread_index_exceeded_0{false};
+    utils::SpinBarrier barrier(n);
+
+    // parallel_for body runs in the implicit arena, which spans all available threads.
+    tbb::parallel_for(0, n, [&](int) {
+        if (tbb::this_task_arena::current_thread_index() > 0) {
+            current_thread_index_exceeded_0 = true;
+        }
+        // TBBBind changes thread affinity when entering the smaller constrained arena and restores it on exit.
+        // current_thread_index() exceeding the smaller arena size no longer causes out of range access in TBBBind.
+        tbb::task_arena{c}.execute([] {
+            REQUIRE_MESSAGE(tbb::this_task_arena::max_concurrency() == 1, "Nested arena should have 1 slot.");
+        });
+        barrier.wait();
+    }, tbb::simple_partitioner{});
+    REQUIRE(current_thread_index_exceeded_0);
+}
 #endif /*__TBB_HWLOC_VALID_ENVIRONMENT && __HWLOC_CPUBIND_PRESENT */
 
 // The test cannot be stabilized with TBB malloc under Thread Sanitizer
@@ -265,3 +298,13 @@ TEST_CASE("Using custom assertion handler to test failure on invalid constraints
         tbb::info::default_concurrency(tbb::task_arena::constraints{}.set_max_threads_per_core(0)),
         "Wrong max_threads_per_core constraints field value.");
 }
+
+#if __TBB_CPP17_PRESENT
+//! \brief \ref regression
+TEST_CASE("ODR-use task_arena::selectable") {
+    CHECK(utils::force_constant_odr_use(tbb::task_arena::selectable) == tbb::task_arena::selectable);
+
+    auto task_arena_ptr = std::make_unique<tbb::task_arena>(tbb::task_arena::automatic);
+    CHECK(task_arena_ptr != nullptr);
+}
+#endif // __TBB_CPP17_PRESENT

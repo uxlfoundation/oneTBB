@@ -5,7 +5,7 @@
    SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 */
 
-#include "tcm/detail/_environment.h"
+#include "detail/_environment.h"
 #include "tcm/version.h"
 
 #if _WIN32

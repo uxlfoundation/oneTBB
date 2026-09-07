@@ -63,7 +63,7 @@ Functions
 Sets the provided assertion handler and returns the previous handler. If ``new_handler`` is ``nullptr``, resets to the
 default handler.
 
-.. note:: ``new_handler`` must not return. If it does, the behavior is undefined.
+.. note:: ``new_handler`` must terminate the program without returning. Otherwise the behavior is undefined.
 
 .. cpp:function:: assertion_handler_type get_assertion_handler() noexcept
 

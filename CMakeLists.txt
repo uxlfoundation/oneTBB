@@ -133,6 +133,10 @@ endif()
 if(APPLE)
 option(TBB_BUILD_APPLE_FRAMEWORKS "Build as Apple Frameworks" OFF)
 endif()
+if (TCM_BUILD)
+  set(TCM_BUILD_OPTION_EXPLICITLY_SET TRUE)
+endif()
+option(TCM_BUILD "Enable Thread Composability Manager (TCM) build" ON)
 
 if (WIN32)
     if (TBB_VERIFY_DEPENDENCY_SIGNATURE)
@@ -345,8 +349,11 @@ else()
     endif()
 endif()
 
-if (TBB_TEST)
+if (TBB_TEST OR TCM_TEST)
     enable_testing()
+endif()
+
+if (TBB_TEST)
     add_subdirectory(test)
 endif()
 
@@ -408,6 +415,17 @@ endif()
 
 if (TBB4PY_BUILD)
     add_subdirectory(python)
+endif()
+
+if (TCM_BUILD)
+  set(TCM_SUBDIR_NAME thread_composability_manager)
+  if (IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${TCM_SUBDIR_NAME}")
+    add_subdirectory(${TCM_SUBDIR_NAME})
+  elseif (TCM_BUILD_OPTION_EXPLICITLY_SET)
+    message(FATAL_ERROR "Build of Thread Composability Manager (TCM) is disabled since "
+                        "${TCM_SUBDIR_NAME} subdirectory does not exist")
+  endif()
+  unset(TCM_SUBDIR_NAME)
 endif()
 
 # Keep it the last instruction.

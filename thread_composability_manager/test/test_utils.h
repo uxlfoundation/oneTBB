@@ -14,7 +14,6 @@
 
 #include "hwloc_test_utils.h"
 #include "../src/utils.h"
-#include "tcm/detail/_tcm_assert.h"
 #include "tcm.h"
 
 #include <algorithm>
@@ -40,7 +39,7 @@ inline std::string to_string(const tcm_const_cpu_mask_t mask) {
 
 inline tcm_cpu_mask_t allocate_cpu_mask() { return hwloc_bitmap_alloc(); }
 inline void free_cpu_mask(tcm_cpu_mask_t mask) {
-  __TCM_ASSERT(mask, "CPU mask should not be nullptr");
+  check(mask, /*msg*/"", /*num_indents*/0, /*report_msg*/"CPU mask should not be nullptr");
   hwloc_bitmap_free(mask);
 }
 
@@ -51,7 +50,8 @@ struct mask_deleter {
 struct masks_guard_t {
   masks_guard_t(uint32_t size) : m_size(size) {}
   void operator()(tcm_cpu_mask_t* cpu_masks) const {
-    __TCM_ASSERT(cpu_masks, "Array of CPU masks cannot be nullptr");
+    check(cpu_masks, /*msg*/"", /*num_indents*/0,
+          /*report_msg*/"Array of CPU masks cannot be nullptr");
     for (uint32_t i = 0; i < m_size; ++i) {
       free_cpu_mask(cpu_masks[i]);
     }
@@ -62,33 +62,33 @@ private:
 };
 
 inline bool is_equal(tcm_const_cpu_mask_t mask_1, tcm_const_cpu_mask_t mask_2) {
-  __TCM_ASSERT(mask_1, "CPU mask should not be nullptr");
-  __TCM_ASSERT(mask_2, "CPU mask should not be nullptr");
+  check(mask_1, /*msg*/"", /*num_indents*/0, /*report_msg*/"CPU mask 1 should not be nullptr");
+  check(mask_2, /*msg*/"", /*num_indents*/0, /*report_msg*/"CPU mask 2 should not be nullptr");
   return hwloc_bitmap_compare(mask_1, mask_2) == 0;
 }
 
 inline bool is_intersect(tcm_const_cpu_mask_t mask_1, tcm_const_cpu_mask_t mask_2) {
-  __TCM_ASSERT(mask_1, "CPU mask should not be nullptr");
-  __TCM_ASSERT(mask_2, "CPU mask should not be nullptr");
+  check(mask_1, /*msg*/"", /*num_indents*/0, /*report_msg*/"CPU mask 1 should not be nullptr");
+  check(mask_2, /*msg*/"", /*num_indents*/0, /*report_msg*/"CPU mask 2 should not be nullptr");
   return hwloc_bitmap_intersects(mask_1, mask_2);
 }
 
 inline void copy(tcm_cpu_mask_t dst, tcm_const_cpu_mask_t src) {
-  __TCM_ASSERT(dst, "Destination CPU mask should not be nullptr");
-  __TCM_ASSERT(src, "Source CPU mask should not be nullptr");
-  int result = hwloc_bitmap_copy(dst, src);
-  __TCM_ASSERT_EX(0 == result, "Unable to copy the CPU mask");
+  check(dst, /*msg*/"", /*num_indents*/0, /*report_msg*/"Destination mask should not be nullptr");
+  check(src, /*msg*/"", /*num_indents*/0, /*report_msg*/"Source mask should not be nullptr");
+  const int result = hwloc_bitmap_copy(dst, src);
+  check(0 == result, /*msg*/"", /*num_indents*/0, /*report_msg*/"Unable to copy the CPU mask");
 }
 
 inline int32_t hardware_concurrency(tcm_const_cpu_mask_t mask) {
-  __TCM_ASSERT(mask, "CPU mask should not be nullptr");
+  check(mask, /*msg*/"", /*num_indents*/0, /*report_msg*/"CPU mask should not be nullptr");
   return int32_t(hwloc_bitmap_weight(mask));
 }
 
 constexpr float tcm_oversubscription_factor = 1.0f;
 
 inline int32_t tcm_concurrency(tcm_const_cpu_mask_t mask) {
-  __TCM_ASSERT(mask, "CPU mask should not be nullptr");
+  check(mask, /*msg*/"", /*num_indents*/0, /*report_msg*/"CPU mask should not be nullptr");
   return int32_t(tcm_oversubscription_factor * hardware_concurrency(mask));
 }
 
@@ -124,8 +124,10 @@ inline int32_t platform_tcm_concurrency() {
 inline void extract_first_n_bits_from_process_affinity_mask(tcm_cpu_mask_t result, int n_threads,
                                                             tcm_const_cpu_mask_t hint = nullptr)
 {
-  __TCM_ASSERT(result, "Result CPU mask should be pre-allocated on the caller side");
-  __TCM_ASSERT(hwloc_bitmap_iszero(result), "Result CPU mask should be empty");
+  check(result, /*msg*/"", /*num_indents*/0,
+        /*report_msg*/"Result CPU mask should be pre-allocated on the caller side");
+  check(hwloc_bitmap_iszero(result), /*msg*/"", /*num_indents*/0,
+        /*report_msg*/"Result CPU mask should be empty");
 
   int start_id = -1;
   if (hint)
@@ -368,7 +370,7 @@ inline bool check_permit(const tcm_permit_t& expected, tcm_permit_handle_t ph,
     msg = "check permit_handle=" + to_string(ph) + " is not nullptr";
   check(ph, msg, num_indents);
 
-  __TCM_ASSERT(expected.size > 0, "Permit size cannot be zero.");
+  check(expected.size > 0, /*msg*/"", /*num_indents*/0, /*report_msg*/"Permit size cannot be zero.");
   std::vector<uint32_t> concurrencies(expected.size, 0);
   std::unique_ptr<tcm_cpu_mask_t[], masks_guard_t> cpu_masks(nullptr, masks_guard_t(expected.size));
   if (expected.cpu_masks) {
@@ -589,7 +591,8 @@ public:
         if (allocate_mask)
             for (uint32_t i = 0; i < size; ++i) {
                 cpu_masks[i] = allocate_cpu_mask();
-                __TCM_ASSERT(cpu_masks[i], "Failed allocating CPU mask");
+                check(cpu_masks[i], /*msg*/"", /*num_indents*/0,
+                      /*report_msg*/"Failed allocating CPU mask");
             }
     }
 
@@ -598,7 +601,7 @@ public:
     uint32_t concurrency() { return get_permit_concurrency(permit); }
 
     tcm_const_cpu_mask_t cpu_mask(size_t idx = 0) {
-      __TCM_ASSERT(idx < size, "Index is out of range");
+      check(idx < size, /*msg*/"", /*num_indents*/0, /*report_msg*/"Index is out of range");
       return cpu_masks ? cpu_masks[idx] : nullptr;
     }
 private:
@@ -646,8 +649,9 @@ inline permit_t<size> make_active_permit(uint32_t expected_concurrency,
   permit.concurrencies[0] = expected_concurrency;
   if (allocate_mask) {
       for (int i = 0; i < size; ++i) {
-          __TCM_ASSERT(permit.cpu_masks[i], "Nothing to copy into");
-          __TCM_ASSERT(cpu_masks[i], "Nothing to copy from");
+          check(permit.cpu_masks[i], /*msg*/"", /*num_indents*/0,
+                /*report_msg*/"Nothing to copy into");
+          check(cpu_masks[i], /*msg*/"", /*num_indents*/0, /*report_msg*/"Nothing to copy from");
           hwloc_bitmap_copy(permit.cpu_masks[i], cpu_masks[i]);
       }
   }

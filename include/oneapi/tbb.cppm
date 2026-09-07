@@ -129,13 +129,9 @@ export namespace tbb {
     using tbb::v1::attach;
     using tbb::v1::finalize;
     using tbb::v1::task_scheduler_handle;
-#if !__TBB_DISABLE_SPEC_EXTENSIONS
-    namespace ext {
-        using tbb::ext::v1::assertion_handler_type;
-        using tbb::ext::v1::set_assertion_handler;
-        using tbb::ext::v1::get_assertion_handler;
-    } // namespace ext
-#endif
+    using tbb::v1::assertion_handler_type;
+    using tbb::v1::set_assertion_handler;
+    using tbb::v1::get_assertion_handler;
 
     namespace task {
 #if __TBB_RESUMABLE_TASKS
@@ -157,10 +153,8 @@ export namespace tbb {
         using tbb::v1::this_task_arena::max_concurrency;
         using tbb::v1::this_task_arena::isolate;
         using tbb::v1::this_task_arena::enqueue;
-#if __TBB_PREVIEW_PARALLEL_PHASE
         using tbb::v1::this_task_arena::start_parallel_phase;
         using tbb::v1::this_task_arena::end_parallel_phase;
-#endif
     } // namespace this_task_arena
 
     using tbb::v1::task_group_context;

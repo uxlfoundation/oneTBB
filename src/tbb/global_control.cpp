@@ -143,7 +143,6 @@ class alignas(max_nfs_size) lifetime_control : public control_storage {
     }
 };
 
-#if __TBB_PREVIEW_PARALLEL_PHASE
 class alignas(max_nfs_size) leave_policy_control : public control_storage {
     std::size_t default_value() const override {
         return std::size_t(tbb::task_arena::leave_policy::automatic);
@@ -151,18 +150,13 @@ class alignas(max_nfs_size) leave_policy_control : public control_storage {
 };
 
 static control_storage* controls[] = {nullptr, nullptr, nullptr, nullptr, nullptr};
-#else
-static control_storage* controls[] = {nullptr, nullptr, nullptr, nullptr};
-#endif
 
 void global_control_acquire() {
     controls[0] = new (cache_aligned_allocate(sizeof(allowed_parallelism_control))) allowed_parallelism_control{};
     controls[1] = new (cache_aligned_allocate(sizeof(stack_size_control))) stack_size_control{};
     controls[2] = new (cache_aligned_allocate(sizeof(terminate_on_exception_control))) terminate_on_exception_control{};
     controls[3] = new (cache_aligned_allocate(sizeof(lifetime_control))) lifetime_control{};
-#if __TBB_PREVIEW_PARALLEL_PHASE
     controls[4] = new (cache_aligned_allocate(sizeof(leave_policy_control))) leave_policy_control{};
-#endif
 }
 
 void global_control_release() {
