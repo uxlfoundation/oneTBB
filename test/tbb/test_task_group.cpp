@@ -1162,55 +1162,81 @@ TEST_CASE("Respect task_group_context passed from outside") {
 #endif
 }
 
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-//! The test for task_handle inside other task waiting with run
-//! \brief \ref requirement
-TEST_CASE("Task handle for scheduler bypass"){
-    tbb::task_group tg;
-    std::atomic<bool> run {false};
+enum class submit_function {
+    run = 0,
+    run_and_wait = 1,
+    arena_enqueue = 2,
+    this_arena_enqueue = 3
+};
 
-    tg.run([&]{
-        return tg.defer([&]{
-            run = true;
-        });
-    });
-
-    tg.wait();
-    CHECK_MESSAGE(run == true, "task handle returned by user lambda (bypassed) should be run");
-
-    // Test returning an empty handle
-    run = false;
-    tg.run([&] {
-        run = true;
-        return tbb::task_handle{};
-    });
-
-    tg.wait();
-    CHECK(run == true);
+void submit(submit_function func, tbb::task_handle&& handle, tbb::task_group& group, tbb::task_arena& arena) {
+    if (func == submit_function::run || func == submit_function::run_and_wait) {
+        group.run(std::move(handle));
+    } else if (func == submit_function::arena_enqueue) {
+        arena.enqueue(std::move(handle));
+    } else {
+        CHECK_MESSAGE(func == submit_function::this_arena_enqueue, "new submit function added but not handled");
+        tbb::this_task_arena::enqueue(std::move(handle));
+    }
 }
 
-//! The test for task_handle inside other task waiting with run_and_wait
-//! \brief \ref requirement
-TEST_CASE("Task handle for scheduler bypass via run_and_wait"){
-    tbb::task_group tg;
-    std::atomic<bool> run {false};
-
-    tg.run_and_wait([&]{
-        return tg.defer([&]{
-            run = true;
-        });
-    });
-
-    CHECK_MESSAGE(run == true, "task handle returned by user lambda (bypassed) should be run");
-
-    // Test returning an empty handle
-    run = false;
-    tg.run_and_wait([&] {
-        run = true;
-    });
-    CHECK(run == true);
+void submit_and_wait(submit_function func, tbb::task_handle&& handle, tbb::task_group& group, tbb::task_arena& arena) {
+    if (func != submit_function::run_and_wait) {
+        submit(func, std::move(handle), group, arena);
+        group.wait();
+    } else {
+        group.run_and_wait(std::move(handle));
+    }
 }
-#endif //__TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+
+template <typename Function>
+void submit_and_wait(submit_function func, const Function& function, tbb::task_group& group, tbb::task_arena& arena) {
+    if (func == submit_function::run_and_wait ) {
+        group.run_and_wait(function);
+    } else if (func == submit_function::run) {
+        group.run(function);
+        group.wait();
+    } else {
+        submit_and_wait(func, group.defer(function), group, arena);
+    }
+}
+
+template <typename SubmitFunction>
+void test_task_scheduler_bypass(SubmitFunction submit_function_tag) {
+    tbb::task_arena arena;
+    tbb::task_group tg;
+
+    // Test returning a non-empty task_handle
+    std::atomic<bool> executed{false};
+    auto set_executed = [&executed] { executed = true; };
+
+    auto bypass_set_executed = [set_executed, &tg] { return tg.defer(set_executed); };
+
+    submit_and_wait(submit_function_tag, bypass_set_executed, tg, arena);
+
+    CHECK_MESSAGE(executed == true, "Bypassed task was not executed");
+    executed = false;
+
+    // Test returning an empty task_handle
+    // The operation is valid, but no-op
+    auto bypass_empty = [&] { executed = true; return tbb::task_handle{}; };
+    submit_and_wait(submit_function_tag, bypass_empty, tg, arena);
+    CHECK_MESSAGE(executed == true, "Task was not executed");
+    executed = false;
+
+    // Test that any return other than task_handle is ignored
+    auto return_int = [&] { executed = true; return 1; };
+    submit_and_wait(submit_function_tag, return_int, tg, arena);
+    CHECK_MESSAGE(executed == true, "Task was not executed");
+}
+
+//! \brief \ref requirement
+TEST_CASE("Task Scheduler Bypass using task_handles"){
+    test_task_scheduler_bypass(submit_function::run);
+    test_task_scheduler_bypass(submit_function::run_and_wait);
+    test_task_scheduler_bypass(submit_function::arena_enqueue);
+    test_task_scheduler_bypass(submit_function::this_arena_enqueue);    
+}
 
 #if TBB_USE_EXCEPTIONS
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS && __TBB_GCC_VERSION && !__clang__ && !__INTEL_COMPILER
@@ -1706,45 +1732,6 @@ TEST_CASE("test task_completion_handle") {
             CHECK_MESSAGE(task_placeholder == 6, "Task body was not executed");
             CHECK_MESSAGE(enqueue_task_completion_handle, "task_completion_handle should not be empty after task completion");
         }
-    }
-}
-
-enum class submit_function {
-    run = 0,
-    run_and_wait = 1,
-    arena_enqueue = 2,
-    this_arena_enqueue = 3
-};
-
-void submit(submit_function func, tbb::task_handle&& handle, tbb::task_group& group, tbb::task_arena& arena) {
-    if (func == submit_function::run || func == submit_function::run_and_wait) {
-        group.run(std::move(handle));
-    } else if (func == submit_function::arena_enqueue) {
-        arena.enqueue(std::move(handle));
-    } else {
-        CHECK_MESSAGE(func == submit_function::this_arena_enqueue, "new submit function added but not handled");
-        tbb::this_task_arena::enqueue(std::move(handle));
-    }
-}
-
-void submit_and_wait(submit_function func, tbb::task_handle&& handle, tbb::task_group& group, tbb::task_arena& arena) {
-    if (func != submit_function::run_and_wait) {
-        submit(func, std::move(handle), group, arena);
-        group.wait();
-    } else {
-        group.run_and_wait(std::move(handle));
-    }
-}
-
-template <typename Function>
-void submit_and_wait(submit_function func, const Function& function, tbb::task_group& group, tbb::task_arena& arena) {
-    if (func == submit_function::run_and_wait ) {
-        group.run_and_wait(function);
-    } else if (func == submit_function::run) {
-        group.run(function);
-        group.wait();
-    } else {
-        submit_and_wait(func, group.defer(function), group, arena);
     }
 }
 
