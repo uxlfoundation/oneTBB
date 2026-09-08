@@ -490,7 +490,7 @@
 **/
 
 // Some STL containers not support allocator traits in old GCC versions
-#if __GXX_EXPERIMENTAL_CXX0X__ && __TBB_GLIBCXX_VERSION <= 50301
+#if __GXX_EXPERIMENTAL_CXX0X__ && __TBB_GLIBCXX_VERSION && __TBB_GLIBCXX_VERSION <= 50301
     #define TBB_ALLOCATOR_TRAITS_BROKEN 1
 #endif
 
