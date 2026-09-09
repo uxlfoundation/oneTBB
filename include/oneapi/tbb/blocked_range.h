@@ -118,7 +118,7 @@ private:
     static Value do_split( blocked_range& r, split )
     {
         __TBB_ASSERT( r.is_divisible(), "cannot split blocked_range that is not divisible" );
-        Value middle = r.my_begin + (r.my_end - r.my_begin) / 2u;
+        Value middle = r.my_begin + (r.my_end - r.my_begin) / 2;
         r.my_end = middle;
         return middle;
     }
