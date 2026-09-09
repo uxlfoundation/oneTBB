@@ -39,6 +39,7 @@ void ParallelPreorderTraversal(const std::vector<Cell*>& root_set);
 static unsigned nodes = 1000;
 static unsigned traversals = 500;
 static bool SilentFlag = false;
+static int numberOfIterations = 1000;
 
 //! Parse the command line.
 static void ParseCommandLine(int argc, char* argv[], utility::thread_number_range& threads) {
@@ -53,6 +54,9 @@ static void ParseCommandLine(int argc, char* argv[], utility::thread_number_rang
                 traversals,
                 "n-of-traversals",
                 "number of times to evaluate the graph. Reduce it (e.g. to 100) to shorten example run time\n")
+            .positional_arg(numberOfIterations,
+                            "n-of-iterations",
+                            "number of iterations the example runs internally")
             .arg(SilentFlag, "silent", "no output except elapsed time "));
 }
 
@@ -60,6 +64,16 @@ int main(int argc, char* argv[]) {
     utility::thread_number_range threads(utility::get_default_num_threads);
     oneapi::tbb::tick_count main_start = oneapi::tbb::tick_count::now();
     ParseCommandLine(argc, argv, threads);
+    double rel_error;
+
+    if (numberOfIterations <= 0) {
+        std::cout << "Setting the number of iterations = " << numberOfIterations << " default\n";
+    }
+    else {
+        std::cout << "Input for the number of iterations = " << numberOfIterations << "\n";
+    }
+
+    utility::measurements mu(numberOfIterations);
 
     // Start scheduler with given number of threads.
     for (int p = threads.first; p <= threads.last; p = threads.step(p)) {
@@ -67,23 +81,33 @@ int main(int argc, char* argv[]) {
         oneapi::tbb::global_control c(oneapi::tbb::global_control::max_allowed_parallelism, p);
         srand(2);
         std::size_t root_set_size = 0;
-        {
-            Graph g;
-            g.create_random_dag(nodes);
-            std::vector<Cell*> root_set;
-            g.get_root_set(root_set);
-            root_set_size = root_set.size();
-            for (unsigned int trial = 0; trial < traversals; ++trial) {
+
+        for (int iter = 0; iter < numberOfIterations; ++iter) {
+            mu.start();
+
+            {
+                Graph g;
+                g.create_random_dag(nodes);
+                std::vector<Cell*> root_set;
+                g.get_root_set(root_set);
+                root_set_size = root_set.size();
+
                 ParallelPreorderTraversal(root_set);
             }
+
+            mu.stop();
         }
+        rel_error = mu.computeRelError();
+
         oneapi::tbb::tick_count::interval_t interval = oneapi::tbb::tick_count::now() - t0;
         if (!SilentFlag) {
             std::cout << interval.seconds() << " seconds using " << p << " threads ("
                       << root_set_size << " nodes in root_set)\n";
         }
     }
+
     utility::report_elapsed_time((oneapi::tbb::tick_count::now() - main_start).seconds());
+    utility::report_relative_error(rel_error);
 
     return 0;
 }
