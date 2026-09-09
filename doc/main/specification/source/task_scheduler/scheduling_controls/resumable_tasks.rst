@@ -23,10 +23,11 @@ Requirements:
 
 The ``oneapi::tbb::task::suspend`` function called within a running task suspends execution of the task and switches the thread to participate in other oneTBB parallel work.
 This function accepts a user callable object with the current execution context ``oneapi::tbb::task::suspend_point`` as an argument.
-The user-specified callable object is executed by the calling thread.
+The user-specified callable object is executed by the calling thread. An exception thrown from the callable object prevents the task from suspending and is propagated to the
+caller of the ``oneapi::tbb::task::suspend`` function.
 
 The ``oneapi::tbb::task::suspend_point`` context tag must be passed to the ``oneapi::tbb::task::resume`` function to trigger a program execution at the suspended point.
-The ``oneapi::tbb::task::resume`` function can be called at any point of an application, even on a separate thread.
+The ``oneapi::tbb::task::resume`` function can be called at any point of an application, including on a separate thread or directly from the user callable object passed to the ``oneapi::tbb::task::suspend`` function.
 In this regard, this function acts as a signal for the task scheduler.
 
 .. note::
@@ -34,6 +35,7 @@ In this regard, this function acts as a signal for the task scheduler.
     There are no guarantees that the same thread that called ``oneapi::tbb::task::suspend`` continues execution after the suspended point.
     However, these guarantees are provided for the outermost blocking oneTBB calls
     (such as ``oneapi::tbb::parallel_for`` and ``oneapi::tbb::flow::graph::wait_for_all``) and ``oneapi::tbb::task_arena::execute`` calls.
+    :doc:`A thread local storage <../../thread_local_storage/enumerable_thread_specific_cls>` can be configured with the ``ets_suspend_aware`` key type to be preserved across task suspension and resumption.
 
 Example
 -------
