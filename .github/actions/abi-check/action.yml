@@ -1,0 +1,80 @@
+# Copyright (c) 2026 UXL Foundation Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: ABI check
+description: >-
+  Compares the exported symbols of the given shared libraries against the
+  checked-in ABI baselines.
+
+inputs:
+  project:
+    description: >-
+      Name of the checked project, used as the heading of the report.
+    required: true
+  binary:
+    description: >-
+      Whitespace separated list of the shared libraries to check.
+    required: true
+  output-dir:
+    description: >-
+      Directory to write the artifacts to.
+    required: false
+    default: abi-artifacts
+  baseline-dir:
+    description: >-
+      Directory holding the ABI baselines of the project.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install ABI tooling
+      shell: bash
+      run: |
+        set -e -o pipefail
+
+        venv_dir=abi-check
+
+        if [ "${RUNNER_OS}" = "Windows" ]; then
+          system_python=python
+          venv_python="${venv_dir}/Scripts/python.exe"
+        else
+          system_python=python3
+          venv_python="${venv_dir}/bin/python"
+        fi
+
+        if [ ! -x "${venv_python}" ]; then
+          "${system_python}" -m venv "${venv_dir}"
+          "${venv_python}" -m pip install --upgrade pip
+          "${venv_python}" -m pip install -r "${GITHUB_ACTION_PATH}/requirements.txt"
+        fi
+
+        echo "ABI_PYTHON=${venv_python}" >> "${GITHUB_ENV}"
+
+    - name: Check ABI
+      shell: bash
+      run: |
+        set -e -o pipefail
+
+        args=(
+          --project "${{ inputs.project }}"
+          --baseline-dir "${{ inputs.baseline-dir }}"
+          --output-dir "${{ inputs.output-dir }}"
+        )
+
+        for binary in ${{ inputs.binary }}; do
+          args+=(--binary "${binary}")
+        done
+
+        "${ABI_PYTHON}" "${GITHUB_ACTION_PATH}/compare_symbols.py" "${args[@]}"
