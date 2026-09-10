@@ -98,10 +98,15 @@ export namespace tbb {
 
     // Memory Allocation
     using tbb::v1::cache_aligned_allocator;
-    using tbb::v1::cache_aligned_resource;
     using tbb::v1::scalable_allocator;
-    using tbb::v1::scalable_memory_resource;
     using tbb::v1::tbb_allocator;
+
+    // libc++ added partial module support before implementing polymorphic memory
+    // resources, so the presence of this C++17 feature must be checked explicitly.
+#if __TBB_CPP17_MEMORY_RESOURCE_PRESENT
+    using tbb::v1::cache_aligned_resource;
+    using tbb::v1::scalable_memory_resource;
+#endif
 #if __TBB_PREVIEW_MEMORY_POOL
     using tbb::v1::memory_pool_allocator;
     using tbb::v1::memory_pool;
@@ -129,13 +134,9 @@ export namespace tbb {
     using tbb::v1::attach;
     using tbb::v1::finalize;
     using tbb::v1::task_scheduler_handle;
-#if !__TBB_DISABLE_SPEC_EXTENSIONS
-    namespace ext {
-        using tbb::ext::v1::assertion_handler_type;
-        using tbb::ext::v1::set_assertion_handler;
-        using tbb::ext::v1::get_assertion_handler;
-    } // namespace ext
-#endif
+    using tbb::v1::assertion_handler_type;
+    using tbb::v1::set_assertion_handler;
+    using tbb::v1::get_assertion_handler;
 
     namespace task {
 #if __TBB_RESUMABLE_TASKS

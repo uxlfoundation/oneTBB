@@ -313,7 +313,7 @@ private:
             hwloc_bitmap_or(buffer_cpu_set, buffer_cpu_set, numa_node_info.cpuset);
         }
         REQUIRE_MESSAGE( hwloc_bitmap_isequal(buffer_cpu_set, process_cpuset),
-            "Intersected NUMA nodes masks should be equal to process affinity.(reference)");
+            "The union of NUMA nodes masks should be equal to process affinity.(reference)");
 
         // Core types topology verification
         hwloc_bitmap_zero(buffer_cpu_set);
@@ -324,7 +324,7 @@ private:
             hwloc_bitmap_or(buffer_cpu_set, buffer_cpu_set, cpu_kind_info.cpuset);
         }
         REQUIRE_MESSAGE(hwloc_bitmap_isequal(buffer_cpu_set, process_cpuset),
-            "Intersected core type masks should be equal to process affinity.(reference)");
+            "The union of core type masks should be equal to process affinity.(reference)");
 
         hwloc_bitmap_free(buffer_cpu_set);
     }

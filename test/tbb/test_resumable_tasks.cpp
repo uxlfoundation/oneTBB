@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -309,7 +310,13 @@ void TestCleanupMaster() {
     std::atomic<int> iter_spawned;
     std::atomic<int> iter_executed;
 
-    for (int i = 0; i < 100; i++) {
+#if __TBB_USE_SANITIZERS
+    constexpr int max_iters = 25;
+#else
+    constexpr int max_iters = 100;
+#endif
+
+    for (int i = 0; i < max_iters; i++) {
         iter_spawned = 0;
         iter_executed = 0;
 

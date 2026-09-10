@@ -607,6 +607,25 @@ public:
         return my_max_concurrency;
     }
 
+    //! Returns my_priority
+    priority debug_priority() const {
+        return my_priority;
+    }
+
+    //! Returns leave policy
+    leave_policy debug_leave_policy() const {
+        return get_leave_policy();
+    }
+
+    //! Returns constraints
+    constraints debug_constraints() const {
+        return constraints{}
+            .set_numa_id(my_numa_id)
+            .set_max_concurrency(my_max_concurrency)
+            .set_core_type(my_core_type)
+            .set_max_threads_per_core(my_max_threads_per_core);
+    }
+
     //! Wait for all work in the arena to be completed
     //! Even submitted by other application threads
     //! Joins arena if/when possible (in the same way as execute())

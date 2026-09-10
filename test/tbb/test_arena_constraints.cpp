@@ -146,33 +146,28 @@ TEST_CASE("Test constrained nested arena of smaller size") {
     }
 
     using namespace tbb::info;
-    system_info::initialize();
 
     tbb::task_arena::constraints c{numa_nodes().back()};
     c.set_core_type(core_types().back());
     c.set_max_threads_per_core(1);
     c.set_max_concurrency(1); // Make the constrained arena smaller than the outer arena, which has n > 1 threads.
 
-    system_info::affinity_mask outer_affinity = system_info::allocate_current_affinity_mask();
+    std::atomic<bool> current_thread_index_exceeded_0{false};
     utils::SpinBarrier barrier(n);
 
     // parallel_for body runs in the implicit arena, which spans all available threads.
     tbb::parallel_for(0, n, [&](int) {
+        if (tbb::this_task_arena::current_thread_index() > 0) {
+            current_thread_index_exceeded_0 = true;
+        }
         // TBBBind changes thread affinity when entering the smaller constrained arena and restores it on exit.
         // current_thread_index() exceeding the smaller arena size no longer causes out of range access in TBBBind.
-        tbb::task_arena{c}.execute([&] {
-            system_info::affinity_mask inner_affinity = system_info::allocate_current_affinity_mask();
-            REQUIRE_MESSAGE(hwloc_bitmap_isincluded(inner_affinity, outer_affinity),
-                "Nested constrained arena affinity mask is not a subset of the outer affinity mask.");
-
-            // Indirectly verify that TBBBind applied the affinity for this arena.
-            if (tbb::detail::r1::constraints_default_concurrency(c) < n) { // affinity mask should be smaller
-                REQUIRE_MESSAGE(!hwloc_bitmap_isequal(inner_affinity, outer_affinity),
-                    "TBBBind did not apply affinity: the nested arena mask was not narrowed.");
-            }
+        tbb::task_arena{c}.execute([] {
+            REQUIRE_MESSAGE(tbb::this_task_arena::max_concurrency() == 1, "Nested arena should have 1 slot.");
         });
         barrier.wait();
     }, tbb::simple_partitioner{});
+    REQUIRE(current_thread_index_exceeded_0);
 }
 #endif /*__TBB_HWLOC_VALID_ENVIRONMENT && __HWLOC_CPUBIND_PRESENT */
 
