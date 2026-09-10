@@ -6,7 +6,7 @@ How Task Scheduler Works
 
 While the task scheduler is not bound to any particular type of parallelism,
 it was designed to work efficiently for fork-join parallelism with lots of forks.
-This type of parallelism is typical for parallel algorithms such as :onetbb-spec:`oneapi::tbb::parallel_for <algorithms/functions/parallel_for_func>`.
+This type of parallelism is typical for parallel algorithms such as :doc:`oneapi::tbb::parallel_for </main/reference/source/algorithms/functions/parallel_for_func>`.
 
 Let's consider the mapping of fork-join parallelism on the task scheduler in more detail. 
 
