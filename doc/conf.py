@@ -192,7 +192,7 @@ html_static_path = ['_static']
 html_css_files = ['theme_overrides.css']
 html_js_files = ['custom.js']
 
-html_theme_options["logo"] = {"text": "oneTBB {} Documentation".format(TBB_VERSION)}
+html_theme_options["logo"] = {"text": f"oneTBB {TBB_VERSION} Documentation"}
     
 html_logo = '_static/oneAPI-rgb-rev-100.png'
 html_favicon = '_static/favicons.png'
