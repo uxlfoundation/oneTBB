@@ -335,32 +335,3 @@ intersphinx_mapping = {'python': ('https://docs.python.org/3', None)}
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
-
-# -- (preview)/(experimental) label highlighting -----------------------------
-def _highlight_status_labels(app, doctree):
-    """Render the (preview)/(experimental) marker in TOC entries as bold orange."""
-    import re
-    from docutils import nodes
-
-    STATUS_LABEL_RE = re.compile(r'\((?:preview|experimental)\)', re.IGNORECASE)
-
-    toc = app.env.tocs.get(app.env.docname)
-    if toc is None:
-        return
-
-    for text_node in list(toc.findall(nodes.Text)):
-        text = text_node.astext()
-        match = STATUS_LABEL_RE.search(text)
-        if match is None:
-            continue
-
-        label = match.group()
-        text_node.parent.replace(text_node, [
-            nodes.Text(text[:match.start()]),
-            nodes.strong(label, label, classes=['toc-label-highlight']),
-            nodes.Text(text[match.end():]),
-        ])
-
-def setup(app):
-    # Runs after TocTreeCollector (priority 500) has populated env.tocs
-    app.connect('doctree-read', _highlight_status_labels, priority=800)
