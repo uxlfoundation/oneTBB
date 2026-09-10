@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <array>
 #include <mutex>
+#include <unordered_map>
 #include <vector>
 
 //! \file test_resource_limited_node.cpp
@@ -1046,4 +1047,150 @@ TEST_CASE("resource_limiter constructors") {
 
     std::array<int, 3> three_resources = {1, 2, 3};
     test_resource_limiter_constructors(three_resources);
+}
+
+// The resource provider that denies a fixed number of acquisition attempts before granting the resource
+class denying_resource_provider : public tbb::detail::d2::resource_provider_base<int> {
+    using request_id = tbb::detail::d2::request_id;
+    using lock_type = std::unique_lock<std::mutex>;
+    std::mutex m_mutex;
+    std::unordered_map<request_id, std::size_t, request_id::hash> m_requests;
+public:
+    using resource_handle_type = int;
+    static constexpr int resource_value = 502;
+    static constexpr std::size_t num_denials = 10;
+
+    denying_resource_provider() = default;
+
+    void request(consumer_type& consumer, request_id id) override {
+        {
+            lock_type lock(m_mutex);
+            m_requests.insert({id, 0}); // Inserts only during the first request
+        }
+        consumer.notify(*this, id);
+    }
+
+    optional_type acquire(consumer_type&, request_id id) override {
+        lock_type lock(m_mutex);
+        auto request = m_requests.find(id);
+        REQUIRE_MESSAGE(request != m_requests.end(), "Acquire without prior notification");
+
+        if (request->second++ < num_denials) {
+            return {};
+        } else {
+            return {optional_type::in_place_t{}, resource_value};
+        }
+    }
+
+    void report_pressure(consumer_type&, std::size_t) override {}
+
+    void release(consumer_type&, request_id id, optional_type&& resource) override {
+        CHECK_MESSAGE(resource.value() == resource_value, "Unexpected resource returned");
+        lock_type lock(m_mutex);
+        auto request = m_requests.find(id);
+        CHECK_MESSAGE(request != m_requests.end(), "Release without prior acquire and notification");
+        CHECK_MESSAGE(request->second > num_denials, "Resource was not denied before granting necessary amount of times");
+        m_requests.erase(request);
+    }
+
+    void withdraw(consumer_type&, request_id) override {}
+};
+
+constexpr int denying_resource_provider::resource_value;
+constexpr std::size_t denying_resource_provider::num_denials;
+
+void test_denying_provider() {
+    using namespace tbb::flow;
+
+    constexpr int first_resource_value = 500;
+    constexpr int second_resource_value = 501;
+
+    resource_limiter<int> first_provider{first_resource_value};
+    resource_limiter<int> second_provider{second_resource_value};
+    denying_resource_provider third_provider;
+
+    constexpr int input_value = 0;
+    constexpr std::size_t num_inputs = 100;
+    using node_type = resource_limited_node<int, std::tuple<>>;
+
+    std::atomic<std::size_t> count{0};
+
+    auto node_body = [&](int input, node_type::output_ports_type&,
+                         int first_resource, int second_resource, int third_resource) {
+        ++count;
+        CHECK_MESSAGE(input == input_value, "Incorrect input");
+        CHECK_MESSAGE(first_resource == first_resource_value, "Incorrect first resource");
+        CHECK_MESSAGE(second_resource == second_resource_value, "Incorrect second resource");
+        CHECK_MESSAGE(third_resource == denying_resource_provider::resource_value, "Incorrect third resource");
+    };
+
+    graph g;
+    node_type node(g, unlimited, std::tie(first_provider, second_provider, third_provider), node_body);
+
+    for (std::size_t i = 0; i < num_inputs; ++i) {
+        node.try_put(input_value);
+    }
+
+    g.wait_for_all();
+    CHECK(count == num_inputs);
+}
+
+void test_rerequesting_with_resource_limiter() {
+    using namespace tbb::flow;
+    
+    int input_value = 0;
+    int first_resource_value = 500;
+    int second_resource_value = 501;
+
+    // First provider should have more resource handles to force the second resource
+    // to deny more frequently
+    resource_limiter<int> p1{first_resource_value, first_resource_value, first_resource_value};
+    resource_limiter<int> p2{second_resource_value};
+
+    using node_type = resource_limited_node<int, std::tuple<>>;
+
+    std::atomic<std::size_t> count{0};
+
+    auto node_body = [&](int input, node_type::output_ports_type&,
+                         int first_resource, int second_resource) {
+        ++count;
+        CHECK_MESSAGE(input == input_value, "Incorrect input");
+        CHECK_MESSAGE(first_resource == first_resource_value, "Incorrect first resource");
+        CHECK_MESSAGE(second_resource == second_resource_value, "Incorrect second resource");
+    };
+
+    graph g;
+    node_type node1(g, unlimited, std::tie(p1, p2), node_body);
+    node_type node2(g, unlimited, std::tie(p1, p2), node_body);
+
+    auto num_threads = tbb::this_task_arena::max_concurrency();
+    std::size_t num_reps = 100;
+
+    for (std::size_t i = 0; i < num_reps; ++i) {
+        utils::SpinBarrier submit_barrier(num_threads);
+        utils::NativeParallelFor(num_threads, [&](int thread_index) {
+            // Using the barrier to increase the chance that 2 threads will have equal
+            // timestamps in requests
+            submit_barrier.wait();
+    
+            // Submit in different order from different threads
+            if (thread_index % 2 == 0) {
+                node1.try_put(input_value);
+            } else {
+                node2.try_put(input_value);
+            }
+        });
+    }
+
+    g.wait_for_all();
+    // Each thread submits a single message, either to node1 or to node2
+    CHECK_MESSAGE(count.load() == num_reps * num_threads, "Some tasks were not executed");
+}
+
+// Test that if one of the required resource providers denied the access to the resource,
+// the resource_limited_node correctly releases and re-requests the successfully acquired resources
+//! \brief \ref error_guessing
+TEST_CASE("Test re-requesting the resources when acquisition fails") {
+    test_denying_provider();
+    test_rerequesting_with_resource_limiter();
 }
