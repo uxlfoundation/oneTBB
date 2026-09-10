@@ -1099,10 +1099,7 @@ public:
 constexpr int denying_resource_provider::resource_value;
 constexpr std::size_t denying_resource_provider::num_denials;
 
-// Test that if one of the required resource providers denied the access to the resource,
-// the resource_limited_node correctly releases and re-requests the successfully acquired resources
-//! \brief \ref error_guessing
-TEST_CASE("Test re-requesting the resources when acquisition fails") {
+void test_denying_provider() {
     using namespace tbb::flow;
 
     constexpr int first_resource_value = 500;
@@ -1136,4 +1133,64 @@ TEST_CASE("Test re-requesting the resources when acquisition fails") {
 
     g.wait_for_all();
     CHECK(count == num_inputs);
+}
+
+void test_rerequesting_with_resource_limiter() {
+    using namespace tbb::flow;
+    
+    int input_value = 0;
+    int first_resource_value = 500;
+    int second_resource_value = 501;
+
+    // First provider should have more resource handles to force the second resource
+    // to deny more frequently
+    resource_limiter<int> p1{first_resource_value, first_resource_value, first_resource_value};
+    resource_limiter<int> p2{second_resource_value};
+
+    using node_type = resource_limited_node<int, std::tuple<>>;
+
+    std::atomic<std::size_t> count{0};
+
+    auto node_body = [&](int input, node_type::output_ports_type&,
+                         int first_resource, int second_resource) {
+        ++count;
+        CHECK_MESSAGE(input == input_value, "Incorrect input");
+        CHECK_MESSAGE(first_resource == first_resource_value, "Incorrect first resource");
+        CHECK_MESSAGE(second_resource == second_resource_value, "Incorrect second resource");
+    };
+
+    graph g;
+    node_type node1(g, unlimited, std::tie(p1, p2), node_body);
+    node_type node2(g, unlimited, std::tie(p1, p2), node_body);
+
+    auto num_threads = tbb::this_task_arena::max_concurrency();
+    std::size_t num_reps = 100;
+
+    for (std::size_t i = 0; i < num_reps; ++i) {
+        utils::SpinBarrier submit_barrier(num_threads);
+        utils::NativeParallelFor(num_threads, [&](int thread_index) {
+            // Using the barrier to increase the chance that 2 threads will have equal
+            // timestamps in requests
+            submit_barrier.wait();
+    
+            // Submit in different order from different threads
+            if (thread_index % 2 == 0) {
+                node1.try_put(input_value);
+            } else {
+                node2.try_put(input_value);
+            }
+        });
+    }
+
+    g.wait_for_all();
+    // Each thread submits a single message, either to node1 or to node2
+    CHECK_MESSAGE(count.load() == num_reps * num_threads, "Some tasks were not executed");
+}
+
+// Test that if one of the required resource providers denied the access to the resource,
+// the resource_limited_node correctly releases and re-requests the successfully acquired resources
+//! \brief \ref error_guessing
+TEST_CASE("Test re-requesting the resources when acquisition fails") {
+    test_denying_provider();
+    test_rerequesting_with_resource_limiter();
 }
