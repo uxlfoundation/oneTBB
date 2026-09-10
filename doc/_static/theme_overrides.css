@@ -12,12 +12,12 @@
    }
 }
 
-.bd-sidebar-primary .toc-label-highlight {
+.toc-label-highlight {
    color: #92400e !important;
-   font-weight: 600;
+   font-weight: 700 !important;
 }
 
-.bd-sidebar-primary a:hover .toc-label-highlight,
-.bd-sidebar-primary a:focus .toc-label-highlight {
+a:hover .toc-label-highlight,
+a:focus .toc-label-highlight {
    color: #b45309 !important;
 }
