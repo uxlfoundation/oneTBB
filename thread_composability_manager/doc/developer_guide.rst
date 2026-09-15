@@ -1,13 +1,6 @@
 TCM Developer Guide
 ###################
 
-..
-   * Composition Scenarios
-
-     * General considerations for each of the composition type: what expected to happen with threads in each composition.
-   * Draw a state machine diagram.
-   * Give an example of concurrent thread pool from tests.
-
 Usage Model
 ***********
 
@@ -22,7 +15,7 @@ Below is a simple example of a usage model a parallel runtime should follow to s
    *Note*: If necessary, adjust project settings so that the compiler can find :code:`tcm.h` header
    file and the TCM library when building and linking the project.
 
-#. Register a client, providing a callback function to react on changes in permit.
+#. Register a client, providing a callback function to react on permit changes.
 
    .. code-block:: cpp
 
@@ -43,15 +36,18 @@ Below is a simple example of a usage model a parallel runtime should follow to s
 
    .. code-block:: cpp
 
-       uint32_t concurrency{};
-       tcm_permit_t permit{&concurrency, /*cpu_masks*/nullptr, /*size*/1, /*state*/{}, /*flags*/{}};
+       uint32_t grant = 0;
+       tcm_permit_t permit {
+           &grant, /*cpu_masks*/nullptr, /*size*/1, /*state*/{}, /*flags*/{}
+       };
        tcm_permit_handle_t permit_handle = nullptr;
-       tcmRequestPermit(client_id, request, /*callback_arg*/nullptr, &permit_handle, &permit);
+       tcmRequestPermit(client_id, request, callback_arg, &permit_handle,
+                        &permit);
 
-   *Note*: The :code:`tcmRequestPermit` function might result in permit switched to :code:`PENDING`
-   state, meaning that the requested resources are being used by another permit, and the requesting
-   side should wait until TCM is able to satisfy the permit, hence activating it and notifying the
-   client through invocation of a client callback.
+   *Note*: The :code:`tcmRequestPermit` function might result in permit switched to
+   :code:`TCM_PERMIT_STATE_PENDING` state, meaning that the requested resources are being used by
+   another permit, and the requesting side should wait until TCM is able to satisfy the permit,
+   hence activating it and notifying the client through invocation of a client callback.
 
 #. Once the permit is activated, register that number of threads that were suggested by TCM.
 
@@ -59,10 +55,11 @@ Below is a simple example of a usage model a parallel runtime should follow to s
 
        uint32_t suggested_concurrency = permit.concurrencies[0];
 
-       // Wake up suggested_concurrency number of threads and register them with the permit
+       // Wake up suggested_concurrency number of threads and register them with
+       // the permit
        tcmRegisterThread(permit_handle); // Invoked by each participating thread
 
-#. Deactivate and activate the permit dependending on the resources usage model.
+#. Deactivate, activate, and re-request the permit dependending on the resources usage model.
 
    .. code-block:: cpp
 
@@ -72,10 +69,15 @@ Below is a simple example of a usage model a parallel runtime should follow to s
        // Activate permit when processing begins again
        tcmActivatePermit(permit_handle);
 
-   *Note*: The activation of a permit might result in permit switched to :code:`PENDING` state,
-   meaning that the requested resources are being used by another permit, and the requesting side
-   should wait until TCM is able to satisfy the permit, hence activating it and notifying the
-   client through invocation of a client callback.
+       // Re-request if desired number of threads changes
+       tcmRequestPermit(client_id, new_request, callback_arg,
+                        &existing_permit_handle, &permit);
+
+   *Note*: Similarly to :code:`tcmRequestPermit` function, call to :code:`tcmActivatePermit` might
+   result in permit switched to :code:`TCM_PERMIT_STATE_PENDING` state, meaning that the requested
+   resources are being used by another permit, and the requesting side should wait until TCM is able
+   to satisfy the permit, hence activating it and notifying the client through invocation of a
+   client callback.
 
 #. Unregister threads and release permit once its resources are no longer needed.
 
@@ -97,9 +99,9 @@ Below is a simple example of a usage model a parallel runtime should follow to s
 .. note:: When running application that uses TCM, set :code:`TCM_ENABLE=1` environment variable to
 actually enable its use.
 
-Refer to :doc:`api_reference` to find more information on TCM usage scenarios.
+Refer to :doc:`api_reference` to find more detailed information about TCM API.
 
-See also :ref:`complete TCM usage example <tcm_usage_example>`.
+See also :ref:`TCM usage examples <tcm_usage_examples>` to learn by example.
 
 Permit State Transitions
 ************************
@@ -295,269 +297,112 @@ The combined use cases include sequential, concurrent, and nested use cases mixe
     });
 
 
-.. _tcm_usage_example:
-Example of Usage
-****************
+.. _tcm_usage_examples:
+Usage examples
+**************
 
-Below is a complete example that demonstrates usage of TCM by a :code:`client_thread_pool` class
-that represents a pool of threads. It allows invoking an arbitrary function in parallel. The
-parallel iteration space is described by :code:`start` and :code:`end` values.
+Examples below demonstrates the use of TCM in various scenarios. Parallelism in these examples is
+achieved through functional decomposition where initial amount of work is split among threads
+participating in computation.
 
-By using TCM, this client thread pool allows composition of itself or similar thread pools in
-various combinations without oversubscribing of a system.
+The examples below use the following helper function that returns an object of :code:`tcm_permit_t`
+type. This structure is filled by TCM when its client wants to read the current state of a permit
+data.
 
-.. code:: cpp
+.. literalinclude:: ./examples/utils.h
+    :language: c++
+    :start-after: /* begin make_permit helper */
+    :end-before: /* end make_permit helper */
 
-   #include "tcm.h"
+Ad hoc parallelism
+==================
 
-   #include <algorithm>
-   #include <functional>
-   #include <future>
-   #include <iostream>
-   #include <thread>
-   #include <vector>
-   #include <deque>
+The simplest way to do computations in parallel is to create a bunch of threads, split the work
+among these threads, and wait for them to finish. Such instantiated threads are usually busy only
+with the useful work they are given, not distracting themselves on other non-payload activities.
+This does not allow them to react on changes to resource permissions that can be communicated by
+TCM. Below example demonstrates the use of TCM for such ad hoc scenarios.
 
-   tcm_result_t renegotiation_callback(tcm_permit_handle_t permit_handle, void* arg,
-                                       tcm_callback_flags_t invocation_reason);
-   class client_thread_pool {
-   public:
-       template <typename Func>
-       void parallel_for(int start, int end, const Func & f) {
-           const int grant = request_permit();
-           thread_pool_cv.notify_all();
+Since resources can be already occupied by another parallel runtime or concurrenct invocation of
+same parallel region, using them disrespecting those other clients would result in platform
+oversubscription. Therefore, the TCM client should first wait until the requested resources become
+free and TCM decides to re-distribute them to this client. Once it is so, the permit is activated
+and TCM invokes client's callback function with a handle of a permit that has just been changed.
 
-           // parallel_for preparation
-           const int work_size = end - start;
-           const int common_size = std::max(1, work_size / grant);
-           int size_remainder = std::max(0, work_size - grant * common_size);
-           int s = start + common_size;
+To signal about changes in a permit back to a parallel region, this example uses the following
+structure:
 
-           // Submit work to workers
-           std::vector<std::future<void>> task_futures;
-           task_futures.reserve(grant);
-           for (int id = 1; id < grant && s != end; ++id) {
-               const int subsize = size_remainder-- > 0 ? common_size + 1 : common_size;
-               const int e = s + subsize;
-               task_futures.emplace_back(enqueue(f, s, e));
-               s = e;
-           }
+.. literalinclude:: ./examples/ad-hoc-parallelism-example.cpp
+   :language: c++
+   :start-after: /* begin synchronization data */
+   :end-before: /* end synchronization data */
 
-           // External thread joins
-           tcmRegisterThread(ph);
-           f(start, start + common_size);
-           wait(task_futures);
-           tcmUnregisterThread();
+The pointer to instance of this structure is passed to callback function as the value for its
+:code:`callback_arg` parameter.
 
-           deactivate_permit();
-       }
+Because threads in such fixed parallel regions cannot react on changes to recommendations of
+resources usage, the negotiation callback function is only needed to signal parallel region about
+activation of its permit, and can be written as the following:
 
-       template<typename F, typename... Args>
-       std::future<void> enqueue(const F& func, Args&&... args) {
-           task_t task{std::bind(func, std::forward<Args>(args)...)};
-           std::future<void> future = task.get_future();
-           {
-               std::lock_guard<std::mutex> lock(task_deque_mutex);
-               tasks.push_back(std::move(task));
-           }
-           task_deque_cv.notify_one();
-           return future;
-       }
+.. literalinclude:: ./examples/ad-hoc-parallelism-example.cpp
+   :language: c++
+   :start-after: /* begin negotiation callback */
+   :end-before: /* end negotiation callback */
 
-       client_thread_pool() {
-           tcm_result_t result = tcmConnect(renegotiation_callback, &client_id);
-           if (result != TCM_RESULT_SUCCESS) {
-               std::cerr << "tcmConnect was unsuccessful. Check 'TCM_ENABLE' is set to 1\n";
-               std::abort();
-           }
-           initialize_thread_pool();
-       }
+Callback is invoked to notify client about changes in its permit so that client can react on these
+changes accordingly. In this example, client's callback is called once permit is activated. The
+negotiation callback function above demonstrates how to read permit data properly. The
+:code:`tcmGetPermitData` function can return data of a being changed permit. This is indicated by
+:code:`tcm_permit_flags_t::stale` bit flag, and it means that the callback is going to be invoked
+one more time once changes to permit are finalized by TCM. Thus, client should abandon the data it
+has just read.
 
-       ~client_thread_pool() {
-           {
-               std::lock_guard<std::mutex> task_lock{task_deque_mutex};
-               is_execution_canceled = true;
-           }
-           {
-               std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-               max_threads = -1;
-           }
-           thread_pool_cv.notify_all();
-           task_deque_cv.notify_all();
+Besides splitting the work among instantiated threads, the main function in this example consults
+with TCM to determine the number of threads it can use so that the platform is not oversubscribed.
+To do so it connects to TCM, requests a permit, waits for it to be activated, and then reads the
+recommended number of threads for use in the :code:`grant` variable. Telling TCM that the permit
+will not allow negotiations once it is activated is done by assigning :code:`1` to the
+:code:`tcm_permit_flags_t::rigid_concurrency` flag during setting up the
+:code:`tcm_permit_request_t` structure for a permit request.
 
-           tcmReleasePermit(ph);
+The first thing each thread does before executing the work it is created for is to register itself
+with the permit, in which it participates. This is necessary to tell TCM that the thread consumes
+one of the resources assigned to a permit, and is done by calling :code:`tcmRegisterThread` function
+passing the instance of :code:`tcm_permit_handle_t` whose resource this thread is going to consume.
+At the end of its work, thread unregister itself from permit by calling :code:`tcmUnregisterThread`.
 
-           for (auto &worker : workers)
-               worker.join();
+Once all the threads finish with their task, the main thread releases the resources by calling
+:code:`tcmReleasePermit` TCM function. This marks the resources described by passed instance of
+:code:`tcm_permit_handle_t` as free, hence making them available for other clients.
 
-           tcmDisconnect(client_id);
-       }
+At the end, main thread disconnects from TCM, essentially telling it that the client won't have
+future permit requests.
 
-   private:
-       using task_t = std::packaged_task<void()>;
-       void wait(std::vector<std::future<void>>& futures) {
-           for (auto&& future : futures)
-               future.get();
-       }
+.. literalinclude:: ./examples/ad-hoc-parallelism-example.cpp
+   :language: c++
+   :start-after: /* begin parallel compute example */
+   :end-before: /* end parallel compute example */
 
-       uint32_t request_permit() {
-           tcm_permit_t permit{};
-           uint32_t grant = 0;
-           permit.concurrencies = &grant;
-           permit.size = 1;
+This is basic example of TCM integration. Despite lacking functionality for dealing with overheads
+related to threads management and reacting on changes in utilization of resources from other
+clients, it demonstrates main API calls parallel runtime should follow to make use of Thread
+Composability Manager and reduce otherwise potential CPU oversubscription.
 
-           tcm_permit_request_t request = TCM_PERMIT_REQUEST_INITIALIZER;
-           request.min_sw_threads = 1; // Minimum of one thread is required to perform work
-           permit_changed = false;
-           tcm_result_t r = tcmRequestPermit(client_id, request, /*callback_arg*/this, &ph,
-                                             &permit);
-           if (r != TCM_RESULT_SUCCESS) {
-               std::cerr << "tcmRequestPermit returned error status: " << r << std::endl;
-               std::abort();
-           }
+Pool of Threads
+===============
 
-           while (permit.state == TCM_PERMIT_STATE_PENDING || permit.flags.stale) {
-               // In case of requested permit oversubscribes or stale data is read, wait for
-               // notification from TCM
-               std::unique_lock<std::mutex> permit_lock(permit_mutex);
-               permit_cv.wait(permit_lock, [this]{ return permit_changed; });
+Below is a more complex example that demonstrates usage of TCM by a :code:`client_thread_pool` class
+that manages a pool of threads. Unlike example from `<Ad hoc parallelism>`_ this example creates
+worker threads once, effectively re-using them to perform computations in parallel. A worker thread
+executes tasks only while the pool holds a permit, and no more workers do so than the permit grants.
+The thread pool reacts to changes in permit by updating the grant, hence waking up missing threads
+or putting excessive ones to sleep. The example also includes synchronization code that allows
+invocation of a parallel computation concurrently with itself, making sure the resources are not
+released while there is work to do.
 
-               tcmGetPermitData(ph, &permit);
-               permit_changed = false;
-           }
-           std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-           max_threads = grant - /*num external threads*/1;
-           return grant;
-       }
+The code re-uses :code:`make_permit` helper from `<Ad hoc parallelism>`_ example.
 
-       void deactivate_permit() {
-           tcmDeactivatePermit(ph);
-           std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-           max_threads = 0;
-       }
-
-       enum pool_state {thread_exit, thread_continue, thread_join};
-       pool_state try_join_thread_pool() {
-           std::unique_lock<std::mutex> join_lock(thread_pool_mutex);
-           thread_pool_cv.wait(join_lock,
-               [this]{ return max_threads == -1 || joined_threads < max_threads; });
-
-           if (max_threads == -1)
-               return pool_state::thread_exit;
-           else if (joined_threads >= max_threads)
-               return pool_state::thread_continue;
-
-           joined_threads += 1;
-           return thread_join;
-       }
-
-       void exit_thread_pool() {
-           std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-           joined_threads -= 1;
-       }
-
-       bool receive_task(task_t& task) {
-           std::unique_lock<std::mutex> lock{task_deque_mutex};
-           task_deque_cv.wait_for(lock, std::chrono::milliseconds{200},
-                                  [this] { return !tasks.empty() || is_execution_canceled; });
-           if (is_execution_canceled || tasks.empty()) {
-               return false;
-           }
-           task = std::move(tasks.back());
-           tasks.pop_back();
-           return true;
-       }
-
-       bool need_to_leave() {
-           std::lock_guard<std::mutex> join_lock(thread_pool_mutex);
-           return max_threads == -1;
-       }
-
-       void initialize_thread_pool() {
-           std::call_once(thread_pool_initialized, [this] {
-               auto thread_routine = [this] {
-                   while (true) {
-                       pool_state state = try_join_thread_pool();
-                       if (state == pool_state::thread_exit)
-                           return;
-                       else if (state == pool_state::thread_continue)
-                           continue;
-
-                       tcmRegisterThread(ph);
-                       // Task execution loop
-                       while (true) {
-                           task_t task;
-                           if (receive_task(task))
-                               task();
-                           else
-                               break;
-                       }
-                       tcmUnregisterThread();
-
-                       exit_thread_pool();
-                       if (need_to_leave()) {
-                           return;
-                       }
-                   }
-               };
-
-               for (unsigned int i = 0; i < std::thread::hardware_concurrency() - 1; ++i)
-                   workers.emplace_back(thread_routine);
-           });
-       }
-
-       // Thread pool internals
-       std::once_flag thread_pool_initialized;
-       std::vector<std::thread> workers;
-       std::mutex thread_pool_mutex;
-       std::condition_variable thread_pool_cv;
-       int max_threads{};
-       int joined_threads{};
-       bool is_execution_canceled{false};
-
-       // Tasking internals
-       std::deque<task_t> tasks;
-       std::condition_variable task_deque_cv;
-       std::mutex task_deque_mutex;
-
-       // TCM related internals
-       tcm_client_id_t client_id{};
-       tcm_permit_handle_t ph{nullptr};
-       std::condition_variable permit_cv;
-       std::mutex permit_mutex;
-       bool permit_changed{false};
-       friend tcm_result_t renegotiation_callback(tcm_permit_handle_t permit_handle, void* arg,
-                                                  tcm_callback_flags_t invocation_reason);
-   };
-
-   tcm_result_t renegotiation_callback(tcm_permit_handle_t /*ph*/, void* arg,
-                                       tcm_callback_flags_t invocation_reason)
-   {
-       if (invocation_reason.new_state) {
-           client_thread_pool& myself = *(client_thread_pool*)arg;
-           {
-               std::lock_guard<std::mutex> lock(myself.permit_mutex);
-               myself.permit_changed = true;
-           }
-           myself.permit_cv.notify_one();
-       }
-
-       return TCM_RESULT_SUCCESS;
-   }
-
-   int main() {
-       const int data_size = 10 * std::thread::hardware_concurrency();
-       std::vector<int> data(data_size, 0);
-
-       client_thread_pool outer;
-       outer.parallel_for(0, data_size, [&data](int begin, int end) {
-           client_thread_pool inner{};
-           inner.parallel_for(begin, end, [&data] (int s, int e) {
-               for (int i = s; i < e; ++ i)
-                   data[i] += 1;
-           });
-       });
-
-       bool is_valid = std::all_of(data.begin(), data.end(), [](int x){ return x == 1; });
-       return is_valid ? /*success*/ 0 : /*failure*/-1;
-   }
+.. literalinclude:: ./examples/client-thread-pool.cpp
+   :language: c++
+   :start-after: /* begin client thread pool example */
+   :end-before: /* end client thread pool example */
