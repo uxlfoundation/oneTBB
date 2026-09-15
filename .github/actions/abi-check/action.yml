@@ -42,7 +42,7 @@ runs:
     - name: Install ABI tooling
       shell: bash
       run: |
-        set -e -o pipefail
+        set -x -e -o pipefail
 
         venv_dir=abi-check
 
@@ -65,7 +65,7 @@ runs:
     - name: Check ABI
       shell: bash
       run: |
-        set -e -o pipefail
+        set -x -e -o pipefail
 
         args=(
           --project "${{ inputs.project }}"
