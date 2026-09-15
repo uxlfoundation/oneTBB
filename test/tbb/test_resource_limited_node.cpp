@@ -1169,8 +1169,13 @@ void test_rerequesting_with_resource_limiter() {
     for (std::size_t i = 0; i < num_reps; ++i) {
         utils::SpinBarrier submit_barrier(num_threads);
         utils::NativeParallelFor(num_threads, [&](int thread_index) {
-            // Using the barrier to increase the chance that 2 threads will have equal
-            // timestamps in requests
+            // Using the barrier to make the requests from different threads race and hence
+            // increase the chance of a denial at acquisition time. A denial may happen either
+            // because two requests carry equal timestamps, or because a request with a later
+            // timestamp reaches the limiter before one with an earlier timestamp.
+            // In the latter case the limiter notifies more requests than it has handles available,
+            // so the later timestamp is denied when it attempts the acquisition. Both cases exercise the
+            // release-and-re-request path.
             submit_barrier.wait();
     
             // Submit in different order from different threads
