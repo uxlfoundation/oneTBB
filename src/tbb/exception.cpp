@@ -59,14 +59,15 @@ const char* missing_wait::what() const noexcept(true) { return "wait() was not c
     bool terminate_on_exception(); // defined in global_control.cpp and ipc_server.cpp
 
     template <typename F>
-    /*[[noreturn]]*/ void do_throw(F throw_func) {
+    /*[[noreturn]]*/ void do_throw(F throw_func, const char* exc_name, const char* init_args) {
         if (terminate_on_exception()) {
-            do_throw_noexcept(throw_func);
+            std::string msg = std::string("Terminating due to exception: ") + exc_name + " with arguments: " + init_args;
+            __TBB_ASSERT_RELEASE(false, msg.c_str());
         }
         throw_func();
     }
 
-    #define DO_THROW(exc, init_args) do_throw( []{ throw exc init_args; } );
+    #define DO_THROW(exc, init_args) do_throw( []{ throw exc init_args; }, #exc, #init_args);
 #else /* !TBB_USE_EXCEPTIONS */
     #define PRINT_ERROR_AND_ABORT(exc_name, msg) \
         std::fprintf (stderr, "Exception %s with message %s would have been thrown, "  \
@@ -114,7 +115,7 @@ void handle_perror( int error_code, const char* what ) {
     }
     __TBB_ASSERT(buf_len <= BUF_SIZE && buf[buf_len] == 0, nullptr);
 #if TBB_USE_EXCEPTIONS
-    do_throw([&buf] { throw std::runtime_error(buf); });
+    do_throw([&buf] { throw std::runtime_error(buf); }, "std::runtime_error", buf);
 #else
     PRINT_ERROR_AND_ABORT( "runtime_error", buf);
 #endif /* !TBB_USE_EXCEPTIONS */

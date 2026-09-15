@@ -28,6 +28,9 @@
 #if _MSC_VER && _DEBUG
 #include <crtdbg.h>
 #endif
+#if (__TBB_BUILD || __TBBBIND_BUILD) // only TBB and TBBBind use custom handler
+#include <exception>
+#endif
 
 #include <mutex>
 
@@ -68,7 +71,11 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
 #endif
         {
             std::fflush(stderr);
+#if (__TBB_BUILD || __TBBBIND_BUILD) // only TBB and TBBBind use custom handler
+            std::terminate();
+#else
             std::abort();
+#endif
         }
     }, assertion_state);
 #if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
