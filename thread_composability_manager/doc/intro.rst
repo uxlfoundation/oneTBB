@@ -49,8 +49,8 @@ General Principles
    **Note**: These situations are considered normal behaviour, not an error or exception.
 
 8. In case of not being able to satisfy the requested minimum, TCM lets the client know this by
-   assigning :code:`PENDING` state to the permit, allowing clients to wait until the necessary
-   minimum becomes available.
+   assigning :code:`TCM_PERMIT_STATE_PENDING` state to the permit, allowing clients to wait until
+   the necessary minimum becomes available.
 
 9. If unsatisfied or partially satisfied requests exist and unused resources appear (e.g. released
    by another permit), TCM notifies the corresponding clients through a registered callback to
