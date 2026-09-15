@@ -290,7 +290,7 @@ jobs:
           fi
 
           for dir in "${platform_dirs[@]}"; do
-            rm -rf "${dir}"
+            find "${dir}" -maxdepth 1 -name '*.txt' -delete
           done
 
           for baseline in abi-artifacts/*/baseline; do
