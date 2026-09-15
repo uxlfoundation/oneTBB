@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import argparse
+import json
 import pathlib
 import re
 import sys
@@ -135,17 +136,24 @@ def parse_binaries(paths):
     return symbols_by_platform
 
 
-def baseline_platforms(baseline_dir):
-    return {path.parent.name for path in baseline_dir.glob("*/*.txt")}
+def platform_map(baseline_dir):
+    path = baseline_dir / "platform_map.json"
+    if not path.is_file():
+        return {}
+    return json.loads(path.read_text()).get("exported_symbols", {})
 
 
-def get_baselines(baseline_dir, platform):
+def baseline_platforms(baseline_dir, mapping):
+    return {path.parent.name for path in baseline_dir.glob("*/*.txt")} | set(mapping)
+
+
+def get_baselines(baseline_dir, target):
     baselines = {}
-    platform_dir = baseline_dir / platform
-    if not platform_dir.is_dir():
+    target_dir = baseline_dir / target
+    if not target_dir.is_dir():
         return baselines
 
-    for path in sorted(platform_dir.glob("*.txt")):
+    for path in sorted(target_dir.glob("*.txt")):
         symbols = set()
         for line in path.read_text().splitlines():
             line = line.strip()
@@ -155,9 +163,9 @@ def get_baselines(baseline_dir, platform):
     return baselines
 
 
-def baseline_text(library, symbols, platform):
+def baseline_text(library, symbols, platforms):
     lines = [
-        f"# Exported symbols of {library} on {platform}.",
+        f"# Exported symbols of {library} on {', '.join(sorted(platforms))}.",
         "# Generated automatically, do not edit by hand.",
         "",
     ]
@@ -165,9 +173,10 @@ def baseline_text(library, symbols, platform):
     return "\n".join(lines) + "\n"
 
 
-def write_new_baselines(libraries, destination, platform):
+def write_new_baselines(libraries, destination, platforms):
     for library, binaries in libraries.items():
-        # The variants of a library (release or debug) are expected to export the same symbols
+        # The variants of a library (release, debug, or another platform sharing
+        # the same baseline) are expected to export the same symbols
         symbols = sorted(set().union(*binaries.values()))
 
         if not symbols:
@@ -175,7 +184,7 @@ def write_new_baselines(libraries, destination, platform):
 
         destination.mkdir(parents=True, exist_ok=True)
         (destination / f"{library}.txt").write_text(
-            baseline_text(library, symbols, platform), newline="\n"
+            baseline_text(library, symbols, platforms), newline="\n"
         )
 
 
@@ -259,14 +268,17 @@ if __name__ == "__main__":
     arguments = parse_arguments()
 
     symbols_by_platform = parse_binaries(arguments.binaries)
+    mapping = platform_map(arguments.baseline_dir)
 
     arguments.output_dir.mkdir(parents=True, exist_ok=True)
 
     report = ""
     checked = []
     skipped = []
+    target_libraries = {}
+    target_platforms = {}
     for platform in sorted(
-        set(symbols_by_platform) | baseline_platforms(arguments.baseline_dir)
+        set(symbols_by_platform) | baseline_platforms(arguments.baseline_dir, mapping)
     ):
         libraries = symbols_by_platform.get(platform, {})
 
@@ -275,13 +287,23 @@ if __name__ == "__main__":
             continue
 
         checked.append(platform)
-        baselines = get_baselines(arguments.baseline_dir, platform)
+        # Either get a correctly mapped platform or use 'platform' itself
+        target = mapping.get(platform, platform)
+        baselines = get_baselines(arguments.baseline_dir, target)
+        report += format_delta(compare_with_baseline(libraries, baselines), platform)
+
+        if libraries:
+            merged = target_libraries.setdefault(target, {})
+            for library, binaries in libraries.items():
+                merged.setdefault(library, {}).update(binaries)
+            target_platforms.setdefault(target, set()).add(platform)
+
+    for target, libraries in target_libraries.items():
         write_new_baselines(
             libraries,
-            arguments.output_dir / "baseline" / arguments.baseline_dir / platform,
-            platform,
+            arguments.output_dir / "baseline" / arguments.baseline_dir / target,
+            target_platforms[target],
         )
-        report += format_delta(compare_with_baseline(libraries, baselines), platform)
 
     (arguments.output_dir / "delta.md").write_text(
         f"### {arguments.project}\n\n{report}" if report else "", newline="\n"
