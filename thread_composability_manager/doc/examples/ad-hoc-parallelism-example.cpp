@@ -7,6 +7,7 @@
 #include "tcm.h"
 #include "utils.h"
 
+#include <atomic>
 #include <algorithm>
 #include <condition_variable>
 #include <cstdio>
@@ -100,7 +101,7 @@ template <typename F> void parallel_compute(int start, int end, const F& f) {
 }
 /* end parallel compute example */
 
-static std::atomic<int> external_threads = 10;
+static std::atomic<int> external_threads{10};
 void thread_func() {
     --external_threads;
     while (external_threads > 0) ;
