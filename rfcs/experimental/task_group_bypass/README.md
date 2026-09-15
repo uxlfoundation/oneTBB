@@ -53,7 +53,7 @@ handling must remain under `TBB_PREVIEW_TASK_GROUP_EXTENSIONS`. In particular, a
 dependencies must not be bypassed until its dependencies are satisfied.
 
 The only behavioral change that is possible is if the user returned `task_handle` already in the existing code. With the
-current implementation, this `task_handle` is discarded and the task is never executed. With the change, the return task
+current implementation, this `task_handle` is discarded and the task is never executed. With the change, the returned task
 will be bypassed and will execute. However, returning a `task_handle` in the existing code is considered valueless, since
 the task it owns can never be executed and is destroyed together with the handle. Such code is therefore treated as
 erroneous rather than as a legitimate usage, and no reasonable existing program is expected to be affected.
