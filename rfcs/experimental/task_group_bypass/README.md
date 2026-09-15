@@ -18,7 +18,8 @@ the current thread may find a higher-priority task to proceed with.
 
 Task Scheduler Bypass was present in older TBB versions as part of the low-level tasking API. Since that API was removed
 and `task_group` was proposed as its direct replacement, the Task Scheduler Bypass capability was introduced as
-a preview feature of `task_group` (which is also mentioned in the oneTBB Migration Guide).
+a preview feature of `task_group` (which is also mentioned in the
+[oneTBB Migration Guide](../../../doc/main/tbb_userguide/Migration_Guide/Task_API.rst#scheduler-bypass)).
 
 This preview feature allows the bodies of tasks in `task_group` to return a `task_handle` object:
 
@@ -38,8 +39,18 @@ Dynamic Dependencies feature is enabled), it serves as an optimization hint for 
 
 Since the feature has been available for a long time and its implementation is stable, it is proposed to move it to `supported`.
 
-From the implementation standpoint, the feature is implemented as several non-virtual member functions of the internal
-`task_group` task class. Therefore, the promotion is not a breaking change.
+From the implementation standpoint, the current production implementation invokes the task body through the non-virtual
+`task_ptr_or_nullptr` function and always returns `nullptr`, discarding any value returned by the body. The preview
+implementation extends this function with return-type dispatch: a body returning `void` continues to return `nullptr`,
+while a body returning `task_handle` transfers the task from the handle and returns it to the scheduler as a bypass
+candidate. A returned task is bypassed only when it is ready to execute, without unresolved dependencies. Because this
+behavior is implemented in non-virtual internal functions, promoting it to `supported` does not require an ABI change.
+
+Multiple preview features are currently guarded by `TBB_PREVIEW_TASK_GROUP_EXTENSIONS`, including scheduler bypass,
+dynamic task dependencies, and waiting for a single task. After the promotion, only the code specific to recognizing
+and returning a ready `task_handle` for scheduler bypass should become unguarded. The dependency-related checks and
+handling must remain under `TBB_PREVIEW_TASK_GROUP_EXTENSIONS`. In particular, a returned task with unresolved
+dependencies must not be bypassed until its dependencies are satisfied.
 
 The only behavioral change that is possible is if the user returned `task_handle` already in the existing code. With the
 current implementation, this `task_handle` is discarded and the task is never executed. With the change, the return task
@@ -79,7 +90,5 @@ of `TBB_HAS_TASK_GROUP` should be no less than `202612`. It may be greater if sm
 ## Open Questions Before Moving to `supported`
 
 1. What is the most appropriate name for the new named requirement? The current options are `TaskGroupTaskBody` and `TaskBody`.
-2. Is the proposed approach with coarse-grained and fine-grained feature-test macros justified enough to be implemented?
-3. Is it acceptable to silently break the use cases where the returned `task_handle` was discarded, treating them as valueless and error-prone?
-4. Should the return types other than `void` and `task_handle` be silently discarded, as the currently released
+2. Should the return types other than `void` and `task_handle` be silently discarded, as the currently released
    implementation does, or should such bodies be ill-formed?
