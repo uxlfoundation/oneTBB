@@ -222,10 +222,10 @@ permit by calling :code:`tcmReleasePermit`:
 +-----------------------+--------+------------------------------------------------------------------------------------+
 
 TCM Data Structures
-###################
+*******************
 
 Dependency on HWLOC
-*******************
+===================
 
 TCM uses `HWLOC library <https://www.open-mpi.org/projects/hwloc/>`_ to parse platform topology and
 obtain process concurrency, process CPU mask, NUMA node, and core type indices.
@@ -238,7 +238,7 @@ TCM client can either link with compatible version of HWLOC or write adapters fo
              single HWLOC library is used within the process.
 
 CPU Mask Adapter
-~~~~~~~~~~~~~~~~
+----------------
 
 .. note:: While NUMA node and core type indices are logical and thus may not correspond to physical
           indices provided by an operating system, CPU masks represented using
@@ -276,7 +276,7 @@ between :code:`hwloc_bitmap_s` and CPU masks used in operating system involves g
 bits in a loop and setting corresponding bits in a platform-specific mask representation.
 
 TCM Function Result
-*******************
+===================
 
 :code:`tcm_result_t` enum defines a set of possible return codes that the API may use.
 
@@ -299,7 +299,7 @@ TCM Function Result
 +-------------------------------------------+-------------------------------------------------------------+
 
 Permit State
-************
+============
 
 The :code:`tcm_permit_state_t` structure describes various states of a permit that the Thread
 Composability Manager uses to indicate ownership of resources described by a permit.
@@ -331,7 +331,7 @@ Composability Manager uses to indicate ownership of resources described by a per
 +------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 Permit Properties
-*****************
+=================
 
 The :code:`tcm_permit_flags_t` describes the properties of permits.
 
@@ -354,7 +354,7 @@ The :code:`tcm_permit_flags_t` describes the properties of permits.
 +-----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 Callback Type
-*************
+=============
 
 The type of a function to pass into :code:`tcmConnect`. The callback is called each time permit of a
 client has been changed due to API calls either from same or different client. It is not called when
@@ -380,7 +380,7 @@ the latest permit data.
 +-----------------------+---------------------------------------------------------------------------------+
 
 Callback Invocation Reasons
-***************************
+===========================
 
 The :code:`tcm_callbacks_flags_t` describes the reasons client callbacks were invoked by the Thread
 Composability Manager.
@@ -401,7 +401,7 @@ Composability Manager.
 +-------------------------+----------------------------------------------------------+
 
 Permits
-*******
+=======
 
 The :code:`tcm_permit_t` structure represents the permit data that is filled in by the Thread
 Composability Manager. The client is responsible for allocating and deallocating memory for objects
@@ -436,7 +436,7 @@ of this structure, including the arrays of necessary size.
 :code:`concurrencies` contains single element and :code:`size` equals to :code:`1`.
 
 Permit Constraints
-******************
+==================
 
 Constraints describe subset of CPU resources where the requested number of software threads execute.
 
@@ -519,7 +519,7 @@ Besides natural numbers, these fields can be assigned to special values. Special
           library with which Thread Composability Manager is linked.
 
 Permit Requests
-***************
+===============
 .. _tcm_permit_request_t:
 
 The :code:`tcm_permit_request_t` structure is the data structure that describes resources to be

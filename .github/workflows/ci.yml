@@ -779,7 +779,7 @@ jobs:
           cmake -G "${{ matrix.generator }}" -A x64 -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} `
             -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} ${{ matrix.cmake_extra }} `
-            -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON \
+            -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON `
             -DTCM_BUILD=ON -DTCM_TEST=OFF -DTCM_DOC_EXAMPLES=ON ..
           if (!$?) {
             throw "CMake configuration step of examples from documentation failed, exit code $LastExitCode"

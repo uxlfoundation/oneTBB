@@ -1,5 +1,5 @@
-Get Started with Thread Composability Manager
-=============================================
+Get Started with TCM
+====================
 
 To install Thread Composability Manager (TCM) follow one of the approaches below.
 
@@ -81,13 +81,13 @@ additional options that can be provided to CMake, including type of the build an
 path.
 
 Version Information
-===================
+-------------------
 
 TCM provides macros, an environment variable, and a function that helps determining version and
 runtime information of the library used.
 
 Version Macros
---------------
+~~~~~~~~~~~~~~
 
 TCM defines the following macros related to versioning.
 
@@ -104,7 +104,7 @@ TCM defines the following macros related to versioning.
 +---------------------------+---------------------------------------------------------------------------------------+
 
 TCM Runtime Version
--------------------
+~~~~~~~~~~~~~~~~~~~
 
 Runtime version information can be obtained using the :code:`tcmGetVersion`:
 
@@ -115,14 +115,14 @@ Runtime version information can be obtained using the :code:`tcmGetVersion`:
 Returns the value of :code:`TCM_VERSION` macro.
 
 Environment Variable
---------------------
+~~~~~~~~~~~~~~~~~~~~
 
 When the environment variable :code:`TCM_VERSION` is set to :code:`1`, additional information is
 printed to :code:`stderr`. The lines start with :code:`"TCM: <value>"`, and may change from version
 to version.
 
 Enabling Thread Composability Manager
-=====================================
+-------------------------------------
 
 By default, Thread Composability Manager is disabled. To enable it, set :code:`TCM_ENABLE=1`
 environment variable when starting an application.
