@@ -745,13 +745,9 @@ jobs:
             -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
             ${{ matrix.cmake_extra }} -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON \
             -DTCM_BUILD=ON -DTCM_TEST=OFF -DTCM_DOC_EXAMPLES=ON ..
-          targets=("build-doc-examples" "tcm-doc-examples")
-          labels=("doc-examples" "tcm-doc-examples")
-          for ((i = 0; i < ${#targets[@]}; i++)); do
-            cmake --build . -v --parallel --target ${targets[i]}
-            ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure \
-                  -L ${labels[i]}
-          done
+          cmake --build . -v --parallel --target build-doc-examples tcm-doc-examples
+          ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure \
+                -L "doc-examples"
 
   windows-doc-examples-testing:
     name: doc_examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_${{ matrix.cmake_extra }}
@@ -788,18 +784,13 @@ jobs:
           if (!$?) {
             throw "CMake configuration step of examples from documentation failed, exit code $LastExitCode"
           }
-
-          $targets = @('build-doc-examples', 'tcm-doc-examples')
-          $labels = @('doc-examples', 'tcm-doc-examples')
-          for ($i = 0; $i -lt $targets.Count; $i++) {
-            cmake --build . --config ${{ matrix.build_type }} -v --parallel --target $targets[i]
-            if (!$?) {
-              throw "CMake build step of examples from documentation failed, exit code $LastExitCode"
-            }
-
-            ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure `
-                  -L $labels[i]
-            if (!$?) {
-              throw "CTest of examples from documentation failed, exit code $LastExitCode"
-            }
+          cmake --build . --config ${{ matrix.build_type }} -v --parallel `
+                --target build-doc-examples tcm-doc-examples
+          if (!$?) {
+            throw "CMake build step of examples from documentation failed, exit code $LastExitCode"
+          }
+          ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure `
+                -L "doc-examples"
+          if (!$?) {
+            throw "CTest of examples from documentation failed, exit code $LastExitCode"
           }
