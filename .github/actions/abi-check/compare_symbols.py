@@ -19,8 +19,8 @@ import sys
 
 import lief
 
-# The job summary of a workflow run is capped, so only the beginning of a long
-# list of symbols is reported
+# The job summary of a workflow run is capped, so only the below specified number 
+# of symbols that appeared first is reported
 MAX_REPORTED_SYMBOLS = 51
 
 OPERATING_SYSTEMS = {
