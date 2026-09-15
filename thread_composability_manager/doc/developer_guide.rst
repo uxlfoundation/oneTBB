@@ -97,7 +97,7 @@ Below is a simple example of a usage model a parallel runtime should follow to s
 
 
 .. note:: When running application that uses TCM, set :code:`TCM_ENABLE=1` environment variable to
-actually enable its use.
+          actually enable its use.
 
 Refer to :doc:`api_reference` to find more detailed information about TCM API.
 
