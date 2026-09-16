@@ -46,7 +46,7 @@ General Principles
    - Partially satisfy the request, possibly by taking back some of earlier permitted resources from
      previous requests and thus balancing resource usage across its clients.
 
-   **Note**: These situations are considered normal behaviour, not an error or exception.
+   **Note**: These situations are considered normal behavior, not an error or exception.
 
 8. In case of not being able to satisfy the requested minimum, TCM lets the client know this by
    assigning :code:`TCM_PERMIT_STATE_PENDING` state to the permit, allowing clients to wait until
