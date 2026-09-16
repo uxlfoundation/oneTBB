@@ -1,0 +1,5 @@
+# Exported symbols of tbbmalloc_proxy on windows-32.
+# Generated automatically, do not edit by hand.
+
+TBB_malloc_replacement_log
+__TBB_malloc_proxy

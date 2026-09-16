@@ -1,0 +1,30 @@
+# Exported symbols of tbbmalloc on windows-64.
+# Generated automatically, do not edit by hand.
+
+?pool_aligned_malloc@rml@@YAPEAXPEAVMemoryPool@1@_K1@Z
+?pool_aligned_realloc@rml@@YAPEAXPEAVMemoryPool@1@PEAX_K2@Z
+?pool_create@rml@@YAPEAVMemoryPool@1@_JPEBUMemPoolPolicy@1@@Z
+?pool_create_v1@rml@@YA?AW4MemPoolError@1@_JPEBUMemPoolPolicy@1@PEAPEAVMemoryPool@1@@Z
+?pool_destroy@rml@@YA_NPEAVMemoryPool@1@@Z
+?pool_free@rml@@YA_NPEAVMemoryPool@1@PEAX@Z
+?pool_identify@rml@@YAPEAVMemoryPool@1@PEAX@Z
+?pool_malloc@rml@@YAPEAXPEAVMemoryPool@1@_K@Z
+?pool_msize@rml@@YA_KPEAVMemoryPool@1@PEAX@Z
+?pool_realloc@rml@@YAPEAXPEAVMemoryPool@1@PEAX_K@Z
+?pool_reset@rml@@YA_NPEAVMemoryPool@1@@Z
+__TBB_malloc_safer_aligned_msize
+__TBB_malloc_safer_aligned_realloc
+__TBB_malloc_safer_free
+__TBB_malloc_safer_msize
+__TBB_malloc_safer_realloc
+scalable_aligned_free
+scalable_aligned_malloc
+scalable_aligned_realloc
+scalable_allocation_command
+scalable_allocation_mode
+scalable_calloc
+scalable_free
+scalable_malloc
+scalable_msize
+scalable_posix_memalign
+scalable_realloc
