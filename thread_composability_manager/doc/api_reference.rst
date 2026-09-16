@@ -29,8 +29,8 @@ using:
 | :code:`client_id` | Out    | Client ID assigned by the Thread Composability Manager for further relation.   |
 +-------------------+--------+--------------------------------------------------------------------------------+
 
-**Warning**: Function returns :code:`TCM_RESULT_ERROR_UNKNOWN` status if :code:`TCM_ENABLE`
- environment variable is not set to :code:`1`.
+.. warning:: Function returns unsuccessful status if :code:`TCM_ENABLE` environment variable is not
+             set to :code:`1`.
 
 If the client does not expect to request or release resources anymore, it should close the
 connection by calling:
