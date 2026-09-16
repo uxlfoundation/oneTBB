@@ -59,7 +59,7 @@ Below is a simple example of a usage model a parallel runtime should follow to s
        // the permit
        tcmRegisterThread(permit_handle); // Invoked by each participating thread
 
-#. Deactivate, activate, and re-request the permit dependending on the resources usage model.
+#. Deactivate, activate, and re-request the permit depending on the resources usage model.
 
    .. code-block:: cpp
 
@@ -301,7 +301,7 @@ The combined use cases include sequential, concurrent, and nested use cases mixe
 Usage examples
 **************
 
-Examples below demonstrates the use of TCM in various scenarios. Parallelism in these examples is
+Examples below demonstrate the use of TCM in various scenarios. Parallelism in these examples is
 achieved through functional decomposition where initial amount of work is split among threads
 participating in computation.
 
@@ -323,7 +323,7 @@ with the useful work they are given, not distracting themselves on other non-pay
 This does not allow them to react on changes to resource permissions that can be communicated by
 TCM. Below example demonstrates the use of TCM for such ad hoc scenarios.
 
-Since resources can be already occupied by another parallel runtime or concurrenct invocation of
+Since resources can be already occupied by another parallel runtime or concurrent invocation of
 same parallel region, using them disrespecting those other clients would result in platform
 oversubscription. Therefore, the TCM client should first wait until the requested resources become
 free and TCM decides to re-distribute them to this client. Once it is so, the permit is activated
