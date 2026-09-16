@@ -18,6 +18,7 @@ Example for Linux* OS:
 .. code-block:: bash
 
     tar -xvf tcm-*.tgz
+    cd tcm-<version>
     source env/vars.sh
 
 Example for Windows* OS:
@@ -25,6 +26,7 @@ Example for Windows* OS:
 .. code-block:: bat
 
     powershell -Command "Expand-Archive -Path tcm-*.zip -DestinationPath . -Force"
+    cd tcm-<version>
     call env\vars.bat
 
 Install from Sources
