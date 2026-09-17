@@ -298,6 +298,7 @@ The combined use cases include sequential, concurrent, and nested use cases mixe
 
 
 .. _tcm_usage_examples:
+
 Usage examples
 **************
 
@@ -402,7 +403,108 @@ released while there is work to do.
 
 The code re-uses :code:`make_permit` helper from `<Ad hoc parallelism>`_ example.
 
+Pool interface
+--------------
+
+The public interface of the pool consists of the :code:`parallel_for` member function and the pool
+lifetime management. The :code:`parallel_for` function asks TCM for the concurrency it is allowed to
+use, splits the given range into that many chunks, submits them as tasks, and waits for their
+completion. Since the pool does not need the resources anymore once the work is done, it deactivates
+the permit, thus letting TCM re-distribute the resources to other clients.
+
+The constructor connects the client to TCM and creates the worker threads. Note that the workers are
+created eagerly, while the permit is requested lazily: the number of threads a pool owns is its own
+business, whereas the number of threads that are allowed to run simultaneously is negotiated with
+TCM.
+
+The destructor stops the workers, releases the permit and disconnects from TCM.
+
 .. literalinclude:: ./examples/client-thread-pool.cpp
    :language: c++
-   :start-after: /* begin client thread pool example */
-   :end-before: /* end client thread pool example */
+   :start-after: /* begin pool interface */
+   :end-before: /* end pool interface */
+
+Permit management
+-----------------
+
+Unlike the `<Ad hoc parallelism>`_ example, this pool keeps a single permit for its whole lifetime:
+:code:`tcmRequestPermit` creates a permit when it is given a null handle and re-uses the permit the
+handle refers to otherwise. Also, several :code:`parallel_for` calls may be running concurrently in
+the same pool, so they share that permit: the first of them requests it, the others only wait until
+it becomes usable, and the last one to finish deactivates it.
+
+A permit is usable when it is neither :code:`TCM_PERMIT_STATE_PENDING` nor
+:code:`TCM_PERMIT_STATE_VOID`, and the data read for it is not marked with the
+:code:`tcm_permit_flags_t::stale` flag. Waiting for such a state is done through the
+:code:`permit_updates` counter, which is incremented every time new permit data is published, either
+by a permit request or by the negotiation callback. Reading the counter before reading the permit
+data guarantees that an update, which happens in between, is not missed.
+
+Once the permit data is read successfully, the granted concurrency is applied to the pool. Because
+several threads may read the permit data concurrently, each read takes a value of the
+:code:`permit_epoch` counter, and only the newest read is allowed to publish the grant it has
+observed. The permit handle is stored before the grant is published, since the workers, which are
+woken up by the new grant, register themselves with that handle.
+
+.. literalinclude:: ./examples/client-thread-pool.cpp
+   :language: c++
+   :start-after: /* begin permit management */
+   :end-before: /* end permit management */
+
+Worker pool
+-----------
+
+The pool of threads translates the permit grant into the number of workers that are allowed to run
+tasks. The :code:`allowed_threads` variable holds that number, and the workers, which do not fit
+into it, keep sleeping on the :code:`pool_cv` condition variable. Increasing the grant wakes up the
+missing threads, while revoking it puts the excessive ones to sleep as soon as they complete the
+tasks they are busy with.
+
+Each worker registers itself with the permit by the :code:`tcmRegisterThread` call before it starts
+taking tasks, and unregisters itself by the :code:`tcmUnregisterThread` call once it has no more
+tasks to do. Therefore, a thread is known to TCM only for the time it actually consumes the
+resources described by the permit.
+
+.. literalinclude:: ./examples/client-thread-pool.cpp
+   :language: c++
+   :start-after: /* begin worker pool */
+   :end-before: /* end worker pool */
+
+Tasking
+-------
+
+The tasking part of the pool is not related to TCM, and is shown for completeness. It is a simple
+deque of tasks, which is filled by the :code:`parallel_for` function and is drained by the workers.
+The only TCM related detail here is that a worker does not wait for new tasks indefinitely: if no
+work appears for a while, :code:`get_task` gives up so that the worker can leave the pool and stop
+being counted by TCM as a thread that uses the resources.
+
+.. literalinclude:: ./examples/client-thread-pool.cpp
+   :language: c++
+   :start-after: /* begin tasking */
+   :end-before: /* end tasking */
+
+The state of the pool described above is kept in the following data members:
+
+.. literalinclude:: ./examples/client-thread-pool.cpp
+   :language: c++
+   :start-after: /* begin pool state */
+   :end-before: /* end pool state */
+
+Negotiation callback
+--------------------
+
+TCM invokes the negotiation callback to notify the pool that its permit has changed. When the change
+is about the granted concurrency, the callback re-reads the permit data, which also applies the new
+grant to the pool, hence waking up the missing workers or putting the excessive ones to sleep. In
+any case, the callback publishes a permit update so that the threads waiting for the permit to
+become usable re-examine its data.
+
+.. literalinclude:: ./examples/client-thread-pool.cpp
+   :language: c++
+   :start-after: /* begin negotiation callback */
+   :end-before: /* end negotiation callback */
+
+This example demonstrates how a parallel runtime, which manages a pool of threads, can adjust the
+number of threads it runs to the resources TCM grants it, both when the permit is requested and when
+TCM renegotiates it later.
