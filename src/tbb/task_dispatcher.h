@@ -299,7 +299,7 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
     ed.wait_ctx = waiter.wait_ctx();
 
     m_properties.outermost = false;
-    m_properties.fifo_tasks_allowed = false;
+    m_properties.fifo_tasks_allowed = dl_guard.old_properties.fifo_tasks_allowed;
 
     if (!dl_guard.is_initially_registered) {
         m_thread_data->my_arena->my_tc_client.get_pm_client()->register_thread();
