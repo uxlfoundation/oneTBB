@@ -86,4 +86,3 @@ TEST_CASE("polymorphic_allocator test") {
     TestAllocator<std::pmr::polymorphic_allocator<void>>(Concept, std::pmr::polymorphic_allocator<void>(&aligned_resource));
 }
 #endif
-

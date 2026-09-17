@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2023 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -24,6 +25,7 @@
 #include <cstdlib>
 #include <utility>
 #include <new> /* std::bad_alloc() */
+#include <limits>
 #else
 #include "oneapi/tbb/detail/_export.h"
 #include <stddef.h> /* Need ptrdiff_t and size_t from here. */
@@ -222,9 +224,17 @@ public:
 
     //! Allocate space for n objects.
     __TBB_nodiscard T* allocate(std::size_t n) {
-        T* p = static_cast<T*>(scalable_malloc(n * sizeof(value_type)));
-        if (!p) {
-            throw_exception(std::bad_alloc());
+        T* p = nullptr;
+
+        // Check overflow before multiplying
+        if (n > std::numeric_limits<std::size_t>::max() / sizeof(value_type)) {
+            throw_exception(std::bad_array_new_length());
+        } else {
+            p = static_cast<T*>(scalable_malloc(n * sizeof(value_type)));
+
+            if (!p) {
+                throw_exception(std::bad_alloc());
+            }
         }
         return p;
     }
