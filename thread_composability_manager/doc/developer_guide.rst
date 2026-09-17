@@ -433,8 +433,8 @@ handle refers to otherwise. Also, several :code:`parallel_for` calls may be runn
 the same pool, so they share that permit: the first of them requests it, the others only wait until
 it becomes usable, and the last one to finish deactivates it.
 
-A permit is usable when it is neither :code:`TCM_PERMIT_STATE_PENDING` nor
-:code:`TCM_PERMIT_STATE_VOID`, and the data read for it is not marked with the
+A permit is usable when it is activated by TCM, that is its state equals to
+:code:`TCM_PERMIT_STATE_ACTIVE`, and the data read for it is not marked with the
 :code:`tcm_permit_flags_t::stale` flag. Waiting for such a state is done through the
 :code:`permit_updates` counter, which is incremented every time new permit data is published, either
 by a permit request or by the negotiation callback. Reading the counter before reading the permit

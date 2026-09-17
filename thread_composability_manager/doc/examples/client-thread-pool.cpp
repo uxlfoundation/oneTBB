@@ -137,8 +137,7 @@ private:
         // Only the newest read publishes what it has read
         const unsigned epoch = ++permit_epoch;
         tcmGetPermitData(handle, &permit);
-        if (permit.state == TCM_PERMIT_STATE_PENDING ||
-            permit.state == TCM_PERMIT_STATE_VOID || permit.flags.stale)
+        if (permit.state != TCM_PERMIT_STATE_ACTIVE || permit.flags.stale)
             // The permit cannot be used yet: either TCM has not satisfied the
             // request, or the data was outdated by a concurrent renegotiation
             // and has to be read again.
