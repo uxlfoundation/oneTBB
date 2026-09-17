@@ -393,7 +393,7 @@ Pool of Threads
 ===============
 
 Below is a more complex example that demonstrates usage of TCM by a :code:`client_thread_pool` class
-that manages a pool of threads. Unlike example from `<Ad hoc parallelism>`_ this example creates
+that manages a pool of threads. Unlike the example from `Ad hoc parallelism`_ this example creates
 worker threads once, effectively re-using them to perform computations in parallel. A worker thread
 executes tasks only while the pool holds a permit, and no more workers do so than the permit grants.
 The thread pool reacts to changes in permit by updating the grant, hence waking up missing threads
@@ -401,7 +401,7 @@ or putting excessive ones to sleep. The example also includes synchronization co
 invocation of a parallel computation concurrently with itself, making sure the resources are not
 released while there is work to do.
 
-The code re-uses :code:`make_permit` helper from `<Ad hoc parallelism>`_ example.
+The code re-uses :code:`make_permit` helper from `Ad hoc parallelism`_ example.
 
 Pool interface
 --------------
@@ -427,11 +427,11 @@ The destructor stops the workers, releases the permit and disconnects from TCM.
 Permit management
 -----------------
 
-Unlike the `<Ad hoc parallelism>`_ example, this pool keeps a single permit for its whole lifetime:
-:code:`tcmRequestPermit` creates a permit when it is given a null handle and re-uses the permit the
-handle refers to otherwise. Also, several :code:`parallel_for` calls may be running concurrently in
-the same pool, so they share that permit: the first of them requests it, the others only wait until
-it becomes usable, and the last one to finish deactivates it.
+Unlike the example from `Ad hoc parallelism`_ section, this pool keeps a single permit for its whole
+lifetime: :code:`tcmRequestPermit` creates a permit when it is given a null handle and re-uses the
+permit the handle refers to otherwise. Also, several :code:`parallel_for` calls may be running
+concurrently in the same pool, so they share that permit: the first of them requests it, the others
+only wait until it becomes usable, and the last one to finish deactivates it.
 
 A permit is usable when it is activated by TCM, that is its state equals to
 :code:`TCM_PERMIT_STATE_ACTIVE`, and the data read for it is not marked with the
