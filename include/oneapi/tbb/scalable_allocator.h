@@ -25,7 +25,6 @@
 #include <cstdlib>
 #include <utility>
 #include <new> /* std::bad_alloc() */
-#include <limits>
 #else
 #include "oneapi/tbb/detail/_export.h"
 #include <stddef.h> /* Need ptrdiff_t and size_t from here. */
@@ -227,7 +226,7 @@ public:
         T* p = nullptr;
 
         // Check overflow before multiplying
-        if (n > std::numeric_limits<std::size_t>::max() / sizeof(value_type)) {
+        if (n > ~(std::size_t(0)) / sizeof(value_type)) {
             throw_exception(std::bad_array_new_length());
         } else {
             p = static_cast<T*>(scalable_malloc(n * sizeof(value_type)));

@@ -23,7 +23,6 @@
 #include "detail/_exception.h"
 #include <cstdlib>
 #include <utility>
-#include <limits>
 
 #if __TBB_CPP17_MEMORY_RESOURCE_PRESENT
 #include <memory_resource>
@@ -63,7 +62,7 @@ public:
         T* p = nullptr;
 
         // Check overflow before multiplying
-        if (n > std::numeric_limits<std::size_t>::max() / sizeof(value_type)) {
+        if (n > ~(std::size_t(0)) / sizeof(value_type)) {
             throw_exception(exception_id::bad_array_new_length);
         } else {
             p = static_cast<T*>(r1::allocate_memory(n * sizeof(value_type)));
