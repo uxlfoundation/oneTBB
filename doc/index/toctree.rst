@@ -50,3 +50,11 @@
    :caption: Specification
 
    /main/specification/source/index
+
+
+.. toctree::
+   :maxdepth: 2
+   :hidden:
+   :caption: Thread Composability Manager
+
+   /tcm/index
