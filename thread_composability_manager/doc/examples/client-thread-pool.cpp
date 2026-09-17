@@ -24,7 +24,7 @@
 tcm_result_t negotiation_callback(tcm_permit_handle_t permit_handle, void* arg,
                                   tcm_callback_flags_t invocation_reason);
 
-/* begin client thread pool example */
+/* begin pool interface */
 class client_thread_pool {
 public:
     // Applies func to the [start, end) range, splitting it between as many
@@ -68,10 +68,9 @@ public:
             tcmReleasePermit(handle);
         tcmDisconnect(client_id);
     }
-
+/* end pool interface */
+/* begin permit management */
 private:
-    using task_t = std::packaged_task<void()>;
-
     // ------------------------------- Permit -------------------------------
 
     // Makes sure the pool holds a permit and returns the concurrency it grants.
@@ -176,8 +175,11 @@ private:
         }
         permit_cv.notify_all();
     }
+/* end permit management */
 
+/* begin worker pool */
     // ----------------------------- Worker pool ----------------------------
+    using task_t = std::packaged_task<void()>;
 
     // Lets 'grant' workers run tasks. The epoch check drops a grant that a
     // newer read of the permit data has already superseded.
@@ -236,7 +238,8 @@ private:
             leave_pool();
         }
     }
-
+/* end worker pool */
+/* begin tasking */
     // ------------------------------- Tasking ------------------------------
 
     template <typename F>
@@ -274,7 +277,9 @@ private:
         }
         task_deque_cv.notify_all();
     }
+/* end tasking */
 
+/* begin pool state */
     // Worker pool internals
     std::vector<std::thread> workers;
     std::mutex pool_mutex;
@@ -298,6 +303,7 @@ private:
     bool is_deactivating{false};
     std::atomic<unsigned> concurrent_invocations{0};
     std::atomic<unsigned> permit_epoch{0};
+/* end pool state */
 
     friend tcm_result_t negotiation_callback(
         tcm_permit_handle_t permit_handle, void* arg,
@@ -305,6 +311,7 @@ private:
 };
 
 // TCM calls this back to tell the pool that its permit has changed
+/* begin negotiation callback */
 tcm_result_t negotiation_callback(tcm_permit_handle_t permit_handle, void* arg,
                                   tcm_callback_flags_t invocation_reason)
 {
@@ -319,7 +326,7 @@ tcm_result_t negotiation_callback(tcm_permit_handle_t permit_handle, void* arg,
     pool.notify_permit_update();
     return TCM_RESULT_SUCCESS;
 }
-/* end client thread pool example */
+/* end negotiation callback */
 
 std::atomic<int> threads_to_start{10};
 
