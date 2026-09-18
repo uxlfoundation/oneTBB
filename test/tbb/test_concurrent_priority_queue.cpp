@@ -21,6 +21,7 @@
 #include <common/concurrent_priority_queue_common.h>
 #include <common/containers_common.h>
 
+#include <random>
 //! \file test_concurrent_priority_queue.cpp
 //! \brief Test for [containers.concurrent_priority_queue] specification
 
@@ -162,6 +163,7 @@ void test_exceptions() {
             MyThrowingType::throw_flag = 1;
             push_selector(pq, elem, i);
         } catch(...) {
+            MyThrowingType::throw_flag = 0;
             REQUIRE_MESSAGE(!pq.empty(), "Failed: pq should not be empty");
             REQUIRE_MESSAGE(pq.size() == 3, "Failed: pq should contain only three elements");
             REQUIRE_MESSAGE(pq.try_pop(elem), "Failed: pq is not functional");
@@ -178,6 +180,7 @@ void test_exceptions() {
             MyThrowingType::throw_flag = 1;
             push_selector(pq2, elem, i);
         } catch(...) {
+            MyThrowingType::throw_flag = 0;
             REQUIRE_MESSAGE(!pq2.empty(), "Failed: pq should not be empty");
             REQUIRE_MESSAGE(pq2.size() == 2, "Failed: pq should contain only two elements");
             REQUIRE_MESSAGE(pq2.try_pop(elem), "Failed: pq is not functional");
@@ -213,16 +216,62 @@ void test_scoped_allocator() {
     allocator_data_type::deactivate();
 }
 
+TEST_CASE("serial tests - pop") {
+    using container_type = tbb::concurrent_priority_queue<int>;
+
+    container_type c1 = {1,2,3,4,5,6,7,8,9};
+
+    std::vector<int>  results;
+
+    for (int i=0; i< 9; ++i) {
+        int val = -1;
+        c1.try_pop(val);
+        results.push_back(val);
+    }
+
+    REQUIRE(results == std::vector<int>({9,8,7,6,5,4,3,2,1}));
+}
+
+namespace std {
+std::ostream& operator << (std::ostream& o , std::vector<int> const& v) {
+    for (auto&& e:v) {
+        o << e << ' ';
+    }
+    return o;
+}
+}
+
+TEST_CASE("serial tests - push") {
+    using container_type = tbb::concurrent_priority_queue<int>;
+
+    container_type c1;
+
+    std::vector<int> values = {1,2,3,4,5,6,7,8,9};
+
+    std::random_device rd;
+    std::mt19937 g(rd());
+
+    std::shuffle(values.begin(), values.end(), g);
+
+    for (int v : values) {
+        c1.push(v);
+    }
+
+    std::vector<int>  results;
+
+    for (int i=0; i< 9; ++i) {
+        int val = -1;
+        c1.try_pop(val);
+        results.push_back(val);
+    }
+
+    CHECK(results == std::vector<int>({9,8,7,6,5,4,3,2,1}));
+}
+
 // Testing concurrent_priority_queue with smart pointers and other special types
 //! \brief \ref error_guessing
 TEST_CASE("concurrent_priority_queue with smart_pointers") {
     test_cpq_with_smart_pointers();
-}
-
-//! Testing push-pop operations in concurrent_priority_queue with multithreading and specific value type
-//! \brief \ref error_guessing
-TEST_CASE("multithreading support in concurrent_priority_queue with specific value type") {
-    test_multithreading();
 }
 
 #if TBB_USE_EXCEPTIONS
@@ -236,4 +285,10 @@ TEST_CASE("exception handling in concurrent_priority_queue") {
 //! \brief \ref error_guessing
 TEST_CASE("concurrent_priority_queue with std::scoped_allocator_adaptor") {
     test_scoped_allocator();
+}
+
+//! Testing push-pop operations in concurrent_priority_queue with multithreading and specific value type
+//! \brief \ref error_guessing
+TEST_CASE("multithreading support in concurrent_priority_queue with specific value type") {
+    test_multithreading();
 }
