@@ -375,13 +375,19 @@ TEST_CASE("Test worker threads remain inactive in enforced serial execution mode
 // The test cannot work correctly with statically linked runtime.
 // TODO: investigate a failure in debug with MSVC
 #if (!_MSC_VER || (defined(_DLL) && !defined(_DEBUG))) && !EMSCRIPTEN
+
+enum class TestCase {
+    SET_TERMINATE,
+    CUSTOM_ASSERTION_HANDLER
+};
+
 #include <csetjmp>
 
 // Overall, the test case is not safe because the dtors might not be called during long jump.
 // Therefore, it makes sense to run the test case after all other test cases.
 //! Test terminate_on_exception behavior
 //! \brief \ref interface \ref requirement
-TEST_CASE("terminate_on_exception: enabled") {
+void global_control_terminate_on_exception(TestCase test_case) {
     oneapi::tbb::global_control c(oneapi::tbb::global_control::terminate_on_exception, 1);
     static bool terminate_handler_called;
     terminate_handler_called = false;
@@ -390,11 +396,24 @@ TEST_CASE("terminate_on_exception: enabled") {
     try {
 #endif
         static std::jmp_buf buffer;
-        std::terminate_handler prev = std::set_terminate([] {
-            CHECK(!terminate_handler_called);
-            terminate_handler_called = true;
-            std::longjmp(buffer, 1);
-        });
+        std::terminate_handler prev_terminate_handler;
+        tbb::ext::assertion_handler_type prev_assertion_handler;
+
+        if (test_case == TestCase::SET_TERMINATE) {
+            prev_terminate_handler = std::set_terminate([] {
+                CHECK(!terminate_handler_called);
+                terminate_handler_called = true;
+                std::longjmp(buffer, 1);
+            });
+        } else if (test_case == TestCase::CUSTOM_ASSERTION_HANDLER) {
+            prev_assertion_handler =
+                tbb::ext::set_assertion_handler([](const char*, int,
+                                                   const char*, const char*) {
+                CHECK(!terminate_handler_called);
+                terminate_handler_called = true;
+                std::longjmp(buffer, 1);
+            });
+        }
 #if _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:4611) // interaction between '_setjmp' and C++ object destruction is non - portable
@@ -421,7 +440,11 @@ TEST_CASE("terminate_on_exception: enabled") {
 #if _MSC_VER
 #pragma warning(pop)
 #endif
-        std::set_terminate(prev);
+        if (test_case == TestCase::SET_TERMINATE) {
+            std::set_terminate(prev_terminate_handler);
+        } else if (test_case == TestCase::CUSTOM_ASSERTION_HANDLER) {
+            tbb::ext::set_assertion_handler(prev_assertion_handler);
+        }
         terminate_handler_called = true;
 #if TBB_USE_EXCEPTIONS
     } catch (...) {
@@ -430,4 +453,16 @@ TEST_CASE("terminate_on_exception: enabled") {
 #endif
     CHECK(terminate_handler_called);
 }
+
+//! Test terminate_on_exception behavior
+//! \brief \ref interface \ref requirement
+TEST_CASE("terminate_on_exception: enabled") {
+    global_control_terminate_on_exception(TestCase::SET_TERMINATE);
+}
+
+TEST_CASE("terminate_on_exception: enabled") {
+    global_control_terminate_on_exception(TestCase::CUSTOM_ASSERTION_HANDLER);
+}
+#else
+TEST_CASE("terminate_on_exception: enabled" * doctest::skip()) {}
 #endif
