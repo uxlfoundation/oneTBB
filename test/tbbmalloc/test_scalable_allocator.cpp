@@ -251,6 +251,9 @@ TEST_CASE("Allocator concept") {
 //! \brief \ref requirement
 TEST_CASE("Exceptions") {
     TestAllocator<tbb::scalable_allocator<void>>(Exceptions);
+
+    tbb::memory_pool<tbb::scalable_allocator<int>> pool;
+    TestAllocator(Exceptions, tbb::memory_pool_allocator<void>(pool));
 }
 #endif /* TBB_USE_EXCEPTIONS */
 
