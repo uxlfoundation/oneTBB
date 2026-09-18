@@ -49,8 +49,8 @@ namespace r1 {
 static std::atomic<tbb::detail::do_once_state> assertion_state;
 
 // TODO: consider extension for formatted error description string
-/* [[noreturn]] */ static void assertion_failure_impl(const char* location, int line,
-                                                      const char* expression, const char* comment) {
+/* [[noreturn]] */ static void assertion_failure_default(const char* location, int line,
+                                                         const char* expression, const char* comment) {
 #if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     // Workaround for erroneous "unreachable code" during assertion throwing using call_once
     #pragma warning (push)
@@ -85,11 +85,11 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
 
 namespace assertion_handler {
 // Initial value is default handler
-static std::atomic<assertion_handler_type> handler{assertion_failure_impl};
+static std::atomic<assertion_handler_type> handler{nullptr};
 
 #if (__TBB_BUILD || __TBBBIND_BUILD) // only TBB and TBBBind use custom handler
 static assertion_handler_type set(assertion_handler_type new_handler) noexcept {
-    return handler.exchange(new_handler ? new_handler : assertion_failure_impl,
+    return handler.exchange(new_handler ? new_handler : nullptr,
                             std::memory_order_acq_rel);
 }
 #endif
@@ -97,11 +97,35 @@ static assertion_handler_type set(assertion_handler_type new_handler) noexcept {
 static assertion_handler_type get() noexcept {
     return handler.load(std::memory_order_acquire);
 }
+
 } // namespace assertion_handler
+
+void terminate_on_user_exception() {
+    assertion_handler_type curr_handler = assertion_handler::get();
+
+    // default "exception in noexcept function" handler can report exception name
+    // for any exception, so use it if one is not redefined
+    if (!curr_handler)
+        do_throw_noexcept([] { throw; });
+
+    char buf[256] = { 0 };
+
+    try {
+        throw;
+    } catch (std::exception &x) {
+        std::snprintf(buf, sizeof(buf), "Terminating due to exception: %s with arguments: %s",
+                      typeid(x).name(), x.what());
+    } catch (...) {
+        std::strncat(buf, "Unknown exception", sizeof(buf)-1);
+    }
+    __TBB_ASSERT_RELEASE(false, buf);
+}
 
 void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line,
                                            const char* expression, const char* comment) {
-    assertion_handler::get()(location, line, expression, comment);
+    assertion_handler_type curr_handler = assertion_handler::get();
+
+    (curr_handler ? curr_handler : assertion_failure_default) (location, line, expression, comment);
 }
 
 //! Report a runtime warning.
