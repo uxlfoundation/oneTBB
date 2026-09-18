@@ -21,6 +21,8 @@
 #include "common/utils_concurrency_limit.h"
 #include "common/cpu_usertime.h"
 
+#include "global_control_terminate_on_exception.h"
+
 #include "oneapi/tbb/global_control.h"
 #include "oneapi/tbb/parallel_for.h"
 
@@ -376,10 +378,7 @@ TEST_CASE("Test worker threads remain inactive in enforced serial execution mode
 // The test cannot work correctly with statically linked runtime.
 // TODO: investigate a failure in debug with MSVC
 #if (!_MSC_VER || (defined(_DLL) && !defined(_DEBUG))) && !EMSCRIPTEN
-#include <csetjmp>
 
-// Overall, the test case is not safe because the dtors might not be called during long jump.
-// Therefore, it makes sense to run the test case after all other test cases.
 //! Test terminate_on_exception behavior
 //! \brief \ref interface \ref requirement
 TEST_CASE("terminate_on_exception: enabled") {
@@ -430,4 +429,6 @@ TEST_CASE("terminate_on_exception: enabled") {
 #endif
     CHECK(terminate_handler_called);
 }
+#else
+TEST_CASE("terminate_on_exception: enabled" * doctest::skip()) {}
 #endif
