@@ -57,7 +57,9 @@ public:
         T* p = nullptr;
 
         // Check overflow before multiplying
-        if (n > max_size()) {
+        if (n > ~std::size_t(0) / sizeof(value_type)) {
+            // r1::cache_aligned_allocate throws bad_array_new_length if
+            // n*sizeof(T) + cache_line_size causes overflow
             throw_exception(exception_id::bad_array_new_length);
         } else {
             p = static_cast<T*>(r1::cache_aligned_allocate(n * sizeof(value_type)));
