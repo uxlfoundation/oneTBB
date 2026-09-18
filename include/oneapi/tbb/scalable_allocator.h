@@ -226,7 +226,7 @@ public:
         T* p = nullptr;
 
         // Check overflow before multiplying
-        if (n > ~(std::size_t(0)) / sizeof(value_type)) {
+        if (n > ~std::size_t(0) / sizeof(value_type)) {
             throw_exception(std::bad_array_new_length());
         } else {
             p = static_cast<T*>(scalable_malloc(n * sizeof(value_type)));
