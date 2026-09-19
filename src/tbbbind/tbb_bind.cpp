@@ -268,7 +268,9 @@ private:
         // this function calls the interface that is available in the HWLOC 2.5 only.
 #if HWLOC_API_VERSION >= 0x20500
         auto some_core = hwloc_get_next_obj_by_type(topology, HWLOC_OBJ_CORE, nullptr);
-        hwloc_get_obj_with_same_locality(topology, some_core, HWLOC_OBJ_CORE, nullptr, nullptr, 0);
+        if (some_core) {
+            hwloc_get_obj_with_same_locality(topology, some_core, HWLOC_OBJ_CORE, nullptr, nullptr, 0);
+        }
 #endif
     }
 
