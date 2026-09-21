@@ -22,9 +22,10 @@ General Principles
    those appears, and to release these resources once the work is done and no new demand is
    foreseen. Threads that utilize these resources are created by the clients as needed.
 
-   **Note:** TCM makes no assumptions about which threads – from the application or from a client’s
-   thread pool – utilize the granted concurrency. Clients should adjust the concurrency value as
-   needed to account for application threads that are going to participate in a parallel region.
+.. note:: TCM makes no assumptions about which threads – from the application or from a client’s
+          thread pool – utilize the granted concurrency. Clients should adjust the concurrency value
+          as needed to account for application threads that are going to participate in a parallel
+          region.
 
 3. It is responsibility of the client to follow the negotiated permits. TCM assumes its clients are
    well-behaved and neither ignore nor abuse their resource permits.
@@ -46,7 +47,7 @@ General Principles
    - Partially satisfy the request, possibly by taking back some of earlier permitted resources from
      previous requests and thus balancing resource usage across its clients.
 
-   **Note**: These situations are considered normal behavior, not an error or exception.
+.. note:: These situations are considered normal behavior, not an error or exception.
 
 8. In case of not being able to satisfy the requested minimum, TCM lets the client know this by
    assigning :code:`TCM_PERMIT_STATE_PENDING` state to the permit, allowing clients to wait until
@@ -59,8 +60,8 @@ General Principles
 10. TCM may also invoke the callback to revoke some resources previously granted above the requested
     minimum.
 
-    **Note**: Since clients cannot immediately react to reduced set of resources which was initially
-    negotiated, it is expected that these clients will reduce the resources usage as soon as
-    execution allows. Depending on the chosen resource distribution strategy, it may happen that the
-    system is oversubscribed for a limited time; TCM should however try avoiding that as much as
-    possible.
+.. note:: Since clients cannot immediately react to reduced set of resources which was initially
+          negotiated, it is expected that these clients will reduce the resources usage as soon as
+          execution allows. Depending on the chosen resource distribution strategy, it may happen
+          that the system is oversubscribed for a limited time; TCM should however try avoiding that
+          as much as possible.
