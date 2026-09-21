@@ -171,7 +171,7 @@ This represent composition of TCM permit requests where one or more clients requ
 after the other.
 
 .. code-block:: cpp
-   :caption: Example of sequential requests for resources from multiple clients.
+   :caption: Example of sequential permit requests for resources from multiple clients
 
     #pragma omp parallel for
     for(int i = 0; i < 100; ++i) {
@@ -203,7 +203,7 @@ concurrently and independently. No client makes new requests while holding one.
 
 .. code-block:: cpp
    :caption: Example of independent requests happening concurrently: one client requests for
-             :math:`P_1` resources, the other - for :math:`P_2`
+             resources to accommodate of :math:`P_1` threads, the other - :math:`P_2`
 
     std::thread omp_call([&] {
         #pragma omp parallel for num_threads(P1)
@@ -242,7 +242,7 @@ A nested permit request corresponds to a situation when a client request a permi
 while holding and using another permit from one of the previous requests.
 
 .. code-block:: cpp
-   :caption: Example of nested permit requests.
+   :caption: Example of nested permit requests
 
     tbb::parallel_for(0, 100, [](int) {
         /*TBB threads working*/
@@ -273,7 +273,7 @@ Combined Use Cases
 The combined use cases include sequential, concurrent, and nested use cases mixed in the code.
 
 .. code-block:: cpp
-   :caption: Example of sequential with nested calls.
+   :caption: Example of sequential with nested calls
 
     #pragma omp parallel for
     for(int i = 0; i < 100; ++i) {
