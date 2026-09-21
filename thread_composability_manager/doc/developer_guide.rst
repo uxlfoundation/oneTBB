@@ -12,8 +12,8 @@ Below is a simple example of a usage model a parallel runtime should follow to s
 
        #include "tcm.h"
 
-.. note:: If necessary, adjust project settings so that the compiler can find :code:`tcm.h` header
-          file and the TCM library when building and linking the project.
+   .. note:: If necessary, adjust project settings so that the compiler can find :code:`tcm.h`
+             header file and the TCM library when building and linking the project.
 
 #. Register a client, providing a callback function to react on permit changes.
 
@@ -28,9 +28,9 @@ Below is a simple example of a usage model a parallel runtime should follow to s
 
        tcm_permit_request_t request = TCM_PERMIT_REQUEST_INITIALIZER;
 
-.. note:: To describe a portion of platform resources adjust the fields of
-          :code:`tcm_permit_request_t` object accordingly. Refer to description of
-          :ref:`tcm_permit_request_t <tcm_permit_request_t>` data structure for more info.
+   .. note:: To describe a portion of platform resources adjust the fields of
+             :code:`tcm_permit_request_t` object accordingly. Refer to description of
+             :ref:`tcm_permit_request_t <tcm_permit_request_t>` data structure for more info.
 
 #. Request a permit for resources.
 
@@ -44,10 +44,11 @@ Below is a simple example of a usage model a parallel runtime should follow to s
        tcmRequestPermit(client_id, request, callback_arg, &permit_handle,
                         &permit);
 
-   *Note*: The :code:`tcmRequestPermit` function might result in permit switched to
-   :code:`TCM_PERMIT_STATE_PENDING` state, meaning that the requested resources are being used by
-   another permit, and the requesting side should wait until TCM is able to satisfy the permit,
-   hence activating it and notifying the client through invocation of a client callback.
+   .. note:: The :code:`tcmRequestPermit` function might result in permit switched to
+             :code:`TCM_PERMIT_STATE_PENDING` state, meaning that the requested resources are being
+             used by another permit, and the requesting side should wait until TCM is able to
+             satisfy the permit, hence activating it and notifying the client through invocation of
+             a client callback.
 
 #. Once the permit is activated, register that number of threads that were suggested by TCM.
 
@@ -73,11 +74,11 @@ Below is a simple example of a usage model a parallel runtime should follow to s
        tcmRequestPermit(client_id, new_request, callback_arg,
                         &existing_permit_handle, &permit);
 
-.. note:: Similarly to :code:`tcmRequestPermit` function, call to :code:`tcmActivatePermit` might
-          result in a permit switched to :code:`TCM_PERMIT_STATE_PENDING` state, meaning that the
-          requested resources are being used by another permit. In this case, the requesting side
-          should wait until TCM is able to satisfy the permit, hence activating it and notifying the
-          client through invocation of a client callback.
+   .. note:: Similarly to :code:`tcmRequestPermit` function, call to :code:`tcmActivatePermit` might
+             result in a permit switched to :code:`TCM_PERMIT_STATE_PENDING` state, meaning that the
+             requested resources are being used by another permit. In this case, the requesting side
+             should wait until TCM is able to satisfy the permit, hence activating it and notifying
+             the client through invocation of a client callback.
 
 #. Unregister threads and release permit once its resources are no longer needed.
 
@@ -96,8 +97,8 @@ Below is a simple example of a usage model a parallel runtime should follow to s
        tcmDisconnect(client_id);
 
 
-.. note:: When running application that uses TCM, set :code:`TCM_ENABLE=1` environment variable to
-          actually enable its use.
+   .. note:: When running application that uses TCM, set :code:`TCM_ENABLE=1` environment variable
+             to actually enable its use.
 
 Refer to :doc:`api_reference` to find more detailed information about TCM API.
 
