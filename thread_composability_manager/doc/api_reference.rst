@@ -77,7 +77,7 @@ resources. After a successful invocation, the caller should check the permit sta
 ensure resource usage is allowed.
 
 Updating a permit request
-~~~~~~~~~~~~~~~~~~~~~~~~~
+=========================
 
 Updating of a permit request is done using the :code:`tcmRequestPermit` API.
 
