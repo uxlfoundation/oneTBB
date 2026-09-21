@@ -193,7 +193,7 @@ Although, this represents the simplest composition scenario, it is still can ben
 Thread Composability Manager. This is because usually resources are not released immediately after a
 parallel region, but remain being used for some time anticipating new parallel work to appear soon.
 It is important to notify TCM about such situation through a call to :code:`tcmIdlePermit` so that
-permit resources can be re-used by subsequent requests from possibly another runtime.
+corresponding resources can be re-used by subsequent requests from possibly another runtime.
 
 Concurrent Requests
 ===================
