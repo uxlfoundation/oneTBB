@@ -68,7 +68,7 @@ template <typename F> void parallel_compute(int start, int end, const F& f) {
     tcm_permit_t permit = make_permit(grant);
     result = tcmRequestPermit(my_tcm_id, request, &callback_arg, &ph, &permit);
 
-    // Waiting for resources permit to be activated
+    // Waiting for resource permit to be activated
     while (permit.flags.stale || permit.state == TCM_PERMIT_STATE_PENDING) {
         std::unique_lock<std::mutex> lock(callback_arg.permit_mutex);
         callback_arg.permit_cv.wait(
