@@ -32,7 +32,7 @@ Below is a simple example of a usage model a parallel runtime should follow to s
           :code:`tcm_permit_request_t` object accordingly. Refer to description of
           :ref:`tcm_permit_request_t <tcm_permit_request_t>` data structure for more info.
 
-#. Request a resources permit.
+#. Request a permit for resources.
 
    .. code-block:: cpp
 
@@ -89,7 +89,7 @@ Below is a simple example of a usage model a parallel runtime should follow to s
        // Invoke once
        tcmReleasePermit(permit_handle);
 
-#. Disconnect from TCM when resources usage is no longer planned.
+#. Disconnect from TCM when resource coordination is no longer planned.
 
    .. code-block:: cpp
 
@@ -127,7 +127,7 @@ described by a permit are allowed to be used or not.
 
 Resource permit:
 
-- Requested by language RT
+- Requested by language runtime (RT)
 - Granted by TCM
 - Includes maximum concurrency and CPU mask (if :code:`tcm_cpu_constraints_t` was specified)
 - The CPU mask may be different from concurrency
@@ -161,18 +161,16 @@ Composition Scenarios
 *********************
 
 The section describes various composition scenarios of parallel runtimes that can occur in runtime
-providing details on transition of CPU resources between them.
+providing details on possible transition of CPU resources between them.
 
 Sequential Requests
 ===================
 
-**Use Case:** One or more clients request resources one after the other.
+This represent composition of TCM permit requests where one or more clients request resources one
+after the other.
 
-Example:
-
-*Listing 1: Sequential requests for resources from multiple clients.*
-
-.. code:: cpp
+.. code-block:: cpp
+   :caption: Example of sequential requests for resources from multiple clients.
 
     #pragma omp parallel for
     for(int i = 0; i < 100; ++i) {
@@ -190,30 +188,21 @@ Example:
 
 At every moment of time the resources are meant to be used by only one parallel runtime.
 
-Although, this represents the simplest composition scenario, it is still can benefit from using
+Although, this represents the simplest composition scenario, it is still can benefit from using the
 Thread Composability Manager. This is because usually resources are not released immediately after a
 parallel region, but remain being used for some time anticipating new parallel work to appear soon.
 It is important to notify TCM about such situation through a call to :code:`tcmIdlePermit` so that
-permit resources can be re-used by subsequent requests from another runtime.
+permit resources can be re-used by subsequent requests from possibly another runtime.
 
 Concurrent Requests
 ===================
 
-**Use Case:** Two or more clients request resources concurrently and independently. No client makes
-new requests while holding one.
+Concurrent permit requests for resources appear when two or more clients request resources
+concurrently and independently. No client makes new requests while holding one.
 
-Possible scenarios:
-
-1. *Independent requests*
-
-   Requests are not coordinated and may compete for the same resources.
-
-Example:
-
-*Listing 2: Independent requests happening concurrently: one client requests for :math:`P_1`
-resources, the other - for :math:`P_2`.*
-
-.. code:: cpp
+.. code-block:: cpp
+   :caption: Example of independent requests happening concurrently: one client requests for
+             :math:`P_1` resources, the other - for :math:`P_2`
 
     std::thread omp_call([&] {
         #pragma omp parallel for num_threads(P1)
@@ -234,6 +223,12 @@ resources, the other - for :math:`P_2`.*
     omp_call.join();
     tbb_call.join();
 
+Concurrent requests can be subdivided onto two possible scenarios:
+
+1. *Independent requests*
+
+   Requests are not coordinated and may compete for the same resources.
+
 2. *Perfect or hierarchical concurrency*.
 
    Multiple resource requests are spread across available resources with no oversubscription. For
@@ -242,14 +237,11 @@ resources, the other - for :math:`P_2`.*
 Nested Requests
 ===============
 
-**Use Case:** One or more clients request resources while using the permit from one of the previous
-requests.
+A nested permit request corresponds to a situation when a client request a permit for resources
+while holding and using another permit from one of the previous requests.
 
-Common case:
-
-*Listing 3: Nested requests for resources from different runtimes.*
-
-.. code:: cpp
+.. code-block:: cpp
+   :caption: Example of nested permit requests.
 
     tbb::parallel_for(0, 100, [](int) {
         /*TBB threads working*/
@@ -279,9 +271,8 @@ Combined Use Cases
 
 The combined use cases include sequential, concurrent, and nested use cases mixed in the code.
 
-*Listing 4: Example of sequential with nested calls.*
-
-.. code:: cpp
+.. code-block:: cpp
+   :caption: Example of sequential with nested calls.
 
     #pragma omp parallel for
     for(int i = 0; i < 100; ++i) {

@@ -17,7 +17,7 @@
 #include <vector>
 
 /* begin synchronization data */
-struct synch_data_t {
+struct sync_data_t {
     std::mutex permit_mutex;
     std::condition_variable permit_cv;
     bool permit_activated{false};
@@ -34,7 +34,7 @@ tcm_result_t negotiation_callback(tcm_permit_handle_t ph, void* arg,
         // Read data is being changed, wait for another callback invocation
         return TCM_RESULT_SUCCESS;
 
-    synch_data_t& permit_data = *(synch_data_t*)arg;
+    sync_data_t& permit_data = *(sync_data_t*)arg;
     if (TCM_PERMIT_STATE_ACTIVE == permit.state) {
         // Permit has been activated, notify parallel region that requested
         // resources are available for use
@@ -63,7 +63,7 @@ template <typename F> void parallel_compute(int start, int end, const F& f) {
     request.min_sw_threads = 1;
     // Non-negotiable once permit is activated
     request.flags.rigid_concurrency = 1;
-    synch_data_t callback_arg;
+    sync_data_t callback_arg;
     tcm_permit_handle_t ph{nullptr};
     tcm_permit_t permit = make_permit(grant);
     result = tcmRequestPermit(my_tcm_id, request, &callback_arg, &ph, &permit);
