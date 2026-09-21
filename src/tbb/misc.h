@@ -277,6 +277,11 @@ static inline unsigned char is_in_transaction() {
 }
 #endif // TBB_USE_ASSERT
 
+// Defined in exception.cpp
+/*[[noreturn]]*/void do_throw_noexcept(void (*throw_exception)()) noexcept;
+
+/*[[noreturn]]*/void terminate_on_user_exception();
+
 } // namespace r1
 } // namespace detail
 } // namespace tbb
