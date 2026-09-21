@@ -6,7 +6,8 @@ ResourceLimitedNodeBody
 **[req.resource_limited_node_body]**
 
 .. note::
-   To enable this :ref:`preview feature<preview_features>`, define the
+   This named requirement is part of the :ref:`Flow Graph resource limiting<fg_resource_limiting>`
+   preview feature. To enable this preview feature, define the
    ``TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING`` or ``TBB_PREVIEW_FLOW_GRAPH_FEATURES`` macro to 1.
 
 The type ``Body`` satisfies ``ResourceLimitedNodeBody`` if it
