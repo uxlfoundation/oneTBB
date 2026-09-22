@@ -31,7 +31,7 @@ would be preferable for many use cases.
 ### Related Work
 
 The `parallel_phase` API (RFC:
-[parallel_phase_for_task_arena](https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/experimental/parallel_phase_for_task_arena))
+[parallel_phase_for_task_arena](https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/supported/parallel_phase_for_task_arena))
 provides per-arena control over worker retention through `task_arena::leave_policy` and
 `start_parallel_phase`/`end_parallel_phase` functions. This proposal complements that feature by
 providing a global override mechanism.
