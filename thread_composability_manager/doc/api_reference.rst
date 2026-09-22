@@ -21,13 +21,14 @@ using:
 
     tcm_result_t tcmConnect(tcm_callback_t callback, tcm_client_id_t* client_id)
 
-+-------------------+--------+--------------------------------------------------------------------------------+
-| Parameter         | Type   | Description                                                                    |
-+===================+========+================================================================================+
-| :code:`callback`  | In     | Permit renegotiation callback.                                                 |
-+-------------------+--------+--------------------------------------------------------------------------------+
-| :code:`client_id` | Out    | Client ID assigned by the Thread Composability Manager for further relation.   |
-+-------------------+--------+--------------------------------------------------------------------------------+
++-------------------+--------+--------------------------------------------------------------------+
+| Parameter         | Type   | Description                                                        |
++===================+========+====================================================================+
+| :code:`callback`  | In     | Permit renegotiation callback.                                     |
++-------------------+--------+--------------------------------------------------------------------+
+| :code:`client_id` | Out    | Client ID assigned by the Thread Composability Manager for further |
+|                   |        | relation.                                                          |
++-------------------+--------+--------------------------------------------------------------------+
 
 .. warning:: Function returns unsuccessful status if :code:`TCM_ENABLE` environment variable is not
              set to :code:`1`.
@@ -39,11 +40,11 @@ connection by calling:
 
     tcm_result_t tcmDisconnect(tcm_client_id_t client_id)
 
-+-------------------+--------+---------------------------+
-| Parameter         | Type   | Description               |
-+===================+========+===========================+
-| :code:`client_id` | In     | Client ID to disconnect   |
-+-------------------+--------+---------------------------+
++-------------------+--------+-------------------------+
+| Parameter         | Type   | Description             |
++===================+========+=========================+
+| :code:`client_id` | In     | Client ID to disconnect |
++-------------------+--------+-------------------------+
 
 Requesting a permit
 *******************
@@ -58,19 +59,27 @@ Clients request for a resources permit using:
                                   tcm_permit_handle_t* permit_handle,
                                   tcm_permit_t* permit)
 
-+-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Parameter             | Type     | Description                                                                                                                                                                                                                                                     |
-+=======================+==========+=================================================================================================================================================================================================================================================================+
-| :code:`client_id`     | In       | Client ID obtained by :code:`tcmConnect`.                                                                                                                                                                                                                       |
-+-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`request`       | In       | Specification of resources requested.                                                                                                                                                                                                                           |
-+-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`callback_arg`  | In       | The argument to pass into the callback function (set previously using :code:`tcmConnect`) in case of a subsequent permit renegotiation.                                                                                                                         |
-+-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`permit_handle` | In/Out   | Descriptor of resources permitted by the Thread Composability Manager for use by the client. Assign :code:`nullptr` before passing to this function to request a new permit. Pass a descriptor of an existing permit to request updates to permit parameters.   |
-+-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`permit`        | In/Out   | The description of resources given to the client as a response to this request. Allocated/deallocated by a client, filled in by the Thread Composability Manager.                                                                                               |
-+-----------------------+----------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++-----------------------+----------+---------------------------------------------------------------+
+| Parameter             | Type     | Description                                                   |
++=======================+==========+===============================================================+
+| :code:`client_id`     | In       | Client ID obtained by :code:`tcmConnect`.                     |
++-----------------------+----------+---------------------------------------------------------------+
+| :code:`request`       | In       | Specification of resources requested.                         |
++-----------------------+----------+---------------------------------------------------------------+
+| :code:`callback_arg`  | In       | The argument to pass into the callback function (set          |
+|                       |          | previously using :code:`tcmConnect`) in case of a subsequent  |
+|                       |          | permit renegotiation.                                         |
++-----------------------+----------+---------------------------------------------------------------+
+| :code:`permit_handle` | In/Out   | Descriptor of resources permitted by the Thread Composability |
+|                       |          | Manager for use by the client. Assign :code:`nullptr` before  |
+|                       |          | passing to this function to request a new permit. Pass a      |
+|                       |          | descriptor of an existing permit to request updates to permit |
+|                       |          | parameters.                                                   |
++-----------------------+----------+---------------------------------------------------------------+
+| :code:`permit`        | In/Out   | The description of resources given to the client as a         |
+|                       |          | response to this request. Allocated/deallocated by a client,  |
+|                       |          | filled in by the Thread Composability Manager.                |
++-----------------------+----------+---------------------------------------------------------------+
 
 The function return value is used to indicate possible execution errors, not the availability of
 resources. After a successful invocation, the caller should check the permit state and fields to
@@ -104,13 +113,16 @@ permit, the client may use the following API:
     tcm_result_t tcmGetPermitData(tcm_permit_handle_t permit_handle,
                                   tcm_permit_t* permit)
 
-+-----------------------+----------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Parameter             | Type     | Description                                                                                                                                                               |
-+=======================+==========+===========================================================================================================================================================================+
-| :code:`permit_handle` | In       | Existing descriptor of resources permitted by the Thread Composability Manager for use by the client.                                                                     |
-+-----------------------+----------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`permit`        | In/Out   | The description of the resources given to the client as a response to this request. Allocated/deallocated by the client, filled in by the Thread Composability Manager.   |
-+-----------------------+----------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++-----------------------+----------+-----------------------------------------------------------+
+| Parameter             | Type     | Description                                               |
++=======================+==========+===========================================================+
+| :code:`permit_handle` | In       | Existing descriptor of resources permitted by the Thread  |
+|                       |          | Composability Manager for use by the client.              |
++-----------------------+----------+-----------------------------------------------------------+
+| :code:`permit`        | In/Out   | The description of the resources given to the client as a |
+|                       |          | response to this request. Allocated/deallocated by the    |
+|                       |          | client, filled in by the Thread Composability Manager.    |
++-----------------------+----------+-----------------------------------------------------------+
 
 **Note**: Due to possible concurrent requests from clients, resulting in redistribution of resources
 by the Thread Composability Manager, the data received in a :code:`permit` argument might be already
@@ -134,11 +146,12 @@ To register a thread that will be working as part of a resource permit, user cal
 
     tcm_result_t tcmRegisterThread(tcm_permit_handle_t permit_handle)
 
-+-----------------------+--------+--------------------------------------------------------------------------------+
-| Parameter             | Type   | Description                                                                    |
-+=======================+========+================================================================================+
-| :code:`permit_handle` | In     | Descriptor of the granted resources current thread is going to be a part of.   |
-+-----------------------+--------+--------------------------------------------------------------------------------+
++-----------------------+--------+----------------------------------------------------------------+
+| Parameter             | Type   | Description                                                    |
++=======================+========+================================================================+
+| :code:`permit_handle` | In     | Descriptor of the granted resources current thread is going to |
+|                       |        | be a part of.                                                  |
++-----------------------+--------+----------------------------------------------------------------+
 
 To unregister a particular thread from being a part of a resources permit with which it was last
 registered, user calls:
@@ -162,11 +175,11 @@ using :code:`tcmIdlePermit`:
 
     tcm_result_t tcmIdlePermit(tcm_permit_handle_t permit_handle)
 
-+-----------------------+--------+------------------------------------------------+
-| Parameter             | Type   | Description                                    |
-+=======================+========+================================================+
-| :code:`permit_handle` | In     | Descriptor of the resources to mark as idle.   |
-+-----------------------+--------+------------------------------------------------+
++-----------------------+--------+----------------------------------------------+
+| Parameter             | Type   | Description                                  |
++=======================+========+==============================================+
+| :code:`permit_handle` | In     | Descriptor of the resources to mark as idle. |
++-----------------------+--------+----------------------------------------------+
 
 The idle state indicates that threads do not process payload but still can spend CPU cycles actively
 looking for work.
@@ -178,11 +191,11 @@ not want to release the permit, it calls :code:`tcmDeactivatePermit`:
 
     tcm_result_t tcmDeactivatePermit(tcm_permit_handle_t permit_handle)
 
-+-----------------------+--------+----------------------------------------------+
-| Parameter             | Type   | Description                                  |
-+=======================+========+==============================================+
-| :code:`permit_handle` | In     | Descriptor of the resources to deactivate.   |
-+-----------------------+--------+----------------------------------------------+
++-----------------------+--------+--------------------------------------------+
+| Parameter             | Type   | Description                                |
++=======================+========+============================================+
+| :code:`permit_handle` | In     | Descriptor of the resources to deactivate. |
++-----------------------+--------+--------------------------------------------+
 
 TCM can also deactivate an idle permit and initiate a permit negotiation – particularly, if idle
 resources are needed to satisfy another request.
@@ -194,11 +207,11 @@ Once the work appears again, the client can reactivate the permit (either idle o
 
     tcm_result_t tcmActivatePermit(tcm_permit_handle_t permit_handle)
 
-+-----------------------+----------+----------------------------------------------+
-| Parameter             | Type     | Description                                  |
-+=======================+==========+==============================================+
-| :code:`permit_handle` | In/Out   | Descriptor of the resources to reactivate.   |
-+-----------------------+----------+----------------------------------------------+
++-----------------------+----------+--------------------------------------------+
+| Parameter             | Type     | Description                                |
++=======================+==========+============================================+
+| :code:`permit_handle` | In/Out   | Descriptor of the resources to reactivate. |
++-----------------------+----------+--------------------------------------------+
 
 Reactivating an idle permit is typically expected to succeed; however, the client might not (yet) be
 aware of TCM concurrently deactivating the permit. Reactivating an inactive permit is not guaranteed
@@ -215,11 +228,12 @@ permit by calling :code:`tcmReleasePermit`:
 
     tcm_result_t tcmReleasePermit(tcm_permit_handle_t permit_handle)
 
-+-----------------------+--------+------------------------------------------------------------------------------------+
-| Parameter             | Type   | Description                                                                        |
-+=======================+========+====================================================================================+
-| :code:`permit_handle` | In     | Descriptor of the resources to release back to the Thread Composability Manager.   |
-+-----------------------+--------+------------------------------------------------------------------------------------+
++-----------------------+--------+-----------------------------------------------------------+
+| Parameter             | Type   | Description                                               |
++=======================+========+===========================================================+
+| :code:`permit_handle` | In     | Descriptor of the resources to release back to the Thread |
+|                       |        | Composability Manager.                                    |
++-----------------------+--------+-----------------------------------------------------------+
 
 TCM Data Structures
 *******************
@@ -288,15 +302,17 @@ TCM Function Result
       TCM_RESULT_ERROR_UNKNOWN
     } tcm_result_t;
 
-+-------------------------------------------+-------------------------------------------------------------+
-| Value                                     | Description                                                 |
-+===========================================+=============================================================+
-| :code:`TCM_RESULT_SUCCESS`                | Indicates successful execution of the function.             |
-+-------------------------------------------+-------------------------------------------------------------+
-| :code:`TCM_RESULT_ERROR_INVALID_ARGUMENT` | Indicates that one or more function arguments are invalid.  |
-+-------------------------------------------+-------------------------------------------------------------+
-| :code:`TCM_RESULT_ERROR_UNKNOWN`          | Indicates erroneous situation during the function execution.|
-+-------------------------------------------+-------------------------------------------------------------+
++-------------------------------------------+---------------------------------------------------+
+| Value                                     | Description                                       |
++===========================================+===================================================+
+| :code:`TCM_RESULT_SUCCESS`                | Indicates successful execution of the function.   |
++-------------------------------------------+---------------------------------------------------+
+| :code:`TCM_RESULT_ERROR_INVALID_ARGUMENT` | Indicates that one or more function arguments are |
+|                                           | invalid.                                          |
++-------------------------------------------+---------------------------------------------------+
+| :code:`TCM_RESULT_ERROR_UNKNOWN`          | Indicates erroneous situation during the function |
+|                                           | execution.                                        |
++-------------------------------------------+---------------------------------------------------+
 
 Permit State
 ============
@@ -316,19 +332,27 @@ Composability Manager uses to indicate ownership of resources described by a per
 
     typedef uint8_t tcm_permit_state_t;
 
-+------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Value                              | Description                                                                                                                                                     |
-+====================================+=================================================================================================================================================================+
-| :code:`TCM_PERMIT_STATE_VOID`      | No permit. Neither client owns any resources associated with permit, nor does the Thread Composability Manager know about corresponding request existence.      |
-+------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`TCM_PERMIT_STATE_INACTIVE`  | Client does not own and therefore should not be using resources related to this permit.                                                                         |
-+------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`TCM_PERMIT_STATE_PENDING`   | Resources are given to another permit and cannot be re-assigned to this permit immediately, but will be considered as soon as they become available.            |
-+------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`TCM_PERMIT_STATE_IDLE`      | Resources are not used for payload processing. However, they can be made so by activation of this or the other permit describing the same resources.            |
-+------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`TCM_PERMIT_STATE_ACTIVE`    | Resources are owned by client, and they are used for payload processing.                                                                                        |
-+------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+
++------------------------------------+-------------------------------------------------------------+
+| Value                              | Description                                                 |
++====================================+=============================================================+
+| :code:`TCM_PERMIT_STATE_VOID`      | No permit. Neither client owns any resources associated     |
+|                                    | with permit, nor does the Thread Composability Manager know |
+|                                    | about corresponding request existence.                      |
++------------------------------------+-------------------------------------------------------------+
+| :code:`TCM_PERMIT_STATE_INACTIVE`  | Client does not own and therefore should not be using       |
+|                                    | resources related to this permit.                           |
++------------------------------------+-------------------------------------------------------------+
+| :code:`TCM_PERMIT_STATE_PENDING`   | Resources are given to another permit and cannot be         |
+|                                    | re-assigned to this permit immediately, but will be         |
+|                                    | considered as soon as they become available.                |
++------------------------------------+-------------------------------------------------------------+
+| :code:`TCM_PERMIT_STATE_IDLE`      | Resources are not used for payload processing. However,     |
+|                                    | they can be made so by activation of this or the other      |
+|                                    | permit describing the same resources.                       |
++------------------------------------+-------------------------------------------------------------+
+| :code:`TCM_PERMIT_STATE_ACTIVE`    | Resources are owned by client, and they are used for        |
+|                                    | payload processing.                                         |
++------------------------------------+-------------------------------------------------------------+
 
 Permit Properties
 =================
@@ -343,15 +367,19 @@ The :code:`tcm_permit_flags_t` describes the properties of permits.
       uint32_t request_as_inactive : 1;
     } tcm_permit_flags_t;
 
-+-----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Value                       | Description                                                                                                                                                                                              |
-+=============================+==========================================================================================================================================================================================================+
-| :code:`stale`               | Indicates whether permit data is up to date and can be relied upon.                                                                                                                                      |
-+-----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`rigid_concurrency`   | Indicates permit requests whose concurrency cannot be changed once granted and in :code:`TCM_PERMIT_STATE_ACTIVE` state. Useful for a client that cannot adjust threads usage during payload processing. |
-+-----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`request_as_inactive` | Indicates that TCM should not try satisfying a request, but rather return valid :code:`permit_handle` that can be used for future API calls.                                                             |
-+-----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
++-----------------------------+--------------------------------------------------------------------+
+| Value                       | Description                                                        |
++=============================+====================================================================+
+| :code:`stale`               | Indicates whether permit data is up to date and can be relied upon.|
++-----------------------------+--------------------------------------------------------------------+
+| :code:`rigid_concurrency`   | Indicates permit requests whose concurrency cannot be changed once |
+|                             | granted and in :code:`TCM_PERMIT_STATE_ACTIVE` state. Useful for a |
+|                             | client that cannot adjust threads usage during payload processing. |
++-----------------------------+--------------------------------------------------------------------+
+| :code:`request_as_inactive` | Indicates that TCM should not try satisfying a request, but rather |
+|                             | return valid :code:`permit_handle` that can be used for future API |
+|                             | calls.                                                             |
++-----------------------------+--------------------------------------------------------------------+
 
 Callback Type
 =============
@@ -369,15 +397,16 @@ the latest permit data.
     typedef tcm_result_t (*tcm_callback_t)(tcm_permit_handle_t permit_handle, void* arg,
                                            tcm_callback_flags_t flags);
 
-+-----------------------+---------------------------------------------------------------------------------+
-| Value                 | Description                                                                     |
-+=======================+=================================================================================+
-| :code:`permit_handle` | The unique permit handle, whose data has been changed.                          |
-+-----------------------+---------------------------------------------------------------------------------+
-| :code:`arg`           | The callback argument a client passed to the :code:`tcmRequestPermit` function. |
-+-----------------------+---------------------------------------------------------------------------------+
-| :code:`flags`         | The reasons of callback invocation.                                             |
-+-----------------------+---------------------------------------------------------------------------------+
++-----------------------+--------------------------------------------------------+
+| Value                 | Description                                            |
++=======================+========================================================+
+| :code:`permit_handle` | The unique permit handle, whose data has been changed. |
++-----------------------+--------------------------------------------------------+
+| :code:`arg`           | The callback argument a client passed to the           |
+|                       | :code:`tcmRequestPermit` function.                     |
++-----------------------+--------------------------------------------------------+
+| :code:`flags`         | The reasons of callback invocation.                    |
++-----------------------+--------------------------------------------------------+
 
 Callback Invocation Reasons
 ===========================
@@ -417,19 +446,20 @@ of this structure, including the arrays of necessary size.
       tcm_permit_flags_t flags;
     } tcm_permit_t;
 
-+-----------------------+--------------------------------------------------------------------------------------------------------------------+
-| Field                 | Description                                                                                                        |
-+=======================+====================================================================================================================+
-| :code:`concurrencies` | The array of permitted concurrencies.                                                                              |
-+-----------------------+--------------------------------------------------------------------------------------------------------------------+
-| :code:`cpu_masks`     | The array of permitted masks. The array items correspond to respective items of the :code:`concurrencies` array.   |
-+-----------------------+--------------------------------------------------------------------------------------------------------------------+
-| :code:`size`          | The size of the arrays.                                                                                            |
-+-----------------------+--------------------------------------------------------------------------------------------------------------------+
-| :code:`state`         | The state of the permit.                                                                                           |
-+-----------------------+--------------------------------------------------------------------------------------------------------------------+
-| :code:`flags`         | The flags of the permit data.                                                                                      |
-+-----------------------+--------------------------------------------------------------------------------------------------------------------+
++-----------------------+------------------------------------------------------------------------+
+| Field                 | Description                                                            |
++=======================+========================================================================+
+| :code:`concurrencies` | The array of permitted concurrencies.                                  |
++-----------------------+------------------------------------------------------------------------+
+| :code:`cpu_masks`     | The array of permitted masks. The array items correspond to respective |
+|                       | items of the :code:`concurrencies` array.                              |
++-----------------------+------------------------------------------------------------------------+
+| :code:`size`          | The size of the arrays.                                                |
++-----------------------+------------------------------------------------------------------------+
+| :code:`state`         | The state of the permit.                                               |
++-----------------------+------------------------------------------------------------------------+
+| :code:`flags`         | The flags of the permit data.                                          |
++-----------------------+------------------------------------------------------------------------+
 
 **Note**: :code:`cpu_masks` is :code:`nullptr` in case subset of resources were not specified as a
 :code:`tcm_cpu_constraints_t` structure during permit request. In this case, the array of
@@ -462,23 +492,26 @@ Objects of :code:`tcm_cpu_constraints_t` type are required to be initialized usi
 The :code:`numa_id`, :code:`core_type_id`, and :code:`threads_per_core` can be assigned a natural
 number, in which case the meaning is:
 
-+---------------------------------------+-------------------------------------------------------------------------+
-| Field                                 | Semantics of assigning an integer value                                 |
-+=======================================+=========================================================================+
-| :code:`numa_id`, :code:`core_type_id` | Requesting resources from item with the index equal to specified value. |
-+---------------------------------------+-------------------------------------------------------------------------+
-| :code:`threads_per_core`              | The number of threads to use per core.                                  |
-+---------------------------------------+-------------------------------------------------------------------------+
++---------------------------------------+--------------------------------------------------------+
+| Field                                 | Semantics of assigning an integer value                |
++=======================================+========================================================+
+| :code:`numa_id`, :code:`core_type_id` | Requesting resources from item with the index equal to |
+|                                       | specified value.                                       |
++---------------------------------------+--------------------------------------------------------+
+| :code:`threads_per_core`              | The number of threads to use per core.                 |
++---------------------------------------+--------------------------------------------------------+
 
 Besides natural numbers, these fields can be assigned to special values. Special values are:
 
-+------------------------+----------------------------------------------------------------------------------------------------------------------------------+
-| Value                  | Description                                                                                                                      |
-+========================+==================================================================================================================================+
-| :code:`tcm_automatic`  | The Thread Composability Manager chooses the value based on the internal heuristics and current load of the platform.            |
-+------------------------+----------------------------------------------------------------------------------------------------------------------------------+
-| :code:`tcm_any`        | The Thread Composability Manager chooses one specific value based on the internal heuristics and current load of the platform.   |
-+------------------------+----------------------------------------------------------------------------------------------------------------------------------+
++------------------------+----------------------------------------------------------------------+
+| Value                  | Description                                                          |
++========================+======================================================================+
+| :code:`tcm_automatic`  | The Thread Composability Manager chooses the value based on the      |
+|                        | internal heuristics and current load of the platform.                |
++------------------------+----------------------------------------------------------------------+
+| :code:`tcm_any`        | The Thread Composability Manager chooses one specific value based on |
+|                        | the internal heuristics and current load of the platform.            |
++------------------------+----------------------------------------------------------------------+
 
 .. code:: cpp
 
@@ -498,21 +531,25 @@ Besides natural numbers, these fields can be assigned to special values. Special
       int32_t threads_per_core;
     } tcm_cpu_constraints_t;
 
-+--------------------------+-------------------------------------------------------------------------------------------------------------------+
-| Field                    | Description                                                                                                       |
-+==========================+===================================================================================================================+
-| :code:`min_concurrency`  | Minimum value of concurrency for the described hardware subset.                                                   |
-+--------------------------+-------------------------------------------------------------------------------------------------------------------+
-| :code:`max_concurrency`  | Maximum value of concurrency for the described hardware subset.                                                   |
-+--------------------------+-------------------------------------------------------------------------------------------------------------------+
-| :code:`mask`             | The low-level mask of the resources subset. If non-NULL, then it is preferred over high-level mask description.   |
-+--------------------------+-------------------------------------------------------------------------------------------------------------------+
-| :code:`numa_id`          | High-level mask description. The logical index of the NUMA node to restrict the search for resources within.      |
-+--------------------------+-------------------------------------------------------------------------------------------------------------------+
-| :code:`core_type_id`     | High-level mask description. The logical index of the core type to restrict the search for resources within.      |
-+--------------------------+-------------------------------------------------------------------------------------------------------------------+
-| :code:`threads_per_core` | High-level mask description. The number of threads per core to consider while searching for resources.            |
-+--------------------------+-------------------------------------------------------------------------------------------------------------------+
++--------------------------+---------------------------------------------------------------------+
+| Field                    | Description                                                         |
++==========================+=====================================================================+
+| :code:`min_concurrency`  | Minimum value of concurrency for the described hardware subset.     |
++--------------------------+---------------------------------------------------------------------+
+| :code:`max_concurrency`  | Maximum value of concurrency for the described hardware subset.     |
++--------------------------+---------------------------------------------------------------------+
+| :code:`mask`             | The low-level mask of the resources subset. If non-NULL, then it is |
+|                          | preferred over high-level mask description.                         |
++--------------------------+---------------------------------------------------------------------+
+| :code:`numa_id`          | High-level mask description. The logical index of the NUMA node to  |
+|                          | restrict the search for resources within.                           |
++--------------------------+---------------------------------------------------------------------+
+| :code:`core_type_id`     | High-level mask description. The logical index of the core type to  |
+|                          | restrict the search for resources within.                           |
++--------------------------+---------------------------------------------------------------------+
+| :code:`threads_per_core` | High-level mask description. The number of threads per core to      |
+|                          | consider while searching for resources.                             |
++--------------------------+---------------------------------------------------------------------+
 
 .. note:: To avoid issues with interpretation of logical indices used to enumerate NUMA nodes and
           core types, the specified values should correspond to logical indices used by HWLOC
@@ -535,19 +572,23 @@ requested from the Thread Composability Manager.
       tcm_permit_flags_t flags;
     } tcm_permit_request_t;
 
-+--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| Field                    | Description                                                                                                                                                |
-+==========================+============================================================================================================================================================+
-| :code:`min_sw_threads`   | The minimum number of software threads to satisfy. Permit requests that cannot be satisfied right away get :code:`TCM_PERMIT_STATE_PENDING` state.         |
-+--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`max_sw_threads`   | The maximum number of software threads desired.                                                                                                            |
-+--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`cpu_constraints`  | The array of hardware constraints, where the Thread Composability Manager should look for available resources. :code:`NULL` means no constraints are set.  |
-+--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`constraints_size` | The size of the :code:`cpu_constraints` array.                                                                                                             |
-+--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
-| :code:`flags`            | The properties of the request.                                                                                                                             |
-+--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
++--------------------------+--------------------------------------------------------------------+
+| Field                    | Description                                                        |
++==========================+====================================================================+
+| :code:`min_sw_threads`   | The minimum number of software threads to satisfy. Permit requests |
+|                          | that cannot be satisfied right away get                            |
+|                          | :code:`TCM_PERMIT_STATE_PENDING` state.                            |
++--------------------------+--------------------------------------------------------------------+
+| :code:`max_sw_threads`   | The maximum number of software threads desired.                    |
++--------------------------+--------------------------------------------------------------------+
+| :code:`cpu_constraints`  | The array of hardware constraints, where the Thread Composability  |
+|                          | Manager should look for available resources. :code:`NULL` means no |
+|                          | constraints are set.                                               |
++--------------------------+--------------------------------------------------------------------+
+| :code:`constraints_size` | The size of the :code:`cpu_constraints` array.                     |
++--------------------------+--------------------------------------------------------------------+
+| :code:`flags`            | The properties of the request.                                     |
++--------------------------+--------------------------------------------------------------------+
 
 Objects of :code:`tcm_permit_request_t` type are required to be initialized using
 :code:`TCM_PERMIT_REQUEST_INITIALIZER`:
