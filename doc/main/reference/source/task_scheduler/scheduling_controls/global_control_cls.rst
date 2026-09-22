@@ -2,6 +2,8 @@
 ..
 .. SPDX-License-Identifier: CC-BY-4.0
 
+.. _global_control_cls:
+
 ==============
 global_control
 ==============
@@ -32,7 +34,7 @@ This value is selected from all currently existing control variables by applying
                 max_allowed_parallelism,
                 thread_stack_size,
                 terminate_on_exception,
-                leave_policy // Preview feature: parallel_phase Interface for task_arena
+                leave_policy
             };
 
             global_control(parameter p, size_t value);
@@ -72,6 +74,19 @@ Member types and constants
     Setting the parameter to 1 causes termination in any condition that would throw or rethrow an exception.
     If set to 0 (default), the parameter does not affect the implementation behavior.
 
+.. cpp:enum:: parameter::leave_policy
+
+    **Selection rule**: the first active request for ``task_arena::leave_policy::fast`` determines
+    the active value and stays in effect until the corresponding object is destroyed. The effect
+    of other ``leave_policy`` requests made while it is active is unspecified.
+
+    Sets the application-wide default for how quickly worker threads leave an arena when there is no more
+    work available. The value must be one of the ``task_arena::leave_policy`` enumerators.
+
+    See :ref:`Worker Thread Retention <worker_retention>` for the description of leave policies
+    and how this parameter interacts with the per-arena ``task_arena::leave_policy`` setting.
+
+
 Member functions
 ----------------
 
@@ -90,10 +105,4 @@ Member functions
 See also:
 
 * :doc:`task_arena <../task_arena/task_arena_cls>`
-
-Preview Features
-----------------
-
-:ref:`parallel_phase Interface<parallel_phase_for_task_arena>` - extends ``global_control``
-with the API to provide the application-wide control over the ``leave_policy``
-of ``task_arena``.
+* :doc:`Worker Thread Retention <worker_retention>`

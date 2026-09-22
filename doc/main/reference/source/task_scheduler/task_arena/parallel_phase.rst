@@ -1,42 +1,41 @@
+.. SPDX-FileCopyrightText: 2026 UXL Foundation Contributors
+..
+.. SPDX-License-Identifier: CC-BY-4.0
+
 .. _parallel_phase_for_task_arena:
 
-===========================================
-``parallel_phase`` Interface for Task Arena
-===========================================
+==============
+parallel_phase
+==============
 **[scheduler.task_arena.parallel_phase]**
 
-.. note::
-   To enable this :ref:`preview feature<preview_features>`, define the
-   ``TBB_PREVIEW_PARALLEL_PHASE`` macro to 1.
-   When available and enabled, the feature-test macro ``TBB_HAS_PARALLEL_PHASE`` is defined.
+The API to mark the start and the end of a *parallel phase* in a ``task_arena``.
+A parallel phase is a hint to the scheduler that a sequence of parallel work is about to be submitted
+into the arena, so that worker threads can be retained in the arena until the phase ends.
+See :ref:`Worker Thread Retention <worker_retention>` for the description of the concept.
 
-By default, oneTBB uses a *delayed thread leave* heuristic: after completing work in an arena,
-worker threads remain for an implementation-defined duration, anticipating that new parallel
-work will arrive soon. This benefits most workloads by reducing the latency of starting
-subsequent parallel computations. However, this behavior can be undesirable, especially if
+A parallel phase is bound to a specific arena. It can be started and ended in two ways:
 
-* parallel tasks are submitted at irregular intervals or with long gaps, and idle threads waste CPU resources;
-* oneTBB use is interleaved with another threading, and idle threads cause CPU oversubscription.
+* with the RAII class ``task_arena::parallel_phase``, which starts the phase on construction
+  and ends it on destruction;
+* with the explicit ``start_parallel_phase`` and ``end_parallel_phase`` functions, available
+  as members of ``task_arena`` for an explicit arena and in the ``this_task_arena`` namespace
+  for the arena currently used by the calling thread.
 
-For explicit control over worker thread retention, a *leave policy* determines
-how fast worker threads leave an arena when no work is available. Additionally, the
-*parallel phase* API lets users bracket regions of recurrent parallel work so the scheduler can
-retain threads more aggressively during those regions and release them promptly afterward.
+**Start of a parallel phase** indicates a point from which the scheduler may retain worker threads
+in the arena. If the arena is not initialized yet, starting a phase initializes it. For the calling thread's arena,
+that means an implicit task arena is created and bound to the thread if there is none.
 
-This feature extends the :ref:`task_arena <task_arena_cls>`
-with the following API:
+**End of a parallel phase** indicates a point from which the scheduler may stop retaining worker threads
+in the arena.
 
-* Adds the ``leave_policy`` enumeration class to ``task_arena``.
-* Adds ``leave_policy`` as the last parameter in ``task_arena`` constructors and ``task_arena::initialize`` methods.
-  This allows you to inform the scheduler about the preferred policy for worker threads
-  when they are about to leave ``task_arena`` due to a lack of available work.
-* Adds new ``start_parallel_phase`` and ``end_parallel_phase`` interfaces to the ``task_arena`` class
-  and the ``this_task_arena`` namespace. These interfaces work as hints to the scheduler to mark the start and end
-  of parallel work submission into the arena, enabling different worker thread retention policies.
-* Adds the Resource Acquisition is Initialization (RAII) class ``scoped_parallel_phase`` to ``task_arena``.
-* Adds the ``leave_policy`` parameter to the ``global_control`` class, providing application-wide
-  control over the default worker thread leave behavior for arenas initialized implicitly or with
-  ``leave_policy::automatic``.
+Both the start and the end accept a ``parallel_phase::flags`` object. Only the flags applicable
+to the given boundary are taken into account, the others are ignored.
+
+.. caution::
+    Every start of a parallel phase must have a matching end on the same arena, before the arena is destroyed
+    (for an implicit arena, before the owning thread completes). Ending a parallel phase that was not started
+    also results in undefined behavior.
 
 Synopsis
 --------
@@ -50,182 +49,152 @@ Synopsis
 
             class task_arena {
             public:
-
-                enum class leave_policy : /* unspecified type */ {
-                    automatic = /* unspecifed */,
-                    fast = /* unspecifed */,
-                };
-
-                task_arena(int max_concurrency = automatic, unsigned reserved_for_masters = 1,
-                           priority a_priority = priority::normal,
-                           leave_policy a_leave_policy = leave_policy::automatic);
-
-                task_arena(const constraints& constraints_, unsigned reserved_for_masters = 1,
-                           priority a_priority = priority::normal,
-                           leave_policy a_leave_policy = leave_policy::automatic);
-
-                void initialize(int max_concurrency, unsigned reserved_for_masters = 1,
-                                priority a_priority = priority::normal,
-                                leave_policy a_leave_policy = leave_policy::automatic);
-
-                void initialize(constraints a_constraints, unsigned reserved_for_masters = 1,
-                                priority a_priority = priority::normal,
-                                leave_policy a_leave_policy = leave_policy::automatic);
-
-                void start_parallel_phase();
-                void end_parallel_phase(bool with_fast_leave = false);
-
-                class scoped_parallel_phase {
+                class parallel_phase {
                 public:
-                    scoped_parallel_phase(task_arena& ta, bool with_fast_leave = false);
+                    class flags {
+                    public:
+                        // Available only when each type in Flags is a parallel phase flag
+                        template <typename... Flags>
+                        flags(Flags... f);
+
+                        flags() = default;
+                        flags(const flags&) = default;
+                        flags(flags&&) = default;
+                        flags& operator=(const flags&) = default;
+                        flags& operator=(flags&&) = default;
+                        ~flags() = default;
+                    };
+                    class end_flag_fast_leave;
+
+                    parallel_phase(attach, flags f = {});
+                    parallel_phase(task_arena& ta, flags f = {});
+                    parallel_phase(parallel_phase&& other);
+                    parallel_phase& operator=(parallel_phase&& other);
+                    ~parallel_phase();
+
+                    void end();
                 };
+
+                void start_parallel_phase(parallel_phase::flags f = {});
+                void end_parallel_phase(parallel_phase::flags f = {});
             }; // class task_arena
 
             namespace this_task_arena {
-                void start_parallel_phase();
-                void end_parallel_phase(bool with_fast_leave = false);
+                void start_parallel_phase(task_arena::parallel_phase::flags f = {});
+                void end_parallel_phase(task_arena::parallel_phase::flags f = {});
             } // namespace this_task_arena
 
         } // namespace tbb
     } // namespace oneapi
 
-.. code:: cpp
-
-    // Defined in header <oneapi/tbb/global_control.h>
-
-    namespace oneapi {
-        namespace tbb {
-
-            class global_control {
-            public:
-                enum parameter {
-                    // ...
-                    leave_policy,
-                    // ...
-                };
-            }; // class global_control
-
-        } // namespace tbb
-    } // namespace oneapi
-
-Member Types
+Member types
 ------------
 
-.. cpp:enum:: leave_policy::automatic
+.. cpp:class:: task_arena::parallel_phase
 
-When passed to a constructor or the ``initialize`` method, the initialized ``task_arena`` has
-the default (possibly system specific) policy for how quickly worker threads leave the arena
-when there is no more work available in the arena and when the arena is not in a parallel phase.
+    The RAII class that maps a parallel phase to a code scope. The phase starts on construction
+    and ends on destruction, unless ended explicitly with ``end()`` or transferred by a move operation.
+    The class is not copyable.
 
-.. note:: Worker threads in ``task_arena`` might be retained based on internal heuristics.
+.. cpp:class:: task_arena::parallel_phase::flags
 
-.. cpp:enum:: leave_policy::fast
+    A set of flags that adjust the behavior of a parallel phase at its start or its end.
+    Each flag is a distinct tag type. A flag passed to an operation it does not apply to is ignored.
 
-When passed to a constructor or the ``initialize`` method, the initialized ``task_arena``
-has policy that allows worker threads to more quickly leave the arena when there is no more work
-available in the arena and when the arena is not in a parallel phase.
+.. cpp:class:: task_arena::parallel_phase::end_flag_fast_leave
 
-.. cpp:class:: scoped_parallel_phase
+    A parallel phase flag that applies to the end of a phase. When set, worker threads leave the arena
+    as soon as possible after the last active phase ends, even if the arena was initialized with
+    ``leave_policy::automatic``.
 
-The RAII class to map a parallel phase to a code scope.
+    .. note::
+        The effect is temporary. Once new work is submitted into the arena while no parallel phase is active,
+        the leave policy set at arena initialization applies again.
 
-.. cpp:function:: scoped_parallel_phase::scoped_parallel_phase(task_arena& ta, bool with_fast_leave = false)
+    .. note::
+        For a ``task_arena`` initialized with ``leave_policy::fast``, this flag has no additional effect.
 
-Constructs a ``scoped_parallel_phase`` object that starts a parallel phase in the specified ``task_arena``.
-If ``with_fast_leave`` is ``true``, the worker threads leave policy is temporarily set to ``fast``.
-
-.. note:: For ``task_arena`` initialized with ``leave_policy::fast``, ``with_fast_leave`` setting has no effect.
-
-.. note::
-   When worker threads enter the arena with no active parallel phases,
-   the leave policy is reset to the value set during the initialization of the arena.
-
-Member Functions
+Member functions
 ----------------
 
-.. cpp:function:: task_arena(const task_arena&)
+.. cpp:function:: flags()
 
-Copies settings from ``task_arena`` instance including the ``leave_policy``.
+    Constructs an empty set of flags.
 
-.. cpp:function:: void start_parallel_phase()
+.. cpp:function:: template <typename... Flags> flags(Flags... f)
 
-Indicates a point from where the scheduler can use a hint to keep threads in the arena for longer.
+    Constructs a set from the given parallel phase flags. Participates in overload resolution
+    only if each type in ``Flags`` is a parallel phase flag type.
 
-.. note:: This function can also be a warm-up hint for the scheduler. It allows the scheduler to wake up worker threads in advance.
+.. cpp:function:: parallel_phase::parallel_phase(task_arena& ta, flags f = {})
 
-.. cpp:function:: void end_parallel_phase(bool with_fast_leave = false)
+    Starts a parallel phase in ``ta``. The flags ``f`` are applied at the start and at the end of the phase.
 
-Indicates the point when the scheduler may drop a hint and no longer retain threads in the arena.
-If ``with_fast_leave`` is ``true``, worker threads leave policy is temporarily set to ``fast``.
+.. cpp:function:: parallel_phase::parallel_phase(attach, flags f = {})
 
-.. note:: For ``task_arena`` initialized with ``leave_policy::fast``, ``with_fast_leave`` setting has no effect.
+    Starts a parallel phase in the arena currently used by the calling thread.
+    The flags ``f`` are applied at the start and at the end of the phase.
 
-.. note::
-   When worker threads enter the arena with no active parallel phases,
-   the leave policy is reset to the value set during the initialization of the arena.
+    .. caution::
+        The phase must end (by ``end()``, destruction, or move assignment) on a thread that uses
+        the same arena. Otherwise, the behavior is undefined.
 
-Functions
----------
+.. cpp:function:: parallel_phase::parallel_phase(parallel_phase&& other)
 
-.. cpp:function:: void this_task_arena::start_parallel_phase()
+    Transfers the ownership of the parallel phase from ``other``.
 
-Indicates the start of the parallel phase in the current ``task_arena``.
+.. cpp:function:: parallel_phase& parallel_phase::operator=(parallel_phase&& other)
 
-.. cpp:function:: void this_task_arena::end_parallel_phase(bool with_fast_leave = false)
+    Ends the parallel phase owned by ``this``, if any, and transfers the ownership of the phase from ``other``.
 
-Indicates the end of the parallel phase in the current ``task_arena``.
-If ``with_fast_leave`` is ``true``, worker threads leave policy is temporarily set to ``fast``.
+.. cpp:function:: parallel_phase::~parallel_phase()
 
-Global Control Integration
---------------------------
+    Ends the parallel phase, if it has not been ended yet.
 
-.. cpp:enum:: global_control::leave_policy
+.. cpp:function:: void parallel_phase::end()
 
-**Selection rule**: see below
+    Ends the parallel phase. Subsequent calls to ``end()`` and the destructor have no effect.
 
-When the ``leave_policy`` parameter is active on a ``global_control`` object with
-the value ``task_arena::leave_policy::fast``, initializing an arena with
-``task_arena::leave_policy::automatic`` behaves as if the arena is initialized with
-``task_arena::leave_policy::fast``. Arenas that were already initialized (including implicit arenas) are not affected 
-by changes to the ``leave_policy`` parameter on a ``global_control`` object.
+.. cpp:function:: void task_arena::start_parallel_phase(parallel_phase::flags f = {})
 
-When multiple ``global_control`` objects exist for the ``leave_policy`` parameter,
-their values are combined as follows: the active parameter value equals to
-``task_arena::leave_policy::fast`` if any alive ``global_control`` object sets that value,
-otherwise it equals to ``task_arena::leave_policy::automatic``.
+    Starts a parallel phase in the arena.
 
-The following table summarizes the interaction between the per-arena and global leave policies
-when an arena is created:
+.. cpp:function:: void task_arena::end_parallel_phase(parallel_phase::flags f = {})
 
-.. table::
+    Ends a parallel phase in the arena.
 
-    +------------------------+-------------------------+------------------------+
-    | Arena ``leave_policy`` | Global ``leave_policy`` | Initial State          |
-    +========================+=========================+========================+
-    | ``fast``               | any                     | Fast leave             |
-    +------------------------+-------------------------+------------------------+
-    | ``automatic``          | ``fast``                | Fast leave             |
-    +------------------------+-------------------------+------------------------+
-    | ``automatic``          | ``automatic`` (default) | System-specific policy |
-    +------------------------+-------------------------+------------------------+
-.. note::
-   The ``global_control::leave_policy`` parameter provides application-wide control,
-   while ``task_arena::leave_policy`` and ``parallel_phase`` provide per-arena control.
-   After arena initialization, the parallel phase API can modify the thread leave behavior
-   for the arena at runtime, regardless of the initial state set by the global control.
+Non-member functions
+--------------------
+
+.. cpp:function:: void this_task_arena::start_parallel_phase(task_arena::parallel_phase::flags f = {})
+
+    Starts a parallel phase in the arena currently used by the calling thread.
+
+.. cpp:function:: void this_task_arena::end_parallel_phase(task_arena::parallel_phase::flags f = {})
+
+    Ends a parallel phase in the arena currently used by the calling thread.
+
+    .. caution::
+        The phase must have been started on a thread that uses the same arena. Otherwise, the behavior is undefined.
 
 Example
-*******
+-------
+
+In this example, a ``global_control`` object sets fast leave as the application-wide default,
+so worker threads are not expected to remain in ``ta`` once parallel work is completed.
+
+However, one stage of the workflow is a sequence of parallel computations
+interleaved with serial code. Bracketing it with ``parallel_phase`` hints the scheduler to keep
+worker threads in ``ta`` between the computations. Outside the phase, the fast leave behavior applies again.
 
 .. literalinclude:: ./examples/parallel_phase_example.cpp
    :language: c++
    :start-after: /*begin_parallel_phase_example*/
    :end-before: /*end_parallel_phase_example*/
 
-In this example, ``global_control::leave_policy`` is set to ``task_arena::leave_policy::fast``, enabling fast
-leave behavior for the ``task_arena``, which is initialized with ``leave_policy::automatic``. This means that
-worker threads are not expected to remain in ``task_arena`` once parallel work is completed.
+See also:
 
-However, the workflow includes a sequence of parallel work (initializing and sorting data) interceded by serial work (prefix sum).
-To hint the start and end of parallel work, ``scoped_parallel_phase`` is used. This provides a hint to the scheduler
-that worker threads might need to remain in ``task_arena`` since there is more parallel work to come.
+* :doc:`Worker Thread Retention <../scheduling_controls/worker_retention>`
+* :doc:`task_arena <task_arena_cls>`
+* :doc:`this_task_arena namespace <this_task_arena_ns>`
+* :doc:`global_control <../scheduling_controls/global_control_cls>`
