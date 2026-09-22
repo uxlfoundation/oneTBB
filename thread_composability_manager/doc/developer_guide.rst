@@ -29,8 +29,8 @@ Below is a simple example of a usage model a parallel runtime should follow to s
        tcm_permit_request_t request = TCM_PERMIT_REQUEST_INITIALIZER;
 
    .. note:: To describe a portion of platform resources adjust the fields of
-             :code:`tcm_permit_request_t` object accordingly. Refer to description of
-             :ref:`tcm_permit_request_t <tcm_permit_request_t>` data structure for more info.
+             :code:`tcm_permit_request_t` object accordingly. Refer to :ref:`Permit Requests
+             <permit_requests>` section of TCM API Reference for more info.
 
 #. Request a permit for resources.
 
