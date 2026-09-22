@@ -464,7 +464,7 @@ Permit Constraints
 Constraints describe subset of CPU resources where the requested number of software threads will
 execute.
 
-.. note:: The less constrained a resource request is the more composable with other requests it is
+.. note:: The less constrained a resource request is, the more composable with other requests it is
           going to be. Therefore, it is better to avoid specifying constraints unless absolutely
           necessary. In cases where constraints are needed, specify them as loosely as possible so
           that TCM has more opportunities to balance resources between conflicting permit requests.
