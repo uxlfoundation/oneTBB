@@ -13,9 +13,9 @@ clients. The clients can request resources in arbitrary order, including nesting
 General Principles
 ------------------
 
-#. The Thread Composability Manager (TCM) is not aware what its clients are. It treats them equally
-   providing the interface to ask for new resources, adjust usage and release previously permitted
-   resources.
+#. The Thread Composability Manager (TCM) is not aware of what its clients are. It treats them
+   equally, providing the interface to ask for new resources, adjust usage and release previously
+   permitted resources.
 
 #. TCM does not allocate or deallocate resources. Its sole purpose is to coordinate usage of
    resources across its clients. A client is expected to request a new portion of resources as
@@ -24,11 +24,11 @@ General Principles
 
    .. note:: TCM makes no assumptions about which threads – from the application or from a client’s
              thread pool – utilize the granted concurrency. Clients should adjust the concurrency
-             value as needed to account for application threads that are going to participate in a
-             parallel region.
+             value as needed, taking into account application threads that are going to participate
+             in a parallel region.
 
-#. It is responsibility of the client to follow the negotiated permits. TCM assumes its clients are
-   well-behaved and neither ignore nor abuse their resource permits.
+#. It is the responsibility of the client to follow the negotiated permits. TCM assumes its clients
+   are well-behaved and neither ignore nor abuse their resource permits.
 
 #. TCM resolves resource requests in accordance with global restrictions set for the process (such
    as affinity masks). In other words, TCM respects constraints on the resources imposed on the
@@ -42,10 +42,10 @@ General Principles
 
 #. In case of not being able to fully satisfy the request, TCM may:
 
-   - Reject the request, that is permit no use of additional resources.
+   - Reject the request, that is permitting no use of additional resources.
 
-   - Partially satisfy the request, possibly by taking back some of earlier permitted resources from
-     previous requests and thus balancing resource usage across its clients.
+   - Partially satisfy the request, possibly by taking back some of the earlier permitted resources
+     from previous requests and thus balancing resource usage across its clients.
 
    .. note:: These situations are considered normal behavior, not an error or exception.
 
@@ -63,5 +63,4 @@ General Principles
    .. note:: Since clients cannot immediately react to reduced set of resources which was initially
              negotiated, it is expected that these clients will reduce the resources usage as soon
              as execution allows. Depending on the chosen resource distribution strategy, it may
-             happen that the system is oversubscribed for a limited time; TCM should however try
-             avoiding that as much as possible.
+             happen that the system is oversubscribed for a limited time.
