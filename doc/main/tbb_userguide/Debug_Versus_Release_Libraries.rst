@@ -45,7 +45,7 @@ That symbol defaults to 1 in the following conditions:
 -  When ``TBB_USE_DEBUG=1``.
 -  On the Microsoft Windows\* operating system, when ``_DEBUG=1``.
 
-The :ref:`reference` section explains the default values in more detail.
+The :ref:`Enabling Debugging Features <enabling_debugging_features>` section explains the default values in more detail.
 
 
 .. CAUTION:: 
