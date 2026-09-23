@@ -16,7 +16,7 @@ new work, or leave promptly to become available for other arenas or other thread
 Default Behavior
 ----------------
 
-By default, oneTBB uses a *delayed thread leave* heuristic: after completing work in an arena,
+By default, oneTBB uses a system-specific thread leave heuristic: after completing work in an arena,
 worker threads might remain for an implementation-defined duration, anticipating that new parallel
 work will arrive soon. This benefits most workloads by reducing the latency of starting
 subsequent parallel computations. However, this behavior can be undesirable, especially if
@@ -41,7 +41,7 @@ A leave policy defines the behavior of a worker thread at the moment it finds no
 There are two policies, represented by the ``task_arena::leave_policy`` enumeration:
 
 ``automatic``
-    The default policy. The worker thread stays in the arena for an implementation-defined duration,
+    The default policy. The worker thread might stay in the arena for an implementation-defined duration,
     anticipating that new work arrives soon. While staying, it may spin or yield, so it consumes CPU
     resources. If work arrives in time, the thread starts executing it with a minimal delay; otherwise,
     it leaves the arena. The exact retention heuristic is system-specific and may differ between

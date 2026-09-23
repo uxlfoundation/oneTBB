@@ -38,6 +38,9 @@ This value is selected from all currently existing control variables by applying
             };
 
             global_control(parameter p, size_t value);
+            // Available only when T is an enumeration type
+            template <typename T>
+            global_control(parameter p, T value);
             ~global_control();
 
             static size_t active_value(parameter param);
@@ -93,6 +96,15 @@ Member functions
 .. cpp:function:: global_control(parameter param, size_t value)
 
     Constructs a ``global_control`` object with a specified control parameter and it's value.
+
+.. cpp:function:: template <typename T> global_control(parameter param, T value)
+
+    Constructs a ``global_control`` object with a specified control parameter and it's value
+    given as an enumerator. Participates in overload resolution only if ``T`` is an enumeration type.
+    The behavior is equivalent to ``global_control(param, static_cast<size_t>(value))``.
+
+    Currently, this constructor is intended for the ``leave_policy`` parameter, which accepts
+    ``task_arena::leave_policy`` enumerators.
 
 .. cpp:function:: ~global_control()
 
