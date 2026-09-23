@@ -53,7 +53,7 @@ Synopsis
                 public:
                     class flags {
                     public:
-                        // Available only when each type in Flags is a parallel phase flag
+                        // Only participates in overload resolution if each type in Flags is a parallel phase flag
                         template <typename... Flags>
                         flags(Flags... f);
 
@@ -128,7 +128,7 @@ Member functions
 
 .. cpp:function:: parallel_phase::parallel_phase(task_arena& ta, flags f = {})
 
-    Starts a parallel phase in ``ta``. The flags ``f`` are applied at the start and at the end of the phase.
+    Starts a parallel phase in ``ta``. The corresponding flags from ``f`` are applied at the start and at the end of the phase.
 
 .. cpp:function:: parallel_phase::parallel_phase(oneapi::tbb::attach, flags f = {})
 
@@ -153,7 +153,7 @@ Member functions
 
 .. cpp:function:: void parallel_phase::end()
 
-    Ends the parallel phase. Subsequent calls to ``end()`` and the destructor have no effect.
+    Ends the owned parallel phase. Subsequent calls to ``end()`` and the destructor have no effect.
 
 .. cpp:function:: void task_arena::start_parallel_phase(parallel_phase::flags f = {})
 

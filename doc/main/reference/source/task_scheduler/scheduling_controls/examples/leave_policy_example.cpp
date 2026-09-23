@@ -30,7 +30,7 @@ void per_arena_leave_policy() {
                                oneapi::tbb::task_arena::priority::normal,
                                oneapi::tbb::task_arena::leave_policy::fast);
     ta.execute([] { tbb_stage(); });
-    // Worker threads have left the arena and do not compete with the other runtime
+    // Worker threads won't be retained in the arena any further to not compete with the other runtime
     other_runtime_stage();
 }
 /*end_arena_leave_policy_example*/

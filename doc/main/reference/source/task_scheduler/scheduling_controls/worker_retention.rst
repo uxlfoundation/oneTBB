@@ -13,11 +13,9 @@ Worker thread retention determines what happens to worker threads participating 
 inside a task arena once no more work is available in it: whether they stay for a while, anticipating
 new work, or leave promptly to become available for other arenas or other threads in the system.
 
-Default Behavior
-----------------
 
 By default, oneTBB uses a system-specific thread leave heuristic: after completing work in an arena,
-worker threads might remain for an implementation-defined duration, anticipating that new parallel
+worker threads might remain for an unspecified duration, anticipating that new parallel
 work will arrive soon. This benefits most workloads by reducing the latency of starting
 subsequent parallel computations. However, this behavior can be undesirable, especially if
 
@@ -41,7 +39,7 @@ A leave policy defines the behavior of a worker thread at the moment it finds no
 There are two policies, represented by the ``task_arena::leave_policy`` enumeration:
 
 ``automatic``
-    The default policy. The worker thread might stay in the arena for an implementation-defined duration,
+    The default policy. The worker thread might stay in the arena for an unspecified duration,
     anticipating that new work arrives soon. While staying, it may spin or yield, so it consumes CPU
     resources. If work arrives in time, the thread starts executing it with a minimal delay; otherwise,
     it leaves the arena. The exact retention heuristic is system-specific and may differ between
@@ -77,7 +75,7 @@ Parallel Phase
 
 A parallel phase is a hint to the scheduler that a sequence of parallel computations,
 possibly interleaved with serial code, is about to be submitted into an arena.
-While an arena is in a parallel phase, the scheduler may apply a more aggressive policy
+Once the phase begins, the scheduler may apply a more aggressive policy
 to retain worker threads in the arena than the leave policy the arena was initialized with.
 
 When the phase ends, the scheduler may drop the hint and no longer retain threads. Optionally, a phase can end
@@ -96,7 +94,7 @@ Examples
 
 In the following example, a stage of parallel computation in a ``task_arena`` is followed by a stage
 that uses a different threading runtime. The arena is initialized with ``leave_policy::fast``, so its
-worker threads do not linger and do not compete for CPU with the threads of the other runtime.
+worker threads do not spin when idle to not compete for CPU with the threads of the other runtime.
 
 .. literalinclude:: ./examples/leave_policy_example.cpp
    :language: c++
