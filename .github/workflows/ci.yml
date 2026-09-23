@@ -96,6 +96,7 @@ jobs:
       - name: Build documentation
         run: |
           set -e -x -o pipefail
+          mv -f thread_composability_manager/doc/* doc/tcm
           export BUILD_TYPE=${BUILD_TYPE} && sphinx-build doc html
           tar -czvf html.tar.gz html/
       - name: Save docs
@@ -730,7 +731,7 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          sudo apt-get update && sudo apt-get install -y ninja-build
+          sudo apt-get update && sudo apt-get install -y ninja-build libhwloc-dev hwloc
           if [[ "${{ matrix.cxx_compiler }}" == "clang++" ]]; then
             sudo apt-get install -y libomp-dev
           fi
@@ -738,11 +739,15 @@ jobs:
         run: |
           set -e -x -o pipefail
           mkdir build && cd build
-          cmake -G "${{ matrix.generator }}" -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} \
-            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
-            ${{ matrix.cmake_extra }} -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON ..
-          cmake --build . -v --parallel --target build-doc-examples
-          ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure -L doc-examples
+          cmake -G "${{ matrix.generator }}" -DCMAKE_CXX_STANDARD=${{ matrix.std }} \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} \
+            -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
+            ${{ matrix.cmake_extra }} -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON \
+            -DTCM_BUILD=ON -DTCM_TEST=OFF -DTCM_DOC_EXAMPLES=ON ..
+          cmake --build . -v --parallel --target build-doc-examples tcm-doc-examples
+          ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure \
+                -L "doc-examples"
 
   windows-doc-examples-testing:
     name: doc_examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_${{ matrix.cmake_extra }}
@@ -764,22 +769,29 @@ jobs:
         uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
-
+      - name: Install dependencies
+        run: |
+          vcpkg install hwloc
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Test doc examples
         run: |
           mkdir build && cd build
           cmake -G "${{ matrix.generator }}" -A x64 -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} `
-            -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} ${{ matrix.cmake_extra }} -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON ..
+            -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} ${{ matrix.cmake_extra }} `
+            -DCMAKE_TOOLCHAIN_FILE="${env:VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" `
+            -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON `
+            -DTCM_BUILD=ON -DTCM_TEST=OFF -DTCM_DOC_EXAMPLES=ON ..
           if (!$?) {
-              throw "CMake configuration step of examples from documentation failed, exit code $LastExitCode"
+            throw "CMake configuration step of examples from documentation failed, exit code $LastExitCode"
           }
-          cmake --build . --config ${{ matrix.build_type }} -v --parallel --target build-doc-examples
+          cmake --build . --config ${{ matrix.build_type }} -v --parallel `
+                --target build-doc-examples tcm-doc-examples
           if (!$?) {
-              throw "CMake build step of examples from documentation failed, exit code $LastExitCode"
+            throw "CMake build step of examples from documentation failed, exit code $LastExitCode"
           }
-          ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure -L doc-examples
+          ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure `
+                -L "doc-examples"
           if (!$?) {
-              throw "CTest of examples from documentation failed, exit code $LastExitCode"
+            throw "CTest of examples from documentation failed, exit code $LastExitCode"
           }
