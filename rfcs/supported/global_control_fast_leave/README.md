@@ -56,14 +56,13 @@ The proposal adds a new enumeration value to the existing `global_control::param
 #### Header
 
 ```cpp
-#define TBB_PREVIEW_PARALLEL_PHASE 1
 #include <oneapi/tbb/global_control.h>
 ```
 
 #### Syntax
 
 ```cpp
-#define TBB_HAS_PARALLEL_PHASE 202xxx
+#define TBB_HAS_PARALLEL_PHASE 202608
 
 namespace oneapi {
 namespace tbb {
@@ -75,9 +74,7 @@ public:
         thread_stack_size,
         terminate_on_exception,
         scheduler_handle,  // not a public parameter
-#if TBB_PREVIEW_PARALLEL_PHASE
         leave_policy,      // NEW: Controls worker fast leave behavior
-#endif
         parameter_max
     };
 
@@ -160,8 +157,7 @@ This design ensures that:
 
 ### Specification Extension
 
-This API would be introduced under the `TBB_PREVIEW_PARALLEL_PHASE` macro, consistent with the
-related parallel phase feature.
+This API is introduced together with the related parallel phase feature.
 
 #### oneTBB Documentation Update (Preview State)
 
@@ -215,7 +211,6 @@ The additional branch is only evaluated once per arena initialization (not on th
 #### Basic Usage
 
 ```cpp
-#define TBB_PREVIEW_PARALLEL_PHASE 1
 #include <oneapi/tbb/global_control.h>
 #include <oneapi/tbb/parallel_for.h>
 

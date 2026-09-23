@@ -47,9 +47,9 @@ are extended. The table below contains only the most recent values.
           -    ``TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING``
           -    ``202608``
           -    ``<oneapi/tbb/flow_graph.h>``
-        * -    :ref:`parallel_phase Interface for Task Arena<parallel_phase_for_task_arena>`
+        * -    :ref:`parallel_phase<parallel_phase_for_task_arena>`
           -    ``TBB_HAS_PARALLEL_PHASE``
-          -    ``202603``
+          -    ``202608``
           -    ``<oneapi/tbb/task_arena.h>``
         * -    :ref:`Core Type Selector for Task Arena Constraints<core_type_selector>`
           -    ``TBB_HAS_TASK_ARENA_CORE_TYPE_SELECTOR``
@@ -74,8 +74,8 @@ are extended. The table below contains only the most recent values.
 Example
 -------
 
-The following example uses a feature-test macro to conditionally enable ``parallel_phase``
-hints when supported by the library:
+The following example uses a feature-test macro to conditionally use the core type selector
+for ``task_arena`` when supported by the library:
 
 .. literalinclude:: ./examples/feature_test_macros.cpp
     :language: c++
