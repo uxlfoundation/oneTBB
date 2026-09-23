@@ -95,11 +95,11 @@ Member functions
 
 .. cpp:function:: global_control(parameter param, size_t value)
 
-    Constructs a ``global_control`` object with a specified control parameter and it's value.
+    Constructs a ``global_control`` object with a specified control parameter and its value.
 
 .. cpp:function:: template <typename T> global_control(parameter param, T value)
 
-    Constructs a ``global_control`` object with a specified control parameter and it's value
+    Constructs a ``global_control`` object with a specified control parameter and its value
     given as an enumerator. Participates in overload resolution only if ``T`` is an enumeration type.
     The behavior is equivalent to ``global_control(param, static_cast<size_t>(value))``.
 
