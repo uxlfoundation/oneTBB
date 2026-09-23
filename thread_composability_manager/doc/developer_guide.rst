@@ -12,7 +12,7 @@ Below is a simple example of a usage model a parallel runtime should follow to s
 
        #include "tcm.h"
 
-   .. note:: If necessary, adjust project settings so that the compiler can find :code:`tcm.h`
+   .. note:: If necessary, adjust project settings so that the compiler can find the :code:`tcm.h`
              header file and the TCM library when building and linking the project.
 
 #. Register a client, providing a callback function to react on permit changes.
@@ -28,9 +28,9 @@ Below is a simple example of a usage model a parallel runtime should follow to s
 
        tcm_permit_request_t request = TCM_PERMIT_REQUEST_INITIALIZER;
 
-   .. note:: To describe a portion of platform resources adjust the fields of
+   .. note:: To describe a portion of platform resources adjust the fields of the
              :code:`tcm_permit_request_t` object accordingly. Refer to :ref:`Permit Requests
-             <permit_requests>` section of TCM API Reference for more info.
+             <permit_requests>` section of the TCM API Reference for more info.
 
 #. Request a permit for resources.
 
@@ -44,7 +44,7 @@ Below is a simple example of a usage model a parallel runtime should follow to s
        tcmRequestPermit(client_id, request, callback_arg, &permit_handle,
                         &permit);
 
-   .. note:: The :code:`tcmRequestPermit` function might result in permit switched to
+   .. note:: The :code:`tcmRequestPermit` function might result in the permit switching to the
              :code:`TCM_PERMIT_STATE_PENDING` state, meaning that the requested resources are being
              used by another permit, and the requesting side should wait until TCM is able to
              satisfy the permit, hence activating it and notifying the client through invocation of
@@ -74,11 +74,11 @@ Below is a simple example of a usage model a parallel runtime should follow to s
        tcmRequestPermit(client_id, new_request, callback_arg,
                         &existing_permit_handle, &permit);
 
-   .. note:: Similarly to :code:`tcmRequestPermit` function, call to :code:`tcmActivatePermit` might
-             result in a permit switched to :code:`TCM_PERMIT_STATE_PENDING` state, meaning that the
-             requested resources are being used by another permit. In this case, the requesting side
-             should wait until TCM is able to satisfy the permit, hence activating it and notifying
-             the client through invocation of a client callback.
+   .. note:: Similarly to the :code:`tcmRequestPermit` function, a call to :code:`tcmActivatePermit`
+             might result in a permit switching to the :code:`TCM_PERMIT_STATE_PENDING` state,
+             meaning that the requested resources are being used by another permit. In this case,
+             the requesting side should wait until TCM is able to satisfy the permit, hence
+             activating it and notifying the client through invocation of a client callback.
 
 #. Unregister threads and release permit once its resources are no longer needed.
 
@@ -97,8 +97,8 @@ Below is a simple example of a usage model a parallel runtime should follow to s
        tcmDisconnect(client_id);
 
 
-   .. note:: When running application that uses TCM, set :code:`TCM_ENABLE=1` environment variable
-             to actually enable its use.
+   .. note:: When running an application that uses TCM, set :code:`TCM_ENABLE=1` environment
+             variable to actually enable its use.
 
 Refer to :doc:`api_reference` to find more detailed information about TCM API.
 
@@ -107,10 +107,10 @@ See also :ref:`TCM usage examples <tcm_usage_examples>` to learn by example.
 Permit State Transitions
 ************************
 
-The diagram below shows possible transitions of a permit state. Black arrows show state transitions
-when TCM API is invoked by a client, while red arrows show state transitions initiated by TCM.
-Whenever change is not initiated by a client itself, this client is notified through invocation of a
-callback function that was registered during the call to :code:`tcmConnect`.
+The diagram below shows the possible transitions of a permit state. Black arrows show state
+transitions when the TCM API is invoked by a client, while red arrows show state transitions
+initiated by TCM. Whenever a change is not initiated by a client itself, the client is notified
+through invocation of a callback function that was registered during the call to :code:`tcmConnect`.
 
 .. image:: ./resources/state_transitions.png
    :width: 800px
@@ -123,8 +123,8 @@ callback function that was registered during the call to :code:`tcmConnect`.
 Resource Permits and Teams of Threads
 *************************************
 
-The table below shows relation between permit state, team of threads, and whether the resources
-described by a permit are allowed to be used or not.
+The table below shows the relationships between permit state, team of threads, and whether the
+resources described by a permit are allowed to be used or not.
 
 Resource permit:
 
@@ -169,7 +169,7 @@ Team of threads
 Composition Scenarios
 *********************
 
-The section describes various composition scenarios of parallel runtimes that can occur in runtime
+The section describes various composition scenarios of parallel runtimes that can occur at runtime
 providing details on possible transition of CPU resources between them.
 
 Sequential Requests
@@ -197,10 +197,10 @@ after the other.
 
 At every moment of time the resources are meant to be used by only one parallel runtime.
 
-Although, this represents the simplest composition scenario, it is still can benefit from using the
+Although this represents the simplest composition scenario, it is still can benefit from using the
 Thread Composability Manager. This is because usually resources are not released immediately after a
-parallel region, but remain being used for some time anticipating new parallel work to appear soon.
-It is important to notify TCM about such situation through a call to :code:`tcmIdlePermit` so that
+parallel region, but remain in use for some time anticipating new parallel work to appear soon. It
+is important to notify TCM about such situation through a call to :code:`tcmIdlePermit` so that
 corresponding resources can be re-used by subsequent requests from possibly another runtime.
 
 Concurrent Requests
@@ -211,7 +211,7 @@ concurrently and independently. No client makes new requests while holding one.
 
 .. code-block:: cpp
    :caption: Example of independent requests happening concurrently: one client requests for
-             resources to accommodate of :math:`P_1` threads, the other - :math:`P_2`
+             resources to accommodate :math:`P_1` threads, the other - :math:`P_2`
 
     std::thread omp_call([&] {
         #pragma omp parallel for num_threads(P1)
@@ -232,7 +232,7 @@ concurrently and independently. No client makes new requests while holding one.
     omp_call.join();
     tbb_call.join();
 
-Concurrent requests can be subdivided onto two possible scenarios:
+Concurrent requests can be subdivided into two possible scenarios:
 
 1. *Independent requests*
 
@@ -246,7 +246,7 @@ Concurrent requests can be subdivided onto two possible scenarios:
 Nested Requests
 ===============
 
-A nested permit request corresponds to a situation when a client request a permit for resources
+A nested permit request corresponds to a situation when a client requests a permit for resources
 while holding and using another permit from one of the previous requests.
 
 .. code-block:: cpp
@@ -271,7 +271,7 @@ Possible scenarios:
 
 2. *Perfect or hierarchical nesting*.
 
-   The outer level limits its concurrency requesting widely spread resources (e.g. one core per
+   The outer level limits its concurrency, requesting widely spread resources (e.g. one core per
    every socket), under the assumption/knowledge about inner levels utilizing “close” resources
    (e.g. all cores in a socket).
 
