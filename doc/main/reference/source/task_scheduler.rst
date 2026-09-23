@@ -62,7 +62,7 @@ Task Arena
 
    task_scheduler/task_arena/task_arena_cls.rst
    task_scheduler/task_arena/this_task_arena_ns.rst
-   task_scheduler/task_area/parallel_phase.rst
+   task_scheduler/task_arena/parallel_phase.rst
    task_scheduler/task_arena/task_scheduler_observer_cls.rst
    Core Type Selector for Task Arena Constraints (preview) <task_scheduler/task_arena/core_type_selector>
 

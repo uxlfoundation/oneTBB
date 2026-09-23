@@ -49,6 +49,6 @@ void global_leave_policy() {
 void other_runtime_stage() { /* computation with another threading runtime */ }
 
 int main() {
-    per_arena_leave_policy();
     global_leave_policy();
+    per_arena_leave_policy();
 }

@@ -439,9 +439,3 @@ The example can also showcase the `end_flag_fast_leave` flag: if one of the two 
 were rewritten with a different runtime (e.g. OpenMP), calling `end_parallel_phase` with
 `end_flag_fast_leave` before that loop would release oneTBB workers promptly, avoiding
 oversubscription/interference with the OpenMP threads.
-
-## Conditions to become fully supported
-
-Following conditions need to be met for the feature to move from experimental to fully supported:
-* Open questions regarding API should be resolved.
-* oneTBB specification needs to be updated to reflect the new feature.

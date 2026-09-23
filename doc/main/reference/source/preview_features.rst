@@ -93,6 +93,7 @@ Containers
      - Enabling macro
    * - :doc:`containers/concurrent_lru_cache`
      - Adds ``concurrent_lru_cache`` class for Least Recently Used cache with concurrent operations.
+     - ``TBB_PREVIEW_CONCURRENT_LRU_CACHE``
    * - :doc:`containers/custom_mutex_chmap`
      - Adds a template parameter to choose the reader-writer mutex type for ``concurrent_hash_map``.
      - ``TBB_PREVIEW_CONCURRENT_HASH_MAP_EXTENSIONS``

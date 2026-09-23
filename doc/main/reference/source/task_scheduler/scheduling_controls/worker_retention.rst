@@ -24,7 +24,7 @@ subsequent parallel computations. However, this behavior can be undesirable, esp
 * parallel tasks are submitted at irregular intervals or with long gaps, and idle threads waste CPU resources;
   for instance, threads that spin while waiting for work increase the CPU load and may cause
   the CPU frequency to drop for the serial parts of the application;
-* oneTBB use is interleaved with another threading, and idle threads cause CPU oversubscription.
+* oneTBB use is interleaved with another threading runtime, and idle threads cause CPU oversubscription.
 
 oneTBB provides two complementary mechanisms to control worker thread retention:
 

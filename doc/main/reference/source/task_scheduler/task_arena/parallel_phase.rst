@@ -66,7 +66,7 @@ Synopsis
                     };
                     class end_flag_fast_leave;
 
-                    parallel_phase(attach, flags f = {});
+                    parallel_phase(oneapi::tbb::attach, flags f = {});
                     parallel_phase(task_arena& ta, flags f = {});
                     parallel_phase(parallel_phase&& other);
                     parallel_phase& operator=(parallel_phase&& other);
@@ -103,9 +103,9 @@ Member types
 
 .. cpp:class:: task_arena::parallel_phase::end_flag_fast_leave
 
-    A parallel phase flag that applies to the end of a phase. When set, worker threads leave the arena
-    as soon as possible after the last active phase ends, even if the arena was initialized with
-    ``leave_policy::automatic``.
+    A parallel phase flag that applies to the end of a phase. When passed to the end of the last active
+    phase in the arena, worker threads leave the arena as soon as possible, even if the arena was initialized
+    with ``leave_policy::automatic``. If other phases are still active in the arena, the flag has no effect.
 
     .. note::
         The effect is temporary. Once new work is submitted into the arena while no parallel phase is active,
@@ -130,7 +130,7 @@ Member functions
 
     Starts a parallel phase in ``ta``. The flags ``f`` are applied at the start and at the end of the phase.
 
-.. cpp:function:: parallel_phase::parallel_phase(attach, flags f = {})
+.. cpp:function:: parallel_phase::parallel_phase(oneapi::tbb::attach, flags f = {})
 
     Starts a parallel phase in the arena currently used by the calling thread.
     The flags ``f`` are applied at the start and at the end of the phase.
