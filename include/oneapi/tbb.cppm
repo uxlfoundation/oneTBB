@@ -144,9 +144,6 @@ export namespace tbb {
 
     using tbb::v1::task_arena;
     using tbb::v1::create_numa_task_arenas;
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    using tbb::v1::is_inside_task;
-#endif
 
     namespace this_task_arena {
         using tbb::v1::this_task_arena::current_thread_index;
