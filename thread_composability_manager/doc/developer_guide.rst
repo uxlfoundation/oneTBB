@@ -75,7 +75,7 @@ Below is a simple example of a usage model a parallel runtime should follow to s
                         &existing_permit_handle, &permit);
 
    .. note:: Similarly to the :code:`tcmRequestPermit` function, a call to :code:`tcmActivatePermit`
-             might result in a permit switching to the :code:`TCM_PERMIT_STATE_PENDING` state,
+             might result in the permit switching to the :code:`TCM_PERMIT_STATE_PENDING` state,
              meaning that the requested resources are being used by another permit. In this case,
              the requesting side should wait until TCM is able to satisfy the permit, hence
              activating it and notifying the client through invocation of a client callback.
