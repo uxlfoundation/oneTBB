@@ -19,9 +19,9 @@ worker threads might remain for an unspecified duration, anticipating that new p
 work will arrive soon. This benefits most workloads by reducing the latency of starting
 subsequent parallel computations. However, this behavior can be undesirable, especially if
 
-* parallel tasks are submitted at irregular intervals or with long gaps, and idle threads waste CPU resources;
-  for instance, threads that spin while waiting for work increase the CPU load and may cause
-  the CPU frequency to drop for the serial parts of the application;
+* parallel tasks are submitted at irregular intervals or with long gaps, and idle threads waste CPU resources.
+  For instance, threads that spin while waiting for work increase the CPU load and may cause
+  the CPU frequency to drop for the serial parts of the application.
 * oneTBB use is interleaved with another threading runtime, and idle threads cause CPU oversubscription.
 
 oneTBB provides two complementary mechanisms to control worker thread retention:
@@ -41,7 +41,7 @@ There are two policies, represented by the ``task_arena::leave_policy`` enumerat
 ``automatic``
     The default policy. The worker thread might stay in the arena for an unspecified duration,
     anticipating that new work arrives soon. While staying, it may spin or yield, so it consumes CPU
-    resources. If work arrives in time, the thread starts executing it with a minimal delay; otherwise,
+    resources. If work arrives in time, the thread starts executing it with a minimal delay. Otherwise,
     it leaves the arena. The exact retention heuristic is system-specific and may differ between
     platforms.
 
@@ -83,7 +83,7 @@ with a *fast leave* request, so that worker threads leave the arena promptly eve
 was initialized with ``leave_policy::automatic``. The request is one-time: it does not change
 the leave policy of the arena.
 
-Parallel phases can be nested or overlap; the arena stays in a phase until all started phases have ended.
+Parallel phases can be nested or overlap and the arena stays in a phase until all started phases have ended.
 
 The parallel phase API is provided by the ``task_arena::parallel_phase`` class and by the
 ``start_parallel_phase`` and ``end_parallel_phase`` functions of ``task_arena`` and

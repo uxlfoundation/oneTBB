@@ -17,7 +17,7 @@ See :ref:`Worker Thread Retention <worker_retention>` for the description of the
 A parallel phase is bound to a specific arena. It can be started and ended in two ways:
 
 * with the RAII class ``task_arena::parallel_phase``, which starts the phase on construction
-  and ends it on destruction;
+  and ends it on destruction.
 * with the explicit ``start_parallel_phase`` and ``end_parallel_phase`` functions, available
   as members of ``task_arena`` for an explicit arena and in the ``this_task_arena`` namespace
   for the arena currently used by the calling thread.
@@ -34,8 +34,8 @@ to the given boundary are taken into account, the others are ignored.
 
 .. caution::
     Every start of a parallel phase must have a matching end on the same arena, before the arena is destroyed
-    (for an implicit arena, before the owning thread completes). Ending a parallel phase that was not started
-    also results in undefined behavior.
+    (for an implicit arena, before the owning thread completes). Otherwise, the behavior is undefined.
+    Ending a parallel phase that was not started also results in undefined behavior.
 
 Synopsis
 --------
@@ -133,7 +133,7 @@ Member functions
 .. cpp:function:: parallel_phase::parallel_phase(oneapi::tbb::attach, flags f = {})
 
     Starts a parallel phase in the arena currently used by the calling thread.
-    The flags ``f`` are applied at the start and at the end of the phase.
+    The corresponding flags from ``f`` are applied at the start and at the end of the phase.
 
     .. caution::
         The phase must end (by ``end()``, destruction, or move assignment) on a thread that uses
@@ -147,9 +147,11 @@ Member functions
 
     Ends the parallel phase owned by ``this``, if any, and transfers the ownership of the phase from ``other``.
 
+    **Returns**: a reference to ``this``.
+
 .. cpp:function:: parallel_phase::~parallel_phase()
 
-    Ends the parallel phase, if it has not been ended yet.
+    Ends the owned parallel phase, if it has not been ended yet.
 
 .. cpp:function:: void parallel_phase::end()
 
@@ -162,6 +164,9 @@ Member functions
 .. cpp:function:: void task_arena::end_parallel_phase(parallel_phase::flags f = {})
 
     Ends a parallel phase in the arena.
+
+    .. caution::
+        Ending a parallel phase that was not started results in undefined behavior.
 
 Non-member functions
 --------------------

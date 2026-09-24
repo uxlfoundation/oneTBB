@@ -14,36 +14,42 @@
     limitations under the License.
 */
 
+int parallel_loop1_begin = 0;
+int parallel_loop1_end = 100;
+
+int parallel_loop2_begin = 100;
+int parallel_loop2_end = 1000;
+
+struct parallel_loop_body {
+    void operator()(int) const {}
+};
+
+using parallel_loop1_body = parallel_loop_body;
+using parallel_loop2_body = parallel_loop_body;
+
 /*begin_feature_test_macros_example*/
 
-#define TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR 1
-
 #include <oneapi/tbb/version.h>
-#include <oneapi/tbb/task_arena.h>
 #include <oneapi/tbb/parallel_for.h>
 
-#include <tuple>
-
-int main() {
-#if TBB_HAS_TASK_ARENA_CORE_TYPE_SELECTOR
-    // Prefer the most performant core types when the feature is available
-    tbb::task_arena::constraints c;
-    c.set_core_type(tbb::task_arena::selectable);
-    auto selector = [](std::tuple<tbb::core_type_id, std::size_t, std::size_t> core_type) -> int {
-        auto index = std::get<1>(core_type);
-        auto total = std::get<2>(core_type);
-        // Exclude the least performant type when there is more than one;
-        // rank the rest by index (higher index = higher score).
-        return (total > 1 && index == 0) ? -1 : static_cast<int>(index);
-    };
-    tbb::task_arena arena(c, selector);
-#else
-    tbb::task_arena arena;
+#if TBB_HAS_PARALLEL_PHASE
+#include <oneapi/tbb/task_arena.h>
 #endif
 
-    arena.execute([] {
-        tbb::parallel_for(0, 1000, [](int) { /* computation */ });
-    });
+int main() {
+#if TBB_HAS_PARALLEL_PHASE
+    tbb::this_task_arena::start_parallel_phase();
+#endif
+
+    tbb::parallel_for(parallel_loop1_begin, parallel_loop1_end,
+                      parallel_loop1_body{});
+
+    tbb::parallel_for(parallel_loop2_begin, parallel_loop2_end,
+                      parallel_loop2_body{});
+
+#if TBB_HAS_PARALLEL_PHASE
+    tbb::this_task_arena::end_parallel_phase(tbb::task_arena::parallel_phase::end_flag_fast_leave{});
+#endif
 }
 
 /*end_feature_test_macros_example*/

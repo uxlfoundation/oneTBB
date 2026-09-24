@@ -74,8 +74,9 @@ are extended. The table below contains only the most recent values.
 Example
 -------
 
-The following example uses a feature-test macro to conditionally use the core type selector
-for ``task_arena`` when supported by the library:
+The following example uses a feature-test macro to conditionally enable ``parallel_phase``
+hints when supported by the library. For a preview feature, testing its feature-test macro
+this way also requires defining the corresponding preview macro.
 
 .. literalinclude:: ./examples/feature_test_macros.cpp
     :language: c++
