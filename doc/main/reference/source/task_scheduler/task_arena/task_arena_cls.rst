@@ -23,7 +23,7 @@ A class that represents an explicit, user-managed task scheduler arena.
             public:
                 static constexpr int automatic = /* unspecified */;
                 static constexpr int not_initialized = /* unspecified */;
-                static constexpr int selectable = /* unspecified */; // Preview feature: Core Type Selectors 
+                static constexpr int selectable = /* unspecified */; // Preview feature: Core Type Selectors
 
                 enum class priority : /* unspecified type */ {
                     low = /* unspecified */,
@@ -31,7 +31,6 @@ A class that represents an explicit, user-managed task scheduler arena.
                     high = /* unspecified */
                 };
 
-                // Preview feature: parallel_phase Interface
                 enum class leave_policy : /* unspecified type */ {
                     automatic = /* unspecified */,
                     fast = /* unspecified */
@@ -54,11 +53,11 @@ A class that represents an explicit, user-managed task scheduler arena.
 
                 task_arena(int max_concurrency = automatic, unsigned reserved_slots = 1,
                     priority a_priority = priority::normal,
-                    leave_policy a_leave_policy = leave_policy::automatic // Preview feature: parallel_phase Interface
+                    leave_policy a_leave_policy = leave_policy::automatic
                 );
                 task_arena(const constraints& constraints_, unsigned reserved_slots = 1,
                     priority a_priority = priority::normal,
-                    leave_policy a_leave_policy = leave_policy::automatic // Preview feature: parallel_phase Interface
+                    leave_policy a_leave_policy = leave_policy::automatic
                 );
                 task_arena(const task_arena &s);
                 explicit task_arena(oneapi::tbb::attach);
@@ -73,11 +72,11 @@ A class that represents an explicit, user-managed task scheduler arena.
                 void initialize();
                 void initialize(int max_concurrency, unsigned reserved_slots = 1,
                     priority a_priority = priority::normal,
-                    leave_policy a_leave_policy = leave_policy::automatic // Preview feature: parallel_phase Interface
+                    leave_policy a_leave_policy = leave_policy::automatic
                 );
                 void initialize(const constraints& constraints_, unsigned reserved_slots = 1,
                     priority a_priority = priority::normal,
-                    leave_policy a_leave_policy = leave_policy::automatic // Preview feature: parallel_phase Interface
+                    leave_policy a_leave_policy = leave_policy::automatic
                 );
                 void initialize(oneapi::tbb::attach);
 
@@ -103,15 +102,10 @@ A class that represents an explicit, user-managed task scheduler arena.
                 // Preview feature: Waiting an Individual Task in task_group
                 task_group_status wait_for(task_completion_handle& ch);
 
-                // Preview feature: parallel_phase Interface
-                void start_parallel_phase();
-                void end_parallel_phase(bool with_fast_leave = false);
-                
-                // Preview feature: parallel_phase Interface
-                class scoped_parallel_phase {
-                public:
-                    scoped_parallel_phase(bool with_fast_leave = false);
-                };
+                class parallel_phase;
+                void start_parallel_phase(parallel_phase::flags f = {});
+                void end_parallel_phase(parallel_phase::flags f = {});
+
             }; // class task_arena
 
             std::vector<task_arena> create_numa_task_arenas(task_arena::constraints constraints_ = {},
@@ -165,6 +159,23 @@ Member types and constants
 
     When passed to a constructor or the ``initialize`` method, the initialized ``task_arena``
     has a raised priority.
+
+.. cpp:enum:: leave_policy::automatic
+
+    When passed to a constructor or the ``initialize`` method, the initialized ``task_arena`` uses
+    the default policy for how quickly worker threads leave the arena when there is no more work available.
+    See :ref:`Worker Thread Retention <worker_retention>`.
+
+.. cpp:enum:: leave_policy::fast
+
+    When passed to a constructor or the ``initialize`` method, the initialized ``task_arena`` uses
+    the policy that makes worker threads leave the arena as soon as there is no more work available.
+    See :ref:`Worker Thread Retention <worker_retention>`.
+
+.. cpp:class:: parallel_phase
+
+    The RAII class to mark a code scope as a parallel phase in the arena.
+    See :ref:`parallel_phase <parallel_phase_for_task_arena>`.
 
 .. cpp:struct:: constraints
 
@@ -228,10 +239,11 @@ Member types and constants
 Member functions
 ----------------
 
-.. cpp:function:: task_arena(int max_concurrency = automatic, unsigned reserved_slots = 1, priority a_priority = priority::normal)
+.. cpp:function:: task_arena(int max_concurrency = automatic, unsigned reserved_slots = 1, priority a_priority = priority::normal, leave_policy a_leave_policy = leave_policy::automatic)
 
-    Creates a ``task_arena`` with a certain concurrency limit (``max_concurrency``) and priority
-    (``a_priority``).  Some portion of the limit can be reserved for application threads with
+    Creates a ``task_arena`` with a certain concurrency limit (``max_concurrency``), priority
+    (``a_priority``), and worker thread leave policy (``a_leave_policy``).
+    Some portion of the limit can be reserved for application threads with
     ``reserved_slots``.  The amount for reservation cannot exceed the limit.
 
     .. caution::
@@ -241,10 +253,11 @@ Member functions
         join the arena. As a result, the execution guarantee for enqueued tasks is not valid
         in such arena. Do not use ``task_arena::enqueue()`` with an arena set to have no worker threads.
 
-.. cpp:function:: task_arena(constraints constraints_, unsigned reserved_slots = 1, priority a_priority = priority::normal)
+.. cpp:function:: task_arena(constraints constraints_, unsigned reserved_slots = 1, priority a_priority = priority::normal, leave_policy a_leave_policy = leave_policy::automatic)
 
-    Creates a ``task_arena`` with a certain constraints(``constraints_``) and priority
-    (``a_priority``).  Some portion of the limit can be reserved for application threads with
+    Creates a ``task_arena`` with a certain constraints(``constraints_``), priority
+    (``a_priority``), and worker thread leave policy (``a_leave_policy``).
+    Some portion of the limit can be reserved for application threads with
     ``reserved_slots``.  The amount for reservation cannot exceed the concurrency limit specified in ``constraints``.
 
     .. caution::
@@ -286,13 +299,15 @@ Member functions
 
         After the call to ``initialize``, the arena parameters are fixed and cannot be changed.
 
-.. cpp:function:: void initialize(int max_concurrency, unsigned reserved_slots = 1, priority a_priority = priority::normal)
+.. cpp:function:: void initialize(int max_concurrency, unsigned reserved_slots = 1, priority a_priority = priority::normal, leave_policy a_leave_policy = leave_policy::automatic)
 
-    Same as ``initialize()``, but overrides ``max_concurrency``, ``reserved_slots``, and ``a_priority`` arena parameters set at construction.
+    Same as ``initialize()``, but overrides ``max_concurrency``, ``reserved_slots``, ``a_priority``, and ``a_leave_policy``
+    arena parameters set at construction.
 
-.. cpp:function:: void initialize(constraints constraints_, unsigned reserved_slots = 1, priority a_priority = priority::normal)
+.. cpp:function:: void initialize(constraints constraints_, unsigned reserved_slots = 1, priority a_priority = priority::normal, leave_policy a_leave_policy = leave_policy::automatic)
 
-    Same as ``initialize()``, but overrides :cpp:struct:`constraints`, ``reserved_slots``, and ``a_priority`` arena parameters set at construction.
+    Same as ``initialize()``, but overrides :cpp:struct:`constraints`, ``reserved_slots``, ``a_priority``, and ``a_leave_policy``
+    arena parameters set at construction.
 
 .. cpp:function:: void initialize(oneapi::tbb::attach)
 
@@ -376,6 +391,14 @@ Member functions
 
     The behavior of this function is equivalent to ``this->execute([&tg]{ return tg.wait(); })``.
 
+.. cpp:function:: void start_parallel_phase(parallel_phase::flags f = {})
+
+    Starts a parallel phase in the arena. See :ref:`parallel_phase <parallel_phase_for_task_arena>`.
+
+.. cpp:function:: void end_parallel_phase(parallel_phase::flags f = {})
+
+    Ends a parallel phase in the arena. See :ref:`parallel_phase <parallel_phase_for_task_arena>`.
+
 Non-member Functions
 --------------------
 
@@ -401,8 +424,6 @@ Preview Features
 
 The following :ref:`preview features<preview_features>` extend the ``task_arena`` API:
 
-* :ref:`parallel_phase Interface<parallel_phase_for_task_arena>` - extends ``task_arena`` with the API to set
-  explicit thread ``leave_policy`` and to provide a hint where the parallel region starts and ends.
 * :ref:`Core Type Selectors<core_type_selector>` - allows to set scores for preferred core types
   while creating or initializing the ``task_arena``.
 * :ref:`Waiting for Individual Tasks in task_group<wait_single_task>` - allows waiting for an individual task to complete
@@ -448,3 +469,6 @@ See also:
 * :doc:`attach <../attach_tag_type>`
 * :doc:`task_group <../task_group/task_group_cls>`
 * :doc:`task_scheduler_observer <task_scheduler_observer_cls>`
+* :doc:`this_task_arena namespace <this_task_arena_ns>`
+* :doc:`parallel_phase <parallel_phase>`
+* :doc:`Worker Thread Retention <../scheduling_controls/worker_retention>`

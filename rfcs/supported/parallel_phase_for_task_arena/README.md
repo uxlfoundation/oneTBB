@@ -152,7 +152,7 @@ class task_arena {
             template <typename... Flags>
             flags(Flags... f);
         };
-        class end_with_fast_leave;
+        class end_flag_fast_leave;
         parallel_phase(attach, flags f = {});
         parallel_phase(task_arena& ta, flags f = {});
         parallel_phase(parallel_phase&& other);
@@ -206,7 +206,7 @@ the API is designed to be configurable. Each flag is a distinct tag type, and se
 be combined into a single `flags` object.
 
 Some flags are only applicable to the start of a parallel phase, and others only to its end, which
-can be reflected in their names (e.g. `end_with_fast_leave`). The `parallel_phase` object accepts flags
+can be reflected in their names (e.g. `end_flag_fast_leave`). The `parallel_phase` object accepts flags
 for both boundaries at once and applies each of them at the corresponding point, while the explicit
 functions only take into account the flags applicable to them. A flag passed to an operation it
 does not apply to is ignored. 
@@ -245,7 +245,7 @@ void handle_request(Request req) {
     tbb::this_task_arena::enqueue([req]() {
         process(req);
         tbb::this_task_arena::end_parallel_phase(
-            tbb::task_arena::parallel_phase::end_with_fast_leave{});
+            tbb::task_arena::parallel_phase::end_flag_fast_leave{});
     });
 }
 ```
@@ -255,7 +255,7 @@ The same use case can be expressed using the `parallel_phase` object:
 ```cpp
 void handle_request(Request req) {
     tbb::task_arena::parallel_phase phase{tbb::attach{},
-                                          tbb::task_arena::parallel_phase::end_with_fast_leave{}};
+                                          tbb::task_arena::parallel_phase::end_flag_fast_leave{}};
     // Some composition of parallel and serial computations
     //
     tbb::this_task_arena::enqueue([req, phs = std::move(phase)]() {
@@ -341,7 +341,7 @@ void parallel_phase_example() {
         // User defined body
     });
     tbb::this_task_arena::end_parallel_phase(
-        tbb::task_arena::parallel_phase::end_with_fast_leave{});
+        tbb::task_arena::parallel_phase::end_flag_fast_leave{});
 
     // Different parallel runtime (for example, OpenMP) is used
     // so it is preferred that worker threads won't be retained
@@ -357,7 +357,7 @@ void parallel_phase_raii_example() {
     {
         // Start of the parallel phase
         tbb::task_arena::parallel_phase phase{ta,
-            tbb::task_arena::parallel_phase::end_with_fast_leave{}};
+            tbb::task_arena::parallel_phase::end_flag_fast_leave{}};
         ta.execute([]() {
             // Parallel computation
         });
@@ -435,13 +435,7 @@ between updates or between frames instead of staying resident for the whole simu
 Wrapping the per-frame loops with `start/end_parallel_phase` should retain workers across frames
 and thus reduce the arena join/leave overhead.
 
-The example can also showcase the `end_with_fast_leave` flag: if one of the two per-frame loops
+The example can also showcase the `end_flag_fast_leave` flag: if one of the two per-frame loops
 were rewritten with a different runtime (e.g. OpenMP), calling `end_parallel_phase` with
-`end_with_fast_leave` before that loop would release oneTBB workers promptly, avoiding
+`end_flag_fast_leave` before that loop would release oneTBB workers promptly, avoiding
 oversubscription/interference with the OpenMP threads.
-
-## Conditions to become fully supported
-
-Following conditions need to be met for the feature to move from experimental to fully supported:
-* Open questions regarding API should be resolved.
-* oneTBB specification needs to be updated to reflect the new feature.
