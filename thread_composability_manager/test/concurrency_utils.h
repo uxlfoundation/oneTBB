@@ -8,13 +8,31 @@
 #ifndef __TCM_TESTS_CONCURRENCY_UTILS_HEADER
 #define __TCM_TESTS_CONCURRENCY_UTILS_HEADER
 
-#include <cstdint>
-#include <cstdio>
+#include <cerrno>
 #include <climits>
+#include <condition_variable>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
-#include <cerrno>
-#include <cstdlib>
+#include <mutex>
+
+// Helper class that allows waiting for a specific condition until someone notifies about it using
+// the same class instance
+class Waiter {
+public:
+    template <typename Predicate>
+    void wait_for(Predicate&& condition) {
+        std::unique_lock lock(mutex);
+        cv.wait(lock, std::forward<Predicate>(condition));
+    }
+
+    void notify_all() { cv.notify_all(); }
+private:
+    std::mutex mutex;
+    std::condition_variable cv;
+};
+
 
 #if __linux__
 #include <mntent.h>
