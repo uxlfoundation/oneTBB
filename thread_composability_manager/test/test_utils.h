@@ -577,6 +577,18 @@ inline void unregister_thread(const std::string& error_message = "",
   }
 }
 
+inline void bulk_thread_unregister(tcm_permit_handle_t permit_handle,
+                                   std::string&& error_message = "",
+                                   std::string&& log_message = "")
+{
+    // std::string msg = log_message;
+    if (log_message.empty())
+        log_message = "tcmUnregisterThreads(" + to_string(permit_handle) + ")";
+    tcm_result_t r = tcmUnregisterThreads(permit_handle);
+    if (!check_success(r, log_message))
+        throw tcm_unregister_threads_error(error_message);
+}
+
 template <int size = 1>
 class permit_t {
 public:
@@ -740,6 +752,23 @@ inline void assert_all_resources_available(const std::string& log_message =
   tcm_client_id_t client_id = connect_new_client();
   if (!can_find(client_id, platform_tcm_concurrency()))
       throw tcm_exception{"Not all platform resources are available"};
+  disconnect_client(client_id);
+
+  test_log("End " + log_message);
+}
+
+/**
+ * Requests permit for a single resource. Checks that it was not granted and then releases the
+ * permit back.
+ */
+inline void assert_fully_subscribed(const std::string& log_message =
+                                    "checking platform is fully subscribed")
+{
+  test_log("Begin " + log_message);
+
+  tcm_client_id_t client_id = connect_new_client();
+  if (can_find(client_id, /*num_resources*/1))
+      throw tcm_exception{"Found free resources"};
   disconnect_client(client_id);
 
   test_log("End " + log_message);
