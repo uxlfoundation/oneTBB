@@ -215,7 +215,6 @@ static void TestPreviewNames() {
 #endif
 #if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
     TestTypeDefinitionPresence( task_completion_handle );
-    TestFuncDefinitionPresence( is_inside_task, (), bool );
 #endif
 #if __TBB_PREVIEW_NUMA_ALLOCATION
     TestFuncDefinitionPresence( allocate_numa_interleaved, (size_t, size_t), void* );
