@@ -1211,7 +1211,7 @@ TEST("Release of client permits when it disconnects") {
   assert_all_resources_available();
 }
 
-namespace bulk_threads_unregister {
+namespace TestUnregisterThreads {
 
 TEST("Bulk unregister drops registration of a separate thread") {
     tcm_client_id_t client_id = connect_new_client(/*callback*/nullptr);
@@ -1340,6 +1340,6 @@ TEST("Bulk unregister works from the thread that did not request") {
     t.join();
 }
 
-} // namespace bulk_threads_unregister
+} // namespace TestUnregisterThreads
 
 
