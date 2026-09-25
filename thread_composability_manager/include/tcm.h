@@ -43,6 +43,8 @@ __TCM_EXPORT tcm_result_t tcmRegisterThread(tcm_permit_handle_t permit_handle);
 
 __TCM_EXPORT tcm_result_t tcmUnregisterThread();
 
+__TCM_EXPORT tcm_result_t tcmUnregisterThreads(tcm_permit_handle_t);
+
 __TCM_EXPORT tcm_result_t tcmGetVersionInfo(char* buffer, uint32_t buffer_size);
 
 #ifdef __cplusplus

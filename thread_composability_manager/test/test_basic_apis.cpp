@@ -11,6 +11,8 @@
 #include "tcm.h"
 
 #include <cstdint>
+#include <mutex>
+#include <condition_variable>
 
 TEST("Each of two sequentially composed clients gets all platform resources") {
   tcm_client_id_t clidA = connect_new_client(client_renegotiate);
@@ -1196,7 +1198,6 @@ TEST("Release of client permits when it disconnects") {
   disconnect_client(client_id);
 
   assert_all_resources_available();
-
   // Test disconnecting while holding IDLE permit
   client_id = connect_new_client();
   int32_t min_sw_threads = platform_tcm_concurrency(), max_sw_threads = min_sw_threads;
@@ -1211,3 +1212,70 @@ TEST("Release of client permits when it disconnects") {
 
   assert_all_resources_available();
 }
+
+namespace bulk_threads_unregister {
+
+// TODO: Use OOP for the waiting function to reduce passing additional stuff: mutex, condition
+// variables
+template<typename Predicate>
+void wait_for(Predicate&& condition, std::mutex& mutex, std::condition_variable& cv) {
+    std::unique_lock lock(mutex);
+    cv.wait(lock, std::forward<Predicate>(condition));
+}
+
+TEST("Bulk unregister drops registration of a separate thread") {
+    tcm_client_id_t client_id = connect_new_client(nullptr);
+
+    int min_sw_threads, max_sw_threads;
+    min_sw_threads = max_sw_threads = platform_tcm_concurrency();
+    const tcm_permit_request_t request = make_request(min_sw_threads, max_sw_threads);
+    std::atomic<tcm_permit_handle_t> ph{nullptr};
+    ph.store(request_permit(client_id, request));
+    uint32_t expected_concurrency = max_sw_threads;
+    tcm_permit_t expected_permit = make_active_permit(&expected_concurrency);
+    check_permit(expected_permit, ph);
+
+    assert_fully_subscribed();
+
+    register_thread(ph);
+    const tcm_permit_request_t nested_request = make_request(/*min_sw_threads*/1, max_sw_threads);
+    tcm_permit_handle_t nested_ph = request_permit(client_id, nested_request);
+    expected_concurrency = 1;
+    check_permit(expected_permit, nested_ph);
+    release_permit(nested_ph);
+
+    std::mutex handle_mutex;
+    std::condition_variable cv;
+    std::atomic<bool> registered = false;
+    cv.notify_all();
+    std::thread t([&]() {
+        wait_for([&ph] { return ph.load(); }, handle_mutex, cv);
+        assert_fully_subscribed();
+
+        register_thread(ph);
+        check(can_find_at_most(/*num_resources*/1),
+              "Nested request finds own resource in a separate thread");
+        registered = true;
+        cv.notify_all();
+
+        wait_for([&registered] { return !registered; }, handle_mutex, cv);
+        assert_fully_subscribed("checking invariant separate thread was unregistered by the main");
+    });
+
+    wait_for([&registered] { return registered.load(); }, handle_mutex, cv);
+
+    bulk_thread_unregister(ph);
+    registered = false;
+    cv.notify_all();
+
+    t.join();
+
+    assert_fully_subscribed();
+
+    disconnect_client(client_id);
+}
+}
+
+} // namespace bulk_threads_unregister
+
+
