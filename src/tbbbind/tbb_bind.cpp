@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2019-2025 Intel Corporation
-    Copyright (c) 2025-2026 UXL Foundation Contributors
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -268,7 +268,9 @@ private:
         // this function calls the interface that is available in the HWLOC 2.5 only.
 #if HWLOC_API_VERSION >= 0x20500
         auto some_core = hwloc_get_next_obj_by_type(topology, HWLOC_OBJ_CORE, nullptr);
-        hwloc_get_obj_with_same_locality(topology, some_core, HWLOC_OBJ_CORE, nullptr, nullptr, 0);
+        if (some_core) {
+            hwloc_get_obj_with_same_locality(topology, some_core, HWLOC_OBJ_CORE, nullptr, nullptr, 0);
+        }
 #endif
     }
 
@@ -570,6 +572,9 @@ public:
         topology.set_affinity_mask(affinity_backup[slot_num]);
     };
 
+    system_topology::affinity_mask get_affinity_mask() {
+        return handler_affinity_mask;
+    }
 };
 
 extern "C" { // exported to TBB interfaces
@@ -604,6 +609,11 @@ TBBBIND_EXPORT void __TBB_internal_apply_affinity(binding_handler* handler_ptr, 
 TBBBIND_EXPORT void __TBB_internal_restore_affinity(binding_handler* handler_ptr, int slot_num) {
     __TBB_ASSERT(handler_ptr != nullptr, "Trying to get access to uninitialized metadata.");
     handler_ptr->restore_previous_affinity_mask(slot_num);
+}
+
+TBBBIND_EXPORT hwloc_bitmap_t __TBB_internal_get_affinity_mask(binding_handler* handler_ptr) {
+    __TBB_ASSERT(handler_ptr != nullptr, "Trying to get access to uninitialized metadata.");
+    return handler_ptr->get_affinity_mask();
 }
 
 TBBBIND_EXPORT int __TBB_internal_get_default_concurrency(int numa_id, int core_type_id, int max_threads_per_core) {

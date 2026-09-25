@@ -1,0 +1,27 @@
+; Copyright (c) 2026 UXL Foundation Contributors
+;
+; SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+EXPORTS
+
+; Connecting to and disconnecting from TCM
+tcmConnect
+tcmDisconnect
+
+; Handling of requests for resources
+tcmRequestPermit
+tcmActivatePermit
+tcmIdlePermit
+tcmDeactivatePermit
+tcmReleasePermit
+tcmGetPermitData
+
+; Thread registration
+tcmRegisterThread
+tcmUnregisterThread
+
+; Version information
+tcmGetVersion
+tcmGetVersionInfo
+tcmRuntimeVersion
+tcmRuntimeInterfaceVersion

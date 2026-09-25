@@ -8,10 +8,11 @@ Note: This document is a sub-RFC for the [Resource-limited Nodes RFC](./README.m
   * 1.1 [Terminology](#terminology)
   * 1.2 [Proposed Design](#proposed-design)
   * 1.3 [API Details](#api-details)
-  * 1.4 [API Specification](#api-specification)
-    * 1.4.1 [`oneapi::tbb::flow::resource_limiter` Class](#oneapitbbflowresource_limiter-class)
-    * 1.4.2 [`ResourceLimitedBody` Named Requirements](#resourcelimitedbody-named-requirements)
-    * 1.4.3 [`oneapi::tbb::flow::resource_limited_node` Class](#oneapitbbflowresource_limited_node-class)
+  * 1.4 [Extending the ``resource_limiter`` Constructors](#extending-the-resource_limiter-constructors)
+  * 1.5 [API Specification](#api-specification)
+    * 1.5.1 [`oneapi::tbb::flow::resource_limiter` Class](#oneapitbbflowresource_limiter-class)
+    * 1.5.2 [`ResourceLimitedBody` Named Requirements](#resourcelimitedbody-named-requirements)
+    * 1.5.3 [`oneapi::tbb::flow::resource_limited_node` Class](#oneapitbbflowresource_limited_node-class)
 * 2 [API to Support Polymorphic Providers](#api-to-support-polymorphic-providers)
 * 3 [Exit Criteria and Open Questions](#exit-criteria-and-open-questions)
 * 4 [Usage Examples](#usage-examples)
@@ -139,6 +140,205 @@ When the resource is used by one of the nodes in the Flow Graph, the `resource_l
 If access to one or several resources cannot be granted immediately, the node and the provider utilize the unspecified *Protocol*, which defines
 how and when access will be granted to each node that requests it. The concurrency held by the currently processed input message is not 
 released until all necessary resource accesses are granted and the body is executed.
+
+### Extending the ``resource_limiter`` Constructors
+
+The initial version of the resource limiting feature in the Flow Graph supported a single constructor for ``tbb::flow::resource_limiter`` class,
+accepting a variadic number of resources:
+
+```cpp
+template <typename ResourceHandle>
+class resource_limiter {
+public:
+    template <typename Handle, typename... Handles>
+    resource_limiter(Handle&& handle, Handles&&... handles) // Constructor (1)
+    {}
+};
+
+resource_limiter<int> limiter(1, 2, 3, 4, 5);
+```
+
+In the code above, ``limiter`` manages 5 resources of type ``int``. Instances of resources are constructed in-place while constructing the limiter.
+The concern with this constructor is that the number of resources should be known at compile-time, while some workflows only know it in runtime.
+
+The current implementation of ``resource_limiter`` uses ``std::forward_list`` container which already provides the necessary runtime semantics, so the
+only concern is the ``resource_limiter`` constructor itself.
+
+The idea is to extend the set of constructors to accept arbitrary containers (or ranges) to define the number of resources and their values at runtime.
+
+```cpp
+template <typename ResourceHandle>
+class resource_limiter {
+public:
+    template <typename Handle, typename... Handles>
+    resource_limiter(Handle&& handle, Handles&&... handles) // Constructor (1) - existing
+    {}
+
+    template <typename InputIterator>
+    resource_limiter(InputIterator first, InputIterator last) // Constructor (2) - extension
+    {}
+
+    template <typename ContainerBasedSequence>
+    resource_limiter(ContainerBasedSequence&& sequence) // Constructor (3) - extension
+    {}
+};
+
+resource_limiter<int> limiter1{1, 2, 3}; // Resources are directly passed, constructed in-place
+
+std::vector<int> vector = {1, 2, 3};
+resource_limiter<int> limiter2{vector.begin(), vector.end()}; // [first, last) constructors, resources are copied from vector
+
+resource_limiter<int> limiter3{vector}; // Same as above
+```
+
+Constructor (2) creates a ``resource_limiter`` containing all the resources in a range ``[first, last)``. Constructor (3) is just a syntactic sugar over
+the constructor (2) - it is equivalent to ``resource_limiter(std::begin(sequence), std::end(sequence))``.
+
+The only limitation that cannot be enforced at compile time is that the number of resources in a range ``[first, last)`` must not be ``0``.
+Constructor (1) enforces this by requiring at least one argument. For constructors (2) and (3), the number of resources is runtime information, so it can
+only be checked at runtime, for example via an assert (in debug mode), an exception, or a similar mechanism. The current proposal is to document the empty
+range as undefined behavior and add an assert in debug mode.
+
+However, adding constructors (2) and (3) introduces an overload ambiguity when 1 or 2 resources are passed directly to the limiter constructor:
+
+```cpp
+resource_limiter<int> limiter1(1);
+resource_limiter<int> limiter2(1, 2);
+```
+
+For ``limiter1`` and ``limiter2``, the constructors (2) and (3) respectively are better matches than constructor (1) due to absence of the variadic.
+This can cause compilation failures, because an ``int`` may be treated as a sequence in constructor (3), or incorrect runtime behavior if two
+integers are interpreted as arguments to the ``forward_list`` constructor in constructor (2).
+
+This issue should be solved by disambiguating constructor (1), which performs in-place construction, from constructors (2) and (3), which perform
+range-based construction.
+The following techniques were considered:
+
+1. Implicit disambiguation by constraining the constructor overloads: constructor (1) may only participate in overload resolution when
+   ``ResourceHandle`` is constructible from all ``Handle`` arguments, constructor (2) only when the argument is an input iterator, and
+   constructor (3) only when the argument is a ``ContainerBasedSequence``. However, this approach will not work for corner cases where
+   ``ResourceHandle`` itself is an iterator or a sequence.
+2. Replace the constructors with factory functions with explicit names. For example, ``tbb::flow::get_resource_limiter_from_range(first, last)``.
+   Currently, this approach cannot be used because ``resource_limiter`` is not guaranteed to be movable, so it cannot be returned from
+   a factory function in C++11.
+3. Use ``std::initializer_list`` for constructor (1). Requires the ``ResourceHandle`` to be copyable.
+4. Explicit disambiguation by adding tag arguments to the constructors. Different tagged constructors help ensure that the correct constructor
+   is chosen. This option will be described below.
+
+There are three possible approaches for introducing a tagged constructor.
+
+The first approach is to use a tag for constructor (1). Since the resources are constructed in place, ``std::in_place_t`` is a natural candidate.
+The only issue is that ``std::in_place_t`` is available only starting in C++17, so supporting C++11/14 would require introducing a public
+``tbb::in_place_t`` type:
+
+```cpp
+// Constructors
+template <typename Handle, typename... Handles>
+resource_limiter(tbb::in_place_t, Handle&& handle, Handles&&... handles);
+
+template <typename InputIterator>
+resource_limiter(InputIterator first, InputIterator last);
+
+template <typename ContainerBasedSequence>
+resource_limiter(ContainerBasedSequence&& sequence);
+
+// Usage
+resource_limiter<int> limiter1(tbb::in_place_t{}, 1, 2, 3);
+
+std::vector<int> resources = {1, 2, 3};
+resource_limiter<int> limiter2(resources.begin(), resources.end());
+
+resource_limiter<int> limiter3(resources);
+```
+
+This would also break source compatibility with existing uses of constructor (1), but that may be acceptable for a preview feature.
+
+The second option is the opposite: use the tag only for the new constructors. A semantically close option is ``std::from_range_t``. Because this tag
+is a C++23 feature, supporting older C++ versions would require a public TBB alternative as well.
+
+```cpp
+// Constructors
+template <typename Handle, typename... Handles>
+resource_limiter(Handle&& handle, Handles&&... handles);
+
+template <typename InputIterator>
+resource_limiter(tbb::from_range_t, InputIterator first, InputIterator last);
+
+template <typename ContainerBasedSequence>
+resource_limiter(tbb::from_range_t, ContainerBasedSequence&& sequence);
+
+// Usage
+resource_limiter<int> limiter1(1, 2, 3);
+
+std::vector<int> resources = {1, 2, 3};
+resource_limiter<int> limiter2(tbb::from_range_t{}, resources.begin(), resources.end());
+
+resource_limiter<int> limiter3(tbb::from_range_t{}, resources);
+```
+
+This approach preserves source compatibility with existing code.
+
+The last option is to modify constructor (1) to use ``std::piecewise_construct_t``. This would change the constructor's semantics, but it
+would also make it a more powerful version of the existing constructor (1).
+
+```cpp
+// Constructors
+template <typename Tuple, typename... Tuples>
+resource_limiter(std::piecewise_construct_t, Tuple&& tuple, Tuples&&... tuples);
+
+template <typename InputIterator>
+resource_limiter(InputIterator first, InputIterator last);
+
+template <typename ContainerBasedSequence>
+resource_limiter(ContainerBasedSequence&& sequence);
+
+// Usage
+resource_limiter<int> limiter1(std::piecewise_construct, std::forward_as_tuple(1),
+                                                         std::forward_as_tuple(2),
+                                                         std::forward_as_tuple(3));
+
+std::vector<int> resources = {1, 2, 3};
+resource_limiter<int> limiter2(resources.begin(), resources.end());
+
+resource_limiter<int> limiter3(resources);
+```
+
+Such a constructor would replace usages of constructor (1) with a less simple form, because each argument would need to
+be forwarded as a tuple. However, it also extends the API to support cases where a resource should be constructed in place from a set
+of arguments rather than a single one, which was not possible with the existing constructor and would otherwise require explicit
+move construction:
+
+```cpp
+struct resource {
+    resource(const char* name, std::unique_ptr<int> memory);
+};
+
+resource_limiter<resource> limiter(std::piecewise_construct, std::forward_as_tuple("my resource", std::make_unique<int>(123)));
+```
+
+This approach does not require introducing extra public tags in the ``tbb`` namespace, and it does not preserve source compatibility.
+
+The proposal is to use the combination of two approaches - the ``std::initializer_list`` and a tagged constructor with piecewise argument.
+``std::initializer_list`` would cover most of the use cases of the existing constructor (1) without introducing extra complexity,
+while the piecewise constructor will cover the rest, as well as more complex use-cases not covered by the existing constructors set.
+
+```cpp
+template <typename ResourceHandle>
+class resource_limiter {
+    template <typename InputIterator>
+    resource_limiter(InputIterator first, InputIterator last);
+
+    template <typename ContainerBasedSequence>
+    resource_limiter(ContainerBasedSequence&& sequence)
+        : resource_limiter(std::begin(sequence), std::end(sequence)) {}
+
+    resource_limiter(std::initializer_list<ResourceHandle> init)
+        : resource_limiter(init.begin(), init.end()) {}
+
+    template <typename Tuple, typename... Tuples>
+    resource_limiter(std::piecewise_construct_t, Tuple&& tuple, Tuples&&... tuples);
+};
+```
 
 ### API Specification
 

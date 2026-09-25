@@ -11,12 +11,14 @@ This section documents ``task_group`` API extensions for advanced use cases.
 .. toctree::
     :titlesonly:
 
-    task_group_bypass_support
-    task_group_dynamic_dependencies
+    task_group_ext/task_bypass_support.rst
+    task_group_ext/task_completion_handle_cls.rst
+    task_group_ext/dynamic_dependencies.rst
+    task_group_ext/wait_single_task.rst
 
 .. rubric:: See also
 
-* `oneapi::tbb::task_group specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_group/task_group_cls>`_
-* `oneapi::tbb::task_group_context specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/scheduling_controls/task_group_context_cls>`_
-* `oneapi::tbb::task_group_status specification <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_group/task_group_status_enum>`_ 
-* `oneapi::tbb::task_handle class <https://oneapi-spec.uxlfoundation.org/specifications/oneapi/latest/elements/onetbb/source/task_scheduler/task_group/task_handle>`_
+* :onetbb-spec:`oneapi::tbb::task_group specification <task_scheduler/task_group/task_group_cls>`
+* :onetbb-spec:`oneapi::tbb::task_group_context specification <task_scheduler/scheduling_controls/task_group_context_cls>`
+* :onetbb-spec:`oneapi::tbb::task_group_status specification <task_scheduler/task_group/task_group_status_enum>`
+* :onetbb-spec:`oneapi::tbb::task_handle class <task_scheduler/task_group/task_handle>`

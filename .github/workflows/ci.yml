@@ -43,13 +43,14 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run scan
         run: |
+          set -e -x -o pipefail
           sudo apt update && sudo apt install -y codespell
           ${GITHUB_WORKSPACE}/.github/scripts/codespell.sh `pwd`
 
@@ -58,13 +59,14 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run scan
         run: |
+          set -e -x -o pipefail
           command -v clang-format
           cp -r examples examples_formatted
           find examples_formatted -regex '.*\.\(cpp\|hpp\)' -exec clang-format -style=file -i {} \;
@@ -78,13 +80,14 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install prerequisites
         run: |
+          set -e -x -o pipefail
           pip3 install -U Jinja2
           pip3 install git+https://github.com/executablebooks/sphinx-book-theme.git
           pip3 install sphinx_design
@@ -92,10 +95,11 @@ jobs:
           mkdir html
       - name: Build documentation
         run: |
+          set -e -x -o pipefail
           export BUILD_TYPE=${BUILD_TYPE} && sphinx-build doc html
           tar -czvf html.tar.gz html/
       - name: Save docs
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: oneTBB-html-docs-${{ env.GITHUB_SHA_SHORT }}
           path: html.tar.gz
@@ -110,23 +114,24 @@ jobs:
     needs: [documentation]
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
 
       - name: Checkout gh-pages
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: gh-pages
           path: gh-pages
       - name: Set env
         run: echo GITHUB_SHA_SHORT=${GITHUB_SHA::8} >> $GITHUB_ENV
       - name: Download documetation
-        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: oneTBB-html-docs-${{ env.GITHUB_SHA_SHORT }}
       - name: Publish to github pages
         run: |
+          set -e -x -o pipefail
           tar -xvf html.tar.gz
           cd gh-pages
           rm -rf *
@@ -143,62 +148,91 @@ jobs:
     runs-on: [ubuntu-latest]
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - name: Run check
         run: |
-          CHANGED_FILES=$(git diff --diff-filter=d --name-only ${{ github.event.pull_request.base.sha }})
-          UXL_COPYRIGHT="Copyright \(c\) [0-9]+(-[0-9]+)? UXL Foundation Contributors"
-          APACHE_COPYRIGHT_LINE="Licensed under the Apache License"
-          CURRENT_YEAR=$(date +%Y)
+          set -e -x -o pipefail
+          base_sha=${{ github.event.pull_request.base.sha }}
+          current_year=$(date +%Y)
+          apache_copyright_line="Licensed under the Apache License"
+          uxl_copyright_re="Copyright \(c\) [0-9]+ UXL Foundation Contributors"
+          intel_copyright_re="Copyright.*[0-9]\{4\}.*Intel"
+          check_failed=false
 
-          FILES_WITH_COPYRIGHT=$(grep -lF "$APACHE_COPYRIGHT_LINE" $CHANGED_FILES || true)
-          FILES_WITH_MISSING_UXL_COPYRIGHT=$(grep -LE "$UXL_COPYRIGHT" $FILES_WITH_COPYRIGHT || true)
+          new_files=$(git diff --find-renames --diff-filter=A --name-only "$base_sha" || true)
+          modified_files=$(git diff --find-renames --diff-filter=M --name-only "$base_sha" || true)
 
-          # Update UXL Copyright years
-          if [ -n "$FILES_WITH_COPYRIGHT" ]; then
-            sed -E -i \
-              -e "/${UXL_COPYRIGHT}/s/ ([0-9]+)[-0-9]*/ \1-${CURRENT_YEAR}/" \
-              -e "/${UXL_COPYRIGHT}/s/${CURRENT_YEAR}-${CURRENT_YEAR}/${CURRENT_YEAR}/" \
-            $FILES_WITH_COPYRIGHT
+          if [ -n "$new_files" ]; then
+            new_with_apache=$(grep -lF "$apache_copyright_line" $new_files || true)
+            for file in $new_with_apache; do
+              uxl_match=$(grep -cE "$uxl_copyright_re" "$file" || true)
+              if [ "$uxl_match" -eq 0 ]; then
+                echo "ERROR: New file is missing UXL copyright: $file"
+                check_failed=true
+              else
+                year_match=$(grep -cE "Copyright \(c\) ${current_year} UXL Foundation Contributors" "$file" || true)
+                if [ "$year_match" -eq 0 ]; then
+                  echo "ERROR: New file must have current year (${current_year}) in UXL copyright: $file"
+                  check_failed=true
+                fi
+              fi
+            done
+          fi
 
-            git checkout -- third-party-programs.txt
-            git diff > years.diff
+          if [ -n "$modified_files" ]; then
+            modified_with_apache=$(grep -lF "$apache_copyright_line" $modified_files || true)
+            for file in $modified_with_apache; do
+              uxl_match=$(grep -cE "$uxl_copyright_re" "$file" || true)
+              if [ "$uxl_match" -eq 0 ]; then
+                echo "ERROR: Modified file is missing single year UXL copyright: $file"
+                check_failed=true
+                continue
+              fi
+              original_uxl=$(git show "${base_sha}:${file}" 2>/dev/null | grep -oE "$uxl_copyright_re" || true)
+              current_uxl=$(grep -oE "$uxl_copyright_re" "$file" || true)
+              if [ -n "$original_uxl" ] && [ "$original_uxl" != "$current_uxl" ]; then
+                echo "ERROR: UXL copyright year must not be changed in: $file"
+                check_failed=true
+              fi
+            done
+          fi
 
-            CHECK_FAILED=false
+          all_changed_files=$(git diff --find-renames --diff-filter=AM --name-only "$base_sha" || true)
+          if [ -n "$all_changed_files" ]; then
+            all_with_apache=$(grep -lF "$apache_copyright_line" $all_changed_files || true)
+            for file in $all_with_apache; do
+              original_intel=$(git show "${base_sha}:${file}" 2>/dev/null | grep "$intel_copyright_re" || true)
+              current_intel=$(grep "$intel_copyright_re" "$file" || true)
+              if [ -n "$original_intel" ] && [ "$original_intel" != "$current_intel" ]; then
+                echo "ERROR: Intel copyright must not be modified in: $file"
+                check_failed=true
+              fi
+            done
+          fi
 
-            if [ -n "$FILES_WITH_MISSING_UXL_COPYRIGHT" ]; then
-              echo "ERROR: UXL Copyright is missed for the following files: ${FILES_WITH_MISSING_UXL_COPYRIGHT}"
-              CHECK_FAILED=true
-            fi
-
-            if [[ -s years.diff ]]; then
-              echo "ERROR: Wrong UXL copyright years"
-              cat years.diff
-              CHECK_FAILED=true
-            fi
-
-            if [ "$CHECK_FAILED" = true ]; then
-              exit 1
-            fi
+          if [ "$check_failed" = true ]; then
+            exit 1
           fi
   python_module_test_ubuntu_latest:
     runs-on: [ubuntu-latest]
     timeout-minutes: 15
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run testing
         run: |
+          set -e -x -o pipefail
           mkdir build && cd build
           cmake -DTBB4PY_BUILD=ON -DCMAKE_CXX_COMPILER=g++ -DCMAKE_C_COMPILER=gcc ..
           make VERBOSE=1 -j${BUILD_CONCURRENCY} python_build
@@ -245,11 +279,11 @@ jobs:
             cmake_static: -DBUILD_SHARED_LIBS=OFF
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install dependencies
         shell: bash
         run: |
@@ -257,10 +291,92 @@ jobs:
       - name: Run testing
         shell: bash
         run: |
-          set -x
+          set -e -x -o pipefail
           mkdir build && cd build
           cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} ${{ matrix.cmake_static }} \
-            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_CPF=${{ matrix.preview }} ..
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST_PREVIEW=${{ matrix.preview }} -DTCM_BUILD=OFF ..
+          make VERBOSE=1 -j${BUILD_CONCURRENCY}
+          ctest --timeout ${TEST_TIMEOUT} --output-on-failure
+
+  linux-tcm-testing:
+    name: tcm_test_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}
+    runs-on: ['${{ matrix.os }}']
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            c_compiler: clang
+            cxx_compiler: clang++
+            std: 20
+            build_type: relwithdebinfo
+          - os: ubuntu-24.04
+            c_compiler: gcc
+            cxx_compiler: g++
+            std: 17
+            build_type: debug
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install dependencies
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y pkg-config libhwloc-dev hwloc
+      - name: Run testing
+        shell: bash
+        run: |
+          set -e -x -o pipefail
+          mkdir build && cd build
+          cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}  \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
+            -DTCM_BUILD=ON -DTBB_BUILD=OFF ..
+          make VERBOSE=1 -j${BUILD_CONCURRENCY}
+          ctest --timeout ${TEST_TIMEOUT} --output-on-failure
+
+  linux-tcm-integration-testing:
+    name: tcm_integration_test_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}
+    runs-on: ['${{ matrix.os }}']
+    timeout-minutes: 45
+    env:
+      TCM_ENABLE: 1
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            c_compiler: clang
+            cxx_compiler: clang++
+            std: 23
+            build_type: debug
+          - os: ubuntu-24.04
+            c_compiler: gcc
+            cxx_compiler: g++
+            std: 20
+            build_type: relwithdebinfo
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install dependencies
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y pkg-config libhwloc-dev hwloc
+      - name: Run testing
+        shell: bash
+        run: |
+          set -e -x -o pipefail
+          mkdir build && cd build
+          cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}  \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
+            -DTCM_BUILD=ON -DTBB_TCM_TESTING=ON ..
           make VERBOSE=1 -j${BUILD_CONCURRENCY}
           ctest --timeout ${TEST_TIMEOUT} --output-on-failure
 
@@ -293,18 +409,18 @@ jobs:
             cmake_static: -DBUILD_SHARED_LIBS=OFF
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run testing
         shell: bash
         run: |
-          set -x
+          set -e -x -o pipefail
           mkdir build && cd build
           cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} ${{ matrix.cmake_static }} \
-            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_CPF=${{ matrix.preview }} ..
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST_PREVIEW=${{ matrix.preview }} ..
           make VERBOSE=1 -j${MACOS_BUILD_CONCURRENCY}
           ctest --timeout ${TEST_TIMEOUT} --output-on-failure
 
@@ -317,13 +433,13 @@ jobs:
       matrix:
         include:
           - os: windows-2025
-            generator: Visual Studio 17 2022
+            generator: Visual Studio 18 2026
             c_compiler: cl
             cxx_compiler: cl
             std: 14
             build_type: relwithdebinfo
             preview: 'ON'
-            job_name: windows_cl2022_cxx14_relwithdebinfo_preview=ON
+            job_name: windows_cl2026_cxx14_relwithdebinfo_preview=ON
           - os: windows-11-arm
             generator: Visual Studio 17 2022
             c_compiler: cl
@@ -343,20 +459,131 @@ jobs:
             job_name: windows_cl2022_cxx17_relwithdebinfo_preview=OFF
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run testing
         run: |
           mkdir build
           cd build
           cmake -G "${{ matrix.generator }}" -A x64 -DCMAKE_CXX_STANDARD=${{ matrix.std }} ${{ matrix.cmake_static }} `
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} `
-            -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_CPF=${{ matrix.preview }} ..
+            -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST_PREVIEW=${{ matrix.preview }} ..
+          if (!$?) {
+              throw "CMake configuration step failed, exit code $LastExitCode"
+          }
           cmake --build . --config ${{ matrix.build_type }} -j -v
+          if (!$?) {
+              throw "CMake build step failed, exit code $LastExitCode"
+          }
           ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure
+          if (!$?) {
+              throw "CTest failed, exit code $LastExitCode"
+          }
+
+  windows-tcm-testing:
+    name: tcm_test_${{ matrix.job_name }}
+    runs-on: ['${{ matrix.os }}']
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            c_compiler: cl
+            cxx_compiler: cl
+            std: 23
+            build_type: debug
+            job_name: windows_cl2026_cxx14_debug
+          - os: windows-2022
+            c_compiler: cl
+            cxx_compiler: cl
+            std: 17
+            build_type: relwithdebinfo
+            job_name: windows_cl2022_cxx17_relwithdebinfo
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Dependencies
+        run: |
+          vcpkg install hwloc
+      - name: Run testing
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+            -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} `
+            -DTCM_BUILD=ON -DTBB_BUILD=OFF `
+            -DCMAKE_TOOLCHAIN_FILE="${env:VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" ..
+          if (!$?) {
+              throw "CMake configuration step failed, exit code $LastExitCode"
+          }
+          cmake --build . --config ${{ matrix.build_type }} --parallel -v
+          if (!$?) {
+              throw "CMake build step failed, exit code $LastExitCode"
+          }
+          ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure
+          if (!$?) {
+              throw "CTest failed, exit code $LastExitCode"
+          }
+
+  windows-tcm-integration_testing:
+    name: tcm_integration_test_${{ matrix.job_name }}
+    runs-on: ['${{ matrix.os }}']
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            c_compiler: cl
+            cxx_compiler: cl
+            std: 20
+            build_type: relwithdebinfo
+            job_name: windows_cl2026_cxx14_relwithdebinfo
+          - os: windows-2022
+            c_compiler: cl
+            cxx_compiler: cl
+            std: 17
+            build_type: debug
+            job_name: windows_cl2022_cxx17_debug
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Dependencies
+        run: |
+          vcpkg install hwloc
+      - name: Run testing
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+            -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} `
+            -DTCM_BUILD=ON -DTBB_TCM_TESTING=ON `
+            -DCMAKE_TOOLCHAIN_FILE="${env:VCPKG_INSTALLATION_ROOT}/scripts/buildsystems/vcpkg.cmake" ..
+          if (!$?) {
+              throw "CMake configuration step failed, exit code $LastExitCode"
+          }
+          cmake --build . --config ${{ matrix.build_type }} --parallel -v
+          if (!$?) {
+              throw "CMake build step failed, exit code $LastExitCode"
+          }
+          ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure
+          if (!$?) {
+              throw "CTest failed, exit code $LastExitCode"
+          }
 
   linux-examples-testing:
     name: examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_preview=${{ matrix.preview }}
@@ -386,19 +613,19 @@ jobs:
             preview: 'ON'
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run testing
         shell: bash
         run: |
-          set -x
+          set -e -x -o pipefail
           mkdir build && cd build
           cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
-            -DTBB_CPF=${{ matrix.preview }} -DTBB_TEST=OFF -DTBB_EXAMPLES=ON ..
+            -DTBB_TEST_PREVIEW=${{ matrix.preview }} -DTBB_TEST=OFF -DTBB_EXAMPLES=ON ..
           cmake --build . -v --target light_test_examples
 
   macos-examples-testing:
@@ -417,19 +644,19 @@ jobs:
             preview: 'ON'
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run testing
         shell: bash
         run: |
-          set -x
+          set -e -x -o pipefail
           mkdir build && cd build
           cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
-            -DTBB_CPF=${{ matrix.preview }} -DTBB_TEST=OFF -DTBB_EXAMPLES=ON ..
+            -DTBB_TEST_PREVIEW=${{ matrix.preview }} -DTBB_TEST=OFF -DTBB_EXAMPLES=ON ..
           cmake --build . -v --target light_test_examples
 
   windows-examples-testing:
@@ -458,22 +685,28 @@ jobs:
             job_name: examples_windows_cl2022_cxx17_relwithdebinfo_preview=OFF
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run testing
         run: |
           mkdir build
           cd build
           cmake -G "${{ matrix.generator }}" -A x64 -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} `
-            -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_CPF=${{ matrix.preview }} -DTBB_TEST=OFF -DTBB_EXAMPLES=ON ..
+            -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST_PREVIEW=${{ matrix.preview }} -DTBB_TEST=OFF -DTBB_EXAMPLES=ON ..
+          if (!$?) {
+              throw "CMake configuration step of examples failed, exit code $LastExitCode"
+          }
           cmake --build . -v --target light_test_examples
+          if (!$?) {
+              throw "CMake build step of examples failed, exit code $LastExitCode"
+          }
 
   linux-doc-examples-testing:
-    name: doc_examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}
+    name: doc_examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_${{ matrix.cmake_extra }}
     runs-on: ['${{ matrix.os }}']
     timeout-minutes: 10
     strategy:
@@ -481,28 +714,38 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            c_compiler: gcc
-            cxx_compiler: g++
+            c_compiler: clang
+            cxx_compiler: clang++
+            generator: Ninja
             std: 20
             build_type: relwithdebinfo
+            cmake_extra: -DTBB_TEST_CXX20_MODULES=ON
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install dependencies
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y ninja-build
+          if [[ "${{ matrix.cxx_compiler }}" == "clang++" ]]; then
+            sudo apt-get install -y libomp-dev
+          fi
       - name: Test doc examples
         run: |
+          set -e -x -o pipefail
           mkdir build && cd build
-          cmake -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} \
+          cmake -G "${{ matrix.generator }}" -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} \
             -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
-            -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON ..
+            ${{ matrix.cmake_extra }} -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON ..
           cmake --build . -v --parallel --target build-doc-examples
           ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure -L doc-examples
-  
+
   windows-doc-examples-testing:
-    name: doc_examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}
+    name: doc_examples_${{ matrix.os }}_${{ matrix.cxx_compiler }}_cxx${{ matrix.std }}_${{ matrix.build_type }}_${{ matrix.cmake_extra }}
     runs-on: ['${{ matrix.os }}']
     timeout-minutes: 10
     strategy:
@@ -515,19 +758,28 @@ jobs:
             cxx_compiler: cl
             std: 20
             build_type: relwithdebinfo
+            cmake_extra: -DTBB_TEST_CXX20_MODULES=ON
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@58077d3c7e43986b6b15fba718e8ea69e387dfcc # v2.15.1
+        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
         with:
           egress-policy: audit
 
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Test doc examples
         run: |
-          mkdir build
-          cd build
+          mkdir build && cd build
           cmake -G "${{ matrix.generator }}" -A x64 -DCMAKE_CXX_STANDARD=${{ matrix.std }} `
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} `
-            -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON ..
+            -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} ${{ matrix.cmake_extra }} -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON ..
+          if (!$?) {
+              throw "CMake configuration step of examples from documentation failed, exit code $LastExitCode"
+          }
           cmake --build . --config ${{ matrix.build_type }} -v --parallel --target build-doc-examples
+          if (!$?) {
+              throw "CMake build step of examples from documentation failed, exit code $LastExitCode"
+          }
           ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure -L doc-examples
+          if (!$?) {
+              throw "CTest of examples from documentation failed, exit code $LastExitCode"
+          }

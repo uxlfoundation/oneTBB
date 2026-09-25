@@ -26,6 +26,7 @@ add_library(tbb
     itt_notify.cpp
     main.cpp
     market.cpp
+    numa_allocation.cpp
     tcm_adaptor.cpp
     misc.cpp
     misc_ex.cpp
@@ -101,6 +102,8 @@ set_target_properties(tbb PROPERTIES
     DEFINE_SYMBOL ""
     VERSION ${TBB_BINARY_VERSION}.${TBB_BINARY_MINOR_VERSION}
     SOVERSION ${TBB_BINARY_VERSION}
+    BUILD_RPATH_USE_ORIGIN TRUE
+    BUILD_RPATH $ORIGIN
 )
 
 tbb_handle_ipo(tbb)

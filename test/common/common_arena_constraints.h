@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2019-2025 Intel Corporation
-    Copyright (c) 2025-2026 UXL Foundation Contributors
+    Copyright (c) 2025 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -94,7 +94,7 @@ int get_processors_group_count() { return 1; }
 #define __HWLOC_HYBRID_CPUS_INTERFACES_VALID (!_WIN32 || _WIN64)
 
 #define __HYBRID_CPUS_TESTING __HWLOC_HYBRID_CPUS_INTERFACES_PRESENT && __HWLOC_HYBRID_CPUS_INTERFACES_VALID
-#define __HWLOC_CPUBIND_PRESENT (!__APPLE__)
+#define __HWLOC_CPUBIND_PRESENT (!__APPLE__ && !__gnu_hurd__)
 
 // Macro to check hwloc interfaces return codes
 #define hwloc_require_ex(command, ...)                                          \
@@ -313,7 +313,7 @@ private:
             hwloc_bitmap_or(buffer_cpu_set, buffer_cpu_set, numa_node_info.cpuset);
         }
         REQUIRE_MESSAGE( hwloc_bitmap_isequal(buffer_cpu_set, process_cpuset),
-            "Intersected NUMA nodes masks should be equal to process affinity.(reference)");
+            "The union of NUMA nodes masks should be equal to process affinity.(reference)");
 
         // Core types topology verification
         hwloc_bitmap_zero(buffer_cpu_set);
@@ -324,7 +324,7 @@ private:
             hwloc_bitmap_or(buffer_cpu_set, buffer_cpu_set, cpu_kind_info.cpuset);
         }
         REQUIRE_MESSAGE(hwloc_bitmap_isequal(buffer_cpu_set, process_cpuset),
-            "Intersected core type masks should be equal to process affinity.(reference)");
+            "The union of core type masks should be equal to process affinity.(reference)");
 
         hwloc_bitmap_free(buffer_cpu_set);
     }
@@ -442,7 +442,7 @@ system_info::affinity_mask prepare_reference_affinity_mask(const tbb::task_arena
             }
 
             index_info combination;
-            combination.index = (tbb::detail::multi_core_type_codec::encoding_format <<
+            combination.index = int(tbb::detail::multi_core_type_codec::encoding_format <<
                 tbb::detail::multi_core_type_codec::bitmask_width); // multiple core type format
             combination.index |= mask;
             combination.concurrency = 0;

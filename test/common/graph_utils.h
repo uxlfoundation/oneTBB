@@ -953,7 +953,7 @@ template<typename NodeType>
 void test_lightweight(unsigned N) {
     test_unlimited_lightweight_execution<NodeType>(N);
     test_limited_lightweight_execution<NodeType>(N, tbb::flow::serial);
-    test_limited_lightweight_execution<NodeType>(N, (std::min)(std::thread::hardware_concurrency() / 2, N/2));
+    test_limited_lightweight_execution<NodeType>(N, (std::min)((std::thread::hardware_concurrency()+1) / 2, N/2));
 
     test_limited_lightweight_execution_with_throwing_body<NodeType>(N, tbb::flow::serial);
 }
@@ -1010,6 +1010,34 @@ struct assert_all_items_equal_impl<0> {
 template <typename TupleLike, typename Message>
 void assert_all_items_equal_to(const TupleLike& tuple_like, const Message& message) {
     assert_all_items_equal_impl<std::tuple_size<TupleLike>::value>::compare(tuple_like, message);
+}
+
+template <typename BufferingNode, typename T>
+void spin_try_get(BufferingNode& node, T& value) {
+    std::size_t count = 0;
+
+    while (!node.try_get(value)) {
+        if (count == 1000000) {
+            // Tests that use spin_try_get first submit a set of values into the graph
+            // and then wait for outputs to arrive in buffers at the end of the graph.
+            // Because flow graph nodes spawn tasks in the graph arena and spin_try_get
+            // does not wait for graph completion, TBB does not strictly guarantee that
+            // a worker thread will wake up and execute the pending task.
+            // The workaround is to enqueue a task into the current graph arena,
+            // which is guaranteed to be executed at some point.
+
+            // This workaround assumes the calling thread is in the graph arena and all
+            // task elements are submitted to the graph before calling spin_try_get.
+
+            // Usage of oneapi::tbb::task_arena::not_initialized directly in CHECK_MESSAGE
+            // results in ODR-use and undefined reference
+            bool is_current_thread_in_arena = oneapi::tbb::this_task_arena::current_thread_index() !=
+                                              oneapi::tbb::task_arena::not_initialized;
+            CHECK_MESSAGE(is_current_thread_in_arena, "Calling thread is not in arena");
+            oneapi::tbb::this_task_arena::enqueue([] {});
+        }
+        ++count;
+    }
 }
 
 #endif  // __TBB_harness_graph_H

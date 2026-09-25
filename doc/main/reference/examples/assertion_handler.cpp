@@ -19,9 +19,7 @@
 #include <oneapi/tbb/global_control.h>
 #include <fstream>
 
-#ifdef TBB_EXT_CUSTOM_ASSERTION_HANDLER
-
-auto default_handler = tbb::ext::get_assertion_handler();
+auto default_handler = tbb::get_assertion_handler();
 
 void wrapper_assertion_handler(const char* location, int line,
                                const char* expression, const char* comment) {
@@ -34,20 +32,14 @@ void wrapper_assertion_handler(const char* location, int line,
     default_handler(location, line, expression, comment);
 }
 
-#endif // TBB_EXT_CUSTOM_ASSERTION_HANDLER
-
 int main() {
-#ifdef TBB_EXT_CUSTOM_ASSERTION_HANDLER
     // Set custom handler
-    tbb::ext::set_assertion_handler(wrapper_assertion_handler);
-#endif // TBB_EXT_CUSTOM_ASSERTION_HANDLER
+    tbb::set_assertion_handler(wrapper_assertion_handler);
 
     // Use oneTBB normally - any assertion failures will use custom handler
     // ...
 
-#ifdef TBB_EXT_CUSTOM_ASSERTION_HANDLER
     // Restore the default handler
-    tbb::ext::set_assertion_handler(nullptr);
-#endif // TBB_EXT_CUSTOM_ASSERTION_HANDLER
+    tbb::set_assertion_handler(nullptr);
 }
 /*end_assertion_handler_example*/
