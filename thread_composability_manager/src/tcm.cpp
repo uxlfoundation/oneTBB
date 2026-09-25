@@ -44,9 +44,24 @@ __TCM_SUPPRESS_WARNING_POP
 namespace tcm {
 namespace internal {
 
-std::stack<tcm_permit_handle_t>& get_active_permit_container() {
-    thread_local std::stack<tcm_permit_handle_t> tls_active_permit;
-    return tls_active_permit;
+struct thread_registration_data_t {
+    std::mutex mutex;
+    std::stack<tcm_permit_handle_t> permits; // Permits with which a thread has been registered
+};
+
+struct threads_register_t {
+    std::mutex mutex;
+    std::deque<thread_registration_data_t> per_thread_registrations;
+} g_threads_register;
+
+thread_registration_data_t& allocate_thread_registration_data() {
+    std::lock_guard<std::mutex> lock(g_threads_register.mutex);
+    return g_threads_register.per_thread_registrations.emplace_back();
+}
+
+thread_registration_data_t& thread_data() {
+    thread_local thread_registration_data_t& registrations = allocate_thread_registration_data();
+    return registrations;
 }
 
 /**
@@ -538,6 +553,8 @@ struct ThreadComposabilityManagerData {
     system_topology::destroy();
   }
 
+  // this_thread_regist
+
   std::mutex data_mutex{};
 
   tcm_client_id_t client_id = 1;
@@ -1008,16 +1025,14 @@ public:
   }
 
   void determine_nested_permit(tcm_permit_handle_t& ph) {
-    auto& permit_stack = get_active_permit_container();
-    prepare_permit_modification(ph);
-    if (!permit_stack.empty()) {
-        auto top_permit = permit_stack.top();
-        if (ph != top_permit) {
-            ph->data.is_nested.store(true, std::memory_order_relaxed);
-        }
-    } else {
-        ph->data.is_nested.store(false, std::memory_order_relaxed);
+    bool is_nested = false;
+    thread_registration_data_t& rd = thread_data();
+    {
+        std::lock_guard<std::mutex> lock(rd.mutex);
+        is_nested = !rd.permits.empty();
     }
+    prepare_permit_modification(ph);
+    ph->data.is_nested.store(is_nested, std::memory_order_relaxed);
     commit_permit_modification(ph);
   }
 
@@ -1413,18 +1428,41 @@ public:
   }
 
   tcm_result_t register_thread(tcm_permit_handle_t ph) {
-    __TCM_ASSERT(ph, nullptr);
-    // TODO: profile only permit_handle and thread_id
-    get_active_permit_container().push(ph);
-    return TCM_RESULT_SUCCESS;
+      __TCM_ASSERT(ph, nullptr);
+      thread_registration_data_t& my_registration_data = thread_data();
+      std::lock_guard<std::mutex> lock(my_registration_data.mutex);
+      my_registration_data.permits.push(ph);
+      return TCM_RESULT_SUCCESS;
   }
 
   tcm_result_t unregister_thread() {
-    auto& permit_stack = get_active_permit_container();
-    __TCM_ASSERT(!permit_stack.empty(), "Attempt unregistering non-registered thread.");
-    permit_stack.pop();
-    // TODO: profile only permit_handle and thread_id
-    return TCM_RESULT_SUCCESS;
+      thread_registration_data_t& my_registration_data = thread_data();
+      std::lock_guard<std::mutex> lock(my_registration_data.mutex);
+      std::stack<tcm_permit_handle_t>& permit_stack = my_registration_data.permits;
+      __TCM_ASSERT(!permit_stack.empty(), "Attempt unregistering non-registered thread.");
+      permit_stack.pop();
+      return TCM_RESULT_SUCCESS;
+  }
+
+  tcm_result_t unregister_threads(tcm_permit_handle_t ph) {
+      auto& threads_data = g_threads_register.per_thread_registrations;
+      std::deque<thread_registration_data_t>::iterator begin = threads_data.begin();
+      std::deque<thread_registration_data_t>::iterator end;
+      {
+          std::lock_guard<std::mutex> lock(g_threads_register.mutex);
+          end = threads_data.end();
+      }
+      while (begin != end) {
+          {
+              thread_registration_data_t& rd = *begin;
+              std::lock_guard<std::mutex> lock(rd.mutex);
+              if (!rd.permits.empty() && rd.permits.top() == ph) {
+                  rd.permits.pop();
+              }
+          }
+          ++begin;
+      }
+      return TCM_RESULT_SUCCESS;
   }
 
   uint32_t platform_resources() const {
@@ -2950,7 +2988,7 @@ tcm_result_t tcmReleasePermit(tcm_permit_handle_t handle) {
 ///     - ::TCM_RESULT_ERROR_UNKNOWN
 tcm_result_t tcmRegisterThread(tcm_permit_handle_t p) {
   using tcm::theTCM;
-  if (p) {
+  if (p) {                      // TODO: Replace with an assert.
     return theTCM::instance().register_thread(p);
   }
   return TCM_RESULT_ERROR_UNKNOWN;
@@ -2970,6 +3008,18 @@ tcm_result_t tcmUnregisterThread() {
   using tcm::theTCM;
 
   return theTCM::instance().unregister_thread();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// @brief Unregisters all the threads that were previously registered with
+///        specified permit
+///
+/// @returns
+///     - ::TCM_RESULT_SUCCESS
+///     - ::TCM_RESULT_ERROR_UNKNOWN
+tcm_result_t tcmUnregisterThreads(tcm_permit_handle_t permit_handle) {
+  using tcm::theTCM;
+  return theTCM::instance().unregister_threads(permit_handle);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
