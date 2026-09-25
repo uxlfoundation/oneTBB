@@ -2076,12 +2076,6 @@ void test_return_task_with_dependencies(submit_function submit_function_tag) {
     CHECK_MESSAGE(successor_placeholder == 1, "Successor task was not completed");
 }
 
-//! \brief \ref interface \ref requirement
-TEST_CASE("test task_group dynamic dependencies feature test macro") {
-    CHECK_MESSAGE(TBB_HAS_TASK_GROUP_DEPENDENCIES == 202603,
-                  "Incorrect feature test macro for dependencies");
-}
-
 //! \brief \ref interface \ref requirement \ref error_guessing
 TEST_CASE("test task_group dynamic dependencies") {
     for (unsigned p = MinThread; p <= MaxThread; ++p) {
@@ -2633,9 +2627,6 @@ void test_get_status_of() {
 
 //! \brief \ref error_guessing
 TEST_CASE("test single task wait") {
-    CHECK_MESSAGE(TBB_HAS_TASK_GROUP_WAIT_FOR_SINGLE_TASK == 202603,
-                  "Incorrect feature test macro for waiting a single task");
-
     test_single_task_wait(/*cancel = */false);
     test_single_task_wait(/*cancel = */true);
 }
@@ -2645,6 +2636,17 @@ TEST_CASE("test task_group::get_status_of") {
     test_get_status_of();
 }
 #endif // __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+
+//! \brief \ref interface \ref requirement
+TEST_CASE("task_group feature-test macros") {
+    CHECK_MESSAGE(TBB_HAS_TASK_GROUP == 202610, "Incorrect feature-test macro for task_group");
+    CHECK_MESSAGE(TBB_HAS_TASK_GROUP_BYPASS == 202610, "Incorrect feature-test macro for task_group bypass");
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+    CHECK_MESSAGE(TBB_HAS_TASK_GROUP_DEPENDENCIES == 202603, "Incorrect feature test macro for dependencies");
+    CHECK_MESSAGE(TBB_HAS_TASK_GROUP_WAIT_FOR_SINGLE_TASK == 202603,
+                  "Incorrect feature test macro for waiting a single task");
+#endif
+}
 
 #if _MSC_VER
 #pragma warning (pop)
