@@ -109,9 +109,17 @@ public:
 
     //! Allocate space for n objects.
     pointer allocate( size_type n, const void* /*hint*/ = nullptr) {
-        pointer p = static_cast<pointer>( my_pool->malloc( n*sizeof(value_type) ) );
-        if (!p)
-            throw_exception(std::bad_alloc());
+        pointer p = nullptr;
+
+        // Check overflow before multiplying
+        if (n > max_size()) {
+            throw_exception(std::bad_array_new_length());
+        } else {
+            p = static_cast<pointer>( my_pool->malloc( n*sizeof(value_type) ) );
+
+            if (!p)
+                throw_exception(std::bad_alloc());
+        }
         return p;
     }
     //! Free previously allocated block of memory.

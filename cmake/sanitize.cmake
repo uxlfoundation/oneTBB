@@ -24,7 +24,9 @@ endif()
 set(TBB_SANITIZE_OPTION -fsanitize=${TBB_SANITIZE})
 
 if (TBB_SANITIZE MATCHES "thread")
-    set(TBB_SANITIZE_OPTION "${TBB_SANITIZE_OPTION} -Wno-tsan")
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        set(TBB_SANITIZE_OPTION "${TBB_SANITIZE_OPTION} -Wno-tsan")
+    endif()
 endif()
 
 if (TBB_SANITIZE MATCHES "address")

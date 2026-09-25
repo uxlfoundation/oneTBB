@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -19,6 +20,7 @@
 
 #include "oneapi/tbb/detail/_utils.h"
 #include "detail/_namespace_injection.h"
+#include "detail/_exception.h"
 #include <cstdlib>
 #include <utility>
 
@@ -57,7 +59,15 @@ public:
 
     //! Allocate space for n objects.
     __TBB_nodiscard T* allocate(std::size_t n) {
-        return static_cast<T*>(r1::allocate_memory(n * sizeof(value_type)));
+        T* p = nullptr;
+
+        // Check overflow before multiplying
+        if (n > ~std::size_t(0) / sizeof(value_type)) {
+            throw_exception(exception_id::bad_array_new_length);
+        } else {
+            p = static_cast<T*>(r1::allocate_memory(n * sizeof(value_type)));
+        }
+        return p;
     }
 
     //! Free previously allocated block of memory.

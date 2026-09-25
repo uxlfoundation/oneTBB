@@ -193,7 +193,7 @@ void* __TBB_EXPORTED_FUNC cache_aligned_allocate(std::size_t size) {
 
     // Check for overflow
     if (size + cache_line_size < size) {
-        throw_exception(exception_id::bad_alloc);
+        throw_exception(exception_id::bad_array_new_length);
     }
     // scalable_aligned_malloc considers zero size request an error, and returns nullptr
     if (size == 0) size = 1;

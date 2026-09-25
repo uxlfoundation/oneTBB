@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -89,6 +90,7 @@ void throw_exception ( exception_id eid ) {
     case exception_id::invalid_key: DO_THROW(std::out_of_range, ("invalid key")); break;
     case exception_id::bad_tagged_msg_cast: DO_THROW(std::runtime_error, ("Illegal tagged_msg cast")); break;
     case exception_id::unsafe_wait: DO_THROW(unsafe_wait, ("Unsafe to wait further")); break;
+    case exception_id::bad_array_new_length: DO_THROW(std::bad_array_new_length, ()); break;
     default: __TBB_ASSERT ( false, "Unknown exception ID" );
     }
     __TBB_ASSERT(false, "Unreachable code");

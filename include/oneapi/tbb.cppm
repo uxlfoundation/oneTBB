@@ -98,10 +98,15 @@ export namespace tbb {
 
     // Memory Allocation
     using tbb::v1::cache_aligned_allocator;
-    using tbb::v1::cache_aligned_resource;
     using tbb::v1::scalable_allocator;
-    using tbb::v1::scalable_memory_resource;
     using tbb::v1::tbb_allocator;
+
+    // libc++ added partial module support before implementing polymorphic memory
+    // resources, so the presence of this C++17 feature must be checked explicitly.
+#if __TBB_CPP17_MEMORY_RESOURCE_PRESENT
+    using tbb::v1::cache_aligned_resource;
+    using tbb::v1::scalable_memory_resource;
+#endif
 #if __TBB_PREVIEW_MEMORY_POOL
     using tbb::v1::memory_pool_allocator;
     using tbb::v1::memory_pool;

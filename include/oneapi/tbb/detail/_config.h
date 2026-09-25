@@ -263,8 +263,8 @@
 // GCC4.8 on RHEL7 does not support std::is_trivially_copyable
 #define __TBB_CPP11_TYPE_PROPERTIES_PRESENT             (_LIBCPP_VERSION || _MSC_VER >= 1700 || (__TBB_GLIBCXX_VERSION >= 50000 && __GXX_EXPERIMENTAL_CXX0X__))
 
-#define __TBB_CPP17_MEMORY_RESOURCE_PRESENT             (_MSC_VER >= 1913 && (__TBB_LANG > 201402L) || \
-                                                        __TBB_GLIBCXX_VERSION >= 90000 && __TBB_LANG >= 201703L)
+#define __TBB_CPP17_MEMORY_RESOURCE_PRESENT             ((_MSC_VER >= 1913 && __TBB_LANG > 201402L) || \
+                                                         (__TBB_LANG >= 201703L && (__TBB_GLIBCXX_VERSION >= 90000 || _LIBCPP_VERSION >= 160000)))
 #define __TBB_CPP17_HW_INTERFERENCE_SIZE_PRESENT        (_MSC_VER >= 1911)
 #define __TBB_CPP17_LOGICAL_OPERATIONS_PRESENT          (__TBB_LANG >= 201703L)
 #define __TBB_CPP17_ALLOCATOR_IS_ALWAYS_EQUAL_PRESENT   (__TBB_LANG >= 201703L)
@@ -490,7 +490,7 @@
 **/
 
 // Some STL containers not support allocator traits in old GCC versions
-#if __GXX_EXPERIMENTAL_CXX0X__ && __TBB_GLIBCXX_VERSION <= 50301
+#if __GXX_EXPERIMENTAL_CXX0X__ && __TBB_GLIBCXX_VERSION && __TBB_GLIBCXX_VERSION <= 50301
     #define TBB_ALLOCATOR_TRAITS_BROKEN 1
 #endif
 
