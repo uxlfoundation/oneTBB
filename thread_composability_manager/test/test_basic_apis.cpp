@@ -1224,7 +1224,7 @@ void wait_for(Predicate&& condition, std::mutex& mutex, std::condition_variable&
 }
 
 TEST("Bulk unregister drops registration of a separate thread") {
-    tcm_client_id_t client_id = connect_new_client(nullptr);
+    tcm_client_id_t client_id = connect_new_client(/*callback*/nullptr);
 
     int min_sw_threads, max_sw_threads;
     min_sw_threads = max_sw_threads = platform_tcm_concurrency();
@@ -1274,6 +1274,60 @@ TEST("Bulk unregister drops registration of a separate thread") {
 
     disconnect_client(client_id);
 }
+
+TEST("Bulk unregister drops only the last registration") {
+    std::mutex mutex;
+    std::condition_variable cv;
+
+    std::atomic<tcm_permit_handle_t> ph{nullptr};
+    tcm_client_id_t client = connect_new_client(/*callback*/nullptr);
+    int32_t min_sw_threads = platform_tcm_concurrency() - 1;
+    int32_t max_sw_threads = min_sw_threads;
+
+    std::thread t([&] {
+        wait_for([&] { return ph.load(); }, mutex, cv);
+        register_thread(ph);
+        check(can_find_at_most(/*num_resources*/2), "Check own + 1 free resource is available");
+
+        tcm_client_id_t client_2 = connect_new_client(/*callback*/nullptr);
+        int32_t my_min = 2; int32_t my_max = my_min;
+        tcm_permit_handle_t ph_2 = request_permit(client, make_request(my_min, my_max));
+        register_thread(ph_2);
+        check(can_find_at_most(/*num_resources*/1), "Only own resource is available for re-use");
+        ph.store(ph_2);        // Allow the main thread to unregister me from my 2nd permit handle
+        cv.notify_all();
+
+        wait_for([&] { return nullptr == ph.load(); }, mutex, cv);
+        check(can_find_at_most(/*num_resources*/1),
+              "After the first thread unregister still only one resource is available");
+        ph.store(ph_2);        // Allow the main thread to unregister me from the only left permit
+        cv.notify_all();
+
+        wait_for([&] { return nullptr == ph.load(); }, mutex, cv);
+        assert_fully_subscribed("checking full thread deregistration makes resources unavailable");
+        disconnect_client(client_2);
+    });
+
+    tcm_permit_handle_t local_ph =
+        request_permit(client, make_request(min_sw_threads, max_sw_threads));
+
+    ph.store(local_ph);         // Allow other thread to register with local permit handle
+    cv.notify_all();
+
+    wait_for([&] { return ph != local_ph; }, mutex, cv);
+    bulk_thread_unregister(ph);
+    ph.store(nullptr);          // Allow other thread to check it still can get only own resource
+    cv.notify_all();
+
+    wait_for([&] { return ph.load(); }, mutex, cv);
+    bulk_thread_unregister(local_ph);
+    ph.store(nullptr);          // Allow other thread to check it cannot get even single resource
+    cv.notify_all();
+    t.join();
+
+    disconnect_client(client);
+}
+
 TEST("Bulk unregister works from the thread that did not request") {
     std::atomic<tcm_permit_handle_t> ph{nullptr};
     std::mutex mutex;
