@@ -11,8 +11,6 @@
 #include "tcm.h"
 
 #include <cstdint>
-#include <mutex>
-#include <condition_variable>
 
 TEST("Each of two sequentially composed clients gets all platform resources") {
   tcm_client_id_t clidA = connect_new_client(client_renegotiate);
@@ -1215,14 +1213,6 @@ TEST("Release of client permits when it disconnects") {
 
 namespace bulk_threads_unregister {
 
-// TODO: Use OOP for the waiting function to reduce passing additional stuff: mutex, condition
-// variables
-template<typename Predicate>
-void wait_for(Predicate&& condition, std::mutex& mutex, std::condition_variable& cv) {
-    std::unique_lock lock(mutex);
-    cv.wait(lock, std::forward<Predicate>(condition));
-}
-
 TEST("Bulk unregister drops registration of a separate thread") {
     tcm_client_id_t client_id = connect_new_client(/*callback*/nullptr);
 
@@ -1244,29 +1234,28 @@ TEST("Bulk unregister drops registration of a separate thread") {
     check_permit(expected_permit, nested_ph);
     release_permit(nested_ph);
 
-    std::mutex handle_mutex;
-    std::condition_variable cv;
+    Waiter w;
     std::atomic<bool> registered = false;
-    cv.notify_all();
+    w.notify_all();
     std::thread t([&]() {
-        wait_for([&ph] { return ph.load(); }, handle_mutex, cv);
+        w.wait_for([&ph] { return ph.load(); });
         assert_fully_subscribed();
 
         register_thread(ph);
         check(can_find_at_most(/*num_resources*/1),
               "Nested request finds own resource in a separate thread");
         registered = true;
-        cv.notify_all();
+        w.notify_all();
 
-        wait_for([&registered] { return !registered; }, handle_mutex, cv);
+        w.wait_for([&registered] { return !registered; });
         assert_fully_subscribed("checking invariant separate thread was unregistered by the main");
     });
 
-    wait_for([&registered] { return registered.load(); }, handle_mutex, cv);
+    w.wait_for([&registered] { return registered.load(); });
 
     bulk_thread_unregister(ph);
     registered = false;
-    cv.notify_all();
+    w.notify_all();
 
     t.join();
 
@@ -1276,16 +1265,14 @@ TEST("Bulk unregister drops registration of a separate thread") {
 }
 
 TEST("Bulk unregister drops only the last registration") {
-    std::mutex mutex;
-    std::condition_variable cv;
-
     std::atomic<tcm_permit_handle_t> ph{nullptr};
     tcm_client_id_t client = connect_new_client(/*callback*/nullptr);
     int32_t min_sw_threads = platform_tcm_concurrency() - 1;
     int32_t max_sw_threads = min_sw_threads;
 
+    Waiter w;
     std::thread t([&] {
-        wait_for([&] { return ph.load(); }, mutex, cv);
+        w.wait_for([&] { return ph.load(); });
         register_thread(ph);
         check(can_find_at_most(/*num_resources*/2), "Check own + 1 free resource is available");
 
@@ -1295,15 +1282,15 @@ TEST("Bulk unregister drops only the last registration") {
         register_thread(ph_2);
         check(can_find_at_most(/*num_resources*/1), "Only own resource is available for re-use");
         ph.store(ph_2);        // Allow the main thread to unregister me from my 2nd permit handle
-        cv.notify_all();
+        w.notify_all();
 
-        wait_for([&] { return nullptr == ph.load(); }, mutex, cv);
+        w.wait_for([&] { return nullptr == ph.load(); });
         check(can_find_at_most(/*num_resources*/1),
               "After the first thread unregister still only one resource is available");
         ph.store(ph_2);        // Allow the main thread to unregister me from the only left permit
-        cv.notify_all();
+        w.notify_all();
 
-        wait_for([&] { return nullptr == ph.load(); }, mutex, cv);
+        w.wait_for([&] { return nullptr == ph.load(); });
         assert_fully_subscribed("checking full thread deregistration makes resources unavailable");
         disconnect_client(client_2);
     });
@@ -1312,17 +1299,17 @@ TEST("Bulk unregister drops only the last registration") {
         request_permit(client, make_request(min_sw_threads, max_sw_threads));
 
     ph.store(local_ph);         // Allow other thread to register with local permit handle
-    cv.notify_all();
+    w.notify_all();
 
-    wait_for([&] { return ph != local_ph; }, mutex, cv);
+    w.wait_for([&] { return ph != local_ph; });
     bulk_thread_unregister(ph);
     ph.store(nullptr);          // Allow other thread to check it still can get only own resource
-    cv.notify_all();
+    w.notify_all();
 
-    wait_for([&] { return ph.load(); }, mutex, cv);
+    w.wait_for([&] { return ph.load(); });
     bulk_thread_unregister(local_ph);
     ph.store(nullptr);          // Allow other thread to check it cannot get even single resource
-    cv.notify_all();
+    w.notify_all();
     t.join();
 
     disconnect_client(client);
@@ -1330,8 +1317,7 @@ TEST("Bulk unregister drops only the last registration") {
 
 TEST("Bulk unregister works from the thread that did not request") {
     std::atomic<tcm_permit_handle_t> ph{nullptr};
-    std::mutex mutex;
-    std::condition_variable cv;
+    Waiter w;
     std::thread t([&] {
         tcm_client_id_t client = connect_new_client(/*callback*/nullptr);
         int32_t min_sw_threads = platform_tcm_concurrency();
@@ -1341,16 +1327,16 @@ TEST("Bulk unregister works from the thread that did not request") {
         register_thread(local_ph);
         check(can_find_at_most(/*num_resources*/1), "Own resource is used");
         ph.store(local_ph);
-        cv.notify_all();
-        wait_for([&] { return !ph.load(); }, mutex, cv);
+        w.notify_all();
+        w.wait_for([&] { return !ph.load(); });
         assert_fully_subscribed("checking invariant separate thread was unregistered by the main");
         disconnect_client(client);
     });
 
-    wait_for([&] { return ph.load(); }, mutex, cv);
+    w.wait_for([&] { return ph.load(); });
     bulk_thread_unregister(ph);
     ph.store(nullptr);
-    cv.notify_all();
+    w.notify_all();
     t.join();
 }
 
