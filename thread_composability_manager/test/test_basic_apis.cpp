@@ -1274,6 +1274,30 @@ TEST("Bulk unregister drops registration of a separate thread") {
 
     disconnect_client(client_id);
 }
+TEST("Bulk unregister works from the thread that did not request") {
+    std::atomic<tcm_permit_handle_t> ph{nullptr};
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::thread t([&] {
+        tcm_client_id_t client = connect_new_client(/*callback*/nullptr);
+        int32_t min_sw_threads = platform_tcm_concurrency();
+        int32_t max_sw_threads = min_sw_threads;
+        tcm_permit_handle_t local_ph =
+            request_permit(client, make_request(min_sw_threads, max_sw_threads));
+        register_thread(local_ph);
+        check(can_find_at_most(/*num_resources*/1), "Own resource is used");
+        ph.store(local_ph);
+        cv.notify_all();
+        wait_for([&] { return !ph.load(); }, mutex, cv);
+        assert_fully_subscribed("checking invariant separate thread was unregistered by the main");
+        disconnect_client(client);
+    });
+
+    wait_for([&] { return ph.load(); }, mutex, cv);
+    bulk_thread_unregister(ph);
+    ph.store(nullptr);
+    cv.notify_all();
+    t.join();
 }
 
 } // namespace bulk_threads_unregister
