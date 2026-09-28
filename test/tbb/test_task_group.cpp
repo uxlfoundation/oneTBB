@@ -1201,8 +1201,7 @@ void submit_and_wait(submit_function func, const Function& function, tbb::task_g
     }
 }
 
-template <typename SubmitFunction>
-void test_task_scheduler_bypass(SubmitFunction submit_function_tag) {
+void test_task_scheduler_bypass(submit_function submit_function_tag) {
     tbb::task_arena arena;
     tbb::task_group tg;
 
