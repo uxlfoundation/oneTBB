@@ -10,6 +10,7 @@
 
 #include "tcm.h"
 
+#include <atomic>
 #include <cstdint>
 
 TEST("Each of two sequentially composed clients gets all platform resources") {
@@ -1196,7 +1197,6 @@ TEST("Release of client permits when it disconnects") {
   disconnect_client(client_id);
 
   assert_all_resources_available();
-
   // Test disconnecting while holding IDLE permit
   client_id = connect_new_client();
   int32_t min_sw_threads = platform_tcm_concurrency(), max_sw_threads = min_sw_threads;
@@ -1211,3 +1211,177 @@ TEST("Release of client permits when it disconnects") {
 
   assert_all_resources_available();
 }
+
+namespace TestUnregisterThreads {
+
+TEST("Bulk unregister drops registration of a separate thread") {
+    tcm_client_id_t client_id = connect_new_client(/*callback*/nullptr);
+
+    int min_sw_threads, max_sw_threads;
+    min_sw_threads = max_sw_threads = platform_tcm_concurrency();
+    const tcm_permit_request_t request = make_request(min_sw_threads, max_sw_threads);
+    std::atomic<tcm_permit_handle_t> ph{nullptr};
+    ph.store(request_permit(client_id, request));
+    uint32_t expected_concurrency = max_sw_threads;
+    tcm_permit_t expected_permit = make_active_permit(&expected_concurrency);
+    check_permit(expected_permit, ph);
+
+    assert_fully_subscribed();
+
+    register_thread(ph);
+    const tcm_permit_request_t nested_request = make_request(/*min_sw_threads*/1, max_sw_threads);
+    tcm_permit_handle_t nested_ph = request_permit(client_id, nested_request);
+    expected_concurrency = 1;
+    check_permit(expected_permit, nested_ph);
+    release_permit(nested_ph);
+
+    Waiter w;
+    std::atomic<bool> registered{};
+    std::thread t([&]() {
+        assert_fully_subscribed();
+
+        register_thread(ph);
+        check(can_find_at_most(/*num_resources*/1),
+              "Nested request finds own resource in a separate thread");
+        w.notify_all_about([&registered] { registered = true; });
+        w.wait_for([&registered] { return !registered; });
+        assert_fully_subscribed("checking invariant separate thread was unregistered by the main");
+    });
+
+    w.wait_for([&registered] { return registered.load(); });
+
+    unregister_threads(ph);
+    w.notify_all_about([&registered] { registered = false; });
+    t.join();
+
+    assert_fully_subscribed();  // The main thread gets unregistered as well
+
+    disconnect_client(client_id);
+}
+
+TEST("Bulk unregister drops only the last registration") {
+    if (platform_tcm_concurrency() < 2)
+        return;   // Skipping test as it requires at least two CPU resources
+
+    tcm_client_id_t client = connect_new_client(/*callback*/nullptr);
+    int32_t min_sw_threads = platform_tcm_concurrency() - 1;
+    int32_t max_sw_threads = min_sw_threads;
+
+    std::atomic<tcm_permit_handle_t> ph =
+        request_permit(client, make_request(min_sw_threads, max_sw_threads));
+    tcm_permit_handle_t top_ph = ph;
+
+    enum test_epoch_t { start, worker_registers_nested, main_unregisters_nested };
+    test_epoch_t test_epoch{start};
+    Waiter w;
+    std::thread t([&] {
+        register_thread(ph);
+        check(can_find_at_most(/*num_resources*/2), "Check own + 1 free resource is available");
+
+        tcm_client_id_t client_2 = connect_new_client(/*callback*/nullptr);
+        uint32_t my_min = 2; int32_t my_max = my_min;
+        tcm_permit_handle_t ph_2 = request_permit(client_2, make_request(int(my_min), my_max));
+        check_permit(make_active_permit(&my_min), ph_2);
+        register_thread(ph_2);
+        check(can_find_at_most(/*num_resources*/1), "Only own resource is available for re-use");
+
+        // Allow the main thread to unregister me from my 2nd permit handle
+        ph.store(ph_2);
+        w.notify_all_about([&test_epoch] { test_epoch = worker_registers_nested; });
+
+        w.wait_for([&] { return test_epoch == main_unregisters_nested; });
+        check(can_find_at_most(/*num_resources*/1),
+              "After the main thread drops 2nd registration still only one resource is available");
+        unregister_thread(); // Unregister from the outer permit
+        assert_fully_subscribed("checking full thread deregistration makes resources unavailable");
+        disconnect_client(client_2);
+    });
+
+    w.wait_for([&] { return test_epoch == worker_registers_nested; });
+
+    unregister_threads(ph);
+    w.notify_all_about([&] { test_epoch = main_unregisters_nested; });
+
+    t.join();
+    unregister_threads(top_ph);      // Unregisters only the main thread
+    release_permit(top_ph);
+    disconnect_client(client);
+}
+
+TEST("Bulk unregister works from the thread that did not request") {
+    std::atomic<tcm_permit_handle_t> ph{nullptr};
+    Waiter w;
+    std::thread t([&] {
+        tcm_client_id_t client = connect_new_client(/*callback*/nullptr);
+        int32_t min_sw_threads = platform_tcm_concurrency();
+        int32_t max_sw_threads = min_sw_threads;
+        tcm_permit_handle_t local_ph =
+            request_permit(client, make_request(min_sw_threads, max_sw_threads));
+        register_thread(local_ph);
+        check(can_find_at_most(/*num_resources*/1), "Own resource is used");
+        w.notify_all_about([&ph, local_ph] { ph.store(local_ph); });
+        w.wait_for([&] { return !ph.load(); });
+        assert_fully_subscribed("checking invariant separate thread was unregistered by the main");
+        disconnect_client(client);
+    });
+
+    w.wait_for([&] { return ph.load(); });
+    unregister_threads(ph);     // Unregister permit handle that this thread knows nothing about
+    w.notify_all_about([&ph] { ph.store(nullptr); });
+    t.join();
+}
+
+TEST("Bulk unregister affects only registered threads") {
+    if (platform_tcm_concurrency() < 2)
+        return;   // Skipping test as it requires at least two CPU resources
+
+    tcm_client_id_t client = connect_new_client(/*callback*/nullptr);
+    int32_t max_sw_threads = platform_tcm_concurrency();
+    int32_t min_sw_threads = max_sw_threads - 1;
+    std::atomic<tcm_permit_handle_t> ph =
+        request_permit(client, make_request(min_sw_threads, max_sw_threads));
+
+    enum test_epoch_t {start, related_thread_registers, unrelated_thread_ready,
+                       main_thread_unregisters, unrelated_thread_done};
+    std::atomic<test_epoch_t> test_epoch = start;
+    Waiter w;
+    std::thread related_thread([&ph, &w, &test_epoch] {
+        register_thread(ph);
+        check(can_find_at_most(/*num_resources=*/2),
+              "Nested call can find at most own + 1 negotiated resource");
+        w.notify_all_about([&test_epoch] { test_epoch.store(related_thread_registers); });
+        w.wait_for([&] { return test_epoch == unrelated_thread_done; });
+        check(can_find_at_most(/*num_resources = no own resource + 1 negotiated*/1),
+              "After bulk unregister nested request can find at most 1 resource");
+    });
+
+    w.wait_for([&] { return test_epoch == related_thread_registers; });
+
+    std::thread unrelated_thread([&w, &test_epoch] {
+        tcm_client_id_t unrelated_client = connect_new_client(/*callback*/nullptr);
+        uint32_t unrelated_min = 1;
+        int32_t unrelated_max = platform_tcm_concurrency();
+        tcm_permit_handle_t local_ph =
+            request_permit(unrelated_client, make_request(int(unrelated_min), unrelated_max));
+        check_permit(make_active_permit(&unrelated_min), local_ph);
+        register_thread(local_ph);
+        check(can_find_at_most(/*num_resource*/1), "Nested call can find only own resource");
+        w.notify_all_about([&test_epoch] { test_epoch.store(unrelated_thread_ready); });
+        w.wait_for([&] { return test_epoch == main_thread_unregisters; });
+        check(can_find_at_most(/*num_resource*/1), "Bulk deregistration does not affect unrelated "
+                                                   "thread as it can still find owned resource");
+        release_permit(local_ph);
+        w.notify_all_about([&test_epoch] { test_epoch.store(unrelated_thread_done); });
+        disconnect_client(unrelated_client);
+    });
+
+    w.wait_for([&] { return test_epoch == unrelated_thread_ready; });
+    unregister_threads(ph);
+    w.notify_all_about([&test_epoch] { test_epoch.store(main_thread_unregisters); });
+
+    related_thread.join();
+    unrelated_thread.join();
+    disconnect_client(client);
+}
+
+} // namespace TestUnregisterThreads
