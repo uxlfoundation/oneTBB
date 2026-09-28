@@ -397,8 +397,8 @@ void global_control_terminate_on_exception(TestCase test_case) {
     try {
 #endif
         static std::jmp_buf buffer;
-        std::terminate_handler prev_terminate_handler;
-        tbb::ext::assertion_handler_type prev_assertion_handler;
+        std::terminate_handler prev_terminate_handler = nullptr;
+        tbb::ext::assertion_handler_type prev_assertion_handler = nullptr;
 
         if (test_case == TestCase::SET_TERMINATE) {
             prev_terminate_handler = std::set_terminate([] {
