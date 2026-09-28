@@ -1270,6 +1270,7 @@ TEST("Bulk unregister drops only the last registration") {
     std::atomic<tcm_permit_handle_t> ph =
         request_permit(client, make_request(min_sw_threads, max_sw_threads));
     tcm_permit_handle_t top_ph = ph;
+    register_thread(top_ph);
 
     enum test_epoch_t { start, worker_registers_nested, main_unregisters_nested };
     test_epoch_t test_epoch{start};

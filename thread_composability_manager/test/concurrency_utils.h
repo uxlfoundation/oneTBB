@@ -16,6 +16,7 @@
 #include <cstring>
 #include <memory>
 #include <mutex>
+#include <utility>
 
 // Helper class that allows waiting for a specific condition until someone notifies about it using
 // the same class instance
