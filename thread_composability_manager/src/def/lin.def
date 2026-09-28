@@ -21,6 +21,7 @@
     /* Thread registration */
     tcmRegisterThread;
     tcmUnregisterThread;
+    tcmUnregisterThreads;
 
     /* Version information */
     tcmGetVersion;
