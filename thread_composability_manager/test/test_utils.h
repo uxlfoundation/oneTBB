@@ -577,11 +577,9 @@ inline void unregister_thread(const std::string& error_message = "",
   }
 }
 
-inline void bulk_thread_unregister(tcm_permit_handle_t permit_handle,
-                                   std::string&& error_message = "",
-                                   std::string&& log_message = "")
+inline void unregister_threads(tcm_permit_handle_t permit_handle, std::string&& error_message = "",
+                               std::string&& log_message = "")
 {
-    // std::string msg = log_message;
     if (log_message.empty())
         log_message = "tcmUnregisterThreads(" + to_string(permit_handle) + ")";
     tcm_result_t r = tcmUnregisterThreads(permit_handle);
