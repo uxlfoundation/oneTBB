@@ -100,6 +100,7 @@ static assertion_handler_type get() noexcept {
 
 } // namespace assertion_handler
 
+#if __TBB_BUILD
 void terminate_on_user_exception() {
     assertion_handler_type curr_handler = assertion_handler::get();
 
@@ -120,6 +121,7 @@ void terminate_on_user_exception() {
     }
     __TBB_ASSERT_RELEASE(false, buf);
 }
+#endif // __TBB_BUILD
 
 void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line,
                                            const char* expression, const char* comment) {
