@@ -1265,6 +1265,9 @@ TEST("Bulk unregister drops registration of a separate thread") {
 }
 
 TEST("Bulk unregister drops only the last registration") {
+    if (platform_tcm_concurrency() < 2)
+        return;   // Skipping test as it requires at least two CPU resources
+
     std::atomic<tcm_permit_handle_t> ph{nullptr};
     tcm_client_id_t client = connect_new_client(/*callback*/nullptr);
     int32_t min_sw_threads = platform_tcm_concurrency() - 1;
@@ -1277,8 +1280,9 @@ TEST("Bulk unregister drops only the last registration") {
         check(can_find_at_most(/*num_resources*/2), "Check own + 1 free resource is available");
 
         tcm_client_id_t client_2 = connect_new_client(/*callback*/nullptr);
-        int32_t my_min = 2; int32_t my_max = my_min;
-        tcm_permit_handle_t ph_2 = request_permit(client, make_request(my_min, my_max));
+        uint32_t my_min = 2; int32_t my_max = my_min;
+        tcm_permit_handle_t ph_2 = request_permit(client, make_request(int(my_min), my_max));
+        check_permit(make_active_permit(&my_min), ph_2);
         register_thread(ph_2);
         check(can_find_at_most(/*num_resources*/1), "Only own resource is available for re-use");
         ph.store(ph_2);        // Allow the main thread to unregister me from my 2nd permit handle
