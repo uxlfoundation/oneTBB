@@ -39,11 +39,11 @@ A leave policy defines the behavior of a worker thread at the moment it finds no
 There are two policies, represented by the ``task_arena::leave_policy`` enumeration:
 
 ``automatic``
-    The default policy. The worker thread might stay in the arena for an unspecified duration,
+    The default policy. It is system-specific and may be equivalent to the ``fast`` policy on some platforms.
+    The worker thread might stay in the arena for an unspecified duration,
     anticipating that new work arrives soon. While staying, it may spin or yield, so it consumes CPU
     resources. If work arrives in time, the thread starts executing it with a minimal delay. Otherwise,
-    it leaves the arena. The exact retention heuristic is system-specific and may differ between
-    platforms.
+    it leaves the arena.
 
 ``fast``
     The worker thread leaves the arena as soon as it finds no more work. This releases CPU resources
