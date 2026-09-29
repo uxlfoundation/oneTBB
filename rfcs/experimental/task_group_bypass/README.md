@@ -46,12 +46,6 @@ while a body returning `task_handle` transfers the task from the handle and retu
 candidate. A returned task is bypassed only when it is ready to execute, without unresolved dependencies. Because this
 behavior is implemented in non-virtual internal functions, promoting it to `supported` does not require an ABI change.
 
-Multiple preview features are currently guarded by `TBB_PREVIEW_TASK_GROUP_EXTENSIONS`, including scheduler bypass,
-dynamic task dependencies, and waiting for a single task. After the promotion, only the code specific to recognizing
-and returning a ready `task_handle` for scheduler bypass should become unguarded. The dependency-related checks and
-handling must remain under `TBB_PREVIEW_TASK_GROUP_EXTENSIONS`. In particular, a returned task with unresolved
-dependencies must not be bypassed until its dependencies are satisfied.
-
 The only behavioral change that is possible is if the user returned `task_handle` already in the existing code. With the
 current implementation, this `task_handle` is discarded and the task is never executed. With the change, the returned task
 will be bypassed and will execute. However, returning a `task_handle` in the existing code is considered valueless, since
