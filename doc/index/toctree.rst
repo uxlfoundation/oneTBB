@@ -5,7 +5,6 @@
    :hidden:
    :maxdepth: 1
 
-   /main/intro/legal_notices_and_disclaimers
    /main/intro/help_support
    /main/intro/notation
    /main/intro/intro_os
@@ -14,6 +13,7 @@
    /main/intro/limitations.rst
    /main/intro/static_linking
    /main/intro/api_abi_changes
+   /main/intro/legal_notices_and_disclaimers
 
 
 .. toctree::
