@@ -422,7 +422,6 @@ TEST_CASE("terminate_on_exception: enabled") {
 #pragma warning(pop)
 #endif
         std::set_terminate(prev);
-        terminate_handler_called = true;
 #if TBB_USE_EXCEPTIONS
     } catch (...) {
         FAIL("The exception is not expected");
