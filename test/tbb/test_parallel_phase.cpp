@@ -36,7 +36,7 @@
 // For thread_leave_manager
 #if !__TBB_SOURCE_DIRECTLY_INCLUDED
 #include "../src/tbb/misc.cpp"
-#endif // !__TBB_SOURCE_DIRECTLY_INCLUDED
+#endif
 #include "../src/tbb/arena.h"
 
 #if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
