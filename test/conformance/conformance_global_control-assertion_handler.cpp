@@ -13,6 +13,10 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 */
+
+//! \file conformance_global_control-assertion_handler.cpp
+//! \brief Test for [sched.global_control] specification
+
 #include "common/test.h"
 
 // The test cannot work correctly with statically linked runtime.

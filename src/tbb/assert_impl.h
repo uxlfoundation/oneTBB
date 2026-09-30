@@ -89,20 +89,22 @@ static std::atomic<assertion_handler_type> handler{nullptr};
 
 #if (__TBB_BUILD || __TBBBIND_BUILD) // only TBB and TBBBind use custom handler
 static assertion_handler_type set(assertion_handler_type new_handler) noexcept {
-    return handler.exchange(new_handler ? new_handler : nullptr,
-                            std::memory_order_acq_rel);
+    assertion_handler_type old_handler =  handler.exchange(new_handler ? new_handler : nullptr,
+                                                           std::memory_order_acq_rel);
+    return old_handler ? old_handler : assertion_failure_default;
 }
 #endif
 
 static assertion_handler_type get() noexcept {
-    return handler.load(std::memory_order_acquire);
+    assertion_handler_type curr_handler = handler.load(std::memory_order_acquire);
+    return curr_handler ? curr_handler : assertion_failure_default;
 }
 
 } // namespace assertion_handler
 
 #if __TBB_BUILD
 void terminate_on_user_exception() {
-    assertion_handler_type curr_handler = assertion_handler::get();
+    assertion_handler_type curr_handler = assertion_handler::handler.load(std::memory_order_acquire);
 
     // default "exception in noexcept function" handler can report exception name
     // for any exception, so use it if one is not redefined
@@ -125,9 +127,7 @@ void terminate_on_user_exception() {
 
 void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line,
                                            const char* expression, const char* comment) {
-    assertion_handler_type curr_handler = assertion_handler::get();
-
-    (curr_handler ? curr_handler : assertion_failure_default) (location, line, expression, comment);
+    assertion_handler::get()(location, line, expression, comment);
 }
 
 //! Report a runtime warning.
