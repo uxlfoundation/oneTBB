@@ -43,8 +43,9 @@ From the implementation standpoint, the current production implementation invoke
 `task_ptr_or_nullptr` function and always returns `nullptr`, discarding any value returned by the body. The preview
 implementation extends this function with return-type dispatch: a body returning `void` continues to return `nullptr`,
 while a body returning `task_handle` transfers the task from the handle and returns it to the scheduler as a bypass
-candidate. A returned task is bypassed only when it is ready to execute, without unresolved dependencies. Because this
-behavior is implemented in non-virtual internal functions, promoting it to `supported` does not require an ABI change.
+candidate. A returned task is bypassed only when it is ready to execute, without unresolved dependencies. 
+The implementation of the feature does not change the layout of any internal or external objects. Therefore, promoting
+it to `supported` is not an ABI break.
 
 The only behavioral change that is possible is if the user returned `task_handle` already in the existing code. With the
 current implementation, this `task_handle` is discarded and the task is never executed. With the change, the returned task
@@ -68,8 +69,7 @@ The type `F` satisfies `TaskGroupTaskBody` (alternative name `TaskBody`) if:
    * a. If the returned `task_handle` is non-empty (and owns a task with no unresolved dependencies, in case the dependencies preview
      feature is enabled), it serves as an optimization hint for the task that could be executed next. In any case, the task is
      submitted for execution implicitly.
-   * b. The returned `task_handle` must not be submitted explicitly. Otherwise, the behavior is undefined.
-   * c. If the returned `task_handle` owns a task that belongs to a different `task_group`, the behavior is undefined.
+   * b. If the returned `task_handle` owns a task that belongs to a different `task_group`, the behavior is undefined.
 
 If the invoke operator of `F` returns a type other than `void` or `task_handle`, it is proposed to discard the returned
 value, as the currently released implementation does.
