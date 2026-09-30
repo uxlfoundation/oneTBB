@@ -102,7 +102,7 @@ static assertion_handler_type get() noexcept {
 
 } // namespace assertion_handler
 
-#if __TBB_BUILD
+#if __TBB_BUILD && TBB_USE_EXCEPTIONS
 void terminate_on_user_exception() {
     assertion_handler_type curr_handler = assertion_handler::handler.load(std::memory_order_acquire);
 
