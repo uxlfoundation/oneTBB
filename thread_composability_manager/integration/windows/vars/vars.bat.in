@@ -29,17 +29,20 @@ if /i "%1"=="intel64"      (set TCM_TARGET_ARCH=intel64)  & shift & goto ParseAr
 :SetEnv
 if "%TCM_TARGET_ARCH%" == "ia32" (
     set "TCM_DEFAULT_BIN_NAME=bin32"
+    set "TCM_DEFAULT_LIB_NAME=lib32"
 ) else (
     set "TCM_DEFAULT_BIN_NAME=bin"
+    set "TCM_DEFAULT_LIB_NAME=lib"
 )
 
 set "TCM_BIN_DIR=@BINARY_PATH_PLACEHOLDER@"
+set "TCM_LIB_DIR=@LIBRARY_PATH_PLACEHOLDER@"
 
 if exist "%TCM_BIN_DIR%" (
     set "INCLUDE=%TCMROOT%\include;%INCLUDE%"
     set "C_INCLUDE_PATH=%TCMROOT%\include;%C_INCLUDE_PATH%"
     set "CPLUS_INCLUDE_PATH=%TCMROOT%\include;%CPLUS_INCLUDE_PATH%"
-    set "LIB=@LIBRARY_PATH_PLACEHOLDER@;%LIB%"
+    set "LIB=%TCM_LIB_DIR%;%LIB%"
     set "PATH=%TCM_BIN_DIR%;%PATH%"
 ) else (
     echo:
