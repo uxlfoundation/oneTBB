@@ -30,7 +30,6 @@
 #include <chrono>
 #include <mutex>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 //! \file test_resource_limited_node.cpp
@@ -1310,24 +1309,21 @@ TEST_CASE("resource_limited_node priorities") {
         [&](int value, consumer_node_type::output_ports_type&, int resource) {
             CHECK(resource == resource_value);
             std::unique_lock<std::mutex> lock(mutex);
-            auto entry = entries.insert({value, map_entry{}}).first;
-            entry->second.low_priority_start_processing_time = std::chrono::high_resolution_clock::now();
+            entries[value].low_priority_start_processing_time = std::chrono::high_resolution_clock::now();
         }, /*priority = */node_priority_t(1));
 
     consumer_node_type medium_priority_node(g, unlimited, std::tie(provider),
         [&](int value, consumer_node_type::output_ports_type&, int resource) {
             CHECK(resource == resource_value);
             std::unique_lock<std::mutex> lock(mutex);
-            auto entry = entries.insert({value, map_entry{}}).first;
-            entry->second.medium_priority_start_processing_time = std::chrono::high_resolution_clock::now();
+            entries[value].medium_priority_start_processing_time = std::chrono::high_resolution_clock::now();
         }, /*priority = */node_priority_t(2));
 
     consumer_node_type high_priority_node(g, unlimited, std::tie(provider),
         [&](int value, consumer_node_type::output_ports_type&, int resource) {
             CHECK(resource == resource_value);
             std::unique_lock<std::mutex> lock(mutex);
-            auto entry = entries.insert({value, map_entry{}}).first;
-            entry->second.high_priority_start_processing_time = std::chrono::high_resolution_clock::now();
+            entries[value].high_priority_start_processing_time = std::chrono::high_resolution_clock::now();
         }, /*priority = */node_priority_t(3));
 
     make_edge(output_port<0>(submitter), low_priority_node);
