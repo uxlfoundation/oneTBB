@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -94,6 +95,8 @@ private:
 
     wait_context& m_wait_context;
     sum_node_type* m_parent = nullptr;
+    //! True once m_range holds a Range; a zombie that never got one must not destroy it.
+    bool m_range_constructed = false;
 public:
     small_object_allocator m_allocator;
     final_sum( Body& body, wait_context& w_o, small_object_allocator& alloc ) :
@@ -107,12 +110,15 @@ public:
     }
 
     ~final_sum() {
-        m_range.begin()->~Range();
+        if (m_range_constructed) {
+            m_range.begin()->~Range();
+        }
     }
     void finish_construction( sum_node_type* parent, const Range& range, Body* stuff_last ) {
         __TBB_ASSERT( m_parent == nullptr, nullptr );
         m_parent = parent;
         new( m_range.begin() ) Range(range);
+        m_range_constructed = true;
         m_stuff_last = stuff_last;
     }
 private:
@@ -443,7 +449,6 @@ public:
                 execute_and_wait(*root, context, w_ctx, context);
             } else {
                 temp_body.assign_to(body);
-                temp_body.finish_construction(nullptr, range, nullptr);
                 alloc.delete_object<final_sum_type>(&temp_body);
             }
         }
