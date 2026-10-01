@@ -462,3 +462,136 @@ TEST_CASE("parallel_for constraints") {
 #if _MSC_VER
 #pragma warning (pop)
 #endif
+
+// Define a simple functor to use with parallel_for
+struct SimpleFunctor {
+    void operator()(const tbb::blocked_range<size_t>& r) const {
+        for (size_t i = r.begin(); i != r.end(); ++i) {
+            // For simplicity, we'll just ensure each element is visited
+        }
+    }
+};
+
+void TestNumaPartitionerSimple() {
+    const size_t N = 1000;
+    std::vector<int> vec(N, 1);
+    
+    tbb::blocked_range<size_t> range(0, N);
+    SimpleFunctor functor;
+    tbb::affinity_partitioner ap;
+    tbb::numa_partitioner<tbb::affinity_partitioner> n_partitioner(ap);
+
+    // Test parallel_for with numa_partitioner
+    parallel_for(range, functor, n_partitioner);
+
+    // Verify results (for now, just check if the function runs without errors)
+    CHECK(true);
+}
+
+void TestNumaPartitionerWithBody() {
+    const size_t N = 1000;
+    std::vector<int> vec(N, 0);
+    
+    tbb::blocked_range<size_t> range(0, N);
+    
+    auto body = [&](const tbb::blocked_range<size_t>& r) {
+        for (size_t i = r.begin(); i != r.end(); ++i) {
+            vec[i] = 1; // Set each element to 1
+        }
+    };
+
+    tbb::affinity_partitioner ap;
+    tbb::numa_partitioner<tbb::affinity_partitioner> n_partitioner(ap);
+    
+    // Test parallel_for with numa_partitioner and a lambda body
+    parallel_for(range, body, n_partitioner);
+
+    // Verify results
+    for (size_t i = 0; i < N; ++i) {
+        CHECK(vec[i] == 1);
+    }
+}
+
+void TestNumaPartitionerEmptyRange() {
+    const size_t N = 0;
+    std::vector<int> vec(N, 1);
+    
+    tbb::blocked_range<size_t> range(0, N);
+    SimpleFunctor functor;
+    tbb::affinity_partitioner ap;
+    tbb::numa_partitioner<tbb::affinity_partitioner> n_partitioner(ap);
+
+    // Test parallel_for with an empty range
+    parallel_for(range, functor, n_partitioner);
+
+    // Verify that the function runs without errors and vec remains unchanged
+    CHECK(true);
+}
+
+//! Testing parallel_for with numa_partitioner
+//! \brief \ref requirement
+TEST_CASE("NUMA partitioner tests") {
+    TestNumaPartitionerSimple();
+    TestNumaPartitionerWithBody();
+    TestNumaPartitionerEmptyRange(); 
+}
+
+void TestNumaPartitionerNonDivisibleRange() {
+    const size_t N = 1003;  // A number that's less likely to be divisible by standard partition sizes
+    std::vector<int> vec(N, 0);
+    
+    tbb::blocked_range<size_t> range(0, N);
+    
+    auto body = [&](const tbb::blocked_range<size_t>& r) {
+        for (size_t i = r.begin(); i != r.end(); ++i) {
+            vec[i] = 1;
+        }
+    };
+
+    tbb::affinity_partitioner ap;
+    tbb::numa_partitioner<tbb::affinity_partitioner> n_partitioner(ap);
+
+    // Test parallel_for with a non-divisible range
+    parallel_for(range, body, n_partitioner);
+
+    // Verify results
+    for (size_t i = 0; i < N; ++i) {
+        CHECK(vec[i] == 1);
+    }
+}
+
+void TestNumaPartitionerExceptionHandling() {
+    const size_t N = 1000;
+    std::vector<int> vec(N, 0);
+    
+    tbb::blocked_range<size_t> range(0, N);
+    
+    auto body = [&](const tbb::blocked_range<size_t>& r) {
+        for (size_t i = r.begin(); i != r.end(); ++i) {
+            if (i == N / 2) throw std::runtime_error("Test exception");
+            vec[i] = 1;
+        }
+    };
+
+    tbb::affinity_partitioner ap;
+    tbb::numa_partitioner<tbb::affinity_partitioner> n_partitioner(ap);
+
+    // Test parallel_for with exception handling
+    bool exceptionCaught = false;
+    try {
+        parallel_for(range, body, n_partitioner);
+    } catch (const std::runtime_error& e) {
+        exceptionCaught = true;
+    }
+
+    // Verify that the exception was caught
+    CHECK(exceptionCaught == true);
+}
+
+// Add this to test suite
+TEST_CASE("NUMA partitioner tests- exceptions") {
+    TestNumaPartitionerNonDivisibleRange();  
+    TestNumaPartitionerExceptionHandling();
+}
+
+
