@@ -33,7 +33,11 @@ enum class TestCase {
 void global_control_terminate_on_exception(TestCase test_case) {
     oneapi::tbb::global_control c(oneapi::tbb::global_control::terminate_on_exception, 1);
     static bool terminate_handler_called;
+    static bool invalid_argument_exception;
+    static bool std_exception;
     terminate_handler_called = false;
+    invalid_argument_exception = false;
+    std_exception = false;
 
 #if TBB_USE_EXCEPTIONS
     try {
@@ -50,11 +54,18 @@ void global_control_terminate_on_exception(TestCase test_case) {
             });
         } else if (test_case == TestCase::CUSTOM_ASSERTION_HANDLER) {
             prev_assertion_handler =
-                tbb::ext::set_assertion_handler([](const char*, int,
-                                                   const char*, const char *comment) {
+                tbb::ext::set_assertion_handler([](const char* location, int line,
+                                                   const char* expression, const char* comment) {
                 CHECK(!terminate_handler_called);
                 terminate_handler_called = true;
+                CHECK(!location);
+                CHECK(!line);
+                CHECK(!expression);
                 CHECK(comment);
+                if (strstr(comment, "std::invalid_argument"))
+                    invalid_argument_exception = true;
+                else if (strstr(comment, "std::exception"))
+                    std_exception = true;
                 std::longjmp(buffer, 1);
             });
         }
@@ -67,6 +78,8 @@ void global_control_terminate_on_exception(TestCase test_case) {
                 oneapi::tbb::parallel_for(0, 1, -1, [](int) {});
                 FAIL("Unreachable code");
             }
+            if (test_case == TestCase::CUSTOM_ASSERTION_HANDLER)
+                CHECK(invalid_argument_exception);
         }
 #if TBB_USE_EXCEPTIONS
         SUBCASE("user exception") {
@@ -79,6 +92,8 @@ void global_control_terminate_on_exception(TestCase test_case) {
                 });
                 FAIL("Unreachable code");
             }
+            if (test_case == TestCase::CUSTOM_ASSERTION_HANDLER)
+                CHECK(std_exception);
         }
 #endif
 #if _MSC_VER
