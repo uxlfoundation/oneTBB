@@ -9,7 +9,7 @@ global_control
 ==============
 **[scheduler.global_control]**
 
-Use this class to control certain settings or behavior of the oneTBB dynamic library.
+Use this class to control certain settings or behavior of the |short_name| dynamic library.
 
 An object of class ``global_control``, or a "control variable", affects one of several behavioral aspects, or parameters, of TBB.
 The ``global_control`` class is primarily intended for use at the application level, to control the whole application behavior.

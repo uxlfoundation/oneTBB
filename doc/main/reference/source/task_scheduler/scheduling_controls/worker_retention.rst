@@ -14,7 +14,7 @@ inside a task arena once no more work is available in it: whether they stay for 
 new work, or leave promptly to become available for other arenas or other threads in the system.
 
 
-By default, oneTBB uses a system-specific thread leave heuristic: after completing work in an arena,
+By default, |short_name| uses a system-specific thread leave heuristic: after completing work in an arena,
 worker threads might remain for an unspecified duration, anticipating that new parallel
 work will arrive soon. This benefits most workloads by reducing the latency of starting
 subsequent parallel computations. However, this behavior can be undesirable, especially if
@@ -22,9 +22,9 @@ subsequent parallel computations. However, this behavior can be undesirable, esp
 * parallel tasks are submitted at irregular intervals or with long gaps, and idle threads waste CPU resources.
   For instance, threads that spin while waiting for work increase the CPU load and may cause
   the CPU frequency to drop for the serial parts of the application.
-* oneTBB use is interleaved with another threading runtime, and idle threads cause CPU oversubscription.
+* |short_name| use is interleaved with another threading runtime, and idle threads cause CPU oversubscription.
 
-oneTBB provides two complementary mechanisms to control worker thread retention:
+|short_name| provides two complementary mechanisms to control worker thread retention:
 
 * A *leave policy* sets how fast worker threads leave an arena when no work is available.
   It is set when an arena is initialized, either per arena or application-wide.

@@ -249,7 +249,7 @@ Member functions
     .. caution::
 
         If ``max_concurrency`` and ``reserved_slots`` are
-        explicitly set to be equal and greater than 1, oneTBB worker threads will never
+        explicitly set to be equal and greater than 1, |short_name| worker threads will never
         join the arena. As a result, the execution guarantee for enqueued tasks is not valid
         in such arena. Do not use ``task_arena::enqueue()`` with an arena set to have no worker threads.
 
@@ -263,7 +263,7 @@ Member functions
     .. caution::
 
         If ``constraints::max_concurrency`` and ``reserved_slots`` are
-        explicitly set to be equal and greater than 1, oneTBB worker threads will never
+        explicitly set to be equal and greater than 1, |short_name| worker threads will never
         join the arena. As a result, the execution guarantee for enqueued tasks is not valid
         in such arena. Do not use ``task_arena::enqueue()`` with an arena set to have no worker threads.
 
