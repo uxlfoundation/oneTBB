@@ -1123,9 +1123,9 @@ public:
 
     template <typename K>
     typename std::enable_if<hash_compare_is_transparent<K>::value,
-                            bool>::type find( const_accessor& result, const K& key ) {
+                            bool>::type find( const_accessor& result, const K& key ) const {
         result.release();
-        return lookup</*insert*/false>(key, nullptr, &result, /*write=*/false, &do_not_allocate_node);
+        return const_cast<concurrent_hash_map*>(this)->lookup</*insert*/false>(key, nullptr, &result, /*write=*/false, &do_not_allocate_node);
     }
 
     template <typename K>

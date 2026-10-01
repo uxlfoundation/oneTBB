@@ -195,6 +195,7 @@ static void TestExceptionClassesExports () {
     TestExceptionClassExports( tbb::user_abort(), tbb::detail::exception_id::user_abort );
     TestExceptionClassExports( std::runtime_error("test"), tbb::detail::exception_id::bad_tagged_msg_cast );
     TestExceptionClassExports( tbb::unsafe_wait("test"), tbb::detail::exception_id::unsafe_wait );
+    TestExceptionClassExports( std::bad_array_new_length(), tbb::detail::exception_id::bad_array_new_length );
 }
 
 #if __TBB_TEST_PREVIEW
