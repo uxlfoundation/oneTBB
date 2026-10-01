@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -207,6 +208,19 @@ void TestAllocatorExceptions(A& a) {
     }
     REQUIRE_MESSAGE(exception_caught, "allocate expected to throw bad_alloc");
     a.deallocate(p1, too_big);
+
+    exception_caught = false;
+    // Test handling the overflow while calculating n * sizeof(T)
+    if (sizeof(T) > 1) {
+        std::size_t max_size = ~std::size_t(0) / sizeof(T);
+        std::size_t allocate_size = max_size + 1;
+        try {
+            p1 = a.allocate(allocate_size);
+        } catch (std::bad_array_new_length&) {
+            exception_caught = true;
+        }
+        REQUIRE_MESSAGE(exception_caught, "allocate expected to throw bad_array_new_length on overflow");
+    }
 #endif // TBB_USE_EXCEPTIONS
     utils::suppress_unused_warning(a);
 }
