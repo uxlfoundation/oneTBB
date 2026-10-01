@@ -94,10 +94,10 @@ static std::atomic<assertion_handler_type> handler{nullptr};
 
 #if (__TBB_BUILD || __TBBBIND_BUILD) // only TBB and TBBBind use custom handler
 static assertion_handler_type set(assertion_handler_type new_handler) noexcept {
-    assertion_handler_type normalized_handler =
+    assertion_handler_type restored_handler =
         new_handler == assertion_failure_default ? nullptr : new_handler;
-    assertion_handler_type old_handler = handler.exchange(normalized_handler,
-                                                           std::memory_order_acq_rel);
+    assertion_handler_type old_handler = handler.exchange(restored_handler,
+                                                          std::memory_order_acq_rel);
     return old_handler ? old_handler : assertion_failure_default;
 }
 #endif
