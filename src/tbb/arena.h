@@ -96,22 +96,16 @@ public:
     //! Insert scheduler to the current available place.
     //! Replace an old value, if necessary.
     void push(task_dispatcher* s) {
-        task_dispatcher* to_cleanup = nullptr;
-        {
-            tbb::spin_mutex::scoped_lock lock(my_co_cache_mutex);
-            // Check if we are replacing some existing buffer entrance
-            if (my_co_scheduler_cache[my_head] != nullptr) {
-                to_cleanup = my_co_scheduler_cache[my_head];
-            }
-            // Store the cached value
-            my_co_scheduler_cache[my_head] = s;
-            // Move head index to the next slot
-            my_head = next_index();
+        tbb::spin_mutex::scoped_lock lock(my_co_cache_mutex);
+        // Check if we are replacing some existing buffer entrance
+        if (my_co_scheduler_cache[my_head] != nullptr) {
+            // Perform buffer cleanup
+            internal_task_dispatcher_cleanup(my_co_scheduler_cache[my_head]);
         }
-        // Cleanup replaced buffer if any
-        if (to_cleanup) {
-            internal_task_dispatcher_cleanup(to_cleanup);
-        }
+        // Store the cached value
+        my_co_scheduler_cache[my_head] = s;
+        // Move head index to the next slot
+        my_head = next_index();
     }
 
     //! Get a cached scheduler if any
