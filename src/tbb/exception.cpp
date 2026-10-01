@@ -66,7 +66,7 @@ const char* missing_wait::what() const noexcept(true) { return "wait() was not c
             std::snprintf(buf, sizeof(buf),
                   "Terminating due to exception: %s with arguments: %s",
                   exc_name, init_args);
-            __TBB_ASSERT_RELEASE(false, buf);
+            tbb::detail::r1::assertion_failure(nullptr, 0, nullptr, buf);
         }
         throw_func();
     }

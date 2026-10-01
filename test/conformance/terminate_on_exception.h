@@ -51,9 +51,10 @@ void global_control_terminate_on_exception(TestCase test_case) {
         } else if (test_case == TestCase::CUSTOM_ASSERTION_HANDLER) {
             prev_assertion_handler =
                 tbb::ext::set_assertion_handler([](const char*, int,
-                                                   const char*, const char*) {
+                                                   const char*, const char *comment) {
                 CHECK(!terminate_handler_called);
                 terminate_handler_called = true;
+                CHECK(comment);
                 std::longjmp(buffer, 1);
             });
         }
