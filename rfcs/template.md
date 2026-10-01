@@ -33,7 +33,11 @@ Pay close attention to the following aspects of the library:
 - API and ABI backward compatibility. The library follows semantic versioning
   so if any of those interfaces are to be broken, the RFC needs to state that
   explicitly.
-- Performance implications, as performance is one of the main goals of the library.
+- Performance implications, as performance is one of the main goals of the
+  library. A good proposal includes listing of a code examples along with
+  important hardware details of the usage scenarios which can be further used as
+  a basis for writing benchmarks to evaluate and track performance of the
+  proposed implementation.
 - Changes to the build system. While the library's primary building system is
   CMake, there are some frameworks that may build the library directly from the sources.
 - Dependencies and support matrix: does the proposal bring any new
@@ -43,7 +47,8 @@ Some other common subsections here are:
 - Discussion: some people like to list all the options first (as separate
   subsections), and then have a dedicated section with the discussion.
 - List of the proposed API and examples of its usage.
-- Testing aspects.
+- Testing aspects, including listing of usage scenarios on which to evaluate
+  performance of a code that would implement this proposal.
 - Short explanation and links to the related sub-proposals, if any. Such
   sub-proposals could be organized as separate standalone RFCs, but this is
   not mandatory. If the change is insignificant or doesn't make any sense
