@@ -42,9 +42,9 @@ class collaborative_call_stack_task : public task {
         m_wait_ctx.release();
     }
     task* execute(d1::execution_data&) override {
-        task* res = d2::task_ptr_or_nullptr(m_func);
+        m_func();
         finalize();
-        return res;
+        return nullptr;
     }
     task* cancel(d1::execution_data&) override {
         finalize();
