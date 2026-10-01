@@ -35,3 +35,24 @@ window.MathJax = {
     }
     }
 }
+
+function decorateSidebarTocEntries() {
+    const sidebarLinks = document.querySelectorAll('.bd-sidebar-primary a');
+
+    sidebarLinks.forEach((link) => {
+        const text = link.textContent || '';
+        const highlightedText = text
+            .replace(/\(preview\)/gi, '<span class="toc-label-highlight">(preview)</span>')
+            .replace(/\(experimental\)/gi, '<span class="toc-label-highlight">(experimental)</span>');
+
+        if (highlightedText !== text) {
+            link.innerHTML = highlightedText;
+        }
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', decorateSidebarTocEntries);
+} else {
+    decorateSidebarTocEntries();
+}

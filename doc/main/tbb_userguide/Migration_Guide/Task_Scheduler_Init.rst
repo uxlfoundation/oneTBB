@@ -13,23 +13,23 @@ Managing the number of threads
 Querying the default number of threads
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-* :onetbb-spec:`oneapi::tbb::info::default_concurrency() <info_namespace>`
+* :doc:`oneapi::tbb::info::default_concurrency() </main/reference/source/info_namespace>`
   returns the maximum concurrency that will be created by *default* in implicit or explicit ``task_arena``.
 
-* :onetbb-spec:`oneapi::tbb::this_task_arena::max_concurrency() <task_scheduler/task_arena/this_task_arena_ns>`
+* :doc:`oneapi::tbb::this_task_arena::max_concurrency() </main/reference/source/task_scheduler/task_arena/this_task_arena_ns>`
   returns the maximum number of threads available for the parallel algorithms within the current context
   (or *default* if an implicit arena is not initialized)
 
-* :onetbb-spec:`oneapi::tbb::global_control::active_value(tbb::global_control::max_allowed_parallelism) <task_scheduler/scheduling_controls/global_control_cls>`
+* :doc:`oneapi::tbb::global_control::active_value(tbb::global_control::max_allowed_parallelism) </main/reference/source/task_scheduler/scheduling_controls/global_control_cls>`
   returns the current limit of the thread pool (or *default* if oneTBB scheduler is not initialized)
 
 Setting the maximum concurrency
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-* :onetbb-spec:`task_arena(/* max_concurrency */) <task_scheduler/task_arena/this_task_arena_ns>`
+* :doc:`task_arena(/* max_concurrency */) </main/reference/source/task_scheduler/task_arena/this_task_arena_ns>`
   limits the maximum concurrency of the parallel algorithm running inside ``task_arena``
 
-* :onetbb-spec:`tbb::global_control(tbb::global_control::max_allowed_parallelism, /* max_concurrency */) <task_scheduler/scheduling_controls/global_control_cls>`
+* :doc:`tbb::global_control(tbb::global_control::max_allowed_parallelism, /* max_concurrency */) </main/reference/source/task_scheduler/scheduling_controls/global_control_cls>`
   limits the total number of oneTBB worker threads
 
 Examples
@@ -110,7 +110,7 @@ The limited parallelism:
 
 Setting thread stack size
 ---------------------------------------
-Use :onetbb-spec:`oneapi::tbb::global_control(oneapi::tbb::global_control::thread_stack_size, /* stack_size */) <task_scheduler/scheduling_controls/global_control_cls>`
+Use :doc:`oneapi::tbb::global_control(oneapi::tbb::global_control::thread_stack_size, /* stack_size */) </main/reference/source/task_scheduler/scheduling_controls/global_control_cls>`
 to set the stack size for oneTBB worker threads:
 
 .. code:: cpp
@@ -135,7 +135,7 @@ to set the stack size for oneTBB worker threads:
 Terminating oneTBB scheduler
 ---------------------------------------
 
-:onetbb-spec:`task_scheduler_handle <task_scheduler/scheduling_controls/task_scheduler_handle_cls>`
+:doc:`task_scheduler_handle </main/reference/source/task_scheduler/scheduling_controls/task_scheduler_handle_cls>`
 allows waiting for oneTBB worker threads completion:
 
 .. code:: cpp

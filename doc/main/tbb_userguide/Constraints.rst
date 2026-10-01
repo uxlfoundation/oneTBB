@@ -4,7 +4,7 @@ Constrained APIs
 ================
 
 Starting from C++20, most of |full_name| APIs are constrained to
-enforce :onetbb-spec:`named requirements <named_requirements>` on
+enforce :doc:`named requirements </main/reference/source/named_requirements>` on
 template arguments types.
 
 The violations of these requirements are detected at a compile time during the template instantiation.
