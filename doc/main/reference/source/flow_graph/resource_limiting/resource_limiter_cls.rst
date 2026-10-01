@@ -22,10 +22,12 @@ For some resource types, the ``ResourceHandle`` represents the resource itself. 
     tbb::flow::resource_limiter<int> int_limiter{1, 2, 3};
 
     using db_resource_handle = std::unique_ptr<Database, CloseDatabase>;
-    tbb::flow::resource_limiter<db_resource_handle> db_limiter{open_database()};
+    tbb::flow::resource_limiter<db_resource_handle> db_limiter{std::piecewise_construct,
+                                                              std::forward_as_tuple(open_database())};
 
 In the example above, ``int_limiter`` manages three resources of type ``int``, and ``db_limiter`` manages a single
-handle to a resource of type ``Database``.
+handle to a resource of type ``Database``. Because ``db_resource_handle`` is not copyable, the handle is
+constructed in place with the ``std::piecewise_construct_t`` constructor.
 
 All the resource handles managed by the ``resource_limiter`` are considered equivalent, so which particular handle a
 consumer receives is unspecified.
@@ -53,8 +55,18 @@ Synopsis
                 public:
                     using resource_handle_type = ResourceHandle;
 
-                    template <typename Handle, typename... Handles>
-                    resource_limiter(Handle&& handle, Handles&&... handles);
+                    resource_limiter() = delete;
+
+                    template <typename InputIterator>
+                    resource_limiter(InputIterator first, InputIterator last);
+
+                    template <typename ContainerBasedSequence>
+                    resource_limiter(ContainerBasedSequence&& sequence);
+
+                    resource_limiter(std::initializer_list<ResourceHandle> init);
+
+                    template <typename Tuple, typename... Tuples>
+                    resource_limiter(std::piecewise_construct_t, Tuple&& tuple, Tuples&&... tuples);
 
                     ~resource_limiter();
                 }; // class resource_limiter
@@ -83,15 +95,68 @@ Member Functions
 
 .. code:: cpp
 
-    template <typename Handle, typename... Handles>
-    resource_limiter(Handle&& handle, Handles&&... handles);
+    template <typename InputIterator>
+    resource_limiter(InputIterator first, InputIterator last);
 
-**Requirements**: ``ResourceHandle`` type must be constructible from ``std::forward<Handle>(handle)``,
-and from ``std::forward<H>(h)`` for each ``H`` in ``Handles`` and for each ``h`` in ``handles``.
+**Requirements**:
 
-Constructs a ``resource_limiter`` that manages at least one resource.
+* ``InputIterator`` type must satisfy the requirements of an input iterator from [input.iterators] section of the ISO C++ Standard.
+* ``ResourceHandle`` type must be constructible from ``std::iterator_traits<InputIterator>::reference``.
 
-Each resource is constructed from the corresponding argument in ``handle`` or ``handles``.
+Constructs a ``resource_limiter`` that manages the resource handles from the sequence ``[first, last)``.
+
+Each handle is constructed from the corresponding element in the sequence.
+
+If ``first == last``, the behavior is undefined.
+
+------------------------------------------------------
+
+.. code:: cpp
+
+    template <typename ContainerBasedSequence>
+    resource_limiter(ContainerBasedSequence&& sequence);
+
+**Requirements**: ``ContainerBasedSequence`` type must meet the :doc:`ContainerBasedSequence requirements <../../named_requirements/algorithms/container_based_sequence>`.
+
+Equivalent to ``resource_limiter(std::begin(sequence), std::end(sequence))``.
+
+------------------------------------------------------
+
+.. code:: cpp
+
+    resource_limiter(std::initializer_list<ResourceHandle> init);
+
+Equivalent to ``resource_limiter(init.begin(), init.end())``.
+
+.. note::
+
+    ``std::initializer_list`` imposes the requirement of copy constructibility on ``ResourceHandle``.
+
+------------------------------------------------------
+
+.. code:: cpp
+
+    template <typename Tuple, typename... Tuples>
+    resource_limiter(std::piecewise_construct_t, Tuple&& tuple, Tuples&&... tuples);
+
+**Requirements**: for each ``T`` in ``{Tuple, Tuples...}`` and the corresponding ``t`` in ``{tuple, tuples...}``,
+``ResourceHandle`` must be constructible from ``std::get<N>(std::forward<T>(t))`` for each ``N`` in
+``[0, std::tuple_size<std::decay_t<T>>::value)``.
+
+Constructs a ``resource_limiter`` that manages ``1 + sizeof...(Tuples)`` resource handles. Each handle is constructed
+in place from the elements of the corresponding tuple, which are forwarded as its constructor arguments.
+
+Use this constructor if ``ResourceHandle`` is not copyable or must be constructed in place.
+
+**Example**:
+
+.. code:: cpp
+
+    tbb::flow::resource_limiter<Handle> limiter(std::piecewise_construct,
+                                                std::forward_as_tuple(arg1, arg2),
+                                                std::forward_as_tuple(arg3));
+
+The limiter manages two handles: the first is constructed as ``Handle(arg1, arg2)``, the second as ``Handle(arg3)``.
 
 ------------------------------------------------------
 
@@ -99,6 +164,6 @@ Each resource is constructed from the corresponding argument in ``handle`` or ``
 
     ~resource_limiter();
 
-Destroys the ``resource_limiter``. 
+Destroys the ``resource_limiter``.
 
 If there are consumers that still reference the limiter, the behavior is undefined.
