@@ -57,8 +57,10 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
     #pragma warning (disable: 4702)
 #endif
     atomic_do_once([&](){
-        std::fprintf(stderr, "Assertion %s failed (located in the %s function, line in file: %d)\n",
-            expression, location, line);
+        if (location) {
+            std::fprintf(stderr, "Assertion %s failed (located in the %s function, line in file: %d)\n",
+                expression, location, line);
+        }
 
         if (comment) {
             std::fprintf(stderr, "Detailed description: %s\n", comment);
@@ -126,7 +128,7 @@ void terminate_on_user_exception() {
     } catch (...) {
         std::strncat(buf, "Unknown exception", sizeof(buf)-1);
     }
-    __TBB_ASSERT_RELEASE(false, buf);
+    tbb::detail::r1::assertion_failure(nullptr, 0, nullptr, buf);
 }
 #endif // __TBB_BUILD
 
