@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -562,6 +563,48 @@ TEST_CASE("parallel_scan testing with generic lambdas") {
     }
 }
 #endif /* __TBB_CPP14_GENERIC_LAMBDAS_PRESENT */
+
+namespace lifetime_test {
+    // Every range that parallel_scan destroys must have been constructed first
+    static std::atomic<std::ptrdiff_t> live_ranges{0};
+
+    class counting_range : public oneapi::tbb::blocked_range<std::size_t> {
+        using base = oneapi::tbb::blocked_range<std::size_t>;
+    public:
+        counting_range( std::size_t begin, std::size_t end ) : base(begin, end) { ++live_ranges; }
+        counting_range( const counting_range& r ) : base(r) { ++live_ranges; }
+        counting_range( counting_range& r, oneapi::tbb::split s ) : base(r, s) { ++live_ranges; }
+        ~counting_range() { --live_ranges; }
+    };
+
+    struct sum_body {
+        std::size_t sum = 0;
+        sum_body() = default;
+        sum_body( sum_body&, oneapi::tbb::split ) {}
+        template<typename Tag>
+        void operator()( const counting_range& r, Tag ) {
+            for ( std::size_t i = r.begin(); i != r.end(); ++i ) sum += 1;
+        }
+        void reverse_join( sum_body& other ) { sum += other.sum; }
+        void assign( sum_body& other ) { sum = other.sum; }
+    };
+}
+
+//! \brief \ref regression
+TEST_CASE("parallel_scan destroys only ranges it has constructed") {
+    const std::size_t length = 34479;
+    for ( std::size_t concurrency_level : utils::concurrency_range() ) {
+        tbb::global_control control(tbb::global_control::max_allowed_parallelism, concurrency_level);
+        for ( int i = 0; i < 2000; ++i ) {
+            lifetime_test::sum_body body;
+            tbb::parallel_scan(lifetime_test::counting_range(0, length), body);
+            REQUIRE(body.sum == length);
+            // Scratch copies may be destroyed slightly after parallel_scan returns
+            for ( int spins = 0; lifetime_test::live_ranges.load() > 0 && spins < 1000000; ++spins ) utils::yield();
+            REQUIRE(lifetime_test::live_ranges.load() == 0);
+        }
+    }
+}
 
 #if __TBB_CPP20_CONCEPTS_PRESENT
 //! \brief \ref error_guessing
