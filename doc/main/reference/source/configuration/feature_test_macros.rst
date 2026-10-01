@@ -75,8 +75,10 @@ Example
 -------
 
 The following example uses a feature-test macro to conditionally enable ``parallel_phase``
-hints when supported by the library. For a preview feature, testing its feature-test macro
-this way also requires defining the corresponding preview macro.
+hints when supported by the library.
+
+For preview features, testing feature-test macros requires defining
+the corresponding preview macro before any included header.
 
 .. literalinclude:: ./examples/feature_test_macros.cpp
     :language: c++
