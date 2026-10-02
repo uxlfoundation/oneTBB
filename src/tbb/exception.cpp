@@ -60,20 +60,25 @@ const char* missing_wait::what() const noexcept(true) { return "wait() was not c
     bool terminate_on_exception(); // defined in global_control.cpp and ipc_server.cpp
 
     template <typename F>
-    /*[[noreturn]]*/ void do_throw(F throw_func) {
+    /*[[noreturn]]*/ void do_throw(F throw_func, const char* exc_name, const char* init_args) {
         if (terminate_on_exception()) {
-            do_throw_noexcept(throw_func);
+            char buf[256] = { 0 };
+            std::snprintf(buf, sizeof(buf),
+                  "Terminating due to exception: %s with arguments: %s",
+                  exc_name, init_args);
+            tbb::detail::r1::assertion_failure(nullptr, 0, nullptr, buf);
         }
         throw_func();
     }
 
-    #define DO_THROW(exc, init_args) do_throw( []{ throw exc init_args; } );
+    #define DO_THROW(exc, init_args) do_throw( []{ throw exc init_args; }, #exc, #init_args);
 #else /* !TBB_USE_EXCEPTIONS */
-    #define PRINT_ERROR_AND_ABORT(exc_name, msg) \
-        std::fprintf (stderr, "Exception %s with message %s would have been thrown, "  \
+    #define PRINT_ERROR_AND_ABORT(exc_name, msg) { \
+        char msg_buf[1024] = { 0 }; \
+        std::snprintf(msg_buf, sizeof(msg_buf), \
+            "Exception %.22s with message %.100s would have been thrown, "  \
             "if exception handling had not been disabled. Aborting.\n", exc_name, msg); \
-        std::fflush(stderr); \
-        std::abort();
+        tbb::detail::r1::assertion_failure(nullptr, 0, nullptr, msg_buf); }
     #define DO_THROW(exc, init_args) PRINT_ERROR_AND_ABORT(#exc, #init_args)
 #endif /* !TBB_USE_EXCEPTIONS */
 
@@ -116,7 +121,7 @@ void handle_perror( int error_code, const char* what ) {
     }
     __TBB_ASSERT(buf_len <= BUF_SIZE && buf[buf_len] == 0, nullptr);
 #if TBB_USE_EXCEPTIONS
-    do_throw([&buf] { throw std::runtime_error(buf); });
+    do_throw([&buf] { throw std::runtime_error(buf); }, "std::runtime_error", buf);
 #else
     PRINT_ERROR_AND_ABORT( "runtime_error", buf);
 #endif /* !TBB_USE_EXCEPTIONS */
