@@ -43,6 +43,8 @@ if errorlevel 9009 (
 	exit /b 1
 )
 
+powershell.exe -Command ^
+    "Copy-Item -Path '..\thread_composability_manager\doc\*' -Destination '.\tcm' -Recurse -Force"
 %SPHINXBUILD% -M %1 %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
 goto end
 
