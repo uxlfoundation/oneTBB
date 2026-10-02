@@ -54,6 +54,10 @@ TEST_CASE("terminate_on_exception: tbb::ext::set_assertion_handler") {
                 std::longjmp(buffer, 1);
             });
 #if TBB_USE_EXCEPTIONS
+#if _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4611) // interaction between '_setjmp' and C++ object destruction is non-portable
+#endif
             if (setjmp(buffer) == 0) {
                 oneapi::tbb::parallel_for(0, 1, [](int) {
                     volatile bool suppress_unreachable_code_warning = true;
