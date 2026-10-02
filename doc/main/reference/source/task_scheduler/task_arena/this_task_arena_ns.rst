@@ -3,6 +3,8 @@
 ..
 .. SPDX-License-Identifier: CC-BY-4.0
 
+.. _this_task_arena_ns:
+
 ===============
 this_task_arena
 ===============
@@ -24,17 +26,16 @@ with the ``task_arena`` currently used by the calling thread.
             int max_concurrency();
 
             template<typename F> auto isolate(F&& f) -> decltype(f());
-            
+
             template<typename F> void enqueue(F&& f);
             template<typename F> void enqueue(F&& f, task_group& tg);
             void enqueue(task_handle&& h);
 
-            // Preview feature: parallel_phase Interface
-            void start_parallel_phase();
-            void end_parallel_phase(bool with_fast_leave = false);
+            void start_parallel_phase(task_arena::parallel_phase::flags f = {});
+            void end_parallel_phase(task_arena::parallel_phase::flags f = {});
         } // namespace this_task_arena
     } // namespace tbb
-    } // namespace oneapi 
+    } // namespace oneapi
 
 .. cpp:namespace:: tbb::this_task_arena
 
@@ -80,33 +81,39 @@ with the ``task_arena`` currently used by the calling thread.
         The object returned by the functor cannot be a reference. ``std::reference_wrapper`` can be used instead.
 
 .. cpp:function:: template<typename F> void enqueue(F&& f)
-  
+
     Enqueues a task into the ``task_arena`` currently used by the calling thread to process the specified functor, then returns immediately.
     The ``F`` type must meet the `Function Objects` requirements described in the [function.objects] section of the ISO C++ standard.
 
-    Behavior of this function is equivalent to ``template<typename F> void task_arena::enqueue(F&& f)`` applied to the ``task_arena`` 
+    Behavior of this function is equivalent to ``template<typename F> void task_arena::enqueue(F&& f)`` applied to the ``task_arena``
     object constructed with ``attach`` parameter.
 
 .. cpp:function:: template<typename F> void enqueue(F&& f, task_group& tg)
-  
+
     Adds a task to process the specified functor into ``tg`` and enqueues it into the ``task_arena`` currently used by the calling thread.
 
     The behavior of this function is equivalent to ``this_task_arena::enqueue( tg.defer(std::forward<F>(f)) )``.
 
-.. cpp:function:: void enqueue(task_handle&& h)   
-     
-    Enqueues a task owned by ``h`` into the ``task_arena`` that is currently used by the calling thread.
-    
-    The behavior of this function is equivalent to the generic version (``template<typename F> void enqueue(F&& f)``), except the parameter type. 
+.. cpp:function:: void enqueue(task_handle&& h)
 
-    .. note:: 
+    Enqueues a task owned by ``h`` into the ``task_arena`` that is currently used by the calling thread.
+
+    The behavior of this function is equivalent to the generic version (``template<typename F> void enqueue(F&& f)``), except the parameter type.
+
+    .. note::
         ``h`` should not be empty to avoid an undefined behavior.
 
-Preview Features
-----------------
+.. cpp:function:: void start_parallel_phase(task_arena::parallel_phase::flags f = {})
 
+    Starts a parallel phase in the ``task_arena`` currently used by the calling thread.
+    See :ref:`parallel_phase <parallel_phase_for_task_arena>`.
 
-The following :ref:`preview features<preview_features>` extend the ``this_task_arena`` API:
+.. cpp:function:: void end_parallel_phase(task_arena::parallel_phase::flags f = {})
 
-* :ref:`parallel_phase Interface<parallel_phase_for_task_arena>` - extends ``this_task_arena`` with the API to
-  provide a hint where the parallel region starts and ends.
+    Ends a parallel phase in the ``task_arena`` currently used by the calling thread.
+    See :ref:`parallel_phase <parallel_phase_for_task_arena>`.
+
+See also:
+
+* :doc:`task_arena <task_arena_cls>`
+* :doc:`parallel_phase <parallel_phase>`
