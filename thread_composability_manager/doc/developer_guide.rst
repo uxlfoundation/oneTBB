@@ -50,7 +50,7 @@ Below is a simple example of a usage model a parallel runtime should follow to s
              satisfy the permit, hence activating it and notifying the client through invocation of
              a client callback.
 
-#. Once the permit is activated, register that number of threads that were suggested by TCM.
+#. Once the permit is activated, register the number of threads that were suggested by TCM.
 
    .. code-block:: cpp
 
@@ -97,7 +97,7 @@ Below is a simple example of a usage model a parallel runtime should follow to s
        tcmDisconnect(client_id);
 
 
-   .. note:: When running an application that uses TCM, set :code:`TCM_ENABLE=1` environment
+   .. note:: When running an application that uses TCM, set the :code:`TCM_ENABLE=1` environment
              variable to actually enable its use.
 
 Refer to :doc:`api_reference` to find more detailed information about TCM API.
@@ -131,20 +131,20 @@ Resource permit:
 - Requested by language runtime (RT)
 - Granted by TCM
 - Includes maximum concurrency and CPU mask (if :code:`tcm_cpu_constraints_t` was specified)
-- The CPU mask may be different from concurrency
+- The the size of the CPU mask may be different from the concurrency
 
 Team of threads
 
 - Managed by language RT
-- Can only be active with a valid resource permit
+- Should only be active with a valid resource permit
 
 
 +----------------+------------------+------------------------------+-------------------------------+
 | Permit State   | Resource usage   | Thread Team State            | Reactivation Speed            |
 +================+==================+==============================+===============================+
-| Void/No permit | Not allowed      | **Cold**: Team sleeping or   |                               |
+| Void/No permit | Not allowed      | **Cold**: Team sleeping or   | Slow                          |
 |                |                  | disbanded. No Language RT    |                               |
-|                |                  | configuration maintained.    | Slow - same as new request    |
+|                |                  | configuration maintained.    |                               |
 +----------------+------------------+------------------------------+-------------------------------+
 | Inactive       | Not allowed      | **Warm**: Team not actively  | Fast - if reclaimed by        |
 |                |                  | consuming CPU resources.     | Language RT                   |
@@ -200,8 +200,8 @@ At every moment of time the resources are meant to be used by only one parallel 
 Although this represents the simplest composition scenario, it is still can benefit from using the
 Thread Composability Manager. This is because usually resources are not released immediately after a
 parallel region, but remain in use for some time anticipating new parallel work to appear soon. It
-is important to notify TCM about such situation through a call to :code:`tcmIdlePermit` so that
-corresponding resources can be re-used by subsequent requests from possibly another runtime.
+is important to notify TCM about such a situation through a call to :code:`tcmIdlePermit` so that
+the corresponding resources can be re-used by subsequent requests from possibly another runtime.
 
 Concurrent Requests
 ===================
@@ -234,7 +234,7 @@ concurrently and independently. No client makes new requests while holding one.
 
 Concurrent requests can be subdivided into two possible scenarios:
 
-1. *Independent requests*
+1. *Uncoordinated requests*
 
    Requests are not coordinated and may compete for the same resources.
 
@@ -247,7 +247,7 @@ Nested Requests
 ===============
 
 A nested permit request corresponds to a situation when a client requests a permit for resources
-while holding and using another permit from one of the previous requests.
+while holding and using another permit from a previous request.
 
 .. code-block:: cpp
    :caption: Example of nested permit requests
@@ -278,7 +278,7 @@ Possible scenarios:
 Combined Use Cases
 ==================
 
-The combined use cases include sequential, concurrent, and nested use cases mixed in the code.
+Combined use cases include sequential, concurrent, and nested use cases mixed in the code.
 
 .. code-block:: cpp
    :caption: Example of sequential with nested calls
@@ -303,7 +303,7 @@ Usage examples
 **************
 
 Examples below demonstrate the use of TCM in various scenarios. Parallelism in these examples is
-achieved through functional decomposition where initial amount of work is split among threads
+achieved through functional decomposition where the initial amount of work is split among threads
 participating in computation.
 
 The examples below use the following helper function that returns an object of :code:`tcm_permit_t`
@@ -321,62 +321,62 @@ Ad hoc parallelism
 The simplest way to do computations in parallel is to create a bunch of threads, split the work
 among these threads, and wait for them to finish. Such instantiated threads are usually busy only
 with the useful work they are given, not distracting themselves on other non-payload activities.
-This does not allow them to react on changes to resource permissions that can be communicated by
-TCM. Below example demonstrates the use of TCM for such ad hoc scenarios.
+This prevents them from reacting to changes to resource permissions that are communicated by
+TCM. The example that follows demonstrates the use of TCM for such ad hoc scenarios.
 
-Since resources can be already occupied by another parallel runtime or concurrent invocation of
-same parallel region, using them disrespecting those other clients would result in platform
-oversubscription. Therefore, the TCM client should first wait until the requested resources become
-free and TCM decides to re-distribute them to this client. Once it is so, the permit is activated
-and TCM invokes client's callback function with a handle of a permit that has just been changed.
+If resources are already occupied by another parallel runtime or concurrent invocation of the same
+parallel region, other clients using them would result in platform oversubscription. Therefore, a
+TCM client should wait until the requested resources become free and TCM decides to re-distribute
+them to this client. Once it is so, the permit is activated and TCM invokes the client's callback
+function with a handle of the permit that has just been changed.
 
-To signal about changes in a permit back to a parallel region, this example uses the following
-structure:
+To signal changes in a permit back to a parallel region, this example uses the following structure:
 
 .. literalinclude:: ./examples/ad-hoc-parallelism-example.cpp
    :language: c++
    :start-after: /* begin synchronization data */
    :end-before: /* end synchronization data */
 
-The pointer to instance of this structure is passed to callback function as the value for its
+A pointer to an instance of this structure is passed to the callback function as the value for its
 :code:`callback_arg` parameter.
 
-Because threads in such fixed parallel regions cannot react on changes to recommendations of
-resources usage, the negotiation callback function is only needed to signal parallel region about
-activation of its permit, and can be written as the following:
+Because threads in fixed parallel regions cannot react to changes to recommendations of resources
+usage, the negotiation callback function is only needed to signal a parallel region about activation
+of its permit, and can be written as the following:
 
 .. literalinclude:: ./examples/ad-hoc-parallelism-example.cpp
    :language: c++
    :start-after: /* begin negotiation callback */
    :end-before: /* end negotiation callback */
 
-Callback is invoked to notify client about changes in its permit so that client can react on these
-changes accordingly. In this example, client's callback is called once permit is activated. The
-negotiation callback function above demonstrates how to read permit data properly. The
-:code:`tcmGetPermitData` function can return data of a being changed permit. This is indicated by
-:code:`tcm_permit_flags_t::stale` bit flag, and it means that the callback is going to be invoked
-one more time once changes to permit are finalized by TCM. Thus, client should abandon the data it
-has just read.
+The callback is invoked to notify the client about changes in its permit so that the client can
+react to these changes accordingly. In this example, the client's callback is called once the permit
+is activated. The negotiation callback function above demonstrates how to read permit data properly.
+The :code:`tcmGetPermitData` function can return data of a permit that is concurrently changing.
+This is indicated by :code:`tcm_permit_flags_t::stale` bit flag, and it means that the callback is
+going to be invoked one more time once changes to permit are finalized by TCM. Thus, the client
+should abandon the data it has just read.
 
 Besides splitting the work among instantiated threads, the main function in this example consults
 with TCM to determine the number of threads it can use so that the platform is not oversubscribed.
 To do so it connects to TCM, requests a permit, waits for it to be activated, and then reads the
 recommended number of threads for use in the :code:`grant` variable. Telling TCM that the permit
 will not allow negotiations once it is activated is done by assigning :code:`1` to the
-:code:`tcm_permit_flags_t::rigid_concurrency` flag during setting up the
-:code:`tcm_permit_request_t` structure for a permit request.
+:code:`tcm_permit_flags_t::rigid_concurrency` flag while setting up the :code:`tcm_permit_request_t`
+structure for a permit request.
 
-The first thing each thread does before executing the work it is created for is to register itself
+The first thing each thread does, before executing the work it is created for, is to register itself
 with the permit, in which it participates. This is necessary to tell TCM that the thread consumes
-one of the resources assigned to a permit, and is done by calling :code:`tcmRegisterThread` function
-passing the instance of :code:`tcm_permit_handle_t` whose resource this thread is going to consume.
-At the end of its work, thread unregister itself from permit by calling :code:`tcmUnregisterThread`.
+one of the resources assigned to a permit, and is done by calling :code:`tcmRegisterThread`
+function, passing the instance of :code:`tcm_permit_handle_t` whose resource this thread is going to
+consume. At the end of its work, a thread unregisters itself from its permit by calling
+:code:`tcmUnregisterThread`.
 
-Once all the threads finish with their task, the main thread releases the resources by calling
-:code:`tcmReleasePermit` TCM function. This marks the resources described by passed instance of
+Once all the threads finish with their task, the main thread releases the resources by calling the
+:code:`tcmReleasePermit` TCM function. This marks the resources described by the passed instance of
 :code:`tcm_permit_handle_t` as free, hence making them available for other clients.
 
-At the end, main thread disconnects from TCM, essentially telling it that the client won't have
+Finally, the main thread disconnects from TCM, essentially telling it that the client won't have
 future permit requests.
 
 .. literalinclude:: ./examples/ad-hoc-parallelism-example.cpp
@@ -384,24 +384,48 @@ future permit requests.
    :start-after: /* begin parallel compute example */
    :end-before: /* end parallel compute example */
 
-This is basic example of TCM integration. Despite lacking functionality for dealing with overheads
-related to threads management and reacting on changes in utilization of resources from other
-clients, it demonstrates main API calls parallel runtime should follow to make use of Thread
+This is a basic example of TCM integration. Despite lacking functionality for dealing with overheads
+related to threads management and reacting to changes in utilization of resources from other
+clients, it demonstrates the main API calls parallel runtimes should use to make use of Thread
 Composability Manager and reduce otherwise potential CPU oversubscription.
 
 Pool of Threads
 ===============
 
 Below is a more complex example that demonstrates usage of TCM by a :code:`client_thread_pool` class
-that manages a pool of threads. Unlike the example from `Ad hoc parallelism`_ this example creates
+that manages a pool of threads. Unlike the example from `Ad hoc parallelism`_, this example creates
 worker threads once, effectively re-using them to perform computations in parallel. A worker thread
 executes tasks only while the pool holds a permit, and no more workers do so than the permit grants.
-The thread pool reacts to changes in permit by updating the grant, hence waking up missing threads
-or putting excessive ones to sleep. The example also includes synchronization code that allows
-invocation of a parallel computation concurrently with itself, making sure the resources are not
-released while there is work to do.
+The thread pool reacts to changes to the permit by updating the grant, hence waking up missing
+threads or putting excessive ones to sleep. The example also includes synchronization code that
+allows invocation of a parallel computation concurrently with itself, making sure the resources are
+not released while there is work to do.
 
-The code re-uses :code:`make_permit` helper from `Ad hoc parallelism`_ example.
+In this section we start by describing the state of the pool and its `public interface <Pool
+interface>`_. In section `Permit management`_ we show how a single permit is managed by the pool
+across concurrent uses. `Worker pool`_ section describes how worker threads are managed by waking
+them up and putting them to sleep in response to changes in the permit. The details of permit
+negotiation is described in `Negotiation callback`_ section. While not directly relevant to TCM, the
+approach to assigning tasks to worker threads is shown in section `Tasking`_.
+
+The code re-uses the :code:`make_permit` function from `Ad hoc parallelism`_ example to help prepare
+the permit data structure to be filled by TCM.
+
+Pool state
+----------
+
+The state of the pool described below is kept in the following data members. The entities can be
+divided into three categories:
+
+* Entities that help managing threads: creation, wakening, putting to sleep, and destruction.
+* Entities that help managing tasks: enqueueing, dequeueing, and cancelation.
+* Entities that help working with TCM: connecting, disconnecting, permit management, synchronization
+  of permit updates.
+
+.. literalinclude:: ./examples/client-thread-pool.cpp
+   :language: c++
+   :start-after: /* begin pool state */
+   :end-before: /* end pool state */
 
 Pool interface
 --------------
@@ -427,9 +451,9 @@ The destructor stops the workers, releases the permit and disconnects from TCM.
 Permit management
 -----------------
 
-Unlike the example from `Ad hoc parallelism`_ section, this pool keeps a single permit for its whole
-lifetime: :code:`tcmRequestPermit` creates a permit when it is given a null handle and re-uses the
-permit the handle refers to otherwise. Also, several :code:`parallel_for` calls may be running
+Unlike the example from the `Ad hoc parallelism`_ section, this pool keeps a single permit for its
+whole lifetime: :code:`tcmRequestPermit` creates a permit when it is given a null handle and re-uses
+the permit the handle refers to otherwise. Also, several :code:`parallel_for` calls may be running
 concurrently in the same pool, so they share that permit: the first of them requests it, the others
 only wait until it becomes usable, and the last one to finish deactivates it.
 
@@ -484,13 +508,6 @@ being counted by TCM as a thread that uses the resources.
    :start-after: /* begin tasking */
    :end-before: /* end tasking */
 
-The state of the pool described above is kept in the following data members:
-
-.. literalinclude:: ./examples/client-thread-pool.cpp
-   :language: c++
-   :start-after: /* begin pool state */
-   :end-before: /* end pool state */
-
 Negotiation callback
 --------------------
 
@@ -508,3 +525,6 @@ become usable re-examine its data.
 This example demonstrates how a parallel runtime, which manages a pool of threads, can adjust the
 number of threads it runs to the resources TCM grants it, both when the permit is requested and when
 TCM renegotiates it later.
+
+Full code of the example is available `here
+<https://github.com/uxlfoundation/oneTBB/blob/master/thread_composability_manager/doc/examples/client-thread-pool.cpp>`_.

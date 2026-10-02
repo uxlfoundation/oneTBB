@@ -127,15 +127,15 @@ To read current permit state and associated data, client calls :code:`tcmGetPerm
              can detect this is happening during the call to :code:`tcmGetPermitData`, in which case
              a :code:`stale` flag of the received permit is set to true (see section about `Permit
              Properties`_). However, it is the responsibility of the client to synchronize multiple,
-             possibly different, copies of permit’s data.
+             possibly different, copies of a permit’s data.
 
 Threads of a client
 *******************
 
 A TCM client utilizes granted CPU resources by running one or more software threads.
 
-To register a thread that will be working as part of a resource permit, hence consuming its
-resource, client calls :code:`tcmRegisterThread` function.
+When a thread starts participating in the permit, effectively consuming granted resources, it should
+register itself by invoking the :code:`tcmRegisterThread` function.
 
 .. code:: cpp
 
@@ -148,8 +148,8 @@ resource, client calls :code:`tcmRegisterThread` function.
 |                       |        | going to consume.                                              |
 +-----------------------+--------+----------------------------------------------------------------+
 
-To unregister a thread from being a part of a resource permit hence stop consuming its resource,
-user calls:
+When a thread stops consuming resources of a permit, it invokes the :code:`tcmUnregisterThread`
+function.
 
 .. code:: cpp
 
@@ -161,7 +161,7 @@ for which the resource permit was obtained.
 Idling, Activating and Deactivating a Permit
 ********************************************
 
-When resources are not immediately needed, the client may mark them as idle by calling
+When resources are not immediately needed, the client may mark them as idle by calling the
 :code:`tcmIdlePermit` function. The idle state indicates that threads do not process payload but
 still can spend CPU cycles actively looking for work. This allows to re-activate the permit
 relatively quickly in case the resources become needed again.
@@ -176,7 +176,7 @@ relatively quickly in case the resources become needed again.
 | :code:`permit_handle` | In     | Descriptor of the resources to mark as idle. |
 +-----------------------+--------+----------------------------------------------+
 
-If the usage of resources is not anticipated soon, the client deactivates the permit by calling
+If the usage of resources is not anticipated soon, the client deactivates the permit by calling the
 :code:`tcmDeactivatePermit` function.
 
 .. code:: cpp
@@ -193,7 +193,7 @@ TCM can also deactivate an idle permit and initiate a permit negotiation – par
 resources are needed to satisfy another request.
 
 Once the resources are needed again, the client can re-activate the permit (either idle or inactive)
-by using :code:`tcmActivatePermit` function.
+by using the :code:`tcmActivatePermit` function.
 
 .. code:: cpp
 
@@ -237,10 +237,10 @@ TCM uses `HWLOC library <https://www.open-mpi.org/projects/hwloc/>`_ to parse pl
 obtain process concurrency, process CPU mask, NUMA node, and core type indices.
 
 To make sure CPU masks, NUMA node and core type indices are interpreted by HWLOC library correctly,
-TCM client can either link with compatible version of HWLOC or write adapters for CPU masks.
+a TCM client can either link with a compatible version of HWLOC or write adapters for CPU masks.
 
-.. warning:: Even compatible versions of HWLOC might have different results of parsing of platform
-             topology. Therefore, it is recommended to ensure that single HWLOC library is used
+.. warning:: Even compatible versions of HWLOC might have different results when parsing platform
+             topology. Therefore, it is recommended to ensure that a single HWLOC library is used
              within the process.
 
 CPU Mask Adapter
@@ -274,7 +274,7 @@ defined in HWLOC as the following:
 
 .. note:: :code:`hwloc_bitmap_s` is one of the main data structures that HWLOC uses when it
           describes platform entities such as NUMA node, core type, or even CPUs that share certain
-          level of cache in terms of a CPU mask, it is unlikely that its layout changes in backward
+          levels of cache in terms of a CPU mask. It is unlikely that its layout changes in backward
           incompatible way.
 
 Since :code:`hwloc_bitmap_s` is filled with physical, operating system indices, the conversion
@@ -284,7 +284,7 @@ bits in a loop and setting corresponding bits in a platform-specific mask repres
 TCM Function Result
 ===================
 
-:code:`tcm_result_t` enum defines a set of possible values that the TCM API may return.
+The :code:`tcm_result_t` enum defines a set of possible values that the TCM API may return.
 
 .. code:: cpp
 
@@ -362,7 +362,8 @@ The :code:`tcm_permit_flags_t` describes the properties of a permit.
 +-----------------------------+--------------------------------------------------------------------+
 | Value                       | Description                                                        |
 +=============================+====================================================================+
-| :code:`stale`               | Indicates whether permit data is up to date and can be relied upon.|
+| :code:`stale`               | Indicates permit data is not up to date and should not be relied   |
+|                             | upon.                                                              |
 +-----------------------------+--------------------------------------------------------------------+
 | :code:`rigid_concurrency`   | Indicates permit requests whose concurrency cannot be changed once |
 |                             | granted and in :code:`TCM_PERMIT_STATE_ACTIVE` state. Useful for   |
@@ -378,12 +379,12 @@ Callback Type
 =============
 
 The type of a function to pass into :code:`tcmConnect`. The callback is called each time the permit
-has been changed due to API calls either from same or different client. It is not called when change
-is initiated by a client itself on a permit in question.
+has been changed due to TCM API invoked for different permits, even if the calls are made by the
+same client.
 
 The purpose of invoking this callback function is to tell a client that the data of a permit has
-been changed. Client may call :code:`tcmGetPermitData` inside callback function in order to obtain
-the latest permit data.
+been changed. A client may call :code:`tcmGetPermitData` inside a callback function in order to
+obtain the latest permit data.
 
 .. code:: cpp
 
@@ -454,14 +455,15 @@ of this type, including the arrays of necessary size.
 | :code:`flags`         | The flags of the permit. See `Permit Properties`_ for details.         |
 +-----------------------+------------------------------------------------------------------------+
 
-.. note:: :code:`cpu_masks` is :code:`nullptr` in case subset of resources were not specified via
-          :code:`tcm_cpu_constraints_t` during the permit request. In this case, the array of
-          :code:`concurrencies` contains single element and :code:`size` equals to :code:`1`.
+.. note:: :code:`cpu_masks` is :code:`nullptr` in the case that the subset of resources were not
+          specified via :code:`tcm_cpu_constraints_t` during the permit request. In this case, the
+          array of :code:`concurrencies` contains a single element and :code:`size` equals to
+          :code:`1`.
 
 Permit Constraints
 ==================
 
-Constraints describe subset of CPU resources where the requested number of software threads will
+Constraints describe the subset of CPU resources where the requested number of software threads will
 execute.
 
 .. note:: The less constrained a resource request is, the more composable with other requests it is
@@ -469,10 +471,11 @@ execute.
           necessary. In cases where constraints are needed, specify them as loosely as possible so
           that TCM has more opportunities to balance resources between conflicting permit requests.
 
-The subset of resources can be specified either by using high-level or low-level description. For
-high-level description client sets values for :code:`numa_id`, :code:`core_type_id`, and
-:code:`threads_per_core` struct fields. For low-level client specifies the mask. In case both
-low-level and high-level description are specified, the TCM prefers low-level description.
+The subset of resources can be specified either by using a high-level or a low-level description.
+For a high-level description, the client sets values for :code:`numa_id`, :code:`core_type_id`, and
+:code:`threads_per_core` struct fields. For a low-level description, the client specifies the mask.
+In case both low-level and high-level descriptions are specified, the TCM prefers the low-level
+description.
 
 Objects of :code:`tcm_cpu_constraints_t` type are required to be initialized using
 :code:`TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER`:
@@ -481,11 +484,11 @@ Objects of :code:`tcm_cpu_constraints_t` type are required to be initialized usi
 
     tcm_cpu_constraints_t constraints = TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER;
 
-The :code:`numa_id`, :code:`core_type_id`, and :code:`threads_per_core` can be assigned a natural
-number, in which case the meaning is the following:
+The :code:`numa_id`, :code:`core_type_id`, and :code:`threads_per_core` can be assigned a
+non-negative integer, in which case the meaning is the following:
 
 +---------------------------------------+--------------------------------------------------------+
-| Field                                 | Semantics of Assigning a Natural Number                |
+| Field                                 | Semantics of Assigning a Non-Negative Integer          |
 +=======================================+========================================================+
 | :code:`numa_id`, :code:`core_type_id` | Requesting resources from item with the index equal to |
 |                                       | specified value.                                       |
@@ -499,10 +502,10 @@ Besides natural numbers, these fields can be assigned the following special valu
 | Value                  | Description                                                          |
 +========================+======================================================================+
 | :code:`tcm_automatic`  | The TCM decides on its own and may choose the value automatically    |
-|                        | based on the internal heuristics and current load of the platform.   |
+|                        | based on internal heuristics and current load of the platform.       |
 +------------------------+----------------------------------------------------------------------+
-| :code:`tcm_any`        | The TCM chooses one specific value based on the internal heuristics  |
-|                        | and current load of the platform.                                    |
+| :code:`tcm_any`        | The TCM chooses one specific value based on internal heuristics and  |
+|                        | current load of the platform.                                        |
 +------------------------+----------------------------------------------------------------------+
 
 .. code:: cpp
@@ -545,9 +548,9 @@ Besides natural numbers, these fields can be assigned the following special valu
 +--------------------------+---------------------------------------------------------------------+
 
 .. note:: To avoid issues with interpretation of logical indices used to enumerate NUMA nodes and
-          core types, the specified values should correspond to logical indices used by HWLOC
-          library with which the Thread Composability Manager is linked. See `Dependency on HWLOC`_
-          for more details.
+          core types, the specified values should correspond to the logical indices used by the
+          HWLOC library with which the Thread Composability Manager is linked. See `Dependency on
+          HWLOC`_ for more details.
 
 .. _permit_requests:
 
