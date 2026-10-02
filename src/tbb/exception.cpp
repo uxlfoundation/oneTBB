@@ -73,11 +73,12 @@ const char* missing_wait::what() const noexcept(true) { return "wait() was not c
 
     #define DO_THROW(exc, init_args) do_throw( []{ throw exc init_args; }, #exc, #init_args);
 #else /* !TBB_USE_EXCEPTIONS */
-    #define PRINT_ERROR_AND_ABORT(exc_name, msg) \
-        std::fprintf (stderr, "Exception %s with message %s would have been thrown, "  \
+    #define PRINT_ERROR_AND_ABORT(exc_name, msg) { \
+        char msg_buf[1024] = { 0 }; \
+        std::snprintf(msg_buf, sizeof(msg_buf), \
+            "Exception %.22s with message %.100s would have been thrown, "  \
             "if exception handling had not been disabled. Aborting.\n", exc_name, msg); \
-        std::fflush(stderr); \
-        std::abort();
+        tbb::detail::r1::assertion_failure(nullptr, 0, nullptr, msg_buf); }
     #define DO_THROW(exc, init_args) PRINT_ERROR_AND_ABORT(#exc, #init_args)
 #endif /* !TBB_USE_EXCEPTIONS */
 
