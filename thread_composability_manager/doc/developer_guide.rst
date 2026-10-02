@@ -418,7 +418,7 @@ The state of the pool described below is kept in the following data members. The
 divided into three categories:
 
 * Entities that help managing threads: creation, wakening, putting to sleep, and destruction.
-* Entities that help managing tasks: enqueueing, dequeueing, and cancelation.
+* Entities that help managing tasks: enqueueing, dequeueing, and cancellation.
 * Entities that help working with TCM: connecting, disconnecting, permit management, synchronization
   of permit updates.
 
