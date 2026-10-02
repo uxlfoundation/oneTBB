@@ -78,8 +78,10 @@ void global_control_terminate_on_exception(TestCase test_case) {
                 oneapi::tbb::parallel_for(0, 1, -1, [](int) {});
                 FAIL("Unreachable code");
             }
-            if (test_case == TestCase::CUSTOM_ASSERTION_HANDLER)
+            if (test_case == TestCase::CUSTOM_ASSERTION_HANDLER) {
                 CHECK(invalid_argument_exception);
+                CHECK(!std_exception);
+            }
         }
 #if TBB_USE_EXCEPTIONS
         SUBCASE("user exception") {
@@ -92,8 +94,10 @@ void global_control_terminate_on_exception(TestCase test_case) {
                 });
                 FAIL("Unreachable code");
             }
-            if (test_case == TestCase::CUSTOM_ASSERTION_HANDLER)
+            if (test_case == TestCase::CUSTOM_ASSERTION_HANDLER) {
+                CHECK(!invalid_argument_exception);
                 CHECK(std_exception);
+            }
         }
 #endif
 #if _MSC_VER
