@@ -21,7 +21,7 @@
 
 // The test cannot work correctly with statically linked runtime.
 // TODO: investigate a failure in debug with MSVC
-#if (!_MSC_VER || (defined(_DLL) && !defined(_DEBUG))) && !EMSCRIPTEN
+#if TBB_USE_EXCEPTIONS && (!_MSC_VER || (defined(_DLL) && !defined(_DEBUG))) && !EMSCRIPTEN
 
 #include "oneapi/tbb/global_control.h"
 #include "oneapi/tbb/parallel_for.h"
