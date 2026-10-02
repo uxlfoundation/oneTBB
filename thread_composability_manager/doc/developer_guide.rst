@@ -401,10 +401,10 @@ threads or putting excessive ones to sleep. The example also includes synchroniz
 allows invocation of a parallel computation concurrently with itself, making sure the resources are
 not released while there is work to do.
 
-In this section we start by describing the state of the pool and its `public interface <Pool
-interface>`_. In section `Permit management`_ we show how a single permit is managed by the pool
-across concurrent uses. `Worker pool`_ section describes how worker threads are managed by waking
-them up and putting them to sleep in response to changes in the permit. The details of permit
+In this section we start by describing the state of the pool and its :ref:`public interface
+<pool_interface>`. In section `Permit management`_ we show how a single permit is managed by the
+pool across concurrent uses. `Worker pool`_ section describes how worker threads are managed by
+waking them up and putting them to sleep in response to changes in the permit. The details of permit
 negotiation is described in `Negotiation callback`_ section. While not directly relevant to TCM, the
 approach to assigning tasks to worker threads is shown in section `Tasking`_.
 
@@ -426,6 +426,8 @@ divided into three categories:
    :language: c++
    :start-after: /* begin pool state */
    :end-before: /* end pool state */
+
+.. _pool_interface:
 
 Pool interface
 --------------
