@@ -25,14 +25,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdarg>
+#include <exception>
 #if _MSC_VER && _DEBUG
 #include <crtdbg.h>
 #endif
-#if (__TBB_BUILD || __TBBBIND_BUILD) && TBB_USE_EXCEPTIONS
-#include <exception>
-#if __TBB_USE_OPTIONAL_RTTI
+#if (__TBB_BUILD || __TBBBIND_BUILD) && TBB_USE_EXCEPTIONS && __TBB_USE_OPTIONAL_RTTI
 #include <typeinfo> // to report exception name
-#endif
 #endif
 
 #include <mutex>
@@ -84,7 +82,6 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
 #endif
 }
 
-#if __TBB_BUILD
 /* [[noreturn]] */ static void call_terminate_default(const char* comment) {
 #if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     // Workaround for erroneous "unreachable code" during assertion throwing using call_once
@@ -108,7 +105,6 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
     #pragma warning (pop)
 #endif
 }
-#endif
 
 namespace assertion_handler {
 // Initial value is default handler
@@ -168,7 +164,6 @@ void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line,
         assertion_failure_default(location, line, expression, comment);
 }
 
-#if __TBB_BUILD
 void call_terminate_on_exception(const char* comment) {
     assertion_handler_type curr = assertion_handler::get();
 
@@ -177,7 +172,6 @@ void call_terminate_on_exception(const char* comment) {
     else
         call_terminate_default(comment);
 }
-#endif
 
 //! Report a runtime warning.
 void runtime_warning( const char* format, ... ) {
