@@ -16,8 +16,8 @@
 cmake_minimum_required(VERSION 3.5.0...3.31.3)
 project(doc_examples_testing LANGUAGES CXX)
 
-set(_reference_examples_path "${CMAKE_CURRENT_SOURCE_DIR}/../reference/source")
-set(_userguide_examples_path "${CMAKE_CURRENT_SOURCE_DIR}/../tbb_userguide/examples")
+set(_reference_path "${CMAKE_CURRENT_SOURCE_DIR}/../reference")
+set(_userguide_path "${CMAKE_CURRENT_SOURCE_DIR}/../tbb_userguide")
 
 # Examples that require special handling and are excluded from the generic build
 set(_doc_examples_exclude_regex
@@ -40,7 +40,7 @@ macro(add_doc_example _doc_example_path)
     set_tests_properties(${_doc_example_name} PROPERTIES LABELS "${doc_examples_test_label}")
 endmacro()
 
-file(GLOB_RECURSE DOC_EXAMPLES_LIST "${_reference_examples_path}/*.cpp" "${_userguide_examples_path}/*.cpp")
+file(GLOB_RECURSE DOC_EXAMPLES_LIST "${_reference_path}/*.cpp" "${_userguide_path}/*.cpp")
 list(FILTER DOC_EXAMPLES_LIST EXCLUDE REGEX "${_doc_examples_exclude_regex}")
 
 foreach(_doc_example_path IN LISTS DOC_EXAMPLES_LIST)
@@ -57,7 +57,7 @@ if (TBB_TEST_CXX20_MODULES)
     if (CMAKE_VERSION VERSION_LESS 3.28)
         message(WARNING "CMake 3.28 or higher is required for C++20 modules, skipping cxx20_module_example")
     else()
-        add_doc_example("${_userguide_examples_path}/cxx20_module_example.cpp")
+        add_doc_example("${_userguide_path}/cxx20_module_example.cpp")
         target_sources(cxx20_module_example PRIVATE
             FILE_SET CXX_MODULES
             BASE_DIRS ${CMAKE_SOURCE_DIR}/include
