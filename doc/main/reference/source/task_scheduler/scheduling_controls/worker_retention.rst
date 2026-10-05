@@ -30,7 +30,7 @@ subsequent parallel computations. However, this behavior can be undesirable, esp
   It is set when an arena is initialized, using either the arena-specific value or the global value.
 * A *parallel phase* brackets a region of recurrent parallel work so that the scheduler
   can retain threads more aggressively during the region and, if needed, releases them promptly afterward.
-  It changes retention behavior of an already initialized arena at runtime.
+  It changes the retention behavior of an already initialized arena at runtime.
 
 Leave Policy
 ------------
