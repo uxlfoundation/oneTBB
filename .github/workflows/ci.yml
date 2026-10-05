@@ -96,9 +96,10 @@ jobs:
       - name: Build documentation
         run: |
           set -e -x -o pipefail
-          # Warnings are collected into a log and summarized below. Once the
-          # existing ones are fixed, add -W to make them fail the build.
-          export BUILD_TYPE=${BUILD_TYPE} && sphinx-build --keep-going -w sphinx-warnings.log doc html
+          # -W turns RST syntax errors, broken internal references and other
+          # Sphinx warnings into build failures; --keep-going reports all of
+          # them in one run instead of stopping at the first.
+          export BUILD_TYPE=${BUILD_TYPE} && sphinx-build -W --keep-going -w sphinx-warnings.log doc html
           tar -czvf html.tar.gz html/
       - name: Report documentation warnings
         if: ${{ always() }}
