@@ -162,7 +162,8 @@ set_assertion_handler(assertion_handler_type new_handler) noexcept {
     return assertion_handler::set(new_handler);
 }
 assertion_handler_type __TBB_EXPORTED_FUNC get_assertion_handler() noexcept {
-    return assertion_handler::get();
+    assertion_handler_type curr = assertion_handler::get();
+    return curr ? curr : assertion_failure_default;
 }
 #endif
 
