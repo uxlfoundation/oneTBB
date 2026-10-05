@@ -137,7 +137,7 @@ Equivalent to ``resource_limiter(init.begin(), init.end())``.
 .. code:: cpp
 
     template <typename Tuple, typename... Tuples>
-    resource_limiter(std::piecewise_construct_t, Tuple&& tuple, Tuples&&... tuples);
+    resource_limiter(std::piecewise_construct_t, Tuple&& handle_arg, Tuples&&... handle_args);
 
 **Requirements**: for each ``T`` in ``{Tuple, Tuples...}`` and the corresponding ``t`` in ``{tuple, tuples...}``,
 ``ResourceHandle`` must be constructible from ``std::get<N>(std::forward<T>(t))`` for each ``N`` in
