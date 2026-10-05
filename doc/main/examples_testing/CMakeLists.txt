@@ -21,7 +21,7 @@ set(_userguide_examples_path "${CMAKE_CURRENT_SOURCE_DIR}/../tbb_userguide/examp
 
 # Examples that require special handling and are excluded from the generic build
 set(_doc_examples_exclude_regex
-    "cxx20_module_example\\.cpp$"  # requires C++20 modules support
+    "cxx20_module_example\\.cpp$|/uncategorized/"
 )
 
 add_custom_target(build-doc-examples
