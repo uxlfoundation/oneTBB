@@ -18,3 +18,4 @@ This section describes the most general features of oneAPI Threading Building Bl
     configuration/custom_assertion_handler.rst
     configuration/feature_macros.rst
     configuration/feature_test_macros.rst
+    configuration/feature_test_macros_changelog.rst
