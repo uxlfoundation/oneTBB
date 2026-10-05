@@ -60,7 +60,6 @@ const char* missing_wait::what() const noexcept(true) { return "wait() was not c
 
     bool terminate_on_exception(); // defined in global_control.cpp and ipc_server.cpp
 
-#if __TBB_BUILD
     template <typename F>
     /*[[noreturn]]*/ void do_throw(F throw_func, const char* exc_name, const char* init_args) {
         if (terminate_on_exception()) {
@@ -72,7 +71,6 @@ const char* missing_wait::what() const noexcept(true) { return "wait() was not c
         }
         throw_func();
     }
-#endif // __TBB_BUILD
 
     #define DO_THROW(exc, init_args) do_throw( []{ throw exc init_args; }, #exc, #init_args);
 #else /* !TBB_USE_EXCEPTIONS */
@@ -85,7 +83,6 @@ const char* missing_wait::what() const noexcept(true) { return "wait() was not c
     #define DO_THROW(exc, init_args) PRINT_ERROR_AND_ABORT(#exc, #init_args)
 #endif /* !TBB_USE_EXCEPTIONS */
 
-#if __TBB_BUILD
 void throw_exception ( exception_id eid ) {
     switch ( eid ) {
     case exception_id::bad_alloc: DO_THROW(std::bad_alloc, ()); break;
@@ -130,7 +127,6 @@ void handle_perror( int error_code, const char* what ) {
     PRINT_ERROR_AND_ABORT( "runtime_error", buf);
 #endif /* !TBB_USE_EXCEPTIONS */
 }
-#endif // __TBB_BUILD
 
 #if __TBB_STD_RETHROW_EXCEPTION_POSSIBLY_BROKEN
 // Runtime detection and workaround for the GCC bug 62258.
