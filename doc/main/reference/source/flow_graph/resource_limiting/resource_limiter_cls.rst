@@ -168,3 +168,5 @@ The limiter manages two handles: the first is constructed as ``Handle(arg1, arg2
 Destroys the ``resource_limiter``.
 
 If there are consumers that still reference the limiter, the behavior is undefined.
+
+DUMMY
