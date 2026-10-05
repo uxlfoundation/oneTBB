@@ -96,7 +96,7 @@ jobs:
       - name: Build documentation
         run: |
           set -e -x -o pipefail
-          export BUILD_TYPE=${BUILD_TYPE} && sphinx-build doc html
+          export BUILD_TYPE=${BUILD_TYPE} && sphinx-build -W --keep-going doc html
           tar -czvf html.tar.gz html/
       - name: Save docs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
