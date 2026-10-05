@@ -730,7 +730,7 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          sudo apt-get update && sudo apt-get install -y ninja-build
+          sudo apt-get update && sudo apt-get install -y ninja-build pkg-config libhwloc-dev hwloc
           if [[ "${{ matrix.cxx_compiler }}" == "clang++" ]]; then
             sudo apt-get install -y libomp-dev
           fi
@@ -741,7 +741,7 @@ jobs:
           cmake -G "${{ matrix.generator }}" -DCMAKE_CXX_STANDARD=${{ matrix.std }} -DCMAKE_BUILD_TYPE=${{ matrix.build_type}} \
             -DCMAKE_CXX_COMPILER=${{ matrix.cxx_compiler }} -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
             ${{ matrix.cmake_extra }} -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON ..
-          cmake --build . -v --parallel --target build-doc-examples
+          cmake --build . -v --parallel --target tbbbind_2_5 build-doc-examples
           ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure -L doc-examples
 
   windows-doc-examples-testing:
