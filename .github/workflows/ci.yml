@@ -96,9 +96,6 @@ jobs:
       - name: Build documentation
         run: |
           set -e -x -o pipefail
-          # -W turns RST syntax errors, broken internal references and other
-          # Sphinx warnings into build failures; --keep-going reports all of
-          # them in one run instead of stopping at the first.
           export BUILD_TYPE=${BUILD_TYPE} && sphinx-build -W --keep-going doc html
           tar -czvf html.tar.gz html/
       - name: Save docs
