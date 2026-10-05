@@ -76,11 +76,31 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
 #endif
         {
             std::fflush(stderr);
-#if (__TBB_BUILD || __TBBBIND_BUILD) // only TBB and TBBBind use custom handler
-            std::terminate();
-#else
             std::abort();
+        }
+    }, assertion_state);
+#if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
+    #pragma warning (pop)
 #endif
+}
+
+/* [[noreturn]] */ static void call_terminate_default(const char* comment) {
+#if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
+    // Workaround for erroneous "unreachable code" during assertion throwing using call_once
+    #pragma warning (push)
+    #pragma warning (disable: 4702)
+#endif
+    atomic_do_once([&](){
+        std::fprintf(stderr, "Detailed description: %s\n", comment);
+#if _MSC_VER && _DEBUG
+        if (1 == _CrtDbgReport(_CRT_ASSERT, nullptr, 0, "tbb_debug.dll", "%s\r\n%s",
+                               "", comment?comment:"")) {
+            _CrtDbgBreak();
+        } else
+#endif
+        {
+            std::fflush(stderr);
+            std::terminate();
         }
     }, assertion_state);
 #if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
@@ -103,8 +123,7 @@ static assertion_handler_type set(assertion_handler_type new_handler) noexcept {
 #endif
 
 static assertion_handler_type get() noexcept {
-    assertion_handler_type curr_handler = handler.load(std::memory_order_acquire);
-    return curr_handler ? curr_handler : assertion_failure_default;
+    return handler.load(std::memory_order_acquire);
 }
 
 } // namespace assertion_handler
@@ -133,13 +152,27 @@ void terminate_on_user_exception() {
     } catch (...) {
         std::strncat(buf, "Unknown exception", sizeof(buf)-1);
     }
-    tbb::detail::r1::assertion_failure(nullptr, 0, nullptr, buf);
+    call_terminate_on_exception(buf);
 }
 #endif // __TBB_BUILD
 
 void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line,
                                            const char* expression, const char* comment) {
-    assertion_handler::get()(location, line, expression, comment);
+    assertion_handler_type curr = assertion_handler::get();
+
+    if (curr)
+        curr(location, line, expression, comment);
+    else
+        assertion_failure_default(location, line, expression, comment);
+}
+
+void call_terminate_on_exception(const char* comment) {
+    assertion_handler_type curr = assertion_handler::get();
+
+    if (curr)
+        curr(nullptr, 0, nullptr, comment);
+    else
+        call_terminate_default(comment);
 }
 
 //! Report a runtime warning.

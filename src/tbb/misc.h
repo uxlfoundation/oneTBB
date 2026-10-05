@@ -43,6 +43,7 @@ namespace tbb {
 namespace detail {
 namespace r1 {
 
+void call_terminate_on_exception(const char* comment);
 void runtime_warning(const char* format, ... );
 
 class task_arena;

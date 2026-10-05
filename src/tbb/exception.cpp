@@ -14,6 +14,7 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 */
+#include "misc.h"
 
 #include "oneapi/tbb/detail/_exception.h"
 #include "oneapi/tbb/detail/_assert.h"
@@ -66,7 +67,7 @@ const char* missing_wait::what() const noexcept(true) { return "wait() was not c
             std::snprintf(buf, sizeof(buf),
                   "Terminating due to exception: %s with arguments: %s",
                   exc_name, init_args);
-            tbb::detail::r1::assertion_failure(nullptr, 0, nullptr, buf);
+            tbb::detail::r1::call_terminate_on_exception(buf);
         }
         throw_func();
     }
@@ -77,8 +78,8 @@ const char* missing_wait::what() const noexcept(true) { return "wait() was not c
         char msg_buf[1024] = { 0 }; \
         std::snprintf(msg_buf, sizeof(msg_buf), \
             "Exception %.22s with message %.100s would have been thrown, "  \
-            "if exception handling had not been disabled. Aborting.\n", exc_name, msg); \
-        tbb::detail::r1::assertion_failure(nullptr, 0, nullptr, msg_buf); }
+            "if exception handling had not been disabled. Terminating.\n", exc_name, msg); \
+        tbb::detail::r1::call_terminate_on_exception(msg_buf); }
     #define DO_THROW(exc, init_args) PRINT_ERROR_AND_ABORT(#exc, #init_args)
 #endif /* !TBB_USE_EXCEPTIONS */
 
