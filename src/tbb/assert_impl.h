@@ -25,12 +25,14 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdarg>
-#include <exception>
 #if _MSC_VER && _DEBUG
 #include <crtdbg.h>
 #endif
-#if (__TBB_BUILD || __TBBBIND_BUILD) && TBB_USE_EXCEPTIONS && __TBB_USE_OPTIONAL_RTTI
+#if (__TBB_BUILD || __TBBBIND_BUILD) && TBB_USE_EXCEPTIONS // only TBB and TBBBind use custom handler
+#include <exception>
+#if __TBB_USE_OPTIONAL_RTTI
 #include <typeinfo> // to report exception name
+#endif
 #endif
 
 #include <mutex>
