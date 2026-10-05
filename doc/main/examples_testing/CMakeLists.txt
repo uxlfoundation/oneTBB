@@ -41,10 +41,11 @@ macro(add_doc_example _doc_example_path)
 endmacro()
 
 file(GLOB_RECURSE DOC_EXAMPLES_LIST "${_reference_path}/*.cpp" "${_userguide_path}/*.cpp")
-list(FILTER DOC_EXAMPLES_LIST EXCLUDE REGEX "${_doc_examples_exclude_regex}")
+set(_doc_examples_filtered "${DOC_EXAMPLES_LIST}")
+list(FILTER _doc_examples_filtered EXCLUDE REGEX "${_doc_examples_exclude_regex}")
 
-foreach(_doc_example_path IN LISTS DOC_EXAMPLES_LIST)
-    add_doc_example(${_doc_example_path})
+foreach(_doc_example_path IN LISTS _doc_examples_filtered)
+    add_doc_example("${_doc_example_path}")
 endforeach()
 
 target_link_libraries(malloc_replacement_log_example TBB::tbbmalloc_proxy)
@@ -57,7 +58,11 @@ if (TBB_TEST_CXX20_MODULES)
     if (CMAKE_VERSION VERSION_LESS 3.28)
         message(WARNING "CMake 3.28 or higher is required for C++20 modules, skipping cxx20_module_example")
     else()
-        add_doc_example("${_userguide_path}/cxx20_module_example.cpp")
+        set(_cxx20_example_sources "${DOC_EXAMPLES_LIST}")
+        list(FILTER _cxx20_example_sources INCLUDE REGEX "/cxx20_module_example\\.cpp$")
+        list(GET _cxx20_example_sources 0 _cxx20_example_source)
+
+        add_doc_example("${_cxx20_example_source}")
         target_sources(cxx20_module_example PRIVATE
             FILE_SET CXX_MODULES
             BASE_DIRS ${CMAKE_SOURCE_DIR}/include
