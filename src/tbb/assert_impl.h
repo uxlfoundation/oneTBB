@@ -21,6 +21,8 @@
 #include "oneapi/tbb/detail/_config.h"
 #include "oneapi/tbb/detail/_utils.h"
 
+#include "misc.h"
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -84,8 +86,8 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
 #endif
 }
 
-#if !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
-/* [[noreturn]] */ static void call_terminate_default(const char* comment) {
+#if !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD && !TBB_USE_EXCEPTIONS
+/* [[noreturn]] */ void call_terminate_default(const char* comment) {
 #if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     // Workaround for erroneous "unreachable code" during assertion throwing using call_once
     #pragma warning (push)
@@ -111,7 +113,6 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
 #endif // !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
 
 namespace assertion_handler {
-// Initial value is default handler
 static std::atomic<assertion_handler_type> handler{nullptr};
 
 #if (__TBB_BUILD || __TBBBIND_BUILD) // only TBB and TBBBind use custom handler
@@ -132,7 +133,7 @@ static assertion_handler_type get() noexcept {
 
 #if __TBB_BUILD && TBB_USE_EXCEPTIONS
 void terminate_on_user_exception() {
-    assertion_handler_type curr_handler = assertion_handler::handler.load(std::memory_order_acquire);
+    assertion_handler_type curr_handler = assertion_handler::get();
 
     // default "exception in noexcept function" handler can report exception name
     // for any exception, so use it if one is not redefined
@@ -154,7 +155,7 @@ void terminate_on_user_exception() {
     } catch (...) {
         std::strncat(buf, "Unknown exception", sizeof(buf)-1);
     }
-    call_terminate_on_exception(buf);
+    curr_handler(nullptr, 0, nullptr, buf);
 }
 #endif // __TBB_BUILD
 
@@ -169,13 +170,12 @@ void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line,
 }
 
 #if !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
-void call_terminate_on_exception(const char* comment) {
+bool call_terminate_on_exception(const char* comment) {
     assertion_handler_type curr = assertion_handler::get();
-
-    if (curr)
-        curr(nullptr, 0, nullptr, comment);
-    else
-        call_terminate_default(comment);
+    if (!curr)
+        return false;
+    curr(nullptr, 0, nullptr, comment);
+    return true;
 }
 #endif // !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
 

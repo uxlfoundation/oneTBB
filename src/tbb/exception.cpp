@@ -65,9 +65,10 @@ const char* missing_wait::what() const noexcept(true) { return "wait() was not c
         if (terminate_on_exception()) {
             char buf[256] = { 0 };
             std::snprintf(buf, sizeof(buf),
-                  "Terminating due to exception: %s with arguments: %s",
-                  exc_name, init_args);
-            tbb::detail::r1::call_terminate_on_exception(buf);
+                      "Terminating due to exception: %s with arguments: %s",
+                      exc_name, init_args);
+            if (!call_terminate_on_exception(buf))
+                do_throw_noexcept(throw_func);
         }
         throw_func();
     }
@@ -77,9 +78,9 @@ const char* missing_wait::what() const noexcept(true) { return "wait() was not c
     #define PRINT_ERROR_AND_ABORT(exc_name, msg) { \
         char msg_buf[1024] = { 0 }; \
         std::snprintf(msg_buf, sizeof(msg_buf), \
-            "Exception %.22s with message %.100s would have been thrown, "  \
+            "Exception %s with message %s would have been thrown, "  \
             "if exception handling had not been disabled. Terminating.\n", exc_name, msg); \
-        tbb::detail::r1::call_terminate_on_exception(msg_buf); }
+        if (!call_terminate_on_exception(msg_buf)) call_terminate_default(msg_buf); }
     #define DO_THROW(exc, init_args) PRINT_ERROR_AND_ABORT(#exc, #init_args)
 #endif /* !TBB_USE_EXCEPTIONS */
 

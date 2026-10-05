@@ -43,7 +43,13 @@ namespace tbb {
 namespace detail {
 namespace r1 {
 
-void call_terminate_on_exception(const char* comment);
+#if !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
+bool call_terminate_on_exception(const char* comment);
+#if !TBB_USE_EXCEPTIONS
+void call_terminate_default(const char* comment);
+#endif
+#endif
+
 void runtime_warning(const char* format, ... );
 
 class task_arena;
