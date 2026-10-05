@@ -99,20 +99,8 @@ jobs:
           # -W turns RST syntax errors, broken internal references and other
           # Sphinx warnings into build failures; --keep-going reports all of
           # them in one run instead of stopping at the first.
-          export BUILD_TYPE=${BUILD_TYPE} && sphinx-build -W --keep-going -w sphinx-warnings.log doc html
+          export BUILD_TYPE=${BUILD_TYPE} && sphinx-build -W --keep-going doc html
           tar -czvf html.tar.gz html/
-      - name: Report documentation warnings
-        if: ${{ always() }}
-        run: |
-          set -e -o pipefail
-          count=$(grep -c -E 'WARNING|ERROR' sphinx-warnings.log || true)
-          {
-            echo "### Sphinx documentation warnings: ${count}"
-            echo '```'
-            cat sphinx-warnings.log
-            echo '```'
-          } >> $GITHUB_STEP_SUMMARY
-          cat sphinx-warnings.log
       - name: Save docs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
