@@ -84,7 +84,7 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
 #endif
 }
 
-#if !__TBBMALLOC_BUILD
+#if !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
 /* [[noreturn]] */ static void call_terminate_default(const char* comment) {
 #if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     // Workaround for erroneous "unreachable code" during assertion throwing using call_once
@@ -108,7 +108,7 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
     #pragma warning (pop)
 #endif
 }
-#endif // !__TBBMALLOC_BUILD
+#endif // !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
 
 namespace assertion_handler {
 // Initial value is default handler
@@ -168,7 +168,7 @@ void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line,
         assertion_failure_default(location, line, expression, comment);
 }
 
-#if !__TBBMALLOC_BUILD
+#if !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
 void call_terminate_on_exception(const char* comment) {
     assertion_handler_type curr = assertion_handler::get();
 
@@ -177,7 +177,7 @@ void call_terminate_on_exception(const char* comment) {
     else
         call_terminate_default(comment);
 }
-#endif
+#endif // !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
 
 //! Report a runtime warning.
 void runtime_warning( const char* format, ... ) {
