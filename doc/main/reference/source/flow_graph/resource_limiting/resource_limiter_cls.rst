@@ -137,10 +137,11 @@ Equivalent to ``resource_limiter(init.begin(), init.end())``.
 .. code:: cpp
 
     template <typename Tuple, typename... Tuples>
-    resource_limiter(std::piecewise_construct_t, Tuple&& handle_arg, Tuples&&... handle_args);
+    resource_limiter(std::piecewise_construct_t, Tuple&& handle_args1, Tuples&&... handle_argsN);
 
-**Requirements**: for each ``T`` in ``{Tuple, Tuples...}`` and the corresponding ``t`` in ``{tuple, tuples...}``,
-``ResourceHandle`` must be constructible from ``std::get<N>(std::forward<T>(t))`` for each ``N`` in
+**Requirements**: for each ``T`` in ``{Tuple, Tuples...}`` and the corresponding set of arguments ``handle_args``
+in ``{handle_args1, handle_argsN...}``, ``ResourceHandle`` must be constructible from
+``std::get<N>(std::forward<T>(handle_args))...`` where ``N`` is in
 ``[0, std::tuple_size<std::decay_t<T>>::value)``.
 
 Constructs a ``resource_limiter`` that manages ``1 + sizeof...(Tuples)`` resource handles. Each handle is constructed
