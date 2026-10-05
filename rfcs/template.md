@@ -48,7 +48,7 @@ Some other common subsections here are:
   subsections), and then have a dedicated section with the discussion.
 - List of the proposed API and examples of its usage.
 - Testing aspects, including listing of usage scenarios on which to evaluate
-  performance of a code that would implement this proposal.
+  performance of any implementation of the proposal.
 - Short explanation and links to the related sub-proposals, if any. Such
   sub-proposals could be organized as separate standalone RFCs, but this is
   not mandatory. If the change is insignificant or doesn't make any sense
