@@ -32,7 +32,8 @@ For example:
 
 Each macro value follows the pattern ``YYYYMM``, where ``YYYY`` is a year, and ``MM`` is a month when
 the corresponding feature was introduced or updated. These values can be increased if the capabilities of given features
-are extended. The table below contains only the most recent values.
+are extended. The table below contains only the most recent values. The full changelog for each feature is
+available as a :ref:`separate table<feature_test_macros_changelog>`.
 
 .. container:: tablenoborder
 
@@ -70,6 +71,10 @@ are extended. The table below contains only the most recent values.
           -    ``TBB_HAS_NUMA_ALLOCATION``
           -    ``202605``
           -    ``<oneapi/tbb/numa_allocation.h>``
+        * -    :ref:`Custom Assertion Handler<custom_assertion_handler>`
+          -    ``TBB_HAS_CUSTOM_ASSERTION_HANDLER``
+          -    ``202608``
+          -    ``<oneapi/tbb/global_control.h>``
 
 Example
 -------

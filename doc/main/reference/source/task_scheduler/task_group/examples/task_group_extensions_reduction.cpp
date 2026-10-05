@@ -52,7 +52,7 @@ struct reduce_task {
             auto left_result = std::make_unique<std::size_t>(0);
             auto right_result = std::make_unique<std::size_t>(0);
 
-            
+
             tbb::task_handle left_leaf = tg.defer(reduce_task{begin, middle, *left_result, tg});
             tbb::task_handle right_leaf = tg.defer(reduce_task{middle, end, *right_result, tg});
 
@@ -94,5 +94,8 @@ int main() {
     std::size_t serial_sum = N * (N - 1) / 2;
     std::size_t parallel_sum = calculate_parallel_sum(0, N);
 
-    if (serial_sum != parallel_sum) std::cerr << "Incorrect reduction result" << std::endl;
+    if (serial_sum != parallel_sum) {
+        std::cerr << "Incorrect reduction result" << std::endl;
+        return 1;
+    }
 }
