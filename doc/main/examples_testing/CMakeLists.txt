@@ -16,7 +16,7 @@
 cmake_minimum_required(VERSION 3.5.0...3.31.3)
 project(doc_examples_testing LANGUAGES CXX)
 
-set(_reference_examples_path "${CMAKE_CURRENT_SOURCE_DIR}/../reference/examples")
+set(_reference_examples_path "${CMAKE_CURRENT_SOURCE_DIR}/../reference/source")
 set(_userguide_examples_path "${CMAKE_CURRENT_SOURCE_DIR}/../tbb_userguide/examples")
 
 # Examples that require special handling and are excluded from the generic build

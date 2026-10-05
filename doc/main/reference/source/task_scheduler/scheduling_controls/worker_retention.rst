@@ -104,7 +104,8 @@ worker threads do not spin when idle to not compete for CPU with the threads of 
 The next example has the same structure, but the parallel algorithm is called directly,
 without an explicit arena, so there is no place to set the leave policy per arena. Instead,
 a ``global_control`` object switches the application-wide default to fast leave, which also applies
-to the implicit arena used by the algorithm.
+to the implicit arena used by the algorithm. For this setting to take effect, the implicit arena
+must not have been initialized before the ``global_control`` object is created.
 
 .. literalinclude:: ./examples/leave_policy_example.cpp
    :language: c++
