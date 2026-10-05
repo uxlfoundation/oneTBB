@@ -1,0 +1,75 @@
+#+TITLE: Unregister threads participating in a permit with a single function invocation
+
+* Introduction
+
+  TCM API contains =tcmUnregisterThread()= function that allows unregistering the thread invoking
+  that function from the last permit, previously registered with the call to
+  =tcmRegisterThread(permit_handle)=.
+
+  For some parallel runtimes this is inconvenient as it requires additional synchronization between
+  working threads, especially if there is difference in responsibilities between participating and
+  work coordinating threads.
+
+  Therefore, the motiviation is to introduce new TCM function that would allow a single thread to
+  unregister from specific permit all the participating threads, i.e. those that were previously
+  registered witht the permit by invoking =tcmRegisterThread(permit_handle)=.
+
+* Proposal
+
+  Introduce new API function to allow deregistration of all the threads registered with specific
+  permit.
+
+  API signature:
+
+  #+begin_src C++
+    tcm_result_t tcmUnregisterThreads(tcm_permit_handle_t permit_handle)
+  #+end_src
+
+  /Parameters/:
+  - =permit_handle= denotes the handle of the permit with which previously registered threads to be
+    deregistered.
+
+
+  /Return values/:
+  - =TCM_RESULT_ERROR_INVALID_ARGUMENT= if the passed =permit_handle= is =nullptr=.
+  - =TCM_RESULT_SUCCESS= in case of successful function invocation.
+
+
+  /Semantics/: The effect of the function invocation is identical to the situation when all the
+  threads that participate in a given permit invoke =tcmUnregisterThread()= on their own.
+
+
+  /Usage Expectations/Requirements/:
+  - Threads that previously registered with a given permit do not call =tcmUnregisterThread()= after
+    a call to =tcmUnregisterThreads(tcm_permit_handle_t)= is made. Calling =tcmUnregisterThread()=
+    in such situation is an undefined behavior.
+  - The =permit_handle= passed to the =tcmUnregisterThreads(tcm_permit_handle_t)= is the last permit
+    with which participating threads were registered.
+  - Thread registration cannot outlive the permit handle with which it is registered.
+
+
+  /Important usage scenarios to support/:
+  - Loop with many iterations of =tcmRegisterThread(permit_handle)= and =tcmUnregisterThreads(permit_handle)=
+    calls.
+
+    Pseudocode example:
+    #+begin_src C++
+      loop {
+          participating_thread_routine {
+              tcmRegisterThread(permit_handle); // Each participating thread calls
+          }
+
+          // barrier synchronization for threads to finish with registration
+
+          primary_thread_routine {
+              tcmUnregisterThreads(permit_handle);
+          }
+
+          // barrier synchronization for threads to wait for their deregistration by a primary thread
+      }
+    #+end_src
+  
+* Open Questions
+  
+  - Are the usage requirements appropriate enough?
+  - Are there any other usage scenarios need to be supported?
