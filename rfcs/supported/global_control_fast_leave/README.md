@@ -31,7 +31,7 @@ would be preferable for many use cases.
 ### Related Work
 
 The `parallel_phase` API (RFC:
-[parallel_phase_for_task_arena](https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/experimental/parallel_phase_for_task_arena))
+[parallel_phase_for_task_arena](https://github.com/uxlfoundation/oneTBB/tree/master/rfcs/supported/parallel_phase_for_task_arena))
 provides per-arena control over worker retention through `task_arena::leave_policy` and
 `start_parallel_phase`/`end_parallel_phase` functions. This proposal complements that feature by
 providing a global override mechanism.
@@ -56,14 +56,13 @@ The proposal adds a new enumeration value to the existing `global_control::param
 #### Header
 
 ```cpp
-#define TBB_PREVIEW_PARALLEL_PHASE 1
 #include <oneapi/tbb/global_control.h>
 ```
 
 #### Syntax
 
 ```cpp
-#define TBB_HAS_PARALLEL_PHASE 202xxx
+#define TBB_HAS_PARALLEL_PHASE 202608
 
 namespace oneapi {
 namespace tbb {
@@ -75,9 +74,7 @@ public:
         thread_stack_size,
         terminate_on_exception,
         scheduler_handle,  // not a public parameter
-#if TBB_PREVIEW_PARALLEL_PHASE
         leave_policy,      // NEW: Controls worker fast leave behavior
-#endif
         parameter_max
     };
 
@@ -158,34 +155,6 @@ This design ensures that:
 3. The global `leave_policy` parameter only affects the initial state of arenas initialized with
    `leave_policy::automatic`
 
-### Specification Extension
-
-This API would be introduced under the `TBB_PREVIEW_PARALLEL_PHASE` macro, consistent with the
-related parallel phase feature.
-
-#### oneTBB Documentation Update (Preview State)
-
-While the feature is in preview state, the
-[parallel phase API reference](https://github.com/uxlfoundation/oneTBB/blob/master/doc/main/reference/parallel_phase_for_task_arena.rst)
-would need to be extended with documentation for the `global_control::leave_policy` parameter:
-- Add a new section "Global Control Integration" describing the `leave_policy` parameter
-- Update the Synopsis to include the `global_control` header and `leave_policy` parameter
-- Add a description of the parameter semantics and selection rule
-- Document the interaction between `global_control::leave_policy` and per-arena `leave_policy`
-- Add usage examples showing how to combine global fast leave with parallel phases
-- Include a note explaining that `global_control::leave_policy` provides application-wide control
-  while `task_arena::leave_policy` and `parallel_phase` provide per-arena control
-
-#### oneAPI Specification Update
-
-Once this feature is stabilized and moved from preview to supported status, the oneAPI
-specification would need to be updated. Specifically, the
-[global_control class documentation](https://github.com/uxlfoundation/oneAPI-spec/blob/main/source/elements/oneTBB/source/task_scheduler/scheduling_controls/global_control_cls.rst)
-would need to be extended with
-- a new entry in the `parameter` enumeration
-- documentation of the interaction with `task_arena::leave_policy` and the `parallel_phase` API
-- usage guidance for when this parameter is appropriate versus per-arena control mechanisms
-
 ### Thread Safety
 
 The implementation would use the existing thread-safe `control_storage` infrastructure:
@@ -215,7 +184,6 @@ The additional branch is only evaluated once per arena initialization (not on th
 #### Basic Usage
 
 ```cpp
-#define TBB_PREVIEW_PARALLEL_PHASE 1
 #include <oneapi/tbb/global_control.h>
 #include <oneapi/tbb/parallel_for.h>
 
@@ -333,9 +301,3 @@ The default behavior could be changed to fast leave, making delayed leave opt-in
 
 **Cons:**
 - Fixes performance regression for some customers while causing it for others
-
-## Exit Criteria
-
-The following conditions need to be met to move the feature from experimental to fully supported:
-- Open questions regarding the API should be resolved.
-- The feature must be added to the oneTBB specification and accepted.

@@ -32,7 +32,8 @@ For example:
 
 Each macro value follows the pattern ``YYYYMM``, where ``YYYY`` is a year, and ``MM`` is a month when
 the corresponding feature was introduced or updated. These values can be increased if the capabilities of given features
-are extended. The table below contains only the most recent values.
+are extended. The table below contains only the most recent values. The full changelog for each feature is
+available as a :ref:`separate table<feature_test_macros_changelog>`.
 
 .. container:: tablenoborder
 
@@ -47,9 +48,9 @@ are extended. The table below contains only the most recent values.
           -    ``TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING``
           -    ``202608``
           -    ``<oneapi/tbb/flow_graph.h>``
-        * -    :ref:`parallel_phase Interface for Task Arena<parallel_phase_for_task_arena>`
+        * -    :ref:`parallel_phase<parallel_phase_for_task_arena>`
           -    ``TBB_HAS_PARALLEL_PHASE``
-          -    ``202603``
+          -    ``202608``
           -    ``<oneapi/tbb/task_arena.h>``
         * -    :ref:`Core Type Selector for Task Arena Constraints<core_type_selector>`
           -    ``TBB_HAS_TASK_ARENA_CORE_TYPE_SELECTOR``
@@ -70,12 +71,19 @@ are extended. The table below contains only the most recent values.
           -    ``TBB_HAS_NUMA_ALLOCATION``
           -    ``202605``
           -    ``<oneapi/tbb/numa_allocation.h>``
+        * -    :ref:`Custom Assertion Handler<custom_assertion_handler>`
+          -    ``TBB_HAS_CUSTOM_ASSERTION_HANDLER``
+          -    ``202608``
+          -    ``<oneapi/tbb/global_control.h>``
 
 Example
 -------
 
 The following example uses a feature-test macro to conditionally enable ``parallel_phase``
-hints when supported by the library:
+hints when supported by the library.
+
+For preview features, testing feature-test macros requires defining
+the corresponding preview macro before any included header.
 
 .. literalinclude:: ./examples/feature_test_macros.cpp
     :language: c++

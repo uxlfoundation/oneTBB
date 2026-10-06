@@ -731,7 +731,7 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          sudo apt-get update && sudo apt-get install -y ninja-build libhwloc-dev hwloc
+          sudo apt-get update && sudo apt-get install -y ninja-build pkg-config libhwloc-dev hwloc
           if [[ "${{ matrix.cxx_compiler }}" == "clang++" ]]; then
             sudo apt-get install -y libomp-dev
           fi
@@ -745,7 +745,7 @@ jobs:
             -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
             ${{ matrix.cmake_extra }} -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON \
             -DTCM_BUILD=ON -DTCM_TEST=OFF -DTCM_DOC_EXAMPLES=ON ..
-          cmake --build . -v --parallel --target build-doc-examples tcm-doc-examples
+          cmake --build . -v --parallel --target tbbbind_2_5 build-doc-examples tcm-doc-examples
           ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure \
                 -L "doc-examples"
 

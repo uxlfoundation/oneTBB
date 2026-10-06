@@ -77,9 +77,6 @@ Task Scheduler
    * - :doc:`task_scheduler/task_group/wait_single_task`
      - Adds waiting for an individual ``task_group`` task through its handle.
      - ``TBB_PREVIEW_TASK_GROUP_EXTENSIONS``
-   * - :doc:`task_scheduler/task_arena/parallel_phase`
-     - Extends ``task_arena`` with an explicit ``parallel_phase`` to control worker participation.
-     - ``TBB_PREVIEW_PARALLEL_PHASE``
    * - :doc:`task_scheduler/task_arena/core_type_selector`
      - Adds core-type constraints to ``task_arena`` for hybrid-CPU systems.
      - ``TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR``
@@ -95,7 +92,8 @@ Containers
      - Description
      - Enabling macro
    * - :doc:`containers/concurrent_lru_cache`
-     - Adds ``concurrent_lru_cache`` class for Least Recently Used cache with concurrent operations.  
+     - Adds ``concurrent_lru_cache`` class for Least Recently Used cache with concurrent operations.
+     - ``TBB_PREVIEW_CONCURRENT_LRU_CACHE``
    * - :doc:`containers/custom_mutex_chmap`
      - Adds a template parameter to choose the reader-writer mutex type for ``concurrent_hash_map``.
      - ``TBB_PREVIEW_CONCURRENT_HASH_MAP_EXTENSIONS``

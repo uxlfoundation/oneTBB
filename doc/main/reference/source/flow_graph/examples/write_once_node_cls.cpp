@@ -1,4 +1,5 @@
 #include "oneapi/tbb/flow_graph.h"
+#include <tuple>
 
 typedef int data_type;
 
@@ -17,14 +18,14 @@ int main() {
     write_once_node<data_type> write_once_n(g); // for buffering once computed value
 
     buffer_node<data_type> buffer_n(g);
-    join_node<tuple<data_type, data_type>, reserving> join_n(g);
+    join_node<std::tuple<data_type, data_type>, reserving> join_n(g);
 
-    function_node<tuple<data_type, data_type>> consumer_n(
+    function_node<std::tuple<data_type, data_type>> consumer_n(
         g, unlimited,
-        [&](const tuple<data_type, data_type>& arg) {
+        [&](const std::tuple<data_type, data_type>& arg) {
             // use the precomputed static result along with dynamic data
-            data_type precomputed_result = get<0>(arg);
-            data_type dynamic_data = get<1>(arg);
+            data_type precomputed_result = std::get<0>(arg);
+            data_type dynamic_data = std::get<1>(arg);
         });
 
     make_edge(static_result_computer_n, write_once_n);
