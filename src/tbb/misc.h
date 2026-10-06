@@ -44,9 +44,9 @@ namespace detail {
 namespace r1 {
 
 #if !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
-bool call_terminate_on_exception(const char* comment);
+bool try_call_user_handler_on_exception(const char* comment);
 #if !TBB_USE_EXCEPTIONS
-void call_terminate_default(const char* comment);
+void throw_in_noexcept_default(const char* comment);
 #endif
 #endif
 

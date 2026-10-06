@@ -43,6 +43,7 @@ const char* user_abort::what() const noexcept(true) { return "User-initiated abo
 const char* missing_wait::what() const noexcept(true) { return "wait() was not called on the structured_task_group"; }
 
 #if TBB_USE_EXCEPTIONS
+    // if throw, report to stderr which exception is being thrown and call std::terminate
     template <typename F>
     /*[[noreturn]]*/ void do_throw_noexcept(F throw_func) noexcept {
         throw_func();
@@ -67,7 +68,7 @@ const char* missing_wait::what() const noexcept(true) { return "wait() was not c
             std::snprintf(buf, sizeof(buf),
                       "Terminating due to exception: %s with arguments: %s",
                       exc_name, init_args);
-            if (!call_terminate_on_exception(buf))
+            if (!try_call_user_handler_on_exception(buf))
                 do_throw_noexcept(throw_func);
         }
         throw_func();
@@ -80,7 +81,7 @@ const char* missing_wait::what() const noexcept(true) { return "wait() was not c
         std::snprintf(msg_buf, sizeof(msg_buf), \
             "Exception %s with message %s would have been thrown, "  \
             "if exception handling had not been disabled. Terminating.\n", exc_name, msg); \
-        if (!call_terminate_on_exception(msg_buf)) call_terminate_default(msg_buf); }
+        if (!try_call_user_handler_on_exception(msg_buf)) throw_in_noexcept_default(msg_buf); }
     #define DO_THROW(exc, init_args) PRINT_ERROR_AND_ABORT(#exc, #init_args)
 #endif /* !TBB_USE_EXCEPTIONS */
 

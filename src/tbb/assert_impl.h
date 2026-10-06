@@ -89,7 +89,7 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
 #if !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD && !TBB_USE_EXCEPTIONS
 // handler for the case, when TBB library is build without exception support and
 // there is no custom assertion handler provided by the user
-/* [[noreturn]] */ void call_terminate_default(const char* comment) {
+/* [[noreturn]] */ void throw_in_noexcept_default(const char* comment) {
 #if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     // Workaround for erroneous "unreachable code" during assertion throwing using call_once
     #pragma warning (push)
@@ -115,6 +115,7 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
 #endif // !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
 
 namespace assertion_handler {
+// Initial value is default handler
 static std::atomic<assertion_handler_type> handler{assertion_failure_default};
 
 #if (__TBB_BUILD || __TBBBIND_BUILD) // only TBB and TBBBind use custom handler
@@ -134,7 +135,7 @@ static assertion_handler_type get() noexcept {
 void terminate_on_user_exception() {
     assertion_handler_type curr_handler = assertion_handler::get();
 
-    // default "exception in noexcept function" handler can report exception name
+    // "exception in noexcept function" can report exception name
     // for any exception, so use it if one is not redefined
     if (curr_handler == assertion_failure_default)
         do_throw_noexcept([] { throw; });
@@ -160,12 +161,11 @@ void terminate_on_user_exception() {
 
 void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line,
                                            const char* expression, const char* comment) {
-    assertion_handler_type curr = assertion_handler::get();
-    curr(location, line, expression, comment);
+    assertion_handler::get()(location, line, expression, comment);
 }
 
 #if !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
-bool call_terminate_on_exception(const char* comment) {
+bool try_call_user_handler_on_exception(const char* comment) {
     assertion_handler_type curr = assertion_handler::get();
     if (curr == assertion_failure_default)
         return false;
