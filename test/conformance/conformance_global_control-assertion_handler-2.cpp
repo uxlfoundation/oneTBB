@@ -46,9 +46,11 @@ TEST_CASE("terminate_on_exception: tbb::ext::set_assertion_handler") {
                                                    const char* expression, const char* comment) {
                 CHECK(!terminate_handler_called);
                 terminate_handler_called = true;
-                CHECK(!location);
+                CHECK(location);
+                CHECK(location[0] == 0);
                 CHECK(!line);
-                CHECK(!expression);
+                CHECK(expression);
+                CHECK(expression[0] == 0);
                 CHECK(comment);
                 CHECK(strcmp(comment, "Unknown exception") == 0);
                 std::longjmp(buffer, 1);

@@ -58,9 +58,11 @@ void global_control_terminate_on_exception(TestCase test_case) {
                                                    const char* expression, const char* comment) {
                 CHECK(!terminate_handler_called);
                 terminate_handler_called = true;
-                CHECK(!location);
+                CHECK(location);
+                CHECK(location[0] == 0);
                 CHECK(!line);
-                CHECK(!expression);
+                CHECK(expression);
+                CHECK(expression[0] == 0);
                 CHECK(comment);
                 if (strstr(comment, "std::invalid_argument"))
                     invalid_argument_exception = true;
