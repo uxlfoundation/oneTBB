@@ -2,6 +2,7 @@
 
 rem ============================================================================
 rem Copyright (C) 2022 Intel Corporation
+rem Copyright (C) 2026 UXL Foundation Contributors
 rem
 rem Licensed under the Apache License, Version 2.0 (the "License");
 rem you may not use this file except in compliance with the License.
