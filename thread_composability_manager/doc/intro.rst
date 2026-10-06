@@ -33,6 +33,14 @@ platform fully without oversubscribing it. Application developers benefit withou
 code, since the integration is done inside the runtimes. TCM targets general-purpose multi-core CPU
 platforms, ranging from desktop systems to servers.
 
+.. image:: ./resources/solving_composability_issue_with_TCM.png
+   :width: 800px
+   :height: 400px
+   :scale: 100 %
+   :alt: Solving composability issue with TCM
+   :align: center
+
+
 Key Concepts
 ------------
 
@@ -132,3 +140,5 @@ Where to Go Next
   complete :ref:`usage examples <tcm_usage_examples>` that can serve as a quick start.
 - :doc:`api_reference` provides the detailed description of TCM functions and data structures,
   including :ref:`permit requests <permit_requests>`.
+- Showcasing TCM videoclip - `End Parallel Runtime Scheduling Conflicts
+  <https://www.youtube.com/watch?v=73rj1sMbGV0>`_
