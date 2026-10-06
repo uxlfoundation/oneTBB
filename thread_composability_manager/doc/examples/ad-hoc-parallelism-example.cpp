@@ -67,6 +67,10 @@ template <typename F> void parallel_compute(int start, int end, const F& f) {
     tcm_permit_handle_t ph{nullptr};
     tcm_permit_t permit = make_permit(grant);
     result = tcmRequestPermit(my_tcm_id, request, &callback_arg, &ph, &permit);
+    if (result != TCM_RESULT_SUCCESS) {
+        std::printf("Unsuccessful tcmRequestPermit.\n");
+        std::abort();
+    }
 
     // Waiting for resource permit to be activated
     while (permit.flags.stale || permit.state == TCM_PERMIT_STATE_PENDING) {

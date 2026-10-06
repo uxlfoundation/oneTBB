@@ -401,12 +401,12 @@ threads or putting excessive ones to sleep. The example also includes synchroniz
 allows invocation of a parallel computation concurrently with itself, making sure the resources are
 not released while there is work to do.
 
-In this section we start by describing the state of the pool and its :ref:`public interface
-<pool_interface>`. In section `Permit management`_ we show how a single permit is managed by the
-pool across concurrent uses. `Worker pool`_ section describes how worker threads are managed by
+In this section, we start by describing the state of the pool and its :ref:`public interface
+<pool_interface>`. In section `Permit management`_, we show how a single permit is managed by the
+pool across concurrent uses. The `Worker pool`_ section describes how worker threads are managed by
 waking them up and putting them to sleep in response to changes in the permit. The details of permit
-negotiation is described in `Negotiation callback`_ section. While not directly relevant to TCM, the
-approach to assigning tasks to worker threads is shown in section `Tasking`_.
+negotiation is described in the `Negotiation callback`_ section. While not directly relevant to TCM,
+the approach to assigning tasks to worker threads is shown in section `Tasking`_.
 
 The code re-uses the :code:`make_permit` function from `Ad hoc parallelism`_ example to help prepare
 the permit data structure to be filled by TCM.
@@ -417,10 +417,10 @@ Pool state
 The state of the pool described below is kept in the following data members. The entities can be
 divided into three categories:
 
-* Entities that help managing threads: creation, wakening, putting to sleep, and destruction.
-* Entities that help managing tasks: enqueueing, dequeueing, and cancellation.
-* Entities that help working with TCM: connecting, disconnecting, permit management, synchronization
-  of permit updates.
+* Entities that help with managing threads: creation, waking, putting to sleep, and destruction.
+* Entities that help with managing tasks: enqueueing, dequeueing, and cancellation.
+* Entities that help with working with TCM: connecting, disconnecting, permit management,
+  synchronization of permit updates.
 
 .. literalinclude:: ./examples/client-thread-pool.cpp
    :language: c++
@@ -459,7 +459,7 @@ the permit the handle refers to otherwise. Also, several :code:`parallel_for` ca
 concurrently in the same pool, so they share that permit: the first of them requests it, the others
 only wait until it becomes usable, and the last one to finish deactivates it.
 
-A permit is usable when it is activated by TCM, that is its state equals to
+A permit is usable when it is activated by TCM, that is, its state equals
 :code:`TCM_PERMIT_STATE_ACTIVE`, and the data read for it is not marked with the
 :code:`tcm_permit_flags_t::stale` flag. Waiting for such a state is done through the
 :code:`permit_updates` counter, which is incremented every time new permit data is published, either
@@ -502,7 +502,7 @@ Tasking
 The tasking part of the pool is not related to TCM, and is shown for completeness. It is a simple
 deque of tasks, which is filled by the :code:`parallel_for` function and is drained by the workers.
 The only TCM related detail here is that a worker does not wait for new tasks indefinitely: if no
-work appears for a while, :code:`get_task` gives up so that the worker can leave the pool and stop
+work appears for a while, :code:`get_task` gives up so that the worker can leave the pool and stops
 being counted by TCM as a thread that uses the resources.
 
 .. literalinclude:: ./examples/client-thread-pool.cpp
