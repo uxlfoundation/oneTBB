@@ -48,9 +48,9 @@ available as a :ref:`separate table<feature_test_macros_changelog>`.
           -    ``TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING``
           -    ``202608``
           -    ``<oneapi/tbb/flow_graph.h>``
-        * -    :ref:`parallel_phase Interface for Task Arena<parallel_phase_for_task_arena>`
+        * -    :ref:`parallel_phase<parallel_phase_for_task_arena>`
           -    ``TBB_HAS_PARALLEL_PHASE``
-          -    ``202603``
+          -    ``202608``
           -    ``<oneapi/tbb/task_arena.h>``
         * -    :ref:`Core Type Selector for Task Arena Constraints<core_type_selector>`
           -    ``TBB_HAS_TASK_ARENA_CORE_TYPE_SELECTOR``
@@ -80,7 +80,10 @@ Example
 -------
 
 The following example uses a feature-test macro to conditionally enable ``parallel_phase``
-hints when supported by the library:
+hints when supported by the library.
+
+For preview features, testing feature-test macros requires defining
+the corresponding preview macro before any included header.
 
 .. literalinclude:: ./examples/feature_test_macros.cpp
     :language: c++
