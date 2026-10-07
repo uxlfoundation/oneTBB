@@ -48,7 +48,7 @@
   - Thread registration cannot outlive the permit handle with which it is registered.
 
 
-  /Important usage scenarios to support/:
+  /Important usage scenarios whose performance needs to be tracked/:
   - Loop with many iterations of =tcmRegisterThread(permit_handle)= and =tcmUnregisterThreads(permit_handle)=
     calls.
 
@@ -68,6 +68,8 @@
           // barrier synchronization for threads to wait for their deregistration by a primary thread
       }
     #+end_src
+
+  - The same loop as above, but threads are re-created at each iteration of the loop.
   
 * Open Questions
   
