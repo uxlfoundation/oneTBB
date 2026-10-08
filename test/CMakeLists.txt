@@ -478,6 +478,48 @@ if (TARGET TBB::tbb)
     if (APPLE OR ANDROID_PLATFORM)
         target_link_libraries(test_dynamic_link PRIVATE -rdynamic)
     endif()
+
+    # Regression test for the deferred unloading of the libraries oneTBB loads dynamically
+    # (TCM, TBBbind, the RML server). The host dlopen()s a plugin that links oneTBB, so the
+    # runtimes are loaded after glibc registered _dl_fini. Needs the TCM test hook.
+    if (TBB_TCM_TESTING AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_library(test_deferred_unload_plugin SHARED
+            ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_deferred_unload_plugin.cpp)
+        target_link_libraries(test_deferred_unload_plugin PRIVATE TBB::tbb)
+        set_property(TARGET test_deferred_unload_plugin PROPERTY BUILD_RPATH_USE_ORIGIN TRUE)
+        set_property(TARGET test_deferred_unload_plugin PROPERTY BUILD_RPATH "$ORIGIN")
+
+        add_executable(test_deferred_unload
+            ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_deferred_unload.cpp)
+        add_dependencies(test_deferred_unload test_deferred_unload_plugin)
+        target_compile_definitions(test_deferred_unload PRIVATE
+            PLUGIN_PATH="$<TARGET_FILE:test_deferred_unload_plugin>")
+        target_link_libraries(test_deferred_unload PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
+
+        # Negative control: identical work with oneTBB as a DT_NEEDED dependency.
+        add_executable(test_deferred_unload_linked
+            ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_deferred_unload_linked.cpp)
+        target_link_libraries(test_deferred_unload_linked PRIVATE TBB::tbb test_deferred_unload_plugin)
+        set_property(TARGET test_deferred_unload_linked PROPERTY BUILD_RPATH_USE_ORIGIN TRUE)
+        set_property(TARGET test_deferred_unload_linked PROPERTY BUILD_RPATH "$ORIGIN")
+
+        foreach (_deferred_unload_mode exit close reload)
+            add_test(NAME test_deferred_unload_${_deferred_unload_mode}
+                     COMMAND test_deferred_unload ${_deferred_unload_mode}
+                     WORKING_DIRECTORY ${TBB_TEST_WORKING_DIRECTORY})
+            set_property(TEST test_deferred_unload_${_deferred_unload_mode}
+                         PROPERTY ENVIRONMENT ${TBB_TESTS_ENVIRONMENT})
+            set_property(TEST test_deferred_unload_${_deferred_unload_mode}
+                         PROPERTY RUN_SERIAL TRUE)
+        endforeach()
+
+        add_test(NAME test_deferred_unload_linked
+                 COMMAND test_deferred_unload_linked
+                 WORKING_DIRECTORY ${TBB_TEST_WORKING_DIRECTORY})
+        set_property(TEST test_deferred_unload_linked
+                     PROPERTY ENVIRONMENT ${TBB_TESTS_ENVIRONMENT})
+        set_property(TEST test_deferred_unload_linked PROPERTY RUN_SERIAL TRUE)
+    endif()
     if (WIN32 AND NOT TBB_TCM_TESTING)
         tbb_add_test(SUBDIR tbb NAME test_numa_dist DEPENDENCIES TBB::tbb)
     endif()

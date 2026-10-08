@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -108,6 +109,10 @@ bool dynamic_link( const char* library,
 void dynamic_unlink( dynamic_link_handle handle );
 
 void dynamic_unlink_all();
+
+//! Registers a handle to be unlinked by the process-lifetime destructor instead of immediately,
+//! after the library's exit-time destructors have run.
+void dynamic_link_keep_until_exit( dynamic_link_handle handle );
 
 // The enum lists possible errors that can appear during dynamic linking. To
 // print detailed information when the errors appear, DYNAMIC_LINK_WARNING macro

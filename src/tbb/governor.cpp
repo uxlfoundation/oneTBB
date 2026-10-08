@@ -119,7 +119,9 @@ void governor::release_resources () {
 #endif /* TBB_USE_ASSERT */
 
     system_topology::destroy();
-    dynamic_unlink_all();
+    // dynamic_unlink_all() is intentionally not called here: the libraries may still be
+    // executing exit-time destructors. It is deferred to a process-lifetime destructor; see
+    // main.cpp.
     global_control_release();
 }
 

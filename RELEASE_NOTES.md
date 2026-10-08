@@ -32,6 +32,7 @@
 - Fixed ``task_arena`` attach construction to preserve settings, ensuring they are retained when copying the attached arena.
 - The ``resource_limited_node`` preview feature now properly respects concurrency limits.
 - Declared ``task_arena::automatic``, ``task_arena::not_initialized``, and ``task_arena::selectable`` as ``constexpr``, fixing linker errors caused by their ODR-use in C++17.
+- Fixed a possible process-exit crash when oneTBB is loaded from a dynamically loaded module, for example a Python* extension or a plugin. The libraries oneTBB loads itself (TCM, TBBbind, and the RML server) are now unloaded from a process-lifetime destructor, after their exit-time destructors have run, instead of from a worker thread during resource release.
 
 ## :octocat: Open-Source Contributions Integrated
 - Fixed universal binary build failures on Apple platforms when using LLVM Clang*. Contributed by Philipp Remy (https://github.com/uxlfoundation/oneTBB/pull/2094).
