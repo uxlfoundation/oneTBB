@@ -1,4 +1,5 @@
 # Copyright (c) 2020-2024 Intel Corporation
+# Copyright (c) 2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,5 +25,9 @@ else()
     #  from statically linked libraries
     set(TBB_LIB_LINK_FLAGS ${TBB_LIB_LINK_FLAGS} -static-intel -Wl,--exclude-libs,ALL)
     set(TBB_OPENMP_FLAG -qopenmp)
+    # Under Linux, ipo detection for 2024+ versions of Intel compilers is supported starting cmake 3.30.1.
+    if (CMAKE_VERSION VERSION_LESS 3.30.1 AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 2023)
+        set(TBB_IPO_DETECTION_BROKEN TRUE)
+    endif()
 endif()
 set(TBB_IPO_LINK_FLAGS ${TBB_IPO_LINK_FLAGS} ${TBB_IPO_COMPILE_FLAGS})

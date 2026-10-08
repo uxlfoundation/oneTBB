@@ -1,4 +1,5 @@
 # Copyright (c) 2020-2025 Intel Corporation
+# Copyright (c) 2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,7 +33,7 @@ if (MSVC_VERSION LESS_EQUAL 1900)
     # https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/compiler-warning-level-1-c4503
     set(TBB_TEST_COMPILE_FLAGS ${TBB_TEST_COMPILE_FLAGS} /wd4503)
 endif()
-set(TBB_LIB_COMPILE_FLAGS -D_CRT_SECURE_NO_WARNINGS /GS /Gy /sdl)
+set(TBB_LIB_COMPILE_FLAGS -D_CRT_SECURE_NO_WARNINGS /GS /Gy /sdl $<$<VERSION_LESS:${MSVC_VERSION},1930>:/ZH:SHA_256>)
 set(TBB_COMMON_COMPILE_FLAGS ${TBB_COMMON_COMPILE_FLAGS} /volatile:iso /FS /EHsc)
 
 set(TBB_LIB_LINK_FLAGS ${TBB_LIB_LINK_FLAGS} LINKER:/DEPENDENTLOADFLAG:0x2000 LINKER:/DYNAMICBASE LINKER:/NXCOMPAT)

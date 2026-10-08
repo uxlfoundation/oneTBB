@@ -20,8 +20,40 @@ SOURCE_DIR = os.path.dirname(__file__)
 LATEX_DIR = os.path.join(SOURCE_DIR, '_latex')
 PREAMBLE_FILE = os.path.join(LATEX_DIR, 'preamble.tex')
 TITLE_PAGE_FILE = os.path.join(LATEX_DIR, 'title_page.tex')
+VERSION_FILE = os.path.join(SOURCE_DIR, '..', 'include', 'oneapi', 'tbb', 'version.h')
+
+def _read_tbb_version():
+    """Extract the oneTBB version from include/oneapi/tbb/version.h.
+
+    Returns a version string TBB_VERSION_MAJOR.TBB_VERSION_MINOR.TBB_VERSION_STRING, e.g. "2023.1.0"
+    """
+    import re
+
+    macros = {}
+    with open(VERSION_FILE, 'r', encoding='utf-8') as version_file:
+        for line in version_file:
+            match = re.match(
+                r'\s*#define\s+(TBB_VERSION_(?:MAJOR|MINOR|PATCH))\s+(\d+)',
+                line,
+            )
+            if match:
+                macros[match.group(1)] = match.group(2)
+
+    for name in ('TBB_VERSION_MAJOR', 'TBB_VERSION_MINOR', 'TBB_VERSION_PATCH'):
+        if name not in macros:
+            raise RuntimeError(f'Could not find version macro {name} in {VERSION_FILE}')
+
+    tbb_version = '{TBB_VERSION_MAJOR}.{TBB_VERSION_MINOR}.{TBB_VERSION_PATCH}'.format(**macros)
+    return tbb_version
+
+TBB_VERSION = _read_tbb_version()
 
 BUILD_TYPE = os.getenv("BUILD_TYPE")
+
+# Set up tags for conditional content
+# Tags allow using .. only:: directives in RST files
+if BUILD_TYPE == 'oss' or BUILD_TYPE is None:
+    tags.add('oss')
 
 # -- Project information -----------------------------------------------------
 
@@ -33,9 +65,9 @@ copyright = u'UXL Foundation Contributors'
 author = u''
 
 # The short X.Y version
-version = u''
+version = TBB_VERSION
 # The full version, including alpha/beta/rc tags
-release = u''
+release = TBB_VERSION
 
 
 # -- General configuration ---------------------------------------------------
@@ -53,10 +85,10 @@ extensions = [
     'sphinx.ext.intersphinx',
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
-    'sphinx.ext.imgmath',
+    'sphinx.ext.mathjax',
     'sphinx.ext.ifconfig',
     'sphinx.ext.viewcode',
-    'sphinx.ext.githubpages', 
+    'sphinx.ext.githubpages',
     'sphinx_design'
 ]
 
@@ -83,13 +115,20 @@ language = 'en'
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = []
+# Base exclude patterns - reference files that should never be built
+exclude_patterns = [
+    'main/reference/source/nested-*.rst',
+    'main/reference/source/uncategorized.rst',
+    'main/reference/source/uncategorized/**',
+    'main/reference/source/low_level_task_api.rst',
+    'main/reference/source/low_level_tasking/**',
+]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = None
 
 # Syntax highlighting for the :: directive
-highlight_language = 'cpp' 
+highlight_language = 'cpp'
 
 if BUILD_TYPE == 'oneapi' or BUILD_TYPE == 'dita':
     rst_prolog = """
@@ -98,7 +137,7 @@ if BUILD_TYPE == 'oneapi' or BUILD_TYPE == 'dita':
 .. |product| replace:: oneTBB
 .. |reg| unicode:: U+000AE
 .. |copy| unicode:: U+000A9
-.. |base_tk| replace:: Intel\ |reg|\  oneAPI Base Toolkit
+.. |toolkit| replace:: Intel\ |reg|\  oneAPI Toolkit (oneAPI Kit)
 .. |dpcpp| replace:: Intel\ |reg|\  oneAPI DPC++/C++ Compiler
     """
 else:
@@ -108,7 +147,7 @@ else:
 .. |product| replace:: oneTBB
 .. |reg| unicode:: U+000AE
 .. |copy| unicode:: U+000A9
-.. |base_tk| replace:: Intel\ |reg|\  oneAPI Base Toolkit
+.. |toolkit| replace:: Intel\ |reg|\  oneAPI Toolkit (oneAPI Kit)
 .. |dpcpp| replace:: Intel\ |reg|\  oneAPI DPC++/C++ Compiler
     """
 
@@ -146,16 +185,10 @@ else:
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
-if BUILD_TYPE == 'oneapi'  or BUILD_TYPE == 'dita':
-    html_context = {
-        'css_files': [
-            '_static/theme_overrides.css',  # override wide tables in RTD theme
-        ],
-    }
-else:
-    html_js_files = ['custom.js']
+html_css_files = ['theme_overrides.css']
+html_js_files = ['custom.js']
 
-html_theme_options["logo"] = {"text": "oneTBB Documentation"}
+html_theme_options["logo"] = {"text": f"oneTBB {TBB_VERSION} Documentation"}
     
 html_logo = '_static/oneAPI-rgb-rev-100.png'
 html_favicon = '_static/favicons.png'

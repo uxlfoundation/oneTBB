@@ -132,12 +132,14 @@ See [sub-RFC for increased availability of NUMA API](tbbbind-link-static-hwloc.o
 
 ### Create NUMA-constrained arenas
 
-See [sub-RFC for creation of NUMA-constrained arenas](create-numa-arenas.md)
+This [sub-proposal is supported](../../supported/numa_support/create-numa-arenas.md).
 
 ### NUMA-aware allocation
 
 Define allocators or other features that simplify the process of allocating or placing data onto
 specific NUMA nodes.
+
+[Interleaved allocation](interleaved-allocation.md) can be a useful kind of NUMA-aware allocations.
 
 ### Simplified approaches to associate task distribution with data placement
 

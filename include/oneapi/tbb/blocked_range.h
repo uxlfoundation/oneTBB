@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -21,8 +22,6 @@
 
 #include "detail/_range_common.h"
 #include "detail/_namespace_injection.h"
-
-#include "version.h"
 
 namespace tbb {
 namespace detail {
@@ -119,7 +118,7 @@ private:
     static Value do_split( blocked_range& r, split )
     {
         __TBB_ASSERT( r.is_divisible(), "cannot split blocked_range that is not divisible" );
-        Value middle = r.my_begin + (r.my_end - r.my_begin) / 2u;
+        Value middle = r.my_begin + (r.my_end - r.my_begin) / 2;
         r.my_end = middle;
         return middle;
     }

@@ -19,7 +19,7 @@
 //! \brief Test for TBBbind library, covers [configuration.debug_features]
 
 #define TEST_CUSTOM_ASSERTION_HANDLER_ENABLED 1
-#if _WIN32 || _WIN64
+#if !defined(_CRT_SECURE_NO_WARNINGS) && (_WIN32 || _WIN64)
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 

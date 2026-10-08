@@ -66,6 +66,7 @@ public:
         thread_stack_size,
         terminate_on_exception,
         scheduler_handle, // not a public parameter
+        leave_policy,
         parameter_max // insert new parameters above this point
     };
 
@@ -86,6 +87,12 @@ public:
         r1::create(*this);
     }
 
+    //! Overload the constructor for enum types to avoid forcing users to cast them to size_t
+    template<typename T, typename = typename std::enable_if<std::is_enum<T>::value>::type>
+    global_control(parameter p, T value)
+        : global_control(p, static_cast<std::size_t>(value))
+    {}
+
     ~global_control() {
         __TBB_ASSERT(my_param < parameter_max, "Invalid parameter");
 #if __TBB_WIN8UI_SUPPORT && (_WIN32_WINNT < 0x0A00)
@@ -97,7 +104,6 @@ public:
     }
 
     static std::size_t active_value(parameter p) {
-        __TBB_ASSERT(p < parameter_max, "Invalid parameter");
         return r1::global_control_active_value((int)p);
     }
 
@@ -112,9 +118,9 @@ private:
 
 //! Finalization options.
 //! Outside of the class to avoid extensive friendship.
-static constexpr std::intptr_t release_nothrowing = 0;
-static constexpr std::intptr_t finalize_nothrowing = 1;
-static constexpr std::intptr_t finalize_throwing = 2;
+__TBB_GLOBAL_VAR constexpr std::intptr_t release_nothrowing = 0;
+__TBB_GLOBAL_VAR constexpr std::intptr_t finalize_nothrowing = 1;
+__TBB_GLOBAL_VAR constexpr std::intptr_t finalize_throwing = 2;
 
 //! User side wrapper for a task scheduler lifetime control object
 class task_scheduler_handle {
@@ -176,7 +182,7 @@ inline void finalize(task_scheduler_handle& handle) {
         if (handle.m_ctl != nullptr) {
             bool finalized = r1::finalize(handle, finalize_throwing);
             __TBB_ASSERT_EX(finalized, "r1::finalize did not respect finalize_throwing ?");
-            
+
         }
     }).on_completion([&] {
         __TBB_ASSERT(!handle, "The handle should be empty after finalize");
@@ -202,15 +208,20 @@ using detail::d1::attach;
 using detail::d1::finalize;
 using detail::d1::task_scheduler_handle;
 using detail::r1::unsafe_wait;
+
+using detail::r1::assertion_handler_type;
+using detail::r1::set_assertion_handler;
+using detail::r1::get_assertion_handler;
 } // namespace v1
 
+// Definitions in namespace ext are kept for compatibility
+// with code built against older oneTBB releases, where
+// the custom assertion handler was available only via the extension API
 namespace ext {
 inline namespace v1 {
-#if !__TBB_DISABLE_SPEC_EXTENSIONS
 using ::tbb::detail::r1::assertion_handler_type;
 using ::tbb::detail::r1::set_assertion_handler;
 using ::tbb::detail::r1::get_assertion_handler;
-#endif
 } // inline namespace v1
 } // namespace ext
 

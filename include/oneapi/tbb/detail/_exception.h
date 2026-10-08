@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -38,6 +39,7 @@ enum class exception_id {
     invalid_key,
     bad_tagged_msg_cast,
     unsafe_wait,
+    bad_array_new_length,
     last_entry
 };
 } // namespace d0
@@ -66,14 +68,14 @@ public:
 };
 
 //! Exception for impossible finalization of task_sheduler_handle
-#if __APPLE__
+#if __APPLE__ || __FreeBSD__
     #pragma GCC visibility push(default)
 #endif
 class TBB_EXPORT unsafe_wait : public std::runtime_error {
 public:
     unsafe_wait(const char* msg) : std::runtime_error(msg) {}
 };
-#if __APPLE__
+#if __APPLE__ || __FreeBSD__
     #pragma GCC visibility pop
 #endif
 

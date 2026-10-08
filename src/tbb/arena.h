@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -22,6 +23,7 @@
 
 #include "oneapi/tbb/detail/_task.h"
 #include "oneapi/tbb/detail/_utils.h"
+#include "oneapi/tbb/global_control.h"
 #include "oneapi/tbb/spin_mutex.h"
 
 #include "scheduler_common.h"
@@ -45,9 +47,7 @@ class task_group_context;
 class threading_control;
 class allocate_root_with_context_proxy;
 
-#if __TBB_ARENA_BINDING
 class numa_binding_observer;
-#endif /*__TBB_ARENA_BINDING*/
 
 //! Bounded coroutines cache LIFO ring buffer
 class arena_co_cache {
@@ -179,7 +179,6 @@ public:
     }
 };
 
-#if __TBB_PREVIEW_PARALLEL_PHASE
 class thread_leave_manager {
     static const std::uintptr_t DELAYED_LEAVE       = 0;
     static const std::uintptr_t FAST_LEAVE          = 1;
@@ -191,14 +190,14 @@ public:
     // This method is not thread-safe!
     // Required to be called after construction to set initial state of the state machine.
     void set_initial_state(tbb::task_arena::leave_policy lp) {
+        std::uintptr_t policy = FAST_LEAVE;
         if (lp == tbb::task_arena::leave_policy::automatic) {
-            std::uintptr_t platform_policy = governor::hybrid_cpu() ? FAST_LEAVE : DELAYED_LEAVE;
-            my_state.store(platform_policy, std::memory_order_relaxed);
-        } else {
-            __TBB_ASSERT(lp == tbb::task_arena::leave_policy::fast,
-                         "Was the new value introduced for leave policy?");
-            my_state.store(FAST_LEAVE, std::memory_order_relaxed);
+            auto glp = tbb::task_arena::leave_policy(global_control::active_value(global_control::leave_policy));
+            if (glp == tbb::task_arena::leave_policy::automatic && !governor::hybrid_cpu()) {
+                policy = DELAYED_LEAVE;
+            }
         }
+        my_state.store(policy, std::memory_order_relaxed);
     }
 
     void reset_if_needed() {
@@ -224,9 +223,10 @@ public:
     }
 
     // Indicate the end of parallel phase in the state machine
-    void unregister_parallel_phase(bool enable_fast_leave) {
+    void unregister_parallel_phase(std::uintptr_t flags) {
         std::uintptr_t prev = my_state.load(std::memory_order_relaxed);
         __TBB_ASSERT(prev != UINTPTR_MAX, "The initial state was not set");
+        bool enable_fast_leave = flags & std::uintptr_t(d1::phase::end_fast_leave);
 
         std::uintptr_t desired{};
         do {
@@ -245,7 +245,6 @@ public:
         return curr != FAST_LEAVE && curr != ONE_TIME_FAST_LEAVE;
     }
 };
-#endif /* __TBB_PREVIEW_PARALLEL_PHASE */
 
 //! The structure of an arena, except the array of slots.
 /** Separated in order to simplify padding.
@@ -298,10 +297,8 @@ struct arena_base : padded<intrusive_list_node> {
     //! The list of local observers attached to this arena.
     observer_list my_observers;
 
-#if __TBB_ARENA_BINDING
     //! Pointer to internal observer that allows to bind threads in arena to certain NUMA node.
     numa_binding_observer* my_numa_binding_observer{nullptr};
-#endif /*__TBB_ARENA_BINDING*/
 
     // Below are rarely modified members
 
@@ -313,10 +310,8 @@ struct arena_base : padded<intrusive_list_node> {
     //! Waiting object for external threads that cannot join the arena.
     concurrent_monitor my_exit_monitors;
 
-#if __TBB_PREVIEW_PARALLEL_PHASE
     //! Manages state of thread_leave state machine
     thread_leave_manager my_thread_leave;
-#endif
 
     //! Coroutines (task_dispathers) cache buffer
     arena_co_cache my_co_cache;
@@ -334,6 +329,14 @@ struct arena_base : padded<intrusive_list_node> {
     unsigned my_max_num_workers;
 
     threading_control_client my_tc_client;
+
+    tbb::task_arena::leave_policy my_leave_policy;
+
+    d1::numa_node_id my_numa_id;
+
+    d1::core_type_id my_core_type;
+
+    int my_max_threads_per_core;
 
 #if TBB_USE_ASSERT
     //! Used to trap accesses to the object after its destruction.
@@ -354,26 +357,20 @@ public:
     };
 
     //! Constructor
-    arena(threading_control* control, unsigned max_num_workers, unsigned num_reserved_slots, unsigned priority_level
-#if __TBB_PREVIEW_PARALLEL_PHASE
-          , tbb::task_arena::leave_policy lp
-#endif
+    arena(threading_control* control, unsigned max_num_workers, unsigned num_reserved_slots, unsigned priority_level,
+          d1::constraints constraints, tbb::task_arena::leave_policy lp
     );
 
     //! Allocate an instance of arena.
     static arena& allocate_arena(threading_control* control, unsigned num_slots, unsigned num_reserved_slots,
-                                 unsigned priority_level
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                                 , tbb::task_arena::leave_policy lp
-#endif
+                                 unsigned priority_level, d1::constraints constraints, tbb::task_arena::leave_policy lp
     );
 
     static arena& create(threading_control* control, unsigned num_slots, unsigned num_reserved_slots,
                          unsigned arena_priority_level,
-                         d1::constraints constraints = d1::constraints{}
-#if __TBB_PREVIEW_PARALLEL_PHASE
-                         , tbb::task_arena::leave_policy lp = tbb::task_arena::leave_policy::automatic
-#endif
+                         d1::constraints constraints = d1::constraints{},
+                         numa_binding_observer* observer = nullptr,
+                         tbb::task_arena::leave_policy lp = tbb::task_arena::leave_policy::automatic
     );
 
     static int unsigned num_arena_slots ( unsigned num_slots, unsigned num_reserved_slots ) {
@@ -484,6 +481,8 @@ public:
 
     std::pair</*min workers = */ int, /*max workers = */ int> update_request(int mandatory_delta, int workers_delta);
 
+    tcm_cpu_mask_t get_affinity_mask() const;
+
     /** Must be the last data field */
     arena_slot my_slots[1];
 }; // class arena
@@ -520,9 +519,7 @@ void arena::advertise_new_work() {
             workers_delta = 1;
         }
 
-#if __TBB_PREVIEW_PARALLEL_PHASE
         my_thread_leave.reset_if_needed();
-#endif
         request_workers(mandatory_delta, workers_delta, /* wakeup_threads = */ true);
     }
 }

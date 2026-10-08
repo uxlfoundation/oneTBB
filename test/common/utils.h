@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -474,6 +475,44 @@ public:
     }
 };
 std::unordered_set<const LifeTrackableObject*> LifeTrackableObject::alive_objects{};
+
+template <typename T>
+class UninitializedStorage {
+    union {
+        T m_value;
+    };
+public:
+    UninitializedStorage() {}
+    ~UninitializedStorage() {}
+    T* operator&() { return &m_value; }
+};
+
+// if non-zero byte found, returns bad value offset plus 1
+inline size_t NonZero(void *ptr, size_t size)
+{
+    size_t words = size / sizeof(intptr_t);
+    size_t tail_sz = size % sizeof(intptr_t);
+    intptr_t *buf = (intptr_t*)ptr;
+    char *buf_tail = (char*)(buf+words);
+
+    intptr_t *word_it = std::find_if(buf, buf + words, [](intptr_t v) { return v != 0; });
+    if (word_it != buf + words) {
+        // find exact byte in non-zero word
+        buf_tail = (char*)word_it;
+        tail_sz = sizeof(intptr_t);
+    }
+    char *tail_it = std::find_if(buf_tail, buf_tail + tail_sz, [](char c) { return c != 0; });
+    if (tail_it != buf_tail + tail_sz) {
+        return (tail_it - (char*)ptr) + 1;
+    }
+    return 0;
+}
+
+template <typename T>
+T force_constant_odr_use(const T& value) {
+    volatile const T* addr = &value;
+    return *addr;
+}
 
 } // namespace utils
 

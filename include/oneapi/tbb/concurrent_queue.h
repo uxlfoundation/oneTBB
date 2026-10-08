@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -294,8 +295,8 @@ concurrent_queue( It, It, Alloc = Alloc() )
 class concurrent_monitor;
 
 // The concurrent monitor tags for concurrent_bounded_queue.
-static constexpr std::size_t cbq_slots_avail_tag = 0;
-static constexpr std::size_t cbq_items_avail_tag = 1;
+__TBB_GLOBAL_VAR constexpr std::size_t cbq_slots_avail_tag = 0;
+__TBB_GLOBAL_VAR constexpr std::size_t cbq_items_avail_tag = 1;
 } // namespace d2
 
 
@@ -561,7 +562,7 @@ private:
     void internal_push( Args&&... args ) {
         unsigned old_abort_counter = my_abort_counter.load(std::memory_order_relaxed);
         ticket_type ticket = my_queue_representation->tail_counter++;
-        std::ptrdiff_t target = ticket - my_capacity;
+        std::ptrdiff_t target = static_cast<std::ptrdiff_t>(ticket - my_capacity);
 
         if (static_cast<std::ptrdiff_t>(my_queue_representation->head_counter.load(std::memory_order_relaxed)) <= target) { // queue is full
             auto pred = [&] {

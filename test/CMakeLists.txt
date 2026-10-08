@@ -79,12 +79,16 @@ function(tbb_add_test)
 
     target_compile_definitions(${_tbb_test_TARGET_NAME} PRIVATE
         $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>
-        $<$<BOOL:${TBB_CPF}>:__TBB_CPF_BUILD=1>
+        $<$<BOOL:${TBB_TEST_PREVIEW}>:__TBB_TEST_PREVIEW=1>
         $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:__TBB_DYNAMIC_LOAD_ENABLED=0>
         $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:__TBB_SOURCE_DIRECTLY_INCLUDED=1>
         $<$<BOOL:${TBB_TCM_TESTING}>:__TBB_TCM_TESTING_ENABLED=1>)
 
     target_link_libraries(${_tbb_test_TARGET_NAME} PRIVATE ${_tbb_test_DEPENDENCIES} Threads::Threads ${TBB_COMMON_LINK_LIBS})
+
+    if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+        target_link_libraries(${_tbb_test_TARGET_NAME} PRIVATE util)
+    endif()
 
     if (COMMAND _tbb_run_memcheck)
         _tbb_run_memcheck(${_tbb_test_NAME} ${_tbb_test_SUBDIR})
@@ -117,7 +121,7 @@ function(tbb_add_c_test)
 
     target_compile_definitions(${_tbb_test_NAME} PRIVATE
         $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>
-        $<$<BOOL:${TBB_CPF}>:__TBB_CPF_BUILD=1>)
+        $<$<BOOL:${TBB_TEST_PREVIEW}>:__TBB_TEST_PREVIEW=1>)
 
     target_link_libraries(${_tbb_test_NAME} PRIVATE ${_tbb_test_DEPENDENCIES} Threads::Threads)
 endfunction()
@@ -159,7 +163,7 @@ function(tbb_add_lib_test)
 
     target_compile_definitions(_${_tbb_test_NAME} PRIVATE
         $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>
-        $<$<BOOL:${TBB_CPF}>:__TBB_CPF_BUILD=1>
+        $<$<BOOL:${TBB_TEST_PREVIEW}>:__TBB_TEST_PREVIEW=1>
         $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:__TBB_DYNAMIC_LOAD_ENABLED=0>
         $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:__TBB_SOURCE_DIRECTLY_INCLUDED=1>)
 
@@ -187,6 +191,35 @@ function(tbb_add_lib_test)
         ${TBB_LIB_LINK_LIBS}
         ${TBB_COMMON_LINK_LIBS}
     )
+endfunction()
+
+function(tbb_add_cxx20_modules_test)
+    set(oneValueArgs SUBDIR NAME)
+    set(multiValueArgs MODULES)
+    cmake_parse_arguments(_tbb_test "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    if (NOT TARGET tbb_cxx20_modules_tests)
+        add_custom_target(tbb_cxx20_modules_tests)
+    endif()
+
+    tbb_add_test(SUBDIR ${_tbb_test_SUBDIR} NAME ${_tbb_test_NAME} DEPENDENCIES TBB::tbb TBB::tbbmalloc)
+    if (NOT _tbb_test_MODULES)
+        set(_tbb_test_MODULES test_tbb_header_module.cppm)
+    endif()
+
+    target_sources(${_tbb_test_NAME} PUBLIC
+        FILE_SET CXX_MODULES
+        BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/${_tbb_test_SUBDIR} ${CMAKE_SOURCE_DIR}/include
+        FILES ${_tbb_test_MODULES}
+    )
+
+    set_target_properties(${_tbb_test_NAME} PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON)
+    set_tests_properties(${_tbb_test_NAME} PROPERTIES
+        LABELS "tbb_cxx20_modules_tests"
+    )
+    add_dependencies(tbb_cxx20_modules_tests ${_tbb_test_NAME})
 endfunction()
 
 function(_tbb_get_hwloc_runtime_vars)
@@ -274,7 +307,7 @@ function(tbb_add_tbbbind_test)
     if (NOT DEFINED HWLOC_TARGET_EXPLICITLY_DEFINED AND TARGET PkgConfig::HWLOC AND TARGET TBB::${TBBBIND_LIBRARY_NAME})
         set_tests_properties(${_tbbbind_test_NAME} PROPERTIES
             PASS_REGULAR_EXPRESSION "oneTBB: TBBBIND.*${TBBBIND_LIBRARY_NAME}"
-            FAIL_REGULAR_EXPRESSION "Status: FAILURE!"
+            FAIL_REGULAR_EXPRESSION "Status:.*FAILURE!"
         )
         target_link_libraries(${_tbbbind_test_NAME} PRIVATE PkgConfig::HWLOC)
         target_compile_definitions(${_tbbbind_test_NAME} PRIVATE __TBB_HWLOC_VALID_ENVIRONMENT)
@@ -437,6 +470,11 @@ if (TARGET TBB::tbb)
         # The linker may not detect a dependency on pthread in static variable constructors.
         target_link_libraries(test_dynamic_link PRIVATE "-Wl,--no-as-needed")
     endif()
+
+    tbb_add_test(SUBDIR tbb NAME test_numa_allocation_whitebox)
+    target_include_directories(test_numa_allocation_whitebox PRIVATE
+        $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>)
+
     if (APPLE OR ANDROID_PLATFORM)
         target_link_libraries(test_dynamic_link PRIVATE -rdynamic)
     endif()
@@ -496,6 +534,7 @@ if (TARGET TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_write_once_node DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_async_node DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_input_node DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR tbb NAME test_resource_limited_node DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_profiling DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_concurrent_queue_whitebox DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_intrusive_list DEPENDENCIES TBB::tbb)
@@ -504,6 +543,8 @@ if (TARGET TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_hw_concurrency DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_eh_thread DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_tbb_version DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR tbb NAME test_numa_allocation DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR tbb NAME test_utils DEPENDENCIES TBB::tbb)
     if (NOT TBB_TCM_TESTING)
         tbb_add_test(SUBDIR tbb NAME test_global_control DEPENDENCIES TBB::tbb)
     endif()
@@ -552,8 +593,36 @@ if (TARGET TBB::tbb)
         tbb_add_test(SUBDIR tbb NAME test_tbb_fork DEPENDENCIES TBB::tbb)
     endif()
 
-    tbb_add_test(SUBDIR tbb NAME test_tbb_header DEPENDENCIES TBB::tbb)
-    target_sources(test_tbb_header PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_secondary.cpp)
+    if (TARGET TBB::tbbmalloc)
+        tbb_add_test(SUBDIR tbb NAME test_tbb_header DEPENDENCIES TBB::tbb TBB::tbbmalloc)
+        target_sources(test_tbb_header PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_secondary.cpp)
+
+        if (TBB_TEST_CXX20_MODULES)
+            if (CMAKE_VERSION VERSION_LESS 3.28)
+                message(WARNING "CMake 3.28 or higher is required to use C++20 modules, skipping module tests")
+            elseif (NOT CMAKE_CXX_STANDARD OR CMAKE_CXX_STANDARD LESS 20)
+                message(WARNING "C++ standard 20 or higher is required, skipping module tests")
+            else()
+                tbb_add_cxx20_modules_test(
+                    SUBDIR tbb
+                    NAME test_tbb_header_module_consumer
+                    MODULES ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_module.cppm
+                )
+                target_sources(test_tbb_header_module_consumer PUBLIC
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_secondary.cpp
+                )
+                tbb_add_cxx20_modules_test(
+                    SUBDIR tbb
+                    NAME test_tbb_header_module_consumer_tbbmod
+                    MODULES ${CMAKE_SOURCE_DIR}/include/oneapi/tbb.cppm
+                )
+                target_sources(test_tbb_header_module_consumer_tbbmod PUBLIC
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_tbb_header_secondary.cpp
+                )
+            endif()
+        endif()
+    endif()
+
     if (NOT MINGW AND TBB_OPENMP_FLAG AND NOT CMAKE_SYSTEM_PROCESSOR MATCHES "(mips)")
         tbb_add_test(SUBDIR tbb NAME test_openmp DEPENDENCIES TBB::tbb)
 
@@ -568,6 +637,14 @@ if (TARGET TBB::tbb)
         if (NOT TBB_OPENMP_NO_LINK_FLAG)
             set_target_properties(test_openmp PROPERTIES LINK_FLAGS ${TBB_OPENMP_FLAG})
         endif()
+    endif()
+
+    if (UNIX)
+      tbb_add_test(SUBDIR tbb NAME test_cgroup_support)
+      target_include_directories(test_cgroup_support PRIVATE
+        $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>
+      )
+      target_link_libraries(test_cgroup_support PRIVATE Threads::Threads)
     endif()
 
     # Define the conformance tests
@@ -652,7 +729,7 @@ if (TARGET TBB::tbbmalloc)
     if (NOT "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "mips")
         if (NOT TBB_EMSCRIPTEN)
             # Define TBB malloc tests
-	    tbb_add_test(SUBDIR tbbmalloc NAME test_scalable_allocator DEPENDENCIES TBB::tbbmalloc)
+       	    tbb_add_test(SUBDIR tbbmalloc NAME test_scalable_allocator DEPENDENCIES TBB::tbbmalloc)
             tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_pools DEPENDENCIES TBB::tbbmalloc)
             tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_init_shutdown DEPENDENCIES TBB::tbbmalloc)
             tbb_add_test(SUBDIR tbbmalloc NAME test_malloc_regression DEPENDENCIES TBB::tbbmalloc)
@@ -675,8 +752,7 @@ if (TARGET TBB::tbbmalloc)
         # ----------------------------------------------------------------------------------------
         # Whitebox testing
         if (NOT TBB_EMSCRIPTEN)
-	    add_executable(test_malloc_whitebox tbbmalloc/test_malloc_whitebox.cpp)
-
+       	    add_executable(test_malloc_whitebox tbbmalloc/test_malloc_whitebox.cpp)
             target_include_directories(test_malloc_whitebox
                 PRIVATE
                 ${CMAKE_CURRENT_SOURCE_DIR}/../include
@@ -706,6 +782,10 @@ if (TARGET TBB::tbbmalloc)
                 target_link_libraries(test_malloc_whitebox PRIVATE ${TBB_COMMON_LINK_FLAGS})
             endif()
             target_link_libraries(test_malloc_whitebox PRIVATE Threads::Threads ${TBB_COMMON_LINK_LIBS})
+
+            if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD")
+                target_link_libraries(test_malloc_whitebox PRIVATE util)
+            endif()
         endif()
         # ------------------------------------------------------------------------------------------
 

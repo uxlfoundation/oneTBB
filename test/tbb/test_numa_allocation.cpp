@@ -1,0 +1,262 @@
+/*
+    Copyright (c) 2026 UXL Foundation Contributors
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+*/
+
+#define TBB_PREVIEW_NUMA_ALLOCATION 1
+
+#include "common/test.h"
+#include "common/utils.h"
+#include "common/utils_dynamic_libs.h"
+
+#include "tbb/numa_allocation.h"
+
+//! \file test_numa_allocation.cpp
+//! \brief Test for [preview] functionality
+
+#if _WIN32 || _WIN64
+#include <psapi.h>
+#else
+#include <unistd.h> // for sysconf(_SC_PAGESIZE)
+#endif
+
+size_t DefaultSystemPageSize() {
+#if _WIN32 || _WIN64
+    SYSTEM_INFO si;
+    GetSystemInfo(&si);
+    return si.dwPageSize;
+#else
+    return sysconf(_SC_PAGESIZE);
+#endif
+}
+
+static const size_t page_size = DefaultSystemPageSize();
+
+#if __linux__
+static long (*move_pages_ptr)(int pid, unsigned long count,
+                              void **pages, const int *nodes,
+                              int *status, int flags) = nullptr;
+
+#include <sstream>
+
+static std::string NodesToString(const std::vector<tbb::numa_node_id>& nodes) {
+    std::ostringstream os;
+    os << '[';
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+        if (i != 0) {
+            os << ", ";
+        }
+        os << nodes[i];
+    }
+    os << ']';
+    return os.str();
+}
+
+static void TouchEachPage(char* base_addr, size_t bytes) {
+    for (size_t i = 0; i < bytes; i += page_size)
+        base_addr[i] = 0;
+}
+#endif
+
+int find_numa_node(void* addr) {
+#if __linux__
+    int numa_node = -1;
+    int status[1];
+    void* pages[1] = { addr };
+
+    // Query which node owns this page
+    if (move_pages_ptr(0, 1, pages, NULL, status, 0) == 0)
+        numa_node = status[0];
+
+    return numa_node;
+#elif _WIN32 || _WIN64
+    PSAPI_WORKING_SET_EX_INFORMATION pv = { nullptr, {0} };
+    pv.VirtualAddress = addr;
+
+    REQUIRE_MESSAGE(QueryWorkingSetEx(GetCurrentProcess(), &pv, sizeof(pv)), "QueryWorkingSetEx failed.");
+
+    // If Valid == 0, the page is either swapped out or not yet faulted in.
+    REQUIRE_MESSAGE(pv.VirtualAttributes.Valid, "VirtualAttributes invalid");
+
+    // Extract the NUMA Node from the bitfield (0-63)
+    return (int)pv.VirtualAttributes.Node;
+#else
+    utils::suppress_unused_warning(addr);
+    return 0;
+#endif
+}
+
+#if __linux__
+    #define NUMA_EQ CHECK_EQ
+#else
+    // we set only desired NUMA node, but Windows may put page on any node
+    #define NUMA_EQ WARN_EQ
+#endif
+
+//! \brief \ref requirement
+TEST_CASE("invalid parameters") {
+    REQUIRE_MESSAGE(tbb::allocate_numa_interleaved(1, 7) == nullptr,
+                    "bytes_per_chunk must be multiple of the memory page size");
+    const std::vector<tbb::numa_node_id> empty_nodes;
+    REQUIRE_MESSAGE(tbb::allocate_numa_interleaved(1, empty_nodes, 1) == nullptr,
+                    "empty nodes vector is forbidden, because superfluous");
+    REQUIRE_MESSAGE(tbb::detail::r1::allocate_interleaved(0, nullptr, 0, 0) == nullptr,
+                    "allocation of 0 bytes must return nullptr");
+    REQUIRE_MESSAGE(tbb::detail::r1::allocate_interleaved(4096, nullptr, 1, 0) == nullptr,
+                    "nodes_count must be 0 if nodes_ids is nullptr");
+    int node = 0;
+    REQUIRE_MESSAGE(tbb::detail::r1::allocate_interleaved(4096, &node, 0, 0) == nullptr,
+                    "nodes_count must be greater than 0 if nodes_ids is not nullptr");
+}
+
+void VerifySizeAndNodes(char *ptr, size_t bytes, const std::vector<tbb::numa_node_id>& nodes,
+                        size_t bytes_per_chunk, bool check_ownership) {
+    REQUIRE_MESSAGE(ptr != nullptr, "Failed to allocate NUMA interleaved memory for size "
+                                    << bytes << " and bytes_per_chunk " << bytes_per_chunk);
+    REQUIRE_EQ(utils::NonZero(ptr, bytes), 0);
+    if (!check_ownership)
+        return;
+    const std::vector<tbb::numa_node_id> *nodes_to_check = &nodes;
+    size_t page_index = 0;
+#if __linux__
+    std::vector<tbb::numa_node_id> sorted_nodes;
+    // For such granularity, interleaving can be done not in exact order of nodes.
+    // 1-node case is correctly processed by generic code path below, so exclude it.
+    if (bytes_per_chunk == page_size && nodes.size() > 1) {
+        sorted_nodes = nodes;
+        std::sort(sorted_nodes.begin(), sorted_nodes.end());
+        auto adj = std::adjacent_find(sorted_nodes.begin(), sorted_nodes.end());
+        // numa_interleave_memory() can be used only for non-repeated nodes case
+        if (adj == sorted_nodes.end()) {
+            // touch each page, otherwise move_pages() will fail with EFAULT
+            // and so detecting NUMA node will be impossible
+            TouchEachPage(ptr, bytes);
+
+            int start_node = find_numa_node(ptr);
+            auto it = std::find_if(sorted_nodes.begin(), sorted_nodes.end(),
+                                   [start_node](tbb::numa_node_id node)
+                                   { return node == start_node; });
+            if (it == sorted_nodes.end()) {
+                const std::string nodes_str = NodesToString(sorted_nodes);
+                REQUIRE_MESSAGE(false, "Unexpected NUMA node " << start_node
+                                << " for the first page, expected one of: " << nodes_str);
+                return;
+            }
+
+            nodes_to_check = &sorted_nodes;
+            page_index = it - sorted_nodes.begin();
+        }
+    }
+    // for single-node allocation, an optimization is possible where memory is not touched inside
+    // allocate_numa_interleaved(), so touch each page to make move_pages() work correctly
+    if (nodes.size() == 1)
+        TouchEachPage(ptr, bytes);
+#endif // __linux__
+    for (size_t offset = 0; offset < bytes; offset += bytes_per_chunk, ++page_index)
+        NUMA_EQ(find_numa_node(ptr + offset), (*nodes_to_check)[page_index % nodes_to_check->size()]);
+}
+
+void AllocateAndVerify(bool use_find_node, size_t bytes, const std::vector<tbb::numa_node_id>& nodes,
+                       size_t bytes_per_chunk)
+{
+    char* ptr = (char*)tbb::allocate_numa_interleaved(bytes, nodes, bytes_per_chunk);
+    VerifySizeAndNodes(ptr, bytes, nodes, bytes_per_chunk, use_find_node);
+    tbb::deallocate_numa_interleaved(ptr, bytes);
+}
+
+//! \brief \ref interface \ref requirement
+TEST_CASE("test basics") {
+    CHECK_MESSAGE(TBB_HAS_NUMA_ALLOCATION == 202605,
+                  "Incorrect feature test macro for NUMA allocation");
+
+#if __linux__
+#if __TBB_DYNAMIC_LOAD_ENABLED
+    utils::LIBRARY_HANDLE lib = nullptr;
+    // In case of single NUMA node, memory is untouched and page query is not working.
+    // Anyway, it has not much sense to check it on single-NUMA system.
+    if (tbb::info::numa_nodes().size() > 1) {
+        lib = utils::OpenLibrary("libnuma.so.1");
+        WARN_MESSAGE(lib, "Can't load libnuma.so.1, skipping NUMA ownership checks");
+        if (lib)
+            utils::GetAddress(lib, "move_pages", move_pages_ptr);
+    }
+#else
+    bool lib = false;
+#endif
+#else
+    // On Windows we use VirtualAllocEx and QueryWorkingSetEx, so always can find NUMA node,
+    // but do it only if there are more than 1 NUMA node.
+    bool lib = tbb::info::numa_nodes().size() > 1;
+#endif
+
+    for (size_t obj_size = 8; obj_size <= 10 * 1024 * 1024LLU; obj_size *= 2)
+    {
+        {
+            std::vector<tbb::numa_node_id> numa_nodes = tbb::info::numa_nodes();
+            {
+                char *ptr = (char *)tbb::allocate_numa_interleaved(obj_size);
+                VerifySizeAndNodes(ptr, obj_size, numa_nodes, page_size, lib);
+                tbb::deallocate_numa_interleaved(ptr, obj_size);
+            }
+
+            for (size_t bytes_per_chunk : std::vector<size_t>{page_size, 3 * page_size, 41 * page_size})
+            {
+                char *ptr = (char *)tbb::allocate_numa_interleaved(obj_size, bytes_per_chunk);
+                VerifySizeAndNodes(ptr, obj_size, numa_nodes, bytes_per_chunk, lib);
+                tbb::deallocate_numa_interleaved(ptr, obj_size);
+            }
+        }
+
+        for (size_t bytes_per_chunk : std::vector<size_t>{page_size, 3 * page_size})
+        {
+            std::vector<tbb::numa_node_id> numa_nodes = tbb::info::numa_nodes();
+
+            // explicit nodes and bytes_per_chunk
+            AllocateAndVerify(lib, obj_size, numa_nodes, bytes_per_chunk);
+
+            // reverse numa_nodes and check that interleaving works as expected
+            std::reverse(numa_nodes.begin(), numa_nodes.end());
+            AllocateAndVerify(lib, obj_size, numa_nodes, bytes_per_chunk);
+
+            // remove half of the nodes and check that interleaving works as expected
+            numa_nodes.erase(numa_nodes.begin(), numa_nodes.begin() + numa_nodes.size() / 2);
+            AllocateAndVerify(lib, obj_size, numa_nodes, bytes_per_chunk);
+
+            // check that duplicated nodes are supported
+            std::vector<tbb::numa_node_id> numa_nodes_1 = tbb::info::numa_nodes();
+            // we treat no-NUMA as single-NUMA with node index 0, but numa_nodes() return -1 in this case
+            if (numa_nodes_1.size() == 1)
+                numa_nodes_1[0] = 0;
+            numa_nodes.insert(numa_nodes.end(), numa_nodes_1.begin(), numa_nodes_1.end());
+            AllocateAndVerify(lib, obj_size, numa_nodes, bytes_per_chunk);
+
+            // check that single-node interleaving works
+            AllocateAndVerify(lib, obj_size, {numa_nodes[0]}, bytes_per_chunk);
+        }
+    }
+    // explicitly check that allocation with tbb::info::numa_nodes() works
+    {
+        size_t obj_size = 1024 * 1024LLU;
+        std::vector<tbb::numa_node_id> numa_nodes = tbb::info::numa_nodes();
+        char *ptr = (char *)tbb::allocate_numa_interleaved(obj_size, numa_nodes);
+        REQUIRE_MESSAGE(ptr != nullptr, "Failed to allocate NUMA interleaved memory for size " << obj_size);
+        REQUIRE_EQ(utils::NonZero(ptr, obj_size), 0);
+        tbb::deallocate_numa_interleaved(ptr, obj_size);
+    }
+
+#if __linux__ && __TBB_DYNAMIC_LOAD_ENABLED
+    if (lib)
+        utils::CloseLibrary(lib);
+#endif
+}

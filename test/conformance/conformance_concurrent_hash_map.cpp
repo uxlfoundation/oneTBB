@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -548,15 +549,15 @@ void TestExceptions() {
 
 struct default_container_traits {
     template <typename container_type, typename iterator_type>
-    static container_type& construct_container(typename std::aligned_storage<sizeof(container_type)>::type& storage, iterator_type begin, iterator_type end){
-        container_type* ptr = reinterpret_cast<container_type*>(&storage);
+    static container_type& construct_container(utils::UninitializedStorage<container_type>& storage, iterator_type begin, iterator_type end){
+        container_type* ptr = &storage;
         new (ptr) container_type(begin, end);
         return *ptr;
     }
 
     template <typename container_type, typename iterator_type, typename allocator_type>
-    static container_type& construct_container(typename std::aligned_storage<sizeof(container_type)>::type& storage, iterator_type begin, iterator_type end, allocator_type const& a){
-        container_type* ptr = reinterpret_cast<container_type*>(&storage);
+    static container_type& construct_container(utils::UninitializedStorage<container_type>& storage, iterator_type begin, iterator_type end, allocator_type const& a){
+        container_type* ptr = &storage;
         new (ptr) container_type(begin, end, a);
         return *ptr;
     }
@@ -1327,6 +1328,25 @@ void test_heterogeneous_find() {
     REQUIRE_MESSAGE(regular_result == heterogeneous_result, "Incorrect heterogeneous find result with accessor (element exists)");
     REQUIRE_MESSAGE(acc->first.integer_key() == 1, "Incorrect accessor returned");
     REQUIRE_MESSAGE(key_type::heterogeneous_keys_count == 0, "Temporary key object was created during find call with accessor (element exists)");
+    acc.release();
+
+    const chmap_type& cchmap = chmap;
+
+    regular_result = cchmap.find(cacc, key);
+    heterogeneous_result = cchmap.find(cacc, int(1));
+
+    REQUIRE(regular_result);
+    REQUIRE_MESSAGE(regular_result == heterogeneous_result, "Incorrect heterogeneous find result with const_accessor (const, element exists)");
+    REQUIRE_MESSAGE(cacc->first.integer_key() == 1, "Incorrect accessor returned");
+    REQUIRE_MESSAGE(key_type::heterogeneous_keys_count == 0, "Temporary key object was created during find call with const_accessor (const, element exists)");
+    cacc.release();
+
+    regular_result = cchmap.find(cacc, key_type(key_type::construct_flag{}, 2));
+    heterogeneous_result = cchmap.find(cacc, int(2));
+
+    REQUIRE(!regular_result);
+    REQUIRE_MESSAGE(regular_result == heterogeneous_result, "Incorrect heterogeneous find result with const_accessor (const, no element)");
+    REQUIRE_MESSAGE(key_type::heterogeneous_keys_count == 0, "Temporary key object was created during find call with const_accessor (const, no element)");
     key_type::reset();
 }
 

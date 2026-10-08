@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2023 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -326,7 +327,8 @@ private:
         else if (size < minBinnedSize)
             return NO_BIN;
 
-        int bin = (size - minBinnedSize)/freeBinsStep;
+        size_t val = (size - minBinnedSize)/freeBinsStep;
+        int bin = (int)val;
 
         MALLOC_ASSERT(bin < HUGE_BIN, "Invalid size.");
         return bin;

@@ -117,6 +117,10 @@ EXPORTS
 ?constraints_default_concurrency@r1@detail@tbb@@YAHABUconstraints@d1@23@H@Z
 ?constraints_threads_per_core@r1@detail@tbb@@YAHABUconstraints@d1@23@H@Z
 
+; Interleaved memory allocation (numa_allocation.cpp)
+?allocate_interleaved@r1@detail@tbb@@YAPAXIPBHII@Z
+?deallocate_interleaved@r1@detail@tbb@@YAXPAXI@Z
+
 ; Observer (observer_proxy.cpp)
 ?observe@r1@detail@tbb@@YAXAAVtask_scheduler_observer@d1@23@_N@Z
 

@@ -59,9 +59,9 @@ struct hash_map_node_base : no_copy {
 };
 
 // Incompleteness flag value
-static void* const rehash_req_flag = reinterpret_cast<void*>(std::size_t(3));
+__TBB_GLOBAL_VAR void* const rehash_req_flag = reinterpret_cast<void*>(std::size_t(3));
 // Rehashed empty bucket flag
-static void* const empty_rehashed_flag = reinterpret_cast<void*>(std::size_t(0));
+__TBB_GLOBAL_VAR void* const empty_rehashed_flag = reinterpret_cast<void*>(std::size_t(0));
 
 template <typename MutexType>
 bool rehash_required( hash_map_node_base<MutexType>* node_ptr ) {
@@ -426,9 +426,6 @@ private:
 
     template <typename C, typename T, typename U>
     friend bool operator!=( const hash_map_iterator<C,T>& i, const hash_map_iterator<C,U>& j );
-
-    template <typename C, typename T, typename U>
-    friend ptrdiff_t operator-( const hash_map_iterator<C,T>& i, const hash_map_iterator<C,U>& j );
 
     template <typename C, typename U>
     friend class hash_map_iterator;
@@ -1126,9 +1123,9 @@ public:
 
     template <typename K>
     typename std::enable_if<hash_compare_is_transparent<K>::value,
-                            bool>::type find( const_accessor& result, const K& key ) {
+                            bool>::type find( const_accessor& result, const K& key ) const {
         result.release();
-        return lookup</*insert*/false>(key, nullptr, &result, /*write=*/false, &do_not_allocate_node);
+        return const_cast<concurrent_hash_map*>(this)->lookup</*insert*/false>(key, nullptr, &result, /*write=*/false, &do_not_allocate_node);
     }
 
     template <typename K>
