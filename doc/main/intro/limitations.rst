@@ -74,7 +74,7 @@ Dynamic Malloc Replacement and Topology API Incompatibilities
 ``tbb::task_arena`` Constants ODR-Use Before C++17
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Limitation:** In C++11 and C++14, ODR-use of ``tbb::task_arena::automatic``, ``tbb::task_arena::not_initialized``, or ``tbb::task_arena::selectable`` (a preview feature) causes link errors.
+**Limitation:** In C++11 and C++14, ODR-use of ``tbb::task_arena::automatic``, ``tbb::task_arena::not_initialized``, or ``tbb::task_arena::selectable`` (a preview feature) may cause link errors.
 
 **Risk:** Unresolved symbol errors at link time, for example:
 
