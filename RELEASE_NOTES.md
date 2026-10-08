@@ -27,7 +27,7 @@
 - Fixed interleaved memory allocation failures for non-default chunk sizes when Transparent Huge Pages (THP) is set to "always."
 - Fixed a crash that could occur during constrained nested arena construction.
 - The ``resource_limited_node`` preview feature now properly respects concurrency limits.
-- Declared ``task_arena::automatic``, not_initialized, and selectable as ``constexpr``, fixing linker errors by their ODR-use in C++17.
+- Declared ``task_arena::automatic``, ``task_arena::not_initialized``, and ``task_arena::selectable`` as ``constexpr``, fixing linker errors caused by their ODR-use in C++17.
 - Fixed ``task_arena`` attach construction to preserve settings, ensuring they are retained when copying the attached arena.
 - Improved the performance of interleaved allocations for the common use case where the chunk size matches the page size and all NUMA nodes are distinct.
 - Significantly improved parallel_sort performance by using a parallel partitioning algorithm during quicksort range splitting.
