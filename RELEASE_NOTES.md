@@ -14,6 +14,43 @@
 * limitations under the License.
 *******************************************************************************/-->
 
+# oneTBB 2023.2 Release Notes
+
+## :rocket: Preview Features
+- Added constructors to ``flow::resource_limiter`` that allow managing a runtime-defined number of handles.
+- The ``resource_limiter`` feature now has a best-effort policy to avoid starving consumers that need several resources at once.
+
+## :tada: New Features
+- ``parallel_phase`` and ``task_arena`` leave policies are now fully supported features.
+
+## :hammer: Issues Fixed
+- Fixed interleaved memory allocation failures for non-default chunk sizes when Transparent Huge Pages (THP) is set to "always."
+- Fixed a crash that could occur during constrained nested arena construction.
+- The ``resource_limited_node`` preview feature now properly respects concurrency limits.
+- Declared ``task_arena::automatic``, not_initialized, and selectable as ``constexpr``, fixing linker errors by their ODR-use in C++17.
+- Fixed ``task_arena`` attach construction to preserve settings, ensuring they are retained when copying the attached arena.
+- Improved the performance of interleaved allocations for the common use case where the chunk size matches the page size and all NUMA nodes are distinct.
+- Significantly improved parallel_sort performance by using a parallel partitioning algorithm during quicksort range splitting.
+- Reduced overheads in the oneTBB scheduler for high-core count NUMA systems.
+
+## :octocat: Open-Source Contributions Integrated
+- Fixed universal binary build failures on Apple platforms when using LLVM Clang*. Contributed by Philipp Remy (https://github.com/uxlfoundation/oneTBB/pull/2094).
+- Fixed a compilation error with libc++. Contributed by NsPro04 (https://github.com/uxlfoundation/oneTBB/pull/2149).
+
+## :information_source: Other
+- Moved the custom assertion handler API from ``tbb::ext`` to ``tbb``, keeping ``tbb::ext`` for backward compatibility.
+
+## :rotating_light: Known Limitations
+- The ``oneapi::tbb::info`` namespace interfaces might unexpectedly change the process affinity mask on Windows* OS systems (see https://github.com/open-mpi/hwloc/issues/366 for details) when using hwloc version lower than 2.5.
+- Using a hwloc version other than 1.11, 2.0, or 2.5 may cause an undefined behavior on Windows OS. See https://github.com/open-mpi/hwloc/issues/477 for details.
+- The NUMA topology may be detected incorrectly on Windows* OS machines where the number of NUMA node threads exceeds the size of 1 processor group.
+- On Windows OS on ARM64*, when compiling an application using oneTBB with the Microsoft* Compiler, the compiler issues a warning C4324 that a structure was padded due to the alignment specifier. Consider suppressing the warning by specifying /wd4324 to the compiler command line.
+- When CPU resource coordination is enabled by setting the TCM_ENABLE environment variable to 1, tasks from a lower-priority ``task_arena`` might be executed before tasks from a higher-priority ``task_arena``.
+- Using oneTBB on WASM* may cause applications to run in a single thread. See [Limitations of WASM Support](https://github.com/uxlfoundation/oneTBB/blob/master/WASM_Support.md#limitations).
+
+> **_NOTE:_**  To see known limitations that impact all versions of oneTBB, refer to [oneTBB Documentation](https://uxlfoundation.github.io/oneTBB/main/intro/limitations.html).
+
+
 # oneTBB 2023.1 Release Notes
 
 ## :rocket: Preview Features
