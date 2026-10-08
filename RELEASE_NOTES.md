@@ -14,6 +14,12 @@
 * limitations under the License.
 *******************************************************************************/-->
 
+# oneTBB 2023.2 Release Notes
+
+## :hammer: Issues Fixed
+- Fixed a possible process-exit crash when oneTBB is loaded from a dynamically loaded module, for example a Python* extension or a plugin. The libraries oneTBB loads itself (TCM, TBBbind, and the RML server) are now unloaded from a process-lifetime destructor, after their exit-time destructors have run, instead of from a worker thread during resource release.
+
+
 # oneTBB 2023.1 Release Notes
 
 ## :rocket: Preview Features

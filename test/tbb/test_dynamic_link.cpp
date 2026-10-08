@@ -204,4 +204,41 @@ TEST_CASE("Test dynamic_link with bad library") {
     // \".*stub_unsigned.*.dll\" is unsigned or has invalid signature."
 }
 
+//! Testing bookkeeping for deferred (process-exit) unlinking of loaded libraries
+//! \brief \ref requirement
+TEST_CASE("Test deferred dynamic unlink") {
+    using namespace tbb::detail::r1;
+
+    // A null handle is not recorded.
+    const std::size_t before = handles.my_size.load();
+    dynamic_link_keep_until_exit(nullptr);
+    REQUIRE_MESSAGE(handles.my_size.load() == before, "A null handle must not be recorded");
+
+    // dynamic_unlink_all() empties the table and is idempotent, so that the process-lifetime
+    // unloader and the Windows DLL_PROCESS_DETACH path can both reach it safely.
+    dynamic_unlink_all();
+    REQUIRE_MESSAGE(handles.my_size.load() == 0, "dynamic_unlink_all() must empty the table");
+    dynamic_unlink_all();
+    REQUIRE_MESSAGE(handles.my_size.load() == 0, "dynamic_unlink_all() must be idempotent");
+
+    // A handle is only unlinked when dynamic_unlink_all() is called, not when it is kept.
+    const char* symbol = "TBB_runtime_version";
+    static const char* (*handler)() = nullptr;
+    static const dynamic_link_descriptor table[] = {
+        { symbol, (pointer_to_handler*)(void*)(&handler) },
+    };
+    constexpr int load_flags = DYNAMIC_LINK_DEFAULT & ~DYNAMIC_LINK_BUILD_ABSOLUTE_PATH;
+    dynamic_link_handle handle = nullptr;
+    const bool linked = dynamic_link(TBBLIB_NAME, table, 1, &handle, load_flags);
+    REQUIRE_MESSAGE(linked, "The library was not linked");
+    REQUIRE_MESSAGE(handle != nullptr, "The library handle was not obtained");
+
+    const std::size_t registered = handles.my_size.load();
+    dynamic_link_keep_until_exit(handle);
+    REQUIRE_MESSAGE(handles.my_size.load() == registered + 1,
+                    "The handle was not recorded for deferred unlink");
+    dynamic_unlink_all();
+    REQUIRE_MESSAGE(handles.my_size.load() == 0, "The deferred handle was not unlinked");
+}
+
 #endif // __TBB_DYNAMIC_LOAD_ENABLED
