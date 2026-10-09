@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2023 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -95,7 +96,8 @@ void FACTORY::close() {
     if ( library_handle )
         (*my_wait_to_close_routine)(*this);
     if ( (size_t)library_handle>FACTORY::c_dont_unload ) {
-        dynamic_unlink(library_handle);
+        // Defer the unload; see dynamic_link_keep_until_exit().
+        dynamic_link_keep_until_exit( library_handle );
         library_handle = nullptr;
     }
 }

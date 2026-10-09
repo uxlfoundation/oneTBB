@@ -16,6 +16,12 @@ add_library(tcm SHARED
   version.cpp
 )
 
+# Widen the exit-time unload race window in hwloc_topology_loader_t's destructor so the
+# deferred-unload regression test is deterministic.
+if (TBB_TCM_TESTING)
+  target_compile_definitions(tcm PRIVATE TCM_TEST_EXIT_RACE_WINDOW=1000)
+endif()
+
 target_compile_features(tcm PRIVATE cxx_std_17) # Minimally supported version of the C++ standard
 
 if (WIN32)

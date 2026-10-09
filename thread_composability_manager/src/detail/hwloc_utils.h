@@ -11,6 +11,10 @@
 #include <vector>
 #include <thread>               // std::this_thread::yield()
 
+#if defined(TCM_TEST_EXIT_RACE_WINDOW)
+#include <chrono>               // std::chrono::milliseconds
+#endif
+
 #include "_tcm_assert.h"
 
 #if _MSC_VER && !__INTEL_COMPILER && !__clang__
@@ -75,6 +79,11 @@ public:
         if (is_initialized) {
             while (spin_mutex.test_and_set()) { std::this_thread::yield(); }
             hwloc_topology_destroy(topology);
+#if defined(TCM_TEST_EXIT_RACE_WINDOW)
+            // Test-only: widen the window in which a worker may unmap this library while
+            // its exit-time destructor runs.
+            std::this_thread::sleep_for(std::chrono::milliseconds(TCM_TEST_EXIT_RACE_WINDOW));
+#endif
             is_initialized = false;
             spin_mutex.clear();
         }
