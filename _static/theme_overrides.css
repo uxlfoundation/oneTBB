@@ -1,0 +1,23 @@
+/* override table width restrictions */
+@media screen and (min-width: 767px) {
+
+   .wy-table-responsive table td {
+      /* !important prevents the common CSS stylesheets from overriding
+         this as on RTD they are loaded after this stylesheet */
+      white-space: normal !important;
+   }
+
+   .wy-table-responsive {
+      overflow: visible !important;
+   }
+}
+
+.bd-sidebar-primary .toc-label-highlight {
+   color: #92400e !important;
+   font-weight: 600;
+}
+
+.bd-sidebar-primary a:hover .toc-label-highlight,
+.bd-sidebar-primary a:focus .toc-label-highlight {
+   color: #b45309 !important;
+}
