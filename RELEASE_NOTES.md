@@ -24,14 +24,14 @@
 - ``parallel_phase`` and ``task_arena`` leave policies are now fully supported features.
 
 ## :hammer: Issues Fixed
-- Fixed interleaved memory allocation failures for non-default chunk sizes when Transparent Huge Pages (THP) is set to "always."
+- Reduced overheads in the oneTBB scheduler for high-core count NUMA systems.
+- Significantly improved parallel_sort performance by using a parallel partitioning algorithm during quicksort range splitting.
+- Improved the performance of interleaved allocations for the common use case where the chunk size matches the page size and all NUMA nodes are distinct.
+- Fixed interleaved memory allocation failures for non-default chunk sizes when Transparent Huge Pages (THP) is set to "always".
 - Fixed a crash that could occur during constrained nested arena construction.
+- Fixed ``task_arena`` attach construction to preserve settings, ensuring they are retained when copying the attached arena.
 - The ``resource_limited_node`` preview feature now properly respects concurrency limits.
 - Declared ``task_arena::automatic``, ``task_arena::not_initialized``, and ``task_arena::selectable`` as ``constexpr``, fixing linker errors caused by their ODR-use in C++17.
-- Fixed ``task_arena`` attach construction to preserve settings, ensuring they are retained when copying the attached arena.
-- Improved the performance of interleaved allocations for the common use case where the chunk size matches the page size and all NUMA nodes are distinct.
-- Significantly improved parallel_sort performance by using a parallel partitioning algorithm during quicksort range splitting.
-- Reduced overheads in the oneTBB scheduler for high-core count NUMA systems.
 
 ## :octocat: Open-Source Contributions Integrated
 - Fixed universal binary build failures on Apple platforms when using LLVM Clang*. Contributed by Philipp Remy (https://github.com/uxlfoundation/oneTBB/pull/2094).
