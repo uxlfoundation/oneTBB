@@ -6,7 +6,7 @@ Cook Until Done: parallel_for_each
 
 For some loops, the end of the iteration space is not known in advance,
 or the loop body may add more iterations to do before the loop exits.
-You can deal with both situations using the template class ``oneapi::tbb::parallel_for_each``.
+You can deal with both situations using the function template ``oneapi::tbb::parallel_for_each``.
 
 
 A linked list is an example of an iteration space that is not known in
@@ -18,16 +18,14 @@ least a few thousand instructions, you can use ``parallel_for_each`` to
 gain some parallelism.
 
 
-For example, consider the following serial code:
+For example, consider the following serial code, where ``Foo`` accepts a
+``const Item&``:
 
 
-::
-
-
-   void SerialApplyFooToList( const std::list<Item>& list ) {
-       for( std::list<Item>::const_iterator i=list.begin() i!=list.end(); ++i ) 
-           Foo(*i);
-   }
+.. literalinclude:: ./examples/cook_until_done.cpp
+    :language: cpp
+    :start-after: /*begin_serial_apply_foo*/
+    :end-before: /*end_serial_apply_foo*/
 
 
 If ``Foo`` takes at least a few thousand instructions to run, you can
@@ -38,26 +36,19 @@ the C++ standard header ``<functional>``, except that ``operator()``
 must be ``const``.
 
 
-::
-
-
-   class ApplyFoo {
-   public:
-       void operator()( Item& item ) const {
-           Foo(item);
-       }
-   };
+.. literalinclude:: ./examples/cook_until_done.cpp
+    :language: cpp
+    :start-after: /*begin_apply_foo*/
+    :end-before: /*end_apply_foo*/
 
 
 The parallel form of ``SerialApplyFooToList`` is as follows:
 
 
-::
-
-
-   void ParallelApplyFooToList( const std::list<Item>& list ) {
-       parallel_for_each( list.begin(), list.end(), ApplyFoo() ); 
-   }
+.. literalinclude:: ./examples/cook_until_done.cpp
+    :language: cpp
+    :start-after: /*begin_parallel_apply_foo*/
+    :end-before: /*end_parallel_apply_foo*/
 
 
 An invocation of ``parallel_for_each`` never causes two threads to act
@@ -75,10 +66,10 @@ There are two ways that ``parallel_for_each`` can acquire work scalably.
 
 
 -  The body argument to ``parallel_for_each``, if it takes a second
-   argument *feeder* of type ``parallel_for_each<Item>&``, can add more
+   argument *feeder* of type ``oneapi::tbb::feeder<Item>&``, can add more
    work by calling ``feeder.add(item)``. For example, suppose processing
    a node in a tree is a prerequisite to processing its descendants.
    With ``parallel_for_each``, after processing a node, you could use
-   ``feeder.add`` to add the descendant nodes. The instance of
+   ``feeder.add`` to add the descendant nodes. The invocation of
    ``parallel_for_each`` does not terminate until all items have been
    processed.
