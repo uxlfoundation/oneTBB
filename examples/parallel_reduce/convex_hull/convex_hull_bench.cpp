@@ -588,14 +588,26 @@ int main(int argc, char *argv[]) {
 
     int nthreads;
     util::my_time_t tm_init, tm_start, tm_end;
+    double rel_error;
+
+    if (util::numberOfIterations <= 0) {
+        util::numberOfIterations = 1;
+        std::cout << "Setting the number of iterations = " << util::numberOfIterations
+                  << " default\n";
+    }
+    else {
+        std::cout << "Input for the number of iterations = " << util::numberOfIterations << "\n";
+    }
 
 #if USECONCVEC
     std::cout << "Starting TBB unbuffered push_back version of QUICK HULL algorithm"
-              << "\n";
+              << "\n\n";
 #else
     std::cout << "Starting STL locked unbuffered push_back version of QUICK HULL algorithm"
-              << "\n";
+              << "\n\n";
 #endif // USECONCVEC
+
+    utility::measurements mu(util::numberOfIterations);
 
     for (nthreads = threads.first; nthreads <= threads.last; nthreads = threads.step(nthreads)) {
         pointVec_t points;
@@ -603,26 +615,36 @@ int main(int argc, char *argv[]) {
 
         oneapi::tbb::global_control c(oneapi::tbb::global_control::max_allowed_parallelism,
                                       nthreads);
-        tm_init = util::gettime();
-        initialize<FillRNDPointsVector>(points);
-        tm_start = util::gettime();
-        std::cout << "Parallel init time on " << nthreads
-                  << " threads: " << util::time_diff(tm_init, tm_start)
-                  << "  Points in input: " << points.size() << "\n";
 
-        tm_start = util::gettime();
-        quickhull(points, hull, false);
-        tm_end = util::gettime();
-        std::cout << "Time on " << nthreads << " threads: " << util::time_diff(tm_start, tm_end)
-                  << "  Points in hull: " << hull.size() << "\n";
+        for (int iter = 0; iter < util::numberOfIterations; ++iter) {
+            tm_init = util::gettime();
+            initialize<FillRNDPointsVector>(points);
+            tm_start = util::gettime();
+            std::cout << "Parallel init time on " << nthreads
+                      << " threads: " << util::time_diff(tm_init, tm_start)
+                      << "  Points in input: " << points.size() << "\n";
+
+            tm_start = util::gettime();
+            mu.start();
+
+            quickhull(points, hull, false);
+
+            mu.stop();
+            tm_end = util::gettime();
+            std::cout << "Time on " << nthreads << " threads: " << util::time_diff(tm_start, tm_end)
+                      << "  Points in hull: " << hull.size() << "\n";
+        }
+
+        rel_error = mu.computeRelError();
     }
+    utility::report_relative_error(rel_error);
 
 #if USECONCVEC
-    std::cout << "Starting TBB buffered version of QUICK HULL algorithm"
-              << "\n";
+    std::cout << "\n\nStarting TBB buffered version of QUICK HULL algorithm"
+              << "\n\n";
 #else
     std::cout << "Starting STL locked buffered version of QUICK HULL algorithm"
-              << "\n";
+              << "\n\n";
 #endif
 
     for (nthreads = threads.first; nthreads <= threads.last; nthreads = threads.step(nthreads)) {
@@ -632,19 +654,29 @@ int main(int argc, char *argv[]) {
         oneapi::tbb::global_control c(oneapi::tbb::global_control::max_allowed_parallelism,
                                       nthreads);
 
-        tm_init = util::gettime();
-        initialize<FillRNDPointsVector_buf>(points);
-        tm_start = util::gettime();
-        std::cout << "Init time on " << nthreads
-                  << " threads: " << util::time_diff(tm_init, tm_start)
-                  << "  Points in input: " << points.size() << "\n";
+        for (int iter = 0; iter < util::numberOfIterations; ++iter) {
+            tm_init = util::gettime();
+            initialize<FillRNDPointsVector_buf>(points);
+            tm_start = util::gettime();
+            std::cout << "Init time on " << nthreads
+                      << " threads: " << util::time_diff(tm_init, tm_start)
+                      << "  Points in input: " << points.size() << "\n";
 
-        tm_start = util::gettime();
-        quickhull(points, hull, true);
-        tm_end = util::gettime();
-        std::cout << "Time on " << nthreads << " threads: " << util::time_diff(tm_start, tm_end)
-                  << "  Points in hull: " << hull.size() << "\n";
+            tm_start = util::gettime();
+            mu.start();
+
+            quickhull(points, hull, true);
+
+            mu.stop();
+            tm_end = util::gettime();
+            std::cout << "Time on " << nthreads << " threads: " << util::time_diff(tm_start, tm_end)
+                      << "  Points in hull: " << hull.size() << "\n";
+        }
+
+        rel_error = mu.computeRelError();
     }
+
+    utility::report_relative_error(rel_error);
 
     return 0;
 }
