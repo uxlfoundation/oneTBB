@@ -48,17 +48,27 @@ class resource_limited_input;
 class request_id {
     std::uint64_t m_unique_integer;
     std::chrono::steady_clock::time_point m_time_point;
+    node_priority_t m_priority;
 public:
     // The timestamp is taken at construction
-    request_id(const std::uint64_t& unique_integer)
+    request_id(const std::uint64_t& unique_integer, node_priority_t priority)
         : m_unique_integer(unique_integer)
         , m_time_point(std::chrono::steady_clock::now())
+        , m_priority(priority)
     {}
 
-    // Orders by time first and then by the unique integer to break ties in the timestamp
+    // Orders by priority first, then by time, and then by the unique integer to break ties in the timestamp
     bool operator<(const request_id& rhs) const {
-        return m_time_point < rhs.m_time_point
-               || (m_time_point == rhs.m_time_point && m_unique_integer < rhs.m_unique_integer);
+        if (m_priority != rhs.m_priority) {
+            // A larger node_priority_t means a higher priority, i.e. a lower request id
+            return m_priority > rhs.m_priority;
+        }
+
+        if (m_time_point != rhs.m_time_point) {
+            return m_time_point < rhs.m_time_point;
+        }
+
+        return m_unique_integer < rhs.m_unique_integer;
     }
 
     // Equality is based on the unique integer (identity), not the timestamp
@@ -639,8 +649,8 @@ class try_acquire_resources_and_execute_task : public graph_task {
 
 public:
     try_acquire_resources_and_execute_task(graph& g, d1::small_object_allocator& allocator, BodyLeaf* body_leaf,
-                                           request_id id, RequestDataType& request_data)
-        : graph_task(g, allocator, no_priority)
+                                           request_id id, RequestDataType& request_data, node_priority_t a_priority)
+        : graph_task(g, allocator, a_priority)
         , m_body(body_leaf)
         , m_id(id)
         , m_request_data(request_data)
@@ -720,7 +730,7 @@ public:
 
     typename requests_map_type::reference form_request(const Input& input, OutputPorts& ports) {
         tbb::spin_mutex::scoped_lock lock(m_mutex);
-        request_id id{++m_counter};
+        request_id id{++m_counter, m_input_ptr->priority()};
         auto res = m_requests.emplace(std::piecewise_construct,
                                       std::forward_as_tuple(id),
                                       std::forward_as_tuple(input, ports));
@@ -807,7 +817,7 @@ public:
         if (prev_value == 1) {
             d1::small_object_allocator allocator;
             using task_type = try_acquire_resources_and_execute_task<resource_limited_body_leaf, request_data_type>;
-            graph_task* t = allocator.new_object<task_type>(this->graph_reference(), allocator, this, id, data);
+            graph_task* t = allocator.new_object<task_type>(this->graph_reference(), allocator, this, id, data, m_input_ptr->priority());
             spawn_in_graph_arena(this->graph_reference(), *t);
         }
     }
@@ -864,8 +874,8 @@ public:
     template <typename Body, typename... ResourceProviders>
     resource_limited_input(graph& g, std::size_t max_concurrency,
                            std::tuple<ResourceProviders&...> resource_providers,
-                           Body& body)
-        : base_type(g, max_concurrency, no_priority, is_body_noexcept(body, resource_providers))
+                           Body& body, node_priority_t priority)
+        : base_type(g, max_concurrency, priority, is_body_noexcept(body, resource_providers))
         , m_body(new body_leaf<Body, ResourceProviders...>(g, resource_providers, body, this))
         , m_init_body(new body_leaf<Body, ResourceProviders...>(g, resource_providers, body, this))
         , m_output_ports(init_output_ports<output_ports_type>::call(g, m_output_ports))
@@ -915,6 +925,8 @@ public:
     Body copy_function_object() {
         return *static_cast<Body*>(m_body->get_body_ptr());
     }
+
+    node_priority_t priority() const { return base_type::my_priority; }
 protected:
     void reset(reset_flags f) {
         base_type::reset_function_input_base(f);
@@ -954,9 +966,10 @@ public:
     template <typename Body, typename ResourceProvider, typename... ResourceProviders>
     resource_limited_node(graph& g, std::size_t concurrency,
                           std::tuple<ResourceProvider&, ResourceProviders&...> resource_providers,
-                          Body body)
+                          Body body,
+                          node_priority_t priority = no_priority)
         : graph_node(g)
-        , input_impl_type(g, concurrency, resource_providers, body)
+        , input_impl_type(g, concurrency, resource_providers, body, priority)
     {}
 
     resource_limited_node(const resource_limited_node& other)
