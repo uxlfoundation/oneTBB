@@ -43,6 +43,13 @@ namespace tbb {
 namespace detail {
 namespace r1 {
 
+#if !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
+bool try_call_user_handler_on_exception(const char* comment);
+#if !TBB_USE_EXCEPTIONS
+void throw_in_noexcept_default(const char* comment);
+#endif
+#endif
+
 void runtime_warning(const char* format, ... );
 
 class task_arena;
@@ -276,6 +283,11 @@ static inline unsigned char is_in_transaction() {
 #endif
 }
 #endif // TBB_USE_ASSERT
+
+// Defined in exception.cpp
+/*[[noreturn]]*/void do_throw_noexcept(void (*throw_exception)()) noexcept;
+
+/*[[noreturn]]*/void terminate_on_user_exception();
 
 } // namespace r1
 } // namespace detail
