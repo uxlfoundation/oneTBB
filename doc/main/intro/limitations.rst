@@ -70,3 +70,16 @@ Dynamic Malloc Replacement and Topology API Incompatibilities
 **Limitation:** On Linux* OS, using dynamic malloc replacement with ``tbb::info`` and ``tbb::task_arena::constraints`` APIs may result in runtime failures.
 
 **Solution:** Set ``TBB_ENABLE_SANITIZERS=1`` in the environment. This informs that dynamic malloc replacement is used.
+
+``tbb::task_arena`` Constants ODR-Use Before C++17
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Limitation:** In C++11 and C++14, ODR-use of ``tbb::task_arena::automatic``, ``tbb::task_arena::not_initialized``, or ``tbb::task_arena::selectable`` (a preview feature) may cause link errors.
+
+**Risk:** Unresolved symbol errors at link time, for example:
+
+.. code:: cpp
+
+   auto arena = std::make_unique<tbb::task_arena>(tbb::task_arena::automatic);
+
+**Solution:** Compile with C++17 or later, or avoid ODR-use by converting the constant to a value, for example ``static_cast<int>(tbb::task_arena::automatic)``.

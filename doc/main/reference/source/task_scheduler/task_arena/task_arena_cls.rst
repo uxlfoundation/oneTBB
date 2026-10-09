@@ -135,12 +135,12 @@ a precedence in execution over the tasks from ``task_arena`` with lower priority
 Member types and constants
 --------------------------
 
-.. cpp:member:: static const int automatic
+.. cpp:member:: static constexpr int automatic
 
     When passed as ``max_concurrency`` to the specific constructor, arena
     concurrency is automatically set based on the hardware configuration.
 
-.. cpp:member:: static const int not_initialized
+.. cpp:member:: static constexpr int not_initialized
 
     When returned by a method or function, indicates that there is no active ``task_arena``
     or that the ``task_arena`` object has not yet been initialized.
