@@ -25,6 +25,9 @@ struct thread_registration_data_t {
                                              // Should correspond to the top of the stack. Changed
                                              // only by the owning thread hence does not require
                                              // synchronization.
+
+    std::unordered_set<tcm_permit_handle_t> seen; // Previous permits with which this thread once
+                                                  // has been registered.
 };
 
 struct permit_registrations_t {

@@ -1420,12 +1420,17 @@ public:
       }
       tl.top_permit = ph;
 
-      // Now, register this thread's data in the permit handle
-      permit_registrations_t& pr = ph->data.registrations;
-      std::lock_guard<std::mutex> lock(pr.mutex);
-      __TCM_ASSERT(pr.thread_locals.count(&tl) == 0,
-                   "Thread has not been registered with the permit yet.");
-      pr.thread_locals.emplace(&tl);
+      auto [iter, succeed] = tl.seen.emplace(ph);
+      if (succeed) {
+          // This thread registers with this permit for the first time, let the permit's data know
+          // about this thread local.
+          permit_registrations_t& pr = ph->data.registrations;
+          std::lock_guard<std::mutex> lock(pr.mutex);
+          __TCM_ASSERT(pr.thread_locals.count(&tl) == 0,
+                       "Thread has not been registered with the permit yet.");
+          pr.thread_locals.emplace(&tl);
+      }
+
       return TCM_RESULT_SUCCESS;
   }
 
@@ -1453,6 +1458,7 @@ public:
               this_thread.top_permit = this_thread.permits.top();
       }
 
+#if 0
       __TCM_ASSERT(ph, "Permit from which to unregister exists.");
 
       // Attempt to unregister this thread's local from the permit handle
@@ -1460,6 +1466,7 @@ public:
       std::lock_guard<std::mutex> lock(pr.mutex);
       pr.thread_locals.erase(&this_thread); // TODO: Consider returning a different status if
                                             // erasure fails
+#endif
       return TCM_RESULT_SUCCESS;
   }
 
