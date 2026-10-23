@@ -254,9 +254,14 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     if (!base_addr)
         return nullptr;
 
-     auto unmap = [](char* base_addr) {
-        BOOL ret = VirtualFree(base_addr, /*dwSize=*/0, MEM_RELEASE);
-        __TBB_ASSERT_RELEASE(ret, "VirtualFree failed");
+    // remember the number of regions to be able to release in case of error
+    size_t region_count = 1;
+
+    auto unmap = [&region_count, bytes_per_chunk](char* base_addr) {
+        for (size_t region_index = 0; region_index < region_count; ++region_index) {
+            BOOL ret = VirtualFree(base_addr + region_index * bytes_per_chunk, /*dwSize=*/0, MEM_RELEASE);
+            __TBB_ASSERT_RELEASE(ret, "VirtualFree failed");
+        }
     };
     std::unique_ptr<char, decltype(unmap)> data_holder(base_addr, unmap);
 
@@ -269,6 +274,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
                                   MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER);
             if (!ok)
                 return nullptr;
+            ++region_count;
         }
 
         MEM_EXTENDED_PARAMETER param = { {0, 0}, {0} };
@@ -297,12 +303,34 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
 void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t bytes) {
     atomic_do_once(interleaved_initialization_impl, interleaved_initialization_state);
 
-    // TODO: process return value of munmap()/VirtualFree()
 #if __linux__
+    // TODO: process return value of munmap()
     munmap(ptr, bytes);
 #elif _WIN32 || _WIN64
-    suppress_unused_warning(bytes);
-    VirtualFree(ptr, /*dwSize=*/0, MEM_RELEASE);
+    // each region after creations placeholders during allocation must be released with individual
+    // VirtualFree, but we don't have bytes_per_chunk here, so must ask OS with VirtualQuery
+    char* address = static_cast<char*>(ptr);
+    size_t remaining = bytes;
+    while (remaining) {
+        MEMORY_BASIC_INFORMATION memory_info;
+        SIZE_T query_result = VirtualQuery(address, &memory_info, sizeof(memory_info));
+        __TBB_ASSERT_RELEASE(query_result == sizeof(memory_info), "VirtualQuery failed");
+        __TBB_ASSERT_RELEASE(memory_info.State != MEM_FREE, "Trying to release a free memory region");
+        __TBB_ASSERT_RELEASE(memory_info.BaseAddress == memory_info.AllocationBase,
+            "Invalid memory region address");
+
+        uintptr_t region_end = reinterpret_cast<uintptr_t>(memory_info.BaseAddress)
+            + memory_info.RegionSize;
+        uintptr_t current_address = reinterpret_cast<uintptr_t>(address);
+        __TBB_ASSERT_RELEASE(current_address < region_end, "Invalid memory region");
+
+        BOOL ret = VirtualFree(memory_info.BaseAddress, /*dwSize=*/0, MEM_RELEASE);
+        __TBB_ASSERT_RELEASE(ret, "VirtualFree failed");
+
+        size_t region_size = region_end - current_address;
+        remaining = region_size < remaining ? remaining - region_size : 0;
+        address = reinterpret_cast<char*>(region_end);
+    }
 #endif
 }
 

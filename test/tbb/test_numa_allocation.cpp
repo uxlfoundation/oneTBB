@@ -260,3 +260,26 @@ TEST_CASE("test basics") {
         utils::CloseLibrary(lib);
 #endif
 }
+
+#if _WIN32 || _WIN64
+
+//! \brief \ref regression
+TEST_CASE("memory leak") {
+    const size_t bytes = 4 * page_size;
+    const std::vector<tbb::numa_node_id> nodes = tbb::info::numa_nodes();
+    char* ptr = static_cast<char*>(tbb::allocate_numa_interleaved(bytes, nodes, page_size));
+    REQUIRE_MESSAGE(ptr != nullptr, "Failed to allocate NUMA interleaved memory");
+
+    const std::uintptr_t base_address = reinterpret_cast<std::uintptr_t>(ptr);
+    tbb::deallocate_numa_interleaved(ptr, bytes);
+
+    for (size_t offset = 0; offset < bytes; offset += page_size) {
+        MEMORY_BASIC_INFORMATION memory_info;
+        const void* page_address = reinterpret_cast<const void*>(base_address + offset);
+        REQUIRE_MESSAGE(VirtualQuery(page_address, &memory_info, sizeof(memory_info)) != 0,
+                        "VirtualQuery failed for page at offset " << offset);
+        CHECK_MESSAGE(memory_info.State == MEM_FREE,
+                      "Page at offset " << offset << " was not released");
+    }
+}
+#endif // _WIN32 || _WIN64

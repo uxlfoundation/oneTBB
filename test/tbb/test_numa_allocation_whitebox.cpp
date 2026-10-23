@@ -52,21 +52,44 @@ static int mock_madvise(void*, size_t, int) noexcept (true) {
 }
 #elif _WIN32 || _WIN64
 
-static bool mock_VirtualAlloc2_ptr_failed = false;
-static bool mock_VirtualFree_failed = false;
+#include <map>
+#include <memory>
+
+static struct {
+    std::unique_ptr<char[]> storage;
+    // allocate_interleaved() split allocated space into multiple regions by VirtualFree() calls,
+    // need to track them for verification
+    // key: address of the region, value: size of the region
+    std::map<char*, size_t> regions;
+    bool make_reservation_fail = false;
+    size_t fail_split = 0;
+    size_t fail_replacement = 0;
+    size_t split_calls = 0;
+    size_t replacement_calls = 0;
+    size_t release_calls = 0;
+} mock_state;
 
 static bool mock_VirtualAllocEx_called = false;
 static bool VirtualAllocEx_should_fail = false;
 
 BOOL mock_VirtualFree(LPVOID lpAddress, SIZE_T dwSize, DWORD  dwFreeType) {
-    static int cnt;
-
-    if (++cnt % 2) {
-        return VirtualFree(lpAddress, dwSize, dwFreeType);
+    char* address = static_cast<char*>(lpAddress);
+    auto region = mock_state.regions.find(address);
+    REQUIRE(region != mock_state.regions.end());
+    if (dwFreeType == (MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER)) {
+        REQUIRE(dwSize > 0);
+        REQUIRE(dwSize < region->second);
+        if (++mock_state.split_calls == mock_state.fail_split)
+            return FALSE;
+        mock_state.regions[address + dwSize] = region->second - dwSize;
+        region->second = dwSize;
     } else {
-        mock_VirtualFree_failed = true;
-        return FALSE;
+        REQUIRE(dwFreeType == MEM_RELEASE);
+        REQUIRE(dwSize == 0);
+        mock_state.regions.erase(region);
+        ++mock_state.release_calls;
     }
+    return TRUE;
 }
 
 LPVOID mock_VirtualAllocEx(HANDLE hProcess, LPVOID lpAddress, SIZE_T dwSize,
@@ -118,18 +141,24 @@ static void mock_numa_interleave_memory(void*, size_t, struct bitmask*) {}
 
 #elif _WIN32 || _WIN64
 
-static void* mock_VirtualAlloc2_ptr(HANDLE, PVOID, SIZE_T Size,
-                                     ULONG, ULONG,
+static void* mock_VirtualAlloc2_ptr(HANDLE, PVOID BaseAddress, SIZE_T Size,
+                                     ULONG AllocationType, ULONG,
                                      MEM_EXTENDED_PARAMETER *, ULONG) {
-    static int cnt;
-
-    if (++cnt % 2) {
-        return VirtualAllocEx(GetCurrentProcess(), /*BaseAddress=*/nullptr, Size,
-                              MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-    } else {
-        mock_VirtualAlloc2_ptr_failed = true;
-        return nullptr;
+    if (AllocationType == (MEM_RESERVE | MEM_RESERVE_PLACEHOLDER)) {
+        REQUIRE(BaseAddress == nullptr);
+        if (mock_state.make_reservation_fail)
+            return nullptr;
+        mock_state.storage.reset(new char[Size]);
+        mock_state.regions[mock_state.storage.get()] = Size;
+        return mock_state.storage.get();
     }
+    REQUIRE(AllocationType == (MEM_RESERVE | MEM_COMMIT | MEM_REPLACE_PLACEHOLDER));
+    auto region = mock_state.regions.find(static_cast<char*>(BaseAddress));
+    REQUIRE(region != mock_state.regions.end());
+    REQUIRE(region->second == Size);
+    if (++mock_state.replacement_calls == mock_state.fail_replacement)
+        return nullptr;
+    return BaseAddress;
 }
 
 #endif
@@ -205,27 +234,58 @@ TEST_CASE("allocate_interleaved with failed syscall") {
     REQUIRE_MESSAGE(mock_mmap_called, "Failed mmap syscall was not called");
     mmap_should_fail = false;
 #elif _WIN32 || _WIN64
-    // VirtualAlloc2_ptr is expected to fail, must use less than chunk size to start with call of
-    // VirtualAlloc2_ptr in the committing loop
-    void *ptr = tbb::detail::r1::allocate_interleaved(per_chunk / 2,
-                                                      nodes_ids, 2, per_chunk);
-    REQUIRE(ptr == nullptr);
-    REQUIRE_MESSAGE(mock_VirtualAlloc2_ptr_failed, "Failed VirtualAlloc2 syscall was not called");
+    const struct {
+        size_t bytes;
+        bool fail_reservation;
+        size_t fail_split;
+        size_t fail_replacement;
+        size_t expected_releases;
+    } cases[] = {
+        {per_chunk, true, 0, 0, 0},
+        {per_chunk / 2, false, 0, 1, 1},
+        {4*per_chunk, false, 1, 0, 1},
+        {4*per_chunk, false, 3, 0, 3},
+        {4*per_chunk, false, 0, 1, 2},
+        {4*per_chunk, false, 0, 3, 4},
+        {4*per_chunk, false, 0, 4, 4},
+        {3*per_chunk + per_chunk / 2, false, 0, 4, 4},
+        {3*per_chunk + per_chunk / 2, false, 0, 0, 0}
+    };
+    for (const auto& test_case : cases) {
+        CAPTURE(test_case.bytes);
+        CAPTURE(test_case.fail_split);
+        CAPTURE(test_case.fail_replacement);
+        mock_state = {};
+        mock_state.make_reservation_fail = test_case.fail_reservation;
+        mock_state.fail_split = test_case.fail_split;
+        mock_state.fail_replacement = test_case.fail_replacement;
+        tbb::detail::r1::VirtualAlloc2_ptr = tbb::detail::r1::mock_VirtualAlloc2_ptr;
 
-    // VirtualAlloc2_ptr is expected not to fail, VirtualFree in the committing loop is failing
-    mock_VirtualFree_failed = false;
-    // must allocate more than chunk size to use VirtualFree in the committing loop
-    ptr = tbb::detail::r1::allocate_interleaved(2*per_chunk, nodes_ids, 2, per_chunk);
-    REQUIRE(ptr == nullptr);
-    REQUIRE_MESSAGE(mock_VirtualFree_failed, "Failed VirtualFree syscall was not called");
+        void* ptr = tbb::detail::r1::allocate_interleaved(test_case.bytes, nodes_ids, 2, per_chunk);
+        if (test_case.fail_reservation || test_case.fail_split || test_case.fail_replacement) {
+            REQUIRE(ptr == nullptr);
+            REQUIRE(mock_state.regions.empty());
+        } else {
+            REQUIRE(ptr == mock_state.storage.get());
+            REQUIRE(mock_state.regions.size() == 4);
+        }
+        REQUIRE(mock_state.release_calls == test_case.expected_releases);
+        if (test_case.fail_split)
+            REQUIRE(mock_state.split_calls == test_case.fail_split);
+        if (test_case.fail_replacement)
+            REQUIRE(mock_state.replacement_calls == test_case.fail_replacement);
+    }
+    mock_state = {};
 
     VirtualAllocEx_should_fail = true;
     mock_VirtualAllocEx_called = false;
     // make it null to use VirtualAllocEx
     tbb::detail::r1::VirtualAlloc2_ptr = nullptr;
-    ptr = tbb::detail::r1::allocate_interleaved(per_chunk / 2, nodes_ids, 1, per_chunk);
+    void* ptr = tbb::detail::r1::allocate_interleaved(per_chunk / 2, nodes_ids, 1, per_chunk);
     REQUIRE(ptr == nullptr);
     REQUIRE_MESSAGE(mock_VirtualAllocEx_called, "Failed VirtualAllocEx syscall was not called");
+    VirtualAllocEx_should_fail = false;
+    tbb::detail::r1::VirtualAlloc2_ptr = tbb::detail::r1::mock_VirtualAlloc2_ptr;
 #endif
 }
 #endif
