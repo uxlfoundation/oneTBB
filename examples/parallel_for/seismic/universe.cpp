@@ -108,7 +108,7 @@ void Universe::InitializeUniverse(video const& colorizer) {
 void Universe::UpdatePulse() {
     if (pulseCounter > 0) {
         ValueType t = (pulseCounter - pulseTime / 2) * 0.05f;
-        V[pulseY][pulseX] += 64 * sqrt(M[pulseY][pulseX]) * exp(-t * t);
+        V[pulseY][pulseX] += 64 * sqrt(M[pulseY][pulseX]) * std::exp(-(static_cast<double>(t) * static_cast<double>(t)));
         --pulseCounter;
     }
 }
