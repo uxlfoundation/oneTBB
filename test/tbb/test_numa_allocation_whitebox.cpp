@@ -81,7 +81,12 @@ BOOL mock_VirtualFree(LPVOID lpAddress, SIZE_T dwSize, DWORD  dwFreeType) {
         REQUIRE(dwSize < region->second);
         if (++mock_state.split_calls == mock_state.fail_split)
             return FALSE;
-        mock_state.regions[address + dwSize] = region->second - dwSize;
+
+        // Splitting creates a new region starting at address + dwSize.
+        // Ensure we do not silently overwrite an existing region entry.
+        auto insert_result = mock_state.regions.emplace(address + dwSize, region->second - dwSize);
+        REQUIRE(insert_result.second);
+
         region->second = dwSize;
     } else {
         REQUIRE(dwFreeType == MEM_RELEASE);
