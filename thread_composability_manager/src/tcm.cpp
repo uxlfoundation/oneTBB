@@ -43,7 +43,81 @@ __TCM_SUPPRESS_WARNING_POP
 #endif
 
 namespace tcm {
+
 namespace internal {
+class ThreadComposabilityFairBalance;
+}
+using ThreadComposabilityManager = internal::ThreadComposabilityFairBalance;
+
+class theTCM {
+    static ThreadComposabilityManager* tcm_ptr;
+    static std::size_t reference_count;
+    static std::size_t num_unique_permits; // Number of unique permits IDs issued.
+    static std::mutex tcm_mutex;
+    static internal::environment tcm_env;
+public:
+    static std::size_t next_permit_id() {
+        return num_unique_permits++;
+    }
+
+    static bool is_enabled() {
+        return tcm_env.tcm_enable == 1;
+    }
+
+    static bool tcm_enable_variable_explicitly_set() {
+        return tcm_env.tcm_enable != tcm_automatic;
+    }
+
+    static bool tcm_in_dev_environment() {
+        static bool in_dev_env = std::getenv("TCMROOT") || std::getenv("ONEAPI_ROOT") ||
+            std::getenv("TBBROOT") || std::getenv("CMPLR_ROOT");
+        return in_dev_env;
+    }
+
+    static internal::environment& get_tcm_env() {
+        return tcm_env;
+    }
+
+    static void increase_ref_count();
+
+    static ThreadComposabilityManager& instance() {
+        __TCM_ASSERT(tcm_ptr != nullptr, "Access to uninitialized resource manager.");
+        return *tcm_ptr;
+    }
+
+    static void decrease_ref_count();
+
+    static void consider_suggesting_usage() {
+        __TCM_ASSERT(!is_enabled(), nullptr);
+        static std::atomic<std::size_t> connection_attempts{0};
+        constexpr std::size_t max_failed_connection_attempts = 2;
+        std::size_t previous_attempts = connection_attempts.fetch_add(1, std::memory_order_relaxed);
+        if (previous_attempts == max_failed_connection_attempts - 1) {
+            std::fprintf(stderr,
+                "Note: Several threading libraries could use Thread Composability Manager.\n"
+                "Hint: If CPUs are overutilized, setting the TCM_ENABLE environment variable to 1\n"
+                "may improve performance. For more details, search for "
+                "\"avoid cpu overutilization\"\n at https://uxlfoundation.github.io/oneTBB/\n"
+                "To suppress this message, set TCM_ENABLE to either 0 or 1.\n"
+            );
+        }
+    }
+};
+
+ThreadComposabilityManager* theTCM::tcm_ptr{nullptr};
+std::size_t theTCM::reference_count{0};
+std::size_t theTCM::num_unique_permits{0};
+std::mutex theTCM::tcm_mutex{};
+internal::environment theTCM::tcm_env{};
+
+namespace internal {
+
+float tcm_oversubscription_factor() {
+    static const float oversb_factor = theTCM::get_tcm_env().tcm_oversubscription_factor;
+    __TCM_ASSERT(oversb_factor > std::numeric_limits<float>::epsilon(),
+                 "Incorrect value of oversubscription factor.");
+    return oversb_factor;
+}
 
 thread_registration_data_t& thread_data() {
     thread_local thread_registration_data_t registrations;
@@ -1418,55 +1492,38 @@ public:
           std::lock_guard<std::mutex> lock(tl.mutex);
           tl.permits.push(ph);  // Actual thread registration
       }
-      tl.top_permit = ph;
 
-      auto [iter, succeed] = tl.seen.emplace(ph);
-      if (succeed) {
+      auto [iter, succeeded] = tl.seen.emplace(ph->permit_id);
+      if (succeeded) {
           // This thread registers with this permit for the first time, let the permit's data know
-          // about this thread local.
+          // about its thread local
           permit_registrations_t& pr = ph->data.registrations;
           std::lock_guard<std::mutex> lock(pr.mutex);
           __TCM_ASSERT(pr.thread_locals.count(&tl) == 0,
                        "Thread has not been registered with the permit yet.");
           pr.thread_locals.emplace(&tl);
       }
+#if TCM_USE_ASSERT
+      else {
+          permit_registrations_t& pr = ph->data.registrations;
+          std::lock_guard<std::mutex> lock(pr.mutex);
+          __TCM_ASSERT(pr.thread_locals.count(&tl) == 1,
+                       "Thread should have been registered with the permit already.");
+      }
+#endif
 
       return TCM_RESULT_SUCCESS;
   }
 
   tcm_result_t unregister_thread() {
-      tcm_permit_handle_t ph = nullptr;
       thread_registration_data_t& this_thread = thread_data();
 
       {
           std::lock_guard<std::mutex> lock(this_thread.mutex);
-          if (this_thread.permits.empty()) {
-              this_thread.top_permit = nullptr;
-              return TCM_RESULT_SUCCESS;
-          }
-
-          ph = this_thread.permits.top();
-          if (this_thread.top_permit != ph) { // Other thread has undone this thread's registration
-              this_thread.top_permit = ph;
-              return TCM_RESULT_SUCCESS;
-          }
-
-          this_thread.permits.pop(); // This thread undoes its previous registration
-
-          this_thread.top_permit = nullptr;
           if (!this_thread.permits.empty())
-              this_thread.top_permit = this_thread.permits.top();
+              this_thread.permits.pop(); // This thread undoes its previous registration
       }
 
-#if 0
-      __TCM_ASSERT(ph, "Permit from which to unregister exists.");
-
-      // Attempt to unregister this thread's local from the permit handle
-      permit_registrations_t& pr = ph->data.registrations;
-      std::lock_guard<std::mutex> lock(pr.mutex);
-      pr.thread_locals.erase(&this_thread); // TODO: Consider returning a different status if
-                                            // erasure fails
-#endif
       return TCM_RESULT_SUCCESS;
   }
 
@@ -2528,10 +2585,13 @@ protected:
            \/
           0xFF (higher memory address)
         */
+
+        const std::size_t permit_id = theTCM::next_permit_id();
 // Suppressing MSVC warning about possible buffer overrun: the writable size is 'permit_size' bytes,
 // but 'XX' bytes might be written
 __TCM_SUPPRESS_WARNING_WITH_PUSH(6386)
-        tcm_permit_handle_t ph = new(permit_rep_as_byte_array) tcm_permit_rep_t;
+        // TODO: Compute and initialize fields inside placement new
+        tcm_permit_handle_t ph = new(permit_rep_as_byte_array) tcm_permit_rep_t{permit_id};
 __TCM_SUPPRESS_WARNING_POP
         ph->epoch.store(0, std::memory_order_relaxed);
         tcm_permit_data_t& pd = ph->data;
@@ -2720,86 +2780,23 @@ protected:
 }; // ThreadComposabilityFairBalance
 } // namespace internal
 
-using ThreadComposabilityManager = internal::ThreadComposabilityFairBalance;
-
-class theTCM {
-  static ThreadComposabilityManager* tcm_ptr;
-  static std::size_t reference_count;
-  static std::mutex tcm_mutex;
-  static internal::environment tcm_env;
-public:
-  static bool is_enabled() {
-    return tcm_env.tcm_enable == 1;
-  }
-
-  static bool tcm_enable_variable_explicitly_set() {
-    return tcm_env.tcm_enable != tcm_automatic;
-  }
-
-  static bool tcm_in_dev_environment() {
-    static bool in_dev_env = std::getenv("TCMROOT") || std::getenv("ONEAPI_ROOT") ||
-                             std::getenv("TBBROOT") || std::getenv("CMPLR_ROOT");
-    return in_dev_env;
-  }
-
-  friend float internal::tcm_oversubscription_factor();
-
-  static void increase_ref_count() {
+void theTCM::increase_ref_count() {
     std::lock_guard<std::mutex> l(tcm_mutex);
     if (reference_count++)
-      return;
+        return;
     tcm_ptr = new ThreadComposabilityManager{};
-  }
+}
 
-  static internal::environment& get_tcm_env() {
-    return tcm_env;
-  }
-
-  static ThreadComposabilityManager& instance() {
-    __TCM_ASSERT(tcm_ptr != nullptr, "Access to uninitialized resource manager.");
-    return *tcm_ptr;
-  }
-
-  static void decrease_ref_count() {
+void theTCM::decrease_ref_count() {
     ThreadComposabilityManager* rm_instance_to_delete = tcm_ptr;
     {
-      std::lock_guard<std::mutex> l(tcm_mutex);
-      __TCM_ASSERT(reference_count != 0, "Incorrect reference count.");
-      if (--reference_count)
-        return;
-      tcm_ptr = nullptr;
-      delete rm_instance_to_delete;
+        std::lock_guard<std::mutex> l(tcm_mutex);
+        __TCM_ASSERT(reference_count != 0, "Incorrect reference count.");
+        if (--reference_count)
+            return;
+        tcm_ptr = nullptr;
+        delete rm_instance_to_delete;
     }
-  }
-
-  static void consider_suggesting_usage() {
-    __TCM_ASSERT(!is_enabled(), nullptr);
-    static std::atomic<std::size_t> connection_attempts{0};
-    constexpr std::size_t max_failed_connection_attempts = 2;
-    std::size_t previous_attempts = connection_attempts.fetch_add(1, std::memory_order_relaxed);
-    if (previous_attempts == max_failed_connection_attempts - 1) {
-      std::fprintf(stderr,
-        "Note: Several threading libraries could use Thread Composability Manager.\n"
-        "Hint: If CPUs are overutilized, setting the TCM_ENABLE environment variable to 1\n"
-        "may improve performance. For more details, search for \"avoid cpu overutilization\"\n"
-        "at https://uxlfoundation.github.io/oneTBB/\n"
-        "To suppress this message, set TCM_ENABLE to either 0 or 1.\n"
-      );
-    }
-  }
-};
-
-
-ThreadComposabilityManager* theTCM::tcm_ptr{nullptr};
-std::size_t theTCM::reference_count{0};
-std::mutex theTCM::tcm_mutex{};
-internal::environment theTCM::tcm_env{};
-
-float internal::tcm_oversubscription_factor() {
-  static const float oversb_factor = theTCM::tcm_env.tcm_oversubscription_factor;
-  __TCM_ASSERT(oversb_factor > std::numeric_limits<float>::epsilon(),
-                "Incorrect value of oversubscription factor.");
-  return oversb_factor;
 }
 
 } // namespace tcm
