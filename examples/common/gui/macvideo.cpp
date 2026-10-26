@@ -166,7 +166,7 @@ void video::show_title() {
 
 drawing_area::drawing_area(int x, int y, int sizex, int sizey)
         : base_index(y * g_sizex + x),
-          max_index(g_sizex * g_sizey),
+          max_index(static_cast<size_t>(g_sizex) * static_cast<size_t>(g_sizey)),
           index_stride(g_sizex),
           pixel_depth(24),
           ptr32(g_pImg),
