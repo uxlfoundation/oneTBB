@@ -286,7 +286,8 @@ void restart_submaps(int &xval, int &yval, double &radius, int indx, SOM_element
 search_result_type graph_BMU(int indx) { // indx ranges over [0 .. SPECULATION_CNT -1]
     wait_for_all_graphs(indx); // wait for the array of subgraphs
     (g[indx])->wait_for_all();
-    std::vector<search_result_type> all_srs(xRangeMax * yRangeMax,
+    std::vector<search_result_type> all_srs(static_cast<std::size_t>(xRangeMax) *
+                                                static_cast<std::size_t>(yRangeMax),
                                             search_result_type(DBL_MAX, -1, -1));
 #if EXTRA_DEBUG
     int extra_computations = 0;
