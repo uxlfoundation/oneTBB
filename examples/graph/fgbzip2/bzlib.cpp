@@ -141,7 +141,12 @@ static int bz_config_ok(void) {
 
 /*---------------------------------------------------*/
 static void* default_bzalloc(void* opaque, Int32 items, Int32 size) {
-    void* v = malloc(items * size);
+    if (items < 0 || size < 0)
+        return nullptr;
+
+    size_t nitems = static_cast<size_t>(items);
+    size_t nsize = static_cast<size_t>(size);
+    void* v = malloc(nitems * nsize);
     return v;
 }
 
