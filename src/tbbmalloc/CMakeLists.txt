@@ -1,5 +1,5 @@
 # Copyright (c) 2020-2024 Intel Corporation
-# Copyright (c) 2025 UXL Foundation Contributors
+# Copyright (c) 2025-2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ target_compile_definitions(tbbmalloc
     $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>
     PRIVATE
     # Disable implicit assertions in C++ headers to avoid dependency on libstdc++
-    $<$<CONFIG:DEBUG>:_GLIBCXX_NO_ASSERTIONS>
+    _GLIBCXX_NO_ASSERTIONS
     __TBBMALLOC_BUILD
     $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:__TBB_DYNAMIC_LOAD_ENABLED=0>
     $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:__TBB_SOURCE_DIRECTLY_INCLUDED=1>)
@@ -67,6 +67,14 @@ target_compile_options(tbbmalloc
     ${TBBMALLOC_LIB_COMPILE_FLAGS}
     ${TBB_COMMON_COMPILE_FLAGS}
 )
+
+if (NOT MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|IntelLLVM")
+    # _GLIBCXX_NO_ASSERTIONS does not override an explicit _GLIBCXX_ASSERTIONS
+    # (e.g. from -D_GLIBCXX_ASSERTIONS or -Wp,-D_GLIBCXX_ASSERTIONS in CXXFLAGS,
+    # or from GCC's -fhardened), so undefine it as well. -Wp is used so that it
+    # also comes after a -Wp,-D passed in CXXFLAGS.
+    target_compile_options(tbbmalloc PRIVATE -Wp,-U_GLIBCXX_ASSERTIONS)
+endif()
 
 enable_language(C)
 
