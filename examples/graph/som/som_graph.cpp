@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -287,8 +288,8 @@ search_result_type graph_BMU(int indx) { // indx ranges over [0 .. SPECULATION_C
     wait_for_all_graphs(indx); // wait for the array of subgraphs
     (g[indx])->wait_for_all();
     std::vector<search_result_type> all_srs(static_cast<std::size_t>(xRangeMax) *
-                                                static_cast<std::size_t>(yRangeMax),
-                                            search_result_type(DBL_MAX, -1, -1));
+        static_cast<std::size_t>(yRangeMax),
+        search_result_type(DBL_MAX, -1, -1));
 #if EXTRA_DEBUG
     int extra_computations = 0;
 #endif
