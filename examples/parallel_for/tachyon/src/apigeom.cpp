@@ -129,9 +129,20 @@ rt_sheightfield(void *tex, vector ctr, int m, int n, apiflt *field, apiflt wx, a
     vector offset;
     apiflt xinc, yinc;
     int x, y, addr;
+    size_t count;
 
-    vertices = (vector *)malloc(m * n * sizeof(vector));
-    normals = (vector *)malloc(m * n * sizeof(vector));
+    if ((field == nullptr) || (m <= 0) || (n <= 0)) {
+        return;
+    }
+
+    count = static_cast<size_t>(m) * static_cast<size_t>(n);
+    vertices = (vector *)malloc(count * sizeof(vector));
+    normals = (vector *)malloc(count * sizeof(vector));
+    if ((vertices == nullptr) || (normals == nullptr)) {
+        free(normals);
+        free(vertices);
+        return;
+    }
 
     offset.x = ctr.x - (wx / 2.0);
     offset.y = ctr.z - (wy / 2.0);
