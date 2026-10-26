@@ -415,7 +415,8 @@ void SplitParallelOverlay(Polygon_map_t **result_map,
     RPolygon *p0 = &((*polymap1)[0]);
     int mapxSize, mapySize, ignore1, ignore2;
     p0->get(&ignore1, &ignore2, &mapxSize, &mapySize);
-    (*result_map)->reserve(mapxSize * mapySize); // can't be any bigger than this
+    (*result_map)->reserve(static_cast<Polygon_map_t::size_type>(mapxSize) *
+                           static_cast<Polygon_map_t::size_type>(mapySize)); // can't be any bigger than this
     resultMutex = new oneapi::tbb::spin_mutex();
 
     int grain_size;
