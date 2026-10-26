@@ -307,6 +307,7 @@ void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t bytes) {
     // TODO: process return value of munmap()
     munmap(ptr, bytes);
 #elif _WIN32 || _WIN64
+    __TBB_ASSERT_RELEASE(bytes, "Bytes must be non-zero for deallocation");
     // each region after creating placeholders during allocation must be released with individual
     // VirtualFree, but we don't have bytes_per_chunk here, so must ask OS with VirtualQuery
     char* address = static_cast<char*>(ptr);
