@@ -369,8 +369,9 @@ bool GenerateMap(Polygon_map_t **newMap,
                   << "\n";
         error_found = true;
     }
-    if (gNPolygons > (xSize * ySize)) {
-        std::cout << "gNPolygons (" << gNPolygons << ") should be less than " << (xSize * ySize)
+    const size_t gridCellCount = static_cast<size_t>(xSize) * static_cast<size_t>(ySize);
+    if (gNPolygons > gridCellCount) {
+        std::cout << "gNPolygons (" << gNPolygons << ") should be less than " << gridCellCount
                   << "\n";
         error_found = true;
     }
@@ -385,7 +386,7 @@ bool GenerateMap(Polygon_map_t **newMap,
     //
     // Continue until every square on the grid is occupied by a polygon
     int *tempMap;
-    tempMap = (int *)malloc(xSize * ySize * sizeof(int));
+    tempMap = (int *)malloc(gridCellCount * sizeof(int));
     for (int i = 0; i < xSize; i++) {
         for (int j = 0; j < ySize; j++) {
             tempMap[i * ySize + j] = 0;
