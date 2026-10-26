@@ -192,7 +192,7 @@ inline color_t video::get_color(colorcomp_t red, colorcomp_t green, colorcomp_t 
 
 inline drawing_area::drawing_area(int x, int y, int sizex, int sizey, const drawing_memory &dmem)
         : base_index(y * dmem.sizex + x),
-          max_index(dmem.sizex * dmem.sizey),
+          max_index(static_cast<std::size_t>(dmem.sizex) * static_cast<std::size_t>(dmem.sizey)),
           index_stride(dmem.sizex),
           pixel_depth(dmem.pixel_depth),
           ptr32(reinterpret_cast<unsigned int *>(dmem.my_address)),
