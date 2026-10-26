@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -943,6 +943,7 @@ public:
     // Move Assignment
     concurrent_hash_map& operator=( concurrent_hash_map &&table ) {
         if( this != &table ) {
+            clear();
             using pocma_type = typename node_allocator_traits::propagate_on_container_move_assignment;
             using is_equal_type = typename node_allocator_traits::is_always_equal;
             move_assign_allocators(this->my_allocator, table.my_allocator);

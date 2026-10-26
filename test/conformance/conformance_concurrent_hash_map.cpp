@@ -1576,6 +1576,53 @@ TEST_CASE("testing move assign operator"){
     move_support_tests::test_move_assignment<hash_map_traits>();
 }
 
+namespace move_assign_non_empty {
+template <typename Table>
+void fill_destination( Table& dst ) {
+    for (int i = 0; i < 10; ++i) {
+        dst.emplace(move_support_tests::FooWithAssign(1000 + i), move_support_tests::FooWithAssign(i));
+    }
+}
+
+template <typename POCMA>
+void test_stateful_allocator() {
+    using fixture_type = typename move_support_tests::DefaultStatefulFixtureHelper<hash_map_traits, POCMA>::type;
+    using container_type = typename fixture_type::container_type;
+
+    fixture_type fixture;
+    container_type dst(fixture.dst_allocator);
+    fill_destination(dst);
+    dst = std::move(fixture.source);
+
+    if (POCMA::value) {
+        fixture.verify_content_shallow_moved(dst);
+    } else {
+        fixture.verify_content_deep_moved(dst);
+        dst.clear();
+    }
+    fixture.verify_no_undestroyed_foo_left_and_dismiss();
+}
+} // namespace move_assign_non_empty
+
+//! Test that move assignment replaces the previous content of the destination
+//! \brief \ref requirement
+TEST_CASE("testing move assign operator to non-empty table") {
+    using fixture_type = move_support_tests::MoveFixture<hash_map_traits, std::allocator<move_support_tests::FooWithAssign>>;
+    using container_type = typename fixture_type::container_type;
+    {
+        move_support_tests::TrackFooCount foo_count_tracker;
+        fixture_type fixture;
+        container_type dst;
+        move_assign_non_empty::fill_destination(dst);
+        dst = std::move(fixture.source);
+        fixture.verify_content_shallow_moved(dst);
+        dst.clear();
+        foo_count_tracker.verify_no_undestroyed_foo_left_and_dismiss();
+    }
+    move_assign_non_empty::test_stateful_allocator<std::true_type>();
+    move_assign_non_empty::test_stateful_allocator<std::false_type>();
+}
+
 //! Test insert and empace
 //! \brief \ref interface \ref requirement
 TEST_CASE("testing concurrent insert and emplace"){
