@@ -53,7 +53,7 @@ extern "C" {
 typedef uint64_t tcm_permit_epoch_t;
 
 struct tcm_permit_rep_t {
-  const std::size_t permit_id{0};     // Unique permit identifier
+  std::size_t permit_id{0};       // Unique permit identifier
   std::atomic<tcm_permit_epoch_t> epoch{0};
   tcm_permit_request_t request{}; // Holds latest corresponding request
   tcm_permit_data_t data{};

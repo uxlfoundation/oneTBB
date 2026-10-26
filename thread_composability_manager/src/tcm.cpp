@@ -57,7 +57,7 @@ class theTCM {
     static internal::environment tcm_env;
 public:
     static std::size_t next_permit_id() {
-        return num_unique_permits++;
+        return ++num_unique_permits; // Caller is responsible for synchronization.
     }
 
     static bool is_enabled() {
@@ -106,7 +106,7 @@ public:
 
 ThreadComposabilityManager* theTCM::tcm_ptr{nullptr};
 std::size_t theTCM::reference_count{0};
-std::size_t theTCM::num_unique_permits{0};
+std::size_t theTCM::num_unique_permits{0}; // Null means real permit ID has not been assigned yet.
 std::mutex theTCM::tcm_mutex{};
 internal::environment theTCM::tcm_env{};
 
@@ -1182,6 +1182,7 @@ public:
       // TODO: Consider adding the permit to containers after the concurrency level
       // calculation to avoid early renegotiation
       if (is_requesting_new_permit) {
+          ph->permit_id = theTCM::next_permit_id();
           client_to_permit_mmap.emplace(ph->data.client_id, ph);
       } else {
           __TCM_ASSERT(is_valid(ph), "Permit request structure must exist.");
@@ -1493,6 +1494,7 @@ public:
           tl.permits.push(ph);  // Actual thread registration
       }
 
+      __TCM_ASSERT(ph->permit_id != 0, "Threads should registered in permits with real permit ID");
       auto [iter, succeeded] = tl.seen.emplace(ph->permit_id);
       if (succeeded) {
           // This thread registers with this permit for the first time, let the permit's data know
@@ -2586,14 +2588,12 @@ protected:
           0xFF (higher memory address)
         */
 
-        const std::size_t permit_id = theTCM::next_permit_id();
 // Suppressing MSVC warning about possible buffer overrun: the writable size is 'permit_size' bytes,
 // but 'XX' bytes might be written
 __TCM_SUPPRESS_WARNING_WITH_PUSH(6386)
         // TODO: Compute and initialize fields inside placement new
-        tcm_permit_handle_t ph = new(permit_rep_as_byte_array) tcm_permit_rep_t{permit_id};
+        tcm_permit_handle_t ph = new(permit_rep_as_byte_array) tcm_permit_rep_t{};
 __TCM_SUPPRESS_WARNING_POP
-        ph->epoch.store(0, std::memory_order_relaxed);
         tcm_permit_data_t& pd = ph->data;
 
         pd.client_id = clid;
