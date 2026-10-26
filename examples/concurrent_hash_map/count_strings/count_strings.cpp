@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -219,11 +220,11 @@ static void CreateData() {
         VowelsRatesSum[i] = CountRateSum(Vowels, VowelsNumber, i);
     }
     for (int i = 0; i < N; ++i) {
-        std::size_t type = static_cast<std::size_t>(rand());
-        Data[i] = GetLetters(type++, 0);
+        std::size_t type = static_cast<std::int64_t>(rand());
+        Data[i] = GetLetters(static_cast<int>(type++), 0);
         for (int j = 0; j < type % size_factor; ++j)
-            Data[i] += GetLetters(type++, 1);
-        Data[i] += GetLetters(type, 2);
+            Data[i] += GetLetters(static_cast<int>(type++), 1);
+        Data[i] += GetLetters(static_cast<int>(type), 2);
     }
     MyString planet = Data[12];
     planet[0] = toupper(planet[0]);

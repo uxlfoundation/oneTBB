@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -62,7 +63,7 @@ void Universe::InitializeUniverse(video const& colorizer) {
                 M[i][j] = 0.125;
                 L[i][j] = 0.125;
             }
-            else if (fabs(t - 0.7 + 0.2 * exp(-8 * x * x) + 0.025 * x) <= 0.1) {
+            else if (fabs(t - 0.7 + 0.2 * exp(-8.0 * x * x) + 0.025 * x) <= 0.1) {
                 m = SHALE;
                 M[i][j] = 0.5;
                 L[i][j] = 0.6;

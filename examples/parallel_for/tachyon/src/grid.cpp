@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -95,9 +96,8 @@ object *newgrid(int xsize, int ysize, int zsize, vector min, vector max) {
     g->voxsize.z /= (flt)g->zsize;
 
     size_t cell_count = (size_t)xsize * (size_t)ysize * (size_t)zsize;
-    size_t cells_bytes = cell_count * sizeof(objectlist *);
-    g->cells = (objectlist **)rt_getmem(cells_bytes);
-    memset(g->cells, 0, cells_bytes);
+    g->cells = (objectlist **)rt_getmem(cell_count * sizeof(objectlist *));
+    memset(g->cells, 0, cell_count * sizeof(objectlist *));
 
     /* fprintf(stderr, "New grid, size: %8d %8d %8d\n", g->xsize, g->ysize, g->zsize); */
 

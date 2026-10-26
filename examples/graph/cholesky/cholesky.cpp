@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -77,7 +78,7 @@ static double ***create_tile_array(double *A, int n, int b) {
 
     for (int j = 0; j < p; ++j) {
         for (int i = 0; i < p; ++i) {
-            double *temp_block = (double *)calloc(sizeof(double), b * b);
+            double *temp_block = (double *)calloc(sizeof(double), static_cast<size_t>(b) * static_cast<size_t>(b));
 
             for (int A_j = j * b, T_j = 0; T_j < b; ++A_j, ++T_j) {
                 for (int A_i = i * b, T_i = 0; T_i < b; ++A_i, ++T_i) {
@@ -165,8 +166,9 @@ public:
     double operator()(double *A, int n, int b, int trials) {
         oneapi::tbb::tick_count t0, t1;
         double elapsed_time = 0.0;
-        double *A0 = (double *)calloc(sizeof(double), n * n);
-        double *C = (double *)calloc(sizeof(double), n * n);
+        const size_t elem_count = static_cast<size_t>(n) * static_cast<size_t>(n);
+        double *A0 = (double *)calloc(sizeof(double), elem_count);
+        double *C = (double *)calloc(sizeof(double), elem_count);
 
         for (int i = 0; i < trials + 1; ++i) {
             if (is_tiled) {
@@ -178,7 +180,7 @@ public:
                 collapse_tile_array(tile, A0, n, b);
             }
             else {
-                memcpy(A0, A, sizeof(double) * n * n);
+                memcpy(A0, A, sizeof(double) * elem_count);
                 t0 = oneapi::tbb::tick_count::now();
                 func(A0, n, b);
                 t1 = oneapi::tbb::tick_count::now();
