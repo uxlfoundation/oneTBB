@@ -220,7 +220,7 @@ static void CreateData() {
         VowelsRatesSum[i] = CountRateSum(Vowels, VowelsNumber, i);
     }
     for (int i = 0; i < N; ++i) {
-        std::size_t type = static_cast<std::int64_t>(rand());
+        std::int64_t type = static_cast<std::int64_t>(rand());
         Data[i] = GetLetters(static_cast<int>(type++), 0);
         for (int j = 0; j < type % size_factor; ++j)
             Data[i] += GetLetters(static_cast<int>(type++), 1);
