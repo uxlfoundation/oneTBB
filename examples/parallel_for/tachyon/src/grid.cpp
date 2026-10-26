@@ -94,8 +94,10 @@ object *newgrid(int xsize, int ysize, int zsize, vector min, vector max) {
     g->voxsize.y /= (flt)g->ysize;
     g->voxsize.z /= (flt)g->zsize;
 
-    g->cells = (objectlist **)rt_getmem(xsize * ysize * zsize * sizeof(objectlist *));
-    memset(g->cells, 0, xsize * ysize * zsize * sizeof(objectlist *));
+    size_t cell_count = (size_t)xsize * (size_t)ysize * (size_t)zsize;
+    size_t cells_bytes = cell_count * sizeof(objectlist *);
+    g->cells = (objectlist **)rt_getmem(cells_bytes);
+    memset(g->cells, 0, cells_bytes);
 
     /* fprintf(stderr, "New grid, size: %8d %8d %8d\n", g->xsize, g->ysize, g->zsize); */
 
