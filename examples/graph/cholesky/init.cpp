@@ -24,13 +24,13 @@
 
 static void posdef_gen(double *A, int n) {
     /* Allocate memory for the matrix and its transpose */
-    double *L = (double *)calloc(sizeof(double), n * n);
+    double *L = (double *)calloc(sizeof(double), static_cast<size_t>(n) * static_cast<size_t>(n));
     assert(L);
 
-    double *LT = (double *)calloc(sizeof(double), n * n);
+    double *LT = (double *)calloc(sizeof(double), static_cast<size_t>(n) * static_cast<size_t>(n));
     assert(LT);
 
-    memset(A, 0, sizeof(double) * n * n);
+    memset(A, 0, sizeof(double) * static_cast<size_t>(n) * static_cast<size_t>(n));
 
     /* Generate a conditioned matrix and fill it with random numbers */
     for (int j = 0; j < n; ++j) {
@@ -96,7 +96,7 @@ void matrix_init(double *&A, int &n, const char *fname) {
         fclose(fp);
     }
     else {
-        A = (double *)calloc(sizeof(double), n * n);
+        A = (double *)calloc(sizeof(double), static_cast<size_t>(n) * static_cast<size_t>(n));
         posdef_gen(A, n);
     }
 }
