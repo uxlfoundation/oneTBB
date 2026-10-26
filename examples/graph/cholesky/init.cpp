@@ -70,7 +70,17 @@ void matrix_init(double *&A, int &n, const char *fname) {
             fprintf(stderr, "\nCouldn't read n from %s\n", fname);
             std::exit(-1);
         }
-        A = (double *)calloc(sizeof(double), n * n);
+        if (n < 0) {
+            fprintf(stderr, "\nInvalid matrix size %d\n", n);
+            std::exit(-1);
+        }
+        size_t n_sz = static_cast<size_t>(n);
+        if (n_sz != 0 && n_sz > SIZE_MAX / n_sz) {
+            fprintf(stderr, "\nMatrix size too large %d\n", n);
+            std::exit(-1);
+        }
+        size_t elem_count = n_sz * n_sz;
+        A = (double *)calloc(sizeof(double), elem_count);
         for (i = 0; i < n; ++i) {
             for (j = 0; j <= i; ++j) {
                 if (fscanf(fp, "%lf ", &A[i * n + j]) <= 0) {
