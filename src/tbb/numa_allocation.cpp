@@ -316,20 +316,26 @@ void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t bytes) {
         SIZE_T query_result = VirtualQuery(address, &memory_info, sizeof(memory_info));
         __TBB_ASSERT_RELEASE(query_result == sizeof(memory_info), "VirtualQuery failed");
         __TBB_ASSERT_RELEASE(memory_info.State != MEM_FREE, "Trying to release a free memory region");
-        __TBB_ASSERT_RELEASE(memory_info.BaseAddress == memory_info.AllocationBase,
-            "Invalid memory region address");
+        __TBB_ASSERT_RELEASE(memory_info.AllocationBase == address, "Pointer is not the start of an allocation");
 
-        uintptr_t region_end = reinterpret_cast<uintptr_t>(memory_info.BaseAddress)
+        char* region_end = static_cast<char*>(memory_info.BaseAddress)
             + memory_info.RegionSize;
-        uintptr_t current_address = reinterpret_cast<uintptr_t>(address);
-        __TBB_ASSERT_RELEASE(current_address < region_end, "Invalid memory region");
+        __TBB_ASSERT_RELEASE(address < region_end, "Invalid memory region");
 
-        BOOL ret = VirtualFree(memory_info.BaseAddress, /*dwSize=*/0, MEM_RELEASE);
+        // find all regions that belong to the same allocation
+        char* alloc_base = static_cast<char*>(memory_info.AllocationBase);
+        char* alloc_end  = region_end;
+        while (alloc_end < address + remaining
+               && VirtualQuery(alloc_end, &memory_info, sizeof(memory_info)) == sizeof(memory_info)
+               && memory_info.State != MEM_FREE && memory_info.AllocationBase == alloc_base)
+            alloc_end = static_cast<char*>(memory_info.BaseAddress) + memory_info.RegionSize;
+
+        BOOL ret = VirtualFree(alloc_base, /*dwSize=*/0, MEM_RELEASE);
         __TBB_ASSERT_RELEASE(ret, "VirtualFree failed");
 
-        size_t region_size = region_end - current_address;
-        remaining = region_size < remaining ? remaining - region_size : 0;
-        address = reinterpret_cast<char*>(region_end);
+        size_t alloc_size = alloc_end - address;
+        remaining = alloc_size < remaining ? remaining - alloc_size : 0;
+        address = alloc_end;
     }
 #endif
 }
