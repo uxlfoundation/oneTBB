@@ -72,7 +72,7 @@ static struct {
 static bool mock_VirtualAllocEx_called = false;
 static bool VirtualAllocEx_should_fail = false;
 
-BOOL mock_VirtualFree(LPVOID lpAddress, SIZE_T dwSize, DWORD  dwFreeType) {
+BOOL mock_VirtualFree(LPVOID lpAddress, SIZE_T dwSize, DWORD dwFreeType) {
     char* address = static_cast<char*>(lpAddress);
     auto region = mock_state.regions.find(address);
     REQUIRE(region != mock_state.regions.end());
