@@ -85,11 +85,11 @@ public:
         }
         thread_pool_cv.notify_all();
         task_deque_cv.notify_all();
-        release_permit(ph, "", "tcmReleasePermit " + runtime_name);
         for (auto &worker : workers) {
             worker.join();
             g_num_created_threads -= 1;
         }
+        release_permit(ph, "", "tcmReleasePermit " + runtime_name);
         disconnect_client(client, "", "tcmDisconnect " + runtime_name);
     }
 
