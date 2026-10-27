@@ -1488,7 +1488,7 @@ public:
   }
 
   tcm_result_t register_thread(tcm_permit_handle_t ph) {
-      __TCM_ASSERT(ph, nullptr);
+      __TCM_ASSERT(ph, "Invalid permit handle");
       thread_registration_data_t& tl = thread_data();
       {
           std::lock_guard<std::mutex> lock(tl.mutex);
@@ -1530,11 +1530,12 @@ public:
   }
 
   tcm_result_t unregister_threads(const tcm_permit_handle_t ph) {
+      __TCM_ASSERT(ph, "Invalid permit handle");
       std::unordered_set<thread_registration_data_t*> thread_locals;
       {
           permit_registrations_t& tr = ph->data.registrations;
           std::lock_guard<std::mutex> lock(tr.mutex);
-          thread_locals = std::move(tr.thread_locals);
+          thread_locals = tr.thread_locals;
       }
       for (auto& e : thread_locals) {
           __TCM_ASSERT(e, "Actual thread data found in the container.");
@@ -3062,4 +3063,4 @@ tcm_result_t tcmGetVersionInfo(char* buffer, uint32_t buffer_size) {
   return TCM_RESULT_SUCCESS;
 }
 
-}
+} // extern "C"
