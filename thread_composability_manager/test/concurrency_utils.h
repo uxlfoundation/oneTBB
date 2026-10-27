@@ -16,6 +16,7 @@
 #include <cstring>
 #include <memory>
 #include <mutex>
+#include <utility>
 
 // Helper class that allows waiting for a specific condition until someone notifies about it using
 // the same class instance
@@ -27,12 +28,18 @@ public:
         cv.wait(lock, std::forward<Predicate>(condition));
     }
 
-    void notify_all() { cv.notify_all(); }
+    template <typename Func>
+    void notify_all_about(Func&& event) {
+        {
+            std::lock_guard lock(mutex);
+            std::forward<Func>(event)();
+        }
+        cv.notify_all();
+    }
 private:
     std::mutex mutex;
     std::condition_variable cv;
 };
-
 
 #if __linux__
 #include <mntent.h>
