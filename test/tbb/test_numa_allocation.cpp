@@ -263,8 +263,10 @@ TEST_CASE("test basics") {
 
 #if _WIN32 || _WIN64
 
-//! \brief \ref regression
-TEST_CASE("memory leak") {
+//! \brief Regression test for memory leaks in regions created by allocate_interleaved:
+//! \brief only 1st region, created by VirtualFree/VirtualAlloc2, was released
+//! \ref regression
+TEST_CASE("memory leak regions after 1st") {
     const size_t bytes = 4 * page_size;
     const std::vector<tbb::numa_node_id> nodes = tbb::info::numa_nodes();
     char* ptr = static_cast<char*>(tbb::allocate_numa_interleaved(bytes, nodes, page_size));
