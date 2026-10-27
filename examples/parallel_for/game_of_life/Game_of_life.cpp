@@ -65,7 +65,8 @@ void Board::seed(int s) {
 }
 
 void Board::seed(const BoardPtr src) {
-    memcpy(m_matrix->data, src->m_matrix->data,
+    memcpy(m_matrix->data,
+           src->m_matrix->data,
            static_cast<size_t>(m_height) * static_cast<size_t>(m_width));
 }
 

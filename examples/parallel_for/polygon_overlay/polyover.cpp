@@ -90,8 +90,9 @@ void SerialOverlayMaps(Polygon_map_t **resultMap, Polygon_map_t *map1, Polygon_m
     RPolygon *p0 = &((*map1)[0]);
     int mapxSize, mapySize, ignore1, ignore2;
     p0->get(&ignore1, &ignore2, &mapxSize, &mapySize);
-    (*resultMap)->reserve(static_cast<Polygon_map_t::size_type>(mapxSize) *
-        static_cast<Polygon_map_t::size_type>(mapySize)); // can't be any bigger than this
+    (*resultMap)
+        ->reserve(static_cast<Polygon_map_t::size_type>(mapxSize) *
+                  static_cast<Polygon_map_t::size_type>(mapySize)); // can't be any bigger than this
     // push the map size as the first polygon,
     (*resultMap)->push_back(RPolygon(0, 0, mapxSize, mapySize));
     for (unsigned int i = 1; i < map1->size(); i++) {
@@ -151,7 +152,8 @@ void NaiveParallelOverlay(Polygon_map_t *&result_map,
     RPolygon *p0 = &(polymap1[0]);
     int mapxSize, mapySize, ignore1, ignore2;
     p0->get(&ignore1, &ignore2, &mapxSize, &mapySize);
-    result_map->reserve(static_cast<Polygon_map_t::size_type>(mapxSize) *
+    result_map->reserve(
+        static_cast<Polygon_map_t::size_type>(mapxSize) *
         static_cast<Polygon_map_t::size_type>(mapySize)); // can't be any bigger than this
     // push the map size as the first polygon,
     oneapi::tbb::spin_mutex *resultMutex = new oneapi::tbb::spin_mutex();
@@ -418,8 +420,9 @@ void SplitParallelOverlay(Polygon_map_t **result_map,
     RPolygon *p0 = &((*polymap1)[0]);
     int mapxSize, mapySize, ignore1, ignore2;
     p0->get(&ignore1, &ignore2, &mapxSize, &mapySize);
-    (*result_map)->reserve(static_cast<Polygon_map_t::size_type>(mapxSize) *
-                           static_cast<Polygon_map_t::size_type>(mapySize)); // can't be any bigger than this
+    (*result_map)
+        ->reserve(static_cast<Polygon_map_t::size_type>(mapxSize) *
+                  static_cast<Polygon_map_t::size_type>(mapySize)); // can't be any bigger than this
     resultMutex = new oneapi::tbb::spin_mutex();
 
     int grain_size;

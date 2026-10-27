@@ -78,7 +78,8 @@ static double ***create_tile_array(double *A, int n, int b) {
 
     for (int j = 0; j < p; ++j) {
         for (int i = 0; i < p; ++i) {
-            double *temp_block = (double *)calloc(sizeof(double), static_cast<size_t>(b) * static_cast<size_t>(b));
+            double *temp_block =
+                (double *)calloc(sizeof(double), static_cast<size_t>(b) * static_cast<size_t>(b));
 
             for (int A_j = j * b, T_j = 0; T_j < b; ++A_j, ++T_j) {
                 for (int A_i = i * b, T_i = 0; T_i < b; ++A_i, ++T_i) {
