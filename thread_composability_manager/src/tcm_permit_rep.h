@@ -12,27 +12,31 @@
 #include <cstdint>
 #include <cstddef>
 
+#include <memory>
 #include <mutex>
 #include <unordered_set>
-#include <stack>
+#include <vector>
 
 #include "tcm/types.h"
 
 namespace tcm {
 namespace internal {
 
+// Lock order: permit_registrations_t::mutex, then thread_registration_data_t::mutex.
 struct thread_registration_data_t {
   std::mutex mutex;
-  std::stack<tcm_permit_handle_t> permits; // Permits with which a thread has been registered
+  // Stack of permits with which a thread has been registered. Released permits are replaced with
+  // nullptr so that the matching tcmUnregisterThread call still pops the right entry.
+  std::vector<tcm_permit_handle_t> permits;
 
   std::unordered_set<std::size_t> seen; // Previous permits with which this thread once has been
                                         // registered.
-  ~thread_registration_data_t();
 };
 
 struct permit_registrations_t {
   std::mutex mutex;
-  std::unordered_set<thread_registration_data_t*> thread_locals;
+  // Shared ownership keeps the registration data of exited threads alive until the permit is gone
+  std::unordered_set<std::shared_ptr<thread_registration_data_t>> thread_locals;
 };
 
 } // namespace internal

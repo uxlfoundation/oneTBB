@@ -1402,4 +1402,58 @@ TEST("Bulk unregister succeeds even if registered threads die") {
     disconnect_client(client);
 }
 
+// OpenMP runtime releases its permit on shutdown before its registered workers exit
+TEST("Registered threads may outlive the permit") {
+    enum test_epoch_t {start, threads_registered, permit_released};
+    test_epoch_t test_epoch = start;
+    const int32_t num_threads = std::max(platform_tcm_concurrency() - 1, 2);
+    int32_t num_registered = 0;
+    Waiter w;
+
+    tcm_client_id_t client = connect_new_client();
+    tcm_permit_handle_t ph = request_permit(client, make_request());
+
+    std::vector<std::thread> threads;
+    for (int32_t i = 0; i < num_threads; ++i) {
+        threads.emplace_back([&, i] {
+            register_thread(ph);
+            w.notify_all_about([&] {
+                if (++num_registered == num_threads)
+                    test_epoch = threads_registered;
+            });
+            w.wait_for([&] { return test_epoch == permit_released; });
+            if (i % 2 == 0)
+                unregister_thread();    // Late unregistration does not touch the released permit
+        });
+    }
+
+    w.wait_for([&] { return test_epoch == threads_registered; });
+    release_permit(ph);
+    w.notify_all_about([&] { test_epoch = permit_released; });
+
+    for (auto& t : threads)
+        t.join();
+    disconnect_client(client);
+}
+
+TEST("Registered threads may outlive the permits of the disconnected client") {
+    enum test_epoch_t {start, thread_registered, client_disconnected};
+    test_epoch_t test_epoch = start;
+    Waiter w;
+
+    tcm_client_id_t client = connect_new_client();
+    tcm_permit_handle_t ph = request_permit(client, make_request());
+
+    std::thread t([&] {
+        register_thread(ph);
+        w.notify_all_about([&] { test_epoch = thread_registered; });
+        w.wait_for([&] { return test_epoch == client_disconnected; });
+    });
+
+    w.wait_for([&] { return test_epoch == thread_registered; });
+    disconnect_client(client);
+    w.notify_all_about([&] { test_epoch = client_disconnected; });
+    t.join();
+}
+
 } // namespace TestUnregisterThreads
