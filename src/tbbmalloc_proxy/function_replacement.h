@@ -71,7 +71,16 @@ const unsigned MAX_PATTERN_SIZE = MAX_PROBE_SIZE - SIZE_OF_RELJUMP + 1;
 // The max distance covered in 32 bits: 2^31 - 1 - C
 // where C should not be smaller than the size of a probe.
 // The latter is important to correctly handle "backward" jumps.
+#if defined(_M_ARM64)
+// On ARM64 the probe is a single B instruction (imm26 * 4 = +-128 MB), and the trampolines
+// it jumps to must be within that distance from the patched function.
+const __int64 MAX_DISTANCE = (((__int64)1 << 27) - 1) - MAX_PROBE_SIZE;
+
+// The size of an ARM64 instruction (the probe written to the function entry)
+const unsigned SIZE_OF_ARM64_INSN = 4;
+#else
 const __int64 MAX_DISTANCE = (((__int64)1 << 31) - 1) - MAX_PROBE_SIZE;
+#endif
 
 // The maximum number of distinct buffers in memory
 const ptrdiff_t MAX_NUM_BUFFERS = 256;
