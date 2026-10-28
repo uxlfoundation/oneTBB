@@ -31,4 +31,4 @@ make html
 ```
 
 
-That's it! Your built documentation is located in the ``build/html`` folder. 
+That's it! Your built documentation is located in the ``build/html`` folder.

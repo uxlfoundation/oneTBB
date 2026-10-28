@@ -26,7 +26,7 @@ void TBB_NestedInOpenMP() {
     {
 #pragma omp for
         for(int i = 0; i < M; ++i) {
-            tbb::parallel_for(tbb::blocked_range<int>(0, N, 10), InnerBody(i));
+            tbb::parallel_for(tbb::blocked_range<int>(0, N, 10), InnerBody{i});
         }
     }
 }
@@ -56,7 +56,7 @@ struct InnerBody {
 
 void* OuterLoopIteration(void* args) {
     int i = reinterpret_cast<intptr_t>(args);
-    tbb::parallel_for(tbb::blocked_range<int>(0, N, 10), InnerBody(i));
+    tbb::parallel_for(tbb::blocked_range<int>(0, N, 10), InnerBody{i});
     return nullptr;
 }
 
