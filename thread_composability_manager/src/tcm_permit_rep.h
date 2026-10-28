@@ -18,18 +18,25 @@
 
 #include "tcm/types.h"
 
+namespace tcm {
+namespace internal {
+
 struct thread_registration_data_t {
   std::mutex mutex;
   std::stack<tcm_permit_handle_t> permits; // Permits with which a thread has been registered
 
   std::unordered_set<std::size_t> seen; // Previous permits with which this thread once has been
                                         // registered.
+  ~thread_registration_data_t();
 };
 
 struct permit_registrations_t {
   std::mutex mutex;
   std::unordered_set<thread_registration_data_t*> thread_locals;
 };
+
+} // namespace internal
+} // namespace tcm
 
 struct tcm_permit_data_t {
   tcm_client_id_t client_id;
@@ -45,7 +52,7 @@ struct tcm_permit_data_t {
   std::atomic<uint32_t> inherited_concurrency_idx; // Index of constraint where inherited
                                                    // concurrency will be stored
 
-  permit_registrations_t registrations; // Pointer to the global threads register
+  tcm::internal::permit_registrations_t registrations; // Pointer to the global threads register
 };
 
 extern "C" {

@@ -1367,6 +1367,7 @@ TEST("Bulk unregister affects only registered threads") {
         w.wait_for([&] { return test_epoch == main_thread_unregisters; });
         check(can_find_at_most(/*num_resource*/1), "Bulk deregistration does not affect unrelated "
                                                    "thread as it can still find owned resource");
+        unregister_thread();    // Thread registration cannot outlive the permit
         release_permit(local_ph);
         w.notify_all_about([&test_epoch] { test_epoch = unrelated_thread_done; });
         disconnect_client(unrelated_client);
@@ -1378,6 +1379,26 @@ TEST("Bulk unregister affects only registered threads") {
 
     related_thread.join();
     unrelated_thread.join();
+    disconnect_client(client);
+}
+
+TEST("Bulk unregister succeeds even if registered threads die") {
+    tcm_client_id_t client = connect_new_client();
+    tcm_permit_handle_t ph = request_permit(client, make_request());
+    tcmRegisterThread(ph);
+
+    {
+        std::vector<std::thread> threads;
+        for (int32_t i = 0; i < platform_tcm_concurrency() - 1; ++i) {
+            threads.emplace_back(
+                [ph]() { tcmRegisterThread(ph); }
+            );
+            threads.back().join();
+        }
+    }
+
+    tcmUnregisterThreads(ph);
+
     disconnect_client(client);
 }
 

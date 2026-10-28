@@ -112,6 +112,22 @@ internal::environment theTCM::tcm_env{};
 
 namespace internal {
 
+inline thread_registration_data_t::~thread_registration_data_t()  {
+    std::stack<tcm_permit_handle_t> permits_copy;
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        permits_copy = std::move(permits);
+    }
+    while (!permits_copy.empty()) {
+        tcm_permit_handle_t ph = permits_copy.top();
+        __TCM_ASSERT(ph, "Thread has been once registered with an invalid permit handle");
+        permits_copy.pop();
+        permit_registrations_t& pr = ph->data.registrations;
+        std::lock_guard<std::mutex> lock(pr.mutex);
+        pr.thread_locals.erase(this);
+    }
+}
+
 float tcm_oversubscription_factor() {
     static const float oversb_factor = theTCM::get_tcm_env().tcm_oversubscription_factor;
     __TCM_ASSERT(oversb_factor > std::numeric_limits<float>::epsilon(),
@@ -1502,7 +1518,7 @@ public:
           permit_registrations_t& pr = ph->data.registrations;
           std::lock_guard<std::mutex> lock(pr.mutex);
           __TCM_ASSERT(pr.thread_locals.count(&tl) == 0,
-                       "Thread has not been registered with the permit yet.");
+                       "Thread has been registered with the permit already.");
           pr.thread_locals.emplace(&tl);
       }
 #if TCM_USE_ASSERT
@@ -1538,7 +1554,7 @@ public:
           thread_locals = tr.thread_locals;
       }
       for (auto& e : thread_locals) {
-          __TCM_ASSERT(e, "Actual thread data found in the container.");
+          __TCM_ASSERT(e, "Actual thread data was not found in the container.");
           thread_registration_data_t& rd = *e;
           std::lock_guard<std::mutex> lock(rd.mutex);
           if (!rd.permits.empty() && ph == rd.permits.top())
