@@ -46,7 +46,7 @@ value; d) via a separate function that returns the error description.
 For the commonly used `allocate_numa_interleaved` function it's natural to return a pointer as the
 return value. It's better for the non-throwing function to be similar. And standard `new` and
 `std::allocator<T>::allocate` return a pointer as a single return value. Among options (a), (b), and
-(c), option (c) is preferable. However, it requires a large set of overloads.
+(c), option (c) is preferable. However, it requires too many overloads.
 
 `std::nothrow_t` is used to implement an overload of `operator new`. There is no clear advantage or
 disadvantage of overloading `allocate_numa_interleaved` vs adding
@@ -98,18 +98,37 @@ The error description is stored per thread. Neither successful allocation calls 
 getter modify the stored description. The returned pointer remains valid, and the string contents
 remain unchanged, until the next failed `allocate_numa_interleaved_nothrow` call in the same thread
 or until that thread terminates. The user must not modify or free the returned string. Before the
-first allocation failure in the current thread, the getter returns a pointer to an empty string.
+first failed `allocate_numa_interleaved_nothrow` call in the current thread, the getter returns a
+pointer to an empty string.
 
 The semantics of `tbb::allocate_numa_interleaved_get_last_error()` are similar to those of Windows'
 `GetLastError()`, so they should be familiar to users.
 
+`const char*` was chosen as the return type because in some cases it is enough to return a pointer
+to static memory without dynamic allocation. Furthermore, `const char*` matches the expected
+common use case, i.e., writing an error to error logs.
+
 ## Implementation notes
+
+Based on the analysis above, on error `allocate_numa_interleaved` should throw
+`std::invalid_argument` for invalid input arguments (i.e., when `bytes` is zero or
+`bytes_per_chunk` is not a multiple of the page size), and `std::system_error` when an underlying
+syscall fails. Both exceptions contain a string describing the error.
+
+On error, `allocate_numa_interleaved_nothrow` never throws and returns `nullptr`. The error
+description can be retrieved as described in the "Use a separate function that returns the error
+description" section.
+
+`deallocate_numa_interleaved` uses `__TBB_ASSERT_RELEASE` to report an error.
 
 TBB has 3 modes of exception support: default, terminate_on_exception enabled, and library build
 with `TBB_USE_EXCEPTIONS=0` (the latter is currently unsupported). For the throwing overloads,
 failures that would normally throw must trigger termination in the latter two configurations. There
 is no need to turn them into non-throwing functions. The non-throwing overloads are not affected by
 changes in exception support and return `nullptr` on failure in all 3 configurations.
+
+Following the "best-effort" principle, the absence of NUMA-supporting libraries is not treated as
+an error, non-interleaved memory is silently returned instead.
 
 `throw` generates a lot of code, so it should not be used in the functions inlined to user code
 without strong justification.
