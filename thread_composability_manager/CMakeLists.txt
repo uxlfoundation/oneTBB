@@ -146,4 +146,16 @@ if (TCM_TEST)
   add_subdirectory(test)
 endif()
 
+if (TCM_DOC_EXAMPLES)
+    set(TCM_DOC_EXAMPLES_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/doc/examples")
+    if (NOT EXISTS ${TCM_DOC_EXAMPLES_DIRECTORY})
+      message(FATAL_ERROR
+        "TCM documentation samples are not found while their testing was enabled")
+    else()
+      message(STATUS "Enabling build of TCM documentation samples")
+      enable_testing()
+      add_subdirectory(${TCM_DOC_EXAMPLES_DIRECTORY})
+    endif()
+endif()
+
 add_subdirectory(cmake/post_install)
