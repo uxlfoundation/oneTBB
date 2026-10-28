@@ -141,8 +141,7 @@ specific NUMA nodes.
 
 [Interleaved allocation](interleaved-allocation.md) can be a useful kind of NUMA-aware allocations.
 
-Error handling during NUMA-aware allocations is described in [a separate document](
-interleaved-allocation-errors.md).
+Error handling during NUMA-aware allocations is described in [a separate document](interleaved-allocation-errors.md).
 
 ### Simplified approaches to associate task distribution with data placement
 
