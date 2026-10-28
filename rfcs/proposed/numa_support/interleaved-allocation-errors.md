@@ -34,7 +34,7 @@ latter also has room for error-code information such as `errno`.
 It is unclear how error codes would be used beyond writing logs, so enum values have no clear
 advantage over strings for indicating what went wrong.
 
-## How to return “what went wrong” string for no-throwing functions
+## How to return “what went wrong” string for non-throwing functions
 
 Those strings can be returned in several ways: a) as the only function return value, with the
 pointer returned through a separate output parameter; b) as part of a composite return value, for
