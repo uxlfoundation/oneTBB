@@ -256,41 +256,46 @@ TEST_CASE("allocate_interleaved with failed syscall") {
         {3*per_chunk + per_chunk / 2, false, 0, 4, 4},
         {3*per_chunk + per_chunk / 2, false, 0, 0, 0}
     };
-    for (const auto& test_case : cases) {
-        CAPTURE(test_case.bytes);
-        CAPTURE(test_case.fail_split);
-        CAPTURE(test_case.fail_replacement);
-        mock_state = {};
-        mock_state.make_reservation_fail = test_case.fail_reservation;
-        mock_state.fail_split = test_case.fail_split;
-        mock_state.fail_replacement = test_case.fail_replacement;
-        tbb::detail::r1::VirtualAlloc2_ptr = tbb::detail::r1::mock_VirtualAlloc2_ptr;
 
-        void* ptr = tbb::detail::r1::allocate_interleaved(test_case.bytes, nodes_ids, 2, per_chunk);
-        if (test_case.fail_reservation || test_case.fail_split || test_case.fail_replacement) {
-            REQUIRE(ptr == nullptr);
-            REQUIRE(mock_state.regions.empty());
-        } else {
-            REQUIRE(ptr == mock_state.storage.get());
-            REQUIRE(mock_state.regions.size() == 4);
+    try {
+        for (const auto &test_case : cases) {
+            CAPTURE(test_case.bytes);
+            CAPTURE(test_case.fail_split);
+            CAPTURE(test_case.fail_replacement);
+            mock_state = {};
+            mock_state.make_reservation_fail = test_case.fail_reservation;
+            mock_state.fail_split = test_case.fail_split;
+            mock_state.fail_replacement = test_case.fail_replacement;
+
+            void *ptr = tbb::detail::r1::allocate_interleaved(test_case.bytes, nodes_ids, 2, per_chunk);
+            if (test_case.fail_reservation || test_case.fail_split || test_case.fail_replacement)
+            {
+                REQUIRE(ptr == nullptr);
+                REQUIRE(mock_state.regions.empty());
+            }
+            else
+            {
+                REQUIRE(ptr == mock_state.storage.get());
+                REQUIRE(mock_state.regions.size() == 4);
+            }
+            REQUIRE(mock_state.release_calls == test_case.expected_releases);
+            if (test_case.fail_split)
+                REQUIRE(mock_state.split_calls == test_case.fail_split);
+            if (test_case.fail_replacement)
+                REQUIRE(mock_state.replacement_calls == test_case.fail_replacement);
         }
-        REQUIRE(mock_state.release_calls == test_case.expected_releases);
-        if (test_case.fail_split)
-            REQUIRE(mock_state.split_calls == test_case.fail_split);
-        if (test_case.fail_replacement)
-            REQUIRE(mock_state.replacement_calls == test_case.fail_replacement);
-    }
-    mock_state = {};
+        mock_state = {};
 
-    VirtualAllocEx_should_fail = true;
-    mock_VirtualAllocEx_called = false;
-    // make it null to use VirtualAllocEx
-    tbb::detail::r1::VirtualAlloc2_ptr = nullptr;
-    void* ptr = tbb::detail::r1::allocate_interleaved(per_chunk / 2, nodes_ids, 1, per_chunk);
-    REQUIRE(ptr == nullptr);
-    REQUIRE_MESSAGE(mock_VirtualAllocEx_called, "Failed VirtualAllocEx syscall was not called");
+        VirtualAllocEx_should_fail = true;
+        mock_VirtualAllocEx_called = false;
+        // make it null to use VirtualAllocEx
+        tbb::detail::r1::VirtualAlloc2_ptr = nullptr;
+        void *ptr = tbb::detail::r1::allocate_interleaved(per_chunk / 2, nodes_ids, 1, per_chunk);
+        REQUIRE(ptr == nullptr);
+        REQUIRE_MESSAGE(mock_VirtualAllocEx_called, "Failed VirtualAllocEx syscall was not called");
+    } catch (doctest::detail::TestFailureException) { /* catch it to restore the state */ }
     VirtualAllocEx_should_fail = false;
     tbb::detail::r1::VirtualAlloc2_ptr = tbb::detail::r1::mock_VirtualAlloc2_ptr;
-#endif
+#endif // _WIN32 || _WIN64
 }
-#endif
+#endif //  __linux__ || _WIN32 || _WIN64
