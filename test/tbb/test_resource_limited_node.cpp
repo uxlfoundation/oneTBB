@@ -1246,7 +1246,6 @@ void test_priorities_with_unlimited_resources() {
     using namespace tbb::flow;
 
     tbb::global_control ctx(tbb::global_control::max_allowed_parallelism, 1);
-    graph g;
 
     using node_type = resource_limited_node<int, std::tuple<int>>;
 
