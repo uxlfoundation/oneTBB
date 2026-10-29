@@ -53,6 +53,7 @@ static int mock_madvise(void*, size_t, int) noexcept (true) {
 #elif _WIN32 || _WIN64
 
 #include <map>
+#include <numeric> // std::accumulate
 #include <memory>
 
 static struct {
@@ -245,16 +246,17 @@ TEST_CASE("allocate_interleaved with failed syscall") {
         size_t fail_split;
         size_t fail_replacement;
         size_t expected_releases;
+        size_t expected_num_of_regions;
     } cases[] = {
-        {per_chunk, true, 0, 0, 0},
-        {per_chunk / 2, false, 0, 1, 1},
-        {4*per_chunk, false, 1, 0, 1},
-        {4*per_chunk, false, 3, 0, 3},
-        {4*per_chunk, false, 0, 1, 2},
-        {4*per_chunk, false, 0, 3, 4},
-        {4*per_chunk, false, 0, 4, 4},
-        {3*per_chunk + per_chunk / 2, false, 0, 4, 4},
-        {3*per_chunk + per_chunk / 2, false, 0, 0, 0}
+        {per_chunk, true, 0, 0, 0, 0},
+        {per_chunk / 2, false, 0, 1, 1, 0},
+        {4*per_chunk, false, 1, 0, 1, 0},
+        {4*per_chunk, false, 3, 0, 3, 0},
+        {4*per_chunk, false, 0, 1, 2, 0},
+        {4*per_chunk, false, 0, 3, 4, 0},
+        {4*per_chunk, false, 0, 4, 4, 0},
+        {3*per_chunk + per_chunk / 2, false, 0, 4, 4, 0},
+        {3*per_chunk + per_chunk / 2, false, 0, 0, 0, 4},
     };
 
     try {
@@ -268,15 +270,22 @@ TEST_CASE("allocate_interleaved with failed syscall") {
             mock_state.fail_replacement = test_case.fail_replacement;
 
             void *ptr = tbb::detail::r1::allocate_interleaved(test_case.bytes, nodes_ids, 2, per_chunk);
+
+            REQUIRE(mock_state.regions.size() == test_case.expected_num_of_regions);
             if (test_case.fail_reservation || test_case.fail_split || test_case.fail_replacement)
             {
+                // allocation is expected to fail, if any of underlying syscalls fail
                 REQUIRE(ptr == nullptr);
-                REQUIRE(mock_state.regions.empty());
             }
             else
             {
                 REQUIRE(ptr == mock_state.storage.get());
-                REQUIRE(mock_state.regions.size() == 4);
+
+                size_t total_size = std::accumulate(
+                    mock_state.regions.begin(), mock_state.regions.end(), size_t{0},
+                    [](size_t sum, const auto &region) { return sum + region.second; }
+                );
+                REQUIRE(total_size == test_case.bytes);
             }
             REQUIRE(mock_state.release_calls == test_case.expected_releases);
             if (test_case.fail_split)
