@@ -75,47 +75,6 @@
 
   - The same loop as above, but threads are re-created at each iteration of the loop.
   
-* Considered scenarios
-** Multiple nested =tbb::task_arena= calls
-
-   #+begin_src C++
-      tbb::task_arena a;
-      tbb::task_arena b;
-      a.execute { 
-          parallel_for { // Permit request A
-              b.execute {
-                  parallel_for {  // Multiple permit requests Bi
-                      // Each thread re-uses one resource from the top permit A
-
-                      a.execute { // No requests, and no additional registrations
-                          parallel_for {
-                              // Threads continue to re-use resources from the top permit
-                          }
-                      }
-                  }
-              } // Unregister from Bi 
-          }
-     } // Unregisters from the 1st permit A
-   #+end_src
-
-** Nested calls of different runtimes
-
-   #+begin_src C++
-     tbb::task_arena a;
-     omp.parallel_for([&]() { // Registers with permit A
-
-         a.execute([&](){ // Registers with permit B
-             // Re-uses resource from the top permit
-
-             omp.parallel_for([&](){ // Multiple permit requests Ci
-                     // Re-uses resource from the top permit
-             }); // Multiple tcmUnregisterThreads(Ci)
-
-         }); // Unregisters from permit B
-    }); // tcmUnregisterThreads(A)
-   #+end_src
-
-
 * Open Questions
   
   1. Are there any other usage scenarios need to be supported?
