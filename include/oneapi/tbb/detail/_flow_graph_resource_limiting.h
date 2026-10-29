@@ -926,7 +926,6 @@ public:
         return *static_cast<Body*>(m_body->get_body_ptr());
     }
 
-    node_priority_t priority() const { return base_type::my_priority; }
 protected:
     void reset(reset_flags f) {
         base_type::reset_function_input_base(f);
@@ -939,6 +938,11 @@ protected:
         __TBB_ASSERT(!(f & rf_clear_edges) || clear_element<N>::this_empty(m_output_ports), "resource_limited_node reset failed");
     }
 private:
+    template <typename, typename, typename, typename...>
+    friend class resource_limited_body_leaf;
+
+    node_priority_t priority() const { return base_type::my_priority; }
+
     template <typename Body, typename... ResourceProviders>
     bool is_body_noexcept(Body& body, std::tuple<ResourceProviders&...>) {
         return noexcept(tbb::detail::invoke(body, std::declval<input_type>(), m_output_ports,
