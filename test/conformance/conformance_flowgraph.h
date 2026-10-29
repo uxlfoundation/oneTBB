@@ -168,6 +168,12 @@ struct track_first_id_functor {
     void operator()( InputType, multifunc_ports_t<InputType, OutputType>& op ) {
         std::get<0>(op).try_put(operator()(OutputType(0)));
     }
+
+    // resource_limited_node: the ports type is deduced because the node may have no output ports
+    template<typename InputType, typename Ports, typename ResourceHandle, typename... ResourceHandles>
+    void operator()( InputType, Ports&, ResourceHandle&, ResourceHandles&... ) {
+        operator()(OutputType(0));
+    }
 };
 
 template<typename OutputType>
