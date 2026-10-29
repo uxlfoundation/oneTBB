@@ -260,8 +260,7 @@ void *__TBB_EXPORTED_FUNC allocate_interleaved(size_t bytes,
     auto unmap = [&region_count, bytes_per_chunk](char* base_addr) {
         for (size_t region_index = 0; region_index < region_count; ++region_index) {
             BOOL ret = VirtualFree(base_addr + region_index * bytes_per_chunk, /*dwSize=*/0, MEM_RELEASE);
-            suppress_unused_warning(ret);
-            __TBB_ASSERT(ret, "VirtualFree failed");
+           __TBB_ASSERT_EX(ret, "VirtualFree failed");
         }
     };
     std::unique_ptr<char, decltype(unmap)> data_holder(base_addr, unmap);
