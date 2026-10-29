@@ -72,8 +72,17 @@ if (NOT MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|IntelLLVM")
     # _GLIBCXX_NO_ASSERTIONS does not override an explicit _GLIBCXX_ASSERTIONS
     # (e.g. from -D_GLIBCXX_ASSERTIONS or -Wp,-D_GLIBCXX_ASSERTIONS in CXXFLAGS,
     # or from GCC's -fhardened), so undefine it as well. -Wp is used so that it
-    # also comes after a -Wp,-D passed in CXXFLAGS.
+    # also comes after a -Wp,-D passed in CXXFLAGS. Not covered: libstdc++
+    # re-enables _GLIBCXX_ASSERTIONS when _GLIBCXX_DEBUG is defined.
     target_compile_options(tbbmalloc PRIVATE -Wp,-U_GLIBCXX_ASSERTIONS)
+
+    # Dropping the assertions is intentional, so silence GCC's -Whardened
+    # warning about it, which -Werror (TBB_STRICT) would turn into an error.
+    include(CheckCXXCompilerFlag)
+    check_cxx_compiler_flag(-Wno-hardened TBB_HAS_WNO_HARDENED)
+    if (TBB_HAS_WNO_HARDENED)
+        target_compile_options(tbbmalloc PRIVATE -Wno-hardened)
+    endif()
 endif()
 
 enable_language(C)
