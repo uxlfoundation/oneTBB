@@ -27,7 +27,6 @@
 
 #include <algorithm>
 #include <array>
-#include <chrono>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
