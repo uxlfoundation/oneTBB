@@ -182,6 +182,42 @@ MemoryBuffer *CreateBuffer(UINT_PTR addr)
             }
         }
 
+        // Nothing free above within the distance: search below the allocation that contains addr.
+        if (VirtualQuery(Addrint2Ptr(addr), &memInfo, sizeof(memInfo)) != sizeof(memInfo))
+            return 0;
+        UINT_PTR regionStart = Ptr2Addrint(memInfo.AllocationBase ? memInfo.AllocationBase : memInfo.BaseAddress);
+        for(;;) {
+            if (regionStart < m_allocSize)
+                break;
+            // The highest allocation-aligned block that ends at or below the start of the current region
+            const UINT_PTR candidate = (regionStart - m_allocSize) & ~(UINT_PTR)(m_allocSize-1);
+
+            // The whole block is below addr, so its farthest byte from addr is the candidate itself
+            if (!IsInDistance(addr, candidate, MAX_DISTANCE))
+                break;
+
+            if (VirtualQuery(Addrint2Ptr(candidate), &memInfo, sizeof(memInfo)) != sizeof(memInfo))
+                break;
+
+            // For a free region, RegionSize counts from the candidate up to the next allocation
+            if (memInfo.State == MEM_FREE && memInfo.RegionSize >= m_allocSize)
+            {
+                void *newPage = VirtualAlloc(Addrint2Ptr(candidate), m_allocSize, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
+                if (!newPage)
+                    break;
+
+                MemoryBuffer *pBuff = new (m_lastBuffer) MemoryBuffer(newPage, m_allocSize);
+                ++m_lastBuffer;
+                return pBuff;
+            }
+
+            // Continue below this region: below the candidate if it was a too-small free gap,
+            // otherwise below the start of the allocation (e.g. a whole DLL image) that occupies it.
+            regionStart = memInfo.State == MEM_FREE
+                ? candidate
+                : Ptr2Addrint(memInfo.AllocationBase ? memInfo.AllocationBase : memInfo.BaseAddress);
+        }
+
         // Failed to find a buffer in the distance
         return 0;
     }
