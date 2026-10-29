@@ -79,13 +79,31 @@
   
   1. Are there any other usage scenarios need to be supported?
 
-     - In future, it might be useful to support the scenario when runtime calls the new
+     - It might be useful to support the scenario when runtime calls the new
        =tcmUnregisterThreads(permit_handle)= API and the old =tcmUnregisterThread()= simultaneously
-       and indiscriminately in an attempt to make sure a thread is unregistered from the specific
-       =permit_handle=. This would require introducing additional API that would accept the
-       =permit_handle= from which a thread wants to unregister itself.
+       in an attempt to make sure a thread is unregistered from a certain =permit_handle=. To be
+       able to determine from which permit a thread has unregistered itself, the new API could be
+       proposed.
 
-       Example:
+       API of such a function could look something like:
        #+begin_src C++
-         tcm_result_t tcmUnregisterThreadFrom(tcm_permit_handle_t);
+         /**
+          ,* Unregisters calling thread from the deepest permit with which it is registered.
+          ,*
+          ,* Params:
+          ,*
+          ,*  - permit_handle_ptr - pointer to tcm_permit_handle_t. Gets written with the value of permit
+          ,*                        handle, from which the calling thread has been unregistered.
+          ,*
+          ,* Returns:
+          ,*
+          ,* - TCM_RESULT_SUCCESS - if deregistration was successful and the argument is updated.
+          ,*
+          ,* - TCM_RESULT_ERROR_INVALID_OPERATION - if the calling thread is not registered with any permit.
+          ,*
+          ,* - TCM_RESULT_ERROR_INVALID_ARGUMENT - if passed argument is nullptr.
+          ,*
+          ,* - TCM_RESULT_ERROR_INVALID_ARGUMENT - if derefenced argument is non-nullptr.
+          ,*/
+         tcm_result_t tcmUnregisterThreadReturningHandle(tcm_permit_handle_t* permit_handle_ptr);
        #+end_src
