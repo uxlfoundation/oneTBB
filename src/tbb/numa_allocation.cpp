@@ -329,8 +329,7 @@ void __TBB_EXPORTED_FUNC deallocate_interleaved(void *ptr, size_t bytes) {
             alloc_end = static_cast<char*>(memory_info.BaseAddress) + memory_info.RegionSize;
 
         BOOL ret = VirtualFree(alloc_base, /*dwSize=*/0, MEM_RELEASE);
-        suppress_unused_warning(ret);
-        __TBB_ASSERT(ret, "VirtualFree failed");
+       __TBB_ASSERT_EX(ret, "VirtualFree failed");
 
         size_t alloc_size = alloc_end - address;
         remaining = alloc_size < remaining ? remaining - alloc_size : 0;
