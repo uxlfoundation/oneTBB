@@ -756,6 +756,95 @@ void test_move_assignment_POCMA_false_unequal_allocator() {
     fixture.verify_content_deep_moved(dst);
 }
 
+template <typename Container>
+struct DestroyOnExit {
+    DestroyOnExit( Container& c ) : container(c) {}
+    DestroyOnExit( const DestroyOnExit& ) = delete;
+    ~DestroyOnExit() { container.~Container(); }
+
+    Container& container;
+};
+
+template <typename ContainerTraits>
+void test_move_assignment_to_non_empty_POCMA_true_stateful_allocator() {
+    using fixture_type = typename DefaultStatefulFixtureHelper<ContainerTraits, /*POCMA = */std::true_type>::type;
+    using container_type = typename fixture_type::container_type;
+    using init_iterator_type = typename ContainerTraits::init_iterator_type;
+
+    fixture_type fixture;
+
+    utils::UninitializedStorage<container_type> dst_storage;
+    container_type& dst = ContainerTraits::template construct_container<container_type>(
+        dst_storage, init_iterator_type(1000), init_iterator_type(1010), fixture.dst_allocator);
+    DestroyOnExit<container_type> dst_guard(dst);
+    dst = std::move(fixture.source);
+
+    fixture.verify_content_shallow_moved(dst);
+    fixture.verify_allocator_was_moved(dst.get_allocator());
+    fixture.verify_no_undestroyed_foo_left_and_dismiss();
+}
+
+template <typename ContainerTraits>
+void test_move_assignment_to_non_empty_POCMA_true_stateless_allocator() {
+    using allocator_type = std::allocator<FooWithAssign>;
+    using fixture_type = MoveFixture<ContainerTraits, allocator_type>;
+    using container_type = typename fixture_type::container_type;
+    using init_iterator_type = typename ContainerTraits::init_iterator_type;
+
+    TrackFooCount foo_count_tracker;
+    {
+        fixture_type fixture;
+
+        utils::UninitializedStorage<container_type> dst_storage;
+        container_type& dst = ContainerTraits::template construct_container<container_type>(
+            dst_storage, init_iterator_type(1000), init_iterator_type(1010));
+        DestroyOnExit<container_type> dst_guard(dst);
+        dst = std::move(fixture.source);
+
+        fixture.verify_content_shallow_moved(dst);
+    }
+    foo_count_tracker.verify_no_undestroyed_foo_left_and_dismiss();
+}
+
+template <typename ContainerTraits>
+void test_move_assignment_to_non_empty_POCMA_false_equal_allocator() {
+    using fixture_type = typename DefaultStatefulFixtureHelper<ContainerTraits, /*POCMA = */std::false_type>::type;
+    using container_type = typename fixture_type::container_type;
+    using init_iterator_type = typename ContainerTraits::init_iterator_type;
+
+    fixture_type fixture;
+    utils::UninitializedStorage<container_type> dst_storage;
+    container_type& dst = ContainerTraits::template construct_container<container_type>(
+        dst_storage, init_iterator_type(1000), init_iterator_type(1010), fixture.source_allocator);
+    DestroyOnExit<container_type> dst_guard(dst);
+    REQUIRE_MESSAGE(fixture.source.get_allocator() == dst.get_allocator(), "Incorrect test setup: allocators should be equal");
+
+    dst = std::move(fixture.source);
+
+    fixture.verify_content_shallow_moved(dst);
+    fixture.verify_no_undestroyed_foo_left_and_dismiss();
+}
+
+template <typename ContainerTraits>
+void test_move_assignment_to_non_empty_POCMA_false_unequal_allocator() {
+    using fixture_type = typename DefaultStatefulFixtureHelper<ContainerTraits, /*POCMA = */std::false_type>::type;
+    using container_type = typename fixture_type::container_type;
+    using init_iterator_type = typename ContainerTraits::init_iterator_type;
+
+    fixture_type fixture;
+
+    utils::UninitializedStorage<container_type> dst_storage;
+    container_type& dst = ContainerTraits::template construct_container<container_type>(
+        dst_storage, init_iterator_type(1000), init_iterator_type(1010), fixture.dst_allocator);
+    DestroyOnExit<container_type> dst_guard(dst);
+    dst = std::move(fixture.source);
+
+    fixture.verify_content_deep_moved(dst);
+    // The elements of the source are still alive as moved-from objects, so the copies in dst must go first.
+    dst.clear();
+    fixture.verify_no_undestroyed_foo_left_and_dismiss();
+}
+
 #define REQUIRE_THROW_EXCEPTION(expr, exception_type)            \
         try {                                                    \
             expr;                                                \
@@ -813,6 +902,10 @@ void test_move_assignment() {
     test_move_assignment_POCMA_true_stateless_allocator<ContainerTraits>();
     test_move_assignment_POCMA_false_equal_allocator<ContainerTraits>();
     test_move_assignment_POCMA_false_unequal_allocator<ContainerTraits>();
+    test_move_assignment_to_non_empty_POCMA_true_stateful_allocator<ContainerTraits>();
+    test_move_assignment_to_non_empty_POCMA_true_stateless_allocator<ContainerTraits>();
+    test_move_assignment_to_non_empty_POCMA_false_equal_allocator<ContainerTraits>();
+    test_move_assignment_to_non_empty_POCMA_false_unequal_allocator<ContainerTraits>();
 }
 
 template<typename container_traits>
