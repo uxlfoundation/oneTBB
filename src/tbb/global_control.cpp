@@ -185,14 +185,18 @@ std::size_t global_control_active_value_unsafe(d1::global_control::parameter par
     return controls[param]->active_value_unsafe();
 }
 
+std::size_t global_control_active_value_unchecked(d1::global_control::parameter param) {
+    return controls[param]->active_value();
+}
+
 //! Comparator for a set of global_control objects
 inline bool control_storage_comparator::operator()(const d1::global_control* lhs, const d1::global_control* rhs) const {
-    __TBB_ASSERT_RELEASE(lhs->my_param < d1::global_control::parameter_max , nullptr);
+    __TBB_ASSERT(lhs->my_param < d1::global_control::parameter_max , nullptr);
     return lhs->my_value < rhs->my_value || (lhs->my_value == rhs->my_value && lhs < rhs);
 }
 
 bool terminate_on_exception() {
-    return d1::global_control::active_value(d1::global_control::terminate_on_exception) == 1;
+    return get_active_value<global_control::terminate_on_exception>() == 1;
 }
 
 struct global_control_impl {
@@ -222,7 +226,7 @@ public:
     }
 
     static void destroy(d1::global_control& gc) {
-        __TBB_ASSERT_RELEASE(gc.my_param < d1::global_control::parameter_max, nullptr);
+        __TBB_ASSERT(gc.my_param < d1::global_control::parameter_max, nullptr);
         control_storage* const c = controls[gc.my_param];
         // Concurrent reading and changing global parameter is possible.
         spin_mutex::scoped_lock lock(c->my_list_mutex);
