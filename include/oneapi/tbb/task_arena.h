@@ -661,12 +661,6 @@ inline int current_thread_index() {
     return idx == slot_id(-1) ? task_arena_base::not_initialized : int(idx);
 }
 
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-inline bool is_inside_task() {
-    return nullptr != current_context();
-}
-#endif //__TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-
 //! Returns the maximal number of threads that can work inside the arena
 inline int max_concurrency() {
     return r1::max_concurrency(nullptr);
@@ -715,10 +709,6 @@ inline namespace v1 {
 using detail::d1::task_arena;
 using detail::d1::attach;
 using detail::d1::create_numa_task_arenas;
-
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-using detail::d1::is_inside_task;
-#endif
 
 namespace this_task_arena {
 using detail::d1::current_thread_index;
