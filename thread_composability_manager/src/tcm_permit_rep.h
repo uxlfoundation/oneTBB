@@ -9,28 +9,23 @@
 #define __TCM_PERMIT_REP_HEADER
 
 #include <atomic>
-#include <cstdint>
 #include <cstddef>
-
+#include <cstdint>
 #include <memory>
 #include <mutex>
+#include <stack>
 #include <unordered_set>
-#include <vector>
 
 #include "tcm/types.h"
 
 namespace tcm {
 namespace internal {
 
-// Lock order: permit_registrations_t::mutex, then thread_registration_data_t::mutex.
 struct thread_registration_data_t {
   std::mutex mutex;
-  // Stack of permits with which a thread has been registered. Released permits are replaced with
-  // nullptr so that the matching tcmUnregisterThread call still pops the right entry.
-  std::vector<tcm_permit_handle_t> permits;
+  std::stack<tcm_permit_handle_t> permits; // Permits with which a thread is registered.
 
-  std::unordered_set<std::size_t> seen; // Previous permits with which this thread once has been
-                                        // registered.
+  std::unordered_set<std::size_t> seen; // Permits this thread has been once registered with.
 };
 
 struct permit_registrations_t {
