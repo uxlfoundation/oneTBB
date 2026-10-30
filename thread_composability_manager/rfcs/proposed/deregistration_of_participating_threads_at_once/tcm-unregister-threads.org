@@ -1,0 +1,114 @@
+#+TITLE: Unregister threads participating in a permit with a single function invocation
+
+* Introduction
+
+  TCM API contains =tcmUnregisterThread()= function that allows unregistering the thread invoking
+  that function from the last permit, previously registered with the call to
+  =tcmRegisterThread(permit_handle)=.
+
+  For some parallel runtimes this is inconvenient as it requires additional synchronization between
+  working threads, especially if there is difference in responsibilities between participating and
+  work coordinating threads.
+
+  Therefore, the motivation is to introduce new TCM function that would allow a single thread to
+  unregister from specific permit all the participating threads, i.e. those that were previously
+  registered with the permit by invoking =tcmRegisterThread(permit_handle)=.
+
+* Proposal
+
+  Introduce new API function to allow deregistration of all the threads registered with specific
+  permit.
+
+  API signature:
+
+  #+begin_src C++
+    tcm_result_t tcmUnregisterThreads(tcm_permit_handle_t permit_handle)
+  #+end_src
+
+  /Parameters/:
+  - =permit_handle= denotes the handle of the permit with which previously registered threads to be
+    deregistered.
+
+
+  /Return values/:
+  - =TCM_RESULT_ERROR_INVALID_ARGUMENT= if the passed =permit_handle= is =nullptr=.
+  - =TCM_RESULT_PERMIT_MISMATCH= if at least for one of the threads the deepest permit, with which
+    it was registered, is not equal to the passed =permit_handle=. In this case, such threads are
+    not unregistered.
+  - =TCM_RESULT_SUCCESS= in case of successful function invocation.
+
+
+  /Semantics/: The effect of the function invocation is identical to the situation when all the
+  threads, whose most recent registration was with the given permit, invoke =tcmUnregisterThread()=
+  on their own, where =tcmUnregisterThread()= makes the thread invoking this function to be
+  registered in one permit less.
+
+
+  /Usage Expectations/Requirements/:
+  - Threads that previously registered with a given permit do not call =tcmUnregisterThread()= after
+    a call to =tcmUnregisterThreads(tcm_permit_handle_t)= is made. Calling =tcmUnregisterThread()=
+    in such situation will attempt to unregister the thread from the previous permit, not the one
+    passed to =tcmUnregisterThreads=.
+  - The thread cannot be simultaneously registered with the same =permit_handle= more than once.
+  - Thread registration cannot outlive the permit handle with which it is registered.
+
+
+  /Important usage scenarios whose performance needs to be tracked/:
+  - Loop with many iterations of =tcmRegisterThread(permit_handle)= and
+    =tcmUnregisterThreads(permit_handle)= calls.
+
+    Pseudocode example:
+    #+begin_src C++
+      loop {
+          participating_thread_routine {
+              tcmRegisterThread(permit_handle); // Each participating thread calls
+          }
+
+          // barrier synchronization for threads to finish with registration
+
+          primary_thread_routine {
+              tcmUnregisterThreads(permit_handle);
+          }
+
+          // barrier synchronization for threads to wait for their deregistration by a primary thread
+      }
+    #+end_src
+
+  - The same loop as above, but threads are re-created at each iteration of the loop.
+  
+* Open Questions
+  
+  1. Are there any other usage scenarios need to be supported?
+
+     - It might be useful to support the scenario when runtime calls the new
+       =tcmUnregisterThreads(permit_handle)= API and API for individual deregistration of a thread
+       simultaneously. The existing =tcmUnregisterThread()= is not suitable for this as it
+       unregisters the calling thread unconditionally, which in concurrent environment might end up
+       unregistering a thread from wrong permit. The new API should be able to either indicate the
+       permit handle from which a thread, calling it, unregisters (so that wrong deregistration can
+       be reverted with an immediate =tcmRegisterThread= invocation) or should not unregister a
+       thread if its most recent registration mismatches the expected one.
+
+       API of a function that returns a permit handle from which a thread unregisters itself could
+       look something like:
+       #+begin_src C++
+         /**
+          ,* Unregisters calling thread from the deepest permit with which it is registered.
+          ,*
+          ,* Params:
+          ,*
+          ,*  - permit_handle_ptr - pointer to tcm_permit_handle_t. Gets written with the value of permit
+          ,*                        handle, from which the calling thread has been unregistered.
+          ,*
+          ,* Returns:
+          ,*
+          ,* - TCM_RESULT_SUCCESS - if deregistration was successful and the argument is updated.
+          ,*
+          ,* - TCM_RESULT_ERROR_INVALID_OPERATION - if the calling thread is not registered with any permit.
+          ,*
+          ,* - TCM_RESULT_ERROR_INVALID_ARGUMENT - if passed argument is nullptr.
+          ,*
+          ,* - TCM_RESULT_ERROR_INVALID_ARGUMENT - if derefenced argument is non-nullptr.
+          ,*/
+         tcm_result_t tcmUnregisterThreadReturningHandle(tcm_permit_handle_t* permit_handle_ptr);
+       #+end_src
