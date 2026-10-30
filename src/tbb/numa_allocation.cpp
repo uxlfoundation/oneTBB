@@ -78,14 +78,7 @@ static const dynamic_link_descriptor LibnumaLinkTable[] = {
     DLD(numa_interleave_memory, numa_interleave_memory_ptr)
 };
 #elif _WIN32 || _WIN64
-static PVOID (*VirtualAlloc2_ptr)(HANDLE Process,
-  PVOID                  BaseAddress,
-  SIZE_T                 Size,
-  ULONG                  AllocationType,
-  ULONG                  PageProtection,
-  MEM_EXTENDED_PARAMETER *ExtendedParameters,
-  ULONG                  ParameterCount
-);
+static decltype(&VirtualAlloc2) VirtualAlloc2_ptr = nullptr;
 
 static const dynamic_link_descriptor LibnumaLinkTable[] = {
     DLD(VirtualAlloc2, VirtualAlloc2_ptr)
