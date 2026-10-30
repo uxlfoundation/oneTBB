@@ -81,12 +81,16 @@
   1. Are there any other usage scenarios need to be supported?
 
      - It might be useful to support the scenario when runtime calls the new
-       =tcmUnregisterThreads(permit_handle)= API and the old =tcmUnregisterThread()= simultaneously
-       in an attempt to make sure a thread is unregistered from a certain =permit_handle=. To be
-       able to determine from which permit a thread has unregistered itself, the new API could be
-       proposed.
+       =tcmUnregisterThreads(permit_handle)= API and API for individual deregistration of a thread
+       simultaneously. The existing =tcmUnregisterThread()= is not suitable for this as it
+       unregisters the calling thread unconditionally, which in concurrent environment might end up
+       unregistering a thread from wrong permit. The new API should be able to either indicate the
+       permit handle from which a thread, calling it, unregisters (so that wrong deregistration can
+       be reverted with an immediate =tcmRegisterThread= invocation) or should not unregister a
+       thread if its most recent registration mismatches the expected one.
 
-       API of such a function could look something like:
+       API of a function that returns a permit handle from which a thread unregisters itself could
+       look something like:
        #+begin_src C++
          /**
           ,* Unregisters calling thread from the deepest permit with which it is registered.
