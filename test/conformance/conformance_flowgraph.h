@@ -42,6 +42,12 @@ template<typename Input, typename Output = Input>
 using async_ports_t =
       typename oneapi::tbb::flow::async_node<Input, Output>::gateway_type;
 
+#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
+template<typename Input, typename Output = Input>
+using resource_limited_ports_t =
+      typename oneapi::tbb::flow::resource_limited_node<Input, std::tuple<Output>>::output_ports_type;
+#endif
+
 template<bool DefaultConstructible, bool CopyConstructible, bool CopyAssignable>
 struct message {
     int data;
@@ -168,6 +174,15 @@ struct track_first_id_functor {
     void operator()( InputType, multifunc_ports_t<InputType, OutputType>& op ) {
         std::get<0>(op).try_put(operator()(OutputType(0)));
     }
+
+#if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
+    template<typename InputType, typename ResourceHandle, typename... ResourceHandles>
+    void operator()( InputType, resource_limited_ports_t<InputType, OutputType>& op,
+                     ResourceHandle&, ResourceHandles&... )
+    {
+        std::get<0>(op).try_put(operator()(OutputType(0)));
+    }
+#endif
 };
 
 template<typename OutputType>

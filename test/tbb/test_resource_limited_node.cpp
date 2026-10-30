@@ -340,7 +340,7 @@ public:
     }
 
     request_id request(std::uint64_t counter_value) {
-        request_id id{counter_value};
+        request_id id{counter_value, tbb::flow::no_priority};
         m_limiter.request(*this, id);
         return id;
     }
@@ -532,7 +532,7 @@ public:
     }
 
     request_id request(std::size_t which, std::uint64_t counter_value) {
-        request_id id{counter_value};
+        request_id id{counter_value, tbb::flow::no_priority};
         m_limiters[which]->request(*this, id);
         return id;
     }
@@ -1198,4 +1198,166 @@ void test_rerequesting_with_resource_limiter() {
 TEST_CASE("Test re-requesting the resources when acquisition fails") {
     test_denying_provider();
     test_rerequesting_with_resource_limiter();
+}
+
+class registration_tracking_limiter : public oneapi::tbb::flow::resource_limiter<int> {
+    using base_type = oneapi::tbb::flow::resource_limiter<int>;
+    using request_id = tbb::detail::d2::request_id;
+public:
+    using base_type::base_type;
+
+    void request(consumer_type& consumer, request_id id) override {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        base_type::request(consumer, id);
+        ++m_outstanding[&consumer];
+    }
+
+    optional_type acquire(consumer_type& consumer, request_id id) override {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        optional_type handle = base_type::acquire(consumer, id);
+        remove_noted_request(consumer);
+        return handle;
+    }
+
+    void withdraw(consumer_type& consumer, request_id id) override {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        base_type::withdraw(consumer, id);
+        remove_noted_request(consumer);
+    }
+
+    std::size_t num_waiting_consumers() {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return m_outstanding.size();
+    }
+
+private:
+    void remove_noted_request(consumer_type& consumer) {
+        auto it = m_outstanding.find(&consumer);
+        if (it != m_outstanding.end() && --it->second == 0) {
+            m_outstanding.erase(it);
+        }
+    }
+
+    std::mutex                                             m_mutex;
+    std::unordered_map<consumer_type*, std::size_t>        m_outstanding;
+};
+
+void test_priorities_with_unlimited_resources() {
+    using namespace tbb::flow;
+
+    tbb::global_control ctx(tbb::global_control::max_allowed_parallelism, 1);
+
+    using node_type = resource_limited_node<int, std::tuple<int>>;
+
+    int resource_value = 1;
+    constexpr std::size_t num_resources = 1000;
+
+    std::vector<int> resources_initializer(num_resources, resource_value);
+    resource_limiter<int> limiter(resources_initializer);
+
+    conformance::test_priority<node_type, int>(unlimited, std::tie(limiter));
+}
+
+void test_priorities_with_single_resource() {
+    using namespace tbb::flow;
+
+    // The submitter body below occupies a thread while the requests it produces are registered
+    // from other threads
+    if (tbb::this_task_arena::max_concurrency() < 2) return;
+
+    graph g;
+
+    using submitter_node_type = resource_limited_node<int, std::tuple<int, int, int>>;
+    using consumer_node_type = resource_limited_node<int, std::tuple<>>;
+
+    int resource_value = 1;
+    registration_tracking_limiter provider{resource_value};
+
+    struct map_entry {
+        bool low_priority_node_executed = false;
+        bool medium_priority_node_executed = false;
+        bool high_priority_node_executed = false;
+    };
+
+    // Nodes below share the single resource and only access the map while holding the resource
+    // So no mutex is needed to access it 
+    std::unordered_map<int, map_entry> execution_info;
+
+    submitter_node_type submitter(g, serial, std::tie(provider),
+        [&](int value, submitter_node_type::output_ports_type& ports, int resource) {
+            CHECK(resource == resource_value);
+            // Port1 is a low priority node, port2 is a medium priority node, port3 is a high priority node
+            std::get<0>(ports).try_put(value);
+            std::get<1>(ports).try_put(value);
+            std::get<2>(ports).try_put(value);
+            // try_put only spawns the tasks that form the requests. Keep holding the only
+            // resource until all three nodes are waiting for it, otherwise whichever of them
+            // registers while the resource is free is served immediately, bypassing arbitration.
+            utils::SpinWaitWhile([&] { return provider.num_waiting_consumers() < 3; });
+        });
+
+    consumer_node_type low_priority_node(g, unlimited, std::tie(provider),
+        [&](int value, consumer_node_type::output_ports_type&, int resource) {
+            CHECK(resource == resource_value);
+
+            auto& value_execution_info = execution_info[value];
+            CHECK_MESSAGE(!value_execution_info.low_priority_node_executed, "Duplicated inputs");
+            CHECK_MESSAGE(value_execution_info.medium_priority_node_executed,
+                          "Low priority node got the resource before the medium priority one");
+            CHECK_MESSAGE(value_execution_info.high_priority_node_executed,
+                          "Low priority node got the resource before the high priority one");
+            value_execution_info.low_priority_node_executed = true;
+        }, /*priority = */node_priority_t(1));
+
+    consumer_node_type medium_priority_node(g, unlimited, std::tie(provider),
+        [&](int value, consumer_node_type::output_ports_type&, int resource) {
+            CHECK(resource == resource_value);
+
+            auto& value_execution_info = execution_info[value];
+            CHECK_MESSAGE(!value_execution_info.medium_priority_node_executed, "Duplicated inputs");
+            CHECK_MESSAGE(!value_execution_info.low_priority_node_executed,
+                          "Low priority node got the resource before the medium priority one");
+            CHECK_MESSAGE(value_execution_info.high_priority_node_executed,
+                          "Medium priority node got the resource before the high priority one");
+            value_execution_info.medium_priority_node_executed = true;
+        }, /*priority = */node_priority_t(2));
+
+    consumer_node_type high_priority_node(g, unlimited, std::tie(provider),
+        [&](int value, consumer_node_type::output_ports_type&, int resource) {
+            CHECK(resource == resource_value);
+            
+            auto& value_execution_info = execution_info[value];
+            CHECK_MESSAGE(!value_execution_info.high_priority_node_executed, "Duplicated inputs");
+            CHECK_MESSAGE(!value_execution_info.low_priority_node_executed,
+                          "Low priority node got the resource before the high priority one");
+            CHECK_MESSAGE(!value_execution_info.medium_priority_node_executed,
+                          "Medium priority node got the resource before the high priority one");
+            value_execution_info.high_priority_node_executed = true;
+        }, /*priority = */node_priority_t(3));
+
+    make_edge(output_port<0>(submitter), low_priority_node);
+    make_edge(output_port<1>(submitter), medium_priority_node);
+    make_edge(output_port<2>(submitter), high_priority_node);
+
+    int num_inputs = 10;
+    for (int i = 0; i < num_inputs; ++i) {
+        submitter.try_put(i);
+    }
+    g.wait_for_all();
+
+    CHECK_MESSAGE(execution_info.size() == num_inputs, "Some inputs were not executed");
+    for (auto& value_execution_info : execution_info) {
+        CHECK_MESSAGE(value_execution_info.second.low_priority_node_executed,
+                      "Some inputs were not executed");
+        CHECK_MESSAGE(value_execution_info.second.medium_priority_node_executed,
+                      "Some inputs were not executed");
+        CHECK_MESSAGE(value_execution_info.second.high_priority_node_executed,
+                      "Some inputs were not executed");
+    }
+}
+
+//! \brief \ref interface \ref requirement
+TEST_CASE("resource_limited_node priorities") {
+    test_priorities_with_unlimited_resources();
+    test_priorities_with_single_resource();
 }
