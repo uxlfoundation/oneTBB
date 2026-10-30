@@ -158,6 +158,20 @@ function.
 This API is meant to be called by every thread that is going to participate in a parallel region,
 for which the resource permit was obtained.
 
+There is an alternative :code:`tcmUnregisterThreads` function that allows to unregister all
+previously registered threads with the given permit handle by a single invocation.
+
+.. code:: cpp
+
+    tcm_result_t tcmUnregisterThreads(tcm_permit_handle_t permit_handle)
+
++-----------------------+--------+----------------------------------------------------------------+
+| Parameter             | Type   | Description                                                    |
++=======================+========+================================================================+
+| :code:`permit_handle` | In     | Descriptor of the granted resources from which registered      |
+|                       |        | threads are to be unregistered.                                |
++-----------------------+--------+----------------------------------------------------------------+
+
 Idling, Activating and Deactivating a Permit
 ********************************************
 
@@ -289,7 +303,7 @@ The :code:`tcm_result_t` enum defines a set of possible values that the TCM API 
 .. code:: cpp
 
     typedef enum _tcm_result_t {
-      TCM_RESULT_SUCCESS,
+      TCM_RESULT_SUCCESS = implementation-defined,
       TCM_RESULT_ERROR_INVALID_ARGUMENT,
       TCM_RESULT_ERROR_UNKNOWN
     } tcm_result_t;
@@ -304,6 +318,10 @@ The :code:`tcm_result_t` enum defines a set of possible values that the TCM API 
 +-------------------------------------------+---------------------------------------------------+
 | :code:`TCM_RESULT_ERROR_UNKNOWN`          | Indicates erroneous situation during the function |
 |                                           | execution.                                        |
++-------------------------------------------+---------------------------------------------------+
+| :code:`TCM_RESULT_PERMIT_MISMATCH`        | Indicates that the permit handle passed to the    |
+|                                           | function does not correspond to the permit handle |
+|                                           | found during function execution.                  |
 +-------------------------------------------+---------------------------------------------------+
 
 Permit State
