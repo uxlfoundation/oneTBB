@@ -1,0 +1,1870 @@
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>TCM API Reference &#8212; oneTBB 2023.2.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=64cc4de3f052d77215f0" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=64cc4de3f052d77215f0" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/sphinx-book-theme.css?v=4418a689" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../_static/theme_overrides.css?v=99c8f478" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="../_static/scripts/fontawesome.js?digest=64cc4de3f052d77215f0"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=64cc4de3f052d77215f0" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=64cc4de3f052d77215f0" />
+
+    <script src="../_static/documentation_options.js?v=56c42811"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/scripts/sphinx-book-theme.js?v=fab101a9"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tcm/api_reference';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <script src="../_static/custom.js?v=a8e4a423"></script>
+    <link rel="icon" href="../_static/favicons.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="prev" title="TCM Developer Guide" href="developer_guide.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="2023.2.0" />
+  
+    
+    <script src="../_static/searchtools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <script src="../searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/oneAPI-rgb-rev-100.png" class="logo__image only-light" alt=""/>
+    <img src="../_static/oneAPI-rgb-rev-100.png" class="logo__image only-dark pst-js-only" alt=""/>
+  
+  
+    <p class="title logo__title">oneTBB 2023.2.0 Documentation</p>
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+<button type="button" class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">About</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../main/intro/help_support.html">Getting Help and Support</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../main/intro/notation.html">Notational Conventions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../main/intro/intro_os.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../main/intro/Benefits.html">oneTBB Benefits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../main/intro/testing_approach.html">Testing Approach</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../main/intro/limitations.html">Known Limitations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../main/intro/static_linking.html">Static Linking of oneTBB</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../main/intro/api_abi_changes.html">API and ABI Change Log</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../main/intro/legal_notices_and_disclaimers.html">Legal Notices and Disclaimers</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Get Started</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="../GSG/get_started.html">Get Started with oneAPI Threading Building Blocks (oneTBB)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../GSG/system_requirements.html">System Requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../GSG/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../GSG/next_steps.html">Next Steps</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../GSG/integrate.html">Integrate oneTBB</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../GSG/samples.html">oneTBB Samples</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Developer Guide</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../main/tbb_userguide/title.html">oneTBB Developer Guide</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/tbb_userguide/Package_Contents_os.html">Package Contents</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Debug_Versus_Release_Libraries.html">Debug Versus Release Libraries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Scalable_Memory_Allocator.html">Scalable Memory Allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Windows_OS_ug.html">Windows*</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Linux_OS.html">Linux*</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Mac_OS.html">macOS*</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/tbb_userguide/Parallelizing_Simple_Loops_os.html">Parallelizing Simple Loops</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Initializing_and_Terminating_the_Library.html">Initializing and Terminating the Library</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/tbb_userguide/parallel_for_os.html">parallel_for</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Lambda_Expressions.html">Lambda Expressions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Automatic_Chunking.html">Automatic Chunking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Controlling_Chunking_os.html">Controlling Chunking</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Bandwidth_and_Cache_Affinity_os.html">Bandwidth and Cache Affinity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Partitioner_Summary.html">Partitioner Summary</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/tbb_userguide/parallel_reduce.html">parallel_reduce</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Advanced_Example.html">Advanced Example</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/rvalue_reduce.html">Use of r-Values for Reduction</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Advanced_Topic_Other_Kinds_of_Iteration_Spaces.html">Advanced Topic: Other Kinds of Iteration Spaces</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/tbb_userguide/Parallelizing_Complex_Loops.html">Parallelizing Complex Loops</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Cook_Until_Done_parallel_do.html">Cook Until Done: parallel_for_each</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/tbb_userguide/Working_on_the_Assembly_Line_pipeline.html">Working on the Assembly Line: parallel_pipeline</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Using_Circular_Buffers.html">Using Circular Buffers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Throughput_of_pipeline.html">Throughput of pipeline</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Non-Linear_Pipelines.html">Non-Linear Pipelines</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Summary_of_Loops_and_Pipelines.html">Summary of Loops and Pipelines</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/tbb_userguide/Parallelizing_with_Tasks.html">Parallelizing with Tasks</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/creating_tasks_with_parallel_invoke.html">Creating Tasks with parallel_invoke</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/creating_tasks_with_task_group.html">Creating Tasks with task_group</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/task_group_thread_safety.html">task_group Thread Safety</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/tbb_userguide/Flow_Graph.html">Parallelizing Data Flow and Dependence Graphs</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Parallelizing_Flow_Graph.html">Parallelizing Data Flow and Dependency Graphs</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/tbb_userguide/Basic_Flow_Graph_concepts.html">Basic Flow Graph Concepts</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Graph_Object.html">Flow Graph Basics: Graph Object</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Nodes.html">Flow Graph Basics: Nodes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Edges.html">Flow Graph Basics: Edges</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Mapping_Nodes2Tasks.html">Flow Graph Basics: Mapping Nodes to Tasks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Flow_Graph_Message_Passing_Protocol.html">Flow Graph Basics: Message Passing Protocol</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Flow_Graph_Single_Vs_Broadcast.html">Flow Graph Basics: Single-push vs. Broadcast-push</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Flow_Graph_Buffering_in_Nodes.html">Flow Graph Basics: Buffering and Forwarding</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Flow_Graph_Reservation.html">Flow Graph Basics: Reservation</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/tbb_userguide/Graph_Main_Categories.html">Graph Application Categories</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Data_Flow_Graph.html">Data Flow Graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Dependence_Graph.html">Dependence Graph</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Predefined_Node_Types.html">Predefined Node Types</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/tbb_userguide/Flow_Graph_Tips.html">Flow Graph Tips and Tricks</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Flow-Graph-waiting-tips.html">Flow Graph Tips for Waiting for and Destroying a Flow Graph</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Flow_Graph_making_edges_tips.html">Flow Graph Tips on Making Edges</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Flow_Graph_nested_parallelism_tips.html">Flow Graph Tips on Nested Parallelism</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Flow_Graph_resource_tips.html">Flow Graph Tips for Limiting Resource Consumption</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Flow-Graph-exception-tips.html">Flow Graph Tips for Exception Handling and Cancellation</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/estimate_flow_graph_performance.html">Estimating Flow Graph Performance</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/fg_ctad.html">Class Template Argument Deduction for Flow Graph Nodes</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../main/tbb_userguide/work_isolation.html">Work Isolation</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/tbb_userguide/Exceptions_and_Cancellation.html">Exceptions and Cancellation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Cancellation_Without_An_Exception.html">Cancellation Without An Exception</a></li>
+
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Cancellation_and_Nested_Parallelism.html">Cancellation and Nested Parallelism</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../main/tbb_userguide/Floating_Point_Settings.html">Floating-point Settings</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/tbb_userguide/Containers.html">Containers</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/tbb_userguide/concurrent_hash_map.html">concurrent_hash_map</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/More_on_HashCompare.html">More on HashCompare</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/concurrent_vector_ug.html">concurrent_vector</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/tbb_userguide/Concurrent_Queue_Classes.html">Concurrent Queue Classes</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/Iterating_Over_a_Concurrent_Queue_for_Debugging.html">Iterating Over a Concurrent Queue for Debugging</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/tbb_userguide/When_Not_to_Use_Queues.html">When Not to Use Queues</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Summary_of_Containers.html">Summary of Containers</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/tbb_userguide/Mutual_Exclusion.html">Mutual Exclusion</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Mutex_Flavors.html">Mutex Flavors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Reader_Writer_Mutexes.html">Reader Writer Mutexes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/UpgradeDowngrade.html">Upgrade/Downgrade</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Lock_Pathologies.html">Lock Pathologies</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../main/tbb_userguide/Timing.html">Timing</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/tbb_userguide/Memory_Allocation.html">Memory Allocation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Which_Dynamic_Libraries_to_Use.html">Which Dynamic Libraries to Use</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Allocator_Configuration.html">Configuring the Memory Allocator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/tbb_userguide/The_Task_Scheduler.html">The Task Scheduler</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Task-Based_Programming.html">Task-Based Programming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/When_Task-Based_Programming_Is_Inappropriate.html">When Task-Based Programming Is Inappropriate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/How_Task_Scheduler_Works.html">How Task Scheduler Works</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Task_Scheduler_Bypass.html">Task Scheduler Bypass</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Guiding_Task_Scheduler_Execution.html">Guiding Task Scheduler Execution</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/tbb_userguide/design_patterns/Design_Patterns.html">Design Patterns</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/design_patterns/Agglomeration.html">Agglomeration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/design_patterns/Elementwise.html">Elementwise</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/design_patterns/Odd-Even_Communication.html">Odd-Even Communication</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/design_patterns/Wavefront.html">Wavefront</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/design_patterns/Reduction.html">Reduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/design_patterns/Divide_and_Conquer.html">Divide and Conquer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/design_patterns/GUI_Thread.html">GUI Thread</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/design_patterns/Non-Preemptive_Priorities.html">Non-Preemptive Priorities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/design_patterns/Lazy_Initialization.html">Lazy Initialization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/design_patterns/Local_Serializer.html">Local Serializer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/design_patterns/Fenced_Data_Transfer.html">Fenced Data Transfer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/design_patterns/Reference_Counting.html">Reference Counting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/design_patterns/General_References.html">General References</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/tbb_userguide/Migration_Guide.html">Migrating from Threading Building Blocks (TBB)</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Migration_Guide/Task_Scheduler_Init.html">Migrating from tbb::task_scheduler_init</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Migration_Guide/Task_API.html">Migrating from low-level task API</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/tbb_userguide/Migration_Guide/Mixing_Two_Runtimes.html">Mixing two runtimes</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../main/tbb_userguide/Constraints.html">Constrained APIs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../main/tbb_userguide/std_invoke.html">Invoke a Callable Object</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../main/tbb_userguide/cxx20_modules_support.html">C++20 Modules Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../main/tbb_userguide/appendix_A.html">Appendix A Costs of Time Slicing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../main/tbb_userguide/appendix_B.html">Appendix B Mixing With Other Threading Packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../main/tbb_userguide/References.html">References</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Developer Reference</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../main/reference/source/index.html">oneTBB API Reference</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../main/reference/source/identifiers.html">Identifiers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../main/reference/source/thread_safety.html">Thread Safety</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../main/reference/source/headers_and_modules.html">Headers and Modules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../main/reference/source/preview_features.html">Preview Features</a></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/reference/source/named_requirements.html">Named Requirements</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/algorithms/range.html">Range</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/algorithms/splittable.html">Splittable</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/algorithms/par_for_body.html">ParallelForBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/algorithms/par_for_func.html">ParallelForFunc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/algorithms/par_for_index.html">ParallelForIndex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/algorithms/par_reduce_body.html">ParallelReduceBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/algorithms/par_reduce_func.html">ParallelReduceFunc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/algorithms/par_reduce_reduction.html">ParallelReduceReduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/algorithms/par_for_each_body.html">ParallelForEachBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/algorithms/container_based_sequence.html">ContainerBasedSequence</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/algorithms/par_scan_body.html">ParallelScanBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/algorithms/par_scan_combine.html">ParallelScanCombine</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/algorithms/par_scan_func.html">ParallelScanFunc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/algorithms/blocked_range_val.html">BlockedRangeValue</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/algorithms/filter_body.html">FilterBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/mutexes/mutex.html">Mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/mutexes/rw_mutex.html">ReaderWriterMutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/containers/hash_compare.html">HashCompare</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/containers/container_range.html">ContainerRange</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/task_scheduler/suspend_func.html">SuspendFunc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/flow_graph/async_node_body.html">AsyncNodeBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/flow_graph/continue_node_body.html">ContinueNodeBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/flow_graph/gateway_type.html">GatewayType</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/flow_graph/function_node_body.html">FunctionNodeBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/flow_graph/join_node_func_obj.html">JoinNodeFunctionObject</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/flow_graph/input_node_body.html">InputNodeBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/flow_graph/multifunction_node_body.html">MultifunctionNodeBody</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/flow_graph/sequencer.html">Sequencer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/named_requirements/flow_graph/resource_limited_node_body.html">ResourceLimitedNodeBody (preview)</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/reference/source/configuration.html">Configuration</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/configuration/namespaces.html">Namespaces</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/configuration/version_information.html">Version Information</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/configuration/enabling_debugging_features.html">Enabling Debugging Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/configuration/custom_assertion_handler.html">Custom Assertion Handler</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/configuration/feature_macros.html">Feature Macros</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/configuration/feature_test_macros.html">Feature-test Macros</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/configuration/feature_test_macros_changelog.html">Changelog for Feature-test Macros</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/reference/source/algorithms.html">Algorithms</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/algorithms/functions/collaborative_call_once_func.html">collaborative_call_once</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/algorithms/functions/collaborative_once_flag_cls.html">collaborative_once_flag</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/algorithms/functions/parallel_for_func.html">parallel_for</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/algorithms/functions/parallel_reduce_func.html">parallel_reduce</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/algorithms/functions/parallel_deterministic_reduce_func.html">parallel_deterministic_reduce</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/algorithms/functions/parallel_scan_func.html">parallel_scan</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/algorithms/functions/pre_scan_tag_and_final_scan_tag_clses.html">pre_scan_tag and final_scan_tag</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/algorithms/functions/parallel_for_each_func.html">parallel_for_each</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/algorithms/functions/feeder.html">feeder</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/algorithms/functions/parallel_invoke_func.html">parallel_invoke</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/algorithms/functions/parallel_pipeline_func.html">parallel_pipeline</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/algorithms/functions/parallel_pipeline_func/filter_cls.html">filter</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/algorithms/functions/parallel_pipeline_func/flow_control_cls.html">flow_control</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/algorithms/functions/parallel_sort_func.html">parallel_sort</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/algorithms/blocked_ranges/blocked_range_cls.html">blocked_range</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/algorithms/blocked_ranges/blocked_range2d_cls.html">blocked_range2d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/algorithms/blocked_ranges/blocked_range3d_cls.html">blocked_range3d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/algorithms/blocked_ranges/blocked_nd_range_cls.html">blocked_nd_range</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/algorithms/partitioners/auto_partitioner.html">auto_partitioner</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/algorithms/partitioners/affinity_partitioner.html">affinity_partitioner</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/algorithms/partitioners/static_partitioner.html">static_partitioner</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/algorithms/partitioners/simple_partitioner.html">simple_partitioner</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/algorithms/split_tags/proportional_split_cls.html">proportional split</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/algorithms/split_tags/split_cls.html">split</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/reference/source/flow_graph.html">Flow Graph</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/flow_graph/graph_cls.html">graph</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/flow_graph/reset_flags_enum.html">reset_flags Enumeration</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/graph_node_cls.html">graph_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/sender.html">sender</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/receiver.html">receiver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/forwarding_and_buffering.html">Forwarding and Buffering</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/continue_node_cls.html">continue_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/func_node_cls.html">function_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/input_node_cls.html">input_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/multifunc_node_cls.html">multifunction_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/async_node_cls.html">async_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/functional_node_policies.html">Function Nodes Policies</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/node_priorities.html">Nodes Priorities</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/predefined_concurrency_limits.html">Predefined Concurrency Limits</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/copy_body_func.html">copy_body</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/overwrite_node_cls.html">overwrite_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/write_once_node_cls.html">write_once_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/buffer_node_cls.html">buffer_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/queue_node_cls.html">queue_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/priority_queue_node_cls.html">priority_queue_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/sequencer_node_cls.html">sequencer_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/limiter_node_cls.html">limiter_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/broadcast_node_cls.html">broadcast_node</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/flow_graph/join_node_cls.html">join_node</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/flow_graph/join_node_policies.html">join_node Policies</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/type_specified_message_keys.html">Type-specified message keys for join_node (preview)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/split_node_cls.html">split_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/indexer_node_cls.html">indexer_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/composite_node_cls.html">composite_node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/input_port_func.html">input_port</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/output_port_func.html">output_port</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/make_edge_func.html">make_edge</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/remove_edge_func.html">remove_edge</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/continue_msg_cls.html">continue_msg</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/tagged_msg_cls.html">tagged_msg</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/flow_graph/resource_limiting.html">Resource Limiting in the Flow Graph (preview)</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/flow_graph/resource_limiting/resource_limiter_cls.html"><code class="docutils literal notranslate"><span class="pre">resource_limiter</span></code> Class</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/flow_graph/resource_limiting/resource_limited_node_cls.html"><code class="docutils literal notranslate"><span class="pre">resource_limited_node</span></code> Class</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/flow_graph/helpers_for_expressing_graphs.html">Helper Functions for Expressing Graphs (preview)</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/flow_graph/helper_functions/constructors_for_nodes.html">Constructors for Flow Graph nodes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/flow_graph/helper_functions/follows_and_precedes_functions.html"><code class="docutils literal notranslate"><span class="pre">follows</span></code> and <code class="docutils literal notranslate"><span class="pre">precedes</span></code> functions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/flow_graph/helper_functions/make_node_set_function.html"><code class="docutils literal notranslate"><span class="pre">make_node_set</span></code> function</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/flow_graph/helper_functions/make_edges_function.html"><code class="docutils literal notranslate"><span class="pre">make_edges</span></code> function</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/waiting_for_single_message.html">Waiting for Single Messages in Flow Graph (preview)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/dependency_flow_graph_example.html">Dependency Flow Graph Example</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/flow_graph/message_flow_graph_example.html">Message Flow Graph Example</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/reference/source/task_scheduler.html">Task Scheduler</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/scheduling_controls/worker_retention.html">Worker Thread Retention</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/scheduling_controls/task_group_context_cls.html">task_group_context</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/scheduling_controls/global_control_cls.html">global_control</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/scheduling_controls/resumable_tasks.html">Resumable tasks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/scheduling_controls/task_scheduler_handle_cls.html">task_scheduler_handle</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/task_group/task_group_cls.html">task_group</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/task_group/task_group_status_enum.html">task_group_status</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/task_group/task_handle.html">task_handle</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/task_group/task_completion_handle.html">task_completion_handle Class (preview)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/task_group/task_bypass.html">Task Bypass Support for task_group (preview)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/task_group/dynamic_dependencies.html">task_group Dynamic Dependencies (preview)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/task_group/wait_single_task.html">Waiting for Individual Tasks in task_group (preview)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/task_arena/task_arena_cls.html">task_arena</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/task_arena/this_task_arena_ns.html">this_task_arena</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/task_arena/parallel_phase.html">parallel_phase</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/task_arena/task_scheduler_observer_cls.html">task_scheduler_observer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/task_arena/core_type_selector.html">Core Type Selector for Task Arena Constraints (preview)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/task_scheduler/attach_tag_type.html">attach tag type</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/reference/source/containers.html">Containers</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/containers/concurrent_vector_cls.html">concurrent_vector</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_vector_cls/construct_destroy_copy.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_vector_cls/concurrent_growth.html">Concurrent growth</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_vector_cls/element_access.html">Element access</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_vector_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_vector_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_vector_cls/unsafe_operations.html">Concurrently unsafe operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_vector_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_vector_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_vector_cls/non_member_lexicographical_comparisons.html">Non-member lexicographical comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_vector_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_vector_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/containers/concurrent_queue_cls.html">concurrent_queue</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_queue_cls/construct_destroy_copy.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_queue_cls/safe_member_functions.html">Concurrently safe member functions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_queue_cls/unsafe_member_functions.html">Concurrently unsafe member functions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_queue_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_queue_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_queue_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_queue_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/containers/concurrent_bounded_queue_cls.html">concurrent_bounded_queue</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_bounded_queue_cls/construct_destroy_copy.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_bounded_queue_cls/safe_member_functions.html">Concurrently safe member functions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_bounded_queue_cls/unsafe_member_functions.html">Concurrently unsafe member functions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_bounded_queue_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_bounded_queue_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_bounded_queue_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_bounded_queue_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/containers/concurrent_priority_queue_cls.html">concurrent_priority_queue</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_priority_queue_cls/construct_destroy_copy.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_priority_queue_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_priority_queue_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_priority_queue_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_priority_queue_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_priority_queue_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_priority_queue_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/containers/concurrent_hash_map_cls.html">concurrent_hash_map</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_hash_map_cls/accessors.html">accessor and const_accessor</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_hash_map_cls/construct_destroy_copy.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_hash_map_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_hash_map_cls/hash_policy.html">Hash policy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_hash_map_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_hash_map_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_hash_map_cls/modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_hash_map_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_hash_map_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_hash_map_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_hash_map_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_hash_map_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/containers/custom_mutex_chmap.html">Customizing the Mutex Type for concurrent_hash_map (preview)</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_map_cls.html">concurrent_unordered_map</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_map_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_map_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_map_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_map_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_map_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_map_cls/element_access.html">Element access</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_map_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_map_cls/bucket_interface.html">Bucket interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_map_cls/hash_policy.html">Hash policy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_map_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_map_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_map_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_map_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_map_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multimap.html">concurrent_unordered_multimap</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multimap_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multimap_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multimap_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multimap_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multimap_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multimap_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multimap_cls/bucket_interface.html">Bucket interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multimap_cls/hash_policy.html">Hash policy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multimap_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multimap_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multimap_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multimap_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multimap_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_set_cls.html">concurrent_unordered_set</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_set_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_set_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_set_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_set_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_set_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_set_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_set_cls/bucket_interface.html">Bucket interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_set_cls/hash_policy.html">Hash policy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_set_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_set_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_set_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_set_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_set_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multiset.html">concurrent_unordered_multiset</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multiset_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multiset_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multiset_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multiset_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multiset_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multiset_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multiset_cls/bucket_interface.html">Bucket interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multiset_cls/hash_policy.html">Hash policy</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multiset_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multiset_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multiset_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multiset_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_unordered_multiset_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/containers/concurrent_map_cls.html">concurrent_map</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_map_cls/value_compare_cls.html">value_compare</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_map_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_map_cls/element_access.html">Element access</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_map_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_map_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_map_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_map_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_map_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_map_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_map_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_map_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_map_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_map_cls/non_member_lexicographical_comparisons.html">Non-member lexicographical comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_map_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/containers/concurrent_multimap_cls.html">concurrent_multimap</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multimap_cls/value_compare_cls.html">value_compare</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multimap_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multimap_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multimap_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multimap_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multimap_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multimap_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multimap_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multimap_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multimap_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multimap_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multimap_cls/non_member_lexicographical_comparisons.html">Non-member lexicographical comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multimap_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/containers/concurrent_set_cls.html">concurrent_set</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_set_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_set_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_set_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_set_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_set_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_set_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_set_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_set_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_set_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_set_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_set_cls/non_member_lexicographical_comparisons.html">Non-member lexicographical comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_set_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/containers/concurrent_multiset_cls.html">concurrent_multiset</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multiset_cls/construction_destruction_copying.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multiset_cls/iterators.html">Iterators</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multiset_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multiset_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multiset_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multiset_cls/lookup.html">Lookup</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multiset_cls/observers.html">Observers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multiset_cls/parallel_iteration.html">Parallel iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multiset_cls/non_member_swap.html">Non-member swap</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multiset_cls/non_member_binary_comparisons.html">Non-member binary comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multiset_cls/non_member_lexicographical_comparisons.html">Non-member lexicographical comparisons</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/containers/concurrent_multiset_cls/deduction_guides.html">Deduction guides</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/containers/concurrent_lru_cache.html">concurrent_lru_cache (preview)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/containers/auxiliary/tbb_hash_compare_cls.html">tbb_hash_compare</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/containers/auxiliary/node_handles_cls.html">Node handles</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/reference/source/thread_local_storage.html">Thread Local Storage</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/thread_local_storage/combinable_cls.html">combinable</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/thread_local_storage/enumerable_thread_specific_cls.html">enumerable_thread_specific</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/thread_local_storage/enumerable_thread_specific_cls/construct_destroy_copy.html">Construction, destruction, copying</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/thread_local_storage/enumerable_thread_specific_cls/safe_modifiers.html">Concurrently safe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/thread_local_storage/enumerable_thread_specific_cls/unsafe_modifiers.html">Concurrently unsafe modifiers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/thread_local_storage/enumerable_thread_specific_cls/size_and_capacity.html">Size and capacity</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/thread_local_storage/enumerable_thread_specific_cls/iteration.html">Iteration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/thread_local_storage/enumerable_thread_specific_cls/combining.html">Combining</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/thread_local_storage/flattened2d_cls.html">flattened2d</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/reference/source/memory_allocation.html">Memory Allocation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/memory_allocation/tbb_allocator_cls.html">tbb_allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/memory_allocation/scalable_allocator_cls.html">scalable_allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/memory_allocation/cache_aligned_allocator_cls.html">cache_aligned_allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/memory_allocation/cache_aligned_resource_cls.html">cache_aligned_resource</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/memory_allocation/scalable_memory_resource_func.html">scalable_memory_resource</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/memory_allocation/c_interface_to_scalable_allocator.html">C Interface to Scalable Allocator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/memory_allocation/numa_interleaved_allocation.html">Allocate Memory Interleaved between NUMA Nodes (preview)</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/memory_allocation/scalable_memory_pools.html">Scalable Memory Pools (preview)</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/memory_allocation/scalable_memory_pools/memory_pool_cls.html">memory_pool</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/memory_allocation/scalable_memory_pools/fixed_pool_cls.html">fixed_pool</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/memory_allocation/scalable_memory_pools/memory_pool_allocator_cls.html">memory_pool_allocator</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../main/reference/source/memory_allocation/malloc_replacement.html">Automatically Replacing <code class="docutils literal notranslate"><span class="pre">malloc</span></code> and Other C/C++ Functions for Dynamic Memory Allocation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/memory_allocation/malloc_replacement/windows_malloc_replacement.html">Windows* OS C/C++ Dynamic Memory Interface Replacement</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/memory_allocation/malloc_replacement/malloc_replacement_log.html">TBB_malloc_replacement_log Function</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../main/reference/source/memory_allocation/malloc_replacement/linux_malloc_replacement.html">Linux* OS C/C++ Dynamic Memory Interface Replacement</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/reference/source/mutual_exclusion.html">Mutual Exclusion</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/mutual_exclusion/mutex_cls.html">mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/mutual_exclusion/rw_mutex_cls.html">rw_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/mutual_exclusion/spin_mutex_cls.html">spin_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/mutual_exclusion/spin_rw_mutex_cls.html">spin_rw_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/mutual_exclusion/speculative_spin_mutex_cls.html">speculative_spin_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/mutual_exclusion/speculative_spin_rw_mutex_cls.html">speculative_spin_rw_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/mutual_exclusion/queuing_mutex_cls.html">queuing_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/mutual_exclusion/queuing_rw_mutex_cls.html">queuing_rw_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/mutual_exclusion/null_mutex_cls.html">null_mutex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/mutual_exclusion/null_rw_mutex_cls.html">null_rw_mutex</a></li>
+</ul>
+</details></li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../main/reference/source/timing.html">Timing</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../main/reference/source/timing/tick_count_cls.html">tick_count class</a></li>
+
+
+</ul>
+</details></li>
+<li class="toctree-l2"><a class="reference internal" href="../main/reference/source/info_namespace.html">info Namespace</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../main/reference/source/deprecated/task_arena_attach_tag.html">task_arena::attach</a></li>
+</ul>
+</details></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">Thread Composability Manager</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Thread Composability Manager</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="get_started.html">Get Started with TCM</a></li>
+<li class="toctree-l2"><a class="reference internal" href="developer_guide.html">TCM Developer Guide</a></li>
+<li class="toctree-l2 current active"><a aria-current="page" class="current reference internal" href="#">TCM API Reference</a></li>
+</ul>
+</details></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+
+
+
+<div class="dropdown dropdown-source-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Source repositories">
+    <i class="fab fa-github"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="https://github.com/uxlfoundation/oneTBB/edit/master/doc/tcm/api_reference.rst" target="_blank"
+   class="btn btn-sm btn-source-edit-button dropdown-item"
+   title="Suggest edit"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-pencil-alt"></i>
+  </span>
+<span class="btn__text-container">Suggest edit</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li><a href="https://github.com/uxlfoundation/oneTBB/issues/new?title=Issue%20on%20page%20%2Ftcm/api_reference.html&body=Your%20issue%20content%20here." target="_blank"
+   class="btn btn-sm btn-source-issues-button dropdown-item"
+   title="Open an issue"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="btn__text-container">Open issue</span>
+</a>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="../_sources/tcm/api_reference.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button pst-navbar-icon"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button type="button" class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button type="button" class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button type="button" class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button type="button" class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div>
+
+
+<button type="button" class="btn btn-sm pst-navbar-icon search-button search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+</button>
+<button class="sidebar-toggle secondary-toggle btn btn-sm pst-navbar-icon" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>TCM API Reference</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#protocol">Protocol</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#connecting-to-and-disconnecting-from-tcm">Connecting to and disconnecting from TCM</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#requesting-a-permit">Requesting a permit</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#updating-a-permit-request">Updating a permit request</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#reading-permit-data">Reading Permit Data</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#threads-of-a-client">Threads of a client</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#idling-activating-and-deactivating-a-permit">Idling, Activating and Deactivating a Permit</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#releasing-a-permit">Releasing a permit</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#tcm-data-structures">TCM Data Structures</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#dependency-on-hwloc">Dependency on HWLOC</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#cpu-mask-adapter">CPU Mask Adapter</a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#tcm-function-result">TCM Function Result</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#permit-state">Permit State</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#permit-properties">Permit Properties</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#callback-type">Callback Type</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#callback-invocation-reasons">Callback Invocation Reasons</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#permits">Permits</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#permit-constraints">Permit Constraints</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#permit-requests">Permit Requests</a></li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="tcm-api-reference">
+<h1>TCM API Reference<a class="headerlink" href="#tcm-api-reference" title="Link to this heading">#</a></h1>
+<section id="protocol">
+<h2>Protocol<a class="headerlink" href="#protocol" title="Link to this heading">#</a></h2>
+<p>Clients request for and release permits using the Thread Composability Manager API. Each permit
+contains info about resources a client can use. Clients can have multiple requests at the same time,
+grouping them together using unique client IDs that are assigned by the Thread Composability Manager
+upon connecting to it.</p>
+<p>It is expected that clients follow TCM recommendations on the resource usage and do not misbehave.</p>
+</section>
+<section id="connecting-to-and-disconnecting-from-tcm">
+<h2>Connecting to and disconnecting from TCM<a class="headerlink" href="#connecting-to-and-disconnecting-from-tcm" title="Link to this heading">#</a></h2>
+<p>Before asking for a permit every client should register itself with the Thread Composability Manager
+using the following function:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">tcm_result_t</span><span class="w"> </span><span class="n">tcmConnect</span><span class="p">(</span><span class="n">tcm_callback_t</span><span class="w"> </span><span class="n">callback</span><span class="p">,</span><span class="w"> </span><span class="n">tcm_client_id_t</span><span class="o">*</span><span class="w"> </span><span class="n">client_id</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">callback</span></code></p></td>
+<td><p>In</p></td>
+<td><p>Permit renegotiation callback. See <a class="reference internal" href="#callback-type">Callback Type</a> for more info.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">client_id</span></code></p></td>
+<td><p>Out</p></td>
+<td><p>Client ID assigned by the Thread Composability Manager for further
+relation.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Function returns unsuccessful status if <code class="code docutils literal notranslate"><span class="pre">TCM_ENABLE</span></code> environment variable is not
+set to <code class="code docutils literal notranslate"><span class="pre">1</span></code>.</p>
+</div>
+<p>If the client does not expect to request or release resources anymore, it should close the
+connection by calling the function:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">tcm_result_t</span><span class="w"> </span><span class="n">tcmDisconnect</span><span class="p">(</span><span class="n">tcm_client_id_t</span><span class="w"> </span><span class="n">client_id</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">client_id</span></code></p></td>
+<td><p>In</p></td>
+<td><p>Client ID that was previously assigned by <code class="code docutils literal notranslate"><span class="pre">tcmConnect</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="requesting-a-permit">
+<h2>Requesting a permit<a class="headerlink" href="#requesting-a-permit" title="Link to this heading">#</a></h2>
+<p>Clients request a permit for resources using:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">tcm_result_t</span><span class="w"> </span><span class="n">tcmRequestPermit</span><span class="p">(</span><span class="n">tcm_client_id_t</span><span class="w"> </span><span class="n">client_id</span><span class="p">,</span><span class="w"> </span><span class="n">tcm_permit_request_t</span><span class="w"> </span><span class="n">request</span><span class="p">,</span>
+<span class="w">                              </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">callback_arg</span><span class="p">,</span><span class="w"> </span><span class="n">tcm_permit_handle_t</span><span class="o">*</span><span class="w"> </span><span class="n">permit_handle</span><span class="p">,</span>
+<span class="w">                              </span><span class="n">tcm_permit_t</span><span class="o">*</span><span class="w"> </span><span class="n">permit</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">client_id</span></code></p></td>
+<td><p>In</p></td>
+<td><p>Client ID obtained by <code class="code docutils literal notranslate"><span class="pre">tcmConnect</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">request</span></code></p></td>
+<td><p>In</p></td>
+<td><p>Description of the resources being requested. See
+<a class="reference internal" href="#id1">Permit Requests</a> section for more info.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">callback_arg</span></code></p></td>
+<td><p>In</p></td>
+<td><p>The argument to pass into the callback function (set
+previously using <code class="code docutils literal notranslate"><span class="pre">tcmConnect</span></code>) in case of a subsequent
+permit renegotiation.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">permit_handle</span></code></p></td>
+<td><p>In/Out</p></td>
+<td><p>Descriptor of resources permitted by the Thread Composability
+Manager for use by the client. Assign <code class="code docutils literal notranslate"><span class="pre">nullptr</span></code> before
+passing to this function to request a new permit. Pass a
+descriptor of an existing permit to re-request it with
+different parameters.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">permit</span></code></p></td>
+<td><p>In/Out</p></td>
+<td><p>The description of resources recommended to the client for
+use. Allocated/deallocated by a client, filled in by TCM.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The function return value is used to indicate possible execution errors, not the availability of
+resources. After a successful invocation, the caller should check the permit state and fields to see
+what resources are recommended for use.</p>
+<section id="updating-a-permit-request">
+<h3>Updating a permit request<a class="headerlink" href="#updating-a-permit-request" title="Link to this heading">#</a></h3>
+<p>Updating of a permit request is done by using the <code class="code docutils literal notranslate"><span class="pre">tcmRequestPermit</span></code> function.</p>
+<p>To indicate that it is an update of an existing permit request rather than a request of a new one,
+client passes a <code class="code docutils literal notranslate"><span class="pre">permit_handle</span></code> value that was returned by a previous call to
+<code class="code docutils literal notranslate"><span class="pre">tcmRequestPermit</span></code>.</p>
+<p>The parameters of a permit request that can be changed are:</p>
+<ul class="simple">
+<li><p>Callback argument (<code class="code docutils literal notranslate"><span class="pre">callback_arg</span></code> parameter of the <code class="code docutils literal notranslate"><span class="pre">tcmRequestPermit</span></code>)</p></li>
+<li><p>Minimum and maximum software threads (see <a class="reference internal" href="#id1">Permit Requests</a> section)</p></li>
+<li><p>Permit properties (see <a class="reference internal" href="#permit-properties">Permit properties</a> section)</p></li>
+</ul>
+</section>
+</section>
+<section id="reading-permit-data">
+<h2>Reading Permit Data<a class="headerlink" href="#reading-permit-data" title="Link to this heading">#</a></h2>
+<p>To read current permit state and associated data, client calls <code class="code docutils literal notranslate"><span class="pre">tcmGetPermitData</span></code> function.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">tcm_result_t</span><span class="w"> </span><span class="n">tcmGetPermitData</span><span class="p">(</span><span class="n">tcm_permit_handle_t</span><span class="w"> </span><span class="n">permit_handle</span><span class="p">,</span><span class="w"> </span><span class="n">tcm_permit_t</span><span class="o">*</span><span class="w"> </span><span class="n">permit</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">permit_handle</span></code></p></td>
+<td><p>In</p></td>
+<td><p>Existing descriptor of resources permitted by the Thread
+Composability Manager for use by the client.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">permit</span></code></p></td>
+<td><p>In/Out</p></td>
+<td><p>The description of the resources given to the client as a
+response to this request. Allocated/deallocated by the
+client, filled in by the Thread Composability Manager.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Due to possible concurrent requests from clients, resulting in redistribution of
+resources by the Thread Composability Manager, the data received in a <code class="code docutils literal notranslate"><span class="pre">permit</span></code>
+argument might be already outdated by the time the thread returns from the
+<code class="code docutils literal notranslate"><span class="pre">tcmGetPermitData</span></code> function. In some situations, the Thread Composability Manager
+can detect this is happening during the call to <code class="code docutils literal notranslate"><span class="pre">tcmGetPermitData</span></code>, in which case
+a <code class="code docutils literal notranslate"><span class="pre">stale</span></code> flag of the received permit is set to true (see section about <a class="reference internal" href="#permit-properties">Permit
+Properties</a>). However, it is the responsibility of the client to synchronize multiple,
+possibly different, copies of a permit’s data.</p>
+</div>
+</section>
+<section id="threads-of-a-client">
+<h2>Threads of a client<a class="headerlink" href="#threads-of-a-client" title="Link to this heading">#</a></h2>
+<p>A TCM client utilizes granted CPU resources by running one or more software threads.</p>
+<p>When a thread starts participating in the permit, effectively consuming granted resources, it should
+register itself by invoking the <code class="code docutils literal notranslate"><span class="pre">tcmRegisterThread</span></code> function.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">tcm_result_t</span><span class="w"> </span><span class="n">tcmRegisterThread</span><span class="p">(</span><span class="n">tcm_permit_handle_t</span><span class="w"> </span><span class="n">permit_handle</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">permit_handle</span></code></p></td>
+<td><p>In</p></td>
+<td><p>Descriptor of the granted resources the invoking thread is
+going to consume.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>When a thread stops consuming resources of a permit, it invokes the <code class="code docutils literal notranslate"><span class="pre">tcmUnregisterThread</span></code>
+function.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">tcm_result_t</span><span class="w"> </span><span class="n">tcmUnregisterThread</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>This API is meant to be called by every thread that is going to participate in a parallel region,
+for which the resource permit was obtained.</p>
+</section>
+<section id="idling-activating-and-deactivating-a-permit">
+<h2>Idling, Activating and Deactivating a Permit<a class="headerlink" href="#idling-activating-and-deactivating-a-permit" title="Link to this heading">#</a></h2>
+<p>When resources are not immediately needed, the client may mark them as idle by calling the
+<code class="code docutils literal notranslate"><span class="pre">tcmIdlePermit</span></code> function. The idle state indicates that threads do not process payload but
+still can spend CPU cycles actively looking for work. This allows to re-activate the permit
+relatively quickly in case the resources become needed again.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">tcm_result_t</span><span class="w"> </span><span class="n">tcmIdlePermit</span><span class="p">(</span><span class="n">tcm_permit_handle_t</span><span class="w"> </span><span class="n">permit_handle</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">permit_handle</span></code></p></td>
+<td><p>In</p></td>
+<td><p>Descriptor of the resources to mark as idle.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>If the usage of resources is not anticipated soon, the client deactivates the permit by calling the
+<code class="code docutils literal notranslate"><span class="pre">tcmDeactivatePermit</span></code> function.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">tcm_result_t</span><span class="w"> </span><span class="n">tcmDeactivatePermit</span><span class="p">(</span><span class="n">tcm_permit_handle_t</span><span class="w"> </span><span class="n">permit_handle</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">permit_handle</span></code></p></td>
+<td><p>In</p></td>
+<td><p>Descriptor of the resources to deactivate.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>TCM can also deactivate an idle permit and initiate a permit negotiation – particularly, if idle
+resources are needed to satisfy another request.</p>
+<p>Once the resources are needed again, the client can re-activate the permit (either idle or inactive)
+by using the <code class="code docutils literal notranslate"><span class="pre">tcmActivatePermit</span></code> function.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">tcm_result_t</span><span class="w"> </span><span class="n">tcmActivatePermit</span><span class="p">(</span><span class="n">tcm_permit_handle_t</span><span class="w"> </span><span class="n">permit_handle</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">permit_handle</span></code></p></td>
+<td><p>In/Out</p></td>
+<td><p>Descriptor of the resources to re-activate.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Re-activating an idle permit is typically expected to succeed; however, the client might not (yet)
+be aware of TCM concurrently deactivating the permit. Re-activating an inactive permit is not
+guaranteed to succeed as its resources might be in use by another client. Therefore, the caller
+should check the permit state and fields to ensure resource usage is allowed.</p>
+</section>
+<section id="releasing-a-permit">
+<h2>Releasing a permit<a class="headerlink" href="#releasing-a-permit" title="Link to this heading">#</a></h2>
+<p>When the resources are not required anymore, the client releases the permit by calling
+<code class="code docutils literal notranslate"><span class="pre">tcmReleasePermit</span></code> function.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">tcm_result_t</span><span class="w"> </span><span class="n">tcmReleasePermit</span><span class="p">(</span><span class="n">tcm_permit_handle_t</span><span class="w"> </span><span class="n">permit_handle</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">permit_handle</span></code></p></td>
+<td><p>In</p></td>
+<td><p>Descriptor of the resources to release back to the Thread
+Composability Manager.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="tcm-data-structures">
+<h2>TCM Data Structures<a class="headerlink" href="#tcm-data-structures" title="Link to this heading">#</a></h2>
+<section id="dependency-on-hwloc">
+<h3>Dependency on HWLOC<a class="headerlink" href="#dependency-on-hwloc" title="Link to this heading">#</a></h3>
+<p>TCM uses <a class="reference external" href="https://www.open-mpi.org/projects/hwloc/">HWLOC library</a> to parse platform topology and
+obtain process concurrency, process CPU mask, NUMA node, and core type indices.</p>
+<p>To make sure CPU masks, NUMA node and core type indices are interpreted by HWLOC library correctly,
+a TCM client can either link with a compatible version of HWLOC or write adapters for CPU masks.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Even compatible versions of HWLOC might have different results when parsing platform
+topology. Therefore, it is recommended to ensure that a single HWLOC library is used
+within the process.</p>
+</div>
+<section id="cpu-mask-adapter">
+<h4>CPU Mask Adapter<a class="headerlink" href="#cpu-mask-adapter" title="Link to this heading">#</a></h4>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>While NUMA node and core type indices are logical and thus may not correspond to physical
+indices provided by an operating system, CPU masks represented using
+<code class="code docutils literal notranslate"><span class="pre">tcm_cpu_mask_t</span></code> are always filled with physical indices of an operating system,
+which can be used to bind software threads to hardware CPUs specified in the mask.</p>
+</div>
+<p><code class="code docutils literal notranslate"><span class="pre">tcm_cpu_mask_t</span></code> is a typedef-declaration of a pointer to <code class="code docutils literal notranslate"><span class="pre">hwloc_bitmap_s</span></code>, which is
+defined in HWLOC as the following:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">hwloc_bitmap_s</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">ulongs_count</span><span class="p">;</span><span class="w"> </span><span class="cm">/* how many ulong bitmasks are valid, &gt;= 1 */</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">ulongs_allocated</span><span class="p">;</span><span class="w"> </span><span class="cm">/* how many ulong bitmasks are allocated, &gt;= ulongs_count */</span>
+<span class="w">    </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">long</span><span class="w"> </span><span class="o">*</span><span class="n">ulongs</span><span class="p">;</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">infinite</span><span class="p">;</span><span class="w"> </span><span class="cm">/* set to 1 if all bits beyond ulongs are set */</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+<p>, where:</p>
+<ul class="simple">
+<li><p><code class="code docutils literal notranslate"><span class="pre">ulongs_count</span></code> is the number of <code class="code docutils literal notranslate"><span class="pre">unsigned</span> <span class="pre">long</span></code> elements used for bitmask
+representation.</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">ulongs_allocated</span></code> is the size of allocated elements of an array.</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">ulongs</span></code> is an array that holds the mask bits.</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">infinite</span></code> is used as a flag to indicate whether bits not represented by <code class="code docutils literal notranslate"><span class="pre">ulongs</span></code>
+array are set or not.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="code docutils literal notranslate"><span class="pre">hwloc_bitmap_s</span></code> is one of the main data structures that HWLOC uses when it
+describes platform entities such as NUMA node, core type, or even CPUs that share certain
+levels of cache in terms of a CPU mask. It is unlikely that its layout changes in backward
+incompatible way.</p>
+</div>
+<p>Since <code class="code docutils literal notranslate"><span class="pre">hwloc_bitmap_s</span></code> is filled with physical, operating system indices, the conversion
+between <code class="code docutils literal notranslate"><span class="pre">hwloc_bitmap_s</span></code> and CPU masks used in operating system involves going over the mask
+bits in a loop and setting corresponding bits in a platform-specific mask representation.</p>
+</section>
+</section>
+<section id="tcm-function-result">
+<h3>TCM Function Result<a class="headerlink" href="#tcm-function-result" title="Link to this heading">#</a></h3>
+<p>The <code class="code docutils literal notranslate"><span class="pre">tcm_result_t</span></code> enum defines a set of possible values that the TCM API may return.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="nc">_tcm_result_t</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">TCM_RESULT_SUCCESS</span><span class="p">,</span>
+<span class="w">  </span><span class="n">TCM_RESULT_ERROR_INVALID_ARGUMENT</span><span class="p">,</span>
+<span class="w">  </span><span class="n">TCM_RESULT_ERROR_UNKNOWN</span>
+<span class="p">}</span><span class="w"> </span><span class="n">tcm_result_t</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Value</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">TCM_RESULT_SUCCESS</span></code></p></td>
+<td><p>Indicates successful execution of the function.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">TCM_RESULT_ERROR_INVALID_ARGUMENT</span></code></p></td>
+<td><p>Indicates that one or more function arguments are
+invalid.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">TCM_RESULT_ERROR_UNKNOWN</span></code></p></td>
+<td><p>Indicates erroneous situation during the function
+execution.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="permit-state">
+<h3>Permit State<a class="headerlink" href="#permit-state" title="Link to this heading">#</a></h3>
+<p>The <code class="code docutils literal notranslate"><span class="pre">tcm_permit_state_t</span></code> structure describes various states of a permit that the Thread
+Composability Manager uses to indicate ownership of resources described by a permit.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">enum</span><span class="w"> </span><span class="nc">tcm_permit_states_t</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">TCM_PERMIT_STATE_VOID</span><span class="p">,</span>
+<span class="w">  </span><span class="n">TCM_PERMIT_STATE_INACTIVE</span><span class="p">,</span>
+<span class="w">  </span><span class="n">TCM_PERMIT_STATE_PENDING</span><span class="p">,</span>
+<span class="w">  </span><span class="n">TCM_PERMIT_STATE_IDLE</span><span class="p">,</span>
+<span class="w">  </span><span class="n">TCM_PERMIT_STATE_ACTIVE</span>
+<span class="p">};</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">tcm_permit_state_t</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Value</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">TCM_PERMIT_STATE_VOID</span></code></p></td>
+<td><p>No permit. Neither client owns any resources associated
+with permit, nor does the Thread Composability Manager know
+about existence of a corresponding request.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">TCM_PERMIT_STATE_INACTIVE</span></code></p></td>
+<td><p>Client does not own and therefore should not be using
+resources related to this permit.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">TCM_PERMIT_STATE_PENDING</span></code></p></td>
+<td><p>Resources are given to another permit and cannot be
+re-assigned to this permit immediately, but will be
+considered as soon as they become available.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">TCM_PERMIT_STATE_IDLE</span></code></p></td>
+<td><p>Resources are not used for payload processing. However,
+they can be made so by activation of this or the other
+permit describing the same resources.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">TCM_PERMIT_STATE_ACTIVE</span></code></p></td>
+<td><p>Resources are owned by the client, and are used for payload
+processing.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="permit-properties">
+<h3>Permit Properties<a class="headerlink" href="#permit-properties" title="Link to this heading">#</a></h3>
+<p>The <code class="code docutils literal notranslate"><span class="pre">tcm_permit_flags_t</span></code> describes the properties of a permit.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">_tcm_permit_flags_t</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">stale</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">rigid_concurrency</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">request_as_inactive</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">tcm_permit_flags_t</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Value</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">stale</span></code></p></td>
+<td><p>Indicates permit data is not up to date and should not be relied
+upon.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">rigid_concurrency</span></code></p></td>
+<td><p>Indicates permit requests whose concurrency cannot be changed once
+granted and in <code class="code docutils literal notranslate"><span class="pre">TCM_PERMIT_STATE_ACTIVE</span></code> state. Useful for
+the client that cannot adjust the number of active threads during
+payload processing.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">request_as_inactive</span></code></p></td>
+<td><p>Indicates that TCM should not try satisfying the request, but
+rather return valid <code class="code docutils literal notranslate"><span class="pre">permit_handle</span></code> that can be used in
+future API calls.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="callback-type">
+<h3>Callback Type<a class="headerlink" href="#callback-type" title="Link to this heading">#</a></h3>
+<p>The type of a function to pass into <code class="code docutils literal notranslate"><span class="pre">tcmConnect</span></code>. The callback is called each time the permit
+has been changed due to TCM API invoked for different permits, even if the calls are made by the
+same client.</p>
+<p>The purpose of invoking this callback function is to tell a client that the data of a permit has
+been changed. A client may call <code class="code docutils literal notranslate"><span class="pre">tcmGetPermitData</span></code> inside a callback function in order to
+obtain the latest permit data.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="n">tcm_result_t</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">tcm_callback_t</span><span class="p">)(</span><span class="n">tcm_permit_handle_t</span><span class="w"> </span><span class="n">permit_handle</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">arg</span><span class="p">,</span>
+<span class="w">                                       </span><span class="n">tcm_callback_flags_t</span><span class="w"> </span><span class="n">flags</span><span class="p">);</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Value</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">permit_handle</span></code></p></td>
+<td><p>The unique permit handle, whose data has been changed.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">arg</span></code></p></td>
+<td><p>The callback argument that was previously passed to
+the <code class="code docutils literal notranslate"><span class="pre">tcmRequestPermit</span></code> function.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">flags</span></code></p></td>
+<td><p>The reasons of callback invocation.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="callback-invocation-reasons">
+<h3>Callback Invocation Reasons<a class="headerlink" href="#callback-invocation-reasons" title="Link to this heading">#</a></h3>
+<p>The <code class="code docutils literal notranslate"><span class="pre">tcm_callbacks_flags_t</span></code> describes the reasons client callbacks were invoked by the Thread
+Composability Manager.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">_tcm_callback_flags_t</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">new_concurrency</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">new_state</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">tcm_callback_flags_t</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Value</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">new_concurrency</span></code></p></td>
+<td><p>Indicates whether permit’s concurrency has been updated.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">new_state</span></code></p></td>
+<td><p>Indicates whether permit’s state has been updated.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="permits">
+<h3>Permits<a class="headerlink" href="#permits" title="Link to this heading">#</a></h3>
+<p>The <code class="code docutils literal notranslate"><span class="pre">tcm_permit_t</span></code> structure represents the permit data that is filled in by the Thread
+Composability Manager. The client is responsible for allocating and deallocating memory for objects
+of this type, including the arrays of necessary size.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">_tcm_permit_t</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kt">uint32_t</span><span class="o">*</span><span class="w"> </span><span class="n">concurrencies</span><span class="p">;</span>
+<span class="w">  </span><span class="n">tcm_cpu_mask_t</span><span class="o">*</span><span class="w"> </span><span class="n">cpu_masks</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">size</span><span class="p">;</span>
+<span class="w">  </span><span class="n">tcm_permit_state_t</span><span class="w"> </span><span class="n">state</span><span class="p">;</span>
+<span class="w">  </span><span class="n">tcm_permit_flags_t</span><span class="w"> </span><span class="n">flags</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">tcm_permit_t</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">concurrencies</span></code></p></td>
+<td><p>The array of permitted concurrencies.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">cpu_masks</span></code></p></td>
+<td><p>The array of permitted masks. The array items correspond to respective
+items of the <code class="code docutils literal notranslate"><span class="pre">concurrencies</span></code> array.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">size</span></code></p></td>
+<td><p>The size of the arrays.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">state</span></code></p></td>
+<td><p>The state of the permit. See <a class="reference internal" href="#permit-state">Permit State</a> for details.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">flags</span></code></p></td>
+<td><p>The flags of the permit. See <a class="reference internal" href="#permit-properties">Permit Properties</a> for details.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="code docutils literal notranslate"><span class="pre">cpu_masks</span></code> is <code class="code docutils literal notranslate"><span class="pre">nullptr</span></code> in the case that the subset of resources were not
+specified via <code class="code docutils literal notranslate"><span class="pre">tcm_cpu_constraints_t</span></code> during the permit request. In this case, the
+array of <code class="code docutils literal notranslate"><span class="pre">concurrencies</span></code> contains a single element and <code class="code docutils literal notranslate"><span class="pre">size</span></code> equals to
+<code class="code docutils literal notranslate"><span class="pre">1</span></code>.</p>
+</div>
+</section>
+<section id="permit-constraints">
+<h3>Permit Constraints<a class="headerlink" href="#permit-constraints" title="Link to this heading">#</a></h3>
+<p>Constraints describe the subset of CPU resources where the requested number of software threads will
+execute.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The less constrained a resource request is, the more composable with other requests it is
+going to be. Therefore, it is better to avoid specifying constraints unless absolutely
+necessary. In cases where constraints are needed, specify them as loosely as possible so
+that TCM has more opportunities to balance resources between conflicting permit requests.</p>
+</div>
+<p>The subset of resources can be specified either by using a high-level or a low-level description.
+For a high-level description, the client sets values for <code class="code docutils literal notranslate"><span class="pre">numa_id</span></code>, <code class="code docutils literal notranslate"><span class="pre">core_type_id</span></code>, and
+<code class="code docutils literal notranslate"><span class="pre">threads_per_core</span></code> struct fields. For a low-level description, the client specifies the mask.
+In case both low-level and high-level descriptions are specified, the TCM prefers the low-level
+description.</p>
+<p>Objects of <code class="code docutils literal notranslate"><span class="pre">tcm_cpu_constraints_t</span></code> type are required to be initialized using
+<code class="code docutils literal notranslate"><span class="pre">TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER</span></code>:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">tcm_cpu_constraints_t</span><span class="w"> </span><span class="n">constraints</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TCM_PERMIT_REQUEST_CONSTRAINTS_INITIALIZER</span><span class="p">;</span>
+</pre></div>
+</div>
+<p>The <code class="code docutils literal notranslate"><span class="pre">numa_id</span></code>, <code class="code docutils literal notranslate"><span class="pre">core_type_id</span></code>, and <code class="code docutils literal notranslate"><span class="pre">threads_per_core</span></code> can be assigned a
+non-negative integer, in which case the meaning is the following:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Semantics of Assigning a Non-Negative Integer</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">numa_id</span></code>, <code class="code docutils literal notranslate"><span class="pre">core_type_id</span></code></p></td>
+<td><p>Requesting resources from item with the index equal to
+specified value.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">threads_per_core</span></code></p></td>
+<td><p>The number of threads to use per core.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Besides natural numbers, these fields can be assigned the following special values:</p>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Value</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">tcm_automatic</span></code></p></td>
+<td><p>The TCM decides on its own and may choose the value automatically
+based on internal heuristics and current load of the platform.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">tcm_any</span></code></p></td>
+<td><p>The TCM chooses one specific value based on internal heuristics and
+current load of the platform.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">hwloc_bitmap_s</span><span class="o">*</span><span class="w"> </span><span class="n">tcm_cpu_mask_t</span><span class="p">;</span>
+<span class="k">typedef</span><span class="w"> </span><span class="cm">/*implementation-defined*/</span><span class="w"> </span><span class="n">tcm_numa_node_t</span><span class="p">;</span>
+<span class="k">typedef</span><span class="w"> </span><span class="cm">/*implementation-defined*/</span><span class="w"> </span><span class="n">tcm_core_type_t</span><span class="p">;</span>
+
+<span class="k">const</span><span class="w"> </span><span class="cm">/*implementation-defined*/</span><span class="w"> </span><span class="n">tcm_automatic</span><span class="w"> </span><span class="o">=</span><span class="cm">/*implementation-defined*/</span><span class="p">;</span>
+<span class="k">const</span><span class="w"> </span><span class="cm">/*implementation-defined*/</span><span class="w"> </span><span class="n">tcm_any</span><span class="w"> </span><span class="o">=</span><span class="cm">/*implementation-defined*/</span><span class="p">;</span>
+
+<span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">_tcm_cpu_constraints_t</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kt">int32_t</span><span class="w"> </span><span class="n">min_concurrency</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">int32_t</span><span class="w"> </span><span class="n">max_concurrency</span><span class="p">;</span>
+<span class="w">  </span><span class="n">tcm_cpu_mask_t</span><span class="w"> </span><span class="n">mask</span><span class="p">;</span>
+<span class="w">  </span><span class="n">tcm_numa_node_t</span><span class="w"> </span><span class="n">numa_id</span><span class="p">;</span>
+<span class="w">  </span><span class="n">tcm_core_type_t</span><span class="w"> </span><span class="n">core_type_id</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">int32_t</span><span class="w"> </span><span class="n">threads_per_core</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">tcm_cpu_constraints_t</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">min_concurrency</span></code></p></td>
+<td><p>Minimum value of concurrency for the described hardware subset.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">max_concurrency</span></code></p></td>
+<td><p>Maximum value of concurrency for the described hardware subset.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">mask</span></code></p></td>
+<td><p>The low-level mask of the subset of CPU resources. Can be filled
+with physical indices of an operating system. See
+<a class="reference internal" href="#cpu-mask-adapter">CPU Mask Adapter</a> for details.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">numa_id</span></code></p></td>
+<td><p>High-level mask description. The logical index of the NUMA node to
+restrict the search for resources within.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">core_type_id</span></code></p></td>
+<td><p>High-level mask description. The logical index of the core type to
+restrict the search for resources within.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">threads_per_core</span></code></p></td>
+<td><p>High-level mask description. The number of threads per core to
+consider while searching for resources.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>To avoid issues with interpretation of logical indices used to enumerate NUMA nodes and
+core types, the specified values should correspond to the logical indices used by the
+HWLOC library with which the Thread Composability Manager is linked. See <a class="reference internal" href="#dependency-on-hwloc">Dependency on
+HWLOC</a> for more details.</p>
+</div>
+</section>
+<section id="permit-requests">
+<span id="id1"></span><h3>Permit Requests<a class="headerlink" href="#permit-requests" title="Link to this heading">#</a></h3>
+<p>The <code class="code docutils literal notranslate"><span class="pre">tcm_permit_request_t</span></code> structure is the data structure that allows describing resources to
+be requested from the Thread Composability Manager.</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">_tcm_permit_request_t</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kt">int32_t</span><span class="w"> </span><span class="n">min_sw_threads</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">int32_t</span><span class="w"> </span><span class="n">max_sw_threads</span><span class="p">;</span>
+<span class="w">  </span><span class="n">tcm_cpu_constraints_t</span><span class="o">*</span><span class="w"> </span><span class="n">cpu_constraints</span><span class="p">;</span>
+<span class="w">  </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">constraints_size</span><span class="p">;</span>
+<span class="w">  </span><span class="n">tcm_permit_flags_t</span><span class="w"> </span><span class="n">flags</span><span class="p">;</span>
+<span class="p">}</span><span class="w"> </span><span class="n">tcm_permit_request_t</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table">
+<thead>
+<tr class="row-odd"><th class="head"><p>Field</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">min_sw_threads</span></code></p></td>
+<td><p>The minimum number of software threads to satisfy. Permit requests
+whose minimum number of software threads cannot be satisfied right
+away get <code class="code docutils literal notranslate"><span class="pre">TCM_PERMIT_STATE_PENDING</span></code> state.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">max_sw_threads</span></code></p></td>
+<td><p>The maximum number of software threads desired.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">cpu_constraints</span></code></p></td>
+<td><p>The array of hardware constraints, where the Thread Composability
+Manager should look for available resources. <code class="code docutils literal notranslate"><span class="pre">nullptr</span></code> means
+no constraints are set. See <a class="reference internal" href="#permit-constraints">Permit Constraints</a> for details.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">constraints_size</span></code></p></td>
+<td><p>The size of the <code class="code docutils literal notranslate"><span class="pre">cpu_constraints</span></code> array.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">flags</span></code></p></td>
+<td><p>The properties of the request. See <a class="reference internal" href="#permit-properties">Permit Properties</a> for
+details.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Objects of <code class="code docutils literal notranslate"><span class="pre">tcm_permit_request_t</span></code> type are required to be initialized using
+<code class="code docutils literal notranslate"><span class="pre">TCM_PERMIT_REQUEST_INITIALIZER</span></code>:</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="n">tcm_permit_request_t</span><span class="w"> </span><span class="n">request</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TCM_PERMIT_REQUEST_INITIALIZER</span><span class="p">;</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The specified values for <code class="code docutils literal notranslate"><span class="pre">min_sw_threads</span></code> and <code class="code docutils literal notranslate"><span class="pre">max_sw_threads</span></code> in the
+<code class="code docutils literal notranslate"><span class="pre">tcm_permit_request_t</span></code> should be compatible with the <code class="code docutils literal notranslate"><span class="pre">min_concurrency</span></code> and
+<code class="code docutils literal notranslate"><span class="pre">max_concurrency</span></code> values in the <code class="code docutils literal notranslate"><span class="pre">tcm_cpu_constraints_t</span></code> array if the latter is
+specified. Otherwise, the behaviour is undefined.</p>
+</div>
+<p>The compatibility rule:</p>
+<ol class="arabic simple">
+<li><p>The sum of minimum concurrencies specified in the constraints array should be less or equal to
+the <code class="code docutils literal notranslate"><span class="pre">min_sw_threads</span></code> specified in the request.</p></li>
+<li><p>The value of <code class="code docutils literal notranslate"><span class="pre">min_sw_threads</span></code> should be less or equal to <code class="code docutils literal notranslate"><span class="pre">max_sw_threads</span></code>.</p></li>
+<li><p>The value of <code class="code docutils literal notranslate"><span class="pre">max_sw_threads</span></code> should be less or equal to the sum of maximum concurrencies
+specified in the constraints array.</p></li>
+</ol>
+<p>Or using inequality notation, the compatibility rule can be written as the following:</p>
+<div class="math notranslate nohighlight">
+\[\sum_{i=1}^N m_i \leq m \leq M \leq \sum_{i=1}^N M_i\]</div>
+<p>where:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(m_i\)</span> is the <code class="code docutils literal notranslate"><span class="pre">min_concurrency</span></code> values from the <code class="code docutils literal notranslate"><span class="pre">cpu_constraints</span></code> array</p></li>
+<li><p><span class="math notranslate nohighlight">\(M_i\)</span> is the <code class="code docutils literal notranslate"><span class="pre">max_concurrency</span></code> values from the <code class="code docutils literal notranslate"><span class="pre">cpu_constraints</span></code> array</p></li>
+<li><p><span class="math notranslate nohighlight">\(N\)</span> is the value of <code class="code docutils literal notranslate"><span class="pre">constraints_size</span></code> field</p></li>
+<li><p><span class="math notranslate nohighlight">\(m\)</span> is the value of <code class="code docutils literal notranslate"><span class="pre">min_sw_threads</span></code> field</p></li>
+<li><p><span class="math notranslate nohighlight">\(M\)</span> is the value of <code class="code docutils literal notranslate"><span class="pre">max_sw_threads</span></code> field</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="developer_guide.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">TCM Developer Guide</p>
+      </div>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item"><div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#protocol">Protocol</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#connecting-to-and-disconnecting-from-tcm">Connecting to and disconnecting from TCM</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#requesting-a-permit">Requesting a permit</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#updating-a-permit-request">Updating a permit request</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#reading-permit-data">Reading Permit Data</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#threads-of-a-client">Threads of a client</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#idling-activating-and-deactivating-a-permit">Idling, Activating and Deactivating a Permit</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#releasing-a-permit">Releasing a permit</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#tcm-data-structures">TCM Data Structures</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#dependency-on-hwloc">Dependency on HWLOC</a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#cpu-mask-adapter">CPU Mask Adapter</a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#tcm-function-result">TCM Function Result</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#permit-state">Permit State</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#permit-properties">Permit Properties</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#callback-type">Callback Type</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#callback-invocation-reasons">Callback Invocation Reasons</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#permits">Permits</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#permit-constraints">Permit Constraints</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#permit-requests">Permit Requests</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright UXL Foundation Contributors.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=64cc4de3f052d77215f0"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=64cc4de3f052d77215f0"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>
