@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -43,8 +44,9 @@ Board::Board(int width, int height, int squareSize, LabelPtr counter)
     m_matrix = new Matrix();
     m_matrix->width = width;
     m_matrix->height = height;
-    m_matrix->data = new char[width * height];
-    memset(m_matrix->data, 0, width * height);
+    const size_t cell_count = static_cast<size_t>(width) * static_cast<size_t>(height);
+    m_matrix->data = new char[cell_count];
+    memset(m_matrix->data, 0, cell_count);
 }
 
 Board::~Board() {
@@ -63,7 +65,9 @@ void Board::seed(int s) {
 }
 
 void Board::seed(const BoardPtr src) {
-    memcpy(m_matrix->data, src->m_matrix->data, m_height * m_width);
+    memcpy(m_matrix->data,
+           src->m_matrix->data,
+           static_cast<size_t>(m_height) * static_cast<size_t>(m_width));
 }
 
 //! Print usage of this program
