@@ -73,7 +73,7 @@ public:
     global_control(parameter p, std::size_t value) :
         my_value(value), my_reserved(), my_param(p) {
         suppress_unused_warning(my_reserved);
-        __TBB_ASSERT(my_param < parameter_max, "Invalid parameter");
+        __TBB_ASSERT_RELEASE(my_param < parameter_max, "Invalid parameter");
 #if __TBB_WIN8UI_SUPPORT && (_WIN32_WINNT < 0x0A00)
         // For Windows 8 Store* apps it's impossible to set stack size
         if (p==thread_stack_size)
