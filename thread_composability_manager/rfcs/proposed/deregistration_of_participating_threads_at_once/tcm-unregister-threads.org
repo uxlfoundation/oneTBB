@@ -32,13 +32,16 @@
 
   /Return values/:
   - =TCM_RESULT_ERROR_INVALID_ARGUMENT= if the passed =permit_handle= is =nullptr=.
+  - =TCM_RESULT_PERMIT_MISMATCH= if at least for one of the threads the deepest permit, with which
+    it was registered, is not equal to the passed =permit_handle=. In this case, such threads are
+    not unregistered.
   - =TCM_RESULT_SUCCESS= in case of successful function invocation.
 
 
   /Semantics/: The effect of the function invocation is identical to the situation when all the
-  threads that participate in a given permit invoke =tcmUnregisterThread()= on their own, where
-  =tcmUnregisterThread()= makes the thread invoking this function to be registered in one permit
-  less.
+  threads, whose most recent registration was with the given permit, invoke =tcmUnregisterThread()=
+  on their own, where =tcmUnregisterThread()= makes the thread invoking this function to be
+  registered in one permit less.
 
 
   /Usage Expectations/Requirements/:
@@ -46,8 +49,6 @@
     a call to =tcmUnregisterThreads(tcm_permit_handle_t)= is made. Calling =tcmUnregisterThread()=
     in such situation will attempt to unregister the thread from the previous permit, not the one
     passed to =tcmUnregisterThreads=.
-  - The =permit_handle= passed to the =tcmUnregisterThreads(tcm_permit_handle_t)= is the deepest
-    permit with which participating threads were registered.
   - The thread cannot be simultaneously registered with the same =permit_handle= more than once.
   - Thread registration cannot outlive the permit handle with which it is registered.
 
