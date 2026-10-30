@@ -321,7 +321,7 @@ public:
 
     //! Destroys the graph.
     /** Calls wait_for_all, then destroys the root task and context. */
-    ~graph();
+    ~graph() noexcept(false);
 
     //! Used to register that an external entity may still interact with the graph.
     /** The graph will not return from wait_for_all until a matching number of release_wait calls is
