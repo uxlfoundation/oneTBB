@@ -1334,7 +1334,8 @@ TEST("Bulk unregister drops only the last registration") {
     w.notify_all_about([&] { test_epoch = main_unregisters_nested; });
 
     t.join();
-    unregister_threads(top_ph);      // Unregisters only the main thread
+    tcm_result_t r = tcmUnregisterThreads(top_ph);      // Unregisters only the main thread
+    check(r == TCM_RESULT_PERMIT_MISMATCH, "tcmUnregisterThreads returned correct status");
     release_permit(top_ph);
     disconnect_client(client);
 }
@@ -1413,6 +1414,18 @@ TEST("Bulk unregister affects only registered threads") {
     related_thread.join();
     unrelated_thread.join();
     disconnect_client(client);
+}
+
+TEST("Bulk unregister returns mismatch status if thread has been previously unregistered") {
+    tcm_client_id_t client = connect_new_client();
+    tcm_permit_handle_t ph = request_permit(client, make_request());
+    tcmRegisterThread(ph);
+
+    unregister_thread();
+
+    tcm_result_t r = tcmUnregisterThreads(ph);
+    check(r == TCM_RESULT_PERMIT_MISMATCH, "Got correct mismatch status for already unregistered "
+          "thread");
 }
 
 TEST("Bulk unregister succeeds even if registered threads die") {

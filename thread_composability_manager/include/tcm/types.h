@@ -19,6 +19,7 @@ extern "C" {
 
 typedef enum _tcm_result_t {
   TCM_RESULT_SUCCESS = 0x0,
+  TCM_RESULT_PERMIT_MISMATCH = 0x10,
   TCM_RESULT_ERROR_INVALID_ARGUMENT = 0x78000004,
   TCM_RESULT_ERROR_UNKNOWN = 0x7ffffffe
 } tcm_result_t;

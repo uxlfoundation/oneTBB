@@ -1546,14 +1546,17 @@ public:
           std::lock_guard<std::mutex> lock(pr.mutex);
           thread_locals = pr.thread_locals;
       }
+      tcm_result_t status = TCM_RESULT_SUCCESS;
       for (auto& e : thread_locals) {
           __TCM_ASSERT(e, "Actual thread data was not found.");
           thread_registration_data_t& trd = *e;
           std::lock_guard<std::mutex> lock(trd.mutex);
           if (!trd.permits.empty() && ph == trd.permits.top())
               trd.permits.pop();
+          else
+              status = TCM_RESULT_PERMIT_MISMATCH;
       }
-      return TCM_RESULT_SUCCESS;
+      return status;
   }
 
   uint32_t platform_resources() const {
