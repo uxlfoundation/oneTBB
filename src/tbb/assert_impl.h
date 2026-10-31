@@ -21,12 +21,20 @@
 #include "oneapi/tbb/detail/_config.h"
 #include "oneapi/tbb/detail/_utils.h"
 
+#include "misc.h"
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <cstdarg>
 #if _MSC_VER && _DEBUG
 #include <crtdbg.h>
+#endif
+#if (__TBB_BUILD || __TBBBIND_BUILD) && TBB_USE_EXCEPTIONS // only TBB and TBBBind use custom handler
+#include <exception>
+#if __TBB_USE_OPTIONAL_RTTI
+#include <typeinfo> // to report exception name
+#endif
 #endif
 
 #include <mutex>
@@ -46,8 +54,8 @@ namespace r1 {
 static std::atomic<tbb::detail::do_once_state> assertion_state;
 
 // TODO: consider extension for formatted error description string
-/* [[noreturn]] */ static void assertion_failure_impl(const char* location, int line,
-                                                      const char* expression, const char* comment) {
+/* [[noreturn]] */ static void assertion_failure_default(const char* location, int line,
+                                                         const char* expression, const char* comment) {
 #if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
     // Workaround for erroneous "unreachable code" during assertion throwing using call_once
     #pragma warning (push)
@@ -76,13 +84,41 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
 #endif
 }
 
+#if !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD && !TBB_USE_EXCEPTIONS
+// Handler for the case when the TBB library is built without exception support and
+// no custom assertion handler is provided by the user
+/* [[noreturn]] */ void throw_for_noexcept_default(const char* comment) {
+#if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
+    // Workaround for erroneous "unreachable code" during assertion throwing using call_once
+    #pragma warning (push)
+    #pragma warning (disable: 4702)
+#endif
+    atomic_do_once([&](){
+        std::fprintf(stderr, "%s\n", comment);
+#if _MSC_VER && _DEBUG
+        if (1 == _CrtDbgReport(_CRT_ASSERT, nullptr, 0, "tbb_debug.dll", "%s\r\n%s",
+                               "", comment?comment:"")) {
+            _CrtDbgBreak();
+        } else
+#endif
+        {
+            std::fflush(stderr);
+            std::abort();
+        }
+    }, assertion_state);
+#if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
+    #pragma warning (pop)
+#endif
+}
+#endif // !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
+
 namespace assertion_handler {
 // Initial value is default handler
-static std::atomic<assertion_handler_type> handler{assertion_failure_impl};
+static std::atomic<assertion_handler_type> handler{assertion_failure_default};
 
 #if (__TBB_BUILD || __TBBBIND_BUILD) // only TBB and TBBBind use custom handler
 static assertion_handler_type set(assertion_handler_type new_handler) noexcept {
-    return handler.exchange(new_handler ? new_handler : assertion_failure_impl,
+    return handler.exchange(new_handler ? new_handler : assertion_failure_default,
                             std::memory_order_acq_rel);
 }
 #endif
@@ -90,12 +126,53 @@ static assertion_handler_type set(assertion_handler_type new_handler) noexcept {
 static assertion_handler_type get() noexcept {
     return handler.load(std::memory_order_acquire);
 }
+
 } // namespace assertion_handler
+
+#if __TBB_BUILD && TBB_USE_EXCEPTIONS
+// Declare as noexcept because the user assertion handler can throw, but this function
+// is called only in terminate_on_exception mode.
+void terminate_on_user_exception() noexcept {
+    assertion_handler_type curr_handler = assertion_handler::get();
+
+    // "exception in noexcept function" can report exception name
+    // for any exception, so use it if the handler is not redefined
+    if (curr_handler == assertion_failure_default)
+        do_throw_noexcept([] { throw; });
+
+    char buf[256] = { 0 };
+
+    // limited form of finding details of the exception
+    try {
+        throw;
+    } catch (std::exception &x) {
+        std::snprintf(buf, sizeof(buf), "Terminating due to an unknown exception derived from "
+                                        "std::exception; explanation %s", x.what());
+    } catch (...) {
+        std::strncat(buf, "Unknown exception", sizeof(buf)-1);
+    }
+    curr_handler("", 0, "", buf);
+    assertion_failure_default(__FILE__, __LINE__, "", "User assertion handler must not return");
+}
+#endif // __TBB_BUILD && TBB_USE_EXCEPTIONS
 
 void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line,
                                            const char* expression, const char* comment) {
     assertion_handler::get()(location, line, expression, comment);
 }
+
+#if !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
+// Declare as noexcept because the user assertion handler can throw, but this function is
+// called either in terminate_on_exception mode or when built with !TBB_USE_EXCEPTIONS.
+bool try_call_user_handler_on_exception(const char* comment) noexcept {
+    assertion_handler_type curr = assertion_handler::get();
+    if (curr == assertion_failure_default)
+        return false;
+    curr("", 0, "", comment);
+    assertion_failure_default(__FILE__, __LINE__, "", "User assertion handler must not return");
+    return true;
+}
+#endif // !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
 
 //! Report a runtime warning.
 void runtime_warning( const char* format, ... ) {
@@ -115,4 +192,3 @@ void runtime_warning( const char* format, ... ) {
 #endif
 
 #endif // __TBB_assert_impl_H
-

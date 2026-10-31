@@ -136,6 +136,7 @@ void AssertionFailureHandler(const char* filename, int line,
 
 tbb::assertion_handler_type SetCustomAssertionHandler() {
     auto default_handler = tbb::set_assertion_handler(AssertionFailureHandler);
+    REQUIRE_MESSAGE(default_handler, "Handler must be callable.");
     auto custom_handler = tbb::get_assertion_handler();
     REQUIRE_MESSAGE(custom_handler == AssertionFailureHandler,
                     "Custom assertion handler was not set.");
