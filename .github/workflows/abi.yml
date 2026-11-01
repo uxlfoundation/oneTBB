@@ -87,14 +87,14 @@ jobs:
           cmake --build build-debug --target package -j$(nproc)
 
       - name: Upload the release package
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: package-${{ matrix.platform }}-release
           path: build/*.zip
           retention-days: 4
 
       - name: Upload the debug package
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: package-${{ matrix.platform }}-debug
           path: build-debug/*.zip
@@ -127,14 +127,14 @@ jobs:
           cmake --build build-debug --target package -j$(sysctl -n hw.ncpu)
 
       - name: Upload the release package
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: package-macos-64-release
           path: build/*.zip
           retention-days: 4
 
       - name: Upload the debug package
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: package-macos-64-debug
           path: build-debug/*.zip
@@ -208,14 +208,14 @@ jobs:
           }
 
       - name: Upload the release package
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: package-${{ matrix.platform }}-release
           path: build/*.zip
           retention-days: 4
 
       - name: Upload the debug package
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: package-${{ matrix.platform }}-debug
           path: build-debug/*.zip
@@ -301,7 +301,7 @@ jobs:
           git add --intent-to-add -- "${platform_dirs[@]}"
           git diff HEAD -- "${platform_dirs[@]}" > abi.patch
       - name: Upload the upgraded baseline patch
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: baseline-patch
           path: abi.patch
