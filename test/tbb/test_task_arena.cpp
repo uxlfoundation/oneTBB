@@ -2103,48 +2103,6 @@ TEST_CASE("Test threads sleep") {
 }
 #endif
 
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-
-//! Basic test for is_inside_task in task_group
-//! \brief \ref interface \ref requirement
-TEST_CASE("is_inside_task in task_group"){
-    CHECK( false == tbb::is_inside_task());
-
-    tbb::task_group tg;
-    tg.run_and_wait([&]{
-        CHECK( true == tbb::is_inside_task());
-    });
-}
-
-//! Basic test for is_inside_task in arena::execute
-//! \brief \ref interface \ref requirement
-TEST_CASE("is_inside_task in arena::execute"){
-    CHECK( false == tbb::is_inside_task());
-
-    tbb::task_arena arena;
-
-    arena.execute([&]{
-        // The execute method is processed outside of any task
-        CHECK( false == tbb::is_inside_task());
-    });
-}
-
-//! The test for is_inside_task in arena::execute when inside other task
-//! \brief \ref error_guessing
-TEST_CASE("is_inside_task in arena::execute") {
-    CHECK(false == tbb::is_inside_task());
-
-    tbb::task_arena arena;
-    tbb::task_group tg;
-    tg.run_and_wait([&] {
-        arena.execute([&] {
-            // The execute method is processed outside of any task
-            CHECK(false == tbb::is_inside_task());
-        });
-    });
-}
-#endif //__TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-
 //! \brief \ref interface \ref requirement \ref regression
 TEST_CASE("worker threads occupy slots in correct range") {
     std::vector<tbb::task_arena> arenas(42);

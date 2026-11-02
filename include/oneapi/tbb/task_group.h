@@ -128,40 +128,35 @@ public:
         , m_func(std::forward<FF>(f)) {}
 };
 
-#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
-    template<typename F>
-    d1::task* task_ptr_or_nullptr_impl(std::false_type, F&& f){
+    // The task body object return type is not task_handle, so no task can be bypassed
+    // Return types other than task_handle are ignored
+    template <typename F>
+    d1::task* task_ptr_or_nullptr_impl(F&& f, /*can bypass task = */std::false_type) {
+        std::forward<F>(f)();
+        return nullptr;
+    }
+
+    // The task body object return type is task_handle, so it can bypass tasks
+    template <typename F>
+    d1::task* task_ptr_or_nullptr_impl(F&& f, /*can bypass task = */std::true_type) {
         task_handle th = std::forward<F>(f)();
         task_handle_task* task_ptr = task_handle_accessor::release(th);
-        // If task has unresolved dependencies, it can't be bypassed
+#if __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
+        // If task has unresolved dependencies, it cannot be bypassed
         if (task_ptr && task_ptr->has_dependencies() && !task_ptr->release_dependency()) {
             task_ptr = nullptr;
         }
-
+#endif
         return task_ptr;
     }
 
     template<typename F>
-    d1::task* task_ptr_or_nullptr_impl(std::true_type, F&& f){
-        std::forward<F>(f)();
-        return nullptr;
-    }
-
-    template<typename F>
     d1::task* task_ptr_or_nullptr(F&& f){
-        using is_void_t = std::is_void<
-            decltype(std::forward<F>(f)())
-            >;
+        using can_bypass_task = std::is_same<decltype(std::forward<F>(f)()),
+                                             task_handle>;
 
-        return  task_ptr_or_nullptr_impl(is_void_t{}, std::forward<F>(f));
+        return task_ptr_or_nullptr_impl(std::forward<F>(f), can_bypass_task{});
     }
-#else
-    template<typename F>
-    d1::task* task_ptr_or_nullptr(F&& f){
-        std::forward<F>(f)();
-        return nullptr;
-    }
-#endif // __TBB_PREVIEW_TASK_GROUP_EXTENSIONS
 } // namespace d2
 
 namespace d1 {
