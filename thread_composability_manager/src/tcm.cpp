@@ -1500,12 +1500,12 @@ public:
       __TCM_ASSERT(ph, "Invalid permit handle");
       const std::shared_ptr<thread_registration_data_t>& trd_ptr = thread_data_ptr();
       thread_registration_data_t& trd = *trd_ptr;
-      bool is_first_registration = false;
       {
           std::lock_guard<std::mutex> lock(trd.mutex);
           trd.permits.push(ph);  // Actual thread registration
-          is_first_registration = trd.seen.emplace(ph->permit_id).second;
       }
+
+      const bool is_first_registration = trd.seen.emplace(ph->permit_id).second;
 
       if (is_first_registration) {
           // This thread registers with this permit for the first time, let the permit's data know
