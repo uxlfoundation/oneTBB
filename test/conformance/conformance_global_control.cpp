@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -422,7 +423,6 @@ TEST_CASE("terminate_on_exception: enabled") {
 #pragma warning(pop)
 #endif
         std::set_terminate(prev);
-        terminate_handler_called = true;
 #if TBB_USE_EXCEPTIONS
     } catch (...) {
         FAIL("The exception is not expected");

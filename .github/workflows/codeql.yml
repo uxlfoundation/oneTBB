@@ -31,12 +31,12 @@ on:
 
 permissions:
   contents: read
-  
+
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
-    # timeout-minutes: 
+    # timeout-minutes:
     permissions:
       # required for all workflows
       security-events: write
@@ -50,44 +50,37 @@ jobs:
       fail-fast: false
       matrix:
         language: ["cpp", "python"]
-    
+
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
-          
+
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Increase swap space
+        if: matrix.language == 'cpp'
+        run: |
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          sudo fallocate -l 20G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
 
     # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
+        uses: github/codeql-action/init@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           languages: ${{ matrix.language }}
- 
-    # Autobuild attempts to build any compiled languages  (C/C++, C#, or Java).
-    # If this step fails, then you should remove it and run the build manually (see below)
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
-    
-    # If the analyze step fails for one of the languages you are analyzing with
-    # "We were unable to automatically build your code", modify the matrix above
-    # to set the build mode to "manual" for that language. Then modify this step
-    # to build your code.
-    # Command-line programs to run using the OS shell.
-    # See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
-    #- if: matrix.build-mode == 'manual'
-    #  shell: bash
-    #  run: |
-    #    echo 'If you are using a "manual" build mode for one or more of the' \
-    #      'languages you are analyzing, replace this with the commands to build' \
-    #      'your code, for example:'
-    #    echo '  make bootstrap'
-    #    echo '  make release'
-    #    exit 1
+          # Build-free extraction enables incremental (overlay) analysis of pull requests.
+          build-mode: none
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@7211b7c8077ea37d8641b6271f6a365a22a5fbfa # v4.36.0
+        uses: github/codeql-action/analyze@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        env:
+          _JAVA_OPTIONS: ${{ matrix.language == 'cpp' && '-Xmx12g' || '' }}
         with:
-          category: "/language:${{matrix.language}}"
+          category: "/language:${{ matrix.language }}"

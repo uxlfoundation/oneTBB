@@ -20,6 +20,8 @@
 //! \file test_utils.cpp
 //! \brief Test for [internal] functionality
 
+//! Testing alignment utility functions
+//! \brief \ref requirement
 TEST_CASE("Test alignment utility functions") {
     CHECK(tbb::detail::align_to_greater_or_equal<std::size_t>(0, 1) == 0);
     CHECK(tbb::detail::align_to_greater_or_equal<std::size_t>(1, 1) == 1);

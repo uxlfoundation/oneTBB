@@ -5,12 +5,12 @@
 
 if (UNIX)
     set(tcm_vars_name "vars.sh")
-    set(tcm_vars_template "${CMAKE_SOURCE_DIR}/integration/linux/vars/vars.sh.in")
+    set(tcm_vars_template "${TCM_SOURCE_ROOT_DIR}/integration/linux/vars/vars.sh.in")
     set(TCM_LIBDIR "$TCMROOT/${CMAKE_INSTALL_LIBDIR}")
     set(TCM_BINDIR "$TCMROOT/${CMAKE_INSTALL_BINDIR}")
 else()
     set(tcm_vars_name "vars.bat")
-    set(tcm_vars_template "${CMAKE_SOURCE_DIR}/integration/windows/vars/vars.bat.in")
+    set(tcm_vars_template "${TCM_SOURCE_ROOT_DIR}/integration/windows/vars/vars.bat.in")
     set(TCM_LIBDIR "%TCMROOT%\\${CMAKE_INSTALL_LIBDIR}")
     set(TCM_BINDIR "%TCMROOT%\\${CMAKE_INSTALL_BINDIR}")
 endif()
@@ -24,7 +24,7 @@ macro(tcm_generate_vars target)
         -DOUTPUT_VARS_NAME=${tcm_vars_name}
         -DTCM_LIBDIR="$<TARGET_FILE_DIR:${target}>"
         -DTCM_BINDIR="$<TARGET_FILE_DIR:${target}>"
-        -P "${CMAKE_SOURCE_DIR}/cmake/generate_vars.cmake"
+        -P "${TCM_SOURCE_ROOT_DIR}/cmake/generate_vars.cmake"
         COMMAND
         ${CMAKE_COMMAND} -E copy
         "${CMAKE_CURRENT_BINARY_DIR}/${tcm_vars_name}"
@@ -38,7 +38,7 @@ macro(tcm_generate_vars target)
         -DOUTPUT_VARS_NAME=${tcm_vars_name}_install
         -DTCM_LIBDIR=${TCM_LIBDIR}
         -DTCM_BINDIR=${TCM_BINDIR}
-        -P "${CMAKE_SOURCE_DIR}/cmake/generate_vars.cmake"
+        -P "${TCM_SOURCE_ROOT_DIR}/cmake/generate_vars.cmake"
         VERBATIM
     )
 

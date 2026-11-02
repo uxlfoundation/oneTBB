@@ -1328,6 +1328,25 @@ void test_heterogeneous_find() {
     REQUIRE_MESSAGE(regular_result == heterogeneous_result, "Incorrect heterogeneous find result with accessor (element exists)");
     REQUIRE_MESSAGE(acc->first.integer_key() == 1, "Incorrect accessor returned");
     REQUIRE_MESSAGE(key_type::heterogeneous_keys_count == 0, "Temporary key object was created during find call with accessor (element exists)");
+    acc.release();
+
+    const chmap_type& cchmap = chmap;
+
+    regular_result = cchmap.find(cacc, key);
+    heterogeneous_result = cchmap.find(cacc, int(1));
+
+    REQUIRE(regular_result);
+    REQUIRE_MESSAGE(regular_result == heterogeneous_result, "Incorrect heterogeneous find result with const_accessor (const, element exists)");
+    REQUIRE_MESSAGE(cacc->first.integer_key() == 1, "Incorrect accessor returned");
+    REQUIRE_MESSAGE(key_type::heterogeneous_keys_count == 0, "Temporary key object was created during find call with const_accessor (const, element exists)");
+    cacc.release();
+
+    regular_result = cchmap.find(cacc, key_type(key_type::construct_flag{}, 2));
+    heterogeneous_result = cchmap.find(cacc, int(2));
+
+    REQUIRE(!regular_result);
+    REQUIRE_MESSAGE(regular_result == heterogeneous_result, "Incorrect heterogeneous find result with const_accessor (const, no element)");
+    REQUIRE_MESSAGE(key_type::heterogeneous_keys_count == 0, "Temporary key object was created during find call with const_accessor (const, no element)");
     key_type::reset();
 }
 

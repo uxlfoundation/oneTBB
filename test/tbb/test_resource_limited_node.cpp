@@ -25,6 +25,12 @@
 
 #include "tbb/flow_graph.h"
 
+#include <algorithm>
+#include <array>
+#include <mutex>
+#include <unordered_map>
+#include <vector>
+
 //! \file test_resource_limited_node.cpp
 //! \brief Test for [preview] functionality
 
@@ -176,7 +182,8 @@ void test_strict_resource_handle() {
     using namespace tbb::flow;
 
     int handle_value = 42;
-    resource_limiter<strict_resource_handle> limiter{strict_resource_handle_provider::construct(handle_value)};
+    resource_limiter<strict_resource_handle> limiter(std::piecewise_construct,
+                                                     std::forward_as_tuple(strict_resource_handle_provider::construct(handle_value)));
 
     using node_type = resource_limited_node<int, std::tuple<>>;
     using ports_type = typename node_type::output_ports_type;
@@ -219,17 +226,27 @@ void test_root_genie() {
     using node_type = resource_limited_node<int, std::tuple<int>>;
     using ports_type = typename node_type::output_ports_type;
 
-    resource_limiter<counting_resource*> root_limiter(&root_resource);
-    resource_limiter<counting_resource*> genie_limiter(&genie_resource);
+    resource_limiter<counting_resource*> root_limiter{&root_resource};
+    resource_limiter<counting_resource*> genie_limiter{&genie_resource};
 
     graph g;
 
     broadcast_node<int> start(g);
 
+    // Records the order in which the three nodes are served, so that the node needing both
+    // resources can be checked for starvation against the two nodes needing only one.
+    std::mutex order_mutex;
+    std::vector<int> service_order;
+    auto note_service = [&](int node_index) {
+        std::lock_guard<std::mutex> lock(order_mutex);
+        service_order.push_back(node_index);
+    };
+
     node_type root_node(g, unlimited, std::tie(root_limiter),
         [&](int input, ports_type& ports, counting_resource* root) {
             CHECK(root == &root_resource);
             root->use();
+            note_service(0);
             std::get<0>(ports).try_put(input);
         });
 
@@ -237,6 +254,7 @@ void test_root_genie() {
         [&](int input, ports_type& ports, counting_resource* genie) {
             CHECK(genie == &genie_resource);
             genie->use();
+            note_service(1);
             std::get<0>(ports).try_put(input);
         });
 
@@ -246,6 +264,7 @@ void test_root_genie() {
             CHECK(genie == &genie_resource);
             root->use();
             genie->use();
+            note_service(2);
             std::get<0>(ports).try_put(input);
         });
 
@@ -295,7 +314,364 @@ void test_root_genie() {
     }
     CHECK(inputs.empty());
 
-    // TODO: add fairness checks
+    CHECK_MESSAGE(service_order.size() == std::size_t(3 * num_inputs),
+                  "Not every body run was recorded");
+    CHECK_MESSAGE(std::count(service_order.begin(), service_order.end(), 2) == num_inputs,
+                  "The node needing both resources was not served for every message");
+    CHECK_MESSAGE(root_resource.counter.load() == 0, "The root resource was left in use");
+    CHECK_MESSAGE(genie_resource.counter.load() == 0, "The genie resource was left in use");
+}
+
+// Verifies the arbitration policy directly against the provider, without a graph in the way.
+// The consumer records the order it is notified in, so the arbitration order is observable
+// exactly rather than statistically.
+class recording_consumer : public tbb::detail::d2::resource_consumer_base<int> {
+    using base_type = tbb::detail::d2::resource_consumer_base<int>;
+public:
+    using request_id = tbb::detail::d2::request_id;
+
+    recording_consumer(tbb::flow::resource_limiter<int>& limiter, int name)
+        : m_limiter(limiter), m_name(name)
+    {}
+
+    void notify(typename base_type::provider_type& provider, request_id id) override {
+        CHECK(&provider == &m_limiter);
+        m_notifications.push_back(id);
+    }
+
+    request_id request(std::uint64_t counter_value) {
+        request_id id{counter_value, tbb::flow::no_priority};
+        m_limiter.request(*this, id);
+        return id;
+    }
+
+    tbb::detail::d2::resource_handle_optional<int> acquire(request_id id) {
+        return m_limiter.acquire(*this, id);
+    }
+
+    void release(request_id id, tbb::detail::d2::resource_handle_optional<int>&& handle) {
+        m_limiter.release(*this, id, std::move(handle));
+    }
+
+    void withdraw(request_id id) { m_limiter.withdraw(*this, id); }
+
+    void report_pressure(std::size_t pressure) { m_limiter.report_pressure(*this, pressure); }
+
+    std::size_t num_notifications() const { return m_notifications.size(); }
+    bool notified(request_id id) const {
+        return std::find(m_notifications.begin(), m_notifications.end(), id) != m_notifications.end();
+    }
+    void clear_notifications() { m_notifications.clear(); }
+
+    int name() const { return m_name; }
+
+private:
+    tbb::flow::resource_limiter<int>&      m_limiter;
+    int                                    m_name;
+    std::vector<request_id>                m_notifications;
+};
+
+void test_request_order() {
+    tbb::flow::resource_limiter<int> limiter{42};
+
+    // The two consumers are given disjoint counter ranges so that the expected order is the
+    // same whether or not the requests land on the same clock tick: a request_id orders by
+    // timestamp and then by counter value, and the observed clock granularity is coarse
+    // mostly likely have the same timestamp.
+    recording_consumer early(limiter, 0);
+    recording_consumer late(limiter, 1);
+
+    // The single handle goes to the first request, which is notified immediately.
+    auto early_first = early.request(1);
+    CHECK_MESSAGE(early.num_notifications() == 1, "The first request was not notified");
+    CHECK_MESSAGE(early.notified(early_first), "The wrong request was notified");
+
+    // While it holds the handle, three more requests queue up behind it.
+    auto handle = early.acquire(early_first);
+    CHECK_MESSAGE(handle.has_value(), "The only request did not get the only handle");
+
+    auto early_second = early.request(2);
+    auto early_third = early.request(3);
+    auto late_first = late.request(10);
+    CHECK_MESSAGE(early.num_notifications() == 1, "A request was notified with no handle available");
+    CHECK_MESSAGE(late.num_notifications() == 0, "A request was notified with no handle available");
+
+    // Each release notifies exactly one request, the earliest of those still waiting.
+    early.release(early_first, std::move(handle));
+    CHECK_MESSAGE(early.num_notifications() == 2, "The next request in order was not notified");
+    CHECK_MESSAGE(early.notified(early_second), "Requests were not served in request order");
+    CHECK_MESSAGE(late.num_notifications() == 0,
+                  "A later request was notified while an earlier one was pending");
+
+    handle = early.acquire(early_second);
+    CHECK_MESSAGE(handle.has_value(), "The earliest request was denied the handle");
+    early.release(early_second, std::move(handle));
+
+    CHECK_MESSAGE(early.num_notifications() == 3, "The next request in order was not notified");
+    CHECK_MESSAGE(early.notified(early_third), "Requests were not served in request order");
+    CHECK_MESSAGE(late.num_notifications() == 0,
+                  "A later request was notified while an earlier one was pending");
+
+    handle = early.acquire(early_third);
+    CHECK_MESSAGE(handle.has_value(), "The notified request was denied the handle");
+    early.release(early_third, std::move(handle));
+
+    // Only once the earlier consumer is drained does the later one get its turn.
+    CHECK_MESSAGE(late.num_notifications() == 1, "The last request was not notified");
+    CHECK_MESSAGE(late.notified(late_first), "The last request was not the one notified");
+    handle = late.acquire(late_first);
+    CHECK_MESSAGE(handle.has_value(), "The notified request was denied the handle");
+    late.release(late_first, std::move(handle));
+}
+
+// Pressure reporting is plumbed through to the providers, but a resource_limiter deliberately
+// ignores it for now.
+void test_pressure_does_not_affect_order() {
+    tbb::flow::resource_limiter<int> limiter{42};
+
+    recording_consumer early(limiter, 0);
+    recording_consumer late(limiter, 1);
+    recording_consumer idle(limiter, 2);
+
+    // Reporting for a consumer that has no outstanding request must be a harmless no-op.
+    idle.report_pressure(std::size_t{1000});
+    CHECK_MESSAGE(idle.num_notifications() == 0, "Reporting pressure notified an idle consumer");
+
+    auto early_first = early.request(1);
+    auto handle = early.acquire(early_first);
+    CHECK_MESSAGE(handle.has_value(), "The first request did not get the only handle");
+
+    auto early_second = early.request(2);
+    auto late_first = late.request(10);
+
+    // The later request claims a large backlog and the earlier one claims none. An ordering that
+    // used the pressure would invert the two here; under request-id ordering nothing changes.
+    late.report_pressure(std::size_t{1000});
+    early.report_pressure(std::size_t{0});
+    CHECK_MESSAGE(early.num_notifications() == 1, "Reporting pressure notified a waiting request");
+    CHECK_MESSAGE(late.num_notifications() == 0, "Reporting pressure notified a waiting request");
+
+    early.release(early_first, std::move(handle));
+    CHECK_MESSAGE(early.notified(early_second),
+                  "The earlier request lost its place after a pressure report");
+    CHECK_MESSAGE(late.num_notifications() == 0,
+                  "A later request was notified ahead of an earlier one after reporting pressure");
+
+    // Drain, reporting again along the way, and confirm the order still holds.
+    handle = early.acquire(early_second);
+    CHECK_MESSAGE(handle.has_value(), "The earliest request was denied the handle");
+    late.report_pressure(std::size_t{2000});
+    early.release(early_second, std::move(handle));
+
+    CHECK_MESSAGE(late.num_notifications() == 1, "The last request was not notified once it was earliest");
+    CHECK_MESSAGE(late.notified(late_first), "The last request was not the one notified");
+    handle = late.acquire(late_first);
+    CHECK_MESSAGE(handle.has_value(), "The notified request was denied the handle");
+    late.release(late_first, std::move(handle));
+}
+
+void test_withdraw() {
+    tbb::flow::resource_limiter<int> limiter{42};
+
+    recording_consumer consumer(limiter, 0);
+
+    // Withdrawing a notified request must free up the notification slot it occupied, or the
+    // requests behind it never get notified.
+    auto notified = consumer.request(1);
+    CHECK_MESSAGE(consumer.num_notifications() == 1, "The first request was not notified");
+
+    auto pending = consumer.request(2);
+    CHECK_MESSAGE(consumer.num_notifications() == 1, "Both requests were notified for one handle");
+
+    consumer.withdraw(notified);
+    CHECK_MESSAGE(consumer.num_notifications() == 2,
+                  "Withdrawing a notified request did not release its notification slot");
+    CHECK_MESSAGE(consumer.notified(pending), "The pending request was not the one notified");
+
+    auto handle = consumer.acquire(pending);
+    CHECK_MESSAGE(handle.has_value(), "The notified request was denied the handle");
+    consumer.release(pending, std::move(handle));
+
+    // Withdrawing a pending request drops it, and withdrawing an unknown request is a no-op.
+    consumer.clear_notifications();
+    auto held = consumer.request(3);
+    handle = consumer.acquire(held);
+    CHECK_MESSAGE(handle.has_value(), "The only request did not get the only handle");
+
+    auto to_withdraw = consumer.request(4);
+    consumer.withdraw(to_withdraw);
+    consumer.withdraw(to_withdraw); // already withdrawn, must not disturb anything
+
+    consumer.release(held, std::move(handle));
+    CHECK_MESSAGE(consumer.num_notifications() == 1,
+                  "A withdrawn request was notified after the handle was released");
+}
+
+// Drives requests at two providers and records which provider notified it, so that the
+// cross-provider agreement the protocol depends on is observable directly.
+class two_provider_consumer : public tbb::detail::d2::resource_consumer_base<int> {
+    using base_type = tbb::detail::d2::resource_consumer_base<int>;
+public:
+    using request_id = tbb::detail::d2::request_id;
+    using limiter_type = tbb::flow::resource_limiter<int>;
+    using handle_type = tbb::detail::d2::resource_handle_optional<int>;
+
+    two_provider_consumer(limiter_type& first, limiter_type& second)
+        : m_limiters{&first, &second}
+        , m_notifications{0, 0}
+    {}
+
+    void notify(typename base_type::provider_type& provider, request_id) override {
+        for (std::size_t i = 0; i < 2; ++i) {
+            if (&provider == m_limiters[i]) {
+                ++m_notifications[i];
+                return;
+            }
+        }
+        CHECK_MESSAGE(false, "Notification from an unknown provider");
+    }
+
+    request_id request(std::size_t which, std::uint64_t counter_value) {
+        request_id id{counter_value, tbb::flow::no_priority};
+        m_limiters[which]->request(*this, id);
+        return id;
+    }
+
+    // Requests the same id at another provider, as a request needing several resources does
+    void request_again(std::size_t which, request_id id) { m_limiters[which]->request(*this, id); }
+
+    handle_type acquire(std::size_t which, request_id id) {
+        return m_limiters[which]->acquire(*this, id);
+    }
+
+    void release(std::size_t which, request_id id, handle_type&& handle) {
+        m_limiters[which]->release(*this, id, std::move(handle));
+    }
+
+    std::size_t num_notifications(std::size_t which) const { return m_notifications[which]; }
+
+private:
+    limiter_type* m_limiters[2];
+    std::size_t   m_notifications[2];
+};
+
+// The minimal shape that deadlocks if the providers can disagree about which request
+// outranks the other.
+void test_cross_provider_agreement() {
+    tbb::flow::resource_limiter<int> first{1};
+    tbb::flow::resource_limiter<int> second{2};
+
+    two_provider_consumer earlier(first, second);
+    two_provider_consumer later(first, second);
+
+    // earlier_id requests at first, and later_id requests at second
+    auto earlier_id = earlier.request(0, 1);
+    CHECK_MESSAGE(earlier.num_notifications(0) == 1, "The first request was not notified");
+
+    auto later_id = later.request(1, 10);
+    CHECK_MESSAGE(later.num_notifications(1) == 1, "The first request was not notified");
+
+    // Now request the same id at the other provider, as a request needing several resources does.
+    earlier.request_again(1, earlier_id);
+    CHECK_MESSAGE(earlier.num_notifications(1) == 1,
+                  "The higher priority lost to a lower priority one");
+
+    later.request_again(0, later_id);
+    CHECK_MESSAGE(later.num_notifications(0) == 0,
+                  "A lower priority request displaced a higher priority notification");
+
+    // Notified at both providers, the earlier consumer can acquire both handles.
+    auto first_handle = earlier.acquire(0, earlier_id);
+    auto second_handle = earlier.acquire(1, earlier_id);
+    CHECK_MESSAGE(first_handle.has_value(),
+                  "The highest priority request was denied the first handle");
+    CHECK_MESSAGE(second_handle.has_value(),
+                  "The highest priority request was denied the second handle");
+
+    earlier.release(0, earlier_id, std::move(first_handle));
+    CHECK_MESSAGE(later.num_notifications(0) == 1,
+                  "The waiting request was not notified once the handle was released");
+    earlier.release(1, earlier_id, std::move(second_handle));
+    CHECK_MESSAGE(later.num_notifications(1) == 1, "The waiting request was not notified once the handle was released");
+
+    // And the later consumer now finishes too, so nothing was left blocked.
+    auto later_first = later.acquire(0, later_id);
+    auto later_second = later.acquire(1, later_id);
+    CHECK_MESSAGE(later_first.has_value(), "The remaining request was denied the first handle");
+    CHECK_MESSAGE(later_second.has_value(), "The remaining request was denied the second handle");
+    later.release(0, later_id, std::move(later_first));
+    later.release(1, later_id, std::move(later_second));
+}
+
+// A ring of N nodes, each needing the two resources it shares with its neighbours, so that
+// every limiter is contended by two nodes and every node contends for two limiters.
+void test_dining_ring() {
+    using namespace oneapi::tbb::flow;
+
+    constexpr std::size_t num_philosophers = 5;
+    constexpr int num_meals = 20;
+
+    using node_type = resource_limited_node<int, std::tuple<int>>;
+    using ports_type = typename node_type::output_ports_type;
+
+    std::vector<counting_resource> chopsticks(num_philosophers);
+    std::vector<std::unique_ptr<resource_limiter<counting_resource*>>> limiters;
+    limiters.reserve(num_philosophers);
+    for (std::size_t i = 0; i < num_philosophers; ++i) {
+        limiters.emplace_back(new resource_limiter<counting_resource*>({&chopsticks[i]}));
+    }
+
+    graph g;
+
+    std::vector<std::atomic<int>> meals_eaten(num_philosophers);
+    for (std::size_t i = 0; i < num_philosophers; ++i) {
+        meals_eaten[i].store(0);
+    }
+
+    // think_nodes hold no resources; eat_nodes hold the left and right chopstick. Each meal
+    // loops back through the think node, so a philosopher only ever has one message in
+    // flight and the ring cannot be satisfied by buffering.
+    std::vector<std::unique_ptr<function_node<int, int>>> think_nodes;
+    std::vector<std::unique_ptr<node_type>> eat_nodes;
+    think_nodes.reserve(num_philosophers);
+    eat_nodes.reserve(num_philosophers);
+
+    for (std::size_t i = 0; i < num_philosophers; ++i) {
+        think_nodes.emplace_back(new function_node<int, int>(g, unlimited,
+            [](int meal) { return meal; }));
+
+        std::size_t left = i;
+        std::size_t right = (i + 1) % num_philosophers;
+
+        eat_nodes.emplace_back(new node_type(g, unlimited,
+            std::tie(*limiters[left], *limiters[right]),
+            [&, i](int meal, ports_type& ports,
+                              counting_resource* left_chopstick, counting_resource* right_chopstick) {
+                left_chopstick->use();
+                right_chopstick->use();
+                ++meals_eaten[i];
+                if (meal + 1 < num_meals) {
+                    std::get<0>(ports).try_put(meal + 1);
+                }
+            }));
+    }
+
+    for (std::size_t i = 0; i < num_philosophers; ++i) {
+        make_edge(*think_nodes[i], *eat_nodes[i]);
+        make_edge(output_port<0>(*eat_nodes[i]), *think_nodes[i]);
+    }
+
+    for (std::size_t i = 0; i < num_philosophers; ++i) {
+        think_nodes[i]->try_put(0);
+    }
+
+    g.wait_for_all();
+
+    for (std::size_t i = 0; i < num_philosophers; ++i) {
+        CHECK_MESSAGE(meals_eaten[i].load() == num_meals,
+                      "Philosopher " << i << " ate " << meals_eaten[i].load()
+                      << " of " << num_meals << " meals");
+    }
 }
 
 void test_cancellation_with_active_requests(bool same_graph, bool exception) {
@@ -303,7 +679,7 @@ void test_cancellation_with_active_requests(bool same_graph, bool exception) {
 
     int resource_value = 1;
     int input_value = 2;
-    resource_limiter<int> limiter(resource_value);
+    resource_limiter<int> limiter{resource_value};
 
     using node_type = resource_limited_node<int, std::tuple<>>;
     using ports_type = typename node_type::output_ports_type;
@@ -379,9 +755,77 @@ void test_cancellation_with_active_requests(bool same_graph, bool exception) {
     }
 }
 
+template <typename ArrayType, typename... ConstructorArgs>
+void test_resource_limiter_constructor(const ArrayType& resource_values, ConstructorArgs&&... constructor_args) {
+    using namespace oneapi::tbb::flow;
+    using resource_type = typename ArrayType::value_type;
+
+    resource_limiter<resource_type> limiter(std::forward<ConstructorArgs>(constructor_args)...);
+
+    graph g;
+
+    using node_type = resource_limited_node<int, std::tuple<>>;
+    using ports_type = typename node_type::output_ports_type;
+    std::atomic<std::size_t> counter(0);
+
+    auto node_body = [&](int, ports_type&, resource_type resource) {
+        auto is_equal = [=](const resource_type& value) { return value == resource; };
+        CHECK_MESSAGE(std::any_of(resource_values.begin(), resource_values.end(), is_equal),
+                      "Unexpected resource");
+                      
+        ++counter;
+        for (std::size_t i = 0; i < 1000; ++i) {
+            CHECK_MESSAGE(counter <= resource_values.size(), "Detected more resources than expected");
+        }
+        --counter;
+    };
+
+    node_type node(g, unlimited, std::tie(limiter), node_body);
+
+    for (int i = 0; i < 1000; ++i) {
+        node.try_put(0);
+    }
+    g.wait_for_all();
+    CHECK(counter == 0);
+}
+
+template <std::size_t... Idx, typename ArrayType>
+void test_resource_limiter_handles_constructor(ArrayType& resources,
+                                               tbb::detail::index_sequence<Idx...>) {
+    CHECK(sizeof...(Idx) == resources.size());
+    test_resource_limiter_constructor(/*resource_values = */resources,
+                                      /*args = */std::piecewise_construct, std::forward_as_tuple(resources[Idx])...);
+}
+
+template <std::size_t... Idx, typename ArrayType>
+void test_resource_limiter_initializer_list_constructor(ArrayType& resources,
+                                                        tbb::detail::index_sequence<Idx...>) {
+    CHECK(sizeof...(Idx) == resources.size());
+    using value_type = typename ArrayType::value_type;
+    std::initializer_list<value_type> init = {resources[Idx]...};
+    test_resource_limiter_constructor(/*resource_values = */resources, /*args = */init);
+} 
+
+template <typename T, std::size_t N>
+void test_resource_limiter_constructors(std::array<T, N>& resources) {
+    auto index_sequence = tbb::detail::make_index_sequence<N>();
+
+    // Test resource_limiter(std::piecewise_construct_t, Tuple&& tuple, Tuples&&... tuples)
+    test_resource_limiter_handles_constructor(resources, index_sequence);
+
+    // Test resource_limiter(std::initializer_list<ResourceHandle> init)
+    test_resource_limiter_initializer_list_constructor(resources, index_sequence);
+
+    // Test resource_limiter(InputIterator first, InputIterator last)
+    test_resource_limiter_constructor(/*resource_values = */resources, /*args = */resources.begin(), resources.end());
+
+    // Test resource_limiter(ContainerBasedSequence&& sequence)
+    test_resource_limiter_constructor(/*resource_values = */resources, /*args = */resources);
+}
+
 //! \brief \ref interface
 TEST_CASE("Feature test macro") {
-    CHECK_MESSAGE(TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING == 202603, "Incorrect feature test macro");
+    CHECK_MESSAGE(TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING == 202608, "Incorrect feature test macro");
 }
 
 //! \brief \ref interface
@@ -405,7 +849,7 @@ using limiter_unique_ptr = std::unique_ptr<oneapi::tbb::flow::resource_limiter<H
 
 template <std::size_t... Idx>
 limiter_unique_ptr<std::size_t> get_limiter_impl(tbb::detail::index_sequence<Idx...>) {
-    return limiter_unique_ptr<std::size_t>(new oneapi::tbb::flow::resource_limiter<std::size_t>(Idx...));
+    return limiter_unique_ptr<std::size_t>(new oneapi::tbb::flow::resource_limiter<std::size_t>({Idx...}));
 }
 
 template <std::size_t NumResources>
@@ -456,6 +900,31 @@ TEST_CASE("resource_limited_node broadcast") {
 //! \brief \ref error_guessing
 TEST_CASE("root-genie test for resource_limited_node") {
     test_root_genie();
+}
+
+//! \brief \ref requirement
+TEST_CASE("resource_limiter request order") {
+    test_request_order();
+}
+
+//! \brief \ref requirement
+TEST_CASE("resource_limiter pressure does not affect order") {
+    test_pressure_does_not_affect_order();
+}
+
+//! \brief \ref error_guessing
+TEST_CASE("resource_limiter withdraw") {
+    test_withdraw();
+}
+
+//! \brief \ref requirement
+TEST_CASE("resource_limiter cross-provider agreement") {
+    test_cross_provider_agreement();
+}
+
+//! \brief \ref error_guessing
+TEST_CASE("resource_limited_node in a cycle contending for shared resources") {
+    test_dining_ring();
 }
 
 #if __TBB_CPP17_INVOKE_PRESENT
@@ -568,3 +1037,327 @@ TEST_CASE("concurrency limit with multiple resources") {
                  "Expected to observe concurrent execution but max_observed=" << max_observed.load());
 }
 
+//! \brief \ref interface \ref requirement
+TEST_CASE("resource_limiter constructors") {
+    std::array<int, 1> one_resource = {1};
+    test_resource_limiter_constructors(one_resource);
+
+    std::array<int, 2> two_resources = {1, 2};
+    test_resource_limiter_constructors(two_resources);
+
+    std::array<int, 3> three_resources = {1, 2, 3};
+    test_resource_limiter_constructors(three_resources);
+}
+
+// The resource provider that denies a fixed number of acquisition attempts before granting the resource
+class denying_resource_provider : public tbb::detail::d2::resource_provider_base<int> {
+    using request_id = tbb::detail::d2::request_id;
+    using lock_type = std::unique_lock<std::mutex>;
+    std::mutex m_mutex;
+    std::unordered_map<request_id, std::size_t, request_id::hash> m_requests;
+public:
+    using resource_handle_type = int;
+    static constexpr int resource_value = 502;
+    static constexpr std::size_t num_denials = 10;
+
+    denying_resource_provider() = default;
+
+    void request(consumer_type& consumer, request_id id) override {
+        {
+            lock_type lock(m_mutex);
+            m_requests.insert({id, 0}); // Inserts only during the first request
+        }
+        consumer.notify(*this, id);
+    }
+
+    optional_type acquire(consumer_type&, request_id id) override {
+        lock_type lock(m_mutex);
+        auto request = m_requests.find(id);
+        REQUIRE_MESSAGE(request != m_requests.end(), "Acquire without prior notification");
+
+        if (request->second++ < num_denials) {
+            return {};
+        } else {
+            return {optional_type::in_place_t{}, resource_value};
+        }
+    }
+
+    void report_pressure(consumer_type&, std::size_t) override {}
+
+    void release(consumer_type&, request_id id, optional_type&& resource) override {
+        CHECK_MESSAGE(resource.value() == resource_value, "Unexpected resource returned");
+        lock_type lock(m_mutex);
+        auto request = m_requests.find(id);
+        CHECK_MESSAGE(request != m_requests.end(), "Release without prior acquire and notification");
+        CHECK_MESSAGE(request->second > num_denials, "Resource was not denied before granting necessary amount of times");
+        m_requests.erase(request);
+    }
+
+    void withdraw(consumer_type&, request_id) override {}
+};
+
+constexpr int denying_resource_provider::resource_value;
+constexpr std::size_t denying_resource_provider::num_denials;
+
+void test_denying_provider() {
+    using namespace tbb::flow;
+
+    constexpr int first_resource_value = 500;
+    constexpr int second_resource_value = 501;
+
+    resource_limiter<int> first_provider{first_resource_value};
+    resource_limiter<int> second_provider{second_resource_value};
+    denying_resource_provider third_provider;
+
+    constexpr int input_value = 0;
+    constexpr std::size_t num_inputs = 100;
+    using node_type = resource_limited_node<int, std::tuple<>>;
+
+    std::atomic<std::size_t> count{0};
+
+    auto node_body = [&](int input, node_type::output_ports_type&,
+                         int first_resource, int second_resource, int third_resource) {
+        ++count;
+        CHECK_MESSAGE(input == input_value, "Incorrect input");
+        CHECK_MESSAGE(first_resource == first_resource_value, "Incorrect first resource");
+        CHECK_MESSAGE(second_resource == second_resource_value, "Incorrect second resource");
+        CHECK_MESSAGE(third_resource == denying_resource_provider::resource_value, "Incorrect third resource");
+    };
+
+    graph g;
+    node_type node(g, unlimited, std::tie(first_provider, second_provider, third_provider), node_body);
+
+    for (std::size_t i = 0; i < num_inputs; ++i) {
+        node.try_put(input_value);
+    }
+
+    g.wait_for_all();
+    CHECK(count == num_inputs);
+}
+
+void test_rerequesting_with_resource_limiter() {
+    using namespace tbb::flow;
+    
+    int input_value = 0;
+    int first_resource_value = 500;
+    int second_resource_value = 501;
+
+    // First provider should have more resource handles to force the second resource
+    // to deny more frequently
+    resource_limiter<int> p1{first_resource_value, first_resource_value, first_resource_value};
+    resource_limiter<int> p2{second_resource_value};
+
+    using node_type = resource_limited_node<int, std::tuple<>>;
+
+    std::atomic<std::size_t> count{0};
+
+    auto node_body = [&](int input, node_type::output_ports_type&,
+                         int first_resource, int second_resource) {
+        ++count;
+        CHECK_MESSAGE(input == input_value, "Incorrect input");
+        CHECK_MESSAGE(first_resource == first_resource_value, "Incorrect first resource");
+        CHECK_MESSAGE(second_resource == second_resource_value, "Incorrect second resource");
+    };
+
+    graph g;
+    node_type node1(g, unlimited, std::tie(p1, p2), node_body);
+    node_type node2(g, unlimited, std::tie(p1, p2), node_body);
+
+    auto num_threads = tbb::this_task_arena::max_concurrency();
+    std::size_t num_reps = 100;
+
+    for (std::size_t i = 0; i < num_reps; ++i) {
+        utils::SpinBarrier submit_barrier(num_threads);
+        utils::NativeParallelFor(num_threads, [&](int thread_index) {
+            // Using the barrier to make the requests from different threads race and hence
+            // increase the chance of a denial at acquisition time. A denial may happen either
+            // because two requests carry equal timestamps, or because a request with a later
+            // timestamp reaches the limiter before one with an earlier timestamp.
+            // In the latter case the limiter notifies more requests than it has handles available,
+            // so the later timestamp is denied when it attempts the acquisition. Both cases exercise the
+            // release-and-re-request path.
+            submit_barrier.wait();
+    
+            // Submit in different order from different threads
+            if (thread_index % 2 == 0) {
+                node1.try_put(input_value);
+            } else {
+                node2.try_put(input_value);
+            }
+        });
+    }
+
+    g.wait_for_all();
+    // Each thread submits a single message, either to node1 or to node2
+    CHECK_MESSAGE(count.load() == num_reps * num_threads, "Some tasks were not executed");
+}
+
+// Test that if one of the required resource providers denied the access to the resource,
+// the resource_limited_node correctly releases and re-requests the successfully acquired resources
+//! \brief \ref error_guessing
+TEST_CASE("Test re-requesting the resources when acquisition fails") {
+    test_denying_provider();
+    test_rerequesting_with_resource_limiter();
+}
+
+class registration_tracking_limiter : public oneapi::tbb::flow::resource_limiter<int> {
+    using base_type = oneapi::tbb::flow::resource_limiter<int>;
+    using request_id = tbb::detail::d2::request_id;
+public:
+    using base_type::base_type;
+
+    void request(consumer_type& consumer, request_id id) override {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        base_type::request(consumer, id);
+        ++m_outstanding[&consumer];
+    }
+
+    optional_type acquire(consumer_type& consumer, request_id id) override {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        optional_type handle = base_type::acquire(consumer, id);
+        remove_noted_request(consumer);
+        return handle;
+    }
+
+    void withdraw(consumer_type& consumer, request_id id) override {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        base_type::withdraw(consumer, id);
+        remove_noted_request(consumer);
+    }
+
+    std::size_t num_waiting_consumers() {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return m_outstanding.size();
+    }
+
+private:
+    void remove_noted_request(consumer_type& consumer) {
+        auto it = m_outstanding.find(&consumer);
+        if (it != m_outstanding.end() && --it->second == 0) {
+            m_outstanding.erase(it);
+        }
+    }
+
+    std::mutex                                             m_mutex;
+    std::unordered_map<consumer_type*, std::size_t>        m_outstanding;
+};
+
+void test_priorities_with_unlimited_resources() {
+    using namespace tbb::flow;
+
+    tbb::global_control ctx(tbb::global_control::max_allowed_parallelism, 1);
+
+    using node_type = resource_limited_node<int, std::tuple<int>>;
+
+    int resource_value = 1;
+    constexpr std::size_t num_resources = 1000;
+
+    std::vector<int> resources_initializer(num_resources, resource_value);
+    resource_limiter<int> limiter(resources_initializer);
+
+    conformance::test_priority<node_type, int>(unlimited, std::tie(limiter));
+}
+
+void test_priorities_with_single_resource() {
+    using namespace tbb::flow;
+
+    // The submitter body below occupies a thread while the requests it produces are registered
+    // from other threads
+    if (tbb::this_task_arena::max_concurrency() < 2) return;
+
+    graph g;
+
+    using submitter_node_type = resource_limited_node<int, std::tuple<int, int, int>>;
+    using consumer_node_type = resource_limited_node<int, std::tuple<>>;
+
+    int resource_value = 1;
+    registration_tracking_limiter provider{resource_value};
+
+    struct map_entry {
+        bool low_priority_node_executed = false;
+        bool medium_priority_node_executed = false;
+        bool high_priority_node_executed = false;
+    };
+
+    // Nodes below share the single resource and only access the map while holding the resource
+    // So no mutex is needed to access it 
+    std::unordered_map<int, map_entry> execution_info;
+
+    submitter_node_type submitter(g, serial, std::tie(provider),
+        [&](int value, submitter_node_type::output_ports_type& ports, int resource) {
+            CHECK(resource == resource_value);
+            // Port1 is a low priority node, port2 is a medium priority node, port3 is a high priority node
+            std::get<0>(ports).try_put(value);
+            std::get<1>(ports).try_put(value);
+            std::get<2>(ports).try_put(value);
+            // try_put only spawns the tasks that form the requests. Keep holding the only
+            // resource until all three nodes are waiting for it, otherwise whichever of them
+            // registers while the resource is free is served immediately, bypassing arbitration.
+            utils::SpinWaitWhile([&] { return provider.num_waiting_consumers() < 3; });
+        });
+
+    consumer_node_type low_priority_node(g, unlimited, std::tie(provider),
+        [&](int value, consumer_node_type::output_ports_type&, int resource) {
+            CHECK(resource == resource_value);
+
+            auto& value_execution_info = execution_info[value];
+            CHECK_MESSAGE(!value_execution_info.low_priority_node_executed, "Duplicated inputs");
+            CHECK_MESSAGE(value_execution_info.medium_priority_node_executed,
+                          "Low priority node got the resource before the medium priority one");
+            CHECK_MESSAGE(value_execution_info.high_priority_node_executed,
+                          "Low priority node got the resource before the high priority one");
+            value_execution_info.low_priority_node_executed = true;
+        }, /*priority = */node_priority_t(1));
+
+    consumer_node_type medium_priority_node(g, unlimited, std::tie(provider),
+        [&](int value, consumer_node_type::output_ports_type&, int resource) {
+            CHECK(resource == resource_value);
+
+            auto& value_execution_info = execution_info[value];
+            CHECK_MESSAGE(!value_execution_info.medium_priority_node_executed, "Duplicated inputs");
+            CHECK_MESSAGE(!value_execution_info.low_priority_node_executed,
+                          "Low priority node got the resource before the medium priority one");
+            CHECK_MESSAGE(value_execution_info.high_priority_node_executed,
+                          "Medium priority node got the resource before the high priority one");
+            value_execution_info.medium_priority_node_executed = true;
+        }, /*priority = */node_priority_t(2));
+
+    consumer_node_type high_priority_node(g, unlimited, std::tie(provider),
+        [&](int value, consumer_node_type::output_ports_type&, int resource) {
+            CHECK(resource == resource_value);
+            
+            auto& value_execution_info = execution_info[value];
+            CHECK_MESSAGE(!value_execution_info.high_priority_node_executed, "Duplicated inputs");
+            CHECK_MESSAGE(!value_execution_info.low_priority_node_executed,
+                          "Low priority node got the resource before the high priority one");
+            CHECK_MESSAGE(!value_execution_info.medium_priority_node_executed,
+                          "Medium priority node got the resource before the high priority one");
+            value_execution_info.high_priority_node_executed = true;
+        }, /*priority = */node_priority_t(3));
+
+    make_edge(output_port<0>(submitter), low_priority_node);
+    make_edge(output_port<1>(submitter), medium_priority_node);
+    make_edge(output_port<2>(submitter), high_priority_node);
+
+    int num_inputs = 10;
+    for (int i = 0; i < num_inputs; ++i) {
+        submitter.try_put(i);
+    }
+    g.wait_for_all();
+
+    CHECK_MESSAGE(execution_info.size() == num_inputs, "Some inputs were not executed");
+    for (auto& value_execution_info : execution_info) {
+        CHECK_MESSAGE(value_execution_info.second.low_priority_node_executed,
+                      "Some inputs were not executed");
+        CHECK_MESSAGE(value_execution_info.second.medium_priority_node_executed,
+                      "Some inputs were not executed");
+        CHECK_MESSAGE(value_execution_info.second.high_priority_node_executed,
+                      "Some inputs were not executed");
+    }
+}
+
+//! \brief \ref interface \ref requirement
+TEST_CASE("resource_limited_node priorities") {
+    test_priorities_with_unlimited_resources();
+    test_priorities_with_single_resource();
+}

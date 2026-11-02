@@ -263,8 +263,8 @@
 // GCC4.8 on RHEL7 does not support std::is_trivially_copyable
 #define __TBB_CPP11_TYPE_PROPERTIES_PRESENT             (_LIBCPP_VERSION || _MSC_VER >= 1700 || (__TBB_GLIBCXX_VERSION >= 50000 && __GXX_EXPERIMENTAL_CXX0X__))
 
-#define __TBB_CPP17_MEMORY_RESOURCE_PRESENT             (_MSC_VER >= 1913 && (__TBB_LANG > 201402L) || \
-                                                        __TBB_GLIBCXX_VERSION >= 90000 && __TBB_LANG >= 201703L)
+#define __TBB_CPP17_MEMORY_RESOURCE_PRESENT             ((_MSC_VER >= 1913 && __TBB_LANG > 201402L) || \
+                                                         (__TBB_LANG >= 201703L && (__TBB_GLIBCXX_VERSION >= 90000 || _LIBCPP_VERSION >= 160000)))
 #define __TBB_CPP17_HW_INTERFERENCE_SIZE_PRESENT        (_MSC_VER >= 1911)
 #define __TBB_CPP17_LOGICAL_OPERATIONS_PRESENT          (__TBB_LANG >= 201703L)
 #define __TBB_CPP17_ALLOCATOR_IS_ALWAYS_EQUAL_PRESENT   (__TBB_LANG >= 201703L)
@@ -490,7 +490,7 @@
 **/
 
 // Some STL containers not support allocator traits in old GCC versions
-#if __GXX_EXPERIMENTAL_CXX0X__ && __TBB_GLIBCXX_VERSION <= 50301
+#if __GXX_EXPERIMENTAL_CXX0X__ && __TBB_GLIBCXX_VERSION && __TBB_GLIBCXX_VERSION <= 50301
     #define TBB_ALLOCATOR_TRAITS_BROKEN 1
 #endif
 
@@ -552,10 +552,6 @@
 #define __TBB_PREVIEW_TASK_GROUP_EXTENSIONS 1
 #endif
 
-#if TBB_PREVIEW_PARALLEL_PHASE || __TBB_BUILD || __TBB_TEST_PREVIEW
-#define __TBB_PREVIEW_PARALLEL_PHASE 1
-#endif
-
 #if TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR || __TBB_BUILD || __TBB_TEST_PREVIEW
 #define __TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR 1
 #endif
@@ -564,18 +560,20 @@
 #define __TBB_PREVIEW_NUMA_ALLOCATION 1
 #endif
 
-#if !__TBB_DISABLE_SPEC_EXTENSIONS
+// EXT macro is kept for compatibility with code built against
+// older oneTBB releases, where the custom assertion handler was
+// available only via the extension API
 #define TBB_EXT_CUSTOM_ASSERTION_HANDLER 202510
-#endif
+
+#define TBB_HAS_TASK_GROUP 202610
+#define TBB_HAS_TASK_GROUP_BYPASS 202610
 
 // Feature-test macros
 #if __TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING
-#define TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING 202603
+#define TBB_HAS_FLOW_GRAPH_RESOURCE_LIMITING 202608
 #endif
 
-#if __TBB_PREVIEW_PARALLEL_PHASE
-#define TBB_HAS_PARALLEL_PHASE 202603
-#endif
+#define TBB_HAS_PARALLEL_PHASE 202608
 
 #if __TBB_PREVIEW_TASK_ARENA_CORE_TYPE_SELECTOR
 #define TBB_HAS_TASK_ARENA_CORE_TYPE_SELECTOR 202603
@@ -592,5 +590,7 @@
 #if __TBB_PREVIEW_NUMA_ALLOCATION
 #define TBB_HAS_NUMA_ALLOCATION 202605
 #endif
+
+#define TBB_HAS_CUSTOM_ASSERTION_HANDLER 202608
 
 #endif // __TBB_detail__config_H

@@ -1,0 +1,31 @@
+# Exported symbols of tbbmalloc_proxy on linux-32.
+# Generated automatically, do not edit by hand.
+
+_ZdaPv
+_ZdaPvRKSt9nothrow_t
+_ZdlPv
+_ZdlPvRKSt9nothrow_t
+_Znaj
+_ZnajRKSt9nothrow_t
+_Znwj
+_ZnwjRKSt9nothrow_t
+__TBB_malloc_proxy
+__libc_calloc
+__libc_free
+__libc_malloc
+__libc_memalign
+__libc_pvalloc
+__libc_realloc
+__libc_valloc
+aligned_alloc
+calloc
+free
+mallinfo
+malloc
+malloc_usable_size
+mallopt
+memalign
+posix_memalign
+pvalloc
+realloc
+valloc

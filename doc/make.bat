@@ -2,6 +2,7 @@
 
 rem ============================================================================
 rem Copyright (C) 2022 Intel Corporation
+rem Copyright (C) 2026 UXL Foundation Contributors
 rem
 rem Licensed under the Apache License, Version 2.0 (the "License");
 rem you may not use this file except in compliance with the License.
@@ -43,6 +44,8 @@ if errorlevel 9009 (
 	exit /b 1
 )
 
+powershell.exe -Command ^
+    "Copy-Item -Path '..\thread_composability_manager\doc\*' -Destination '.\tcm' -Recurse -Force"
 %SPHINXBUILD% -M %1 %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
 goto end
 

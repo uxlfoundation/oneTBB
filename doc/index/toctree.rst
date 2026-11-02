@@ -11,7 +11,9 @@
    /main/intro/Benefits
    /main/intro/testing_approach
    /main/intro/limitations.rst
+   /main/intro/static_linking
    /main/intro/api_abi_changes
+   /main/intro/legal_notices_and_disclaimers
 
 
 .. toctree::
@@ -28,24 +30,24 @@
 
 
 .. toctree::
-   :maxdepth: 3
-   :hidden:
    :caption: Developer Guide
+   :hidden:
+   :maxdepth: 3
 
    /main/tbb_userguide/title
 
 
 .. toctree::
-   :maxdepth: 3
-   :hidden:
    :caption: Developer Reference
+   :hidden:
+   :maxdepth: 3
 
-   /main/reference/reference
+   /main/reference/source/index
 
 
 .. toctree::
-   :maxdepth: 3
+   :caption: Thread Composability Manager
    :hidden:
-   :caption: Specification
+   :maxdepth: 3
 
-   /main/specification/source/index
+   /tcm/index

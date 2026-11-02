@@ -62,6 +62,7 @@ add_test(NAME python_test
          COMMAND ${CMAKE_COMMAND}
                  -DTBB_BINARIES_PATH=$<TARGET_FILE_DIR:TBB::tbb>
                  -DPYTHON_MODULE_BUILD_PATH=${PYTHON_BUILD_WORK_DIR}/build
+                 -DPY_EXECUTABLE=${PY_EXECUTABLE}
                  -P ${PROJECT_SOURCE_DIR}/cmake/python/test_launcher.cmake)
 
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/build/

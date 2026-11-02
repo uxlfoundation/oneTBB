@@ -1,0 +1,8 @@
+{
+  "exported_symbols": {
+    "linux-64": "./",
+    "linux-32": "./",
+    "windows-64": "./",
+    "windows-32": "./"
+  }
+}

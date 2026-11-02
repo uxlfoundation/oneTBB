@@ -39,6 +39,7 @@ enum class exception_id {
     invalid_key,
     bad_tagged_msg_cast,
     unsafe_wait,
+    bad_array_new_length,
     last_entry
 };
 } // namespace d0

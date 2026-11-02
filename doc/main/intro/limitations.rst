@@ -6,7 +6,7 @@ Known Limitations
 This page outlines the known limitations of oneTBB to help you better understand its capabilities. 
 
 Debug TBB In The SYCL Program
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Limitation:** The application may crash when using the Debug version of oneTBB in a SYCL program compiled with Intel(R) oneAPI DPC++/C++ Compiler. This happens because both ``tbb`` (Release version) and ``tbb_debug`` (Debug version) libraries load simultaneously, causing conflicts.
 
@@ -14,6 +14,15 @@ Debug TBB In The SYCL Program
 
 * Link the application with the Release version ``tbb`` instead of ``tbb_debug``.
 * Use the ``qtbb`` flag provided by the Intel(R) oneAPI DPC++/C++ Compiler.
+
+Static Linking Possible But Not Recommended
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Limitation:** Building and using oneTBB as a static library reduces the benefits of the shared thread pool and limits library functionality.
+
+**Risks:** See :ref:`Static Linking of oneTBB <static_linking>` for why the shared library is the preferred form, which features are unavailable in a static library, and the risks of having more than one copy of oneTBB in a process.
+
+**Solution:** Prefer the shared library. If a static library is required, follow :ref:`Recommendations If You Must Link Statically <static_linking_recommendations>` and see `Building oneTBB as a Static Library <https://github.com/uxlfoundation/oneTBB/blob/master/cmake/README.md#building-onetbb-as-a-static-library>`_ for build instructions.
 
 Freestanding Compilation Mode
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -61,3 +70,16 @@ Dynamic Malloc Replacement and Topology API Incompatibilities
 **Limitation:** On Linux* OS, using dynamic malloc replacement with ``tbb::info`` and ``tbb::task_arena::constraints`` APIs may result in runtime failures.
 
 **Solution:** Set ``TBB_ENABLE_SANITIZERS=1`` in the environment. This informs that dynamic malloc replacement is used.
+
+``tbb::task_arena`` Constants ODR-Use Before C++17
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Limitation:** In C++11 and C++14, ODR-use of ``tbb::task_arena::automatic``, ``tbb::task_arena::not_initialized``, or ``tbb::task_arena::selectable`` (a preview feature) may cause link errors.
+
+**Risk:** Unresolved symbol errors at link time, for example:
+
+.. code:: cpp
+
+   auto arena = std::make_unique<tbb::task_arena>(tbb::task_arena::automatic);
+
+**Solution:** Compile with C++17 or later, or avoid ODR-use by converting the constant to a value, for example ``static_cast<int>(tbb::task_arena::automatic)``.

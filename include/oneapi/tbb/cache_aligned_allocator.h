@@ -1,4 +1,4 @@
-/*
+﻿/*
     Copyright (c) 2005-2022 Intel Corporation
     Copyright (c) 2026 UXL Foundation Contributors
 
@@ -20,8 +20,10 @@
 
 #include "detail/_utils.h"
 #include "detail/_namespace_injection.h"
+#include "detail/_exception.h"
 #include <cstdlib>
 #include <utility>
+#include <new>
 
 #if __TBB_CPP17_MEMORY_RESOURCE_PRESENT
 #include <memory_resource>
@@ -52,7 +54,17 @@ public:
 
     //! Allocate space for n objects, starting on a cache/sector line.
     __TBB_nodiscard T* allocate(std::size_t n) {
-        return static_cast<T*>(r1::cache_aligned_allocate(n * sizeof(value_type)));
+        T* p = nullptr;
+
+        // Check overflow before multiplying
+        if (n > ~std::size_t(0) / sizeof(value_type)) {
+            // r1::cache_aligned_allocate throws bad_array_new_length if
+            // n*sizeof(T) + cache_line_size causes overflow
+            throw_exception(exception_id::bad_array_new_length);
+        } else {
+            p = static_cast<T*>(r1::cache_aligned_allocate(n * sizeof(value_type)));
+        }
+        return p;
     }
 
     //! Free block of memory that starts on a cache line

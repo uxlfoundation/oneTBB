@@ -78,6 +78,20 @@ TEST_CASE("Test cache_aligned_allocate throws") {
     } catch (...) {
         REQUIRE_MESSAGE(false, "cache_aligned_deallocate did not accept the address obtained with cache_aligned_allocate");
     }
+
+    exception_caught = false;
+    // Check handling the n + cache_line_size overflow
+    const size_t overflow_size = ~size_t(0) - cache_line_size() + 1;
+
+    try {
+        (void)cache_aligned_allocate(overflow_size);
+    } catch(std::bad_array_new_length&) {
+        exception_caught = true;
+    } catch(...) {
+        REQUIRE_MESSAGE(false, "Unexpected exception type in case of overflow");
+    }
+
+    REQUIRE_MESSAGE(exception_caught, "cache_aligned_allocate did not throw bad_array_new_length in case of overflow");
 }
 #endif /* TBB_USE_EXCEPTIONS */
 

@@ -1063,13 +1063,18 @@ void MemoryPool::returnEmptyBlock(Block *block, bool poolTheBlock)
 {
     block->reset();
     if (poolTheBlock) {
-        getTLS(/*create=*/false)->freeSlabBlocks.returnBlock(block);
-    } else {
-        // slab blocks in user's pools do not have valid backRefIdx
-        if (!extMemPool.userPool())
-            removeBackRef(*(block->getBackRefIdx()));
-        extMemPool.backend.putSlabBlock(block);
+        if (auto tls = getTLS(/*create=*/false)) {
+            tls->freeSlabBlocks.returnBlock(block);
+            return;
+        }
+        // No TLS (e.g. the owning thread has already been shut down):
+        // fall through and return the block to the backend instead of
+        // leaking it.
     }
+    // slab blocks in user's pools do not have valid backRefIdx
+    if (!extMemPool.userPool())
+        removeBackRef(*(block->getBackRefIdx()));
+    extMemPool.backend.putSlabBlock(block);
 }
 
 bool ExtMemoryPool::init(intptr_t poolId, rawAllocType rawAlloc,
