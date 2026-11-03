@@ -1089,11 +1089,13 @@ public:
 
   void determine_nested_permit(tcm_permit_handle_t& ph) {
     bool is_nested = false;
-    thread_registration_data_t& rd = thread_data();
+    thread_registration_data_t& trd = thread_data();
     {
-        std::lock_guard<std::mutex> lock(rd.mutex);
-        is_nested = !rd.permits.empty();
+        std::lock_guard<std::mutex> lock(trd.mutex);
+        if (!trd.permits.empty() && ph != trd.permits.top())
+            is_nested = true;
     }
+
     prepare_permit_modification(ph);
     ph->data.is_nested.store(is_nested, std::memory_order_relaxed);
     commit_permit_modification(ph);
