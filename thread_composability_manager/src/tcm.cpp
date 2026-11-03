@@ -1047,10 +1047,6 @@ public:
           deallocate_masks(request.cpu_constraints, data.cpu_mask, data.size);
       }
 
-      // Clients may release a permit while threads are still registered with it. However, since
-      // threads do not dereference permits during (de)registration, it is safe not to detach the
-      // permit from these threads here.
-
       using type = std::atomic<uint32_t>;
       for (uint32_t i = 0; i < data.size; ++i) {
           data.concurrency[i].~type();
@@ -1483,6 +1479,18 @@ public:
         __TCM_PROFILE_PERMIT(handle, "released");
     }
 
+    {
+        // Do cleanup of permits seen by threads
+        permit_registrations_t& pr = handle->data.registrations;
+        std::lock_guard<std::mutex> lock(pr.mutex);
+        for (auto& trd_ptr : pr.thread_locals) {
+            thread_registration_data_t& trd = *trd_ptr;
+            std::lock_guard<std::mutex> per_thread_lock(trd.mutex);
+            const std::size_t num = trd.seen.erase(handle->permit_id);
+            __TCM_ASSERT_EX(num == 1, "Permit was not known to the thread");
+        }
+    }
+
     // Permit representation has been erased from internal structures, i.e. TCM does not know about
     // it anymore. Thus, can deallocate permit representation without holding a lock.
     deallocate_permit(handle);
@@ -1498,12 +1506,12 @@ public:
       __TCM_ASSERT(ph, "Invalid permit handle");
       const std::shared_ptr<thread_registration_data_t>& trd_ptr = thread_data_ptr();
       thread_registration_data_t& trd = *trd_ptr;
+      bool is_first_registration = false;
       {
           std::lock_guard<std::mutex> lock(trd.mutex);
           trd.permits.push(ph);  // Actual thread registration
+          is_first_registration = trd.seen.emplace(ph->permit_id).second;
       }
-
-      const bool is_first_registration = trd.seen.emplace(ph->permit_id).second;
 
       if (is_first_registration) {
           // This thread registers with this permit for the first time, let the permit's data know
