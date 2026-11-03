@@ -108,7 +108,7 @@
           ,*
           ,* - TCM_RESULT_ERROR_INVALID_ARGUMENT - if passed argument is nullptr.
           ,*
-          ,* - TCM_RESULT_ERROR_INVALID_ARGUMENT - if derefenced argument is non-nullptr.
+          ,* - TCM_RESULT_ERROR_INVALID_ARGUMENT - if dereferenced argument is non-nullptr.
           ,*/
          tcm_result_t tcmUnregisterThreadReturningHandle(tcm_permit_handle_t* permit_handle_ptr);
        #+end_src
