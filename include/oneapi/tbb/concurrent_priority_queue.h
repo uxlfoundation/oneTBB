@@ -21,7 +21,6 @@
 #include "detail/_aggregator.h"
 #include "detail/_template_helpers.h"
 #include "detail/_allocator_traits.h"
-#include "detail/_range_common.h"
 #include "detail/_exception.h"
 #include "detail/_utils.h"
 #include "detail/_containers_helpers.h"
@@ -32,6 +31,7 @@
 #include <utility>
 #include <initializer_list>
 #include <type_traits>
+#include <algorithm>
 
 namespace tbb {
 namespace detail {
@@ -344,40 +344,22 @@ private:
     void heapify() {
         if (!mark && data.size() > 0) mark = 1;
         for (; mark < data.size(); ++mark) {
-            // for each unheapified element under size
-            size_type cur_pos = mark;
-            value_type to_place = std::move(data[mark]);
-            do { // push to_place up the heap
-                size_type parent = (cur_pos - 1) >> 1;
-                if (!my_compare(data[parent], to_place))
-                    break;
-                data[cur_pos] = std::move(data[parent]);
-                cur_pos = parent;
-            } while(cur_pos);
-            data[cur_pos] = std::move(to_place);
+            std::push_heap(data.begin(), data.begin() + mark + 1,  my_compare);
         }
     }
 
     // Re-heapify after an extraction
     // Re-heapify by pushing last element down the heap from the root.
     void reheap() {
-        size_type cur_pos = 0, child = 1;
+        __TBB_ASSERT(!data.empty(), NULL);
 
-        while(child < mark) {
-            size_type target = child;
-            if (child + 1 < mark && my_compare(data[child], data[child + 1]))
-                ++target;
-            // target now has the higher priority child
-            if (my_compare(data[target], data.back()))
-                break;
-            data[cur_pos] = std::move(data[target]);
-            cur_pos = target;
-            child = (cur_pos << 1) + 1;
+        if (data.size() > 1) {
+            data.front() = std::move(data.back());
+            std::make_heap(data.begin(), data.end() - 1, my_compare);
         }
-        if (cur_pos != data.size() - 1)
-            data[cur_pos] = std::move(data.back());
+
         data.pop_back();
-        if (mark > data.size()) mark = data.size();
+        mark = data.size();
     }
 
     void push_back_helper( const T& value ) {
