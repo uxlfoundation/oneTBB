@@ -618,8 +618,6 @@ struct ThreadComposabilityManagerData {
     system_topology::destroy();
   }
 
-  // this_thread_regist
-
   std::mutex data_mutex{};
 
   tcm_client_id_t client_id = 1;

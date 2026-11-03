@@ -52,7 +52,8 @@ struct tcm_permit_data_t {
   std::atomic<uint32_t> inherited_concurrency_idx; // Index of constraint where inherited
                                                    // concurrency will be stored
 
-  tcm::internal::permit_registrations_t registrations; // Pointer to the global threads register
+  tcm::internal::permit_registrations_t registrations; // Holds data of the threads that have been
+                                                       // registered with the permit
 };
 
 extern "C" {
