@@ -270,6 +270,14 @@ public:
     template<typename InputIterator>
     ConcQWithSizeWrapper( InputIterator begin, InputIterator end, const A& a = A() )
         : oneapi::tbb::concurrent_queue<T, A>(begin, end, a) {}
+    ConcQWithSizeWrapper& operator=(const ConcQWithSizeWrapper& q) {
+        oneapi::tbb::concurrent_queue<T, A>::operator=(q);
+        return *this;
+    }
+    ConcQWithSizeWrapper& operator=(ConcQWithSizeWrapper&& q) {
+        oneapi::tbb::concurrent_queue<T, A>::operator=(std::move(q));
+        return *this;
+    }
     typename oneapi::tbb::concurrent_queue<T, A>::size_type size() const { return this->unsafe_size(); }
 };
 
@@ -337,7 +345,7 @@ public:
     friend bool operator==(const BarIterator& bia, const BarIterator& bib) ;
     friend bool operator!=(const BarIterator& bia, const BarIterator& bib) ;
     template<typename CQ, typename T, typename TIter, typename CQ_EX, typename T_EX>
-    friend void TestConstructors ();
+    friend void TestConstructorsAndAssign ();
 } ;
 
 bool operator==(const BarIterator& bia, const BarIterator& bib) {
@@ -414,28 +422,36 @@ bool operator==(const BarEx& bar1, const BarEx& bar2) {
 }
 
 template<typename CQ, typename T, typename TIter, typename CQ_EX, typename T_EX>
-void TestConstructors () {
+void TestConstructorsAndAssign () {
     CQ src_queue;
     typename CQ::const_iterator dqb;
     typename CQ::const_iterator dqe;
+    typename CQ::const_iterator assign_dqb;
+    typename CQ::const_iterator assign_dqe;
     typename CQ::const_iterator iter;
     using size_type = typename CQ::size_type;
 
+    // Testing copy ctor and copy assign
     for (size_type size = 0; size < 1001; ++size) {
-        for (size_type i = 0; i < size; ++i)
+        for (size_type i = 0; i < size; ++i) {
             src_queue.push(T(i + (i ^ size)));
+        }
         typename CQ::const_iterator sqb( src_queue.unsafe_begin());
         typename CQ::const_iterator sqe( src_queue.unsafe_end()  );
 
         CQ dst_queue(sqb, sqe);
         CQ copy_with_alloc(src_queue, typename CQ::allocator_type());
+        CQ assign_copied;
+        assign_copied = src_queue;
 
         CHECK_FAST_MESSAGE(src_queue.size() == dst_queue.size(), "different size");
         CHECK_FAST_MESSAGE(src_queue.size() == copy_with_alloc.size(), "different size");
+        CHECK_FAST_MESSAGE(src_queue.size() == assign_copied.size(), "different size");
 
         src_queue.clear();
     }
 
+    // Testing ctor from Input iterators
     T bar_array[1001];
     for (size_type size=0; size < 1001; ++size) {
         for (size_type i=0; i < size; ++i) {
@@ -460,10 +476,17 @@ void TestConstructors () {
 
     src_queue.clear();
 
+    // Testing copying empty queue
     CQ dst_queue3(src_queue);
-    CHECK(src_queue.size() == dst_queue3.size());
-    CHECK(0 == dst_queue3.size());
+    CQ dst_queue3_assign;
+    dst_queue3_assign = src_queue;
 
+    CHECK(src_queue.size() == dst_queue3.size());
+    CHECK(src_queue.size() == dst_queue3_assign.size());
+    CHECK(0 == dst_queue3.size());
+    CHECK(0 == dst_queue3_assign.size());
+
+    // Testing that there are no mismatches after copying
     int k = 0;
     for (size_type i = 0; i < 1001; ++i) {
         T tmp_bar;
@@ -472,24 +495,44 @@ void TestConstructors () {
         src_queue.try_pop(tmp_bar);
 
         CQ dst_queue4( src_queue);
+        CQ dst_queue4_assign;
+        dst_queue4_assign = src_queue;
 
         CHECK_FAST(src_queue.size() == dst_queue4.size());
+        CHECK_FAST(src_queue.size() == dst_queue4_assign.size());
 
         dqb = dst_queue4.unsafe_begin();
         dqe = dst_queue4.unsafe_end();
+
+        assign_dqb = dst_queue4_assign.unsafe_begin();
+        assign_dqe = dst_queue4_assign.unsafe_end();
+
         iter = src_queue.unsafe_begin();
-        auto res = std::mismatch(dqb, dqe, iter);
-        CHECK_FAST_MESSAGE(res.first == dqe, "unexpected element");
-        CHECK_FAST_MESSAGE(res.second == src_queue.unsafe_end(), "different size?");
+        auto res_copy_ctor = std::mismatch(dqb, dqe, iter);
+        auto res_copy_assign = std::mismatch(assign_dqb, assign_dqe, iter);
+
+        CHECK_FAST_MESSAGE(res_copy_ctor.first == dqe, "unexpected element");
+        CHECK_FAST_MESSAGE(res_copy_ctor.second == src_queue.unsafe_end(), "different size?");
+        CHECK_FAST_MESSAGE(res_copy_assign.first == assign_dqe, "unexpected element");
+        CHECK_FAST_MESSAGE(res_copy_assign.second == src_queue.unsafe_end(), "different size?");
     }
 
     CQ dst_queue5(src_queue);
+    CQ dst_queue5_assign(src_queue);
+    dst_queue5_assign = src_queue;
 
     CHECK(src_queue.size() == dst_queue5.size());
+    CHECK(src_queue.size() == dst_queue5_assign.size());
+
     dqb = dst_queue5.unsafe_begin();
     dqe = dst_queue5.unsafe_end();
+
+    assign_dqb = dst_queue5_assign.unsafe_begin();
+    assign_dqe = dst_queue5_assign.unsafe_end();
+
     iter = src_queue.unsafe_begin();
     REQUIRE_MESSAGE(std::equal(dqb, dqe, iter), "unexpected element");
+    REQUIRE_MESSAGE(std::equal(assign_dqb, assign_dqe, iter), "unexpected element");
 
     for (size_type i=0; i<100; ++i) {
         T tmp_bar;
@@ -499,16 +542,32 @@ void TestConstructors () {
 
         dst_queue5.push(T(i + 1000));
         dst_queue5.push(T(i + 1000));
+
+        dst_queue5_assign.push(T(i + 1000));
+        dst_queue5_assign.push(T(i + 1000));
+
         dst_queue5.try_pop(tmp_bar);
+        dst_queue5_assign.try_pop(tmp_bar);
     }
 
     CHECK(src_queue.size() == dst_queue5.size());
+    CHECK(src_queue.size() == dst_queue5_assign.size());
+
     dqb = dst_queue5.unsafe_begin();
     dqe = dst_queue5.unsafe_end();
+
+    assign_dqb = dst_queue5_assign.unsafe_begin();
+    assign_dqe = dst_queue5_assign.unsafe_end();
+
     iter = src_queue.unsafe_begin();
-    auto res = std::mismatch(dqb, dqe, iter);
-    REQUIRE_MESSAGE(res.first == dqe, "unexpected element");
-    REQUIRE_MESSAGE(res.second == src_queue.unsafe_end(), "different size?");
+
+    auto res_copy_ctor = std::mismatch(dqb, dqe, iter);
+    auto res_copy_assign = std::mismatch(assign_dqb, assign_dqe, iter);
+
+    REQUIRE_MESSAGE(res_copy_ctor.first == dqe, "unexpected element");
+    REQUIRE_MESSAGE(res_copy_ctor.second == src_queue.unsafe_end(), "different size?");
+    REQUIRE_MESSAGE(res_copy_assign.first == dqe, "unexpected element");
+    REQUIRE_MESSAGE(res_copy_assign.second == src_queue.unsafe_end(), "different size?");
 
 #if TBB_USE_EXCEPTIONS
     k = 0;
@@ -536,20 +595,30 @@ void TestConstructors () {
 
         T_EX::set_mode(T_EX::COPY_CONSTRUCT);
         CQ_EX dst_queue_ex(src_queue_ex);
+        CQ_EX dst_queue_ex_assign;
+        dst_queue_ex_assign = src_queue_ex;
 
         CHECK_FAST(src_queue_ex.size() == dst_queue_ex.size());
+        CHECK_FAST(src_queue_ex.size() == dst_queue_ex_assign.size());
 
         typename CQ_EX::const_iterator dqb_ex = dst_queue_ex.unsafe_begin();
         typename CQ_EX::const_iterator dqe_ex = dst_queue_ex.unsafe_end();
+        typename CQ_EX::const_iterator dqb_ex_assign = dst_queue_ex_assign.unsafe_begin();
+        typename CQ_EX::const_iterator dqe_ex_assign = dst_queue_ex_assign.unsafe_end();
+
         typename CQ_EX::const_iterator iter_ex = src_queue_ex.unsafe_begin();
 
-        auto res2 = std::mismatch(dqb_ex, dqe_ex, iter_ex);
-        CHECK_FAST_MESSAGE(res2.first == dqe_ex, "unexpected element");
-        CHECK_FAST_MESSAGE(res2.second == src_queue_ex.unsafe_end(), "different size?");
+        auto res_copy_ctor_ex = std::mismatch(dqb_ex, dqe_ex, iter_ex);
+        auto res_copy_assign_ex = std::mismatch(dqb_ex_assign, dqe_ex_assign, iter_ex);
+
+        CHECK_FAST_MESSAGE(res_copy_ctor_ex.first == dqe_ex, "unexpected element");
+        CHECK_FAST_MESSAGE(res_copy_ctor_ex.second == src_queue_ex.unsafe_end(), "different size?");
+        CHECK_FAST_MESSAGE(res_copy_assign_ex.first == dqe_ex_assign, "unexpected element");
+        CHECK_FAST_MESSAGE(res_copy_assign_ex.second == src_queue_ex.unsafe_end(), "different size?");
     }
 #endif
     src_queue.clear();
-
+    // Testing move ctor
     for (size_type size = 0; size < 1001; ++size) {
         for (size_type i = 0; i < size; ++i) {
             src_queue.push(T(i + (i ^ size)));
@@ -562,6 +631,7 @@ void TestConstructors () {
 
         size_type size_of_queue = src_queue.size();
         CQ dst_queue(std::move(src_queue));
+        CQ dst_queue_assign;
 
         CHECK_FAST_MESSAGE((src_queue.empty() && src_queue.size() == 0), "not working move constructor?");
         CHECK_FAST_MESSAGE((size == size_of_queue && size_of_queue == dst_queue.size()), "not working move constructor?");
@@ -571,10 +641,20 @@ void TestConstructors () {
             "there was data movement during move constructor"
         );
 
+        dst_queue_assign = std::move(dst_queue);
+
+        CHECK_FAST_MESSAGE((dst_queue.empty() && dst_queue.size() == 0), "not working move constructor?");
+        CHECK_FAST_MESSAGE((size == size_of_queue && size_of_queue == dst_queue_assign.size()), "not working move constructor?");
+
+        CHECK_FAST_MESSAGE(
+            std::equal(locations.begin(), locations.end(), dst_queue_assign.unsafe_begin(), [](const T* t1, const T& r2) { return t1 == &r2; }),
+            "there was data movement during move constructor"
+        );
+
         for (size_type i = 0; i < size; ++i) {
             T test(i + (i ^ size));
             T popped;
-            bool pop_result = dst_queue.try_pop( popped);
+            bool pop_result = dst_queue_assign.try_pop( popped);
 
             CHECK_FAST(pop_result);
             CHECK_FAST(test == popped);
@@ -583,8 +663,8 @@ void TestConstructors () {
 }
 
 void TestQueueConstructors() {
-    TestConstructors<ConcQWithSizeWrapper<Bar>, Bar, BarIterator, ConcQWithSizeWrapper<BarEx>, BarEx>();
-    TestConstructors<oneapi::tbb::concurrent_bounded_queue<Bar>, Bar, BarIterator, oneapi::tbb::concurrent_bounded_queue<BarEx>, BarEx>();
+    TestConstructorsAndAssign<ConcQWithSizeWrapper<Bar>, Bar, BarIterator, ConcQWithSizeWrapper<BarEx>, BarEx>();
+    TestConstructorsAndAssign<oneapi::tbb::concurrent_bounded_queue<Bar>, Bar, BarIterator, oneapi::tbb::concurrent_bounded_queue<BarEx>, BarEx>();
 }
 
 template<typename T>
@@ -1301,7 +1381,7 @@ void TestQueueOperabilityAfterDataMove( CQ& queue ) {
 }
 
 template<class CQ, class T>
-void TestMoveConstructors() {
+void TestMoveConstructorsAndAssign() {
     T::construction_num = T::destruction_num = 0;
     CQ src_queue( allocator<T>(0) );
     const std::size_t size = 10;
@@ -1340,22 +1420,34 @@ void TestMoveConstructors() {
     qit = dst_queue2.unsafe_begin();
     for( std::size_t i = 0; i < size; ++i, ++qit ) {
         REQUIRE_MESSAGE(locations[i] == &(*qit), "an item should have been moved but was not" );
+        locations[i] = &(*qit);
+    }
+
+    // Testing move assign
+    CQ dst_queue3;
+    dst_queue3 = std::move(dst_queue2);
+
+    TestQueueOperabilityAfterDataMove<T>( dst_queue2);
+
+    qit = dst_queue3.unsafe_begin();
+    for( std::size_t i = 0; i < size; ++i, ++qit ) {
+        REQUIRE_MESSAGE(locations[i] == &(*qit), "an item should have been moved but was not" );
     }
 
     for( std::size_t i = 0; i < size; ++i) {
         T test(i + (i ^ size));
         T popped;
-        bool pop_result = dst_queue2.try_pop( popped );
+        bool pop_result = dst_queue3.try_pop( popped );
         CHECK(pop_result);
         CHECK(test == popped);
     }
-    CHECK(dst_queue2.empty());
-    CHECK(dst_queue2.size() == 0);
+    CHECK(dst_queue3.empty());
+    CHECK(dst_queue3.size() == 0);
 }
 
 void TestMoveConstruction() {
-    TestMoveConstructors<ConcQWithSizeWrapper<Bar, allocator<Bar>>, Bar>();
-    TestMoveConstructors<oneapi::tbb::concurrent_bounded_queue<Bar, allocator<Bar>>, Bar>();
+    TestMoveConstructorsAndAssign<ConcQWithSizeWrapper<Bar, allocator<Bar>>, Bar>();
+    TestMoveConstructorsAndAssign<oneapi::tbb::concurrent_bounded_queue<Bar, allocator<Bar>>, Bar>();
 }
 
 class NonTrivialConstructorType {
@@ -1486,9 +1578,9 @@ void TestQueueIteratorComparisons() {
     TestQueueIteratorComparisonsBasic<typename QueueType::const_iterator>(cq);
 }
 
-//! Test constructors
+//! Test constructors and assignment
 //! \brief \ref interface \ref requirement
-TEST_CASE("testing constructors") {
+TEST_CASE("testing constructors and assignment") {
     TestQueueConstructors();
 }
 
@@ -1510,9 +1602,9 @@ TEST_CASE("testing clean operation") {
     TestClearWorks();
 }
 
-//! Test move constructors
+//! Test move constructors and move assignment
 //! \brief \ref interface \ref requirement
-TEST_CASE("testing move constructor") {
+TEST_CASE("testing move constructor and move assignment") {
     TestMoveConstruction();
 }
 
