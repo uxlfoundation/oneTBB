@@ -8,7 +8,7 @@
 #ifndef __TCM_TRACING_UTILS_HEADER
 #define __TCM_TRACING_UTILS_HEADER
 
-#include "tcm/detail/_tcm_assert.h"
+#include "detail/_tcm_assert.h"
 
 #include <algorithm>
 #include <chrono>
