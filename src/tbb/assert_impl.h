@@ -32,9 +32,6 @@
 #endif
 #if (__TBB_BUILD || __TBBBIND_BUILD) && TBB_USE_EXCEPTIONS // only TBB and TBBBind use custom handler
 #include <exception>
-#if __TBB_USE_OPTIONAL_RTTI
-#include <typeinfo> // to report exception name
-#endif
 #endif
 
 #include <mutex>
