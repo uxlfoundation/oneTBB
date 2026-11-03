@@ -107,7 +107,7 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
     #pragma warning (pop)
 #endif
 }
-#endif // !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
+#endif // !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD && !TBB_USE_EXCEPTIONS
 
 namespace assertion_handler {
 // Initial value is default handler
