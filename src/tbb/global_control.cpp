@@ -186,6 +186,7 @@ std::size_t global_control_active_value_unsafe(d1::global_control::parameter par
 }
 
 std::size_t global_control_active_value_unchecked(d1::global_control::parameter param) {
+    __TBB_ASSERT(param < d1::global_control::parameter_max, nullptr);
     return controls[param]->active_value();
 }
 
