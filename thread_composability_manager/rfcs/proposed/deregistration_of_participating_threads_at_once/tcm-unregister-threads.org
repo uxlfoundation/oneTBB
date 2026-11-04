@@ -32,9 +32,9 @@
 
   /Return values/:
   - =TCM_RESULT_ERROR_INVALID_ARGUMENT= if the passed =permit_handle= is =nullptr=.
-  - =TCM_RESULT_PERMIT_MISMATCH= if at least for one of the threads the deepest permit, with which
-    it was registered, is not equal to the passed =permit_handle=. In this case, such threads are
-    not unregistered.
+  - =TCM_RESULT_PERMIT_MISMATCH= if at least for one of the threads the deepest/latest permit, with
+    which it was registered, is not equal to the passed =permit_handle=. In this case, such threads
+    are not unregistered.
   - =TCM_RESULT_SUCCESS= in case of successful function invocation.
 
 
@@ -93,7 +93,7 @@
        look something like:
        #+begin_src C++
          /**
-          ,* Unregisters calling thread from the deepest permit with which it is registered.
+          ,* Unregisters calling thread from the deepest/latest permit with which it is registered.
           ,*
           ,* Params:
           ,*
