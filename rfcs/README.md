@@ -33,8 +33,7 @@ The `rfcs/experimental` directory contains RFCs for experimental library feature
 In addition to the design, these documents describe the criteria for the described
 functionality to exit the experimental status.
 
-The `rfcs/supported` directory contains documents for the fully supported features,
-both implemented according to the library specification and provided as extensions.
+The `rfcs/supported` directory contains documents for the fully supported features.
 
 The `rfcs/archived` directory contains rejected proposals and documents for
 the former functionality that has been removed.
@@ -76,8 +75,8 @@ of what is required to move it from experimental to fully supported - for
 example, feedback from users, demonstrated performance improvements, etc.
 
 A proposal that is implemented as a fully supported feature appears
-in the `rfcs/supported` directory. It typically involves the oneTBB specification
-changes and should therefore have a link to the section in the specification
+in the `rfcs/supported` directory. It typically involves the oneTBB documentation
+changes and should therefore have a link to the section in the documentation
 with its formal wording.
 
 A feature that is removed or a proposal that is abandoned or rejected will 
