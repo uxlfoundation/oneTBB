@@ -1630,21 +1630,33 @@ namespace Arm64Replacement {
     }
 
     void TestFarTarget() {
-        CodePage funcPage;
-        REQUIRE(funcPage.code);
-        const UINT_PTR far_offsets[] = { (UINT_PTR)1 << 30, (UINT_PTR)1 << 31 };
-        for (UINT_PTR offset : far_offsets) {
-            CodePage targetPage((void*)(Ptr2Addrint(funcPage.code) + offset));
-            if (!targetPage.code)
+        // Reserve a range, release it, and put the function and the target at its ends: the target
+        // is out of B range, and the free memory between them can hold the probe.
+        const UINT_PTR distance = (UINT_PTR)1 << 28;
+        for (int attempt = 0; attempt < 10; ++attempt) {
+            char* base = (char*)VirtualAlloc(nullptr, distance + 4096, MEM_RESERVE, PAGE_NOACCESS);
+            if (!base)
                 continue;
-            UINT32* target = targetPage.emit(0, { AddX0(100), RET });
+            VirtualFree(base, 0, MEM_RELEASE);
+            CodePage funcPage(base);
+            CodePage targetPage(base + distance);
+            if (!funcPage.code || !targetPage.code)
+                continue; // the range was taken concurrently
+
             UINT32* func = funcPage.emit(0, { AddX0(1), RET });
+            UINT32* target = targetPage.emit(0, { AddX0(100), RET });
+            REQUIRE(!IsInDistance(Ptr2Addrint(func), Ptr2Addrint(target), MAX_DISTANCE));
             TestFunc orig = Replace(func, target);
+
+            // The entry must branch to a probe that jumps to the target
+            UINT32* probe = (UINT32*)Addrint2Ptr(Arm64::BranchTarget(Ptr2Addrint(func), func[0]));
+            REQUIRE(probe[0] == Arm64::LDR_X16_PLUS8);
+            REQUIRE(probe[1] == Arm64::BR_X16);
             REQUIRE(((TestFunc)func)(1) == 101);
             REQUIRE(orig(1) == 2);
             return;
         }
-        INFO("Cannot allocate a far target, test skipped!\n");
+        FAIL("Cannot allocate a far target");
     }
 } // namespace Arm64Replacement
 
