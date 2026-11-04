@@ -1565,7 +1565,7 @@ public:
       for (auto& e : pr.thread_locals) {
           __TCM_ASSERT(e, "Actual thread data was not found.");
           thread_registration_data_t& trd = *e;
-          std::lock_guard<std::mutex> lock(trd.mutex);
+          std::lock_guard<std::mutex> per_thread_lock(trd.mutex);
           if (!trd.permits.empty() && permit_id == trd.permits.top())
               trd.permits.pop();
           else
