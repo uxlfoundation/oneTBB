@@ -594,7 +594,7 @@ public:
             // Always attempt to do proper cleanup to avoid inevitable memory corruption
             // in case of missing wait (for the sake of better testability & debuggability)
 
-            call_with_assert_release([&] {
+            tbb::detail::call_with_assert_release([&] {
                 // wait can take a task from queue that execution might call __TBB_ASSERT_RELEASE
                 if (!context().is_group_execution_cancelled())
                     cancel();
