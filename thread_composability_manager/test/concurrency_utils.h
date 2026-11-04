@@ -24,14 +24,14 @@ class Waiter {
 public:
     template <typename Predicate>
     void wait_for(Predicate&& condition) {
-        std::unique_lock lock(mutex);
+        std::unique_lock<std::mutex> lock(mutex);
         cv.wait(lock, std::forward<Predicate>(condition));
     }
 
     template <typename Func>
     void notify_all_about(Func&& event) {
         {
-            std::lock_guard lock(mutex);
+            std::lock_guard<std::mutex> lock(mutex);
             std::forward<Func>(event)();
         }
         cv.notify_all();
