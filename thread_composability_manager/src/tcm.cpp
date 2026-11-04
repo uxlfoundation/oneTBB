@@ -1558,15 +1558,11 @@ public:
 
   tcm_result_t unregister_threads(const tcm_permit_handle_t ph) {
       __TCM_ASSERT(ph, "Invalid permit handle");
-      std::unordered_set<std::shared_ptr<thread_registration_data_t>> thread_locals;
-      {
-          permit_registrations_t& pr = ph->data.registrations;
-          std::lock_guard<std::mutex> lock(pr.mutex);
-          thread_locals = pr.thread_locals;
-      }
       tcm_result_t status = TCM_RESULT_SUCCESS;
       const std::size_t& permit_id = ph->permit_id;
-      for (auto& e : thread_locals) {
+      permit_registrations_t& pr = ph->data.registrations;
+      std::lock_guard<std::mutex> lock(pr.mutex);
+      for (auto& e : pr.thread_locals) {
           __TCM_ASSERT(e, "Actual thread data was not found.");
           thread_registration_data_t& trd = *e;
           std::lock_guard<std::mutex> lock(trd.mutex);
