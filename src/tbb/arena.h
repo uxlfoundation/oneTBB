@@ -37,7 +37,6 @@
 #include "observer_proxy.h"
 #include "thread_control_monitor.h"
 #include "threading_control_client.h"
-#include "misc.h"
 
 namespace tbb {
 namespace detail {
@@ -193,7 +192,7 @@ public:
     void set_initial_state(tbb::task_arena::leave_policy lp) {
         std::uintptr_t policy = FAST_LEAVE;
         if (lp == tbb::task_arena::leave_policy::automatic) {
-            auto glp = tbb::task_arena::leave_policy(get_active_value<global_control::leave_policy>());
+            auto glp = tbb::task_arena::leave_policy(global_control::active_value(global_control::leave_policy));
             if (glp == tbb::task_arena::leave_policy::automatic && !governor::hybrid_cpu()) {
                 policy = DELAYED_LEAVE;
             }
