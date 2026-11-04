@@ -3052,13 +3052,17 @@ tcm_result_t tcmUnregisterThread() {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-/// @brief Unregisters all the threads that were previously registered with
+/// @brief Unregisters all the threads that were most recently registered with
 ///        specified permit
 ///
 /// @returns
 ///     - ::TCM_RESULT_SUCCESS
-///     - ::TCM_RESULT_ERROR_UNKNOWN
+///     - ::TCM_RESULT_PERMIT_MISMATCH
+///     - ::TCM_RESULT_ERROR_INVALID_ARGUMENT
 tcm_result_t tcmUnregisterThreads(tcm_permit_handle_t permit_handle) {
+  if (!permit_handle)
+    return TCM_RESULT_ERROR_INVALID_ARGUMENT;
+
   using tcm::theTCM;
   return theTCM::instance().unregister_threads(permit_handle);
 }
