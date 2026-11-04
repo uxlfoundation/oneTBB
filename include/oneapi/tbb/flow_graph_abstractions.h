@@ -42,6 +42,8 @@ public:
 
     //! Submit signal from an asynchronous activity to FG.
     virtual bool try_put(const input_type&) = 0;
+
+    ~receiver_gateway() noexcept override = default;
 };
 
 } // d2
