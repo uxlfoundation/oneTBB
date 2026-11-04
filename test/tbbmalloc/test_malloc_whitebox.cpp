@@ -1388,6 +1388,7 @@ void TestReallocDecreasing() {
 #if !__TBB_WIN8UI_SUPPORT && defined(_WIN32)
 
 #include "../../src/tbbmalloc_proxy/function_replacement.cpp"
+#include <initializer_list>
 #include <string>
 namespace FunctionReplacement {
     FunctionInfo funcInfo = { "funcname","dllname" };
@@ -1470,6 +1471,194 @@ void TesFunctionReplacementLog() {
     TestFalseSearchCase();
     TestWrongFunctionInDll();
 }
+
+#if defined(_WIN64)
+// When everything above a module within MAX_DISTANCE is taken, trampoline memory
+// must be found below the module.
+void TestTrampolineMemoryBelowModule() {
+    SYSTEM_INFO sysInfo;
+    GetSystemInfo(&sysInfo);
+    const UINT_PTR gran = sysInfo.dwAllocationGranularity;
+    const UINT_PTR span = ((UINT_PTR)MAX_DISTANCE + MAX_PROBE_SIZE + gran) & ~(gran - 1);
+
+    // Layout: [free: span][module: gran][blocker: up to base + 3*span]
+    char* base = (char*)VirtualAlloc(nullptr, 3 * span, MEM_RESERVE, PAGE_NOACCESS);
+    if (!base) {
+        INFO("Cannot reserve address space, test skipped!\n");
+        return;
+    }
+    VirtualFree(base, 0, MEM_RELEASE);
+    void* module = VirtualAlloc(base + span, gran, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    void* blocker = VirtualAlloc(base + span + gran, 2 * span - gran, MEM_RESERVE, PAGE_NOACCESS);
+    if (module && blocker) {
+        MemoryProvider provider;
+        const UINT_PTR addr = Ptr2Addrint(module) + gran / 2;
+        const UINT_PTR loc = provider.GetLocation(addr);
+        REQUIRE_MESSAGE(loc != 0, "No trampoline memory found below the module");
+        REQUIRE(loc < Ptr2Addrint(module));
+        REQUIRE(IsInDistance(addr, loc, MAX_DISTANCE));
+        VirtualFree(Addrint2Ptr(loc & ~(gran - 1)), 0, MEM_RELEASE);
+    } else {
+        INFO("Address space was taken concurrently, test skipped!\n");
+    }
+    if (blocker) VirtualFree(blocker, 0, MEM_RELEASE);
+    if (module) VirtualFree(module, 0, MEM_RELEASE);
+}
+#endif // _WIN64
+
+#if defined(_M_ARM64)
+namespace Arm64Replacement {
+    typedef UINT64 (*TestFunc)(UINT64);
+
+    const UINT32 RET  = 0xD65F03C0;
+    const UINT32 BRK  = 0xD4200000;
+    const UINT32 CMP_X0_0 = 0xF100001F;                                    // cmp x0, #0
+    inline UINT32 MovX0(UINT32 imm) { return 0xD2800000 | (imm << 5); }   // movz x0, #imm
+    inline UINT32 AddX0(UINT32 imm) { return 0x91000000 | (imm << 10); }  // add x0, x0, #imm
+
+    // An executable page for generated functions
+    struct CodePage {
+        UINT32* code;
+        explicit CodePage(void* hint = nullptr)
+            : code((UINT32*)VirtualAlloc(hint, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE)) {}
+        ~CodePage() { if (code) VirtualFree(code, 0, MEM_RELEASE); }
+        UINT32* emit(unsigned at, std::initializer_list<UINT32> insns) {
+            UINT32* p = code + at;
+            for (UINT32 insn : insns) *p++ = insn;
+            FlushInstructionCache(GetCurrentProcess(), code + at, insns.size() * sizeof(UINT32));
+            return code + at;
+        }
+    };
+
+    // Redirect func to target and return the trampoline that calls the original func
+    TestFunc Replace(UINT32* func, UINT32* target) {
+        void* orig = nullptr;
+        REQUIRE(InsertTrampolineArm64(func, target, &orig));
+        FlushInstructionCache(GetCurrentProcess(), func, SIZE_OF_ARM64_INSN);
+        REQUIRE(orig);
+        return (TestFunc)orig;
+    }
+
+    void TestClassify() {
+        REQUIRE(Arm64::Classify(0xA9BF7BFD) == Arm64::PLAIN);       // stp x29, x30, [sp, #-16]!
+        REQUIRE(Arm64::Classify(0xD503237F) == Arm64::PLAIN);       // pacibsp
+        REQUIRE(Arm64::Classify(0x17FFFFFF) == Arm64::BRANCH);      // b #-4
+        REQUIRE(Arm64::Classify(0x54000060) == Arm64::COND_BRANCH); // b.eq #12
+        REQUIRE(Arm64::Classify(0xB4000060) == Arm64::COND_BRANCH); // cbz x0, #12
+        REQUIRE(Arm64::Classify(0x36000060) == Arm64::COND_BRANCH); // tbz w0, #0, #12
+        REQUIRE(Arm64::Classify(0x10000040) == Arm64::ADDRESS);     // adr x0, #8
+        REQUIRE(Arm64::Classify(0xB0000000) == Arm64::ADDRESS);     // adrp x0, #0x1000
+        REQUIRE(Arm64::Classify(0x94000002) == Arm64::UNSUPPORTED); // bl #8
+        REQUIRE(Arm64::Classify(RET) == Arm64::UNSUPPORTED);
+        REQUIRE(Arm64::Classify(0x58000040) == Arm64::UNSUPPORTED); // ldr x0, #8
+
+        REQUIRE(Arm64::BranchTarget(0x10000, 0x17FFFFFF) == 0x10000 - 4);
+        REQUIRE(Arm64::CondBranchTarget(0x10000, 0xB4FFFFE0) == 0x10000 - 4); // cbz x0, #-4
+        REQUIRE(Arm64::CondBranchTarget(0x10000, 0x3607FFE0) == 0x10000 - 4); // tbz w0, #0, #-4
+        REQUIRE(Arm64::AdrValue(0x12345, 0xB0000000) == 0x13000);
+        REQUIRE(Arm64::AdrValue(0x12345, 0xF0FFFFE0) == 0x11000);              // adrp x0, #-0x1000
+    }
+
+    void TestPlainInstruction() {
+        CodePage page;
+        REQUIRE(page.code);
+        UINT32* func = page.emit(0, { AddX0(1), RET });
+        UINT32* target = page.emit(16, { AddX0(100), RET });
+        TestFunc orig = Replace(func, target);
+        REQUIRE(((TestFunc)func)(1) == 101);
+        REQUIRE(orig(1) == 2);
+    }
+
+    void TestConditionalBranches() {
+        CodePage page;
+        REQUIRE(page.code);
+        UINT32* target = page.emit(0, { MovX0(100), RET });
+
+        UINT32* cbz = page.emit(16, { 0xB4000060 /*cbz x0, #12*/, MovX0(5), RET, MovX0(7), RET });
+        TestFunc orig = Replace(cbz, target);
+        REQUIRE(((TestFunc)cbz)(0) == 100);
+        REQUIRE(orig(0) == 7);
+        REQUIRE(orig(1) == 5);
+
+        UINT32* tbz = page.emit(32, { 0x36000060 /*tbz w0, #0, #12*/, MovX0(5), RET, MovX0(7), RET });
+        orig = Replace(tbz, target);
+        REQUIRE(orig(2) == 7);
+        REQUIRE(orig(1) == 5);
+
+        UINT32* beq = page.emit(48, { 0x54000060 /*b.eq #12*/, MovX0(5), RET, MovX0(7), RET });
+        orig = Replace(beq, target);
+        // Set the flags before calling the trampoline
+        UINT64 origAddr = (UINT64)orig;
+        UINT32* stub = page.emit(64, { CMP_X0_0, Arm64::LDR_X16_PLUS8, Arm64::BR_X16,
+                                      (UINT32)origAddr, (UINT32)(origAddr >> 32) });
+        REQUIRE(((TestFunc)stub)(0) == 7);
+        REQUIRE(((TestFunc)stub)(1) == 5);
+    }
+
+    void TestAddressInstructions() {
+        CodePage page;
+        REQUIRE(page.code);
+        UINT32* target = page.emit(0, { MovX0(100), RET });
+
+        UINT32* adr = page.emit(16, { 0x10000040 /*adr x0, #8*/, RET });
+        TestFunc orig = Replace(adr, target);
+        REQUIRE(orig(0) == (UINT64)adr + 8);
+
+        UINT32* adrp = page.emit(32, { 0xB0000000 /*adrp x0, #0x1000*/, RET });
+        orig = Replace(adrp, target);
+        REQUIRE(orig(0) == ((UINT64)adrp & ~(UINT64)0xFFF) + 0x1000);
+    }
+
+    void TestBranchEntry() {
+        CodePage page;
+        REQUIRE(page.code);
+        UINT32* target = page.emit(0, { MovX0(100), RET });
+        UINT32* func = page.emit(16, { 0x14000002 /*b #8*/, BRK, MovX0(7), RET });
+        TestFunc orig = Replace(func, target);
+        REQUIRE((UINT32*)orig == func + 2);
+        REQUIRE(orig(0) == 7);
+    }
+
+    void TestUnsupportedEntry() {
+        CodePage page;
+        REQUIRE(page.code);
+        UINT32* target = page.emit(0, { MovX0(100), RET });
+        UINT32* func = page.emit(16, { 0x58000040 /*ldr x0, #8*/, RET });
+        void* orig = nullptr;
+        REQUIRE(!InsertTrampolineArm64(func, target, &orig));
+        REQUIRE(func[0] == 0x58000040);
+    }
+
+    void TestFarTarget() {
+        CodePage funcPage;
+        REQUIRE(funcPage.code);
+        const UINT_PTR far_offsets[] = { (UINT_PTR)1 << 30, (UINT_PTR)1 << 31 };
+        for (UINT_PTR offset : far_offsets) {
+            CodePage targetPage((void*)(Ptr2Addrint(funcPage.code) + offset));
+            if (!targetPage.code)
+                continue;
+            UINT32* target = targetPage.emit(0, { AddX0(100), RET });
+            UINT32* func = funcPage.emit(0, { AddX0(1), RET });
+            TestFunc orig = Replace(func, target);
+            REQUIRE(((TestFunc)func)(1) == 101);
+            REQUIRE(orig(1) == 2);
+            return;
+        }
+        INFO("Cannot allocate a far target, test skipped!\n");
+    }
+} // namespace Arm64Replacement
+
+void TestArm64FunctionReplacement() {
+    using namespace Arm64Replacement;
+    TestClassify();
+    TestPlainInstruction();
+    TestConditionalBranches();
+    TestAddressInstructions();
+    TestBranchEntry();
+    TestUnsupportedEntry();
+    TestFarTarget();
+}
+#endif // _M_ARM64
 
 #endif /*!__TBB_WIN8UI_SUPPORT && defined(_WIN32)*/
 
@@ -1713,4 +1902,18 @@ TEST_CASE("Transparent huge pages") {
 TEST_CASE("Function replacement log") {
     TesFunctionReplacementLog();
 }
+
+#if defined(_WIN64)
+//! \brief \ref error_guessing
+TEST_CASE("Trampoline memory below the module") {
+    TestTrampolineMemoryBelowModule();
+}
+#endif
+
+#if defined(_M_ARM64)
+//! \brief \ref error_guessing
+TEST_CASE("ARM64 function replacement") {
+    TestArm64FunctionReplacement();
+}
+#endif
 #endif

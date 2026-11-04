@@ -801,7 +801,7 @@ if (TARGET TBB::tbbmalloc)
         endif()
 
         # Thread Sanitizer overloads memory management routines that conflicts with tbbmalloc_proxy.
-        if (BUILD_SHARED_LIBS AND NOT TBB_SANITIZE MATCHES "thread" AND TBBMALLOC_PROXY_BUILD AND NOT MSVC_CXX_ARCHITECTURE_ID MATCHES "ARM64")
+        if (BUILD_SHARED_LIBS AND NOT TBB_SANITIZE MATCHES "thread" AND TBBMALLOC_PROXY_BUILD AND NOT MSVC_CXX_ARCHITECTURE_ID MATCHES "ARM64EC")
             # Define TBB malloc proxy tests
             tbb_add_lib_test(SUBDIR tbbmalloc NAME test_malloc_atexit DEPENDENCIES TBB::tbbmalloc_proxy TBB::tbbmalloc)
 	    if (NOT TBB_EMSCRIPTEN)
