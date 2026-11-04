@@ -10,7 +10,7 @@
 
 #if __TCM_ENABLE_CALLSTACK_TRACER
 
-#include "tcm/detail/_tcm_assert.h"
+#include "detail/_tcm_assert.h"
 #include "_tracing_utils.h"
 
 #include <algorithm>

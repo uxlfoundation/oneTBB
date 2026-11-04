@@ -61,9 +61,13 @@ target_compile_definitions(tcm PRIVATE
   $<$<BOOL:${TCM_COMMIT_ID}>:__TCM_COMMIT_ID="${TCM_COMMIT_ID}">
 )
 
-target_include_directories(tcm PUBLIC
+target_include_directories(tcm
+  PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+
+  PRIVATE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
 
 # Prefer using target_link_options instead of target_link_libraries to specify link options because
