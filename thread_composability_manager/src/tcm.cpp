@@ -989,7 +989,7 @@ public:
           const std::lock_guard<std::mutex> l(data_mutex);
           client_resources = clear_up_internals_from(clid);
           __TCM_ASSERT(available_concurrency <= available_concurrency + client_resources.concurrency,
-                     "Overflow detected");
+                       "Overflow detected");
           available_concurrency += client_resources.concurrency;
           should_renegotiate = client_resources.concurrency > 0 && has_resource_demand(*this);
 
@@ -1002,8 +1002,10 @@ public:
 #endif
       }
 
-      for (const auto& ph : client_resources.permit_handles)
+      for (const auto& ph : client_resources.permit_handles) {
+          clear_up_threads_registration_from(ph);
           deallocate_permit(ph);
+      }
 
       if (should_renegotiate)
           renegotiate_permits(/*initiator*/nullptr);
@@ -1463,6 +1465,23 @@ public:
       return overall_resources;
   }
 
+  /**
+   * Clears permit IDs from registrations of each participated thread.
+   */
+  void clear_up_threads_registration_from(tcm_permit_handle_t handle) {
+      __TCM_ASSERT(handle, "Invalid permit handle");
+
+      // Do cleanup of permits seen by threads
+      permit_registrations_t& pr = handle->data.registrations;
+      std::lock_guard<std::mutex> lock(pr.mutex);
+      for (auto& trd_ptr : pr.thread_locals) {
+          thread_registration_data_t& trd = *trd_ptr;
+          std::lock_guard<std::mutex> per_thread_lock(trd.mutex);
+          const std::size_t num = trd.seen.erase(handle->permit_id);
+          __TCM_ASSERT_EX(num == 1, "Permit was not known to the thread");
+      }
+  }
+
   tcm_result_t release_permit(tcm_permit_handle_t handle) {
     __TCM_PROFILE_THIS_FUNCTION();
 
@@ -1481,17 +1500,7 @@ public:
         __TCM_PROFILE_PERMIT(handle, "released");
     }
 
-    {
-        // Do cleanup of permits seen by threads
-        permit_registrations_t& pr = handle->data.registrations;
-        std::lock_guard<std::mutex> lock(pr.mutex);
-        for (auto& trd_ptr : pr.thread_locals) {
-            thread_registration_data_t& trd = *trd_ptr;
-            std::lock_guard<std::mutex> per_thread_lock(trd.mutex);
-            const std::size_t num = trd.seen.erase(handle->permit_id);
-            __TCM_ASSERT_EX(num == 1, "Permit was not known to the thread");
-        }
-    }
+    clear_up_threads_registration_from(handle);
 
     // Permit representation has been erased from internal structures, i.e. TCM does not know about
     // it anymore. Thus, can deallocate permit representation without holding a lock.
