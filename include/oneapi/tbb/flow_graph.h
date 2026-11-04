@@ -554,7 +554,7 @@ inline graph::graph(task_group_context& use_this_context) :
 }
 
 inline graph::~graph() noexcept(false) {
-    call_with_assert_release([&] {
+    tbb::detail::call_with_assert_release([&] {
         // wait can take a task from queue that execution might call __TBB_ASSERT_RELEASE
         wait_for_all();
     }, tbb::detail::stack_unwinding_in_progress());
