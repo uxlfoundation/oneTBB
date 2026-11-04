@@ -23,8 +23,7 @@ namespace internal {
 
 struct thread_registration_data_t {
   std::mutex mutex;
-  std::stack<tcm_permit_handle_t> permits; // Permits with which a thread is registered.
-
+  std::stack<std::size_t> permits;      // Permits with which a thread is registered.
   std::unordered_set<std::size_t> seen; // Permits this thread has been once registered with.
 };
 

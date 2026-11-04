@@ -1091,10 +1091,11 @@ public:
 
   void determine_nested_permit(tcm_permit_handle_t& ph) {
     bool is_nested = false;
+    const std::size_t permit_id = ph->permit_id;
     thread_registration_data_t& trd = thread_data();
     {
         std::lock_guard<std::mutex> lock(trd.mutex);
-        if (!trd.permits.empty() && ph != trd.permits.top())
+        if (!trd.permits.empty() && permit_id != trd.permits.top())
             is_nested = true;
     }
 
@@ -1520,7 +1521,7 @@ public:
       bool is_first_registration = false;
       {
           std::lock_guard<std::mutex> lock(trd.mutex);
-          trd.permits.push(ph);  // Actual thread registration
+          trd.permits.push(ph->permit_id);  // Actual thread registration
           is_first_registration = trd.seen.emplace(ph->permit_id).second;
       }
 
@@ -1564,11 +1565,12 @@ public:
           thread_locals = pr.thread_locals;
       }
       tcm_result_t status = TCM_RESULT_SUCCESS;
+      const std::size_t& permit_id = ph->permit_id;
       for (auto& e : thread_locals) {
           __TCM_ASSERT(e, "Actual thread data was not found.");
           thread_registration_data_t& trd = *e;
           std::lock_guard<std::mutex> lock(trd.mutex);
-          if (!trd.permits.empty() && ph == trd.permits.top())
+          if (!trd.permits.empty() && permit_id == trd.permits.top())
               trd.permits.pop();
           else
               status = TCM_RESULT_PERMIT_MISMATCH;
