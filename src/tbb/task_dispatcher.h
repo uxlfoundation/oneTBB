@@ -383,7 +383,7 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
             } while (t != nullptr); // main dispatch loop
             break; // Exit exception loop;
         } catch (...) {
-            if (global_control::active_value(global_control::terminate_on_exception) == 1) {
+            if (get_active_value<global_control::terminate_on_exception>() == 1) {
                 do_throw_noexcept([] { throw; });
             }
 

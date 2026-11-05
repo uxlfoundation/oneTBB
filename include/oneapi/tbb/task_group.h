@@ -585,16 +585,17 @@ public:
 
     ~task_group_base() noexcept(false) {
         if (m_wait_vertex.continue_execution()) {
-#if __TBB_CPP17_UNCAUGHT_EXCEPTIONS_PRESENT
-            bool stack_unwinding_in_progress = std::uncaught_exceptions() > 0;
-#else
-            bool stack_unwinding_in_progress = std::uncaught_exception();
-#endif
+            bool stack_unwinding_in_progress = tbb::detail::stack_unwinding_in_progress();
             // Always attempt to do proper cleanup to avoid inevitable memory corruption
             // in case of missing wait (for the sake of better testability & debuggability)
-            if (!context().is_group_execution_cancelled())
-                cancel();
-            d1::wait(m_wait_vertex.get_context(), context());
+
+            tbb::detail::call_with_assert_release([&] {
+                // wait can take a task from queue that execution might call __TBB_ASSERT_RELEASE
+                if (!context().is_group_execution_cancelled())
+                    cancel();
+                d1::wait(m_wait_vertex.get_context(), context());
+            }, stack_unwinding_in_progress);
+
             if (!stack_unwinding_in_progress)
                 throw_exception(exception_id::missing_wait);
         }

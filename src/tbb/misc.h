@@ -22,6 +22,7 @@
 #include "oneapi/tbb/detail/_assert.h"
 #include "oneapi/tbb/detail/_utils.h"
 #include "oneapi/tbb/info.h"
+#include "oneapi/tbb/global_control.h"
 #include "tcm.h"
 
 #if __unix__
@@ -276,6 +277,17 @@ static inline unsigned char is_in_transaction() {
 #endif
 }
 #endif // TBB_USE_ASSERT
+
+std::size_t global_control_active_value_unchecked(d1::global_control::parameter param);
+
+template <global_control::parameter P>
+std::size_t get_active_value() {
+    static_assert(P >= global_control::max_allowed_parallelism && P < global_control::parameter_max,
+                  "Invalid global_control parameter");
+    return global_control_active_value_unchecked(P);
+}
+
+
 
 } // namespace r1
 } // namespace detail

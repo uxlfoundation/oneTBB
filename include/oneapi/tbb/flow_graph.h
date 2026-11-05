@@ -553,8 +553,11 @@ inline graph::graph(task_group_context& use_this_context) :
     my_is_active = true;
 }
 
-inline graph::~graph() {
-    wait_for_all();
+inline graph::~graph() noexcept(false) {
+    tbb::detail::call_with_assert_release([&] {
+        // wait can take a task from queue that execution might call __TBB_ASSERT_RELEASE
+        wait_for_all();
+    }, tbb::detail::stack_unwinding_in_progress());
     if (own_context) {
         my_context->~task_group_context();
         r1::cache_aligned_deallocate(my_context);
