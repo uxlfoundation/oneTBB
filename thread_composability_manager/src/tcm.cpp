@@ -1550,8 +1550,10 @@ public:
       thread_registration_data_t& trd = thread_data();
 
       std::lock_guard<std::mutex> lock(trd.mutex);
-      if (!trd.permits.empty())
-          trd.permits.pop(); // This thread undoes its previous registration
+      if (trd.permits.empty())
+          return TCM_RESULT_PERMIT_MISMATCH;
+
+      trd.permits.pop(); // This thread undoes its previous registration
 
       return TCM_RESULT_SUCCESS;
   }
