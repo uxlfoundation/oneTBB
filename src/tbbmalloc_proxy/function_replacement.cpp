@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -182,6 +183,42 @@ MemoryBuffer *CreateBuffer(UINT_PTR addr)
             }
         }
 
+        // Nothing free above within the distance: search below the allocation that contains addr.
+        if (VirtualQuery(Addrint2Ptr(addr), &memInfo, sizeof(memInfo)) != sizeof(memInfo))
+            return 0;
+        UINT_PTR regionStart = Ptr2Addrint(memInfo.AllocationBase ? memInfo.AllocationBase : memInfo.BaseAddress);
+        for(;;) {
+            if (regionStart < m_allocSize)
+                break;
+            // The highest allocation-aligned block that ends at or below the start of the current region
+            const UINT_PTR candidate = (regionStart - m_allocSize) & ~(UINT_PTR)(m_allocSize-1);
+
+            // The whole block is below addr, so its farthest byte from addr is the candidate itself
+            if (!IsInDistance(addr, candidate, MAX_DISTANCE))
+                break;
+
+            if (VirtualQuery(Addrint2Ptr(candidate), &memInfo, sizeof(memInfo)) != sizeof(memInfo))
+                break;
+
+            // For a free region, RegionSize counts from the candidate up to the next allocation
+            if (memInfo.State == MEM_FREE && memInfo.RegionSize >= m_allocSize)
+            {
+                void *newPage = VirtualAlloc(Addrint2Ptr(candidate), m_allocSize, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
+                if (!newPage)
+                    break;
+
+                MemoryBuffer *pBuff = new (m_lastBuffer) MemoryBuffer(newPage, m_allocSize);
+                ++m_lastBuffer;
+                return pBuff;
+            }
+
+            // Continue below this region: below the candidate if it was a too-small free gap,
+            // otherwise below the start of the allocation (e.g. a whole DLL image) that occupies it.
+            regionStart = memInfo.State == MEM_FREE
+                ? candidate
+                : Ptr2Addrint(memInfo.AllocationBase ? memInfo.AllocationBase : memInfo.BaseAddress);
+        }
+
         // Failed to find a buffer in the distance
         return 0;
     }
@@ -232,6 +269,8 @@ private:
 };
 
 static MemoryProvider memProvider;
+
+#if !defined(_M_ARM64)
 
 // Compare opcodes from dictionary (str1) and opcodes from code (str2)
 // str1 might contain '*' to mask addresses
@@ -426,6 +465,171 @@ static DWORD InsertTrampoline64(void *inpAddr, void *targetAddr, const char* pat
     return SIZE_OF_INDJUMP;
 }
 
+#else // _M_ARM64
+
+/*
+ * ARM64: instructions are 4 bytes long and 4-byte aligned, so a function is redirected by
+ * replacing only its first instruction with a B to a probe placed within +-128 MB. The probe
+ * loads the absolute target address into x16 (IP0, free to use at a call boundary) and
+ * branches to it. Because a single instruction is displaced, no instruction-length decoding
+ * or prologue dictionary is needed: the trampoline that calls the original function executes
+ * the displaced instruction (rewritten if it is PC-relative) and branches back to entry + 4.
+ * Instructions that can't be moved make IsPrologueKnown() fail, so replacement is skipped,
+ * as on x86/x64 for unknown prologues.
+ */
+namespace Arm64 {
+    const UINT32 LDR_X16_PLUS8 = 0x58000050; // ldr x16, #8
+    const UINT32 BR_X16        = 0xD61F0200; // br  x16
+
+    enum Kind {
+        PLAIN,       // PC-independent: copied as is
+        BRANCH,      // B: its target is the original function (hot-patch stubs in ucrtbase.dll)
+        COND_BRANCH, // CBZ/CBNZ/TBZ/TBNZ/B.cond: re-emitted with a local target
+        ADDRESS,     // ADR/ADRP: replaced by a load of the computed address
+        UNSUPPORTED
+    };
+
+    inline INT64 SignExtend(UINT64 value, unsigned bits) {
+        const UINT64 sign = (UINT64)1 << (bits - 1);
+        value &= ((UINT64)1 << bits) - 1;
+        return (INT64)((value ^ sign) - sign);
+    }
+
+    inline bool IsB(UINT32 i)          { return (i & 0xFC000000) == 0x14000000; }
+    inline bool IsCbz(UINT32 i)        { return (i & 0x7E000000) == 0x34000000; } // CBZ/CBNZ, imm19
+    inline bool IsTbz(UINT32 i)        { return (i & 0x7E000000) == 0x36000000; } // TBZ/TBNZ, imm14
+    inline bool IsBCond(UINT32 i)      { return (i & 0xFF000000) == 0x54000000; } // B.cond/BC.cond, imm19
+    inline bool IsHint(UINT32 i)       { return (i & 0xFFFFF01F) == 0xD503201F; } // NOP, PACIBSP, BTI, ...
+    inline bool IsBranchSystem(UINT32 i) { return (i & 0x1C000000) == 0x14000000; } // branches, system
+    inline bool IsAdr(UINT32 i)        { return (i & 0x1F000000) == 0x10000000; } // ADR/ADRP
+    inline bool IsLiteralLoad(UINT32 i) { return (i & 0x3B000000) == 0x18000000; } // LDR/LDRSW/PRFM (literal)
+
+    inline Kind Classify(UINT32 i) {
+        if (IsB(i))
+            return BRANCH;
+        if (IsCbz(i) || IsTbz(i) || IsBCond(i))
+            return COND_BRANCH;
+        if (IsHint(i))
+            return PLAIN;
+        if (IsBranchSystem(i)) // BL, BR, BLR, RET, exception and system instructions
+            return UNSUPPORTED;
+        if (IsAdr(i))
+            return ADDRESS;
+        if (IsLiteralLoad(i))
+            return UNSUPPORTED;
+        return PLAIN;
+    }
+
+    inline UINT_PTR BranchTarget(UINT_PTR pc, UINT32 i) {
+        return pc + (UINT_PTR)(SignExtend(i, 26) * 4);
+    }
+    inline UINT_PTR CondBranchTarget(UINT_PTR pc, UINT32 i) {
+        return pc + (UINT_PTR)(SignExtend(i >> 5, IsTbz(i) ? 14 : 19) * 4);
+    }
+    // The same conditional branch with its offset set to `words` instructions
+    inline UINT32 RetargetCondBranch(UINT32 i, UINT32 words) {
+        const UINT32 mask = IsTbz(i) ? 0x3FFFu : 0x7FFFFu;
+        return (i & ~(mask << 5)) | ((words & mask) << 5);
+    }
+    inline UINT_PTR AdrValue(UINT_PTR pc, UINT32 i) {
+        const UINT64 imm = ((i >> 29) & 0x3) | ((UINT64)((i >> 5) & 0x7FFFF) << 2);
+        if (i & 0x80000000) // ADRP
+            return (pc & ~(UINT_PTR)0xFFF) + (UINT_PTR)(SignExtend(imm, 21) * 4096);
+        return pc + (UINT_PTR)SignExtend(imm, 21);
+    }
+    inline UINT32 Branch(UINT_PTR from, UINT_PTR to) {
+        return 0x14000000 | (UINT32)(((INT64)(to - from) >> 2) & 0x3FFFFFF);
+    }
+    inline UINT32 LdrLiteral64(UINT32 rt, UINT32 words) {
+        return 0x58000000 | ((words & 0x7FFFF) << 5) | (rt & 0x1F);
+    }
+
+    // Get a location within +-128 MB of `near_addr` that can hold code
+    inline UINT32* GetCodeLocation(UINT_PTR near_addr) {
+        const UINT_PTR loc = memProvider.GetLocation(near_addr);
+        if (!loc)
+            return nullptr;
+        DWORD prot = 0;
+        if (!VirtualProtect(Addrint2Ptr(loc), MAX_PROBE_SIZE, PAGE_EXECUTE_READWRITE, &prot))
+            return nullptr;
+        return (UINT32*)Addrint2Ptr(loc);
+    }
+
+    // Build a trampoline that runs the instruction displaced from `src` and continues at src + 4
+    inline void* MakeTrampoline(UINT_PTR src, UINT32 insn) {
+        UINT32* code = GetCodeLocation(src);
+        if (!code)
+            return nullptr;
+        const UINT_PTR t = Ptr2Addrint(code);
+        UINT_PTR value = 0;
+        switch (Classify(insn)) {
+        case PLAIN:
+            code[0] = insn;
+            code[1] = Branch(t + 4, src + SIZE_OF_ARM64_INSN);
+            break;
+        case COND_BRANCH:
+            // Taken: jump to the absolute branch at +8. Not taken: continue the function.
+            value = CondBranchTarget(src, insn);
+            code[0] = RetargetCondBranch(insn, 2);
+            code[1] = Branch(t + 4, src + SIZE_OF_ARM64_INSN);
+            code[2] = LDR_X16_PLUS8;
+            code[3] = BR_X16;
+            memcpy(&code[4], &value, sizeof(value));
+            break;
+        case ADDRESS:
+            value = AdrValue(src, insn);
+            code[0] = LdrLiteral64(insn & 0x1F, 2);
+            code[1] = Branch(t + 4, src + SIZE_OF_ARM64_INSN);
+            memcpy(&code[2], &value, sizeof(value));
+            break;
+        default:
+            return nullptr;
+        }
+        FlushInstructionCache(GetCurrentProcess(), code, MAX_PROBE_SIZE);
+        return code;
+    }
+} // namespace Arm64
+
+// Replace the first instruction at inpAddr with a branch to targetAddr.
+// RETURN: false on failure, true on success
+static bool InsertTrampolineArm64(void *inpAddr, void *targetAddr, void** storedAddr)
+{
+    const UINT_PTR srcAddr = Ptr2Addrint(inpAddr);
+    UINT_PTR destAddr = Ptr2Addrint(targetAddr);
+    UINT32 insn;
+    memcpy(&insn, inpAddr, sizeof(insn));
+
+    if ( storedAddr ){ // If requested, keep a way to call the original function
+        if ( Arm64::Classify(insn) == Arm64::BRANCH ) {
+            // For the special case when a system function consists of a single branch,
+            // instead of moving it somewhere we use the target of the branch as the original function.
+            *storedAddr = Addrint2Ptr(Arm64::BranchTarget(srcAddr, insn));
+        } else {
+            *storedAddr = Arm64::MakeTrampoline(srcAddr, insn);
+            if (!*storedAddr)
+                return false;
+        }
+    }
+
+    if (!IsInDistance(srcAddr, destAddr, MAX_DISTANCE)) {
+        // Too far for B: go through a probe that does an absolute jump
+        UINT32* probe = Arm64::GetCodeLocation(srcAddr);
+        if (!probe)
+            return false;
+        probe[0] = Arm64::LDR_X16_PLUS8;
+        probe[1] = Arm64::BR_X16;
+        memcpy(&probe[2], &destAddr, sizeof(destAddr));
+        FlushInstructionCache(GetCurrentProcess(), probe, MAX_PROBE_SIZE);
+        destAddr = Ptr2Addrint(probe);
+    }
+
+    // A single aligned 4-byte store: other threads see either the old or the new instruction.
+    InterlockedExchange((volatile LONG*)inpAddr, (LONG)Arm64::Branch(srcAddr, destAddr));
+    return true;
+}
+
+#endif // _M_ARM64
+
 // Insert a jump instruction in the inpAddr to the targetAddr
 // 1. Get the memory protection of the page containing the input address
 // 2. Change the memory protection to writable
@@ -440,14 +644,20 @@ static bool InsertTrampoline(void *inpAddr, void *targetAddr, const char ** opco
     if (!VirtualProtect(inpAddr, MAX_PROBE_SIZE, PAGE_EXECUTE_WRITECOPY, &origProt))
         return FALSE;
 
+#if defined(_M_ARM64)
+    (void)opcodes; // not used: the displaced instruction is relocated instead
+    const bool replaced = InsertTrampolineArm64(inpAddr, targetAddr, origFunc);
+    probeSize = SIZE_OF_ARM64_INSN;
+#else
     const char* pattern = nullptr;
     if ( origFunc ){ // Need to store original function code
         UCHAR * const codePtr = (UCHAR *)inpAddr;
         if ( *codePtr == 0xE9 ){ // JMP relative instruction
             // For the special case when a system function consists of a single near jump,
             // instead of moving it somewhere we use the target of the jump as the original function.
-            unsigned offsetInJmp = *(unsigned*)(codePtr + 1);
-            *origFunc = (void*)(Ptr2Addrint(inpAddr) + offsetInJmp + SIZE_OF_RELJUMP);
+            // The offset is signed: the jump can go backwards.
+            int offsetInJmp = *(int*)(codePtr + 1);
+            *origFunc = (void*)(Ptr2Addrint(inpAddr) + (INT_PTR)offsetInJmp + SIZE_OF_RELJUMP);
             origFunc = nullptr; // now it must be ignored by InsertTrampoline32/64
         } else {
             // find the right opcode pattern
@@ -460,15 +670,19 @@ static bool InsertTrampoline(void *inpAddr, void *targetAddr, const char ** opco
     probeSize = InsertTrampoline32(inpAddr, targetAddr, pattern, origFunc);
     if (!probeSize)
         probeSize = InsertTrampoline64(inpAddr, targetAddr, pattern, origFunc);
+    const bool replaced = probeSize != 0;
+#endif
 
     // Restore original protection
     VirtualProtect(inpAddr, MAX_PROBE_SIZE, origProt, &origProt);
 
-    if (!probeSize)
+    if (!replaced)
         return FALSE;
 
     FlushInstructionCache(GetCurrentProcess(), inpAddr, probeSize);
+#if !defined(_M_ARM64) // the ARM64 trampolines are flushed when they are made
     FlushInstructionCache(GetCurrentProcess(), origFunc, probeSize);
+#endif
 
     return TRUE;
 }
@@ -565,7 +779,18 @@ bool IsPrologueKnown(const char* dllName, const char *funcName, const char **opc
         return false;
     }
 
+#if defined(_M_ARM64)
+    (void)opcodes;
+    UINT32 insn;
+    memcpy(&insn, (void*)inpFunc, sizeof(insn));
+    char opcodeString[2*sizeof(insn)+1];
+    LOG_PRINT(opcodeString, sizeof(opcodeString), "%08X", (unsigned)insn);
+    const bool known = Arm64::Classify(insn) != Arm64::UNSUPPORTED;
+    Log::record(functionInfo, opcodeString, known);
+    return known;
+#else
     return CheckOpcodes( opcodes, (void*)inpFunc, /*abortOnError=*/false, &functionInfo) != 0;
+#endif
 }
 
 // Public Windows API
