@@ -56,9 +56,6 @@ class tree_task : public d1::task {
         }
     }
 
-    // Thieves steal from the oldest end of the deque, so the biggest trees have to be spawned
-    // first. The spine is built smallest-first, so it is walked to the tail and spawned on the
-    // way back. Depth is the spine length, O(log n)
     static void spawn_spine(tree_task* root, d1::wait_tree_vertex_interface* vertex) {
         if (root != nullptr) {
             tree_task* next = root->next_root();
@@ -68,17 +65,16 @@ class tree_task : public d1::task {
         }
     }
 
-    static void spawn_child(tree_task*& child, d1::wait_tree_vertex_interface* vertex) {
-        if (child != nullptr) {
-            if (child->num_elements() > TASK_TREE_GRAINSIZE) {
-                child->wait_tree_vertex() = vertex;
+    static void spawn_task(tree_task* task, d1::wait_tree_vertex_interface* vertex) {
+        if (task != nullptr) {
+            if (task->num_elements() > TASK_TREE_GRAINSIZE) {
+                task->wait_tree_vertex() = vertex;
                 vertex->reserve();
-                r1::spawn(*child, child->ctx());
+                r1::spawn(*task, task->ctx());
             } else {
-                vertex->reserve(static_cast<std::uint32_t>(child->num_elements()));
-                recursive_spawn(child, vertex);
+                vertex->reserve(static_cast<std::uint32_t>(task->num_elements()));
+                recursive_spawn(task, vertex);
             }
-            child = nullptr;
         }
     }
 protected:
@@ -88,32 +84,47 @@ protected:
         if (m_grab_target == nullptr && m_left_child == nullptr && m_right_child == nullptr) return;
 
         d1::wait_tree_vertex_interface* vertex = r1::get_thread_reference_vertex(m_tg_wait_context_vertex);
+        // Distribute tasks if we are the grabber
         grab_and_redistribute_tasks(vertex);
 
-        // Publish geometrically decreasing chunks from this one execution by descending the right
-        // spine. Spawning just the two halves would need log(size) executions to reach grainsize
-        tree_task* node = this;
-        while (node->m_num_elements > TASK_TREE_GRAINSIZE) {
-            tree_task* right = node->m_right_child;
+        // Distribute tasks if we are the tree
+        while (m_num_elements > TASK_TREE_GRAINSIZE) {
+            // TODO: only the first split may have a perfect tree. Consider moving it out the loop
+            __TBB_ASSERT(m_left_child != nullptr, "Broken tree structure");
+            if (m_right_child == nullptr) {
+                // We are the balanced tree
+                // Split itself into two balanced trees
+                tree_task* old_left_child = m_left_child;
+                m_left_child = m_left_child->m_right_child;
+                old_left_child->m_right_child = nullptr;
 
-            spawn_child(node->m_left_child, vertex);
-            node->m_right_child = nullptr;
-            node->m_num_elements = 1;
+                // Updated before the spawn: the task may already be executed and destroyed after it
+                old_left_child->m_num_elements = m_num_elements / 2;
+                m_num_elements -= old_left_child->m_num_elements;
 
-            // The interior node keeps its own body and is now a standalone task
-            if (node != this) {
-                node->m_wait_tree_vertex = vertex;
-                vertex->reserve();
-                r1::spawn(*node, node->ctx());
+                spawn_task(old_left_child, vertex);
+            } else {
+                // We are the perfect tree
+                // Split itself into a balanced tree and a perfect tree
+                tree_task* old_right_child = m_right_child;
+                m_right_child = nullptr;
+                m_num_elements -= old_right_child->m_num_elements;
+
+                spawn_task(old_right_child, vertex);
             }
-            node = right;
         }
 
-        if (node == this) {
-            spawn_child(m_left_child, vertex);
-            spawn_child(m_right_child, vertex);
-        } else {
-            spawn_root(node, vertex);
+        if (m_num_elements > 1) {
+            vertex->reserve(static_cast<std::uint32_t>(m_num_elements - 1));
+
+            tree_task* left = m_left_child;
+            tree_task* right = m_right_child;
+            m_left_child = nullptr;
+            m_right_child = nullptr;
+            m_num_elements = 1;
+
+            recursive_spawn(left, vertex);
+            recursive_spawn(right, vertex);
         }
     }
 public:
@@ -282,7 +293,6 @@ inline void tree_task::grab_and_redistribute_tasks(d1::wait_tree_vertex_interfac
     if (m_grab_target != nullptr) {
         tree_task* head = m_grab_target->grab_all();
         m_grab_target = nullptr;
-
         spawn_spine(head, vertex);
     }
 }
