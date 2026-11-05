@@ -29,7 +29,9 @@ struct thread_registration_data_t {
 
 struct permit_registrations_t {
   std::mutex mutex;
-  // Shared ownership keeps the registration data of exited threads alive until the permit is gone
+
+  // Shared ownership keeps the registration data of exited threads alive until the permit is gone.
+  // TODO: Consider using std::weak_ptr here instead. Requires C++26 support.
   std::unordered_set<std::shared_ptr<thread_registration_data_t>> thread_locals;
 };
 
