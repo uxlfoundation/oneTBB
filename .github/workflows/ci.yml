@@ -425,6 +425,37 @@ jobs:
           make VERBOSE=1 -j${MACOS_BUILD_CONCURRENCY}
           ctest --timeout ${TEST_TIMEOUT} --output-on-failure
 
+  macos-tcm-testing:
+    name: tcm_${{ matrix.os }}_${{ matrix.build_type }}
+    runs-on: ['${{ matrix.os }}']
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            build_type: debug
+          - os: macos-15-intel
+            build_type: release
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install TCM dependency
+        run: brew install hwloc
+      - name: Run TCM testing
+        shell: bash
+        run: |
+          set -e -x -o pipefail
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_CXX_STANDARD=17 \
+            -DTCM_BUILD=ON -DTBB_TCM_TESTING=ON
+          cmake --build build --target tcm_tests test_task --parallel "${MACOS_BUILD_CONCURRENCY}"
+          ctest --test-dir build --timeout "${TEST_TIMEOUT}" --output-on-failure -L tcm_tests
+          ctest --test-dir build --timeout "${TEST_TIMEOUT}" --output-on-failure -R '^test_tcm_(enabled|disabled)$'
+
   windows-testing:
     name: ${{ matrix.job_name }}
     runs-on: ['${{ matrix.os }}']
