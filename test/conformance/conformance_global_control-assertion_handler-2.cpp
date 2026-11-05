@@ -82,7 +82,8 @@ TEST_CASE(test_name) {
     }
     CHECK(terminate_handler_called);
 }
-#else
+#else // TBB_USE_EXCEPTIONS && (!_MSC_VER || (defined(_DLL) && !defined(_DEBUG))) && !EMSCRIPTEN
+//! Test terminate_on_exception: skip in this configuration
 //! \brief \ref interface \ref requirement
 TEST_CASE(test_name * doctest::skip()) {}
 #endif
