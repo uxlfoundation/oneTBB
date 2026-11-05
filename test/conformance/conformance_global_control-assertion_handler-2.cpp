@@ -83,5 +83,6 @@ TEST_CASE(test_name) {
     CHECK(terminate_handler_called);
 }
 #else
+//! \brief \ref interface \ref requirement
 TEST_CASE(test_name * doctest::skip()) {}
 #endif

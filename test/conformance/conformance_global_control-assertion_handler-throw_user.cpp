@@ -37,5 +37,6 @@ TEST_CASE(test_name) {
 }
 
 #else
+//! \brief \ref interface \ref requirement
 TEST_CASE(test_name * doctest::skip()) {}
 #endif

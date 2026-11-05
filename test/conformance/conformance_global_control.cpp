@@ -388,5 +388,6 @@ TEST_CASE(test_name) {
     global_control_terminate_on_exception(TestCase::SET_TERMINATE);
 }
 #else // (!_MSC_VER || (defined(_DLL) && !defined(_DEBUG))) && !EMSCRIPTEN
+//! \brief \ref interface \ref requirement
 TEST_CASE(test_name * doctest::skip()) {}
 #endif
