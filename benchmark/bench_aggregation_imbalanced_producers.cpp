@@ -103,7 +103,7 @@ std::vector<int> make_distribution(int num_producers, int num_heavy, int total_t
 } // namespace
 
 int main() {
-    constexpr int total_tasks = 200000;
+    constexpr int total_tasks = 1000000;
     constexpr int num_heavy = 2;
     constexpr double heavy_share = 0.9;
     constexpr int reps = 7;

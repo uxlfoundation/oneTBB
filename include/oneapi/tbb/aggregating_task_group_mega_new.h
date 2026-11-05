@@ -45,6 +45,29 @@ class tree_task : public d1::task {
         }
     }
 
+    static void spawn_root(tree_task* root, d1::wait_tree_vertex_interface* vertex) {
+        if (root->num_elements() > TASK_TREE_GRAINSIZE) {
+            root->wait_tree_vertex() = vertex;
+            vertex->reserve();
+            r1::spawn(*root, root->ctx());
+        } else {
+            vertex->reserve(static_cast<std::uint32_t>(root->num_elements()));
+            recursive_spawn(root, vertex);
+        }
+    }
+
+    // Thieves steal from the oldest end of the deque, so the biggest trees have to be spawned
+    // first. The spine is built smallest-first, so it is walked to the tail and spawned on the
+    // way back. Depth is the spine length, O(log n)
+    static void spawn_spine(tree_task* root, d1::wait_tree_vertex_interface* vertex) {
+        if (root != nullptr) {
+            tree_task* next = root->next_root();
+            root->next_root() = nullptr;
+            spawn_spine(next, vertex);
+            spawn_root(root, vertex);
+        }
+    }
+
     static void spawn_child(tree_task*& child, d1::wait_tree_vertex_interface* vertex) {
         if (child != nullptr) {
             if (child->num_elements() > TASK_TREE_GRAINSIZE) {
@@ -132,7 +155,6 @@ public:
 
 class task_forest {
     std::atomic<tree_task*> m_head;
-    // The forest is thread-local, so only the owner thread touches the counter and no lock is needed
     std::size_t m_num_direct_spawns;
 
     static tree_task* locked_flag() {
@@ -237,21 +259,7 @@ inline void tree_task::grab_and_redistribute_tasks(d1::wait_tree_vertex_interfac
         tree_task* head = m_grab_target->grab_all();
         m_grab_target = nullptr;
 
-        // TODO: the spine is smallest-first, so the largest trees are published last. Try reversing
-        // it here (O(log n), on cells this loop touches anyway) and measure the effect on ramp-up
-        while (head != nullptr) {
-            tree_task* next = head->next_root();
-            head->next_root() = nullptr;
-            if (head->num_elements() > TASK_TREE_GRAINSIZE) {
-                head->wait_tree_vertex() = vertex;
-                vertex->reserve();
-                r1::spawn(*head, head->ctx());
-            } else {
-                vertex->reserve(static_cast<std::uint32_t>(head->num_elements()));
-                recursive_spawn(head, vertex);
-            }
-            head = next;
-        }
+        spawn_spine(head, vertex);
     }
 }
 
