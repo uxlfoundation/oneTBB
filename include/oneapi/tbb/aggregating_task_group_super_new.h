@@ -17,7 +17,7 @@ namespace detail {
 namespace d2 {
 
 #define TASK_TREE_GRAINSIZE 128
-#define DIRECT_SPAWN_THRESHOLD 4
+#define DIRECT_SPAWN_THRESHOLD 8
 
 class binary_task_tree;
 
@@ -116,7 +116,7 @@ class binary_task_tree {
     }
 
     std::atomic<tree_task*> m_head;
-    // Accessed only under the lock, reset on every new head
+    // The tree is thread-local, so only the owner thread touches the counter and no lock is needed
     std::size_t m_num_direct_spawns;
 
     // TODO: O(log n) on the producer hot path. Consider an O(1) intrusive list push here and
@@ -155,20 +155,29 @@ public:
         using task_type = function_tree_task<typename std::decay<Function>::type>;
         task_type* new_task = alloc.new_object<task_type>(std::forward<Function>(function), &wait_vertex, ctx, alloc);
 
+        // While no batch is in flight and the backlog is still small, publish the task exactly as
+        // task_group::run would: no head, no tree, no lock
+        if (m_num_direct_spawns < DIRECT_SPAWN_THRESHOLD &&
+            m_head.load(std::memory_order_relaxed) == nullptr)
+        {
+            ++m_num_direct_spawns;
+            new_task->wait_tree_vertex() = r1::get_thread_reference_vertex(&wait_vertex);
+            new_task->wait_tree_vertex()->reserve();
+            r1::spawn(*new_task, ctx);
+            return;
+        }
+
         // Lock the task tree to prevent races with grab_all.
         // The tree is thread-local, so only the owner thread takes the lock and it is never contended here
         tree_task* current_task_tree = lock();
         __TBB_ASSERT(current_task_tree != locked_flag(), "The task tree is already locked by the owner thread");
 
-        bool spawn_new_task = true;
+        bool spawn_new_task = current_task_tree == nullptr;
 
-        if (current_task_tree == nullptr) {
+        if (spawn_new_task) {
             current_task_tree = new_task;
             new_task->grab_target() = this;
             m_num_direct_spawns = 0;
-        } else if (m_num_direct_spawns < DIRECT_SPAWN_THRESHOLD) {
-            // The backlog is still small, so publish the task as is to give the thieves more entry points
-            ++m_num_direct_spawns;
         } else {
             // Aggregating
             // Special handling for the first layer of the tree
@@ -180,7 +189,6 @@ public:
                 add_task_to_subtree(current_task_tree->left_child(), new_task);
             }
             ++current_task_tree->num_subtree_elements();
-            spawn_new_task = false;
         }
 
         if (spawn_new_task) {
