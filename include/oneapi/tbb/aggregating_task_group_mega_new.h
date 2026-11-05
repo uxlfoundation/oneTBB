@@ -89,8 +89,32 @@ protected:
 
         d1::wait_tree_vertex_interface* vertex = r1::get_thread_reference_vertex(m_tg_wait_context_vertex);
         grab_and_redistribute_tasks(vertex);
-        spawn_child(m_left_child, vertex);
-        spawn_child(m_right_child, vertex);
+
+        // Publish geometrically decreasing chunks from this one execution by descending the right
+        // spine. Spawning just the two halves would need log(size) executions to reach grainsize
+        tree_task* node = this;
+        while (node->m_num_elements > TASK_TREE_GRAINSIZE) {
+            tree_task* right = node->m_right_child;
+
+            spawn_child(node->m_left_child, vertex);
+            node->m_right_child = nullptr;
+            node->m_num_elements = 1;
+
+            // The interior node keeps its own body and is now a standalone task
+            if (node != this) {
+                node->m_wait_tree_vertex = vertex;
+                vertex->reserve();
+                r1::spawn(*node, node->ctx());
+            }
+            node = right;
+        }
+
+        if (node == this) {
+            spawn_child(m_left_child, vertex);
+            spawn_child(m_right_child, vertex);
+        } else {
+            spawn_root(node, vertex);
+        }
     }
 public:
     tree_task(d1::wait_context_vertex* tg_wait_context_vertex,
