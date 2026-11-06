@@ -469,7 +469,6 @@ struct AlgoPorts {
 
 // Everything an algorithm body needs that is not its input message.
 struct AlgoBodyContext {
-    int algo_tid;
     double exec_time;
     const AlgorithmInfo& algo_info;
     const WorkflowMetadata& metadata;
@@ -487,12 +486,14 @@ void execute_algorithm(const AlgoBodyContext& ctx, const AlgorithmOutput& input,
     const int message_id = input.empty() ? 0 : input.begin()->second->message_id;
 
 #if USE_TRACE > 0
-    // Create scoped trace event for algorithm execution
+    // One complete event per execution, on the executing thread's track, named
+    // <algorithm>:input_<message id>.
     std::unique_ptr<ScopedTraceEvent> trace;
     if (ctx.trace_collector) {
-        std::string event_name = "input_" + std::to_string(message_id);
+        std::string event_name =
+            ctx.algo_info.name + ":input_" + std::to_string(message_id);
         trace = std::make_unique<ScopedTraceEvent>(*ctx.trace_collector, event_name,
-                                                   ctx.algo_tid);
+                                                   trace_worker_tid(*ctx.trace_collector));
     }
 #endif
 
@@ -515,11 +516,9 @@ void execute_algorithm(const AlgoBodyContext& ctx, const AlgorithmOutput& input,
                 product_info.memory_usage_bytes,
                 message_id,
 #if USE_TRACE > 0
-                ctx.algo_tid,  // Algorithm-specific thread ID
                 ctx.trace_collector,
                 ctx.trace_level
 #else
-                ctx.algo_tid,
                 nullptr,
                 TraceLevel::OFF
 #endif
@@ -620,7 +619,6 @@ create_algorithm_node(
     using namespace oneapi::tbb::flow;
 
     const AlgoBodyContext ctx{
-        metadata.algorithm_to_tid.at(algo_name),
         algo_info.execution_time_seconds,
         algo_info,
         metadata
@@ -971,7 +969,7 @@ run_workflow(
                 if (trace_collector) {
                     trace_collector->record_instant_event(
                         "latency_start_input_" + std::to_string(message_id),
-                        0  // tid=0 for source events
+                        INPUT_GENERATOR_TID
                     );
                 }
 #endif
@@ -987,7 +985,6 @@ run_workflow(
                         prod_info.instance,
                         prod_info.memory_usage_bytes,
                         message_id,
-                        0,  // tid=0 for input_generator-created products
                         trace_collector,
                         config.trace_level  // Pass trace level for DataProduct events
                     );
@@ -998,7 +995,6 @@ run_workflow(
                         prod_info.instance,
                         prod_info.memory_usage_bytes,
                         message_id,
-                        0,
                         nullptr,
                         TraceLevel::OFF
                     );
@@ -1395,12 +1391,6 @@ int main(int argc, char* argv[]) {
         // is, so the two always agree about which ids exist.
         MessageClock::configure(config.num_inputs);
 
-        // Assign thread IDs to algorithms for tracing
-        int tid = 1;
-        for (const auto& algo_name : metadata.topological_order) {
-            metadata.algorithm_to_tid[algo_name] = tid++;
-        }
-
         // Setup tracing
 #if USE_TRACE > 0
         std::unique_ptr<TraceCollector> trace_collector;
@@ -1446,20 +1436,21 @@ int main(int argc, char* argv[]) {
                 ? TraceCollector::WriteMode::EAGER
                 : TraceCollector::WriteMode::LAZY;
 
+            // The pid must differ from every tid: viewers treat the thread whose tid
+            // equals the pid as the process's main thread and don't show it as an
+            // ordinary named track. tids start at 1 (see INPUT_GENERATOR_TID), so 0
+            // is free.
+            constexpr int trace_pid = 0;
             trace_collector = std::make_unique<TraceCollector>(
                 filename.str(),
-                config.num_trials,
+                trace_pid,
                 "workflow_bench",
                 mode
             );
 
-            // Register thread names for algorithms
-            for (const auto& [algo_name, algo_tid] : metadata.algorithm_to_tid) {
-                trace_collector->add_thread_name(algo_tid, algo_name);
-            }
-
-            // Register tid=0 for input_generator and source events
-            trace_collector->add_thread_name(0, "input_generator");
+            // The input generator's track holds a marker per admitted message. Worker
+            // tracks are named as each thread first records (see trace_worker_tid).
+            trace_collector->add_thread_name(INPUT_GENERATOR_TID, "input_generator");
 
             // The config event: the admission point this trace was taken at, written
             // into the trace itself rather than left to be read back out of the
@@ -1471,7 +1462,23 @@ int main(int argc, char* argv[]) {
                     ":admission_window_c=" + std::to_string(admission_window_c) +
                     ":workflow_memory_bytes=" +
                     std::to_string(metadata.total_workflow_memory),
-                0);
+                INPUT_GENERATOR_TID);
+
+            // One marker per algorithm, naming the resources it holds, so a trace
+            // query can select executions by resource without the workflow JSON:
+            // "algorithm:<name>:resources=<r1>,<r2>", with an empty list for an
+            // algorithm that uses none. Slices are "<name>:input_<n>", which is
+            // the join key. See README.md for the query.
+            for (const auto& algo_name : metadata.topological_order) {
+                std::string resources;
+                for (const auto& resource : metadata.algorithms.at(algo_name).resource_usage) {
+                    if (!resources.empty()) resources += ",";
+                    resources += resource;
+                }
+                trace_collector->record_instant_event(
+                    "algorithm:" + algo_name + ":resources=" + resources,
+                    INPUT_GENERATOR_TID);
+            }
 
             // Setup signal handler for LAZY mode flush (only if LAZY selected)
             if (config.tracing_mode == TracingMode::LAZY) {

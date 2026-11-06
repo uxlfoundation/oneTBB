@@ -271,6 +271,36 @@ inline SteadyWindow reduce_steady_window(int num_inputs) {
     return out;
 }
 
+#if USE_TRACE > 0
+// ============================================================================
+// Trace tracks
+// ============================================================================
+//
+// One track for the input generator's markers, and one track per worker thread
+// for everything else. A thread runs one algorithm body at a time, so the complete
+// events on its track never partially overlap -- as they did with one track per
+// algorithm, because an algorithm without resources can run several messages at
+// once. Each event's name says which algorithm and message it was.
+//
+// Tracks are numbered from 1: Perfetto mishandles tid 0, merging that thread into
+// another one (https://github.com/thoren-d/tracing-chrome/issues/32).
+constexpr int INPUT_GENERATOR_TID = 1;
+constexpr int FIRST_WORKER_TID = 2;
+
+// The calling thread's track. Assigned, and named in the trace, the first time the
+// thread records an event; after that it is one thread_local read. Assumes one
+// TraceCollector per process, which is how workflow_runner uses it.
+inline int trace_worker_tid(TraceCollector& tc) {
+    static std::atomic<int> next_tid{FIRST_WORKER_TID};
+    thread_local const int tid = [&tc] {
+        const int t = next_tid.fetch_add(1, std::memory_order_relaxed);
+        tc.add_thread_name(t, "worker " + std::to_string(t - FIRST_WORKER_TID + 1));
+        return t;
+    }();
+    return tid;
+}
+#endif
+
 // ============================================================================
 // DataProduct Class
 // ============================================================================
@@ -285,51 +315,46 @@ public:
     std::string instance;       // Optional instance name
     uint64_t estimated_memory_usage_bytes;  // Parsed from JSON
     int message_id;             // Links to originating input message
-    int thread_id;              // Algorithm-specific thread ID for tracing
     std::int64_t birth_ns;
 
 #if USE_TRACE > 0
     TraceCollector* trace_collector;
     TraceLevel trace_level;     // Runtime control: MINIMAL vs FULL
 
+    // In FULL mode the allocation and the free are markers on the track of the
+    // thread that does each, which need not be the same thread.
     DataProduct(const std::string& name_, const std::string& type_,
                 const std::string& instance_, uint64_t mem_bytes, int msg_id,
-                int tid,  // Algorithm-specific thread ID
                 TraceCollector* tc = nullptr,
                 TraceLevel level = TraceLevel::MINIMAL)
         : name(name_), type(type_), instance(instance_),
           estimated_memory_usage_bytes(mem_bytes), message_id(msg_id),
-          thread_id(tid), birth_ns(bench_now_ns()), trace_collector(tc),
-          trace_level(level)
+          birth_ns(bench_now_ns()), trace_collector(tc), trace_level(level)
     {
         MemoryGauge::on_construct(estimated_memory_usage_bytes);
 
-        // Only emit alloc events in FULL mode
         if (trace_collector && trace_level == TraceLevel::FULL) {
             trace_collector->record_instant_event(
                 "DataProduct_alloc:" + name + ":" + std::to_string(estimated_memory_usage_bytes),
-                thread_id  // Use algorithm-specific tid
-            );
+                trace_worker_tid(*trace_collector));
         }
     }
 
     ~DataProduct() {
-        // Only emit free events in FULL mode
         if (trace_collector && trace_level == TraceLevel::FULL) {
             trace_collector->record_instant_event(
                 "DataProduct_free:" + name + ":" + std::to_string(estimated_memory_usage_bytes),
-                thread_id
-            );
+                trace_worker_tid(*trace_collector));
         }
     }
 #else
     // Simplified constructor for USE_TRACE == 0
     DataProduct(const std::string& name_, const std::string& type_,
-                const std::string& instance_, uint64_t mem_bytes, int msg_id, int tid,
-                void* tc = nullptr, TraceLevel level = TraceLevel::MINIMAL)
+                const std::string& instance_, uint64_t mem_bytes, int msg_id,
+                void* /*tc*/ = nullptr, TraceLevel /*level*/ = TraceLevel::MINIMAL)
         : name(name_), type(type_), instance(instance_),
           estimated_memory_usage_bytes(mem_bytes), message_id(msg_id),
-          thread_id(tid), birth_ns(bench_now_ns())
+          birth_ns(bench_now_ns())
     {
         MemoryGauge::on_construct(estimated_memory_usage_bytes);
     }
@@ -549,7 +574,6 @@ struct WorkflowMetadata {
     std::map<std::string, std::string> product_to_producer;
     std::map<std::string, std::vector<std::string>> product_to_consumers;
     std::vector<std::string> topological_order;
-    std::map<std::string, int> algorithm_to_tid;  // Map algorithm name to thread ID for tracing
 
     void analyze() {
         // 1. Build product_to_producer mapping
