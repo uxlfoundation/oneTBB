@@ -104,6 +104,50 @@ int find_numa_node(void* addr) {
     #define NUMA_EQ WARN_EQ
 #endif
 
+template <typename Pointer, typename = void>
+struct can_deallocate_numa : std::false_type {};
+
+template <typename Pointer>
+struct can_deallocate_numa<Pointer, tbb::detail::void_t<decltype(
+    tbb::deallocate_numa_interleaved(
+        std::declval<Pointer>(), std::declval<std::size_t>())
+)>> : std::true_type {};
+
+static_assert(!can_deallocate_numa<float*>::value,
+              "Typed pointers must require an explicit template argument");
+
+static_assert(can_deallocate_numa<void*>::value,
+             "The untyped overload must accept void*");
+
+template <typename... Args>
+void TestTypedAllocation(size_t count, const Args&... args) {
+    int* ptr = tbb::allocate_numa_interleaved<int>(count, args...);
+    REQUIRE_MESSAGE(ptr != nullptr, "Failed to allocate " << count << " int objects");
+    REQUIRE_EQ(utils::NonZero(ptr, count * sizeof(*ptr)), 0);
+    tbb::deallocate_numa_interleaved<int>(ptr, count);
+
+    long* ptr_long = tbb::allocate_numa_interleaved<long>(count, args...);
+    REQUIRE_MESSAGE(ptr_long != nullptr, "Failed to allocate " << count << " long objects");
+    REQUIRE_EQ(utils::NonZero(ptr_long, count * sizeof(*ptr_long)), 0);
+    tbb::deallocate_numa_interleaved<long>(ptr_long, count);
+
+    int (*a)[4] = tbb::allocate_numa_interleaved<int[4]>(count, args...);
+    REQUIRE_MESSAGE(a != nullptr, "Failed to allocate " << count << " int[4] objects");
+    REQUIRE_EQ(utils::NonZero(a, count * sizeof(*a)), 0);
+    tbb::deallocate_numa_interleaved<int[4]>(a, count);
+}
+
+//! \brief \ref requirement
+TEST_CASE("typed allocation") {
+    size_t obj_size = 1024 * 1024;
+    const std::vector<tbb::numa_node_id> nodes = tbb::info::numa_nodes();
+
+    TestTypedAllocation(obj_size);
+    TestTypedAllocation(obj_size, page_size);
+    TestTypedAllocation(obj_size, nodes);
+    TestTypedAllocation(obj_size, nodes, page_size);
+}
+
 //! \brief \ref requirement
 TEST_CASE("invalid parameters") {
     REQUIRE_MESSAGE(tbb::allocate_numa_interleaved(1, 7) == nullptr,
@@ -172,7 +216,7 @@ void AllocateAndVerify(bool use_find_node, size_t bytes, const std::vector<tbb::
 {
     char* ptr = (char*)tbb::allocate_numa_interleaved(bytes, nodes, bytes_per_chunk);
     VerifySizeAndNodes(ptr, bytes, nodes, bytes_per_chunk, use_find_node);
-    tbb::deallocate_numa_interleaved(ptr, bytes);
+    tbb::deallocate_numa_interleaved((void*)ptr, bytes);
 }
 
 //! \brief \ref interface \ref requirement
@@ -207,14 +251,14 @@ TEST_CASE("test basics") {
             {
                 char *ptr = (char *)tbb::allocate_numa_interleaved(obj_size);
                 VerifySizeAndNodes(ptr, obj_size, numa_nodes, page_size, lib);
-                tbb::deallocate_numa_interleaved(ptr, obj_size);
+                tbb::deallocate_numa_interleaved((void*)ptr, obj_size);
             }
 
             for (size_t bytes_per_chunk : std::vector<size_t>{page_size, 3 * page_size, 41 * page_size})
             {
                 char *ptr = (char *)tbb::allocate_numa_interleaved(obj_size, bytes_per_chunk);
                 VerifySizeAndNodes(ptr, obj_size, numa_nodes, bytes_per_chunk, lib);
-                tbb::deallocate_numa_interleaved(ptr, obj_size);
+                tbb::deallocate_numa_interleaved((void*)ptr, obj_size);
             }
         }
 
@@ -252,7 +296,7 @@ TEST_CASE("test basics") {
         char *ptr = (char *)tbb::allocate_numa_interleaved(obj_size, numa_nodes);
         REQUIRE_MESSAGE(ptr != nullptr, "Failed to allocate NUMA interleaved memory for size " << obj_size);
         REQUIRE_EQ(utils::NonZero(ptr, obj_size), 0);
-        tbb::deallocate_numa_interleaved(ptr, obj_size);
+        tbb::deallocate_numa_interleaved((void*)ptr, obj_size);
     }
 
 #if __linux__ && __TBB_DYNAMIC_LOAD_ENABLED
