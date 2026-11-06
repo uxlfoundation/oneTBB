@@ -724,6 +724,13 @@ if (TARGET TBB::tbb)
     endif()
 endif()
 
+# Performance benchmarks (test/perf). Off by default: they are not correctness
+# tests, and their ctest smoke runs carry the label "perf".
+option(TBB_TEST_PERF "Build the performance benchmarks in test/perf" OFF)
+if (TBB_TEST_PERF AND TARGET TBB::tbb)
+    add_subdirectory(perf)
+endif()
+
 if (TARGET TBB::tbbmalloc)
     # TBB allocator tests
     if (NOT "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "mips")

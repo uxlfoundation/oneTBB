@@ -1,0 +1,29 @@
+{
+  "algorithms": {
+    "a": {"estimated_execution_time": "0.002 s", "produces": ["pa"], "consumes": ["ext"], "resource_usage": ["R1"]},
+    "b": {"estimated_execution_time": "0.002 s", "produces": ["pb"], "consumes": ["ext"], "resource_usage": []},
+    "c": {"estimated_execution_time": "0.002 s", "produces": ["pc"], "consumes": ["ext"], "resource_usage": ["R2"]},
+    "d": {"estimated_execution_time": "0.002 s", "produces": ["pd"], "consumes": ["ext"], "resource_usage": []},
+    "j3": {"estimated_execution_time": "0.001 s", "produces": ["p3"], "consumes": ["pa", "pb", "pc"], "resource_usage": []},
+    "j4": {"estimated_execution_time": "0.001 s", "produces": ["p4"], "consumes": ["pa", "pb", "pc", "pd"], "resource_usage": ["R1"]},
+    "mix3": {"estimated_execution_time": "0.001 s", "produces": ["pm"], "consumes": ["pa", "pb", "ext"], "resource_usage": []},
+    "mix4": {"estimated_execution_time": "0.001 s", "produces": ["pm4"], "consumes": ["pa", "pc", "pd", "ext"], "resource_usage": []},
+    "final": {"estimated_execution_time": "0.001 s", "produces": ["pf"], "consumes": ["p3", "p4", "pm", "pm4"], "resource_usage": ["R1", "R2"]}
+  },
+  "data_products": {
+    "ext": {"type": "T", "instance": null, "estimated_memory_usage": "1.0 MB"},
+    "pa":  {"type": "T", "instance": null, "estimated_memory_usage": "1.0 MB"},
+    "pb":  {"type": "T", "instance": null, "estimated_memory_usage": "1.0 MB"},
+    "pc":  {"type": "T", "instance": null, "estimated_memory_usage": "1.0 MB"},
+    "pd":  {"type": "T", "instance": null, "estimated_memory_usage": "1.0 MB"},
+    "p3":  {"type": "T", "instance": null, "estimated_memory_usage": "1.0 MB"},
+    "p4":  {"type": "T", "instance": null, "estimated_memory_usage": "1.0 MB"},
+    "pm":  {"type": "T", "instance": null, "estimated_memory_usage": "1.0 MB"},
+    "pm4": {"type": "T", "instance": null, "estimated_memory_usage": "1.0 MB"},
+    "pf":  {"type": "T", "instance": null, "estimated_memory_usage": "1.0 MB"}
+  },
+  "limited resources": {
+    "R1": {},
+    "R2": {}
+  }
+}

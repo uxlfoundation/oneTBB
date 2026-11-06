@@ -1,0 +1,14 @@
+{
+  "algorithms": {
+    "a": {"estimated_execution_time": "0.002 s", "produces": ["pa"], "consumes": ["ext"], "resource_usage": []},
+    "b": {"estimated_execution_time": "0.002 s", "produces": ["pb"], "consumes": ["ext"], "resource_usage": []},
+    "j": {"estimated_execution_time": "0.001 s", "produces": ["pj"], "consumes": ["pa", "pb"], "resource_usage": []}
+  },
+  "data_products": {
+    "ext": {"type": "T", "instance": null, "estimated_memory_usage": "1.0 MB"},
+    "pa":  {"type": "T", "instance": null, "estimated_memory_usage": "1.0 MB"},
+    "pb":  {"type": "T", "instance": null, "estimated_memory_usage": "1.0 MB"},
+    "pj":  {"type": "T", "instance": null, "estimated_memory_usage": "1.0 MB"}
+  },
+  "limited resources": {}
+}
