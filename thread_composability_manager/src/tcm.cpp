@@ -9,6 +9,7 @@
 #include "detail/hwloc_utils.h"
 #include "detail/_environment.h"
 #include "tcm.h"
+#include "tcm/types.h"
 #include "tcm_permit_rep.h"
 
 #if __linux__
@@ -42,12 +43,91 @@ __TCM_SUPPRESS_WARNING_POP
 #endif
 
 namespace tcm {
+
+namespace internal {
+class ThreadComposabilityFairBalance;
+}
+using ThreadComposabilityManager = internal::ThreadComposabilityFairBalance;
+
+class theTCM {
+    static ThreadComposabilityManager* tcm_ptr;
+    static std::size_t reference_count;
+    static std::atomic<std::size_t> num_unique_permits; // Number of unique permits IDs issued.
+    static std::mutex tcm_mutex;
+    static internal::environment tcm_env;
+public:
+    static std::size_t next_permit_id() {
+        return num_unique_permits.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    static bool is_enabled() {
+        return tcm_env.tcm_enable == 1;
+    }
+
+    static bool tcm_enable_variable_explicitly_set() {
+        return tcm_env.tcm_enable != tcm_automatic;
+    }
+
+    static bool tcm_in_dev_environment() {
+        static bool in_dev_env = std::getenv("TCMROOT") || std::getenv("ONEAPI_ROOT") ||
+            std::getenv("TBBROOT") || std::getenv("CMPLR_ROOT");
+        return in_dev_env;
+    }
+
+    static internal::environment& get_tcm_env() {
+        return tcm_env;
+    }
+
+    static void increase_ref_count();
+
+    static ThreadComposabilityManager& instance() {
+        __TCM_ASSERT(tcm_ptr != nullptr, "Access to uninitialized resource manager.");
+        return *tcm_ptr;
+    }
+
+    static void decrease_ref_count();
+
+    static void consider_suggesting_usage() {
+        __TCM_ASSERT(!is_enabled(), nullptr);
+        static std::atomic<std::size_t> connection_attempts{0};
+        constexpr std::size_t max_failed_connection_attempts = 2;
+        std::size_t previous_attempts = connection_attempts.fetch_add(1, std::memory_order_relaxed);
+        if (previous_attempts == max_failed_connection_attempts - 1) {
+            std::fprintf(stderr,
+                "Note: Several threading libraries could use Thread Composability Manager.\n"
+                "Hint: If CPUs are overutilized, setting the TCM_ENABLE environment variable to 1\n"
+                "may improve performance. For more details, search for "
+                "\"avoid cpu overutilization\"\n at https://uxlfoundation.github.io/oneTBB/\n"
+                "To suppress this message, set TCM_ENABLE to either 0 or 1.\n"
+            );
+        }
+    }
+};
+
+ThreadComposabilityManager* theTCM::tcm_ptr{nullptr};
+std::size_t theTCM::reference_count{0};
+std::atomic<std::size_t> theTCM::num_unique_permits{0};
+std::mutex theTCM::tcm_mutex{};
+internal::environment theTCM::tcm_env{};
+
 namespace internal {
 
-std::stack<tcm_permit_handle_t>& get_active_permit_container() {
-    thread_local std::stack<tcm_permit_handle_t> tls_active_permit;
-    return tls_active_permit;
+float tcm_oversubscription_factor() {
+    static const float oversb_factor = theTCM::get_tcm_env().tcm_oversubscription_factor;
+    __TCM_ASSERT(oversb_factor > std::numeric_limits<float>::epsilon(),
+                 "Incorrect value of oversubscription factor.");
+    return oversb_factor;
 }
+
+const std::shared_ptr<thread_registration_data_t>& thread_data_ptr() {
+    // The data is shared with the permits the thread has registered with, so it may outlive the
+    // thread
+    thread_local const std::shared_ptr<thread_registration_data_t> registrations =
+        std::make_shared<thread_registration_data_t>();
+    return registrations;
+}
+
+thread_registration_data_t& thread_data() { return *thread_data_ptr(); }
 
 /**
  *******************************************************************************
@@ -909,7 +989,7 @@ public:
           const std::lock_guard<std::mutex> l(data_mutex);
           client_resources = clear_up_internals_from(clid);
           __TCM_ASSERT(available_concurrency <= available_concurrency + client_resources.concurrency,
-                     "Overflow detected");
+                       "Overflow detected");
           available_concurrency += client_resources.concurrency;
           should_renegotiate = client_resources.concurrency > 0 && has_resource_demand(*this);
 
@@ -922,8 +1002,10 @@ public:
 #endif
       }
 
-      for (const auto& ph : client_resources.permit_handles)
+      for (const auto& ph : client_resources.permit_handles) {
+          clear_up_threads_registration_from(ph);
           deallocate_permit(ph);
+      }
 
       if (should_renegotiate)
           renegotiate_permits(/*initiator*/nullptr);
@@ -1008,16 +1090,17 @@ public:
   }
 
   void determine_nested_permit(tcm_permit_handle_t& ph) {
-    auto& permit_stack = get_active_permit_container();
-    prepare_permit_modification(ph);
-    if (!permit_stack.empty()) {
-        auto top_permit = permit_stack.top();
-        if (ph != top_permit) {
-            ph->data.is_nested.store(true, std::memory_order_relaxed);
-        }
-    } else {
-        ph->data.is_nested.store(false, std::memory_order_relaxed);
+    bool is_nested = false;
+    const std::size_t permit_id = ph->permit_id;
+    thread_registration_data_t& trd = thread_data();
+    {
+        std::lock_guard<std::mutex> lock(trd.mutex);
+        if (!trd.permits.empty() && permit_id != trd.permits.top())
+            is_nested = true;
     }
+
+    prepare_permit_modification(ph);
+    ph->data.is_nested.store(is_nested, std::memory_order_relaxed);
     commit_permit_modification(ph);
   }
 
@@ -1383,6 +1466,23 @@ public:
       return overall_resources;
   }
 
+  /**
+   * Clears permit IDs from registrations of each participated thread.
+   */
+  void clear_up_threads_registration_from(tcm_permit_handle_t handle) {
+      __TCM_ASSERT(handle, "Invalid permit handle");
+
+      // Do cleanup of permits seen by threads
+      permit_registrations_t& pr = handle->data.registrations;
+      std::lock_guard<std::mutex> lock(pr.mutex);
+      for (auto& trd_ptr : pr.thread_locals) {
+          thread_registration_data_t& trd = *trd_ptr;
+          std::lock_guard<std::mutex> per_thread_lock(trd.mutex);
+          const std::size_t num = trd.seen.erase(handle->permit_id);
+          __TCM_ASSERT_EX(num == 1, "Permit was not known to the thread");
+      }
+  }
+
   tcm_result_t release_permit(tcm_permit_handle_t handle) {
     __TCM_PROFILE_THIS_FUNCTION();
 
@@ -1401,6 +1501,8 @@ public:
         __TCM_PROFILE_PERMIT(handle, "released");
     }
 
+    clear_up_threads_registration_from(handle);
+
     // Permit representation has been erased from internal structures, i.e. TCM does not know about
     // it anymore. Thus, can deallocate permit representation without holding a lock.
     deallocate_permit(handle);
@@ -1413,18 +1515,65 @@ public:
   }
 
   tcm_result_t register_thread(tcm_permit_handle_t ph) {
-    __TCM_ASSERT(ph, nullptr);
-    // TODO: profile only permit_handle and thread_id
-    get_active_permit_container().push(ph);
-    return TCM_RESULT_SUCCESS;
+      __TCM_ASSERT(ph, "Invalid permit handle");
+      const std::shared_ptr<thread_registration_data_t>& trd_ptr = thread_data_ptr();
+      thread_registration_data_t& trd = *trd_ptr;
+      bool is_first_registration = false;
+      {
+          std::lock_guard<std::mutex> lock(trd.mutex);
+          trd.permits.push(ph->permit_id);  // Actual thread registration
+          is_first_registration = trd.seen.emplace(ph->permit_id).second;
+      }
+
+      if (is_first_registration) {
+          // This thread registers with this permit for the first time, let the permit's data know
+          // about its thread local
+          permit_registrations_t& pr = ph->data.registrations;
+          std::lock_guard<std::mutex> lock(pr.mutex);
+          __TCM_ASSERT(pr.thread_locals.count(trd_ptr) == 0,
+                       "Thread has been registered with the permit already.");
+          pr.thread_locals.emplace(trd_ptr);
+      }
+#if TCM_USE_ASSERT
+      else {
+          permit_registrations_t& pr = ph->data.registrations;
+          std::lock_guard<std::mutex> lock(pr.mutex);
+          __TCM_ASSERT(pr.thread_locals.count(trd_ptr) == 1,
+                       "Thread should have been registered with the permit already.");
+      }
+#endif
+
+      return TCM_RESULT_SUCCESS;
   }
 
   tcm_result_t unregister_thread() {
-    auto& permit_stack = get_active_permit_container();
-    __TCM_ASSERT(!permit_stack.empty(), "Attempt unregistering non-registered thread.");
-    permit_stack.pop();
-    // TODO: profile only permit_handle and thread_id
-    return TCM_RESULT_SUCCESS;
+      thread_registration_data_t& trd = thread_data();
+
+      std::lock_guard<std::mutex> lock(trd.mutex);
+      if (trd.permits.empty())
+          return TCM_RESULT_PERMIT_MISMATCH;
+
+      trd.permits.pop(); // This thread undoes its previous registration
+
+      return TCM_RESULT_SUCCESS;
+  }
+
+  tcm_result_t unregister_threads(const tcm_permit_handle_t ph) {
+      __TCM_ASSERT(ph, "Invalid permit handle");
+      tcm_result_t status = TCM_RESULT_SUCCESS;
+      const std::size_t& permit_id = ph->permit_id;
+      permit_registrations_t& pr = ph->data.registrations;
+      std::lock_guard<std::mutex> lock(pr.mutex);
+      for (auto& e : pr.thread_locals) {
+          __TCM_ASSERT(e, "Actual thread data was not found.");
+          thread_registration_data_t& trd = *e;
+          std::lock_guard<std::mutex> per_thread_lock(trd.mutex);
+          if (!trd.permits.empty() && permit_id == trd.permits.top())
+              trd.permits.pop();
+          else
+              status = TCM_RESULT_PERMIT_MISMATCH;
+      }
+      return status;
   }
 
   uint32_t platform_resources() const {
@@ -2468,12 +2617,14 @@ protected:
            \/
           0xFF (higher memory address)
         */
+
+        const std::size_t permit_id = theTCM::next_permit_id();
 // Suppressing MSVC warning about possible buffer overrun: the writable size is 'permit_size' bytes,
 // but 'XX' bytes might be written
 __TCM_SUPPRESS_WARNING_WITH_PUSH(6386)
-        tcm_permit_handle_t ph = new(permit_rep_as_byte_array) tcm_permit_rep_t;
+        // TODO: Compute and initialize fields inside placement new
+        tcm_permit_handle_t ph = new(permit_rep_as_byte_array) tcm_permit_rep_t{permit_id};
 __TCM_SUPPRESS_WARNING_POP
-        ph->epoch.store(0, std::memory_order_relaxed);
         tcm_permit_data_t& pd = ph->data;
 
         pd.client_id = clid;
@@ -2660,86 +2811,23 @@ protected:
 }; // ThreadComposabilityFairBalance
 } // namespace internal
 
-using ThreadComposabilityManager = internal::ThreadComposabilityFairBalance;
-
-class theTCM {
-  static ThreadComposabilityManager* tcm_ptr;
-  static std::size_t reference_count;
-  static std::mutex tcm_mutex;
-  static internal::environment tcm_env;
-public:
-  static bool is_enabled() {
-    return tcm_env.tcm_enable == 1;
-  }
-
-  static bool tcm_enable_variable_explicitly_set() {
-    return tcm_env.tcm_enable != tcm_automatic;
-  }
-
-  static bool tcm_in_dev_environment() {
-    static bool in_dev_env = std::getenv("TCMROOT") || std::getenv("ONEAPI_ROOT") ||
-                             std::getenv("TBBROOT") || std::getenv("CMPLR_ROOT");
-    return in_dev_env;
-  }
-
-  friend float internal::tcm_oversubscription_factor();
-
-  static void increase_ref_count() {
+void theTCM::increase_ref_count() {
     std::lock_guard<std::mutex> l(tcm_mutex);
     if (reference_count++)
-      return;
+        return;
     tcm_ptr = new ThreadComposabilityManager{};
-  }
+}
 
-  static internal::environment& get_tcm_env() {
-    return tcm_env;
-  }
-
-  static ThreadComposabilityManager& instance() {
-    __TCM_ASSERT(tcm_ptr != nullptr, "Access to uninitialized resource manager.");
-    return *tcm_ptr;
-  }
-
-  static void decrease_ref_count() {
+void theTCM::decrease_ref_count() {
     ThreadComposabilityManager* rm_instance_to_delete = tcm_ptr;
     {
-      std::lock_guard<std::mutex> l(tcm_mutex);
-      __TCM_ASSERT(reference_count != 0, "Incorrect reference count.");
-      if (--reference_count)
-        return;
-      tcm_ptr = nullptr;
-      delete rm_instance_to_delete;
+        std::lock_guard<std::mutex> l(tcm_mutex);
+        __TCM_ASSERT(reference_count != 0, "Incorrect reference count.");
+        if (--reference_count)
+            return;
+        tcm_ptr = nullptr;
+        delete rm_instance_to_delete;
     }
-  }
-
-  static void consider_suggesting_usage() {
-    __TCM_ASSERT(!is_enabled(), nullptr);
-    static std::atomic<std::size_t> connection_attempts{0};
-    constexpr std::size_t max_failed_connection_attempts = 2;
-    std::size_t previous_attempts = connection_attempts.fetch_add(1, std::memory_order_relaxed);
-    if (previous_attempts == max_failed_connection_attempts - 1) {
-      std::fprintf(stderr,
-        "Note: Several threading libraries could use Thread Composability Manager.\n"
-        "Hint: If CPUs are overutilized, setting the TCM_ENABLE environment variable to 1\n"
-        "may improve performance. For more details, search for \"avoid cpu overutilization\"\n"
-        "at https://uxlfoundation.github.io/oneTBB/\n"
-        "To suppress this message, set TCM_ENABLE to either 0 or 1.\n"
-      );
-    }
-  }
-};
-
-
-ThreadComposabilityManager* theTCM::tcm_ptr{nullptr};
-std::size_t theTCM::reference_count{0};
-std::mutex theTCM::tcm_mutex{};
-internal::environment theTCM::tcm_env{};
-
-float internal::tcm_oversubscription_factor() {
-  static const float oversb_factor = theTCM::tcm_env.tcm_oversubscription_factor;
-  __TCM_ASSERT(oversb_factor > std::numeric_limits<float>::epsilon(),
-                "Incorrect value of oversubscription factor.");
-  return oversb_factor;
 }
 
 } // namespace tcm
@@ -2950,7 +3038,7 @@ tcm_result_t tcmReleasePermit(tcm_permit_handle_t handle) {
 ///     - ::TCM_RESULT_ERROR_UNKNOWN
 tcm_result_t tcmRegisterThread(tcm_permit_handle_t p) {
   using tcm::theTCM;
-  if (p) {
+  if (p) {                      // TODO: Replace with an assert.
     return theTCM::instance().register_thread(p);
   }
   return TCM_RESULT_ERROR_UNKNOWN;
@@ -2973,6 +3061,22 @@ tcm_result_t tcmUnregisterThread() {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+/// @brief Unregisters all the threads that were most recently registered with
+///        specified permit
+///
+/// @returns
+///     - ::TCM_RESULT_SUCCESS
+///     - ::TCM_RESULT_PERMIT_MISMATCH
+///     - ::TCM_RESULT_ERROR_INVALID_ARGUMENT
+tcm_result_t tcmUnregisterThreads(tcm_permit_handle_t permit_handle) {
+  if (!permit_handle)
+    return TCM_RESULT_ERROR_INVALID_ARGUMENT;
+
+  using tcm::theTCM;
+  return theTCM::instance().unregister_threads(permit_handle);
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /// @brief Provides TCM meta information for clients into provided character buffer
 ///
 /// @returns
@@ -2992,4 +3096,4 @@ tcm_result_t tcmGetVersionInfo(char* buffer, uint32_t buffer_size) {
   return TCM_RESULT_SUCCESS;
 }
 
-}
+} // extern "C"

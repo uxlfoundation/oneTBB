@@ -9,9 +9,34 @@
 #define __TCM_PERMIT_REP_HEADER
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <mutex>
+#include <stack>
+#include <unordered_set>
 
 #include "tcm/types.h"
+
+namespace tcm {
+namespace internal {
+
+struct thread_registration_data_t {
+  std::mutex mutex;
+  std::stack<std::size_t> permits;      // Permits with which a thread is registered.
+  std::unordered_set<std::size_t> seen; // Permits this thread has been once registered with.
+};
+
+struct permit_registrations_t {
+  std::mutex mutex;
+
+  // Shared ownership keeps the registration data of exited threads alive until the permit is gone.
+  // TODO: Consider using std::weak_ptr here instead. Requires C++26 support.
+  std::unordered_set<std::shared_ptr<thread_registration_data_t>> thread_locals;
+};
+
+} // namespace internal
+} // namespace tcm
 
 struct tcm_permit_data_t {
   tcm_client_id_t client_id;
@@ -20,9 +45,15 @@ struct tcm_permit_data_t {
   uint32_t size;
   std::atomic<tcm_permit_state_t> state;
   tcm_permit_flags_t flags;
-  uint32_t tcm_epoch_snapshot; // Updated whenever this permit asks for resources by itself (via request permit or activate)
+  uint32_t tcm_epoch_snapshot; // Updated whenever this permit asks for resources by itself (via
+                               // request permit or activate)
+
   std::atomic<bool> is_nested; // Indicates whether this permit is nested
-  std::atomic<uint32_t> inherited_concurrency_idx; // Index of constraint where inherited concurrency will be stored
+  std::atomic<uint32_t> inherited_concurrency_idx; // Index of constraint where inherited
+                                                   // concurrency will be stored
+
+  tcm::internal::permit_registrations_t registrations; // Holds data of the threads that have been
+                                                       // registered with the permit
 };
 
 extern "C" {
@@ -30,10 +61,11 @@ extern "C" {
 typedef uint64_t tcm_permit_epoch_t;
 
 struct tcm_permit_rep_t {
-  std::atomic<tcm_permit_epoch_t> epoch;
-  tcm_permit_request_t request; // Holds latest corresponding request
-  tcm_permit_data_t data;
-  void* callback_arg;
+  const std::size_t permit_id{0}; // Unique permit identifier
+  std::atomic<tcm_permit_epoch_t> epoch{0};
+  tcm_permit_request_t request{}; // Holds latest corresponding request
+  tcm_permit_data_t data{};
+  void* callback_arg{};
 };
 
 } // extern "C"
