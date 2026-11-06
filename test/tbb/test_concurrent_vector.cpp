@@ -34,6 +34,7 @@
 #include <tbb/parallel_for.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <random>
 
 //! \file test_concurrent_vector.cpp
@@ -660,6 +661,43 @@ TEST_CASE("Test exception in constructors") {
         vector_type vec3(src_vec, allocator_type{});
         utils::suppress_unused_warning(vec3);
     }(), const std::bad_alloc);
+}
+
+//! Test grow_to_at_least when the growth does not fit into int
+//! \brief \ref regression \ref error_guessing
+TEST_CASE("grow_to_at_least with growth larger than INT_MAX") {
+    using allocator_type = StaticSharedCountingAllocator<std::allocator<char>>;
+    using vector_type = tbb::concurrent_vector<char, allocator_type>;
+
+    // The vector below has size 1, so the growth is new_size - 1
+    std::vector<std::size_t> new_sizes = {
+        std::size_t(0x80000001) // growth is INT_MAX + 1
+    };
+#if SIZE_MAX > UINT32_MAX
+    new_sizes.push_back(std::size_t(1) << 32);       // growth is 0xFFFFFFFF
+    new_sizes.push_back((std::size_t(1) << 32) + 1); // growth is 0x100000000
+#endif
+
+    // Restore the shared allocator state even if a check fails
+    struct limits_guard {
+        ~limits_guard() {
+            allocator_type::set_limits(0);
+            allocator_type::init_counters();
+        }
+    } guard;
+
+    for (std::size_t new_size : new_sizes) {
+        allocator_type::init_counters();
+        allocator_type::set_limits(0);
+        vector_type vec;
+        vec.push_back('a');
+
+        // The allocator fails before the large segments are allocated,
+        // so the growth must be reported with an exception instead of a hang
+        allocator_type::set_limits(1 << 20);
+        CHECK_THROWS_AS(vec.grow_to_at_least(new_size), const std::bad_alloc);
+        allocator_type::set_limits(0);
+    }
 }
 #endif // TBB_USE_EXCEPTIONS
 
