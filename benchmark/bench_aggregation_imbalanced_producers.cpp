@@ -9,11 +9,18 @@
 // The producers are TBB workers rather than std::threads, because the task tree lives in TLS and a
 // producer exiting with an un-grabbed head would leave that head pointing into unmapped storage.
 
-#ifdef USE_FOREST
+#ifdef OLD_ATG
+#include "oneapi/tbb/aggregating_task_group_old.h"
+#endif
+
+#ifdef SUPER_NEW_ATG
 #include "oneapi/tbb/aggregating_task_group_super_new.h"
-#else
+#endif
+
+#ifdef MEGA_NEW_ATG
 #include "oneapi/tbb/aggregating_task_group_mega_new.h"
 #endif
+
 #include "oneapi/tbb/blocked_range.h"
 #include "oneapi/tbb/parallel_for.h"
 #include "oneapi/tbb/task_group.h"

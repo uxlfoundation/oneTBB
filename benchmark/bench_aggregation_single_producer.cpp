@@ -7,11 +7,18 @@
 // std::thread producers cannot be used while the task tree lives in TLS: a producer exiting with an
 // un-grabbed head leaves that head pointing into unmapped storage.
 
-#ifdef USE_FOREST
-#include "oneapi/tbb/aggregating_task_group_mega_new.h"
-#else
+#ifdef OLD_ATG
+#include "oneapi/tbb/aggregating_task_group_old.h"
+#endif
+
+#ifdef SUPER_NEW_ATG
 #include "oneapi/tbb/aggregating_task_group_super_new.h"
 #endif
+
+#ifdef MEGA_NEW_ATG
+#include "oneapi/tbb/aggregating_task_group_mega_new.h"
+#endif
+
 #include "oneapi/tbb/blocked_range.h"
 #include "oneapi/tbb/parallel_for.h"
 #include "oneapi/tbb/task_group.h"

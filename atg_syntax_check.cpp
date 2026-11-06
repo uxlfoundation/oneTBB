@@ -1,4 +1,4 @@
-#include "oneapi/tbb/aggregating_task_group_super_new.h"
+#include "oneapi/tbb/aggregating_task_group_old.h"
 #include "oneapi/tbb/blocked_range.h"
 #include "oneapi/tbb/parallel_for.h"
 #include <cstdio>
