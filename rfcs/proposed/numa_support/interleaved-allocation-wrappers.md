@@ -56,11 +56,6 @@ There is currently no such state, but future extensions to the interface may req
 template that returns raw pointers is similar to a C++ allocator, which may be familiar to some
 users.
 
-`std::span<T>` is a natural way to keep a pointer and its element count together and also iterate
-over the memory in natural way. Since `std::span<T>` is unavailable before C++20, this approach
-would require a compatibility layer for older C++ standards. In that respect, it is similar to
-using `std::unique_ptr<T[]>` but without iteration possibility.
-
 `std::span<T>` naturally combines a pointer and its element count, and supports iteration. However,
 because it is available only in C++20 and later, using it would require a compatibility layer for
 older C++ standards. `std::unique_ptr<T[]>` does not provide iteration support.
