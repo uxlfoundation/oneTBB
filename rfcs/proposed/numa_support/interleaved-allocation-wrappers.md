@@ -22,8 +22,8 @@ A significant limitation for C++17 PMR is the potential mismatch between the req
 acquired memory sizes. `tbb::allocate_numa_interleaved` allocates memory in page-sized units, but
 there is no way to communicate the actual allocation size to
 `std::pmr::unsynchronized_pool_resource`. As a result, the pool resource may request regions that
-are significantly smaller than the allocated memory. Providing own *memory resource* implemenation
-that supports general regions splitting/merging is far from trivial.
+are significantly smaller than the allocated memory. Providing a custom *memory resource* implementation
+that supports general region splitting/merging is far from trivial.
 
 ## Support of large typed arrays
 
