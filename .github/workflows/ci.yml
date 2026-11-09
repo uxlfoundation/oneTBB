@@ -612,7 +612,7 @@ jobs:
             std: 14
             build_type: relwithdebinfo
             preview: 'OFF'
-          - os: ubuntu-22.04
+          - os: ubuntu-26.04
             c_compiler: gcc
             cxx_compiler: g++
             std: 17
