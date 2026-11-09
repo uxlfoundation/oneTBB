@@ -1,4 +1,4 @@
-# High-level wrappers for inteleaved memory allocation
+# High-level wrappers for interleaved memory allocation
 
 The basic interface for interleaved memory allocation was designed to support the following use
 cases:
