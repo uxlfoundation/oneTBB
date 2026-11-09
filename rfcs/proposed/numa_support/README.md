@@ -141,7 +141,7 @@ specific NUMA nodes.
 
 [Interleaved allocation](interleaved-allocation.md) can be a useful kind of NUMA-aware allocations.
 
-Approaches to high-level wrappers for inteleaved memory allocation is described in
+Approaches to high-level wrappers for interleaved memory allocation are described in
 [the document](interleaved-allocation-wrappers.md).
 
 ### Simplified approaches to associate task distribution with data placement
