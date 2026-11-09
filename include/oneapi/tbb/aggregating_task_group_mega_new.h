@@ -19,15 +19,29 @@ namespace d2 {
 #define TASK_TREE_GRAINSIZE 128
 #define DIRECT_SPAWN_THRESHOLD 8
 
+// Set to 1 to count references per task through a parent chain, as in the original prototype, so
+// that a whole batch holds a single reference on the shared wait tree vertex instead of one per task
+#ifndef __TBB_AGG_PARENT_REFCOUNT
+#define __TBB_AGG_PARENT_REFCOUNT 0
+#endif
+
 class task_forest;
 
 class tree_task : public d1::task {
+#if __TBB_AGG_PARENT_REFCOUNT
+    // A task is either the grabber or a member of a tree, never both, so a single word holds either
+    // the forest to grab or the parent. Both pointers are aligned, so the tag bit is free
+    static constexpr std::uintptr_t parent_tag = 1;
+    std::uintptr_t                  m_link;
+    std::atomic<std::size_t>        m_ref_count;
+#else
     task_forest*                    m_grab_target;
+    d1::wait_context_vertex*        m_tg_wait_context_vertex;
+#endif
     tree_task*                      m_next_root;
     tree_task*                      m_left_child;
     tree_task*                      m_right_child;
     std::size_t                     m_num_elements;
-    d1::wait_context_vertex*        m_tg_wait_context_vertex;
     d1::wait_tree_vertex_interface* m_wait_tree_vertex;
     task_group_context&             m_ctx;
 
@@ -38,7 +52,9 @@ class tree_task : public d1::task {
             head->left_child() = nullptr;
             head->right_child() = nullptr;
             head->num_elements() = 1;
+#if !__TBB_AGG_PARENT_REFCOUNT
             head->wait_tree_vertex() = vertex;
+#endif
             r1::spawn(*head, head->ctx());
             recursive_spawn(left, vertex);
             recursive_spawn(right, vertex);
@@ -47,20 +63,30 @@ class tree_task : public d1::task {
 
     static void spawn_root(tree_task* root, d1::wait_tree_vertex_interface* vertex) {
         if (root->num_elements() > TASK_TREE_GRAINSIZE) {
+#if !__TBB_AGG_PARENT_REFCOUNT
             root->wait_tree_vertex() = vertex;
             vertex->reserve();
+#endif
             r1::spawn(*root, root->ctx());
         } else {
+#if !__TBB_AGG_PARENT_REFCOUNT
             vertex->reserve(static_cast<std::uint32_t>(root->num_elements()));
+#endif
             recursive_spawn(root, vertex);
         }
     }
 
-    static void spawn_spine(tree_task* root, d1::wait_tree_vertex_interface* vertex) {
+    // The forest roots become children of the grabber, which owns the batch's single vertex reference
+    static void spawn_spine(tree_task* root, tree_task* parent, d1::wait_tree_vertex_interface* vertex) {
         if (root != nullptr) {
             tree_task* next = root->next_root();
             root->next_root() = nullptr;
-            spawn_spine(next, vertex);
+            spawn_spine(next, parent, vertex);
+#if __TBB_AGG_PARENT_REFCOUNT
+            parent->reserve(1);
+            root->set_parent(parent);
+#endif
+            suppress_unused_warning(parent);
             spawn_root(root, vertex);
         }
     }
@@ -68,11 +94,15 @@ class tree_task : public d1::task {
     static void spawn_task(tree_task* task, d1::wait_tree_vertex_interface* vertex) {
         if (task != nullptr) {
             if (task->num_elements() > TASK_TREE_GRAINSIZE) {
+#if !__TBB_AGG_PARENT_REFCOUNT
                 task->wait_tree_vertex() = vertex;
                 vertex->reserve();
+#endif
                 r1::spawn(*task, task->ctx());
             } else {
+#if !__TBB_AGG_PARENT_REFCOUNT
                 vertex->reserve(static_cast<std::uint32_t>(task->num_elements()));
+#endif
                 recursive_spawn(task, vertex);
             }
         }
@@ -81,9 +111,14 @@ protected:
     d1::small_object_allocator      m_allocator;
 
     void distribute_tasks() {
-        if (m_grab_target == nullptr && m_left_child == nullptr && m_right_child == nullptr) return;
+        if (grab_target() == nullptr && m_left_child == nullptr && m_right_child == nullptr) return;
 
+#if __TBB_AGG_PARENT_REFCOUNT
+        // Every published piece is already parented and accounted for, so no vertex is needed here
+        d1::wait_tree_vertex_interface* vertex = nullptr;
+#else
         d1::wait_tree_vertex_interface* vertex = r1::get_thread_reference_vertex(m_tg_wait_context_vertex);
+#endif
         // Distribute tasks if we are the grabber
         grab_and_redistribute_tasks(vertex);
 
@@ -115,7 +150,9 @@ protected:
         }
 
         if (m_num_elements > 1) {
+#if !__TBB_AGG_PARENT_REFCOUNT
             vertex->reserve(static_cast<std::uint32_t>(m_num_elements - 1));
+#endif
 
             tree_task* left = m_left_child;
             tree_task* right = m_right_child;
@@ -130,21 +167,73 @@ protected:
 public:
     tree_task(d1::wait_context_vertex* tg_wait_context_vertex,
               task_group_context& ctx, d1::small_object_allocator& allocator)
-        : m_grab_target(nullptr)
+        :
+#if __TBB_AGG_PARENT_REFCOUNT
+          m_link(0)
+        , m_ref_count(1) // self-reference, dropped when the body completes
+#else
+          m_grab_target(nullptr)
+        , m_tg_wait_context_vertex(tg_wait_context_vertex)
+#endif
         , m_next_root(nullptr)
         , m_left_child(nullptr)
         , m_right_child(nullptr)
         , m_num_elements(1) // the tree initially contains only this task
-        , m_tg_wait_context_vertex(tg_wait_context_vertex)
         , m_wait_tree_vertex(nullptr)
         , m_ctx(ctx)
         , m_allocator(allocator)
-    {}
+    {
+        suppress_unused_warning(tg_wait_context_vertex);
+    }
 
     ~tree_task() override {
+#if __TBB_AGG_PARENT_REFCOUNT
+        // Only the grabber and the directly spawned tasks hold a vertex reference
+        if (m_wait_tree_vertex != nullptr) m_wait_tree_vertex->release();
+#else
         __TBB_ASSERT(m_wait_tree_vertex != nullptr, nullptr);
         m_wait_tree_vertex->release();
+#endif
     }
+
+#if __TBB_AGG_PARENT_REFCOUNT
+    void reserve(std::size_t delta = 1) {
+        __TBB_ASSERT(m_ref_count.load(std::memory_order_relaxed) != 0, "Cannot reserve without other references");
+        m_ref_count.fetch_add(delta);
+    }
+
+    void set_parent(tree_task* parent) {
+        __TBB_ASSERT(m_link == 0, "The task is already a grabber or a child");
+        m_link = reinterpret_cast<std::uintptr_t>(parent) | parent_tag;
+    }
+
+    void release(d1::execution_data* ed = nullptr) {
+        if (m_ref_count.fetch_sub(1) == 1) {
+            tree_task* parent = (m_link & parent_tag) != 0
+                              ? reinterpret_cast<tree_task*>(m_link & ~parent_tag) : nullptr;
+            destroy(ed);
+            if (parent != nullptr) parent->release();
+        }
+    }
+
+    virtual void destroy(d1::execution_data* ed) = 0;
+
+    void set_grab_target(task_forest* target) {
+        __TBB_ASSERT(m_link == 0, "The task is already a grabber or a child");
+        m_link = reinterpret_cast<std::uintptr_t>(target);
+    }
+    task_forest* grab_target() {
+        return (m_link & parent_tag) != 0 ? nullptr : reinterpret_cast<task_forest*>(m_link);
+    }
+    void clear_grab_target() {
+        __TBB_ASSERT((m_link & parent_tag) == 0, "The task is a child, not a grabber");
+        m_link = 0;
+    }
+#else
+    void set_grab_target(task_forest* target) { m_grab_target = target; }
+    task_forest* grab_target() { return m_grab_target; }
+    void clear_grab_target() { m_grab_target = nullptr; }
+#endif
 
     tree_task*& next_root()   { return m_next_root; }
     tree_task*& left_child()  { return m_left_child; }
@@ -155,7 +244,6 @@ public:
     task_group_context& ctx() { return m_ctx; }
 
     d1::wait_tree_vertex_interface*& wait_tree_vertex() { return m_wait_tree_vertex; }
-    task_forest*& grab_target() { return m_grab_target; }
 
     void grab_and_redistribute_tasks(d1::wait_tree_vertex_interface* vertex);
 };
@@ -176,16 +264,35 @@ public:
         this->distribute_tasks();
 
         m_function();
+#if __TBB_AGG_PARENT_REFCOUNT
+        this->release(&ed);
+#else
         m_allocator.delete_object(this, ed);
+#endif
         return nullptr;
     }
     
     d1::task* cancel(d1::execution_data& ed) override {
         this->distribute_tasks();
 
+#if __TBB_AGG_PARENT_REFCOUNT
+        this->release(&ed);
+#else
         m_allocator.delete_object(this, ed);
+#endif
         return nullptr;
     }
+
+#if __TBB_AGG_PARENT_REFCOUNT
+private:
+    void destroy(d1::execution_data* ed) override {
+        if (ed != nullptr) {
+            m_allocator.delete_object(this, *ed);
+        } else {
+            m_allocator.delete_object(this);
+        }
+    }
+#endif
 };
 
 class task_forest {
@@ -244,7 +351,7 @@ public:
 
         if (current_head == nullptr) {
             m_num_direct_spawns = 0;
-            new_task->grab_target() = this;
+            new_task->set_grab_target(this);
             new_task->wait_tree_vertex() = r1::get_thread_reference_vertex(&wait_vertex);
             new_task->wait_tree_vertex()->reserve();
             unlock(grabber_spawned_flag());
@@ -272,6 +379,12 @@ public:
                 new_task->num_elements() += current_head->num_elements();
                 new_task->num_elements() += next_tree->num_elements();
 
+#if __TBB_AGG_PARENT_REFCOUNT
+                // The parent graph is fixed here and stays valid however the tree is later split
+                current_head->set_parent(new_task);
+                next_tree->set_parent(new_task);
+                new_task->reserve(2);
+#endif
                 current_head = new_task;
             }
             unlock(current_head);
@@ -290,10 +403,10 @@ public:
 };
 
 inline void tree_task::grab_and_redistribute_tasks(d1::wait_tree_vertex_interface* vertex) {
-    if (m_grab_target != nullptr) {
-        tree_task* head = m_grab_target->grab_all();
-        m_grab_target = nullptr;
-        spawn_spine(head, vertex);
+    if (task_forest* target = grab_target()) {
+        tree_task* head = target->grab_all();
+        clear_grab_target();
+        spawn_spine(head, this, vertex);
     }
 }
 
