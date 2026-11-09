@@ -395,7 +395,7 @@ jobs:
             std: 17
             build_type: debug
             preview: 'ON'
-          - os: macos-14
+          - os: macos-26-intel
             c_compiler: clang
             cxx_compiler: clang++
             std: 14
@@ -408,6 +408,12 @@ jobs:
             build_type: release
             preview: 'ON'
             cmake_static: -DBUILD_SHARED_LIBS=OFF
+          - os: macos-26
+            c_compiler: clang
+            cxx_compiler: clang++
+            std: 23
+            build_type: release
+            preview: 'ON'
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
@@ -746,7 +752,7 @@ jobs:
             ${{ matrix.cmake_extra }} -DTBB_TEST=OFF -DTBB_DOC_EXAMPLES=ON \
             -DTCM_BUILD=ON -DTCM_TEST=OFF -DTCM_DOC_EXAMPLES=ON ..
           cmake --build . -v --parallel --target tbbbind_2_5 build-doc-examples tcm-doc-examples
-          ctest -C ${{ matrix.build_type }} --timeout ${env:TEST_TIMEOUT} --output-on-failure \
+          ctest -C ${{ matrix.build_type }} --timeout ${{ env.TEST_TIMEOUT }} --output-on-failure \
                 -L "doc-examples"
 
   windows-doc-examples-testing:
