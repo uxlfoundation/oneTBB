@@ -253,7 +253,13 @@ jobs:
             std: 14
             build_type: relwithdebinfo
             preview: 'OFF'
-          - os: ubuntu-22.04
+          - os: ubuntu-latest
+            c_compiler: gcc
+            cxx_compiler: g++
+            std: 23
+            build_type: relwithdebinfo
+            preview: 'ON'
+          - os: ubuntu-26.04
             c_compiler: gcc
             cxx_compiler: g++
             std: 17
@@ -271,7 +277,7 @@ jobs:
             std: 20
             build_type: release
             preview: 'ON'
-          - os: ubuntu-22.04-arm
+          - os: ubuntu-26.04-arm
             c_compiler: gcc
             cxx_compiler: g++
             std: 20
