@@ -145,8 +145,12 @@ private:
         }
     };
 
-MemoryBuffer *CreateBuffer(UINT_PTR addr)
+    // Create a buffer within MAX_DISTANCE of both addr and addr2, searching from addr
+    MemoryBuffer *CreateBuffer(UINT_PTR addr, UINT_PTR addr2)
     {
+        auto inRange = [=](UINT_PTR a) {
+            return IsInDistance(addr, a, MAX_DISTANCE) && IsInDistance(addr2, a, MAX_DISTANCE);
+        };
         // No more room in the pages database
         if (m_lastBuffer - m_pages == MAX_NUM_BUFFERS)
             return 0;
@@ -163,7 +167,7 @@ MemoryBuffer *CreateBuffer(UINT_PTR addr)
 
             // Check that the address is in the right distance.
             // VirtualAlloc can only round the address down; so it will remain in the right distance
-            if (!IsInDistance(addr, Ptr2Addrint(newAddr), MAX_DISTANCE))
+            if (!inRange(Ptr2Addrint(newAddr)))
                 break;
 
             if (VirtualQuery(newAddr, &memInfo, sizeof(memInfo)) != sizeof(memInfo))
@@ -194,7 +198,7 @@ MemoryBuffer *CreateBuffer(UINT_PTR addr)
             const UINT_PTR candidate = (regionStart - m_allocSize) & ~(UINT_PTR)(m_allocSize-1);
 
             // The whole block is below addr, so its farthest byte from addr is the candidate itself
-            if (!IsInDistance(addr, candidate, MAX_DISTANCE))
+            if (!inRange(candidate))
                 break;
 
             if (VirtualQuery(Addrint2Ptr(candidate), &memInfo, sizeof(memInfo)) != sizeof(memInfo))
@@ -242,8 +246,15 @@ public:
     // Return a memory location in distance less than 2^31 from input address
     UINT_PTR GetLocation(UINT_PTR addr)
     {
+        return GetLocation(addr, addr);
+    }
+
+    // Return a memory location in distance less than 2^31 from both addresses
+    UINT_PTR GetLocation(UINT_PTR addr, UINT_PTR addr2)
+    {
         MemoryBuffer *pBuff = m_pages;
-        for (; pBuff<m_lastBuffer && IsInDistance(pBuff->m_next, addr, MAX_DISTANCE); ++pBuff)
+        for (; pBuff<m_lastBuffer && IsInDistance(pBuff->m_next, addr, MAX_DISTANCE)
+               && IsInDistance(pBuff->m_next, addr2, MAX_DISTANCE); ++pBuff)
         {
             if (pBuff->m_next < pBuff->m_base + pBuff->m_size)
             {
@@ -253,7 +264,7 @@ public:
             }
         }
 
-        pBuff = CreateBuffer(addr);
+        pBuff = CreateBuffer(addr, addr2);
         if(!pBuff)
             return 0;
 
@@ -337,18 +348,37 @@ static UINT CheckOpcodes( const char ** opcodes, void *inpAddr, bool abortOnErro
     return 0;
 }
 
-// Modify offsets in original code after moving it to a trampoline.
-// We do not have more than one offset to correct in existing opcode patterns.
-static void CorrectOffset( UINT_PTR address, const char* pattern, UINT distance )
+// The 32-bit displacement of a RIP-relative operand in the moved code is marked with "#*******"
+// in the pattern. We do not have more than one in existing opcode patterns.
+// RETURN: the position of the displacement in the code, or -1
+static int OperandPosition( const char* pattern )
 {
-    const char* pos = strstr(pattern, "#*******");
-    if( pos ) {
-        address += (pos - pattern)/2; // compute the offset position
-        UINT value;
-        // UINT assignment is not used to avoid potential alignment issues
-        memcpy(&value, Addrint2Ptr(address), sizeof(value));
-        value += distance;
-        memcpy(Addrint2Ptr(address), &value, sizeof(value));
+    const char* pos = pattern ? strstr(pattern, "#*******") : nullptr;
+    return pos ? (int)(pos - pattern)/2 : -1;
+}
+
+// A RIP-relative displacement disp in the code at srcAddr becomes srcAddr + disp - trampAddr when
+// the code is moved to trampAddr. So the trampoline must be within 2^31 of srcAddr + disp as well.
+// RETURN: srcAddr + disp, or srcAddr if the code has no such operand
+static UINT_PTR OperandBase( UINT_PTR srcAddr, const char* pattern )
+{
+    const int pos = OperandPosition(pattern);
+    if (pos < 0)
+        return srcAddr;
+    INT32 disp;
+    memcpy(&disp, Addrint2Ptr(srcAddr + pos), sizeof(disp));
+    return srcAddr + (INT_PTR)disp;
+}
+
+// Modify the offset in original code after moving it to a trampoline
+static void CorrectOffset( UINT_PTR trampAddr, const char* pattern, UINT_PTR operandBase )
+{
+    const int pos = OperandPosition(pattern);
+    if (pos >= 0) {
+        __TBB_ASSERT(IsInDistance(trampAddr, operandBase, MAX_DISTANCE), "The operand is out of reach");
+        const INT32 disp = (INT32)(operandBase - trampAddr);
+        // INT32 assignment is not used to avoid potential alignment issues
+        memcpy(Addrint2Ptr(trampAddr + pos), &disp, sizeof(disp));
     }
 }
 
@@ -436,7 +466,8 @@ static DWORD InsertTrampoline32(void *inpAddr, void *targetAddr, const char* pat
     if ( storedAddr ){ // If requested, store original function code
         bytesToMove = strlen(pattern)/2-1; // The last byte matching the pattern must not be copied
         __TBB_ASSERT_RELEASE( bytesToMove >= SIZE_OF_RELJUMP, "Incorrect bytecode pattern?" );
-        UINT_PTR trampAddr = memProvider.GetLocation(srcAddr);
+        const UINT_PTR operandBase = OperandBase(srcAddr, pattern);
+        UINT_PTR trampAddr = memProvider.GetLocation(srcAddr, operandBase);
         if (!trampAddr)
             return 0;
         *storedAddr = Addrint2Ptr(trampAddr);
@@ -447,7 +478,7 @@ static DWORD InsertTrampoline32(void *inpAddr, void *targetAddr, const char* pat
         memcpy(*storedAddr, codePtr, bytesToMove);
         offset = srcAddr - trampAddr;
         offset32 = (UINT)(offset & 0xFFFFFFFF);
-        CorrectOffset( trampAddr, pattern, offset32 );
+        CorrectOffset( trampAddr, pattern, operandBase );
         // Set jump to the code after replacement
         offset32 -= SIZE_OF_RELJUMP;
         *(UCHAR*)(trampAddr+bytesToMove) = 0xE9;
@@ -501,7 +532,8 @@ static DWORD InsertTrampoline64(void *inpAddr, void *targetAddr, const char* pat
     if ( storedAddr ){ // If requested, store original function code
         bytesToMove = strlen(pattern)/2-1; // The last byte matching the pattern must not be copied
         __TBB_ASSERT_RELEASE( bytesToMove >= SIZE_OF_INDJUMP, "Incorrect bytecode pattern?" );
-        UINT_PTR trampAddr = memProvider.GetLocation(srcAddr);
+        const UINT_PTR operandBase = OperandBase(srcAddr, pattern);
+        UINT_PTR trampAddr = memProvider.GetLocation(srcAddr, operandBase);
         if (!trampAddr)
             return 0;
         *storedAddr = Addrint2Ptr(trampAddr);
@@ -512,7 +544,7 @@ static DWORD InsertTrampoline64(void *inpAddr, void *targetAddr, const char* pat
         memcpy(*storedAddr, codePtr, bytesToMove);
         offset = srcAddr - trampAddr;
         offset32 = (UINT)(offset & 0xFFFFFFFF);
-        CorrectOffset( trampAddr, pattern, offset32 );
+        CorrectOffset( trampAddr, pattern, operandBase );
         // Set jump to the code after replacement. It is within the distance of relative jump!
         offset32 -= SIZE_OF_RELJUMP;
         *(UCHAR*)(trampAddr+bytesToMove) = 0xE9;

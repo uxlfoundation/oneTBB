@@ -1504,6 +1504,43 @@ void TestTrampolineMemoryBelowModule() {
     if (blocker) VirtualFree(blocker, 0, MEM_RELEASE);
     if (module) VirtualFree(module, 0, MEM_RELEASE);
 }
+
+// Trampoline memory must also be within reach of the address that a RIP-relative operand of
+// the moved code is relative to.
+void TestTrampolineMemoryForOperand() {
+    SYSTEM_INFO sysInfo;
+    GetSystemInfo(&sysInfo);
+    const UINT_PTR gran = sysInfo.dwAllocationGranularity;
+    const UINT_PTR span = ((UINT_PTR)MAX_DISTANCE + MAX_PROBE_SIZE + gran) & ~(gran - 1);
+    const UINT_PTR half = (span / 2) & ~(gran - 1);
+
+    // Layout: [free: half][taken: span - half][module: gran][blocker: up to base + 3*span]
+    char* base = (char*)VirtualAlloc(nullptr, 3 * span, MEM_RESERVE, PAGE_NOACCESS);
+    if (!base) {
+        INFO("Cannot reserve address space, test skipped!\n");
+        return;
+    }
+    VirtualFree(base, 0, MEM_RELEASE);
+    void* taken = VirtualAlloc(base + half, span - half, MEM_RESERVE, PAGE_NOACCESS);
+    void* module = VirtualAlloc(base + span, gran, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+    void* blocker = VirtualAlloc(base + span + gran, 2 * span - gran, MEM_RESERVE, PAGE_NOACCESS);
+    if (taken && module && blocker) {
+        MemoryProvider provider;
+        const UINT_PTR addr = Ptr2Addrint(module) + gran / 2;
+        // The free memory is within reach of addr, but not of an operand base 3/4 * span above it
+        REQUIRE(provider.GetLocation(addr, addr + 3 * (span / 4)) == 0);
+        const UINT_PTR loc = provider.GetLocation(addr, addr - span / 4);
+        REQUIRE(loc != 0);
+        REQUIRE(IsInDistance(addr, loc, MAX_DISTANCE));
+        REQUIRE(IsInDistance(addr - span / 4, loc, MAX_DISTANCE));
+        VirtualFree(Addrint2Ptr(loc & ~(gran - 1)), 0, MEM_RELEASE);
+    } else {
+        INFO("Address space was taken concurrently, test skipped!\n");
+    }
+    if (blocker) VirtualFree(blocker, 0, MEM_RELEASE);
+    if (module) VirtualFree(module, 0, MEM_RELEASE);
+    if (taken) VirtualFree(taken, 0, MEM_RELEASE);
+}
 #endif // _WIN64
 
 #if defined(_M_X64)
@@ -1611,6 +1648,19 @@ void TestX64TrampolineUnwind() {
     TestMovedAllocation();
     TestPartialPrologue();
     TestFunctionWithoutUnwindData();
+}
+
+// The moved RIP-relative operand of _o_free in ucrtbase.dll must refer to the same address
+void TestX64RelocatedOperand() {
+    const INT32 disp = -0x5ABFA;
+    const UCHAR* d = (const UCHAR*)&disp;
+    // mov rdx, rcx; lea rcx, [rip + disp]; jmp
+    X64TrampolineUnwind::TestFunction func({ 0x48, 0x8B, 0xD1, 0x48, 0x8D, 0x0D, d[0], d[1], d[2], d[3],
+                                             0xE9, 0, 0, 0, 0 });
+    const UINT_PTR tramp = func.replace("488BD1488D0D#*******E9");
+    INT32 movedDisp;
+    memcpy(&movedDisp, (void*)(tramp + 6), sizeof(movedDisp));
+    REQUIRE(tramp + 10 + (INT_PTR)movedDisp == Ptr2Addrint(func.page) + 10 + (INT_PTR)disp);
 }
 #endif // _M_X64
 
@@ -2090,9 +2140,19 @@ TEST_CASE("Function replacement log") {
 TEST_CASE("Trampoline memory below the module") {
     TestTrampolineMemoryBelowModule();
 }
+
+//! \brief \ref error_guessing
+TEST_CASE("Trampoline memory for a RIP-relative operand") {
+    TestTrampolineMemoryForOperand();
+}
 #endif
 
 #if defined(_M_X64)
+//! \brief \ref error_guessing
+TEST_CASE("x64 trampoline with a RIP-relative operand") {
+    TestX64RelocatedOperand();
+}
+
 //! \brief \ref error_guessing
 TEST_CASE("x64 trampoline unwind data") {
     TestX64TrampolineUnwind();
