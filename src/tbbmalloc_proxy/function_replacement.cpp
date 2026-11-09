@@ -352,6 +352,72 @@ static void CorrectOffset( UINT_PTR address, const char* pattern, UINT distance 
     }
 }
 
+#if defined(_M_X64)
+/*
+ * A trampoline runs the first bytes of the original function, which can be prologue
+ * instructions that move RSP or push registers. A stack walk (by a debugger or a profiler)
+ * that pauses a thread there needs unwind data for the trampoline; otherwise the trampoline
+ * is taken for a leaf function and the return address is read from the wrong place.
+ *
+ * The trampoline gets a copy of the unwind data of the original function, registered with
+ * RtlAddFunctionTable as the documentation requires for generated code. No unwind codes need to
+ * be selected: in a prolog, the unwinder only undoes the codes whose offset is not past RIP, which
+ * are those of the moved instructions. The copy declares the whole trampoline as prolog, as past
+ * the prolog the unwinder checks whether the code at RIP is an epilog, and the final jmp looks like one.
+ *
+ * Only version 1 unwind data without chained info is copied. The functions replaced with a
+ * trampoline in ucrtbase.dll (_aligned_free, _aligned_msize, _free_base; free and _o_free have no
+ * unwind data, _msize is a jmp) use it, with at most 4 unwind codes (ucrtbase.dll 10.0.28000).
+ * For other unwind data nothing is registered, and stack walks behave as without this support.
+ *
+ * References, in the Microsoft documentation:
+ * - "x64 exception handling", https://learn.microsoft.com/cpp/build/exception-handling-x64:
+ *   "struct UNWIND_INFO" for the layout, and "Unwind procedure" for how the unwinder uses it.
+ * - RtlAddFunctionTable, https://learn.microsoft.com/windows/win32/api/winnt/nf-winnt-rtladdfunctiontable
+ */
+namespace X64Unwind {
+    // UNWIND_INFO; it is documented, but not defined in the Windows SDK headers
+    struct Info {
+        UCHAR versionAndFlags;
+        UCHAR sizeOfProlog;
+        UCHAR countOfCodes;
+        UCHAR frame;
+        USHORT codes[1];
+    };
+    const unsigned MAX_CODES = (MAX_PROBE_SIZE - sizeof(RUNTIME_FUNCTION) - offsetof(Info, codes)) / sizeof(USHORT);
+
+    // Register unwind data for the trampoline that runs `moved` bytes of the function at src
+    inline void RegisterTrampoline(UINT_PTR src, UINT_PTR tramp, size_t moved) {
+        DWORD64 imageBase = 0;
+        const RUNTIME_FUNCTION* func = RtlLookupFunctionEntry(src, &imageBase, nullptr);
+        // Without unwind data, the function is a leaf that doesn't change RSP: nothing to describe.
+        // UNWIND_INFO is DWORD-aligned, so an odd UnwindData is not its address.
+        if (!func || imageBase + func->BeginAddress != src || (func->UnwindData & 1))
+            return;
+        const Info* orig = (const Info*)Addrint2Ptr(imageBase + func->UnwindData);
+        if ((orig->versionAndFlags & 0x7) != 1 || ((orig->versionAndFlags >> 3) & UNW_FLAG_CHAININFO)
+            || orig->countOfCodes > MAX_CODES)
+            return;
+
+        const UINT_PTR slot = memProvider.GetLocation(src);
+        if (!slot)
+            return;
+        RUNTIME_FUNCTION* entry = (RUNTIME_FUNCTION*)Addrint2Ptr(slot);
+        Info* info = (Info*)Addrint2Ptr(slot + sizeof(RUNTIME_FUNCTION));
+        memcpy(info, orig, offsetof(Info, codes) + orig->countOfCodes * sizeof(USHORT));
+        info->versionAndFlags = 1; // no handlers: no exception can be raised in the trampoline
+        info->sizeOfProlog = (UCHAR)(moved + SIZE_OF_RELJUMP);
+
+        // Both the trampoline and its unwind data are within 2 GB of src
+        const UINT_PTR base = slot < tramp ? slot : tramp;
+        entry->BeginAddress = (DWORD)(tramp - base);
+        entry->EndAddress = (DWORD)(tramp + moved + SIZE_OF_RELJUMP - base);
+        entry->UnwindData = (DWORD)(Ptr2Addrint(info) - base);
+        RtlAddFunctionTable(entry, 1, base);
+    }
+} // namespace X64Unwind
+#endif // _M_X64
+
 // Insert jump relative instruction to the input address
 // RETURN: the size of the trampoline or 0 on failure
 static DWORD InsertTrampoline32(void *inpAddr, void *targetAddr, const char* pattern, void** storedAddr)
@@ -386,6 +452,9 @@ static DWORD InsertTrampoline32(void *inpAddr, void *targetAddr, const char* pat
         offset32 -= SIZE_OF_RELJUMP;
         *(UCHAR*)(trampAddr+bytesToMove) = 0xE9;
         memcpy((UCHAR*)(trampAddr+bytesToMove+1), &offset32, sizeof(offset32));
+#if defined(_M_X64)
+        X64Unwind::RegisterTrampoline(srcAddr, trampAddr, bytesToMove);
+#endif
     }
 
     // The following will work correctly even if srcAddr>tgtAddr, as long as
@@ -448,6 +517,9 @@ static DWORD InsertTrampoline64(void *inpAddr, void *targetAddr, const char* pat
         offset32 -= SIZE_OF_RELJUMP;
         *(UCHAR*)(trampAddr+bytesToMove) = 0xE9;
         memcpy((UCHAR*)(trampAddr+bytesToMove+1), &offset32, sizeof(offset32));
+#if defined(_M_X64)
+        X64Unwind::RegisterTrampoline(srcAddr, trampAddr, bytesToMove);
+#endif
     }
 
     // Fill the buffer
@@ -504,6 +576,72 @@ namespace Arm64 {
     inline bool IsAdr(UINT32 i)        { return (i & 0x1F000000) == 0x10000000; } // ADR/ADRP
     inline bool IsLiteralLoad(UINT32 i) { return (i & 0x3B000000) == 0x18000000; } // LDR/LDRSW/PRFM (literal)
 
+    /*
+     * If the displaced instruction changes SP or LR, a stack walk (by a debugger or a profiler) that
+     * pauses a thread in the trampoline needs unwind data for it; otherwise the trampoline is taken
+     * for a leaf function, and SP or LR are not restored. The trampoline is registered with
+     * RtlAddFunctionTable as a 2-instruction function whose prolog is the displaced instruction.
+     *
+     * The unwind data can't be copied from the original function as on x64: on ARM64 the function
+     * length is part of the unwind data, so the copy would claim the trampoline is as long as the
+     * original function and cover the neighboring trampolines. So the displaced instruction is
+     * translated to its unwind code, which is supported for the instructions that start prologs:
+     * - pacibsp, which signs LR in builds with pointer authentication: _aligned_msize in
+     *   ucrtbase.dll 10.0.28000 starts with it. The other functions replaced with a trampoline
+     *   there start with B, CBZ or MOV, which need no unwind data.
+     * - stp x29, x30, [sp, #-n]!, which saves the frame pointer and LR in other builds.
+     * - sub sp, sp, #n (up to 32 KB), which allocates the stack frame.
+     * Other instructions get no unwind data, as before this support: only stack walks paused in
+     * the trampoline are affected, while refusing the instruction would skip the replacement.
+     *
+     * References:
+     * - "ARM64 exception handling", https://learn.microsoft.com/cpp/build/arm64-exception-handling:
+     *   ".xdata records" for the header (IMAGE_ARM64_RUNTIME_FUNCTION_ENTRY_XDATA in winnt.h) and
+     *   "Unwind codes" for the codes, which are not defined in the Windows SDK headers.
+     * - Arm A64 Instruction Set Architecture (DDI 0602), https://developer.arm.com/documentation/ddi0602:
+     *   the encodings of STP, SUB (immediate) and PACIBSP.
+     */
+
+    const UINT32 PACIBSP = 0xD503237F;
+
+    // Unwind codes, named as in the "Unwind codes" table of "ARM64 exception handling"
+    const UCHAR UWC_ALLOC_S     = 0x00; // 000xxxxx: sub sp, sp, #x*16
+    const UCHAR UWC_SAVE_FPLR_X = 0x80; // 10zzzzzz: stp x29, lr, [sp, #-(z+1)*8]!
+    const UCHAR UWC_ALLOC_M     = 0xC0; // 11000xxx'xxxxxxxx: sub sp, sp, #x*16
+    const UCHAR UWC_END         = 0xE4;
+    const UCHAR UWC_PAC_SIGN_LR = 0xFC; // pacibsp
+
+    // Write the unwind code for an instruction that changes SP or LR.
+    // RETURN: the size of the code, or 0 if the instruction has no unwind code here
+    inline unsigned UnwindCode(UINT32 i, UCHAR code[2]) {
+        if (i == PACIBSP) {
+            code[0] = UWC_PAC_SIGN_LR;
+            return 1;
+        }
+        if ((i & 0xFFC07FFF) == 0xA9807BFD) {                  // stp x29, x30, [sp, #-n]!
+            const INT64 size = -SignExtend(i >> 15, 7) * 8;
+            if (size <= 0)
+                return 0;
+            code[0] = (UCHAR)(UWC_SAVE_FPLR_X | (size / 8 - 1));
+            return 1;
+        }
+        if ((i & 0xFF8003FF) == 0xD10003FF) {                  // sub sp, sp, #n
+            const UINT32 size = ((i >> 10) & 0xFFF) << ((i & 0x00400000) ? 12 : 0);
+            const UINT32 x = size / 16;
+            if (size % 16 || x >= 0x800)
+                return 0;
+            if (x < 0x20) {
+                code[0] = (UCHAR)(UWC_ALLOC_S | x);
+                return 1;
+            }
+            code[0] = (UCHAR)(UWC_ALLOC_M | (x >> 8));
+            code[1] = (UCHAR)x;
+            return 2;
+        }
+        return 0;
+    }
+
+
     inline Kind Classify(UINT32 i) {
         if (IsB(i))
             return BRANCH;
@@ -517,6 +655,7 @@ namespace Arm64 {
             return ADDRESS;
         if (IsLiteralLoad(i))
             return UNSUPPORTED;
+
         return PLAIN;
     }
 
@@ -555,6 +694,29 @@ namespace Arm64 {
         return (UINT32*)Addrint2Ptr(loc);
     }
 
+    // Unwind data for a trampoline of two instructions (the displaced one and a branch back),
+    // placed after them in the same slot
+    struct TrampolineUnwind {
+        RUNTIME_FUNCTION entry;
+        UINT32 header;
+        UCHAR codes[4]; // the unwind code of the displaced instruction, then UWC_END
+    };
+
+    inline void RegisterTrampoline(UINT32* code, UINT32 insn) {
+        TrampolineUnwind* data = (TrampolineUnwind*)(code + 2);
+        memset(data->codes, UWC_END, sizeof(data->codes));
+        if (UnwindCode(insn, data->codes) == 0)
+            return; // no stack or LR change, or one without an unwind code here
+        const UINT_PTR base = Ptr2Addrint(code);
+        IMAGE_ARM64_RUNTIME_FUNCTION_ENTRY_XDATA header = {};
+        header.FunctionLength = 2; // instructions
+        header.CodeWords = 1;
+        data->header = header.HeaderData;
+        data->entry.BeginAddress = 0;
+        data->entry.UnwindData = (DWORD)(Ptr2Addrint(&data->header) - base);
+        RtlAddFunctionTable(&data->entry, 1, base);
+    }
+
     // Build a trampoline that runs the instruction displaced from `src` and continues at src + 4
     inline void* MakeTrampoline(UINT_PTR src, UINT32 insn) {
         UINT32* code = GetCodeLocation(src);
@@ -566,6 +728,7 @@ namespace Arm64 {
         case PLAIN:
             code[0] = insn;
             code[1] = Branch(t + 4, src + SIZE_OF_ARM64_INSN);
+            RegisterTrampoline(code, insn);
             break;
         case COND_BRANCH:
             // Taken: jump to the absolute branch at +8. Not taken: continue the function.

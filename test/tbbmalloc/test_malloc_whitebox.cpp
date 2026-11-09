@@ -1506,6 +1506,114 @@ void TestTrampolineMemoryBelowModule() {
 }
 #endif // _WIN64
 
+#if defined(_M_X64)
+namespace X64TrampolineUnwind {
+    enum { PUSH_NONVOL = 0, ALLOC_SMALL = 2, SAVE_NONVOL = 4 }; // unwind operations
+
+    inline USHORT Code(unsigned offset, unsigned op, unsigned info) {
+        return (USHORT)(offset | (op << 8) | (info << 12));
+    }
+
+    // A function on an executable page, with unwind data registered as for generated code
+    struct TestFunction {
+        UCHAR* page;
+        RUNTIME_FUNCTION* entry = nullptr;
+        TestFunction(std::initializer_list<UCHAR> code)
+            : page((UCHAR*)VirtualAlloc(nullptr, 4096, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE)) {
+            REQUIRE(page);
+            memcpy(page, code.begin(), code.size());
+            page[0x80] = 0xC3; // ret: the replacement function
+        }
+        void addUnwindData(UCHAR sizeOfProlog, std::initializer_list<USHORT> codes) {
+            X64Unwind::Info* info = (X64Unwind::Info*)(page + 0x110);
+            info->versionAndFlags = 1;
+            info->sizeOfProlog = sizeOfProlog;
+            info->countOfCodes = (UCHAR)codes.size();
+            info->frame = 0;
+            memcpy(info->codes, codes.begin(), codes.size() * sizeof(USHORT));
+            entry = (RUNTIME_FUNCTION*)(page + 0x100);
+            entry->BeginAddress = 0;
+            entry->EndAddress = 0x40;
+            entry->UnwindData = 0x110;
+            REQUIRE(RtlAddFunctionTable(entry, 1, (DWORD64)page));
+        }
+        ~TestFunction() {
+            if (entry) RtlDeleteFunctionTable(entry);
+            if (page) VirtualFree(page, 0, MEM_RELEASE);
+        }
+        // Redirect the function and return its trampoline
+        UINT_PTR replace(const char* pattern) {
+            void* orig = nullptr;
+            REQUIRE(InsertTrampoline32(page, page + 0x80, pattern, &orig));
+            return Ptr2Addrint(orig);
+        }
+    };
+
+    // Unwind a thread paused at pc with the given stack
+    CONTEXT Unwind(UINT_PTR pc, UINT64* stack) {
+        CONTEXT ctx = {};
+        ctx.ContextFlags = CONTEXT_FULL;
+        ctx.Rip = pc;
+        ctx.Rsp = (DWORD64)stack;
+        DWORD64 imageBase = 0;
+        PRUNTIME_FUNCTION func = RtlLookupFunctionEntry(pc, &imageBase, nullptr);
+        REQUIRE_MESSAGE(func, "No unwind data for the trampoline");
+        void* handlerData = nullptr;
+        DWORD64 frame = 0;
+        RtlVirtualUnwind(UNW_FLAG_NHANDLER, imageBase, pc, func, &ctx, &handlerData, &frame, nullptr);
+        return ctx;
+    }
+
+    void TestMovedAllocation() {
+        // sub rsp, 28h; test rcx, rcx; jne
+        TestFunction func({ 0x48, 0x83, 0xEC, 0x28, 0x48, 0x85, 0xC9, 0x75, 0x00, 0xC3 });
+        func.addUnwindData(4, { Code(4, ALLOC_SMALL, (0x28 - 8) / 8) });
+        const UINT_PTR tramp = func.replace("4883EC284885C975");
+
+        UINT64 stack[8] = { 0x1111, 0, 0, 0, 0, 0x2222 };
+        CONTEXT ctx = Unwind(tramp, stack); // before sub
+        REQUIRE(ctx.Rip == 0x1111);
+        REQUIRE(ctx.Rsp == (DWORD64)(stack + 1));
+        for (unsigned offset : { 4, 7 }) { // after sub, and at the jump back to the function
+            ctx = Unwind(tramp + offset, stack);
+            REQUIRE(ctx.Rip == 0x2222);
+            REQUIRE(ctx.Rsp == (DWORD64)(stack + 6));
+        }
+    }
+
+    void TestPartialPrologue() {
+        // mov [rsp+8], rbx; push rdi; sub rsp, 20h: only the first two are moved.
+        // The unwind codes are those of _aligned_msize in ucrtbase.dll; the operand of
+        // SAVE_NONVOL looks like a code for offset 6 and must be skipped with it.
+        TestFunction func({ 0x48, 0x89, 0x5C, 0x24, 0x08, 0x57, 0x48, 0x83, 0xEC, 0x20, 0xC3 });
+        func.addUnwindData(10, { Code(10, SAVE_NONVOL, 3 /*rbx*/), 0x30 / 8,
+                                 Code(10, ALLOC_SMALL, (0x20 - 8) / 8),
+                                 Code(6, PUSH_NONVOL, 7 /*rdi*/) });
+        const UINT_PTR tramp = func.replace("48895C24085748");
+
+        UINT64 stack[2] = { 0x3333, 0x2222 };
+        CONTEXT ctx = Unwind(tramp + 6, stack);
+        REQUIRE(ctx.Rdi == 0x3333);
+        REQUIRE(ctx.Rip == 0x2222);
+        REQUIRE(ctx.Rsp == (DWORD64)(stack + 2));
+    }
+
+    void TestFunctionWithoutUnwindData() {
+        TestFunction func({ 0x48, 0x83, 0xEC, 0x28, 0x48, 0x85, 0xC9, 0x75, 0x00, 0xC3 });
+        const UINT_PTR tramp = func.replace("4883EC284885C975");
+        DWORD64 imageBase = 0;
+        REQUIRE(RtlLookupFunctionEntry(tramp, &imageBase, nullptr) == nullptr);
+    }
+} // namespace X64TrampolineUnwind
+
+void TestX64TrampolineUnwind() {
+    using namespace X64TrampolineUnwind;
+    TestMovedAllocation();
+    TestPartialPrologue();
+    TestFunctionWithoutUnwindData();
+}
+#endif // _M_X64
+
 #if defined(_M_ARM64)
 namespace Arm64Replacement {
     typedef UINT64 (*TestFunc)(UINT64);
@@ -1551,6 +1659,7 @@ namespace Arm64Replacement {
         REQUIRE(Arm64::Classify(0x94000002) == Arm64::UNSUPPORTED); // bl #8
         REQUIRE(Arm64::Classify(RET) == Arm64::UNSUPPORTED);
         REQUIRE(Arm64::Classify(0x58000040) == Arm64::UNSUPPORTED); // ldr x0, #8
+
 
         REQUIRE(Arm64::BranchTarget(0x10000, 0x17FFFFFF) == 0x10000 - 4);
         REQUIRE(Arm64::CondBranchTarget(0x10000, 0xB4FFFFE0) == 0x10000 - 4); // cbz x0, #-4
@@ -1658,6 +1767,66 @@ namespace Arm64Replacement {
         }
         FAIL("Cannot allocate a far target");
     }
+
+    // Unwind a thread paused in the trampoline at pc with the given stack
+    CONTEXT Unwind(UINT_PTR pc, UINT64* stack) {
+        CONTEXT ctx = {};
+        ctx.ContextFlags = CONTEXT_FULL;
+        ctx.Pc = pc;
+        ctx.Sp = (DWORD64)stack;
+        ctx.Fp = 0x2929;
+        ctx.Lr = 0x3030;
+        DWORD64 imageBase = 0;
+        PRUNTIME_FUNCTION func = RtlLookupFunctionEntry(pc, &imageBase, nullptr);
+        REQUIRE_MESSAGE(func, "No unwind data for the trampoline");
+        void* handlerData = nullptr;
+        DWORD64 frame = 0;
+        RtlVirtualUnwind(UNW_FLAG_NHANDLER, imageBase, pc, func, &ctx, &handlerData, &frame, nullptr);
+        return ctx;
+    }
+
+    void TestTrampolineUnwind() {
+        CodePage page;
+        REQUIRE(page.code);
+        UINT32* target = page.emit(0, { RET });
+        UINT64 stack[4] = { 0x1111, 0x2222 };
+        const DWORD64 sp = (DWORD64)stack;
+
+        // stp x29, x30, [sp, #-16]!
+        UINT_PTR tramp = (UINT_PTR)Replace(page.emit(16, { 0xA9BF7BFD, RET }), target);
+        CONTEXT ctx = Unwind(tramp, stack); // before the stp
+        REQUIRE(ctx.Sp == sp);
+        REQUIRE(ctx.Pc == 0x3030);
+        ctx = Unwind(tramp + SIZE_OF_ARM64_INSN, stack);
+        REQUIRE(ctx.Sp == sp + 16);
+        REQUIRE(ctx.Fp == 0x1111);
+        REQUIRE(ctx.Pc == 0x2222);
+
+        // sub sp, sp, #n: alloc_s and alloc_m
+        const UINT32 subs[] = { 0xD10103FF /*#0x40*/, 0xD14007FF /*#0x1000*/ };
+        const DWORD64 sizes[] = { 0x40, 0x1000 };
+        for (int i = 0; i < 2; ++i) {
+            tramp = (UINT_PTR)Replace(page.emit(32 + 16 * i, { subs[i], RET }), target);
+            ctx = Unwind(tramp + SIZE_OF_ARM64_INSN, stack);
+            REQUIRE(ctx.Sp == sp + sizes[i]);
+            REQUIRE(ctx.Pc == 0x3030);
+        }
+
+        // pacibsp, the first instruction of _aligned_msize in ucrtbase.dll
+        tramp = (UINT_PTR)Replace(page.emit(64, { Arm64::PACIBSP, RET }), target);
+        ctx = Unwind(tramp + SIZE_OF_ARM64_INSN, stack);
+        REQUIRE(ctx.Sp == sp);
+        REQUIRE(ctx.Pc == 0x3030);
+        // No unwind data for instructions that don't change the stack, or without an unwind code here;
+        // the function is still replaced
+        const UINT32 noUnwindCode[] = { AddX0(1), 0xA9BE53F3 /*stp x19, x20, [sp, #-32]!*/,
+                                        0xD14043FF /*sub sp, sp, #0x10000*/, 0xD503233F /*paciasp*/ };
+        for (int i = 0; i < 4; ++i) {
+            tramp = (UINT_PTR)Replace(page.emit(80 + 16 * i, { noUnwindCode[i], RET }), target);
+            DWORD64 imageBase = 0;
+            REQUIRE(RtlLookupFunctionEntry(tramp + SIZE_OF_ARM64_INSN, &imageBase, nullptr) == nullptr);
+        }
+    }
 } // namespace Arm64Replacement
 
 void TestArm64FunctionReplacement() {
@@ -1669,6 +1838,7 @@ void TestArm64FunctionReplacement() {
     TestBranchEntry();
     TestUnsupportedEntry();
     TestFarTarget();
+    TestTrampolineUnwind();
 }
 #endif // _M_ARM64
 
@@ -1919,6 +2089,13 @@ TEST_CASE("Function replacement log") {
 //! \brief \ref error_guessing
 TEST_CASE("Trampoline memory below the module") {
     TestTrampolineMemoryBelowModule();
+}
+#endif
+
+#if defined(_M_X64)
+//! \brief \ref error_guessing
+TEST_CASE("x64 trampoline unwind data") {
+    TestX64TrampolineUnwind();
 }
 #endif
 
