@@ -238,8 +238,10 @@ public:
             new_active = c->default_value();
         } else {
             // depending on global control type, use minimal or maximal from active values
-            new_active = c->is_first_arg_preferred(0, 1) ?
-                (*c->my_list.begin())->my_value : (*c->my_list.rbegin())->my_value;
+            const std::size_t min_candidate = (*c->my_list.begin())->my_value;
+            const std::size_t max_candidate = (*c->my_list.rbegin())->my_value;
+            new_active = c->is_first_arg_preferred(min_candidate, max_candidate) ?
+                min_candidate : max_candidate;
         }
         if (new_active != old_active) {
             c->apply_active(new_active);
