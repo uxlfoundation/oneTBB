@@ -75,7 +75,7 @@ double measure(Body body, int reps) {
 } // namespace
 
 int main() {
-    constexpr int num_tasks = 1000000;
+    constexpr int num_tasks = 500000;
     constexpr int reps = 7;
 
     tbb::task_arena arena;
