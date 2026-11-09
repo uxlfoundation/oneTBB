@@ -35,5 +35,7 @@ TEST_CASE(test_name) {
 }
 
 #else
+//! Test terminate_on_exception: skip in this configuration
+//! \brief \ref interface \ref requirement
 TEST_CASE(test_name * doctest::skip()) {}
 #endif
