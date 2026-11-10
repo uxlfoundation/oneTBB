@@ -24,7 +24,6 @@
 #include <functional>
 #include <vector>
 #include <climits>
-#include <exception>
 
 #include "_config.h"
 #include "_assert.h"
