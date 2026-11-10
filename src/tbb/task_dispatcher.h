@@ -383,7 +383,7 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
             break; // Exit exception loop;
 #if TBB_USE_EXCEPTIONS
         } catch (...) {
-            if (global_control::active_value<global_control::terminate_on_exception>() == 1) {
+            if (get_active_value<global_control::terminate_on_exception>() == 1) {
                 terminate_on_user_exception();
             }
 
