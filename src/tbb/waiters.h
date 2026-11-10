@@ -63,21 +63,17 @@ public:
         __TBB_ASSERT(t == nullptr, nullptr);
 
         if (is_worker_should_leave(slot)) {
-            if (is_delayed_leave_enabled()) {
-                static constexpr std::chrono::microseconds worker_wait_leave_duration(1000);
-                static_assert(worker_wait_leave_duration > std::chrono::steady_clock::duration(1),
-                              "Clock resolution is not enough for measured interval.");
-
+            const auto worker_wait_leave_duration = my_arena.my_thread_leave.retention_duration();
+            if (worker_wait_leave_duration.count() > 0) {
                 for (auto t1 = std::chrono::steady_clock::now(), t2 = t1;
-                    std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1) < worker_wait_leave_duration;
+                    t2 - t1 < worker_wait_leave_duration;
                     t2 = std::chrono::steady_clock::now())
                 {
                     if (!my_arena.is_empty() && !my_arena.is_recall_requested()) {
                         return true;
                     }
 
-                    if (!my_arena.my_thread_leave.is_retention_allowed() ||
-                        my_arena.my_threading_control->is_any_other_client_active())
+                    if (my_arena.my_threading_control->is_any_other_client_active())
                     {
                         break;
                     }
@@ -107,10 +103,6 @@ public:
 
 private:
     using base_type = waiter_base;
-
-    bool is_delayed_leave_enabled() {
-       return my_arena.my_thread_leave.is_retention_allowed();
-    }
 
     bool is_worker_should_leave(arena_slot& slot) const {
         bool is_top_priority_arena = my_arena.is_top_priority();

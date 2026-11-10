@@ -19,6 +19,7 @@
 #define _TBB_arena_H
 
 #include <atomic>
+#include <chrono>
 #include <cstring>
 
 #include "oneapi/tbb/detail/_task.h"
@@ -244,7 +245,30 @@ public:
         __TBB_ASSERT(curr != UINTPTR_MAX, "The initial state was not set");
         return curr != FAST_LEAVE && curr != ONE_TIME_FAST_LEAVE;
     }
+
+    // Wait duration before a worker leaves; zero means no retention
+    std::chrono::microseconds retention_duration() const {
+        std::uintptr_t curr = my_state.load(std::memory_order_relaxed);
+        __TBB_ASSERT(curr != UINTPTR_MAX, "The initial state was not set");
+        if (curr >= PARALLEL_PHASE) {
+            return parallel_phase_retention_duration();
+        }
+        if (curr == FAST_LEAVE || curr == ONE_TIME_FAST_LEAVE) {
+            return std::chrono::microseconds(0);
+        }
+        return default_retention_duration();
+    }
+
+    static constexpr std::chrono::microseconds default_retention_duration() {
+        return std::chrono::microseconds(1000);
+    }
+    static constexpr std::chrono::microseconds parallel_phase_retention_duration() {
+        return std::chrono::microseconds(10000);
+    }
 };
+
+static_assert(thread_leave_manager::default_retention_duration() > std::chrono::steady_clock::duration(1),
+              "Clock resolution is not enough for measured interval.");
 
 //! The structure of an arena, except the array of slots.
 /** Separated in order to simplify padding.
