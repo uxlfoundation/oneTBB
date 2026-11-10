@@ -679,8 +679,9 @@ d1::slot_id task_arena_impl::execution_slot(const d1::task_arena_base& ta) {
 
 class nested_arena_context : no_copy {
 public:
-    nested_arena_context(thread_data& td, arena& nested_arena, std::size_t slot_index)
+    nested_arena_context(thread_data& td, arena& nested_arena, std::size_t slot_index, bool slot_is_borrowed = false)
         : m_orig_execute_data_ext(td.my_task_dispatcher->m_execute_data_ext)
+        , m_slot_is_borrowed(slot_is_borrowed)
     {
         if (td.my_arena != &nested_arena) {
             m_orig_arena = td.my_arena;
@@ -694,20 +695,29 @@ public:
             if (td.my_inbox.is_idle_state(true))
                 td.my_inbox.set_is_idle(false);
             task_dispatcher& task_disp = td.my_arena_slot->default_task_dispatcher();
-            td.enter_task_dispatcher(task_disp, m_orig_execute_data_ext.task_disp->m_stealing_threshold);
+            if (m_slot_is_borrowed) {
+                td.attach_task_dispatcher(task_disp);
+            } else {
+                td.enter_task_dispatcher(task_disp, m_orig_execute_data_ext.task_disp->m_stealing_threshold);
+            }
 
             // If the calling thread occupies the slots out of external thread reserve we need to notify the
             // market that this arena requires one worker less.
-            if (td.my_arena_index >= td.my_arena->my_num_reserved_slots) {
+            if (!m_slot_is_borrowed && td.my_arena_index >= td.my_arena->my_num_reserved_slots) {
                 td.my_arena->request_workers(/* mandatory_delta = */ 0, /* workers_delta = */ -1);
             }
 
             td.my_last_observer = nullptr;
+            m_prev_nested_arena_context = td.my_nested_arena_context;
+            td.my_nested_arena_context = this;
             // The task_arena::execute method considers each calling thread as an external thread.
             td.my_arena->my_observers.notify_entry_observers(td.my_last_observer, /* worker*/false);
         }
 
         m_task_dispatcher = td.my_task_dispatcher;
+        if (m_slot_is_borrowed) {
+            m_borrowed_execute_data_ext = m_task_dispatcher->m_execute_data_ext;
+        }
         m_orig_fifo_tasks_allowed = m_task_dispatcher->allow_fifo_task(true);
         m_orig_critical_task_allowed = m_task_dispatcher->m_properties.critical_task_allowed;
         m_task_dispatcher->m_properties.critical_task_allowed = true;
@@ -722,10 +732,26 @@ public:
         __TBB_ASSERT(td.my_arena_slot, nullptr);
         __TBB_ASSERT(td.my_arena_slot->is_occupied(), nullptr);
         __TBB_ASSERT(td.my_task_dispatcher, nullptr);
+        if (td.my_nested_arena_context != this) {
+            m_prev_nested_arena_context = td.my_nested_arena_context;
+            td.my_nested_arena_context = this;
+        }
     }
+
+    bool find_slot(arena& target_arena, std::size_t& slot_index) const {
+        for (const nested_arena_context* context = this; context; context = context->m_prev_nested_arena_context) {
+            if (context->m_orig_arena == &target_arena) {
+                slot_index = context->m_orig_slot_index;
+                return true;
+            }
+        }
+        return false;
+    }
+
     ~nested_arena_context() {
         thread_data& td = *m_task_dispatcher->m_thread_data;
         __TBB_ASSERT(governor::is_thread_data_set(&td), nullptr);
+        __TBB_ASSERT(td.my_nested_arena_context == this, nullptr);
         m_task_dispatcher->allow_fifo_task(m_orig_fifo_tasks_allowed);
         m_task_dispatcher->m_properties.critical_task_allowed = m_orig_critical_task_allowed;
         if (m_orig_arena) {
@@ -734,23 +760,32 @@ public:
 
             // Notify the market that this thread releasing a one slot
             // that can be used by a worker thread.
-            if (td.my_arena_index >= td.my_arena->my_num_reserved_slots) {
-                td.my_arena->request_workers(/* mandatory_delta = */ 0, /* workers_delta = */ 1);
+            if (m_slot_is_borrowed) {
+                td.my_task_dispatcher->m_execute_data_ext = m_borrowed_execute_data_ext;
+                td.detach_task_dispatcher();
+            } else {
+                td.leave_task_dispatcher();
             }
-
-            td.leave_task_dispatcher();
-            td.my_arena_slot->release();
-            td.my_arena->my_exit_monitors.notify_one(); // do not relax!
+            if (!m_slot_is_borrowed) {
+                if (td.my_arena_index >= td.my_arena->my_num_reserved_slots) {
+                    td.my_arena->request_workers(/* mandatory_delta = */ 0, /* workers_delta = */ 1);
+                }
+                td.my_arena_slot->release();
+                td.my_arena->my_exit_monitors.notify_one(); // do not relax!
+            }
             td.my_is_registered = m_orig_is_thread_registered;
             td.attach_arena(*m_orig_arena, m_orig_slot_index);
             td.attach_task_dispatcher(*m_orig_execute_data_ext.task_disp);
             __TBB_ASSERT(td.my_inbox.is_idle_state(false), nullptr);
         }
         td.my_task_dispatcher->m_execute_data_ext = m_orig_execute_data_ext;
+        td.my_nested_arena_context = m_prev_nested_arena_context;
     }
 
 private:
     execution_data_ext    m_orig_execute_data_ext{};
+    execution_data_ext    m_borrowed_execute_data_ext{};
+    nested_arena_context* m_prev_nested_arena_context{ nullptr };
     arena*              m_orig_arena{ nullptr };
     observer_proxy*     m_orig_last_observer{ nullptr };
     task_dispatcher*    m_task_dispatcher{ nullptr };
@@ -758,6 +793,7 @@ private:
     bool                m_orig_fifo_tasks_allowed{};
     bool                m_orig_critical_task_allowed{};
     bool                m_orig_is_thread_registered{};
+    bool                m_slot_is_borrowed;
 };
 
 class delegated_task : public d1::task {
@@ -813,8 +849,14 @@ void task_arena_impl::execute(d1::task_arena_base& ta, d1::delegate_base& d) {
 
     bool same_arena = td->my_arena == a;
     std::size_t index1 = td->my_arena_index;
+    bool slot_is_borrowed = false;
     if (!same_arena) {
-        index1 = a->occupy_free_slot</*as_worker */false>(*td);
+        if (td->my_nested_arena_context) {
+            slot_is_borrowed = td->my_nested_arena_context->find_slot(*a, index1);
+        }
+        if (!slot_is_borrowed) {
+            index1 = a->occupy_free_slot</*as_worker */false>(*td);
+        }
         if (index1 == arena::out_of_arena) {
             concurrent_monitor::thread_context waiter((std::uintptr_t)&d);
             d1::wait_context wo(1);
@@ -833,7 +875,7 @@ void task_arena_impl::execute(d1::task_arena_base& ta, d1::delegate_base& d) {
                 index2 = a->occupy_free_slot</*as_worker*/false>(*td);
                 if (index2 != arena::out_of_arena) {
                     a->my_exit_monitors.cancel_wait(waiter);
-                    nested_arena_context scope(*td, *a, index2 );
+                    nested_arena_context scope(*td, *a, index2);
                     r1::wait(wo, exec_context);
                     __TBB_ASSERT(!exec_context.my_exception.load(std::memory_order_relaxed), nullptr); // exception can be thrown above, not deferred
                     break;
@@ -854,7 +896,7 @@ void task_arena_impl::execute(d1::task_arena_base& ta, d1::delegate_base& d) {
 
     context_guard_helper</*report_tasks=*/false> context_guard;
     context_guard.set_ctx(a->my_default_ctx);
-    nested_arena_context scope(*td, *a, index1);
+    nested_arena_context scope(*td, *a, index1, slot_is_borrowed);
 #if _WIN64
     try {
 #endif
