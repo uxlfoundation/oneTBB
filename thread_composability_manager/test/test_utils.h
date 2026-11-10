@@ -577,13 +577,15 @@ inline void unregister_thread(const std::string& error_message = "",
   }
 }
 
-inline void unregister_threads(tcm_permit_handle_t permit_handle, std::string&& error_message = "",
-                               std::string&& log_message = "")
+inline void unregister_threads(
+    tcm_permit_handle_t permit_handle, const tcm_result_t expected_status = TCM_RESULT_SUCCESS,
+    std::string&& error_message = "", std::string&& log_message = "")
 {
     if (log_message.empty())
-        log_message = "tcmUnregisterThreads(" + to_string(permit_handle) + ")";
-    tcm_result_t r = tcmUnregisterThreads(permit_handle);
-    if (!check_success(r, log_message))
+        log_message =
+            "tcmUnregisterThreads(" + to_string(permit_handle) + ") returned expected status";
+    const tcm_result_t r = tcmUnregisterThreads(permit_handle);
+    if (!check(expected_status == r, log_message))
         throw tcm_unregister_threads_error(error_message);
 }
 
