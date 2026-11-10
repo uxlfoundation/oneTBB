@@ -434,36 +434,6 @@ auto invoke(F&& f, Args&&... args)
 }
 #endif // __TBB_CPP17_INVOKE_PRESENT
 
-inline bool stack_unwinding_in_progress() {
-#if __TBB_CPP17_UNCAUGHT_EXCEPTIONS_PRESENT
-    return std::uncaught_exceptions() > 0;
-#else
-    return std::uncaught_exception();
-#endif
-}
-
-#if TBB_USE_EXCEPTIONS
-template<typename UserCode>
-void call_with_assert_release(const UserCode& user_code, bool unwinding_in_progress) {
-    try {
-        user_code();
-    } catch (...) {
-        // User handlers for __TBB_ASSERT_RELEASE may throw, so user code is awaiting an own
-        // exception, not one caused the stack unwinding. We have no other choice but to terminate.
-        if (unwinding_in_progress)
-            std::terminate();
-        // this is an exception from user's assertion handler, TBB is unusable after this,
-        // so do not try to release any resources, just propagate
-        throw;
-    }
-}
-#else
-template<typename UserCode>
-void call_with_assert_release(UserCode&& user_code, bool /*unwinding_in_progress*/) {
-    user_code();
-}
-#endif // TBB_USE_EXCEPTIONS
-
 } // namespace d0
 
 namespace d1 {
