@@ -534,6 +534,8 @@ private:
     std::atomic<std::uint64_t> m_ref_count;
 };
 
+class nested_arena_context;
+
 class alignas (max_nfs_size) task_dispatcher {
 public:
     // TODO: reconsider low level design to better organize dependencies and files.
@@ -557,6 +559,9 @@ public:
 
     //! The current execution data
     execution_data_ext m_execute_data_ext;
+
+    //! The active nested arena scope for this dispatcher
+    nested_arena_context* m_nested_arena_context{ nullptr };
 
     //! Properties
     struct properties {

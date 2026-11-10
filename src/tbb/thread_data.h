@@ -42,7 +42,6 @@ class arena_slot;
 class task_group_context;
 class task_dispatcher;
 class thread_dispatcher_client;
-class nested_arena_context;
 
 class context_list : public intrusive_list<d1::intrusive_list_node> {
 public:
@@ -108,7 +107,6 @@ public:
         , my_arena{ nullptr }
         , my_last_client{ nullptr }
         , my_arena_slot{}
-        , my_nested_arena_context{ nullptr }
         , my_random{ this }
         , my_last_observer{ nullptr }
         , my_small_object_pool{new (cache_aligned_allocate(sizeof(small_object_pool_impl))) small_object_pool_impl{}}
@@ -127,7 +125,6 @@ public:
         poison_pointer(my_task_dispatcher);
         poison_pointer(my_arena);
         poison_pointer(my_arena_slot);
-        poison_pointer(my_nested_arena_context);
         poison_pointer(my_last_observer);
         poison_pointer(my_small_object_pool);
         poison_pointer(my_context_list);
@@ -163,9 +160,6 @@ public:
 
     //! Pointer to the slot in the arena we own at the moment
     arena_slot* my_arena_slot;
-
-    //! The active nested arena scope chain
-    nested_arena_context* my_nested_arena_context;
 
     //! The mailbox (affinity mechanism) the current thread attached to
     mail_inbox my_inbox;
