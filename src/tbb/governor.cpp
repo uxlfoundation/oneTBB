@@ -119,9 +119,15 @@ void governor::release_resources () {
 #endif /* TBB_USE_ASSERT */
 
     system_topology::destroy();
-    // dynamic_unlink_all() is intentionally not called here: the libraries may still be
-    // executing exit-time destructors. It is deferred to a process-lifetime destructor; see
-    // main.cpp.
+#if _WIN32 || _WIN64
+    // Windows DllMain must not call FreeLibrary(). Unload here only when shutdown is reached
+    // from a normal thread context; otherwise the OS reclaims the handles at process exit.
+    if (!in_dllmain_detach())
+        dynamic_unlink_all();
+#else
+    // On other platforms the libraries may still be executing exit-time destructors. Unloading
+    // is deferred to the process-lifetime destructor; see main.cpp.
+#endif
     global_control_release();
 }
 

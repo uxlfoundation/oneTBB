@@ -214,8 +214,8 @@ TEST_CASE("Test deferred dynamic unlink") {
     dynamic_link_keep_until_exit(nullptr);
     REQUIRE_MESSAGE(handles.my_size.load() == before, "A null handle must not be recorded");
 
-    // dynamic_unlink_all() empties the table and is idempotent, so that the process-lifetime
-    // unloader and the Windows DLL_PROCESS_DETACH path can both reach it safely.
+    // dynamic_unlink_all() empties the table and is idempotent, so multiple shutdown paths can
+    // reach it safely.
     dynamic_unlink_all();
     REQUIRE_MESSAGE(handles.my_size.load() == 0, "dynamic_unlink_all() must empty the table");
     dynamic_unlink_all();

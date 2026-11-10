@@ -332,8 +332,7 @@ namespace r1 {
         }
 
         void free() {
-            // Idempotent: the process-lifetime unloader and the Windows DLL_PROCESS_DETACH
-            // path may both reach here.
+            // Idempotent: process-lifetime and normal-context shutdown paths may both reach here.
             const std::size_t size = my_size.exchange( 0 );
             for (std::size_t i=0; i<size; ++i)
                 dynamic_unlink( my_handles[i] );

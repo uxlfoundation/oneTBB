@@ -110,8 +110,9 @@ void dynamic_unlink( dynamic_link_handle handle );
 
 void dynamic_unlink_all();
 
-//! Registers a handle to be unlinked by the process-lifetime destructor instead of immediately,
-//! after the library's exit-time destructors have run.
+//! Registers a handle for deferred unlinking, after the library's exit-time destructors have run.
+//! On Windows, the unload is performed only from a normal-context shutdown; otherwise the OS
+//! reclaims the handle at process exit.
 void dynamic_link_keep_until_exit( dynamic_link_handle handle );
 
 // The enum lists possible errors that can appear during dynamic linking. To

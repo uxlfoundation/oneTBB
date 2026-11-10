@@ -42,7 +42,7 @@ extern "C" __attribute__((visibility("default"))) void run_work() {
     oneapi::tbb::parallel_for(oneapi::tbb::blocked_range<int>(0, n),
         [&](const oneapi::tbb::blocked_range<int>& range) {
             for (int i = range.begin(); i != range.end(); ++i) {
-                values[i] += values[n - i - 1];
+                values[i] += 1.0;
             }
         });
 }
