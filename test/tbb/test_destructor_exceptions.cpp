@@ -14,26 +14,28 @@
     limitations under the License.
 */
 
-#define TBB_PREVIEW_ISOLATED_TASK_GROUP 1
-#include "common/test.h"
-
-#include "oneapi/tbb/flow_graph.h"
-#include "oneapi/tbb/global_control.h"
-#include "oneapi/tbb/task_arena.h"
-#include "oneapi/tbb/task_group.h"
-
-#include <atomic>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <exception>
-#include <thread>
-#include <type_traits>
-
 //! \file test_destructor_exceptions.cpp
 //! \brief Test for [flow_graph.graph scheduler.task_group] specification
 
-namespace {
+// test that exceptions thrown by tasks from destructors of graph nodes and task groups are handled
+// correctly
+
+#define TBB_PREVIEW_ISOLATED_TASK_GROUP 1
+
+#include "common/test.h"
+
+#if __TBB_MSVC_UNREACHABLE_CODE_IGNORED
+    // Workaround for erroneous "unreachable code" warning in the template below.
+    #pragma warning (push)
+    #pragma warning (disable: 4702)
+#endif
+
+#include "oneapi/tbb/flow_graph.h"
+#include "oneapi/tbb/global_control.h"
+#include "oneapi/tbb/task_group.h"
+
+#include <atomic>
+#include <exception>
 
 #if TBB_USE_EXCEPTIONS
 
@@ -98,7 +100,7 @@ void check_exception_source() {
     require_scenario(expected_exception(std::current_exception()), "wrong exception reached destruction");
 }
 
-void terminate_handler() noexcept {
+void terminating_handler() noexcept {
     require_scenario(current_scenario.load()->exit == exit_kind::termination,
                      "termination instead of exception propagation");
     require_scenario(current_scenario.load()->outer_throwing, "outer exception was not thrown");
@@ -202,7 +204,7 @@ template <typename Group>
 void run_scenario(context_kind context, exception_kind source, exit_kind exit) {
     scenario_state state(source, exit);
     current_scenario = &state;
-    auto previous_terminate = std::set_terminate(terminate_handler);
+    auto previous_terminate = std::set_terminate(terminating_handler);
     auto previous_assertion = tbb::set_assertion_handler(assertion_handler);
     auto restore_handlers = tbb::detail::make_raii_guard([=] {
         tbb::set_assertion_handler(previous_assertion);
@@ -273,5 +275,3 @@ DESTRUCTOR_EXCEPTION_CASES(isolated_task_group, external)
 
 #undef DESTRUCTOR_EXCEPTION_CASES
 #undef DESTRUCTOR_EXCEPTION_CASE
-
-} // namespace
