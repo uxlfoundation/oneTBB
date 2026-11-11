@@ -21,17 +21,17 @@
 namespace tcm {
 namespace internal {
 
-struct thread_registration_data_t {
+struct thread_data_t {
   std::mutex mutex;
   std::stack<std::size_t> permits;      // Permits with which a thread is registered.
   std::unordered_set<std::size_t> seen; // Permits this thread has been once registered with.
 };
 
-struct permit_registrations_t {
+struct thread_owning_data_t {
   std::mutex mutex;
 
   // Weak ownership helps to avoid extra work for exited threads.
-  std::deque<std::weak_ptr<thread_registration_data_t>> thread_locals;
+  std::deque<std::weak_ptr<thread_data_t>> thread_data;
 };
 
 } // namespace internal
@@ -51,8 +51,8 @@ struct tcm_permit_data_t {
   std::atomic<uint32_t> inherited_concurrency_idx; // Index of constraint where inherited
                                                    // concurrency will be stored
 
-  tcm::internal::permit_registrations_t registrations; // Holds data of the threads that have been
-                                                       // registered with the permit
+  tcm::internal::thread_owning_data_t threads_data; // Holds data of the threads that have been
+                                                    // registered with the permit
 };
 
 extern "C" {

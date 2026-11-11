@@ -120,15 +120,12 @@ float tcm_oversubscription_factor() {
     return oversb_factor;
 }
 
-const std::shared_ptr<thread_registration_data_t>& thread_data_ptr() {
-    // The data is shared with the permits the thread has registered with, so it may outlive the
-    // thread
-    thread_local const std::shared_ptr<thread_registration_data_t> registrations =
-        std::make_shared<thread_registration_data_t>();
-    return registrations;
+const std::shared_ptr<thread_data_t>& thread_data_ptr() {
+    thread_local const std::shared_ptr<thread_data_t> td = std::make_shared<thread_data_t>();
+    return td;
 }
 
-thread_registration_data_t& thread_data() { return *thread_data_ptr(); }
+thread_data_t& thread_data() { return *thread_data_ptr(); }
 
 /**
  *******************************************************************************
@@ -1004,7 +1001,7 @@ public:
       }
 
       for (const auto& ph : client_resources.permit_handles) {
-          clear_up_threads_registration_from(ph);
+          clear_up_threads_data_from(ph);
           deallocate_permit(ph);
       }
 
@@ -1093,10 +1090,10 @@ public:
   void determine_nested_permit(tcm_permit_handle_t& ph) {
     bool is_nested = false;
     const std::size_t permit_id = ph->permit_id;
-    thread_registration_data_t& trd = thread_data();
+    thread_data_t& td = thread_data();
     {
-        std::lock_guard<std::mutex> lock(trd.mutex);
-        if (!trd.permits.empty() && permit_id != trd.permits.top())
+        std::lock_guard<std::mutex> lock(td.mutex);
+        if (!td.permits.empty() && permit_id != td.permits.top())
             is_nested = true;
     }
 
@@ -1470,17 +1467,17 @@ public:
   /**
    * Clears permit IDs from registrations of each participated thread.
    */
-  void clear_up_threads_registration_from(tcm_permit_handle_t handle) {
+  void clear_up_threads_data_from(tcm_permit_handle_t handle) {
       __TCM_ASSERT(handle, "Invalid permit handle");
 
       // Do cleanup of permits seen by threads
-      permit_registrations_t& pr = handle->data.registrations;
+      thread_owning_data_t& pr = handle->data.threads_data;
       std::lock_guard<std::mutex> lock(pr.mutex);
-      for (std::weak_ptr<thread_registration_data_t>& trd_ptr : pr.thread_locals) {
-          if (std::shared_ptr<thread_registration_data_t> p = trd_ptr.lock()) {
-              thread_registration_data_t& trd = *p;
-              std::lock_guard<std::mutex> per_thread_lock(trd.mutex);
-              const std::size_t num = trd.seen.erase(handle->permit_id);
+      for (std::weak_ptr<thread_data_t>& td_ptr : pr.thread_data) {
+          if (std::shared_ptr<thread_data_t> td_sp = td_ptr.lock()) {
+              thread_data_t& td = *td_sp;
+              std::lock_guard<std::mutex> per_thread_lock(td.mutex);
+              const std::size_t num = td.seen.erase(handle->permit_id);
               __TCM_ASSERT_EX(num == 1, "Permit was not known to the thread");
           }
       }
@@ -1504,7 +1501,7 @@ public:
         __TCM_PROFILE_PERMIT(handle, "released");
     }
 
-    clear_up_threads_registration_from(handle);
+    clear_up_threads_data_from(handle);
 
     // Permit representation has been erased from internal structures, i.e. TCM does not know about
     // it anymore. Thus, can deallocate permit representation without holding a lock.
@@ -1519,55 +1516,53 @@ public:
 
   tcm_result_t register_thread(tcm_permit_handle_t ph) {
       __TCM_ASSERT(ph, "Invalid permit handle");
-      const std::shared_ptr<thread_registration_data_t>& trd_sp = thread_data_ptr();
-      thread_registration_data_t* trd_ptr = trd_sp.get();
+      const std::shared_ptr<thread_data_t>& td_sp = thread_data_ptr();
+      thread_data_t* td_ptr = td_sp.get();
       bool is_first_registration = false;
       {
-          std::lock_guard<std::mutex> lock(trd_ptr->mutex);
-          trd_ptr->permits.push(ph->permit_id);  // Actual thread registration
-          is_first_registration = trd_ptr->seen.emplace(ph->permit_id).second;
+          std::lock_guard<std::mutex> lock(td_ptr->mutex);
+          td_ptr->permits.push(ph->permit_id);  // Actual thread registration
+          is_first_registration = td_ptr->seen.emplace(ph->permit_id).second;
       }
 
       if (is_first_registration) {
           // This thread registers with this permit for the first time, let the permit's data know
           // about its thread local
-          permit_registrations_t& pr = ph->data.registrations;
+          thread_owning_data_t& pr = ph->data.threads_data;
           std::lock_guard<std::mutex> lock(pr.mutex);
-          __TCM_ASSERT(
-              std::find_if(pr.thread_locals.cbegin(), pr.thread_locals.cend(),
-                           [&](const std::weak_ptr<thread_registration_data_t>& e) {
-                               const std::shared_ptr<thread_registration_data_t>& sp = e.lock();
-                               return sp && sp.get() == trd_ptr;
-                           }) == pr.thread_locals.cend(),
-              "Thread has been registered with the permit already.");
-          pr.thread_locals.emplace_back(std::weak_ptr<thread_registration_data_t>(trd_sp));
+          __TCM_ASSERT(std::find_if(pr.thread_data.cbegin(), pr.thread_data.cend(),
+                                    [&](const std::weak_ptr<thread_data_t>& e) {
+                                        const std::shared_ptr<thread_data_t>& sp = e.lock();
+                                        return sp.get() == td_ptr;
+                                    }) == pr.thread_data.cend(),
+                       "Thread has been registered with the permit already.");
+          pr.thread_data.emplace_back(std::weak_ptr<thread_data_t>(td_sp));
       }
 #if TCM_USE_ASSERT
       else {
-          permit_registrations_t& pr = ph->data.registrations;
+          thread_owning_data_t& pr = ph->data.threads_data;
           std::lock_guard<std::mutex> lock(pr.mutex);
-          std::deque<std::weak_ptr<thread_registration_data_t>>& d = pr.thread_locals;
+          std::deque<std::weak_ptr<thread_data_t>>& d = pr.thread_data;
           __TCM_ASSERT(
               std::accumulate(d.cbegin(), d.cend(), /*init*/0,
-                              [&] (int sum, const std::weak_ptr<thread_registration_data_t>& d) {
-                                  const std::shared_ptr<thread_registration_data_t>& sp = d.lock();
-                                  return sum + int(sp && sp.get() == trd_ptr);
+                              [&] (int sum, const std::weak_ptr<thread_data_t>& d) {
+                                  const std::shared_ptr<thread_data_t>& sp = d.lock();
+                                  return sum + int(sp.get() == td_ptr);
                               }) == 1,
               "Thread should have been registered with the permit already.");
       }
 #endif
-
       return TCM_RESULT_SUCCESS;
   }
 
   tcm_result_t unregister_thread() {
-      thread_registration_data_t& trd = thread_data();
+      thread_data_t& td = thread_data();
 
-      std::lock_guard<std::mutex> lock(trd.mutex);
-      if (trd.permits.empty())
+      std::lock_guard<std::mutex> lock(td.mutex);
+      if (td.permits.empty())
           return TCM_RESULT_PERMIT_MISMATCH;
 
-      trd.permits.pop(); // This thread undoes its previous registration
+      td.permits.pop(); // This thread undoes its previous registration
 
       return TCM_RESULT_SUCCESS;
   }
@@ -1576,23 +1571,23 @@ public:
       __TCM_PROFILE_THIS_FUNCTION();
       __TCM_ASSERT(ph, "Invalid permit handle");
       tcm_result_t status = TCM_RESULT_SUCCESS;
-      const std::size_t& permit_id = ph->permit_id;
-      permit_registrations_t& pr = ph->data.registrations;
+      const std::size_t permit_id = ph->permit_id;
+      thread_owning_data_t& pr = ph->data.threads_data;
       std::lock_guard<std::mutex> lock(pr.mutex);
-      for (std::weak_ptr<thread_registration_data_t>& e : pr.thread_locals) {
-          std::shared_ptr<thread_registration_data_t> p = e.lock();
-          if (!p) {
+      for (std::weak_ptr<thread_data_t>& e : pr.thread_data) {
+          std::shared_ptr<thread_data_t> td_ptr = e.lock();
+          if (!td_ptr) {
               status = TCM_RESULT_PERMIT_MISMATCH;
               continue;
           }
-          thread_registration_data_t& trd = *p;
-          std::lock_guard<std::mutex> per_thread_lock(trd.mutex);
-          if (trd.permits.empty() || permit_id != trd.permits.top()) {
+          thread_data_t& td = *td_ptr;
+          std::lock_guard<std::mutex> per_thread_lock(td.mutex);
+          if (td.permits.empty() || permit_id != td.permits.top()) {
               status = TCM_RESULT_PERMIT_MISMATCH;
               continue;
           }
 
-          trd.permits.pop();
+          td.permits.pop();
       }
       return status;
   }

@@ -1334,7 +1334,7 @@ TEST("Bulk unregister drops only the last registration") {
     w.notify_all_about([&] { test_epoch = main_unregisters_nested; });
 
     t.join();
-    unregister_threads(ph, /*expected status*/TCM_RESULT_PERMIT_MISMATCH);
+    unregister_threads(top_ph, /*expected status*/TCM_RESULT_PERMIT_MISMATCH);
     release_permit(top_ph);
     disconnect_client(client);
 }
