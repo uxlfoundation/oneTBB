@@ -872,7 +872,8 @@ TEST_CASE("Nested test case") {
 //! \brief \ref error_guessing
 TEST_CASE("Bypass prioritized task"){
     tbb::global_control gc( tbb::global_control::max_allowed_parallelism, 1 );
-    BypassPrioritizedTask::test();
+    tbb::task_arena arena(1);
+    arena.execute(BypassPrioritizedTask::test);
 }
 
 //! Test mixing prioritized and ordinary successors
