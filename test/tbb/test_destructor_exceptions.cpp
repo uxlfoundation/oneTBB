@@ -233,12 +233,12 @@ void run_scenario(context_kind context, exception_kind source, exit_kind exit) {
         CHECK_MESSAGE(task_completed, "Task-group work must succeed after destructor exception");
 
         bool graph_completed = false;
-        tbb::flow::graph graph;
-        tbb::flow::function_node<int> node(graph, tbb::flow::serial, [&](int) {
+        tbb::flow::graph fl_graph;
+        tbb::flow::function_node<int> node(fl_graph, tbb::flow::serial, [&](int) {
             graph_completed = true;
         });
         REQUIRE(node.try_put(1));
-        graph.wait_for_all();
+        fl_graph.wait_for_all();
         CHECK_MESSAGE(graph_completed, "Graph work must succeed after destructor exception");
     });
 }
