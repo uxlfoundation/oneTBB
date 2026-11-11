@@ -334,8 +334,8 @@ namespace r1 {
         void free() {
             // Idempotent: process-lifetime and normal-context shutdown paths may both reach here.
             const std::size_t size = my_size.exchange( 0 );
-            for (std::size_t i=0; i<size; ++i)
-                dynamic_unlink( my_handles[i] );
+            for (std::size_t i = size; i > 0; --i)
+                dynamic_unlink( my_handles[i-1] );
         }
     } handles;
 
