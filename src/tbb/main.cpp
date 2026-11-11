@@ -68,8 +68,17 @@ extern bool ITT_Present;
 void ITT_DoUnsafeOneTimeInitialization();
 #endif
 
+struct early_library_loader {
+    early_library_loader() {
+        tcm_adaptor::initialize();
+    }
+};
 #if !(_WIN32||_WIN64) || __TBB_SOURCE_DIRECTLY_INCLUDED
 static __TBB_InitOnce __TBB_InitOnceHiddenInstance;
+// Must follow __TBB_InitOnceHiddenInstance: loading libraries registers their global objects destructors,
+// which should be run in reverse order of registration before __TBB_InitOnce's destructor decrements
+// the reference counter and potentially unloads the library.
+static early_library_loader __early_library_loader_instance;
 #endif
 
 //------------------------------------------------------------------------
@@ -79,7 +88,6 @@ static __TBB_InitOnce __TBB_InitOnceHiddenInstance;
 void __TBB_InitOnce::add_ref() {
     if (++count == 1) {
         governor::acquire_resources();
-        tcm_adaptor::initialize();
     }
 }
 
@@ -133,6 +141,9 @@ extern "C" bool WINAPI DllMain( HANDLE /*hinstDLL*/, DWORD reason, LPVOID lpvRes
     switch( reason ) {
         case DLL_PROCESS_ATTACH:
             __TBB_InitOnce::add_ref();
+            // TODO: loading libraries inside DllMain is not recommended because of potential issues with loader lock.
+            // Consider moving it out of DllMain.
+            tcm_adaptor::initialize();
             break;
         case DLL_PROCESS_DETACH:
             // Since THREAD_DETACH is not called for the main thread, call auto-termination

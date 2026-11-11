@@ -137,6 +137,9 @@ if (TCM_BUILD)
   set(TCM_BUILD_OPTION_EXPLICITLY_SET TRUE)
 endif()
 option(TCM_BUILD "Enable Thread Composability Manager (TCM) build" ON)
+# Do not keep the value in the cache, so it is re-evaluated on every configure
+set(TCM_BUILD ${TCM_BUILD})
+unset(TCM_BUILD CACHE)
 
 if (WIN32)
     if (TBB_VERIFY_DEPENDENCY_SIGNATURE)
@@ -151,6 +154,9 @@ if (WIN32)
     endif()
     option(TBB_VERIFY_DEPENDENCY_SIGNATURE
         "Verify signature of a dependency during its dynamic linking at run-time on Windows*" OFF)
+    # Do not keep the value in the cache, so it is re-evaluated on every configure
+    set(TBB_VERIFY_DEPENDENCY_SIGNATURE ${TBB_VERIFY_DEPENDENCY_SIGNATURE})
+    unset(TBB_VERIFY_DEPENDENCY_SIGNATURE CACHE)
 endif()
 
 if (NOT DEFINED BUILD_SHARED_LIBS)
@@ -349,6 +355,17 @@ else()
     endif()
 endif()
 
+if (TCM_BUILD)
+  set(TCM_SUBDIR_NAME thread_composability_manager)
+  if (IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${TCM_SUBDIR_NAME}")
+    add_subdirectory(${TCM_SUBDIR_NAME})
+  elseif (TCM_BUILD_OPTION_EXPLICITLY_SET)
+    message(FATAL_ERROR "Build of Thread Composability Manager (TCM) is disabled since "
+                        "${TCM_SUBDIR_NAME} subdirectory does not exist")
+  endif()
+  unset(TCM_SUBDIR_NAME)
+endif()
+
 if (TBB_TEST OR TCM_TEST)
     enable_testing()
 endif()
@@ -415,17 +432,6 @@ endif()
 
 if (TBB4PY_BUILD)
     add_subdirectory(python)
-endif()
-
-if (TCM_BUILD)
-  set(TCM_SUBDIR_NAME thread_composability_manager)
-  if (IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${TCM_SUBDIR_NAME}")
-    add_subdirectory(${TCM_SUBDIR_NAME})
-  elseif (TCM_BUILD_OPTION_EXPLICITLY_SET)
-    message(FATAL_ERROR "Build of Thread Composability Manager (TCM) is disabled since "
-                        "${TCM_SUBDIR_NAME} subdirectory does not exist")
-  endif()
-  unset(TCM_SUBDIR_NAME)
 endif()
 
 # Keep it the last instruction.

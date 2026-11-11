@@ -478,6 +478,7 @@ if (TARGET TBB::tbb)
     if (APPLE OR ANDROID_PLATFORM)
         target_link_libraries(test_dynamic_link PRIVATE -rdynamic)
     endif()
+
     if (WIN32 AND NOT TBB_TCM_TESTING)
         tbb_add_test(SUBDIR tbb NAME test_numa_dist DEPENDENCIES TBB::tbb)
     endif()
@@ -587,6 +588,22 @@ if (TARGET TBB::tbb)
         tbb_add_tbbbind_test(SUBDIR tbb NAME test_arena_constraints)
         tbb_add_tbbbind_test(SUBDIR tbb NAME test_tbbbind)
     endif()
+
+    # Test for the library shutdown during process termination
+    tbb_add_lib_test(SUBDIR tbb NAME test_tbb_shutdown DEPENDENCIES TBB::tbb)
+    tbb_add_test(SUBDIR tbb NAME test_tbb_shutdown)
+    target_include_directories(test_tbb_shutdown PRIVATE
+        $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>)
+    target_compile_definitions(test_tbb_shutdown PRIVATE
+        TEST_TBB_SHUTDOWN_LIBRARY="$<TARGET_FILE:_test_tbb_shutdown>")
+    add_dependencies(test_tbb_shutdown _test_tbb_shutdown)
+    # Optional libraries loaded at run-time; build them if available
+    foreach(_shutdown_dep TCM::tcm TBB::tbbmalloc TBB::${TBBBIND_LIBRARY_NAME})
+        if (TARGET ${_shutdown_dep})
+            add_dependencies(test_tbb_shutdown ${_shutdown_dep})
+        endif()
+    endforeach()
+    unset(_shutdown_dep)
 
     if ((NOT "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "mips") AND (NOT TBB_EMSCRIPTEN))
         # TODO: Fix for MIPS
