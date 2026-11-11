@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -132,8 +133,9 @@ public:
         using is_equal_type = typename segment_table_allocator_traits::is_always_equal;
 
         if (this != &other) {
-            move_assign_allocators(my_segment_table_allocator, other.my_segment_table_allocator);
+            // Release the old segments before the allocator they were created with is replaced
             internal_move_assign(std::move(other), tbb::detail::disjunction<is_equal_type, pocma_type>());
+            move_assign_allocators(my_segment_table_allocator, other.my_segment_table_allocator);
         }
         return *this;
     }
