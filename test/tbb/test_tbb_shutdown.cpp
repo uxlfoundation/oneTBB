@@ -52,7 +52,7 @@ extern "C" TEST_EXPORT bool run_tbb_shutdown_test() {
     // Loads tbbbind (if available)
     auto numa_nodes = tbb::info::numa_nodes();
     tbb::task_arena arena(tbb::task_arena::constraints{}.set_numa_id(numa_nodes.front()));
-    arena.execute([data] {
+    arena.execute([data, n] {
         tbb::parallel_for(std::size_t(0), n, [data](std::size_t i) {
             utils::doDummyWork(1000);
             data[i] = i + 1;
