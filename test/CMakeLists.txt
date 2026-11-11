@@ -590,20 +590,22 @@ if (TARGET TBB::tbb)
     endif()
 
     # Test for the library shutdown during process termination
-    tbb_add_lib_test(SUBDIR tbb NAME test_tbb_shutdown DEPENDENCIES TBB::tbb)
-    tbb_add_test(SUBDIR tbb NAME test_tbb_shutdown)
-    target_include_directories(test_tbb_shutdown PRIVATE
-        $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>)
-    target_compile_definitions(test_tbb_shutdown PRIVATE
-        TEST_TBB_SHUTDOWN_LIBRARY="$<TARGET_FILE:_test_tbb_shutdown>")
-    add_dependencies(test_tbb_shutdown _test_tbb_shutdown)
-    # Optional libraries loaded at run-time; build them if available
-    foreach(_shutdown_dep TCM::tcm TBB::tbbmalloc TBB::${TBBBIND_LIBRARY_NAME})
-        if (TARGET ${_shutdown_dep})
-            add_dependencies(test_tbb_shutdown ${_shutdown_dep})
-        endif()
-    endforeach()
-    unset(_shutdown_dep)
+    if (BUILD_SHARED_LIBS)
+        tbb_add_lib_test(SUBDIR tbb NAME test_tbb_shutdown DEPENDENCIES TBB::tbb)
+        tbb_add_test(SUBDIR tbb NAME test_tbb_shutdown)
+        target_include_directories(test_tbb_shutdown PRIVATE
+            $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>)
+        target_compile_definitions(test_tbb_shutdown PRIVATE
+            TEST_TBB_SHUTDOWN_LIBRARY="$<TARGET_FILE:_test_tbb_shutdown>")
+        add_dependencies(test_tbb_shutdown _test_tbb_shutdown)
+        # Optional libraries loaded at run-time; build them if available
+        foreach(_shutdown_dep TCM::tcm TBB::tbbmalloc TBB::${TBBBIND_LIBRARY_NAME})
+            if (TARGET ${_shutdown_dep})
+                add_dependencies(test_tbb_shutdown ${_shutdown_dep})
+            endif()
+        endforeach()
+        unset(_shutdown_dep)
+    endif()
 
     if ((NOT "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "mips") AND (NOT TBB_EMSCRIPTEN))
         # TODO: Fix for MIPS
