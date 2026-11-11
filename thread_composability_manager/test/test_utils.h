@@ -585,8 +585,12 @@ inline void unregister_threads(
         log_message =
             "tcmUnregisterThreads(" + to_string(permit_handle) + ") returned expected status";
     const tcm_result_t r = tcmUnregisterThreads(permit_handle);
-    if (!check(expected_status == r, log_message))
+    if (!check(expected_status == r, log_message)) {
+        if (error_message.empty())
+            error_message = "Expected status " + std::to_string(expected_status) +
+                ", got status " + std::to_string(r);
         throw tcm_unregister_threads_error(error_message);
+    }
 }
 
 template <int size = 1>
