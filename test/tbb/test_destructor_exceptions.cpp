@@ -60,7 +60,7 @@ struct scenario_state {
     scenario_state(exception_kind source_, exit_kind exit_) : source(source_), exit(exit_) {}
 };
 
-scenario_state* current_scenario = nullptr;
+std::atomic<scenario_state*> current_scenario{nullptr};
 const char assertion_message[] = "Throw from destructor cleanup";
 
 // A terminate handler exits without returning to doctest, so checks must fail the process directly.
@@ -78,48 +78,48 @@ bool expected_exception(std::exception_ptr exception) {
     try {
         std::rethrow_exception(exception);
     } catch (const user_exception&) {
-        return current_scenario->source == exception_kind::user;
+        return current_scenario.load()->source == exception_kind::user;
     } catch (const assertion_exception&) {
-        return current_scenario->source == exception_kind::assertion;
+        return current_scenario.load()->source == exception_kind::assertion;
     } catch (...) {
         return false;
     }
 }
 
 void check_exception_source() {
-    require_scenario(current_scenario->destruction_started, "destruction did not start");
-    require_scenario(current_scenario->task_started, "task did not start");
-    require_scenario(current_scenario->task_throwing, "task did not throw during cleanup");
-    unsigned expected_calls = current_scenario->source == exception_kind::assertion ? 1 : 0;
-    require_scenario(current_scenario->assertion_calls == expected_calls,
+    require_scenario(current_scenario.load()->destruction_started, "destruction did not start");
+    require_scenario(current_scenario.load()->task_started, "task did not start");
+    require_scenario(current_scenario.load()->task_throwing, "task did not throw during cleanup");
+    unsigned expected_calls = current_scenario.load()->source == exception_kind::assertion ? 1 : 0;
+    require_scenario(current_scenario.load()->assertion_calls == expected_calls,
                      "unexpected assertion handler call count");
-    require_scenario(std::this_thread::get_id() == current_scenario->destroying_thread,
+    require_scenario(std::this_thread::get_id() == current_scenario.load()->destroying_thread,
                      "exception did not reach the destroying thread");
     require_scenario(expected_exception(std::current_exception()), "wrong exception reached destruction");
 }
 
 void terminate_handler() noexcept {
-    require_scenario(current_scenario->exit == exit_kind::termination,
+    require_scenario(current_scenario.load()->exit == exit_kind::termination,
                      "termination instead of exception propagation");
-    require_scenario(current_scenario->outer_throwing, "outer exception was not thrown");
+    require_scenario(current_scenario.load()->outer_throwing, "outer exception was not thrown");
     check_exception_source();
     std::_Exit(EXIT_SUCCESS);
 }
 
 void assertion_handler(const char*, int, const char*, const char* comment) {
-    require_scenario(current_scenario->source == exception_kind::assertion, "unexpected assertion");
-    require_scenario(current_scenario->task_throwing, "assertion outside the throwing task");
+    require_scenario(current_scenario.load()->source == exception_kind::assertion, "unexpected assertion");
+    require_scenario(current_scenario.load()->task_throwing, "assertion outside the throwing task");
     require_scenario(comment && std::strcmp(comment, assertion_message) == 0,
                      "unexpected assertion message");
-    require_scenario(current_scenario->assertion_calls.fetch_add(1) == 0,
+    require_scenario(current_scenario.load()->assertion_calls.fetch_add(1) == 0,
                      "assertion handler called more than once");
     throw assertion_exception{};
 }
 
 [[noreturn]] void throw_from_task() {
-    require_scenario(current_scenario->destruction_started, "task threw before destructor cleanup");
-    current_scenario->task_throwing = true;
-    if (current_scenario->source == exception_kind::assertion) {
+    require_scenario(current_scenario.load()->destruction_started, "task threw before destructor cleanup");
+    current_scenario.load()->task_throwing = true;
+    if (current_scenario.load()->source == exception_kind::assertion) {
         __TBB_ASSERT_RELEASE(false, assertion_message);
         require_scenario(false, "assertion handler returned");
     }
@@ -133,15 +133,15 @@ struct destruction_marker {
 #else
         bool unwinding = std::uncaught_exception();
 #endif
-        require_scenario(unwinding == (current_scenario->exit == exit_kind::termination),
+        require_scenario(unwinding == (current_scenario.load()->exit == exit_kind::termination),
                          "incorrect unwinding state before destruction");
-        current_scenario->destruction_started = true;
+        current_scenario.load()->destruction_started = true;
     }
 };
 
 class throwing_graph_task : public tbb::detail::d2::graph_task {
     tbb::detail::d1::task* execute(tbb::detail::d1::execution_data&) override {
-        current_scenario->task_started = true;
+        current_scenario.load()->task_started = true;
         throw_from_task();
     }
 
@@ -165,14 +165,14 @@ void prepare_task(tbb::flow::graph& graph) {
 template <typename Group>
 void prepare_task(Group& group) {
     group.run([] {
-        current_scenario->task_started = true;
+        current_scenario.load()->task_started = true;
         // A queued task would be skipped by destructor cancellation. Keep this task running instead.
         while (!tbb::is_current_task_group_canceling())
             std::this_thread::yield();
         throw_from_task();
     });
     // Wait until the task starts so cancellation cannot skip its body.
-    while (!current_scenario->task_started)
+    while (!current_scenario.load()->task_started)
         std::this_thread::yield();
 }
 
@@ -180,8 +180,8 @@ template <typename Group>
 void prepare_destruction(Group& group) {
     prepare_task(group);
     destruction_marker marker;
-    if (current_scenario->exit == exit_kind::termination) {
-        current_scenario->outer_throwing = true;
+    if (current_scenario.load()->exit == exit_kind::termination) {
+        current_scenario.load()->outer_throwing = true;
         throw outer_exception{};
     }
 }
