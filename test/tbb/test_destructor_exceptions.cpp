@@ -245,15 +245,13 @@ using graph = tbb::flow::graph;
 using task_group = tbb::task_group;
 using isolated_task_group = tbb::isolated_task_group;
 
-#define DESTRUCTOR_EXCEPTION_CASE(Group, Context, Source, Exit)                       \
-    TEST_CASE(#Group "_" #Context "_" #Source "_" #Exit) {                            \
+#define DESTRUCTOR_EXCEPTION_CASE(Group, Context, Source, Exit) TEST_CASE(#Group "_" #Context "_" #Source "_" #Exit) { \
         run_scenario<Group>(context_kind::Context, exception_kind::Source, exit_kind::Exit); \
     }
 
 #else
 
-#define DESTRUCTOR_EXCEPTION_CASE(Group, Context, Source, Exit)                       \
-    TEST_CASE(#Group "_" #Context "_" #Source "_" #Exit) {                            \
+#define DESTRUCTOR_EXCEPTION_CASE(Group, Context, Source, Exit) TEST_CASE(#Group "_" #Context "_" #Source "_" #Exit) { \
         std::puts("SKIP: destructor exception tests require exception support");       \
     }
 
@@ -266,7 +264,6 @@ using isolated_task_group = tbb::isolated_task_group;
     DESTRUCTOR_EXCEPTION_CASE(Group, Context, assertion, termination)
 
 // Note that the names of the test cases are used in CMake to run them individually
-//! \brief \ref error_guessing
 DESTRUCTOR_EXCEPTION_CASES(graph, owned)
 DESTRUCTOR_EXCEPTION_CASES(graph, external)
 DESTRUCTOR_EXCEPTION_CASES(task_group, owned)
