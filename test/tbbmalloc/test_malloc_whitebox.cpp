@@ -1541,6 +1541,39 @@ void TestTrampolineMemoryForOperand() {
     if (module) VirtualFree(module, 0, MEM_RELEASE);
     if (taken) VirtualFree(taken, 0, MEM_RELEASE);
 }
+
+// A buffer out of reach must be skipped, not end the search for a suitable later buffer.
+void TestTrampolineMemorySkipsFarBuffer() {
+    SYSTEM_INFO sysInfo;
+    GetSystemInfo(&sysInfo);
+    const UINT_PTR gran = sysInfo.dwAllocationGranularity;
+    const UINT_PTR span = ((UINT_PTR)MAX_DISTANCE + MAX_PROBE_SIZE + gran) & ~(gran - 1);
+
+    void* anchor = VirtualAlloc(nullptr, gran, MEM_RESERVE, PAGE_NOACCESS);
+    if (!anchor) {
+        INFO("Cannot reserve address space, test skipped!\n");
+        return;
+    }
+    const UINT_PTR nearAddr = Ptr2Addrint(anchor);
+    const UINT_PTR farAddr = nearAddr + 2 * span;
+    if (farAddr + span < Ptr2Addrint(sysInfo.lpMaximumApplicationAddress)) {
+        MemoryProvider provider;
+        const UINT_PTR nearLoc = provider.GetLocation(nearAddr);
+        const UINT_PTR farLoc = provider.GetLocation(farAddr);
+        if (nearLoc && farLoc) {
+            REQUIRE(!IsInDistance(nearLoc, farAddr, MAX_DISTANCE));
+            // The first buffer is out of reach of farAddr, the second one still has room
+            REQUIRE(provider.GetLocation(farAddr) == farLoc + MAX_PROBE_SIZE);
+        } else {
+            INFO("Cannot allocate trampoline memory, test skipped!\n");
+        }
+        if (farLoc) VirtualFree(Addrint2Ptr(farLoc & ~(gran - 1)), 0, MEM_RELEASE);
+        if (nearLoc) VirtualFree(Addrint2Ptr(nearLoc & ~(gran - 1)), 0, MEM_RELEASE);
+    } else {
+        INFO("Address space is too small, test skipped!\n");
+    }
+    VirtualFree(anchor, 0, MEM_RELEASE);
+}
 #endif // _WIN64
 
 #if defined(_M_X64)
@@ -2144,6 +2177,11 @@ TEST_CASE("Trampoline memory below the module") {
 //! \brief \ref error_guessing
 TEST_CASE("Trampoline memory for a RIP-relative operand") {
     TestTrampolineMemoryForOperand();
+}
+
+//! \brief \ref error_guessing
+TEST_CASE("Trampoline memory skips a buffer out of reach") {
+    TestTrampolineMemorySkipsFarBuffer();
 }
 #endif
 

@@ -253,10 +253,11 @@ public:
     UINT_PTR GetLocation(UINT_PTR addr, UINT_PTR addr2)
     {
         MemoryBuffer *pBuff = m_pages;
-        for (; pBuff<m_lastBuffer && IsInDistance(pBuff->m_next, addr, MAX_DISTANCE)
-               && IsInDistance(pBuff->m_next, addr2, MAX_DISTANCE); ++pBuff)
+        for (; pBuff<m_lastBuffer; ++pBuff)
         {
-            if (pBuff->m_next < pBuff->m_base + pBuff->m_size)
+            if (pBuff->m_next < pBuff->m_base + pBuff->m_size
+                && IsInDistance(pBuff->m_next, addr, MAX_DISTANCE)
+                && IsInDistance(pBuff->m_next, addr2, MAX_DISTANCE))
             {
                 UINT_PTR loc = pBuff->m_next;
                 pBuff->m_next += MAX_PROBE_SIZE;
