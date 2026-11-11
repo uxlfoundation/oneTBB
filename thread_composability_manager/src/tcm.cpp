@@ -1573,6 +1573,7 @@ public:
   }
 
   tcm_result_t unregister_threads(const tcm_permit_handle_t ph) {
+      __TCM_PROFILE_THIS_FUNCTION();
       __TCM_ASSERT(ph, "Invalid permit handle");
       tcm_result_t status = TCM_RESULT_SUCCESS;
       const std::size_t& permit_id = ph->permit_id;
