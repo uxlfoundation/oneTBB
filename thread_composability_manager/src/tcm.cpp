@@ -1580,15 +1580,19 @@ public:
       permit_registrations_t& pr = ph->data.registrations;
       std::lock_guard<std::mutex> lock(pr.mutex);
       for (std::weak_ptr<thread_registration_data_t>& e : pr.thread_locals) {
-          if (std::shared_ptr<thread_registration_data_t> p = e.lock()) {
-              thread_registration_data_t& trd = *p;
-              std::lock_guard<std::mutex> per_thread_lock(trd.mutex);
-              if (!trd.permits.empty() && permit_id == trd.permits.top())
-                  trd.permits.pop();
-              else
-                  status = TCM_RESULT_PERMIT_MISMATCH;
-          }else
-                  status = TCM_RESULT_PERMIT_MISMATCH;
+          std::shared_ptr<thread_registration_data_t> p = e.lock();
+          if (!p) {
+              status = TCM_RESULT_PERMIT_MISMATCH;
+              continue;
+          }
+          thread_registration_data_t& trd = *p;
+          std::lock_guard<std::mutex> per_thread_lock(trd.mutex);
+          if (trd.permits.empty() || permit_id != trd.permits.top()) {
+              status = TCM_RESULT_PERMIT_MISMATCH;
+              continue;
+          }
+
+          trd.permits.pop();
       }
       return status;
   }
