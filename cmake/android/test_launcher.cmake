@@ -1,4 +1,5 @@
 # Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,4 +25,10 @@ endforeach()
 
 # execute binary
 execute_on_device("chmod -R 755 ${ANDROID_DEVICE_TESTING_DIRECTORY}")
-execute_on_device("LD_LIBRARY_PATH=${ANDROID_DEVICE_TESTING_DIRECTORY} ${ANDROID_DEVICE_TESTING_DIRECTORY}/${TEST_NAME}")
+# TEST_ARGS is an optional CMake list, e.g. "-DTEST_ARGS=--test-case=*_propagation;--no-colors".
+set(test_arguments "")
+foreach(test_argument IN LISTS TEST_ARGS)
+    string(REPLACE "'" "'\\''" test_argument "${test_argument}")
+    string(APPEND test_arguments " '${test_argument}'")
+endforeach()
+execute_on_device("LD_LIBRARY_PATH=${ANDROID_DEVICE_TESTING_DIRECTORY} ${ANDROID_DEVICE_TESTING_DIRECTORY}/${TEST_NAME}${test_arguments}")
