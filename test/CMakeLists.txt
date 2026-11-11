@@ -590,16 +590,20 @@ if (TARGET TBB::tbb)
     endif()
 
     # Test for the library shutdown during process termination
-    if (BUILD_SHARED_LIBS)
+    if (BUILD_SHARED_LIBS AND NOT TBB_EMSCRIPTEN)
         tbb_add_lib_test(SUBDIR tbb NAME test_tbb_shutdown DEPENDENCIES TBB::tbb)
         tbb_add_test(SUBDIR tbb NAME test_tbb_shutdown)
         target_include_directories(test_tbb_shutdown PRIVATE
             $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>)
+        set_target_properties(test_tbb_shutdown PROPERTIES
+            BUILD_RPATH_USE_ORIGIN TRUE
+            BUILD_RPATH "$ORIGIN")
+        target_compile_definitions(test_tbb_shutdown PRIVATE
+            "TEST_TBB_SHUTDOWN_LIBRARY=\"$<TARGET_FILE_NAME:_test_tbb_shutdown>\"")
+
         add_dependencies(test_tbb_shutdown _test_tbb_shutdown)
-        set_property(TARGET test_tbb_shutdown PROPERTY BUILD_RPATH_USE_ORIGIN TRUE)
-        set_property(TARGET test_tbb_shutdown PROPERTY BUILD_RPATH "$ORIGIN")
         # Optional libraries loaded at run-time; build them if available
-        foreach(_shutdown_dep TCM::tcm TBB::tbbmalloc TBB::${TBBBIND_LIBRARY_NAME})
+        foreach(_shutdown_dep TCM::tcm TBB::tbbmalloc TBB::tbbbind TBB::tbbbind_2_0 TBB::tbbbind_2_5)
             if (TARGET ${_shutdown_dep})
                 add_dependencies(test_tbb_shutdown ${_shutdown_dep})
             endif()
