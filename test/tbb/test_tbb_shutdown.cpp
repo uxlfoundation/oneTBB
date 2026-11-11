@@ -74,8 +74,8 @@ extern "C" TEST_EXPORT bool run_tbb_shutdown_test() {
 
 //! \brief \ref error_guessing
 TEST_CASE("Process exit after runtime loading TBB") {
-    utils::LIBRARY_HANDLE library = utils::OpenLibrary(TEST_TBB_SHUTDOWN_LIBRARY);
-    REQUIRE_MESSAGE(library, "Cannot find " TEST_TBB_SHUTDOWN_LIBRARY);
+    utils::LIBRARY_HANDLE library = utils::OpenLibrary(TEST_LIBRARY_NAME("_test_tbb_shutdown"));
+    REQUIRE_MESSAGE(library, "Cannot find " TEST_LIBRARY_NAME("_test_tbb_shutdown"));
 
     bool (*run)() = nullptr;
     utils::GetAddress(library, "run_tbb_shutdown_test", run);

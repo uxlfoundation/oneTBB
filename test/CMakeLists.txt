@@ -595,9 +595,9 @@ if (TARGET TBB::tbb)
         tbb_add_test(SUBDIR tbb NAME test_tbb_shutdown)
         target_include_directories(test_tbb_shutdown PRIVATE
             $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>)
-        target_compile_definitions(test_tbb_shutdown PRIVATE
-            TEST_TBB_SHUTDOWN_LIBRARY="$<TARGET_FILE:_test_tbb_shutdown>")
         add_dependencies(test_tbb_shutdown _test_tbb_shutdown)
+        set_property(TARGET test_tbb_shutdown PROPERTY BUILD_RPATH_USE_ORIGIN TRUE)
+        set_property(TARGET test_tbb_shutdown PROPERTY BUILD_RPATH "$ORIGIN")
         # Optional libraries loaded at run-time; build them if available
         foreach(_shutdown_dep TCM::tcm TBB::tbbmalloc TBB::${TBBBIND_LIBRARY_NAME})
             if (TARGET ${_shutdown_dep})
