@@ -24,7 +24,7 @@ constexpr char test_name[] =
 
 // The test does not work correctly when the runtime is statically linked.
 // TODO: investigate a failure in debug with MSVC
-#if (!_MSC_VER || (defined(_DLL) && !defined(_DEBUG))) && !EMSCRIPTEN
+#if TBB_USE_EXCEPTIONS && (!_MSC_VER || (defined(_DLL) && !defined(_DEBUG))) && !EMSCRIPTEN
 
 #include "terminate_on_exception.h"
 
