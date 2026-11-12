@@ -92,6 +92,8 @@ public:
         return true;
     }
 
+    bool continue_bypassing() const { return true; }
+
     void pause(arena_slot&) {
         waiter_base::pause();
     }
@@ -162,6 +164,10 @@ public:
         return true;
     }
 
+    bool continue_bypassing() const {
+        return my_wait_ctx.continue_execution();
+    }
+
     void pause(arena_slot&) {
         if (!sleep_waiter::pause()) {
             return;
@@ -195,6 +201,8 @@ public:
         t = get_self_recall_task(slot);
         return true;
     }
+
+    bool continue_bypassing() const { return true; }
 
     void pause(arena_slot& slot) {
         if (!sleep_waiter::pause()) {

@@ -351,6 +351,14 @@ d1::task* task_dispatcher::local_wait_for_all(d1::task* t, Waiter& waiter ) {
 
                     ITT_CALLEE_LEAVE(ITTPossible, itt_caller);
 
+                    // Early-exit the bypass loop in case of the signal from the waiter
+                    if (t && !waiter.continue_bypassing()) {
+                        __TBB_ASSERT(!task_accessor::is_resume_task(*t),
+                            "Resume task must not be spawned into the task pool");
+                        r1::spawn(*t, *ed.context);
+                        t = nullptr;
+                    }
+
                     // The task affinity in execution data is set for affinitized tasks.
                     // So drop it after the task execution.
                     ed.affinity_slot = d1::no_slot;

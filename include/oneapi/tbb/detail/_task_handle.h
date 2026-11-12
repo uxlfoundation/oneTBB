@@ -48,14 +48,10 @@ class task_handle_task;
 class task_dynamic_state;
 
 struct notify_list_node {
-    // First element is a pointer to a bypassed task
-    // Second element is true if bypass is allowed
-    using notify_result_type = std::pair<task_handle_task*, bool>;
-
     notify_list_node* next_node = nullptr;
 
-    virtual notify_result_type notify_on_completion() = 0;
-    virtual notify_result_type notify_on_cancellation() = 0;
+    virtual task_handle_task* notify_on_completion() = 0;
+    virtual task_handle_task* notify_on_cancellation() = 0;
     virtual ~notify_list_node() = default;
 };
 
@@ -66,13 +62,13 @@ struct notify_successor_node : notify_list_node {
     notify_successor_node(task_dynamic_state* state, d1::small_object_allocator& alloc)
         : successor_state(state), allocator(alloc) {}
 
-    notify_result_type notify_common();
+    task_handle_task* notify_common();
 
-    notify_result_type notify_on_completion() override {
+    task_handle_task* notify_on_completion() override {
         return notify_common();
     }
 
-    notify_result_type notify_on_cancellation() override {
+    task_handle_task* notify_on_cancellation() override {
         return notify_common();
     }
 };
@@ -83,20 +79,20 @@ struct notify_waiter_node : notify_list_node {
 
     notify_waiter_node() : task_wait_context(1), was_canceled(false) {}
 
-    notify_result_type notify_common() {
+    task_handle_task* notify_common() {
         task_wait_context.release();
-
-        // Bypassing from list notification is not allowed if there are waiters in the list
-        return {nullptr, false};
+        return nullptr;
     }
 
-    virtual notify_result_type notify_on_completion() override {
-        return notify_common();
+    virtual task_handle_task* notify_on_completion() override {
+        task_wait_context.release();
+        return nullptr;
     }
 
-    virtual notify_result_type notify_on_cancellation() override {
+    virtual task_handle_task* notify_on_cancellation() override {
         was_canceled = true;
-        return notify_common();
+        task_wait_context.release();
+        return nullptr;
     }
 };
 
@@ -210,14 +206,13 @@ private:
     d1::small_object_allocator m_allocator;
 };
 
-inline std::pair<task_handle_task*, bool> notify_successor_node::notify_common() {
+inline task_handle_task* notify_successor_node::notify_common() {
     task_handle_task* successor_task = nullptr;
     if (successor_state->release_dependency()) {
         successor_task = successor_state->get_task();
         allocator.delete_object(this);
     }
-
-    return {successor_task, true};
+    return successor_task;
 }
 
 class dynamic_state_task : public d1::task {
@@ -545,17 +540,14 @@ inline task_handle_task* task_dynamic_state::fetch_list_and_notify_all(notify_li
     __TBB_ASSERT(state_flag == COMPLETED_FLAG || state_flag == CANCELED_FLAG, "Unexpected state_flag");
     notify_list_node* node = fetch_notify_list(state_flag);
     task_handle_task* next_task = nullptr;
-    bool bypass_allowed = true;
 
     while (node != nullptr) {
         notify_list_node* next_node = node->next_node;
 
         // Don't dereference node after the notification!
-        notify_list_node::notify_result_type result = state_flag == COMPLETED_FLAG ?
-                                                      node->notify_on_completion() :
-                                                      node->notify_on_cancellation();
-        if (!result.second) bypass_allowed = false;
-        task_handle_task* successor_task = result.first;
+        task_handle_task* successor_task = state_flag == COMPLETED_FLAG
+                                           ? node->notify_on_completion()
+                                           : node->notify_on_cancellation();
 
         if (next_task == nullptr) {
             next_task = successor_task;
@@ -566,10 +558,6 @@ inline task_handle_task* task_dynamic_state::fetch_list_and_notify_all(notify_li
         node = next_node;
     }
 
-    if (next_task && !bypass_allowed) {
-        d1::spawn(*next_task, next_task->ctx());
-        next_task = nullptr;
-    }
     return next_task;
 }
 
