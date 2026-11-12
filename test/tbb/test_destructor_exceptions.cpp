@@ -17,8 +17,8 @@
 //! \file test_destructor_exceptions.cpp
 //! \brief Test for [flow_graph.graph scheduler.task_group] specification
 
-// test that exceptions thrown by tasks from destructors of graph nodes and task groups are handled
-// correctly
+// test that exceptions thrown by assertion handlers or tasks from destructors of graph nodes and
+// task groups are handled correctly
 
 #define TBB_PREVIEW_ISOLATED_TASK_GROUP 1
 
@@ -43,6 +43,7 @@
 enum class context_kind { owned, external };
 // test for exception from task or assertion failure triggering
 enum class exception_kind { user, assertion };
+// expected exception propagation or termination
 enum class exit_kind { propagation, termination };
 
 struct user_exception {};

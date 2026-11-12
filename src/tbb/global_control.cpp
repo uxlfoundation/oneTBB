@@ -186,6 +186,7 @@ std::size_t global_control_active_value_unsafe(d1::global_control::parameter par
     return controls[param]->active_value_unsafe();
 }
 
+// unchecked, because do not check param validity in release mode
 std::size_t global_control_active_value_unchecked(d1::global_control::parameter param) {
     __TBB_ASSERT(param < d1::global_control::parameter_max, nullptr);
     return controls[param]->active_value();
