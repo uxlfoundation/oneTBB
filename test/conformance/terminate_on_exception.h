@@ -26,11 +26,17 @@ enum class TestCase {
     CUSTOM_ASSERTION_HANDLER
 };
 
+enum Workload : int {
+    INTERNAL_EXCEPTION = 1,
+    USER_EXCEPTION = 2
+};
+
 // Overall, the test case is not safe because the dtors might not be called during long jump.
 // Therefore, it makes sense to run the test case after all other test cases.
 //! Test terminate_on_exception behavior
 //! \brief \ref interface \ref requirement
-void global_control_terminate_on_exception(TestCase test_case) {
+void global_control_terminate_on_exception(TestCase test_case,
+        int workload = Workload::INTERNAL_EXCEPTION|Workload::USER_EXCEPTION) {
     oneapi::tbb::global_control c(oneapi::tbb::global_control::terminate_on_exception, 1);
     static bool terminate_handler_called;
     static bool invalid_argument_exception;
@@ -68,9 +74,16 @@ void global_control_terminate_on_exception(TestCase test_case) {
                     invalid_argument_exception = true;
                 else if (strstr(comment, "std::exception"))
                     std_exception = true;
+#if defined(__clang__) && defined(_MSC_VER)
+                // On Clang with MSVC, longjmp from within noexcept leads to std::terminate call,
+                // so exit instead. Under global_control::terminate_on_exception, we have noexcept.
+                exit(0);
+#else
                 std::longjmp(buffer, 1);
+#endif
             });
         }
+        if (workload & Workload::INTERNAL_EXCEPTION)
 #if _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:4611) // interaction between '_setjmp' and C++ object destruction is non - portable
@@ -86,6 +99,7 @@ void global_control_terminate_on_exception(TestCase test_case) {
             }
         }
 #if TBB_USE_EXCEPTIONS
+        if (workload & Workload::USER_EXCEPTION)
         SUBCASE("user exception") {
             if (setjmp(buffer) == 0) {
                 oneapi::tbb::parallel_for(0, 1, [](int) {

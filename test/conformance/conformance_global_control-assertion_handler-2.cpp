@@ -57,7 +57,13 @@ TEST_CASE(test_name) {
                 const char *expected_comment = "Unknown exception";
                 CHECK_MESSAGE(strcmp(comment, expected_comment) == 0, "expected \"" << std::string(expected_comment) << "\", got: "
                               << std::string(comment));
+#if defined(__clang__) && defined(_MSC_VER)
+                // On Clang with MSVC, longjmp from within noexcept leads to std::terminate call,
+                // so exit instead. Under global_control::terminate_on_exception, we have noexcept.
+                exit(0);
+#else
                 std::longjmp(buffer, 1);
+#endif
             });
 #if _MSC_VER
 #pragma warning(push)

@@ -20,7 +20,7 @@
 #include "common/test.h"
 
 constexpr char test_name[] =
-    "terminate_on_exception: tbb::set_assertion_handler";
+    "terminate_on_exception: tbb::set_assertion_handler, internal exception";
 
 // The test does not work correctly when the runtime is statically linked.
 // TODO: investigate a failure in debug with MSVC
@@ -29,10 +29,10 @@ constexpr char test_name[] =
 #include "terminate_on_exception.h"
 
 //! Test terminate_on_exception by using tbb::set_assertion_handler and throwing an exception from
-//! the library and a std::exception from user code.
+//! the library and a std::exception from user code, depending on the selected workload.
 //! \brief \ref interface \ref requirement
 TEST_CASE(test_name) {
-    global_control_terminate_on_exception(TestCase::CUSTOM_ASSERTION_HANDLER);
+    global_control_terminate_on_exception(TestCase::CUSTOM_ASSERTION_HANDLER, Workload::INTERNAL_EXCEPTION);
 }
 #else // (!_MSC_VER || (defined(_DLL) && !defined(_DEBUG))) && !EMSCRIPTEN
 //! Test terminate_on_exception: skip in this configuration
