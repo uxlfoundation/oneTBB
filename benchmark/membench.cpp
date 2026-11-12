@@ -7,16 +7,16 @@
 #include <tbb/task_arena.h>
 
 #if ATG_OLD
-#include <tbb/aggregating_task_group_old.h>
+#include <oneapi/tbb/aggregating_task_group_old.h>
 #endif
 #if ATG_SUPER_NEW
-#include <tbb/aggregating_task_group_super_new.h>
+#include <oneapi/tbb/aggregating_task_group_super_new.h>
 #endif
 #if ATG_MEGA_NEW
-#include <tbb/aggregating_task_group_mega_new.h>
+#include <oneapi/tbb/aggregating_task_group_mega_new.h>
 #endif
 #if ATG_ULTRA_NEW
-#include <tbb/aggregating_task_group_ultra_new.h>
+#include <oneapi/tbb/aggregating_task_group_ultra_new.h>
 #endif
 
 using namespace std::chrono;
