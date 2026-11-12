@@ -23,6 +23,7 @@ constexpr char test_name[] =
     "terminate_on_exception: tbb::set_assertion_handler, user exception";
 
 // The test does not work correctly when the runtime is statically linked.
+// The test throws a user exception, so it requires exception support.
 // TODO: investigate a failure in debug with MSVC
 #if TBB_USE_EXCEPTIONS && (!_MSC_VER || (defined(_DLL) && !defined(_DEBUG))) && !EMSCRIPTEN
 
