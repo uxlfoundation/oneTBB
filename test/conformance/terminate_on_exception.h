@@ -31,6 +31,11 @@ enum Workload : int {
     USER_EXCEPTION = 2
 };
 
+enum class ExpectedException {
+    INVALID_ARGUMENT,
+    STD_EXCEPTION
+};
+
 // Overall, the test case is not safe because the dtors might not be called during long jump.
 // Therefore, it makes sense to run the test case after all other test cases.
 //! Test terminate_on_exception behavior
@@ -39,11 +44,8 @@ void global_control_terminate_on_exception(TestCase test_case,
         int workload = Workload::INTERNAL_EXCEPTION|Workload::USER_EXCEPTION) {
     oneapi::tbb::global_control c(oneapi::tbb::global_control::terminate_on_exception, 1);
     static bool terminate_handler_called;
-    static bool invalid_argument_exception;
-    static bool std_exception;
     terminate_handler_called = false;
-    invalid_argument_exception = false;
-    std_exception = false;
+    static ExpectedException expected_exception;
 
 #if TBB_USE_EXCEPTIONS
     try {
@@ -71,9 +73,10 @@ void global_control_terminate_on_exception(TestCase test_case,
                 REQUIRE(expression[0] == 0);
                 REQUIRE(comment);
                 if (strstr(comment, "std::invalid_argument"))
-                    invalid_argument_exception = true;
+                    REQUIRE(expected_exception == ExpectedException::INVALID_ARGUMENT);
                 else if (strstr(comment, "std::exception"))
-                    std_exception = true;
+                    REQUIRE(expected_exception == ExpectedException::STD_EXCEPTION);
+
 #if defined(__clang__) && defined(_MSC_VER)
                 // On Clang with MSVC, longjmp from within noexcept leads to std::terminate call,
                 // so exit instead. Under global_control::terminate_on_exception, we have noexcept.
@@ -90,33 +93,27 @@ void global_control_terminate_on_exception(TestCase test_case,
 #pragma warning(push)
 #pragma warning(disable:4611) // interaction between '_setjmp' and C++ object destruction is non - portable
 #endif
-        SUBCASE("internal exception") {
-            if (setjmp(buffer) == 0) {
-                oneapi::tbb::parallel_for(0, 1, -1, [](int) {});
-                FAIL("Unreachable code");
+            SUBCASE("internal exception") {
+                if (setjmp(buffer) == 0) {
+                    expected_exception = ExpectedException::INVALID_ARGUMENT;
+                    oneapi::tbb::parallel_for(0, 1, -1, [](int) {});
+                    FAIL("Unreachable code");
+                }
             }
-            if (test_case == TestCase::CUSTOM_ASSERTION_HANDLER) {
-                CHECK(invalid_argument_exception);
-                CHECK(!std_exception);
-            }
-        }
 #if TBB_USE_EXCEPTIONS
         if (workload & Workload::USER_EXCEPTION)
-        SUBCASE("user exception") {
-            if (setjmp(buffer) == 0) {
-                oneapi::tbb::parallel_for(0, 1, [](int) {
-                    volatile bool suppress_unreachable_code_warning = true;
-                    if (suppress_unreachable_code_warning) {
-                        throw std::exception();
-                    }
-                });
-                FAIL("Unreachable code");
+            SUBCASE("user exception") {
+                if (setjmp(buffer) == 0) {
+                    expected_exception = ExpectedException::STD_EXCEPTION;
+                    oneapi::tbb::parallel_for(0, 1, [](int) {
+                        volatile bool suppress_unreachable_code_warning = true;
+                        if (suppress_unreachable_code_warning) {
+                            throw std::exception();
+                        }
+                    });
+                    FAIL("Unreachable code");
+                }
             }
-            if (test_case == TestCase::CUSTOM_ASSERTION_HANDLER) {
-                CHECK(!invalid_argument_exception);
-                CHECK(std_exception);
-            }
-        }
 #endif
 #if _MSC_VER
 #pragma warning(pop)
