@@ -203,6 +203,12 @@ void destroy_group(context_kind context) {
 
 template <typename Group>
 void run_scenario(context_kind context, exception_kind source, exit_kind exit) {
+    // need at least 2, so that waiting for the task started loop in prepare_task
+    // is not to hung
+    tbb::global_control gc(tbb::global_control::max_allowed_parallelism,
+        std::max((size_t)2,
+            tbb::global_control::active_value(tbb::global_control::max_allowed_parallelism)));
+
     scenario_state state(source, exit);
     current_scenario = &state;
     auto previous_terminate = std::set_terminate(terminating_handler);
