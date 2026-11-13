@@ -58,6 +58,7 @@ endif()
 # Assigning options their defaults after determining whether they were specified explicitly or not
 option(TCM_TEST "Enable testing" ON)
 option(TCM_STRICT "Treat compiler warnings as errors" ON)
+option(TCM_GENERATE_VARS "Generate and install vars script (standalone build only)" ON)
 option(TCM_FUZZ_TESTING "Enable FUZZ testing of TCM" OFF)
 
 set(TCM_PROFILE ${TCM_PROFILE} CACHE STRING "Enable profiling of TCM functionality" FORCE)
