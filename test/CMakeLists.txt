@@ -478,6 +478,117 @@ if (TARGET TBB::tbb)
     if (APPLE OR ANDROID_PLATFORM)
         target_link_libraries(test_dynamic_link PRIVATE -rdynamic)
     endif()
+
+    # Regression test for the deferred unloading of the libraries oneTBB loads dynamically
+    # (TCM, TBBbind, the RML server). The host dlopen()s a plugin that links oneTBB, so the
+    # runtimes are loaded after glibc registered _dl_fini. Needs the TCM test hook.
+    if (TBB_TCM_TESTING AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_library(test_deferred_unload_plugin SHARED
+            ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_deferred_unload_plugin.cpp)
+        target_link_libraries(test_deferred_unload_plugin PRIVATE TBB::tbb)
+        set_property(TARGET test_deferred_unload_plugin PROPERTY BUILD_RPATH_USE_ORIGIN TRUE)
+        set_property(TARGET test_deferred_unload_plugin PROPERTY BUILD_RPATH "$ORIGIN")
+
+        add_executable(test_deferred_unload
+            ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_deferred_unload.cpp)
+        add_dependencies(test_deferred_unload test_deferred_unload_plugin)
+        target_compile_definitions(test_deferred_unload PRIVATE
+            PLUGIN_PATH="$<TARGET_FILE:test_deferred_unload_plugin>")
+        target_link_libraries(test_deferred_unload PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
+
+        # Negative control: identical work with oneTBB as a DT_NEEDED dependency.
+        add_executable(test_deferred_unload_linked
+            ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_deferred_unload_linked.cpp)
+        target_link_libraries(test_deferred_unload_linked PRIVATE TBB::tbb test_deferred_unload_plugin)
+        set_property(TARGET test_deferred_unload_linked PROPERTY BUILD_RPATH_USE_ORIGIN TRUE)
+        set_property(TARGET test_deferred_unload_linked PROPERTY BUILD_RPATH "$ORIGIN")
+
+        foreach (_deferred_unload_mode exit close reload)
+            add_test(NAME test_deferred_unload_${_deferred_unload_mode}
+                     COMMAND test_deferred_unload ${_deferred_unload_mode}
+                     WORKING_DIRECTORY ${TBB_TEST_WORKING_DIRECTORY})
+            set_property(TEST test_deferred_unload_${_deferred_unload_mode}
+                         PROPERTY ENVIRONMENT ${TBB_TESTS_ENVIRONMENT})
+            set_property(TEST test_deferred_unload_${_deferred_unload_mode}
+                         PROPERTY RUN_SERIAL TRUE)
+        endforeach()
+
+        add_test(NAME test_deferred_unload_linked
+                 COMMAND test_deferred_unload_linked
+                 WORKING_DIRECTORY ${TBB_TEST_WORKING_DIRECTORY})
+        set_property(TEST test_deferred_unload_linked
+                     PROPERTY ENVIRONMENT ${TBB_TESTS_ENVIRONMENT})
+        set_property(TEST test_deferred_unload_linked PROPERTY RUN_SERIAL TRUE)
+    endif()
+
+    # Regression test for dynamic unloads performed from Windows DllMain. The host does not link
+    # oneTBB; it preloads a fake tbbmalloc.dll and checks that oneTBB does not release its loader
+    # reference from DLL_PROCESS_DETACH. Mirrors the Linux deferred-unload plugin test.
+    if (WIN32 AND BUILD_SHARED_LIBS AND NOT WINDOWS_STORE AND NOT TBB_WINDOWS_DRIVER AND TARGET tbbmalloc)
+        set(_windows_dllmain_unload_dir "${CMAKE_CURRENT_BINARY_DIR}/windows_dllmain_unload")
+
+        add_library(test_windows_dllmain_unload_fake_allocator SHARED
+            ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_windows_dllmain_unload_fake_allocator.cpp)
+        set_target_properties(test_windows_dllmain_unload_fake_allocator PROPERTIES
+            OUTPUT_NAME "test_windows_fake_allocator")
+
+        add_library(test_windows_dllmain_unload_plugin SHARED
+            ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_windows_dllmain_unload_plugin.cpp)
+        target_compile_definitions(test_windows_dllmain_unload_plugin PRIVATE
+            __TBB_NO_IMPLICIT_LINKAGE=1
+            $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>)
+        target_link_libraries(test_windows_dllmain_unload_plugin PRIVATE TBB::tbb)
+
+        add_executable(test_windows_dllmain_unload
+            ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_windows_dllmain_unload.cpp)
+        set_property(TARGET test_windows_dllmain_unload PROPERTY
+            RUNTIME_OUTPUT_DIRECTORY "${_windows_dllmain_unload_dir}")
+        foreach (_config ${CMAKE_CONFIGURATION_TYPES})
+            string(TOUPPER "${_config}" _config_upper)
+            set_property(TARGET test_windows_dllmain_unload PROPERTY
+                RUNTIME_OUTPUT_DIRECTORY_${_config_upper} "${_windows_dllmain_unload_dir}/${_config}")
+        endforeach()
+        add_dependencies(test_windows_dllmain_unload
+            test_windows_dllmain_unload_fake_allocator
+            test_windows_dllmain_unload_plugin
+            TBB::tbb)
+        add_custom_command(TARGET test_windows_dllmain_unload POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:test_windows_dllmain_unload_fake_allocator>"
+                "$<TARGET_FILE_DIR:test_windows_dllmain_unload>/$<TARGET_FILE_NAME:tbbmalloc>"
+            VERBATIM)
+
+        add_executable(test_windows_dllmain_unload_linked
+            ${CMAKE_CURRENT_SOURCE_DIR}/tbb/test_windows_dllmain_unload_linked.cpp)
+        target_compile_definitions(test_windows_dllmain_unload_linked PRIVATE
+            __TBB_NO_IMPLICIT_LINKAGE=1
+            $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>)
+        target_link_libraries(test_windows_dllmain_unload_linked PRIVATE
+            TBB::tbb test_windows_dllmain_unload_plugin)
+        add_dependencies(test_windows_dllmain_unload_linked
+            test_windows_dllmain_unload_plugin TBB::tbb)
+
+        foreach (_windows_dllmain_unload_mode close reload)
+            add_test(NAME test_windows_dllmain_unload_${_windows_dllmain_unload_mode}
+                     COMMAND $<TARGET_FILE:test_windows_dllmain_unload> ${_windows_dllmain_unload_mode}
+                             $<TARGET_FILE:TBB::tbb>
+                             $<TARGET_FILE:test_windows_dllmain_unload_plugin>
+                             $<TARGET_FILE_NAME:tbbmalloc>
+                     WORKING_DIRECTORY ${TBB_TEST_WORKING_DIRECTORY})
+            set_property(TEST test_windows_dllmain_unload_${_windows_dllmain_unload_mode}
+                         PROPERTY ENVIRONMENT ${TBB_TESTS_ENVIRONMENT})
+            set_property(TEST test_windows_dllmain_unload_${_windows_dllmain_unload_mode}
+                         PROPERTY RUN_SERIAL TRUE)
+        endforeach()
+
+        add_test(NAME test_windows_dllmain_unload_linked
+                 COMMAND $<TARGET_FILE:test_windows_dllmain_unload_linked>
+                 WORKING_DIRECTORY ${TBB_TEST_WORKING_DIRECTORY})
+        set_property(TEST test_windows_dllmain_unload_linked
+                     PROPERTY ENVIRONMENT ${TBB_TESTS_ENVIRONMENT})
+        set_property(TEST test_windows_dllmain_unload_linked PROPERTY RUN_SERIAL TRUE)
+    endif()
+
     if (WIN32 AND NOT TBB_TCM_TESTING)
         tbb_add_test(SUBDIR tbb NAME test_numa_dist DEPENDENCIES TBB::tbb)
     endif()

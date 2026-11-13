@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -18,12 +19,19 @@
 
 #include "main.h"
 #include "governor.h"
+#include "dynamic_link.h"
 #include "threading_control.h"
 #include "environment.h"
 #include "market.h"
 #include "tcm_adaptor.h"
 #include "misc.h"
 #include "itt_notify.h"
+
+#if (_WIN32 || _WIN64) && !__TBB_SOURCE_DIRECTLY_INCLUDED
+#define __TBB_WINDOWS_DLL_BUILD 1
+#else
+#define __TBB_WINDOWS_DLL_BUILD 0
+#endif
 
 namespace tbb {
 namespace detail {
@@ -72,12 +80,58 @@ void ITT_DoUnsafeOneTimeInitialization();
 static __TBB_InitOnce __TBB_InitOnceHiddenInstance;
 #endif
 
+#if __TBB_WINDOWS_DLL_BUILD
+namespace {
+thread_local bool tls_in_dllmain_detach = false;
+
+struct dllmain_detach_scope_t {
+    dllmain_detach_scope_t() { tls_in_dllmain_detach = true; }
+    ~dllmain_detach_scope_t() { tls_in_dllmain_detach = false; }
+};
+} // namespace
+
+bool in_dllmain_detach() {
+    return tls_in_dllmain_detach;
+}
+#else
+bool in_dllmain_detach() {
+    return false;
+}
+#endif
+
+#if !__TBB_WINDOWS_DLL_BUILD
+namespace {
+// Process-lifetime object whose destructor unlinks the libraries registered via
+// dynamic_link_keep_until_exit(). It is registered during the hidden instance's construction, so
+// its destructor runs after release_resources() and after the loaded libraries' exit-time
+// destructors.
+//
+// This destructor is deliberately not used in Windows DLL builds: the CRT invokes it from
+// DllMain, where FreeLibrary() is unsafe. There, cleanup is done by governor::release_resources()
+// only when it is reached outside DllMain.
+struct dynamic_unlink_at_exit_t {
+    ~dynamic_unlink_at_exit_t() {
+        dynamic_unlink_all();
+    }
+};
+
+void schedule_dynamic_unlink_at_exit() {
+    static dynamic_unlink_at_exit_t unloader;
+    (void)unloader;
+}
+} // namespace
+#endif
+
 //------------------------------------------------------------------------
 // __TBB_InitOnce
 //------------------------------------------------------------------------
 
 void __TBB_InitOnce::add_ref() {
     if (++count == 1) {
+#if !__TBB_WINDOWS_DLL_BUILD
+        // Register the deferred unload before any library can be loaded, so it runs last.
+        schedule_dynamic_unlink_at_exit();
+#endif
         governor::acquire_resources();
         tcm_adaptor::initialize();
     }
@@ -134,7 +188,9 @@ extern "C" bool WINAPI DllMain( HANDLE /*hinstDLL*/, DWORD reason, LPVOID lpvRes
         case DLL_PROCESS_ATTACH:
             __TBB_InitOnce::add_ref();
             break;
-        case DLL_PROCESS_DETACH:
+        case DLL_PROCESS_DETACH: {
+            dllmain_detach_scope_t dllmain_scope;
+            (void)dllmain_scope;
             // Since THREAD_DETACH is not called for the main thread, call auto-termination
             // here as well - but not during process shutdown (due to risk of a deadlock).
             if ( lpvReserved == nullptr ) { // library unload
@@ -147,7 +203,11 @@ extern "C" bool WINAPI DllMain( HANDLE /*hinstDLL*/, DWORD reason, LPVOID lpvRes
                 // Remove reference that we added in DoOneTimeInitialization.
                 __TBB_InitOnce::remove_ref();
             }
+            // Do not call dynamic_unlink_all() here: it calls FreeLibrary() while the loader
+            // lock is held. governor::release_resources() performs this cleanup only outside
+            // DllMain; otherwise the OS reclaims the remaining handles at process exit.
             break;
+        }
         case DLL_THREAD_DETACH:
             governor::terminate_external_thread();
             break;

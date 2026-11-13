@@ -289,6 +289,7 @@ namespace r1 {
     }
     void dynamic_unlink( dynamic_link_handle ) {}
     void dynamic_unlink_all() {}
+    void dynamic_link_keep_until_exit( dynamic_link_handle ) {}
 #else
 #if __TBB_DYNAMIC_LOAD_ENABLED
 /*
@@ -331,9 +332,10 @@ namespace r1 {
         }
 
         void free() {
-            const std::size_t size = my_size;
-            for (std::size_t i=0; i<size; ++i)
-                dynamic_unlink( my_handles[i] );
+            // Idempotent: process-lifetime and normal-context shutdown paths may both reach here.
+            const std::size_t size = my_size.exchange( 0 );
+            for (std::size_t i = size; i > 0; --i)
+                dynamic_unlink( my_handles[i-1] );
         }
     } handles;
 
@@ -518,6 +520,15 @@ namespace r1 {
     void dynamic_unlink_all() {
     #if __TBB_DYNAMIC_LOAD_ENABLED
         handles.free();
+    #endif
+    }
+
+    void dynamic_link_keep_until_exit( dynamic_link_handle handle ) {
+    #if __TBB_DYNAMIC_LOAD_ENABLED
+        if ( handle )
+            handles.add( handle );
+    #else
+        suppress_unused_warning( handle );
     #endif
     }
 
@@ -807,6 +818,7 @@ namespace r1 {
     }
     void dynamic_unlink( dynamic_link_handle ) {}
     void dynamic_unlink_all() {}
+    void dynamic_link_keep_until_exit( dynamic_link_handle ) {}
 #endif /* __TBB_WEAK_SYMBOLS_PRESENT || __TBB_DYNAMIC_LOAD_ENABLED */
 
 } // namespace r1
