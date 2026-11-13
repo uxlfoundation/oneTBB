@@ -45,7 +45,7 @@ void global_control_terminate_on_exception(TestCase test_case,
     oneapi::tbb::global_control c(oneapi::tbb::global_control::terminate_on_exception, 1);
     static bool terminate_handler_called;
     terminate_handler_called = false;
-    static ExpectedException expected_exception;
+    static std::atomic<ExpectedException> expected_exception;
 
 #if TBB_USE_EXCEPTIONS
     try {
@@ -76,13 +76,15 @@ void global_control_terminate_on_exception(TestCase test_case,
                     REQUIRE(expected_exception == ExpectedException::INVALID_ARGUMENT);
                 else if (strstr(comment, "std::exception"))
                     REQUIRE(expected_exception == ExpectedException::STD_EXCEPTION);
+                else
+                    REQUIRE(false); // Unexpected exception type
 
 #if defined(__clang__) && defined(_MSC_VER)
                 // On Clang with MSVC, longjmp from within noexcept leads to std::terminate call,
                 // so exit instead. Under global_control::terminate_on_exception, we have noexcept.
                 // Must use REQUIRE instead of CHECK to ensure the test fails immediately if the
                 // condition is not met.
-                exit(0);
+                _Exit(0);
 #else
                 std::longjmp(buffer, 1);
 #endif

@@ -62,7 +62,7 @@ TEST_CASE(test_name) {
                 // so exit instead. Under global_control::terminate_on_exception, we have noexcept.
                 // Must use REQUIRE instead of CHECK to ensure the test fails immediately if the condition
                 // is not met.
-                exit(0);
+                _Exit(0);
 #else
                 std::longjmp(buffer, 1);
 #endif
