@@ -321,54 +321,49 @@ TEST_CASE("Assertion handler compatibility API") {
     CHECK_MESSAGE(&tbb::set_assertion_handler == &tbb::ext::set_assertion_handler, "Incorrect compat set_assertion_handler");
 }
 
+const struct GlobalControlState {
+    tbb::global_control::parameter name;
+    size_t in1, in2, in3, in4, in5;
+    size_t out1, out2, out3, out4, out5;
+} cases[] = {
+#if !(__TBB_WIN8UI_SUPPORT && (_WIN32_WINNT < 0x0A00))
+    {tbb::global_control::thread_stack_size, 1*1024*1024, 4*1024*1024, 8*1024*1024, 2*1024*1024, 10*1024*1024,
+        8*1024*1024, 8*1024*1024, 8*1024*1024, 10*1024*1024, 8*1024*1024},
+#endif // !(__TBB_WIN8UI_SUPPORT && (_WIN32_WINNT < 0x0A00))
+    {tbb::global_control::max_allowed_parallelism, 10, 20, 30, 15, 5,
+        10, 10, 10, 5, 10},
+    {tbb::global_control::terminate_on_exception, 0, 0, 0, 1, 0,
+        0, 1, 0, 0, 0},
+    {tbb::global_control::terminate_on_exception, 0, 0, 1, 1, 0,
+        1, 1, 1, 1, 1},
+    {tbb::global_control::leave_policy, 0, 0, 0, 1, 0,
+        0, 1, 0, 0, 0},
+    {tbb::global_control::leave_policy, 0, 0, 1, 1, 0,
+        1, 1, 1, 1, 1}
+};
+
 //! After control deletion, the active value should reflect the selection rule for the control type
 //! \brief \ref regression
 TEST_CASE("Removing global control updates active value") {
-#if !(__TBB_WIN8UI_SUPPORT && (_WIN32_WINNT < 0x0A00))
-    {
-        tbb::global_control gc0(tbb::global_control::thread_stack_size, 1*1024*1024);
-        tbb::global_control gc1(tbb::global_control::thread_stack_size, 4*1024*1024);
-        tbb::global_control gc2(tbb::global_control::thread_stack_size, 8*1024*1024);
+    int iter = 0;
+    for (const auto& c : cases) {
+        CAPTURE(c.name);
+        CAPTURE(iter);
+        tbb::global_control gc0(c.name, c.in1);
+        tbb::global_control gc1(c.name, c.in2);
+        tbb::global_control gc2(c.name, c.in3);
 
-        REQUIRE(tbb::global_control::active_value(tbb::global_control::thread_stack_size)
-                == 8*1024*1024);
+        REQUIRE(tbb::global_control::active_value(c.name) == c.out1);
         {
-            tbb::global_control gc4(tbb::global_control::thread_stack_size, 2*1024*1024);
-            REQUIRE(tbb::global_control::active_value(tbb::global_control::thread_stack_size)
-                    == 8*1024*1024);
+            tbb::global_control gc4(c.name, c.in4);
+            REQUIRE(tbb::global_control::active_value(c.name) == c.out2);
         }
-        REQUIRE(tbb::global_control::active_value(tbb::global_control::thread_stack_size)
-                == 8*1024*1024);
+        REQUIRE(tbb::global_control::active_value(c.name) == c.out3);
         {
-            tbb::global_control gc4(tbb::global_control::thread_stack_size, 10*1024*1024);
-            REQUIRE(tbb::global_control::active_value(tbb::global_control::thread_stack_size)
-                    == 10*1024*1024);
+            tbb::global_control gc4(c.name, c.in5);
+            REQUIRE(tbb::global_control::active_value(c.name) == c.out4);
         }
-        REQUIRE(tbb::global_control::active_value(tbb::global_control::thread_stack_size)
-                == 8*1024*1024);
+        REQUIRE(tbb::global_control::active_value(c.name) == c.out5);
+        ++iter;
     }
-#endif // !(__TBB_WIN8UI_SUPPORT && (_WIN32_WINNT < 0x0A00))
-    {
-        tbb::global_control gc0(tbb::global_control::max_allowed_parallelism, 10);
-        tbb::global_control gc1(tbb::global_control::max_allowed_parallelism, 20);
-        tbb::global_control gc3(tbb::global_control::max_allowed_parallelism, 30);
-
-        REQUIRE(tbb::global_control::active_value(tbb::global_control::max_allowed_parallelism)
-                == 10);
-        {
-            tbb::global_control gc4(tbb::global_control::max_allowed_parallelism, 15);
-            REQUIRE(tbb::global_control::active_value(tbb::global_control::max_allowed_parallelism)
-                    == 10);
-        }
-        REQUIRE(tbb::global_control::active_value(tbb::global_control::max_allowed_parallelism)
-                == 10);
-        {
-            tbb::global_control gc4(tbb::global_control::max_allowed_parallelism, 5);
-            REQUIRE(tbb::global_control::active_value(tbb::global_control::max_allowed_parallelism)
-                    == 5);
-        }
-        REQUIRE(tbb::global_control::active_value(tbb::global_control::max_allowed_parallelism)
-                == 10);
-    }
-
 }
