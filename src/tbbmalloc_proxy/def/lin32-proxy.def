@@ -46,10 +46,6 @@ _Znwj;
 _ZnwjRKSt9nothrow_t;
 
 local:
-
-/* TBB symbols */
-*3rml8internal*;
-*3tbb*;
-*__TBB*;
+*;
 
 };
