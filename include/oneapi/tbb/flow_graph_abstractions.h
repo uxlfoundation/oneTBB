@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -30,7 +31,7 @@ public:
     //! Inform a graph that a previous call to reserve_wait is no longer in effect
     virtual void release_wait() = 0;
 
-    virtual ~graph_proxy() {}
+    virtual ~graph_proxy() noexcept(false) {}
 };
 
 template <typename Input>
@@ -41,6 +42,8 @@ public:
 
     //! Submit signal from an asynchronous activity to FG.
     virtual bool try_put(const input_type&) = 0;
+
+    ~receiver_gateway() noexcept override = default;
 };
 
 } // d2

@@ -553,13 +553,20 @@ inline graph::graph(task_group_context& use_this_context) :
     my_is_active = true;
 }
 
-inline graph::~graph() {
-    wait_for_all();
-    if (own_context) {
-        my_context->~task_group_context();
-        r1::cache_aligned_deallocate(my_context);
-    }
-    delete my_task_arena;
+inline graph::~graph() noexcept(false) {
+    // wait_for_all() may take a task from the queue whose execution can throw or invoke
+    // __TBB_ASSERT_RELEASE, while the assertion handler may also throw. If another exception is
+    // already being handled, this results in std::terminate being called; otherwise, the exception
+    // propagates.
+    try_call([&] {
+        wait_for_all();
+    }).on_completion([&] {
+        if (own_context) {
+            my_context->~task_group_context();
+            r1::cache_aligned_deallocate(my_context);
+        }
+        delete my_task_arena;
+    });
 }
 
 inline void graph::reserve_wait() {

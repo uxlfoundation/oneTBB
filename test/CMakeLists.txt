@@ -17,8 +17,8 @@ include(ProcessorCount)
 
 # General function for test target generation
 function(tbb_add_test)
-    set(oneValueArgs SUBDIR NAME SUFFIX)
-    set(multiValueArgs DEPENDENCIES)
+    set(oneValueArgs SUBDIR NAME SUFFIX GROUPED_TEST_FILTER)
+    set(multiValueArgs DEPENDENCIES TEST_CASES)
     cmake_parse_arguments(_tbb_test "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     set(_tbb_test_TARGET_NAME ${_tbb_test_NAME})
@@ -52,22 +52,52 @@ function(tbb_add_test)
         # Expand the linker rpath by the CMAKE_LIBRARY_OUTPUT_DIRECTORY path since clang compiler from Android SDK
         # doesn't respect the -L flag.
         target_link_libraries(${_tbb_test_TARGET_NAME} PRIVATE "-Wl,--rpath-link,${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
-        add_test(NAME ${_tbb_test_TARGET_NAME}
-                 COMMAND ${CMAKE_COMMAND}
-                         -DBINARIES_PATH=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
-                         -DTEST_NAME=${_tbb_test_TARGET_NAME}
-                         -P ${PROJECT_SOURCE_DIR}/cmake/android/test_launcher.cmake)
-    else()
-        add_test(NAME ${_tbb_test_TARGET_NAME} COMMAND ${_tbb_test_TARGET_NAME} --force-colors=1 WORKING_DIRECTORY ${TBB_TEST_WORKING_DIRECTORY})
-        # Additional testing scenarios if Intel(R) Software Development Emulator is found
-        if (UNIX AND ";test_mutex;conformance_mutex;" MATCHES ";${_tbb_test_TARGET_NAME};" AND SDE_EXE)
-            add_test(NAME ${_tbb_test_TARGET_NAME}_SDE COMMAND ${SDE_EXE} -nhm -rtm_mode disabled -- ./${_tbb_test_TARGET_NAME} --force-colors=1 WORKING_DIRECTORY ${TBB_TEST_WORKING_DIRECTORY})
-            set_property(TEST ${_tbb_test_TARGET_NAME}_SDE PROPERTY ENVIRONMENT ${TBB_TESTS_ENVIRONMENT} APPEND)
-        endif()
     endif()
 
-    set_property(TEST ${_tbb_test_TARGET_NAME} PROPERTY ENVIRONMENT ${TBB_TESTS_ENVIRONMENT} APPEND)
-    set_property(TEST ${_tbb_test_TARGET_NAME} PROPERTY RUN_SERIAL TRUE)
+    set(_tbb_test_TEST_NAMES)
+    if (NOT _tbb_test_TEST_CASES OR _tbb_test_GROUPED_TEST_FILTER)
+        list(APPEND _tbb_test_TEST_NAMES ${_tbb_test_TARGET_NAME})
+    endif()
+    foreach(_test_case IN LISTS _tbb_test_TEST_CASES)
+        list(APPEND _tbb_test_TEST_NAMES ${_tbb_test_TARGET_NAME}_${_test_case})
+    endforeach()
+
+    foreach(_test_name IN LISTS _tbb_test_TEST_NAMES)
+        set(_test_args)
+        if (NOT ANDROID_PLATFORM)
+            list(APPEND _test_args --force-colors=1)
+        endif()
+        if (_test_name STREQUAL _tbb_test_TARGET_NAME)
+            if (_tbb_test_GROUPED_TEST_FILTER)
+                # add a filter for the grouped test invocation, i.e. --test-case=*_propagation
+                list(APPEND _test_args "--test-case=${_tbb_test_GROUPED_TEST_FILTER}")
+            endif()
+        else()
+            string(LENGTH "${_tbb_test_TARGET_NAME}_" _test_case_offset)
+            string(SUBSTRING "${_test_name}" ${_test_case_offset} -1 _test_case)
+            list(APPEND _test_args "--test-case=${_test_case}")
+        endif()
+        if (ANDROID_PLATFORM)
+            add_test(NAME ${_test_name}
+                COMMAND ${CMAKE_COMMAND}
+                    "-DBINARIES_PATH=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+                    "-DTEST_NAME=${_tbb_test_TARGET_NAME}"
+                    "-DTEST_ARGS=${_test_args}"
+                    -P ${PROJECT_SOURCE_DIR}/cmake/android/test_launcher.cmake)
+        else()
+            add_test(NAME ${_test_name} COMMAND ${_tbb_test_TARGET_NAME} ${_test_args}
+                WORKING_DIRECTORY ${TBB_TEST_WORKING_DIRECTORY})
+        endif()
+    endforeach()
+
+    # Additional testing scenarios if Intel(R) Software Development Emulator is found
+    if (NOT ANDROID_PLATFORM AND UNIX AND ";test_mutex;conformance_mutex;" MATCHES ";${_tbb_test_TARGET_NAME};" AND SDE_EXE)
+        add_test(NAME ${_tbb_test_TARGET_NAME}_SDE COMMAND ${SDE_EXE} -nhm -rtm_mode disabled -- ./${_tbb_test_TARGET_NAME} --force-colors=1 WORKING_DIRECTORY ${TBB_TEST_WORKING_DIRECTORY})
+        set_property(TEST ${_tbb_test_TARGET_NAME}_SDE PROPERTY ENVIRONMENT ${TBB_TESTS_ENVIRONMENT} APPEND)
+    endif()
+
+    set_property(TEST ${_tbb_test_TEST_NAMES} PROPERTY ENVIRONMENT ${TBB_TESTS_ENVIRONMENT} APPEND)
+    set_property(TEST ${_tbb_test_TEST_NAMES} PROPERTY RUN_SERIAL TRUE)
 
     # Prefer using target_link_options instead of target_link_libraries to specify link options because
     # target_link_libraries may incorrectly handle some options (on Windows, for example).
@@ -90,7 +120,8 @@ function(tbb_add_test)
         target_link_libraries(${_tbb_test_TARGET_NAME} PRIVATE util)
     endif()
 
-    if (COMMAND _tbb_run_memcheck)
+    # Process-isolated scenarios may intentionally exit without normal resource cleanup, so skip them.
+    if (COMMAND _tbb_run_memcheck AND NOT _tbb_test_TEST_CASES)
         _tbb_run_memcheck(${_tbb_test_NAME} ${_tbb_test_SUBDIR})
     endif()
 endfunction()
@@ -500,6 +531,20 @@ if (TARGET TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_blocked_range DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_concurrent_vector DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_task_group DEPENDENCIES TBB::tbb)
+    if (NOT EMSCRIPTEN)
+        set(_destructor_exception_cases)
+        foreach(_group graph task_group isolated_task_group)
+            foreach(_context owned external)
+                foreach(_source user assertion)
+                    list(APPEND _destructor_exception_cases ${_group}_${_context}_${_source}_termination)
+                endforeach()
+            endforeach()
+        endforeach()
+        # Propagation cases share a process; termination cases exit from std::terminate.
+        tbb_add_test(SUBDIR tbb NAME test_destructor_exceptions DEPENDENCIES TBB::tbb
+            GROUPED_TEST_FILTER "*_propagation"
+            TEST_CASES ${_destructor_exception_cases})
+    endif()
     tbb_add_test(SUBDIR tbb NAME test_concurrent_hash_map DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_task_arena DEPENDENCIES TBB::tbb)
     tbb_add_test(SUBDIR tbb NAME test_parallel_phase DEPENDENCIES TBB::tbb)
