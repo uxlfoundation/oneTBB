@@ -1948,6 +1948,31 @@ TEST_CASE("Delegated spawn wait") {
     TestDelegatedSpawnWait();
 }
 
+TEST_CASE("Nested execute reuses an occupied arena slot") {
+    tbb::task_arena arena_a(1);
+    tbb::task_arena arena_b(1);
+    tbb::task_arena arena_c(1);
+    int outer_slot = tbb::task_arena::not_initialized;
+    int reentered_slot = tbb::task_arena::not_initialized;
+
+    arena_a.execute([&] {
+        outer_slot = tbb::this_task_arena::current_thread_index();
+        arena_b.execute([&] {
+            arena_c.execute([&] {
+                for (int attempt = 0; attempt < 2; ++attempt) {
+                    arena_a.execute([&] {
+                        reentered_slot = tbb::this_task_arena::current_thread_index();
+                        tbb::parallel_for(0, 10, [](int) {});
+                    });
+                }
+            });
+        });
+    });
+
+    CHECK(outer_slot == 0);
+    CHECK(reentered_slot == outer_slot);
+}
+
 #if !EMSCRIPTEN
 //! For emscripten, FPU control state has not been set correctly
 //! Test task arena isolation functionality
