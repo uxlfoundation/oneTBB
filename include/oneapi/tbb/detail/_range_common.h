@@ -87,7 +87,7 @@ template <typename Value>
 concept blocked_range_value = std::copyable<Value> &&
                               requires( const std::remove_reference_t<Value>& lhs, const std::remove_reference_t<Value>& rhs ) {
                                   { lhs < rhs } -> relaxed_convertible_to<bool>;
-                                  { lhs - rhs } -> std::convertible_to<std::size_t>;
+                                  { lhs - rhs } -> relaxed_convertible_to<std::size_t>;
                                   { lhs + (rhs - lhs) } -> std::convertible_to<Value>;
                               };
 
