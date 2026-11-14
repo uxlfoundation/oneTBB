@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -129,7 +130,7 @@ void video::show_title() {}
 
 drawing_area::drawing_area(int x, int y, int sizex, int sizey)
         : base_index(y * g_sizex + x),
-          max_index(g_sizex * g_sizey),
+          max_index(static_cast<size_t>(g_sizex) * static_cast<size_t>(g_sizey)),
           index_stride(g_sizex),
           pixel_depth(24),
           ptr32(g_pImg),
