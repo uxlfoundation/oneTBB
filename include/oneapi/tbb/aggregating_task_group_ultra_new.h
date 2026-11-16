@@ -1,6 +1,8 @@
 #ifndef __TBB_aggregating_task_group_ultra_new_H
 #define __TBB_aggregating_task_group_ultra_new_H
 
+#include "trace.h"
+
 #include "detail/_config.h"
 #include "detail/_namespace_injection.h"
 #include "detail/_assert.h"
@@ -121,9 +123,13 @@ public:
     {}
 
     d1::task* execute(d1::execution_data& ed) override {
+        TRACE_BEGIN_EVENT("function_tree_task::execute()", tbb::this_task_arena::current_thread_index());
         this->distribute_subtasks();
+        TRACE_BEGIN_EVENT("user function", tbb::this_task_arena::current_thread_index());
         m_function();
+        TRACE_END_EVENT("user function", tbb::this_task_arena::current_thread_index());
         m_allocator.delete_object(this, ed);
+        TRACE_END_EVENT("function_tree_task::execute()", tbb::this_task_arena::current_thread_index());
         return nullptr;
     }
 
@@ -225,12 +231,11 @@ public:
 
     template <typename Function>
     void push(Function&& function, d1::wait_context_vertex& wait_vertex, task_group_context& ctx) {
+        TRACE_BEGIN_EVENT("task_forest::push", tbb::this_task_arena::current_thread_index());
         d1::small_object_allocator alloc;
 
         using task_type = function_tree_task<typename std::decay<Function>::type>;
         task_type* new_task = alloc.new_object<task_type>(std::forward<Function>(function), &wait_vertex, ctx, alloc);
-
-        grab_task* grabber = nullptr;
 
         // Lock the forest to prevent races with grabbers
         tree_task* next_head = lock();
@@ -238,10 +243,7 @@ public:
         tree_task* current_head = new_task;
         new_task->next_root = next_head;
 
-        if (next_head == nullptr) {
-            grabber = alloc.new_object<grab_task>(this, r1::get_thread_reference_vertex(&wait_vertex),
-                                                  &wait_vertex, ctx, alloc);
-        } else {
+        if (next_head != nullptr) {
             tree_task* prev_head = current_head;
 
             while (next_head && prev_head->num_elements == next_head->num_elements) {
@@ -258,10 +260,21 @@ public:
         }
 
         unlock(current_head);
-        if (grabber) r1::spawn(*grabber, ctx);
+
+        if (next_head == nullptr) {
+            
+        }
+
+        if (next_head == nullptr) {
+            grab_task* grabber = alloc.new_object<grab_task>(this, r1::get_thread_reference_vertex(&wait_vertex),
+                                                             &wait_vertex, ctx, alloc);
+            r1::spawn(*grabber, ctx);
+        }
+        TRACE_END_EVENT("task_forest::push", tbb::this_task_arena::current_thread_index());
     }
 
     tree_task* grab(d1::wait_context_vertex* tg_wait_context_vertex, task_group_context& ctx) {
+        TRACE_BEGIN_EVENT("task_forest::grab", tbb::this_task_arena::current_thread_index());
         tree_task* head = lock();
         tree_task* new_head = nullptr;
         tree_task* producer_head = head;
@@ -298,12 +311,11 @@ public:
             }
         }
 
-        // TODO: if there are more tasks to grab - spawn another grabber
-
         unlock(producer_head);
 
         // Whatever is left behind must stay reachable, so this grabber owns the hand-off
         if (producer_head != nullptr) {
+            TRACE_INSTANT_EVENT("Spawn additional grabber", tbb::this_task_arena::current_thread_index());
             d1::small_object_allocator alloc;
             grab_task* successor = alloc.new_object<grab_task>(
                 this, r1::get_thread_reference_vertex(tg_wait_context_vertex),
@@ -311,6 +323,7 @@ public:
             r1::spawn(*successor, ctx);
         }
 
+        TRACE_END_EVENT("task_forest::grab", tbb::this_task_arena::current_thread_index());
         return new_head;
     }
 
@@ -324,6 +337,7 @@ public:
 };
 
 inline d1::task* grab_task::execute(d1::execution_data& ed) {
+    TRACE_BEGIN_EVENT("grab_task::execute", tbb::this_task_arena::current_thread_index());
     __TBB_ASSERT(ed.context == &m_ctx, nullptr);
     d1::task* next_task = nullptr;
     tree_task* grabbed_tree = m_target->grab(m_tg_wait_context_vertex, m_ctx);
@@ -333,6 +347,7 @@ inline d1::task* grab_task::execute(d1::execution_data& ed) {
     }
 
     m_allocator.delete_object(this, ed);
+    TRACE_END_EVENT("grab_task::execute", tbb::this_task_arena::current_thread_index());
     return next_task;
 }
 
@@ -380,6 +395,7 @@ public:
         // Drain the local forest instead of leaving the producer to steal its own tasks back.
         // An already spawned grabber may find nothing left, which is the one wasted grabber per producer
         if (tree_task* grabbed = m_task_forest.grab_all()) {
+            TRACE_INSTANT_EVENT("Distribute spine on wait()", tbb::this_task_arena::current_thread_index());
             grab_task::distribute_spine_recursion(1, grabbed, r1::get_thread_reference_vertex(&m_wait_vertex));
         }
 

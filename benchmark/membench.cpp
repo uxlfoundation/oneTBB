@@ -24,6 +24,8 @@ using namespace std::chrono;
 
 int main(int argc, char* argv[])
 {
+	TRACE_INITIALIZE("membench_trace.json", /*pid = */ 424242, "benchmark");
+	TRACE_ADD_THREADS(0, tbb::this_task_arena::max_concurrency());
 	int mode=0;
 	// mode 0 executes both parallel_for and task_group based versions
     // mode 1 executes parallel_for version only
@@ -67,7 +69,8 @@ int main(int argc, char* argv[])
 	// DoCalc over Count elements using BlockSize that evenly distributes 
 	// work among threads and then with reduced sizes until MinBlockSize is reached
 	
-	for (int runIndex=0; runIndex <= RunCount; ++runIndex)
+	// for (int runIndex=0; runIndex <= RunCount; ++runIndex)
+	int runIndex = RunCount;
 	{
 		int BlockSize = std::max(static_cast<int>((Count/NumThreads)/(1<<runIndex)), MinBlockSize);
 		std::cout << "BlockSize = " << BlockSize << std::endl;
@@ -162,5 +165,6 @@ int main(int argc, char* argv[])
 	delete [] buf2;
 	delete [] buf3;
 
+	TRACE_FINISH();
 	return 0;
 }

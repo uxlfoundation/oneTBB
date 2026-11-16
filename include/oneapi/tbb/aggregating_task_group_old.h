@@ -1,6 +1,8 @@
 #ifndef __TBB_aggregating_task_group_H
 #define __TBB_aggregating_task_group_H
 
+#include "trace.h"
+
 #include "detail/_config.h"
 #include "detail/_namespace_injection.h"
 #include "detail/_assert.h"
