@@ -41,7 +41,7 @@ enum class ExpectedException {
 //! Test terminate_on_exception behavior
 //! \brief \ref interface \ref requirement
 void global_control_terminate_on_exception(TestCase test_case,
-        int workload = Workload::INTERNAL_EXCEPTION|Workload::USER_EXCEPTION) {
+        int workload = Workload::INTERNAL_EXCEPTION | Workload::USER_EXCEPTION) {
     oneapi::tbb::global_control c(oneapi::tbb::global_control::terminate_on_exception, 1);
     static bool terminate_handler_called;
     terminate_handler_called = false;
