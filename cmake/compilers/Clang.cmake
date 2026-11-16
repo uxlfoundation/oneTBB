@@ -108,7 +108,9 @@ if (NOT APPLE AND NOT WIN32)
 endif()
 
 # Android's libc lacks some symbols listed in version scripts, linker may treat it as error.
-set(TBB_LIB_LINK_FLAGS ${TBB_LIB_LINK_FLAGS} $<$<BOOL:${ANDROID}>:-Wl,--undefined-version>)
+if (ANDROID)
+    set(TBB_LIB_LINK_FLAGS ${TBB_LIB_LINK_FLAGS} -Wl,--undefined-version)
+endif()
 
 set(TBB_COMMON_LINK_LIBS ${CMAKE_DL_LIBS})
 
