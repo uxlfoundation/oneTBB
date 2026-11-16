@@ -262,10 +262,6 @@ public:
         unlock(current_head);
 
         if (next_head == nullptr) {
-            
-        }
-
-        if (next_head == nullptr) {
             grab_task* grabber = alloc.new_object<grab_task>(this, r1::get_thread_reference_vertex(&wait_vertex),
                                                              &wait_vertex, ctx, alloc);
             r1::spawn(*grabber, ctx);
@@ -340,7 +336,12 @@ inline d1::task* grab_task::execute(d1::execution_data& ed) {
     TRACE_BEGIN_EVENT("grab_task::execute", tbb::this_task_arena::current_thread_index());
     __TBB_ASSERT(ed.context == &m_ctx, nullptr);
     d1::task* next_task = nullptr;
+
+#if GRAB_ALL
     tree_task* grabbed_tree = m_target->grab(m_tg_wait_context_vertex, m_ctx);
+#else
+    tree_task* grabbed_tree = m_target->grab();
+#endif
 
     if (grabbed_tree != nullptr) {
         next_task = distribute_spine(grabbed_tree);
