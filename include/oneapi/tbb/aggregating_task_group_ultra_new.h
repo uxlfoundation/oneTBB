@@ -25,9 +25,13 @@ class task_forest;
 
 class tree_task : public d1::task {
 public:
-    tree_task* next_root;
+    // A node is either a root on the forest/grabbed spine or an interior node, never both:
+    // a root's right child is always null, and an interior node is never on a spine
+    union {
+        tree_task* next_root;
+        tree_task* right_child;
+    };
     tree_task* left_child;
-    tree_task* right_child;
 
     std::size_t num_elements;
 
@@ -42,7 +46,6 @@ public:
               d1::small_object_allocator& allocator)
         : next_root(nullptr)
         , left_child(nullptr)
-        , right_child(nullptr)
         , num_elements(1)
         , wait_tree_vertex(nullptr)
         , m_ctx(ctx)
@@ -249,7 +252,7 @@ public:
             tree_task* prev_head = current_head;
 
             while (next_head && prev_head->num_elements == next_head->num_elements) {
-                prev_head->next_root = nullptr;
+                // Shares a slot with next_root, so this write also unlinks prev_head from the spine
                 prev_head->right_child = next_head->left_child;
                 next_head->left_child = prev_head;
                 
