@@ -41,15 +41,16 @@ users.
 
 There are three largely independent design choices:
 
-1. Whether to use standalone allocation function templates or a class template with member
+1. Whether to use (a) standalone allocation function templates or (b) a class template with member
 functions.
 
-2. How to get the size of the allocated object during deallocation. That could be left entirely
-to the user, or represented by `std::span<T>` or `std::unique_ptr<T[]>` with a custom deleter.
+2. How to get the size of the allocated object during deallocation. That could be (a) left entirely
+to the user, or represented by (b) `std::span<T>` or (c) `std::unique_ptr<T[]>` with a custom
+deleter.
 
-3. Whether to return uninitialized memory or to construct and destroy objects in it. The latter
-requires passing constructor arguments to the allocation functions. Note that interleaved memory is
-always filled with zeroes, which suits static arrays of fundamental types.
+3. Whether (a) to return uninitialized memory or (b) to construct and destroy objects in it. The
+latter requires passing constructor arguments to the allocation functions. Note that interleaved
+memory is always filled with zeroes, which suits static arrays of fundamental types.
 
 A class template with member functions is a natural place to store state shared across allocations.
 There is currently no such state, but future extensions to the interface may require it. A class
