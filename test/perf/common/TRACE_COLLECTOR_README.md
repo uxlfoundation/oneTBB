@@ -2,11 +2,11 @@
 
 `trace_collector.h` records timed events from a running program and writes them to a JSON file in the [Trace Event Format](https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU). That format can be opened in [Perfetto](https://ui.perfetto.dev) and in Chrome's `chrome://tracing`, which show each event as a bar on a timeline.
 
-The header has no dependencies beyond the C++ standard library, so it can be used in any application, not just the benchmarks in this directory. This guide shows how to add it to a new one.
+The header's lazy mode keeps a buffer per thread in a oneTBB `enumerable_thread_specific`, so a program that uses the header needs the oneTBB headers and must link the oneTBB library (`TBB::tbb` in CMake). Beyond that it can be used in any application, not just the benchmarks in this directory. This guide shows how to add it to a new one.
 
 ## Quick start
 
-Add `test/perf/common` to the include path and include the header:
+Add `test/perf/common` and the oneTBB headers to the include path, link oneTBB, and include the header:
 
 ```cpp
 #include "trace_collector.h"
@@ -78,8 +78,10 @@ The fourth constructor argument selects when events reach the file:
 
 | Mode | Behaviour | Choose it when |
 |---|---|---|
-| `TraceCollector::WriteMode::LAZY` (default) | Events are kept in memory and written, sorted by time, when the collector is destroyed or `flush()` is called. | You want the lowest overhead while the program runs. Memory grows with the number of events. |
+| `TraceCollector::WriteMode::LAZY` (default) | Each thread keeps its events in a buffer of its own, so recording takes no lock. When the collector is destroyed or `flush()` is called, the buffers are written one after another, each thread's events in the order that thread recorded them. The buffers belong to the collector, so events from threads that have since exited are still written. | You want the lowest overhead while the program runs. Memory grows with the number of events. |
 | `TraceCollector::WriteMode::EAGER` | Each event is written and flushed to the file as soon as it is recorded. | The program may crash or hang and you want the events up to that point. Each event costs a file write. |
+
+Neither mode sorts the file by time. A lazy file holds each thread's events in turn, and in both modes a complete event (`"X"`) is recorded when it ends but carries its start time. The Trace Event Format allows events in any order, and Perfetto and `chrome://tracing` sort them when they load the file.
 
 In eager mode, a program that dies before the collector is destroyed leaves a file missing only its closing `]`. The Trace Event Format allows that, so the file can still be loaded.
 
@@ -90,7 +92,7 @@ In lazy mode nothing is written until the collector is destroyed or `flush()` is
 - **Destroy the collector normally.** Give it a scope that ends before the program exits, or own it with a `std::unique_ptr` that is reset.
 - **`std::exit` skips the destructors of local objects.** If the program can exit that way, call `flush()` first, or register it with `std::atexit` through a global pointer to the collector.
 - **`flush()` finishes the file.** It writes everything recorded so far, once. Events recorded after it are not written, so call it only when tracing is over.
-- **Signals.** `workflow_runner.cpp` calls `flush()` from its `SIGTERM`/`SIGINT` handler so an interrupted lazy run still produces a trace. That is best effort: `flush()` allocates memory and takes a lock, which is not safe in a signal handler in general.
+- **Signals.** `workflow_runner.cpp` calls `flush()` from its `SIGTERM`/`SIGINT` handler so an interrupted lazy run still produces a trace. `flush()` can run while other threads are still recording: it writes the events each thread had finished recording when it started. It is still best effort: `flush()` allocates memory, writes a file, and takes a lock that serialises it with other `flush()` calls and the destructor, none of which is safe in a signal handler in general.
 
 The output file is created, or overwritten, at the path given to the constructor. A relative path is relative to the current directory.
 
@@ -127,4 +129,4 @@ To compile tracing out entirely, put the tracing code under a preprocessor switc
 - **No event arguments.** Events carry only a name, track, time and duration; the format's `args` field is not supported, nor are counter or flow events. To attach data to an event, put it in the name, for example `"config:threads=8:inputs=600"`.
 - **One process name and one category** per file. Tracks can be named; the process is shown by its number.
 - **Microsecond resolution.** Timestamps and durations are whole microseconds, so anything shorter than 1 µs has a duration of 0.
-- **Every call takes a lock.** All methods are safe to call from any thread, but they serialise on one mutex. With many short events from many threads, the tracing itself can affect what you are measuring.
+- **Eager mode takes a lock on every call.** All methods are safe to call from any thread. In eager mode they serialise on one mutex and each one writes to the file, so with many short events from many threads, the tracing itself can affect what you are measuring. Lazy mode records without a lock, but copying an event's name can still allocate memory.

@@ -17,16 +17,26 @@
 #ifndef TRACE_COLLECTOR_H
 #define TRACE_COLLECTOR_H
 
+#include <oneapi/tbb/cache_aligned_allocator.h>
+#include <oneapi/tbb/enumerable_thread_specific.h>
+
+#include <algorithm>
+#include <atomic>
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
 #include <fstream>
 #include <mutex>
-#include <algorithm>
+#include <ostream>
 #include <string>
-#include <vector>
 #include <utility>
-#include <cstdio>
+#include <vector>
 
 // Trace collection helper class
+//
+// In lazy mode each thread appends to its own buffer and recording takes no lock.
+// In eager mode every event is written to the file as it is recorded, under a mutex.
 class TraceCollector {
 public:
     enum class WriteMode {
@@ -37,34 +47,163 @@ public:
 private:
     struct trace_event {
         std::string name;
-        std::string phase;  // "B", "E", or "X"
-        int tid;
-        int64_t ts;  // microseconds from start
-        int64_t dur;  // duration in microseconds (only for "X" phase)
+        int64_t ts = 0;    // microseconds from start
+        int64_t dur = 0;   // duration in microseconds (only for 'X')
+        int tid = 0;
+        char phase = 0;    // 'B', 'E', 'X', 'i', or 'M' (a thread name)
+    };
+
+    // Lazy mode: one thread's events, as a list of fixed-size chunks.
+    struct event_chunk {
+        static constexpr std::size_t capacity = 1024;
+        trace_event events[capacity];
+        event_chunk* next = nullptr;
+    };
+
+    struct thread_buffer {
+        event_chunk* head = nullptr;            // set before the buffer is registered
+        event_chunk* tail = nullptr;            // owner thread only
+        std::size_t tail_used = 0;              // owner thread only
+        std::atomic<std::size_t> published{0};  // events completely written
+        thread_buffer* next_registered = nullptr;
+
+        thread_buffer() = default;
+        thread_buffer(const thread_buffer&) = delete;
+        thread_buffer& operator=(const thread_buffer&) = delete;
+
+        ~thread_buffer() {
+            while (head) {
+                event_chunk* next = head->next;
+                delete head;
+                head = next;
+            }
+        }
     };
 
     WriteMode write_mode;
     std::string filename;
     int pid;
     std::string category;
-    std::vector<trace_event> events;  // Only used in lazy mode
-    std::vector<std::pair<int, std::string>> thread_names;
-    std::mutex mtx;
+
+    // Lazy mode members.
+    oneapi::tbb::enumerable_thread_specific<
+        thread_buffer,
+        oneapi::tbb::cache_aligned_allocator<thread_buffer>,
+        oneapi::tbb::ets_key_per_instance> buffers;
+    std::atomic<thread_buffer*> registered{nullptr};
+    std::mutex flush_mtx;  // serialises flush() and the destructor; never held while recording
+    bool lazy_written;     // guarded by flush_mtx
 
     // Eager mode members
+    std::mutex mtx;
     std::ofstream trace_file;
     bool file_opened;
     bool first_event;  // Track if we need comma before next event
-    bool lazy_written;  // Track if lazy trace already written
 
 public:
     std::chrono::time_point<std::chrono::steady_clock> start_time;
 
 private:
+    int64_t now_us() const {
+        return std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now() - start_time).count();
+    }
 
-    // Write all events in lazy mode (called by destructor)
-    void write_lazy_trace() {
+    // Write one event as a JSON object, without a separator.
+    void write_entry(std::ostream& out, char phase, const std::string& name,
+                     int tid, int64_t ts, int64_t dur) const {
+        if (phase == 'M') {
+            out << "  {\"name\": \"thread_name\", \"ph\": \"M\", \"pid\": " << pid
+                << ", \"tid\": " << tid
+                << ", \"args\": {\"name\": \"" << name << "\"}}";
+            return;
+        }
+        out << "  {\"name\": \"" << name << "\""
+            << ", \"cat\": \"" << category << "\""
+            << ", \"ph\": \"" << phase << "\""
+            << ", \"ts\": " << ts;
+        if (phase == 'i') {
+            out << ", \"s\": \"g\"";  // Scope: global (required for instant events)
+        }
+        out << ", \"pid\": " << pid
+            << ", \"tid\": " << tid;
+        if (phase == 'X') {
+            out << ", \"dur\": " << dur;
+        }
+        out << "}";
+    }
+
+    // The calling thread's buffer, registered the first time the thread records.
+    thread_buffer& local_buffer() {
+        bool exists = false;
+        thread_buffer& b = buffers.local(exists);
+        if (!exists) {
+            b.head = b.tail = new event_chunk;
+            thread_buffer* h = registered.load(std::memory_order_relaxed);
+            do {
+                b.next_registered = h;
+            } while (!registered.compare_exchange_weak(h, &b, std::memory_order_release,
+                                                       std::memory_order_relaxed));
+        }
+        return b;
+    }
+
+    // Lazy mode: append to the calling thread's buffer. No lock.
+    void append(char phase, const std::string& name, int tid, int64_t ts, int64_t dur) {
+        thread_buffer& b = local_buffer();
+        if (b.tail_used == event_chunk::capacity) {
+            event_chunk* c = new event_chunk;
+            b.tail->next = c;
+            b.tail = c;
+            b.tail_used = 0;
+        }
+        trace_event& e = b.tail->events[b.tail_used++];
+        e.name = name;
+        e.ts = ts;
+        e.dur = dur;
+        e.tid = tid;
+        e.phase = phase;
+        b.published.store(b.published.load(std::memory_order_relaxed) + 1,
+                          std::memory_order_release);
+    }
+
+    void record(char phase, const std::string& name, int tid, int64_t ts, int64_t dur) {
+        if (write_mode == WriteMode::LAZY) {
+            append(phase, name, tid, ts, dur);
+            return;
+        }
         std::lock_guard<std::mutex> lock(mtx);
+        if (!file_opened) {
+            return;
+        }
+        if (!first_event) {
+            trace_file << ",\n";
+        }
+        first_event = false;
+        write_entry(trace_file, phase, name, tid, ts, dur);
+        trace_file.flush();  // Ensure immediate write to disk
+    }
+
+    // Calls f on each of the first n events of b, in the order they were recorded.
+    template <typename F>
+    static void for_each_event(const thread_buffer& b, std::size_t n, F f) {
+        for (const event_chunk* c = b.head; n > 0; ) {
+            const std::size_t k = n < event_chunk::capacity ? n : event_chunk::capacity;
+            for (std::size_t i = 0; i < k; ++i) {
+                f(c->events[i]);
+            }
+            n -= k;
+            if (n > 0) {
+                c = c->next;  // only read when an event in the next chunk is published
+            }
+        }
+    }
+
+    // Write all events in lazy mode (called by flush() and the destructor). Other
+    // threads may still be recording: what they had published when this started is
+    // written, and anything later is not.
+    void write_lazy_trace() {
+        std::lock_guard<std::mutex> lock(flush_mtx);
 
         // Safe to call multiple times (e.g., signal + destructor)
         if (lazy_written) {
@@ -72,43 +211,36 @@ private:
         }
         lazy_written = true;
 
-        std::sort(events.begin(), events.end(),
-            [](const trace_event& a, const trace_event& b) { return a.ts < b.ts; });
+        // Take each buffer's count once, so both passes below write the same events.
+        // The list is newest first; write threads in the order they first recorded.
+        std::vector<std::pair<const thread_buffer*, std::size_t>> snapshot;
+        for (const thread_buffer* b = registered.load(std::memory_order_acquire); b;
+             b = b->next_registered) {
+            snapshot.emplace_back(b, b->published.load(std::memory_order_acquire));
+        }
+        std::reverse(snapshot.begin(), snapshot.end());
 
-        // Write JSON Array Format
+        // Write JSON Array Format: thread names first, then each thread's events.
         std::ofstream out_file(filename);
         out_file << "[\n";
-
-        // Add thread name metadata events
-        for (size_t i = 0; i < thread_names.size(); ++i) {
-            int tid = thread_names[i].first;
-            const std::string& name = thread_names[i].second;
-            out_file << "  {\"name\": \"thread_name\", \"ph\": \"M\", \"pid\": " << pid
-                     << ", \"tid\": " << tid
-                     << ", \"args\": {\"name\": \"" << name << "\"}}";
-            if (i < thread_names.size() - 1 || !events.empty()) {
-                out_file << ",";
+        bool first = true;
+        auto write_if = [&](bool metadata) {
+            for (const auto& [b, n] : snapshot) {
+                for_each_event(*b, n, [&](const trace_event& e) {
+                    if ((e.phase == 'M') != metadata) {
+                        return;
+                    }
+                    if (!first) {
+                        out_file << ",\n";
+                    }
+                    first = false;
+                    write_entry(out_file, e.phase, e.name, e.tid, e.ts, e.dur);
+                });
             }
-            out_file << "\n";
-        }
-
-        // Write trace events
-        for (size_t i = 0; i < events.size(); ++i) {
-            const auto& e = events[i];
-            out_file << "  {\"name\": \"" << e.name << "\""
-                     << ", \"cat\": \"" << category << "\""
-                     << ", \"ph\": \"" << e.phase << "\""
-                     << ", \"ts\": " << e.ts;
-            if (e.phase == "i") {
-                out_file << ", \"s\": \"g\"";  // Scope: global for instant events
-            }
-            out_file << ", \"pid\": " << pid
-                     << ", \"tid\": " << e.tid;
-            if (e.phase == "X") {
-                out_file << ", \"dur\": " << e.dur;
-            }
-            out_file << "}";
-            if (i < events.size() - 1) out_file << ",";
+        };
+        write_if(true);
+        write_if(false);
+        if (!first) {
             out_file << "\n";
         }
         out_file << "]\n";
@@ -125,9 +257,9 @@ public:
         , filename(fname)
         , pid(pid_val)
         , category(cat)
+        , lazy_written(false)
         , file_opened(false)
         , first_event(true)
-        , lazy_written(false)
         , start_time(std::chrono::steady_clock::now())
     {
         if (write_mode == WriteMode::EAGER) {
@@ -139,8 +271,8 @@ public:
 
     ~TraceCollector() {
         if (write_mode == WriteMode::EAGER) {
+            std::lock_guard<std::mutex> lock(mtx);
             if (file_opened) {
-                std::lock_guard<std::mutex> lock(mtx);
                 trace_file << "\n]\n";
                 trace_file.close();
                 std::printf("Eager trace written to %s\n", filename.c_str());
@@ -161,111 +293,22 @@ public:
     }
 
     void add_thread_name(int tid, const std::string& name) {
-        std::lock_guard<std::mutex> lock(mtx);
-
-        if (write_mode == WriteMode::EAGER && file_opened) {
-            // Write immediately in eager mode
-            if (!first_event) trace_file << ",\n";
-            trace_file << "  {\"name\": \"thread_name\", \"ph\": \"M\", "
-                       << "\"pid\": " << pid
-                       << ", \"tid\": " << tid
-                       << ", \"args\": {\"name\": \"" << name << "\"}}";
-            trace_file.flush();
-            first_event = false;
-        } else {
-            // Buffer for lazy mode
-            thread_names.emplace_back(tid, name);
-        }
+        record('M', name, tid, 0, 0);
     }
-
 
     // Record a BEGIN or END event
     void record_event(const std::string& name, const std::string& phase, int tid) {
-        auto now = std::chrono::steady_clock::now();
-        auto ts_us = std::chrono::duration_cast<std::chrono::microseconds>(now - start_time).count();
-
-        std::lock_guard<std::mutex> lock(mtx);
-
-        if (write_mode == WriteMode::LAZY) {
-            // Lazy mode: buffer in memory
-            events.push_back({name, phase, tid, ts_us, 0});
-        } else {
-            // Eager mode: write immediately
-            if (file_opened) {
-                if (!first_event) {
-                    trace_file << ",\n";
-                } else {
-                    first_event = false;
-                }
-                trace_file << "  {\"name\": \"" << name << "\""
-                           << ", \"cat\": \"" << category << "\""
-                           << ", \"ph\": \"" << phase << "\""
-                           << ", \"ts\": " << ts_us
-                           << ", \"pid\": " << pid
-                           << ", \"tid\": " << tid
-                           << "}";
-                trace_file.flush();  // Ensure immediate write to disk
-            }
-        }
+        record(phase.empty() ? '?' : phase[0], name, tid, now_us(), 0);
     }
 
     // Record a DURATION event (single event with start time and duration)
     void record_duration_event(const std::string& name, int tid, int64_t ts_us, int64_t dur_us) {
-        std::lock_guard<std::mutex> lock(mtx);
-
-        if (write_mode == WriteMode::LAZY) {
-            // Lazy mode: buffer in memory
-            events.push_back({name, "X", tid, ts_us, dur_us});
-        } else {
-            // Eager mode: write immediately
-            if (file_opened) {
-                if (!first_event) {
-                    trace_file << ",\n";
-                } else {
-                    first_event = false;
-                }
-                trace_file << "  {\"name\": \"" << name << "\""
-                           << ", \"cat\": \"" << category << "\""
-                           << ", \"ph\": \"X\""
-                           << ", \"ts\": " << ts_us
-                           << ", \"dur\": " << dur_us
-                           << ", \"pid\": " << pid
-                           << ", \"tid\": " << tid
-                           << "}";
-                trace_file.flush();  // Ensure immediate write to disk
-            }
-        }
+        record('X', name, tid, ts_us, dur_us);
     }
 
     // Record an INSTANT event (phase "i")
     void record_instant_event(const std::string& name, int tid) {
-        auto now = std::chrono::steady_clock::now();
-        auto ts_us = std::chrono::duration_cast<std::chrono::microseconds>(now - start_time).count();
-
-        std::lock_guard<std::mutex> lock(mtx);
-
-        if (write_mode == WriteMode::LAZY) {
-            // Lazy mode: buffer in memory (duration field unused for instant events)
-            events.push_back({name, "i", tid, ts_us, 0});
-        } else {
-            // Eager mode: write immediately
-            if (file_opened) {
-                if (!first_event) {
-                    trace_file << ",\n";
-                } else {
-                    first_event = false;
-                }
-                trace_file << "  {\"name\": \"" << name << "\""
-                           << ", \"cat\": \"" << category << "\""
-                           << ", \"ph\": \"i\""
-                           << ", \"ts\": " << ts_us
-                           << ", \"s\": \"g\""  // Scope: global (required for instant events)
-                           << ", \"pid\": " << pid
-                           << ", \"tid\": " << tid
-                           << "}";
-                trace_file.flush();
-            }
-        }
+        record('i', name, tid, now_us(), 0);
     }
 };
 
