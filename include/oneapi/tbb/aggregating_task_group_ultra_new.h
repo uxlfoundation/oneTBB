@@ -211,7 +211,13 @@ class task_forest {
         return reinterpret_cast<tree_task*>(locked_flag_value);
     }
 
+    tree_task* wait_while_locked() {
+        return spin_wait_while_eq(m_head, locked_flag());
+    }
+
     tree_task* lock() {
+#ifdef GRAB_ALL
+        // Half-grabbing locks from the grabber side too, so the owner may have to wait
         atomic_backoff backoff;
         tree_task* current_head = locked_flag();
 
@@ -222,6 +228,12 @@ class task_forest {
         }
         __TBB_ASSERT(current_head != locked_flag(), "Forest was not locked");
         return current_head;
+#else
+        // Only the owner thread locks, so this can never find the forest already locked
+        tree_task* current_head = m_head.exchange(locked_flag());
+        __TBB_ASSERT(current_head != locked_flag(), "The forest is already locked by the owner thread");
+        return current_head;
+#endif
     }
 
     void unlock(tree_task* head) {
@@ -244,7 +256,9 @@ public:
         tree_task* next_head = lock();
         // The carry loop below walks next_head along the spine, so the decision has to be taken now
         const bool forest_was_empty = next_head == nullptr;
-        ++m_num_elements;
+#ifdef GRAB_ALL
+        ++m_num_elements; // only the half-grab path needs the count, and it is the only writer under the lock
+#endif
         tree_task* current_head = new_task;
         new_task->next_root = next_head;
 
@@ -328,12 +342,21 @@ public:
         return new_head;
     }
 
-    // Used by the producer on wait(): nothing is left behind, so no successor is needed
+    // Used by the producer on wait(): nothing is left behind, so no successor is needed.
+    // Swaps the head out rather than locking, which is what keeps the owner's lock wait-free
     tree_task* grab_all() {
-        tree_task* head = lock();
+        tree_task* current_head = wait_while_locked();
+
+        // The CAS can lose either to the owner locking the forest or to the other caller:
+        // the grabber and the self-grab in wait() race by design
+        while (!m_head.compare_exchange_strong(current_head, nullptr)) {
+            current_head = wait_while_locked();
+        }
+        __TBB_ASSERT(current_head != locked_flag(), "Incorrect grab_all");
+#ifdef GRAB_ALL
         m_num_elements = 0;
-        unlock(nullptr);
-        return head;
+#endif
+        return current_head;
     }
 };
 
