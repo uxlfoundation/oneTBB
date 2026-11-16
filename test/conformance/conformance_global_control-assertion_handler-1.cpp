@@ -35,7 +35,7 @@ constexpr char test_name[] =
 TEST_CASE(test_name) {
     global_control_terminate_on_exception(TestCase::CUSTOM_ASSERTION_HANDLER, Workload::USER_EXCEPTION);
 }
-#else // (!_MSC_VER || (defined(_DLL) && !defined(_DEBUG))) && !EMSCRIPTEN
+#else // TBB_USE_EXCEPTIONS && (!_MSC_VER || (defined(_DLL) && !defined(_DEBUG))) && !EMSCRIPTEN
 //! Test terminate_on_exception: skip in this configuration
 //! \brief \ref interface \ref requirement
 TEST_CASE(test_name * doctest::skip()) {}
