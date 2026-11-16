@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -48,26 +49,6 @@ _ZN3rml13pool_identifyEPv;
 _ZN3rml10pool_msizeEPNS_10MemoryPoolEPv;
 
 local:
-
-/* TBB symbols */
-*3rml*;
-*3tbb*;
-*__TBB*;
-__itt_*;
-ITT_DoOneTimeInitialization;
-TBB_runtime_interface_version;
-
-/* Intel Compiler (libirc) symbols */
-__intel_*;
-_intel_*;
-get_memcpy_largest_cachelinesize;
-get_memcpy_largest_cache_size;
-get_mem_ops_method;
-init_mem_ops_method;
-irc__get_msg;
-irc__print;
-override_mem_ops_method;
-set_memcpy_largest_cachelinesize;
-set_memcpy_largest_cache_size;
+*;
 
 };
