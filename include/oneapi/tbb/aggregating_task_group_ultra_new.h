@@ -239,11 +239,13 @@ public:
 
         // Lock the forest to prevent races with grabbers
         tree_task* next_head = lock();
+        // The carry loop below walks next_head along the spine, so the decision has to be taken now
+        const bool forest_was_empty = next_head == nullptr;
         ++m_num_elements;
         tree_task* current_head = new_task;
         new_task->next_root = next_head;
 
-        if (next_head != nullptr) {
+        if (!forest_was_empty) {
             tree_task* prev_head = current_head;
 
             while (next_head && prev_head->num_elements == next_head->num_elements) {
@@ -261,7 +263,7 @@ public:
 
         unlock(current_head);
 
-        if (next_head == nullptr) {
+        if (forest_was_empty) {
             grab_task* grabber = alloc.new_object<grab_task>(this, r1::get_thread_reference_vertex(&wait_vertex),
                                                              &wait_vertex, ctx, alloc);
             r1::spawn(*grabber, ctx);
