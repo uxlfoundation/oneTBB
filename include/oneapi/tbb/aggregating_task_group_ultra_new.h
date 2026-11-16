@@ -339,10 +339,10 @@ inline d1::task* grab_task::execute(d1::execution_data& ed) {
     __TBB_ASSERT(ed.context == &m_ctx, nullptr);
     d1::task* next_task = nullptr;
 
-#if GRAB_ALL
+#ifdef GRAB_ALL
     tree_task* grabbed_tree = m_target->grab(m_tg_wait_context_vertex, m_ctx);
 #else
-    tree_task* grabbed_tree = m_target->grab();
+    tree_task* grabbed_tree = m_target->grab_all();
 #endif
 
     if (grabbed_tree != nullptr) {
