@@ -140,6 +140,10 @@ public:
 
     static bool hybrid_cpu() { return cpu_features.hybrid; }
 
+    static std::chrono::microseconds default_retention_duration() { return cpu_features.default_retention_duration; }
+
+    static std::chrono::microseconds extra_retention_duration() { return cpu_features.extra_retention_duration; }
+
     static bool rethrow_exception_broken() { return is_rethrow_broken; }
 
     static bool is_itt_present() {

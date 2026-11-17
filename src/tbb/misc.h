@@ -32,6 +32,7 @@
 #endif
 
 #include <atomic>
+#include <chrono>
 
 // Does the operating system have a system call to pin a thread to a set of OS processors?
 #define __TBB_OS_AFFINITY_SYSCALL_PRESENT ((__linux__ && !__ANDROID__) || (__FreeBSD_version >= 701000))
@@ -216,6 +217,8 @@ struct cpu_features_type {
     bool rtm_enabled{false};
     bool waitpkg_enabled{false};
     bool hybrid{false};
+    std::chrono::microseconds default_retention_duration{0};
+    std::chrono::microseconds extra_retention_duration{0};
 };
 
 void detect_cpu_features(cpu_features_type& cpu_features);

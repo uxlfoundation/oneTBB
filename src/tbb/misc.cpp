@@ -151,6 +151,14 @@ void detect_cpu_features(cpu_features_type& cpu_features) {
         cpu_features.hybrid = (nperflevels > 1);
     }
 #endif
+
+    if (cpu_features.hybrid) {
+        cpu_features.default_retention_duration = std::chrono::microseconds{0};
+        cpu_features.extra_retention_duration   = std::chrono::microseconds{1000};
+    } else {
+        cpu_features.default_retention_duration = std::chrono::microseconds{1000};
+        cpu_features.extra_retention_duration   = std::chrono::microseconds{10000};
+    }
 }
 
 //------------------------------------------------------------------------
