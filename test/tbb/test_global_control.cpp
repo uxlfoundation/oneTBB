@@ -321,7 +321,7 @@ TEST_CASE("Assertion handler compatibility API") {
     CHECK_MESSAGE(&tbb::set_assertion_handler == &tbb::ext::set_assertion_handler, "Incorrect compat set_assertion_handler");
 }
 
-constexpr size_t automaic_leave = static_cast<std::size_t>(tbb::task_arena::leave_policy::automatic);
+constexpr size_t automatic_leave = static_cast<std::size_t>(tbb::task_arena::leave_policy::automatic);
 constexpr size_t fast_leave = static_cast<std::size_t>(tbb::task_arena::leave_policy::fast);
 
 const struct GlobalControlState {
@@ -341,12 +341,12 @@ const struct GlobalControlState {
         1, 1, 1, 1, 1},
     {tbb::global_control::leave_policy,
         // input values for leave_policy
-        automaic_leave, automaic_leave, automaic_leave, fast_leave, automaic_leave,
+        automatic_leave, automatic_leave, automatic_leave, fast_leave, automatic_leave,
         // expected output values for leave_policy
-        automaic_leave, fast_leave, automaic_leave, automaic_leave, automaic_leave},
+        automatic_leave, fast_leave, automatic_leave, automatic_leave, automatic_leave},
     {tbb::global_control::leave_policy,
         // input values for leave_policy
-        automaic_leave, automaic_leave, fast_leave, fast_leave, automaic_leave,
+        automatic_leave, automatic_leave, fast_leave, fast_leave, automatic_leave,
         // expected output values for leave_policy
         fast_leave, fast_leave, fast_leave, fast_leave, fast_leave}
 };
@@ -364,12 +364,12 @@ TEST_CASE("Removing global control updates active value") {
 
         REQUIRE(tbb::global_control::active_value(c.name) == c.out1);
         {
-            tbb::global_control gc4(c.name, c.in4);
+            tbb::global_control gc3(c.name, c.in4);
             REQUIRE(tbb::global_control::active_value(c.name) == c.out2);
         }
         REQUIRE(tbb::global_control::active_value(c.name) == c.out3);
         {
-            tbb::global_control gc5(c.name, c.in5);
+            tbb::global_control gc4(c.name, c.in5);
             REQUIRE(tbb::global_control::active_value(c.name) == c.out4);
         }
         REQUIRE(tbb::global_control::active_value(c.name) == c.out5);
