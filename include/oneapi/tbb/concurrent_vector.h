@@ -868,8 +868,7 @@ private:
         while (old_size < new_size && !this->my_size.compare_exchange_weak(old_size, new_size))
         {}
 
-        int delta = static_cast<int>(new_size) - static_cast<int>(old_size);
-        if (delta > 0) {
+        if (old_size < new_size) {
             return internal_grow(old_size, new_size, args...);
         }
 
