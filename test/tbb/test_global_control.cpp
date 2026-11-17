@@ -321,8 +321,8 @@ TEST_CASE("Assertion handler compatibility API") {
     CHECK_MESSAGE(&tbb::set_assertion_handler == &tbb::ext::set_assertion_handler, "Incorrect compat set_assertion_handler");
 }
 
-constexpr size_t automaic_leave = size_t(tbb::task_arena::leave_policy::automatic);
-constexpr size_t fast_leave = size_t(tbb::task_arena::leave_policy::fast);
+constexpr size_t automaic_leave = static_cast<std::size_t>(tbb::task_arena::leave_policy::automatic);
+constexpr size_t fast_leave = static_cast<std::size_t>(tbb::task_arena::leave_policy::fast);
 
 const struct GlobalControlState {
     tbb::global_control::parameter name;
