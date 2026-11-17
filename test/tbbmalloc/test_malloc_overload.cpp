@@ -61,6 +61,9 @@
  // later Android doesn't have valloc or dlmalloc_usable_size
 #define __TBB_VALLOC_PRESENT (__unix__ && __ANDROID_API__<21) || __APPLE__
 #define __TBB_DLMALLOC_USABLE_SIZE_PRESENT  __ANDROID__ && __ANDROID_API__<21
+#if __unix__ && (!defined(__ANDROID_API__) || __ANDROID_API__ >= 26)
+#define __TBB_MALLOPT_PRESENT 1
+#endif
 
 #include "common/utils.h"
 #include "common/utils_report.h"
@@ -397,9 +400,9 @@ void FuncReplacementInfoCheck() {
 //! Testing tbbmalloc_proxy overload capabilities
 //! \brief \ref error_guessing
 TEST_CASE("Main set of tests") {
-#if __unix__
+#if __TBB_MALLOPT_PRESENT
     REQUIRE(mallopt(0, 0)); // add dummy mallopt call for coverage
-#endif // __unix__
+#endif // __TBB_MALLOPT_PRESENT
 
     void *ptr = nullptr;
     utils::suppress_unused_warning(ptr); // for android
