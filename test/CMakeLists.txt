@@ -604,8 +604,15 @@ if (TARGET TBB::tbb)
         target_compile_definitions(test_tbb_shutdown PRIVATE
             __TBB_BUILD
             __TBB_SOURCE_DIRECTLY_INCLUDED=1
+            __TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION=1
             "TEST_TBB_SHUTDOWN_LIBRARY=\"$<TARGET_FILE_NAME:_test_tbb_shutdown>\"")
+        target_compile_options(test_tbb_shutdown PRIVATE ${TBB_WARNING_SUPPRESS} ${TBB_LIB_COMPILE_FLAGS})
         target_link_libraries(test_tbb_shutdown PRIVATE ${TBB_LIB_LINK_LIBS})
+        if (COMMAND target_link_options)
+            target_link_options(test_tbb_shutdown PRIVATE ${TBB_LIB_LINK_FLAGS})
+        else()
+            target_link_libraries(test_tbb_shutdown PRIVATE ${TBB_LIB_LINK_FLAGS})
+        endif()
         set_target_properties(test_tbb_shutdown PROPERTIES
             BUILD_RPATH_USE_ORIGIN TRUE
             BUILD_RPATH "$ORIGIN")
