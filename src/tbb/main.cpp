@@ -149,7 +149,7 @@ extern "C" bool WINAPI DllMain( HANDLE /*hinstDLL*/, DWORD reason, LPVOID lpvRes
             __TBB_InitOnce::add_ref();
             // TODO: loading libraries inside DllMain is not recommended because of potential issues with loader lock.
             // Consider moving it out of DllMain.
-            tcm_adaptor::initialize();
+            __TBB_LOAD_EARLY_LIBRARIES();
             break;
         case DLL_PROCESS_DETACH:
             // Since THREAD_DETACH is not called for the main thread, call auto-termination
