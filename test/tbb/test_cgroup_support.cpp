@@ -272,8 +272,8 @@ TEST_CASE("cgroup v1 path finds correct CPU limitation") {
 
 #else
 
-//! Test cgroup support on non-Linux systems
+//! Test is skipped when cgroup support is disabled at compile time
 //! \brief \ref requirement
-TEST_CASE("cgroup support is tested only on Linux" * doctest::skip()) {}
+TEST_CASE("cgroup support is tested only when __TBB_USE_CGROUPS is enabled" * doctest::skip()) {}
 
 #endif                          // __TBB_USE_CGROUPS
