@@ -321,6 +321,9 @@ TEST_CASE("Assertion handler compatibility API") {
     CHECK_MESSAGE(&tbb::set_assertion_handler == &tbb::ext::set_assertion_handler, "Incorrect compat set_assertion_handler");
 }
 
+constexpr size_t automaic_leave = size_t(tbb::task_arena::leave_policy::automatic);
+constexpr size_t fast_leave = size_t(tbb::task_arena::leave_policy::fast);
+
 const struct GlobalControlState {
     tbb::global_control::parameter name;
     size_t in1, in2, in3, in4, in5;
@@ -336,10 +339,16 @@ const struct GlobalControlState {
         0, 1, 0, 0, 0},
     {tbb::global_control::terminate_on_exception, 0, 0, 1, 1, 0,
         1, 1, 1, 1, 1},
-    {tbb::global_control::leave_policy, 0, 0, 0, 1, 0,
-        0, 1, 0, 0, 0},
-    {tbb::global_control::leave_policy, 0, 0, 1, 1, 0,
-        1, 1, 1, 1, 1}
+    {tbb::global_control::leave_policy,
+        // input values for leave_policy
+        automaic_leave, automaic_leave, automaic_leave, fast_leave, automaic_leave,
+        // expected output values for leave_policy
+        automaic_leave, fast_leave, automaic_leave, automaic_leave, automaic_leave},
+    {tbb::global_control::leave_policy,
+        // input values for leave_policy
+        automaic_leave, automaic_leave, fast_leave, fast_leave, automaic_leave,
+        // expected output values for leave_policy
+        fast_leave, fast_leave, fast_leave, fast_leave, fast_leave}
 };
 
 //! After control deletion, the active value should reflect the selection rule for the control type
