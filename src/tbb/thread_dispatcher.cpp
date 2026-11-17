@@ -54,31 +54,31 @@ thread_dispatcher_client* thread_dispatcher::create_client(arena& a) {
 }
 
 
-void thread_dispatcher::register_client(thread_dispatcher_client* client) {
+void thread_dispatcher::register_client(thread_dispatcher_client* td_client) {
     client_list_mutex_type::scoped_lock lock(my_list_mutex);
-    insert_client(*client);
+    insert_client(*td_client);
 }
 
-bool thread_dispatcher::try_unregister_client(thread_dispatcher_client* client, std::uint64_t aba_epoch, unsigned priority) {
-    __TBB_ASSERT(client, nullptr);
+bool thread_dispatcher::try_unregister_client(thread_dispatcher_client* td_client, std::uint64_t aba_epoch, unsigned priority) {
+    __TBB_ASSERT(td_client, nullptr);
     // we hold reference to the server, so market cannot be destroyed at any moment here
     __TBB_ASSERT(!is_poisoned(my_server), nullptr);
     my_list_mutex.lock();
     for (auto& it : my_client_list[priority]) {
-        if (client == &it) {
+        if (td_client == &it) {
             if (it.get_aba_epoch() == aba_epoch) {
                 // Client is alive
                 // Acquire my_references to sync with threads that just left the arena
                 // Pay attention that references should be read before workers_requested because
                 // if references is no zero some other thread might call adjust_demand and lead to
                 // a race over workers_requested
-                if (!client->references() && !client->has_request()) {
+                if (!td_client->references() && !td_client->has_request()) {
                     // Client is abandoned. Destroy it.
-                    remove_client(*client);
+                    remove_client(*td_client);
                     ++my_clients_aba_epoch;
 
                     my_list_mutex.unlock();
-                    destroy_client(client);
+                    destroy_client(td_client);
 
                     return true;
                 }
@@ -90,40 +90,40 @@ bool thread_dispatcher::try_unregister_client(thread_dispatcher_client* client, 
     return false;
 }
 
-void thread_dispatcher::destroy_client(thread_dispatcher_client* client) {
-    client->~thread_dispatcher_client();
-    cache_aligned_deallocate(client);
+void thread_dispatcher::destroy_client(thread_dispatcher_client* td_client) {
+    td_client->~thread_dispatcher_client();
+    cache_aligned_deallocate(td_client);
 }
 
 // Should be called under lock
-void thread_dispatcher::insert_client(thread_dispatcher_client& client) {
-    __TBB_ASSERT(client.priority_level() < num_priority_levels, nullptr);
-    my_client_list[client.priority_level()].push_front(client);
+void thread_dispatcher::insert_client(thread_dispatcher_client& td_client) {
+    __TBB_ASSERT(td_client.priority_level() < num_priority_levels, nullptr);
+    my_client_list[td_client.priority_level()].push_front(td_client);
 
     __TBB_ASSERT(!my_next_client || my_next_client->priority_level() < num_priority_levels, nullptr);
     my_next_client = select_next_client(my_next_client);
 }
 
 // Should be called under lock
-void thread_dispatcher::remove_client(thread_dispatcher_client& client) {
-    __TBB_ASSERT(client.priority_level() < num_priority_levels, nullptr);
-    my_client_list[client.priority_level()].remove(client);
+void thread_dispatcher::remove_client(thread_dispatcher_client& td_client) {
+    __TBB_ASSERT(td_client.priority_level() < num_priority_levels, nullptr);
+    my_client_list[td_client.priority_level()].remove(td_client);
 
-    if (my_next_client == &client) {
+    if (my_next_client == &td_client) {
         my_next_client = nullptr;
     }
     my_next_client = select_next_client(my_next_client);
 }
 
-bool thread_dispatcher::is_client_alive(thread_dispatcher_client* client) {
-    if (!client) {
+bool thread_dispatcher::is_client_alive(thread_dispatcher_client* td_client) {
+    if (!td_client) {
         return false;
     }
 
     // Still cannot access internals of the client since the object itself might be destroyed.
     for (auto& priority_list : my_client_list) {
         for (auto& c : priority_list) {
-            if (client == &c) {
+            if (td_client == &c) {
                 return true;
             }
         }
@@ -167,8 +167,8 @@ thread_dispatcher_client* thread_dispatcher::client_in_need(thread_dispatcher_cl
 bool thread_dispatcher::is_any_client_in_need() {
     client_list_mutex_type::scoped_lock lock(my_list_mutex, /*is_writer=*/false);
     for (auto& priority_list : my_client_list) {
-        for (auto& client : priority_list) {
-            if (client.is_joinable()) {
+        for (auto& td_client : priority_list) {
+            if (td_client.is_joinable()) {
                 return true;
             }
         }
@@ -188,11 +188,11 @@ void thread_dispatcher::release(bool blocking_terminate) {
 void thread_dispatcher::process(job& j) {
     thread_data& td = static_cast<thread_data&>(j);
     // td.my_last_client can be dead. Don't access it until client_in_need is called
-    thread_dispatcher_client* client = td.my_last_client;
+    thread_dispatcher_client* td_client = td.my_last_client;
     for (int i = 0; i < 2; ++i) {
-        while ((client = client_in_need(client)) ) {
-            td.my_last_client = client;
-            client->process(td);
+        while ((td_client = client_in_need(td_client)) ) {
+            td.my_last_client = td_client;
+            td_client->process(td);
         }
         // Workers leave thread_dispatcher because there is no client in need. It can happen earlier than
         // adjust_job_count_estimate() decreases my_slack and RML can put this thread to sleep.
