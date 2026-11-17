@@ -20,68 +20,66 @@
 #define __TBB_NO_IMPLICIT_LINKAGE 1
 
 #if _USRDLL
-#include "common/dummy_body.h"
 
-#include "oneapi/tbb/global_control.h"
-#include "oneapi/tbb/info.h"
-#include "oneapi/tbb/task_arena.h"
-#include "oneapi/tbb/parallel_for.h"
-#include "oneapi/tbb/tbb_allocator.h"
-
-#include <algorithm>
-#include <cstddef>
+#include <atomic>
+#include <chrono>
 #include <thread>
 
-#if _WIN32||_WIN64
-    #define TEST_EXPORT __declspec(dllexport)
-#else
-    #define TEST_EXPORT __TBB_EXPORT
-#endif
-
-extern "C" TEST_EXPORT bool run_tbb_shutdown_test() {
-    constexpr std::size_t n = 1000;
-
-    tbb::global_control gc(tbb::global_control::max_allowed_parallelism,
-                           std::max(2u, std::thread::hardware_concurrency()));
-
-    // Loads tbbmalloc
-    tbb::tbb_allocator<std::size_t> alloc;
-    std::size_t* data = alloc.allocate(n);
-    std::fill(data, data + n, 0);
-
-    // Loads tbbbind (if available)
-    auto numa_nodes = tbb::info::numa_nodes();
-    tbb::task_arena arena(tbb::task_arena::constraints{}.set_numa_id(numa_nodes.front()));
-    arena.execute([data, n] {
-        tbb::parallel_for(std::size_t(0), n, [data](std::size_t i) {
-            utils::doDummyWork(1000);
-            data[i] = i + 1;
-        });
-    });
-
-    bool correct = true;
-    for (std::size_t i = 0; i < n; ++i) {
-        correct = correct && data[i] == i + 1;
+static struct slow_global_object {
+    ~slow_global_object() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        // Crashes if the library was unmapped in the meantime
+        alive = false;
     }
-    alloc.deallocate(data, n);
-    return correct;
-}
+    std::atomic<bool> alive{true};
+} slow_global_object_instance;
 
 #else
 
 #include "common/test.h"
-#include "common/utils_dynamic_libs.h"
+
+#include "../../src/tbb/dynamic_link.h"
+
+// Load the test library at TBB startup
+#define __TBB_LOAD_EARLY_LIBRARIES() \
+    tbb::detail::r1::dynamic_link(TEST_TBB_SHUTDOWN_LIBRARY, nullptr, 0, nullptr, \
+        tbb::detail::r1::DYNAMIC_LINK_DEFAULT & ~tbb::detail::r1::DYNAMIC_LINK_BUILD_ABSOLUTE_PATH)
+
+#include "../../src/tbb/main.cpp"
+
+#include "common/spin_barrier.h"
+
+#include <chrono>
+#include <cstdlib>
+#include <thread>
+
+constexpr unsigned n_threads = 4;
+utils::SpinBarrier barrier(n_threads + 1);
 
 //! \brief \ref error_guessing
-TEST_CASE("Process exit after runtime loading TBB") {
-    utils::LIBRARY_HANDLE library = utils::OpenLibrary(TEST_TBB_SHUTDOWN_LIBRARY);
-    REQUIRE_MESSAGE(library, "Cannot find " TEST_TBB_SHUTDOWN_LIBRARY);
+TEST_CASE("Library unloading at process exit does not race with global objects destructors") {
+    using tbb::detail::r1::__TBB_InitOnce;
 
-    bool (*run)() = nullptr;
-    utils::GetAddress(library, "run_tbb_shutdown_test", run);
-    REQUIRE_MESSAGE(run(), "parallel algorithm produced incorrect results");
+    // Since the exit handler is registered after global objects are created,
+    // it will be invoked before their destruction
+    std::atexit([] { barrier.wait(); });
 
-    // The library is intentionally not closed as the test checks TBB's shutdown at process exit
+    for (unsigned i = 0; i < n_threads; ++i) {
+        std::thread([] {
+            __TBB_InitOnce::add_ref();
+            // Signal the main thread that the detached thread has started
+            barrier.wait();
+            // Wait for the exit handler to be invoked
+            barrier.wait();
+            // Let __TBB_InitOnce destructor run, but release the references while the plugin's
+            // global object is still being destroyed
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            __TBB_InitOnce::remove_ref();
+        }).detach();
+    }
+
+    // Wait for detached threads to start
+    barrier.wait();
 }
 
 #endif

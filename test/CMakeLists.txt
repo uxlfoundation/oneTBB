@@ -591,24 +591,29 @@ if (TARGET TBB::tbb)
 
     # Test for the library shutdown during process termination
     if (BUILD_SHARED_LIBS AND NOT TBB_EMSCRIPTEN)
-        tbb_add_lib_test(SUBDIR tbb NAME test_tbb_shutdown DEPENDENCIES TBB::tbb)
+        tbb_add_lib_test(SUBDIR tbb NAME test_tbb_shutdown)
         tbb_add_test(SUBDIR tbb NAME test_tbb_shutdown)
-        target_include_directories(test_tbb_shutdown PRIVATE
-            $<TARGET_PROPERTY:TBB::tbb,INTERFACE_INCLUDE_DIRECTORIES>)
+
+        # The test includes main.cpp to access __TBB_InitOnce, the rest of the library sources are linked in
+        set(_shutdown_tbb_dir ${CMAKE_CURRENT_SOURCE_DIR}/../src/tbb)
+        file(GLOB _shutdown_tbb_srcs ${_shutdown_tbb_dir}/*.cpp)
+        list(REMOVE_ITEM _shutdown_tbb_srcs ${_shutdown_tbb_dir}/main.cpp)
+
+        target_sources(test_tbb_shutdown PRIVATE ${_shutdown_tbb_srcs})
+        target_include_directories(test_tbb_shutdown PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+        target_compile_definitions(test_tbb_shutdown PRIVATE
+            __TBB_BUILD
+            __TBB_SOURCE_DIRECTLY_INCLUDED=1
+            "TEST_TBB_SHUTDOWN_LIBRARY=\"$<TARGET_FILE_NAME:_test_tbb_shutdown>\"")
+        target_link_libraries(test_tbb_shutdown PRIVATE ${TBB_LIB_LINK_LIBS})
         set_target_properties(test_tbb_shutdown PROPERTIES
             BUILD_RPATH_USE_ORIGIN TRUE
             BUILD_RPATH "$ORIGIN")
-        target_compile_definitions(test_tbb_shutdown PRIVATE
-            "TEST_TBB_SHUTDOWN_LIBRARY=\"$<TARGET_FILE_NAME:_test_tbb_shutdown>\"")
 
         add_dependencies(test_tbb_shutdown _test_tbb_shutdown)
-        # Optional libraries loaded at run-time; build them if available
-        foreach(_shutdown_dep TCM::tcm TBB::tbbmalloc TBB::tbbbind TBB::tbbbind_2_0 TBB::tbbbind_2_5)
-            if (TARGET ${_shutdown_dep})
-                add_dependencies(test_tbb_shutdown ${_shutdown_dep})
-            endif()
-        endforeach()
-        unset(_shutdown_dep)
+
+        unset(_shutdown_tbb_srcs)
+        unset(_shutdown_tbb_dir)
     endif()
 
     if ((NOT "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "mips") AND (NOT TBB_EMSCRIPTEN))

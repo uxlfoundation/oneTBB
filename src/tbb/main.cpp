@@ -69,9 +69,14 @@ extern bool ITT_Present;
 void ITT_DoUnsafeOneTimeInitialization();
 #endif
 
+// Can be redefined by whitebox tests
+#ifndef __TBB_LOAD_EARLY_LIBRARIES
+#define __TBB_LOAD_EARLY_LIBRARIES() tcm_adaptor::initialize()
+#endif
+
 struct early_library_loader {
     early_library_loader() {
-        tcm_adaptor::initialize();
+        __TBB_LOAD_EARLY_LIBRARIES();
     }
 };
 #if !(_WIN32||_WIN64) || __TBB_SOURCE_DIRECTLY_INCLUDED
