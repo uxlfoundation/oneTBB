@@ -369,7 +369,7 @@ TEST_CASE("Removing global control updates active value") {
         }
         REQUIRE(tbb::global_control::active_value(c.name) == c.out3);
         {
-            tbb::global_control gc4(c.name, c.in5);
+            tbb::global_control gc5(c.name, c.in5);
             REQUIRE(tbb::global_control::active_value(c.name) == c.out4);
         }
         REQUIRE(tbb::global_control::active_value(c.name) == c.out5);
