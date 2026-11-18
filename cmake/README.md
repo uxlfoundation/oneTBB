@@ -354,7 +354,7 @@ Variable | Description
 `TBB_VERSION`           | oneTBB version (format: `<major>.<minor>.<patch>.<tweak>`)
 `TBB_IMPORTED_TARGETS`  | All created oneTBB imported targets (not supported for builds from source code)
 
-Starting from [oneTBB 2021.1](https://github.com/uxlfoundation/oneTBB/releases/tag/v2021.1), GitHub* release TBBConfig files in the binary packages are located under `<tbb-root>/lib/cmake/TBB`.
+Starting from [oneTBB 2021.1](https://github.com/uxlfoundation/oneTBB/releases/tag/v2021.1.1), GitHub* release TBBConfig files in the binary packages are located under `<tbb-root>/lib/cmake/TBB`.
 For example, `TBB_DIR` should be set to `<tbb-root>/lib/cmake/TBB`.
 
 TBBConfig files are automatically created during the build from source code and can be installed together with the library.
