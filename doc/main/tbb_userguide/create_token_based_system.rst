@@ -59,14 +59,12 @@ pull from the ``buffer_node``.
 
      graph g;
 
-
      int src_count = 0;
-     int number_of_objects = 0;
+     int number_of_objects = 100;
      int max_objects = 3;
 
-
      input_node< big_object * > s( g, [&]( oneapi::tbb::flow_control& fc ) -> big_object* {
-         if ( src_count < M ) {
+         if ( src_count < number_of_objects ) {
            big_object* v = new big_object();
            ++src_count;
            return v;
@@ -77,11 +75,8 @@ pull from the ``buffer_node``.
      } );
      s.activate();
 
-     join_node< tuple_t, reserving > j(g);
-
-
      buffer_node< token_t > b(g);
-
+     join_node< tuple_t, reserving > j(g);
 
      function_node< tuple_t, token_t > f( g, unlimited, 
        []( const tuple_t &t ) -> token_t {
@@ -95,13 +90,14 @@ pull from the ``buffer_node``.
      make_edge( s, input_port<0>(j) );
      make_edge( b, input_port<1>(j) );
      make_edge( j, f );
-     make_edge( f, b );
 
+     // The function node reinserts the token_t back into buffer upon 
+     // completion, completing the cycle.
+     make_edge( f, b );
 
      b.try_put( 1 );
      b.try_put( 2 );
      b.try_put( 3 );
-
 
      g.wait_for_all();
 
