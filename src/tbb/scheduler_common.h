@@ -595,8 +595,8 @@ public:
                                 context_guard_helper<ITTPossible>& ctxguard,
                                 isolation_type isolation, bool outermost, bool criticality_absence);
 
-    template <bool ITTPossible, typename Waiter>
-    d1::task* local_wait_for_all(d1::task * t, Waiter& waiter);
+    template <bool ITTPossible, bool Isolated, typename Waiter>
+    d1::task* local_wait_for_all(d1::task* t, Waiter& waiter);
 
     task_dispatcher(const task_dispatcher&) = delete;
 
