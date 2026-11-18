@@ -774,7 +774,6 @@ TEST_CASE("container_range concept for concurrent_vector ranges") {
 }
 #endif // __TBB_CPP20_CONCEPTS_PRESENT
 
-#if TBB_USE_EXCEPTIONS
 // There was a bug in concurrent_vector that was reproduced when resize marked
 // segment (that owned by my_first_block) as deleted and
 // on segment allocation thread is stuck waiting this segment to be published by other thread that allocated first block.
@@ -814,6 +813,8 @@ TEST_CASE("testing resize on sequantual mode") {
     v.clear();
     CHECK(v.size() == 0);
 }
+
+#if TBB_USE_EXCEPTIONS
 
 static bool block_table = false;
 static bool table_entered = false;
