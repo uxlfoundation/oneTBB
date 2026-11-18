@@ -1,6 +1,6 @@
 /*
     Copyright (c) 2020-2025 Intel Corporation
-    Copyright (c) 2025 UXL Foundation Contributors
+    Copyright (c) 2025-2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -111,10 +111,7 @@ class wait_context {
     std::uint64_t m_version_and_traits{1};
     std::atomic<std::uint64_t> m_ref_count{};
 
-    void add_reference(std::int64_t delta) {
-        call_itt_task_notify(releasing, this);
-        std::uint64_t r = m_ref_count.fetch_add(static_cast<std::uint64_t>(delta)) + static_cast<std::uint64_t>(delta);
-
+    void notify_if_done(std::uint64_t r) {
         __TBB_ASSERT_EX((r & overflow_mask) == 0, "Overflow is detected");
 
         if (!r) {
@@ -148,11 +145,13 @@ public:
     }
 
     void reserve(std::uint32_t delta = 1) {
-        add_reference(delta);
+        call_itt_task_notify(releasing, this);
+        notify_if_done(m_ref_count.fetch_add(delta) + delta);
     }
 
     void release(std::uint32_t delta = 1) {
-        add_reference(-std::int64_t(delta));
+        call_itt_task_notify(releasing, this);
+        notify_if_done(m_ref_count.fetch_sub(delta) - delta);
     }
 };
 
