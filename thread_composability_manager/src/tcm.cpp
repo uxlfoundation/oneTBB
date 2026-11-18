@@ -120,8 +120,13 @@ float tcm_oversubscription_factor() {
     return oversb_factor;
 }
 
+bool& is_alive() {
+    thread_local bool is_alive = true;
+    return is_alive;
+}
+
 const std::shared_ptr<thread_data_t>& thread_data_ptr() {
-    thread_local const std::shared_ptr<thread_data_t> td = std::make_shared<thread_data_t>();
+    thread_local const std::shared_ptr<thread_data_t> td = std::make_shared<thread_data_t>(is_alive());
     return td;
 }
 
@@ -1516,6 +1521,8 @@ public:
 
   tcm_result_t register_thread(tcm_permit_handle_t ph) {
       __TCM_ASSERT(ph, "Invalid permit handle");
+      if (!is_alive())
+          return TCM_RESULT_SUCCESS;
       const std::shared_ptr<thread_data_t>& td_sp = thread_data_ptr();
       thread_data_t* td_ptr = td_sp.get();
       bool is_first_registration = false;
@@ -1556,6 +1563,8 @@ public:
   }
 
   tcm_result_t unregister_thread() {
+      if (!is_alive())
+          return TCM_RESULT_SUCCESS;
       thread_data_t& td = thread_data();
 
       std::lock_guard<std::mutex> lock(td.mutex);

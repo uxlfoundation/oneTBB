@@ -22,9 +22,15 @@ namespace tcm {
 namespace internal {
 
 struct thread_data_t {
+  bool& is_alive;
   std::mutex mutex;
   std::stack<std::size_t> permits;      // Permits with which a thread is registered.
   std::unordered_set<std::size_t> seen; // Permits this thread has been once registered with.
+
+  thread_data_t(bool& is_alive_ref) : is_alive(is_alive_ref) {}
+  ~thread_data_t() {
+      is_alive = false;
+  }
 };
 
 struct thread_owning_data_t {
