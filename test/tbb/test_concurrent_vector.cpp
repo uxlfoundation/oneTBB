@@ -817,29 +817,29 @@ TEST_CASE("testing resize on sequantual mode") {
 #if TBB_USE_EXCEPTIONS
 
 struct gated_allocator_base {
-    static bool block_table;
-    static bool table_entered;
-    static bool release_table;
+    static bool block_allocate;
+    static bool allocate_entered;
+    static bool release_allocate;
     static std::mutex gate_mutex;
     static std::condition_variable gate_cv;
 
-    static void wait_for_table() {
+    static void wait_for_allocate() {
         std::unique_lock<std::mutex> lock(gate_mutex);
-        gate_cv.wait(lock, [] { return table_entered; });
+        gate_cv.wait(lock, [] { return allocate_entered; });
     }
 
-    static void unblock_table() {
+    static void unblock_allocate() {
         {
             std::lock_guard<std::mutex> lock(gate_mutex);
-            release_table = true;
+            release_allocate = true;
         }
         gate_cv.notify_all();
     }
 };
 
-bool gated_allocator_base::block_table = false;
-bool gated_allocator_base::table_entered = false;
-bool gated_allocator_base::release_table = false;
+bool gated_allocator_base::block_allocate = false;
+bool gated_allocator_base::allocate_entered = false;
+bool gated_allocator_base::release_allocate = false;
 std::mutex gated_allocator_base::gate_mutex;
 std::condition_variable gated_allocator_base::gate_cv;
 
@@ -853,10 +853,10 @@ struct gated_allocator : std::allocator<T>, gated_allocator_base {
     T* allocate(std::size_t n) {
         {
             std::unique_lock<std::mutex> lock(gate_mutex);
-            if (block_table) {
-                table_entered = true;
+            if (block_allocate) {
+                allocate_entered = true;
                 gate_cv.notify_all();
-                gate_cv.wait(lock, [] { return release_table; });
+                gate_cv.wait(lock, [] { return release_allocate; });
             }
         }
         return std::allocator<T>::allocate(n);
@@ -867,9 +867,9 @@ struct gated_allocator : std::allocator<T>, gated_allocator_base {
 //! \brief \ref regression
 TEST_CASE("at while segment table is being extended") {
     tbb::concurrent_vector<int, gated_allocator<int>> v;
-    gated_allocator_base::block_table = true;
+    gated_allocator_base::block_allocate = true;
     std::thread grower([&] { v.grow_by(16); });
-    gated_allocator_base::wait_for_table(); // to guarantee that the internal size is 16
+    gated_allocator_base::wait_for_allocate(); // to guarantee that the internal size is 16
     bool threw = false;
     try {
         // at this point, internal size is already 16, but my_segment_table has not been extended yet,
@@ -880,7 +880,7 @@ TEST_CASE("at while segment table is being extended") {
     } catch (const std::out_of_range&) {
         threw = true;
     }
-    gated_allocator_base::unblock_table();
+    gated_allocator_base::unblock_allocate();
     grower.join();
     CHECK(threw);
 }
