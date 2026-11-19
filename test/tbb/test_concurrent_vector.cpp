@@ -864,7 +864,7 @@ TEST_CASE("at while embedded table is being extended") {
     wait_for_table(); // to guarantee that the internal size is 16
     bool threw = false;
     try {
-        // at this point, internal size is already 16, but my_segment_table is not be extended yet,
+        // at this point, internal size is already 16, but my_segment_table has not been extended yet,
         // because gated_allocator::allocate is blocked, so we expect the exception
         int* result = &v.at(8);
         std::cerr << "at(8) returned " << static_cast<void*>(result)
