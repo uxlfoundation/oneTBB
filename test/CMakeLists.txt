@@ -478,6 +478,7 @@ if (TARGET TBB::tbb)
     if (APPLE OR ANDROID_PLATFORM)
         target_link_libraries(test_dynamic_link PRIVATE -rdynamic)
     endif()
+
     if (WIN32 AND NOT TBB_TCM_TESTING)
         tbb_add_test(SUBDIR tbb NAME test_numa_dist DEPENDENCIES TBB::tbb)
     endif()
@@ -586,6 +587,40 @@ if (TARGET TBB::tbb)
     if (NOT TBB_EMSCRIPTEN)
         tbb_add_tbbbind_test(SUBDIR tbb NAME test_arena_constraints)
         tbb_add_tbbbind_test(SUBDIR tbb NAME test_tbbbind)
+    endif()
+
+    # Test for the library shutdown during process termination
+    if (BUILD_SHARED_LIBS AND NOT TBB_EMSCRIPTEN)
+        tbb_add_lib_test(SUBDIR tbb NAME test_tbb_shutdown)
+        tbb_add_test(SUBDIR tbb NAME test_tbb_shutdown)
+
+        # The test includes main.cpp to access __TBB_InitOnce, the rest of the library sources are linked in
+        set(_shutdown_tbb_dir ${CMAKE_CURRENT_SOURCE_DIR}/../src/tbb)
+        file(GLOB _shutdown_tbb_srcs ${_shutdown_tbb_dir}/*.cpp)
+        list(REMOVE_ITEM _shutdown_tbb_srcs ${_shutdown_tbb_dir}/main.cpp)
+
+        target_sources(test_tbb_shutdown PRIVATE ${_shutdown_tbb_srcs})
+        target_include_directories(test_tbb_shutdown PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+        target_compile_definitions(test_tbb_shutdown PRIVATE
+            __TBB_BUILD
+            __TBB_SOURCE_DIRECTLY_INCLUDED=1
+            __TBB_SKIP_DEPENDENCY_SIGNATURE_VERIFICATION=1
+            "TEST_TBB_SHUTDOWN_LIBRARY=\"$<TARGET_FILE_NAME:_test_tbb_shutdown>\"")
+        target_compile_options(test_tbb_shutdown PRIVATE ${TBB_WARNING_SUPPRESS} ${TBB_LIB_COMPILE_FLAGS})
+        target_link_libraries(test_tbb_shutdown PRIVATE ${TBB_LIB_LINK_LIBS})
+        if (COMMAND target_link_options)
+            target_link_options(test_tbb_shutdown PRIVATE ${TBB_LIB_LINK_FLAGS})
+        else()
+            target_link_libraries(test_tbb_shutdown PRIVATE ${TBB_LIB_LINK_FLAGS})
+        endif()
+        set_target_properties(test_tbb_shutdown PROPERTIES
+            BUILD_RPATH_USE_ORIGIN TRUE
+            BUILD_RPATH "$ORIGIN")
+
+        add_dependencies(test_tbb_shutdown _test_tbb_shutdown)
+
+        unset(_shutdown_tbb_srcs)
+        unset(_shutdown_tbb_dir)
     endif()
 
     if ((NOT "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "mips") AND (NOT TBB_EMSCRIPTEN))
