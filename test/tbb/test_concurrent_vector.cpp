@@ -865,7 +865,7 @@ struct gated_allocator : std::allocator<T>, gated_allocator_base {
 
 //! Concurrent at() throws an exception when the table is being extended.
 //! \brief \ref regression
-TEST_CASE("at while embedded table is being extended") {
+TEST_CASE("at while segment table is being extended") {
     tbb::concurrent_vector<int, gated_allocator<int>> v;
     gated_allocator_base::block_table = true;
     std::thread grower([&] { v.grow_by(16); });
