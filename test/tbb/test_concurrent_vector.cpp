@@ -816,27 +816,35 @@ TEST_CASE("testing resize on sequantual mode") {
 
 #if TBB_USE_EXCEPTIONS
 
-static bool block_table = false;
-static bool table_entered = false;
-static bool release_table = false;
-static std::mutex gate_mutex;
-static std::condition_variable gate_cv;
+struct gated_allocator_base {
+    static bool block_table;
+    static bool table_entered;
+    static bool release_table;
+    static std::mutex gate_mutex;
+    static std::condition_variable gate_cv;
 
-void wait_for_table() {
-    std::unique_lock<std::mutex> lock(gate_mutex);
-    gate_cv.wait(lock, [] { return table_entered; });
-}
-
-void unblock_table() {
-    {
-        std::lock_guard<std::mutex> lock(gate_mutex);
-        release_table = true;
+    static void wait_for_table() {
+        std::unique_lock<std::mutex> lock(gate_mutex);
+        gate_cv.wait(lock, [] { return table_entered; });
     }
-    gate_cv.notify_all();
-}
+
+    static void unblock_table() {
+        {
+            std::lock_guard<std::mutex> lock(gate_mutex);
+            release_table = true;
+        }
+        gate_cv.notify_all();
+    }
+};
+
+bool gated_allocator_base::block_table = false;
+bool gated_allocator_base::table_entered = false;
+bool gated_allocator_base::release_table = false;
+std::mutex gated_allocator_base::gate_mutex;
+std::condition_variable gated_allocator_base::gate_cv;
 
 template <typename T>
-struct gated_allocator : std::allocator<T> {
+struct gated_allocator : std::allocator<T>, gated_allocator_base {
     using value_type = T;
     template <typename U> struct rebind { using other = gated_allocator<U>; };
     gated_allocator() = default;
@@ -859,20 +867,20 @@ struct gated_allocator : std::allocator<T> {
 //! \brief \ref regression
 TEST_CASE("at while embedded table is being extended") {
     tbb::concurrent_vector<int, gated_allocator<int>> v;
-    block_table = true;
+    gated_allocator_base::block_table = true;
     std::thread grower([&] { v.grow_by(16); });
-    wait_for_table(); // to guarantee that the internal size is 16
+    gated_allocator_base::wait_for_table(); // to guarantee that the internal size is 16
     bool threw = false;
     try {
         // at this point, internal size is already 16, but my_segment_table has not been extended yet,
         // because gated_allocator::allocate is blocked, so we expect the exception
         int* result = &v.at(8);
-        std::cerr << "at(8) returned " << static_cast<void*>(result)
-                  << ", size=" << v.size() << ", capacity=" << v.capacity() << '\n';
+        FAIL("at(8) returned " << static_cast<void*>(result)
+             << ", size=" << v.size() << ", capacity=" << v.capacity());
     } catch (const std::out_of_range&) {
         threw = true;
     }
-    unblock_table();
+    gated_allocator_base::unblock_table();
     grower.join();
     CHECK(threw);
 }
