@@ -19,6 +19,13 @@
 
 #define __TBB_NO_IMPLICIT_LINKAGE 1
 
+// A regression test for the race condition during process shutdown
+// If a library that is loaded dynamically by TBB has global static objects,
+// TBB used to unload the library while the destructor of these static objects is executed
+
+// The code under _USRDLL is compiled as a library which is dynamically loaded by TBB
+// If TBB unloads this library while the destructor of the static object is called, writing
+// to the atomic crashes
 #if _USRDLL
 
 #include <atomic>
