@@ -62,7 +62,7 @@ TEST_CASE("Library unloading at process exit does not race with global objects d
 
     // Since the exit handler is registered after global objects are created,
     // it will be invoked before their destruction
-    std::atexit([] { barrier.wait(); });
+    REQUIRE(std::atexit([] { barrier.wait(); }) == 0);
 
     for (unsigned i = 0; i < n_threads; ++i) {
         std::thread([] {
