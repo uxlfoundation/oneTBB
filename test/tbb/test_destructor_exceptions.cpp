@@ -232,6 +232,7 @@ void run_scenario(context_kind context, exception_kind source, exit_kind exit) {
     }
     REQUIRE_MESSAGE(caught, "The destructor must propagate the task exception");
 
+    // recovery check after the exceptions
     arena.execute([] {
         bool task_completed = false;
         tbb::task_group group;
