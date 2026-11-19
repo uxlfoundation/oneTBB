@@ -35,7 +35,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <memory>
 #include <random>
+#include <type_traits>
+#include <utility>
 
 //! \file test_concurrent_vector.cpp
 //! \brief Test for [containers.concurrent_vector] specification
@@ -811,4 +814,88 @@ TEST_CASE("testing resize on sequantual mode") {
 
     v.clear();
     CHECK(v.size() == 0);
+}
+
+struct AllocatorIdCounters {
+    std::size_t allocations = 0;
+    std::size_t frees = 0;
+    std::size_t constructions = 0;
+    std::size_t destructions = 0;
+};
+
+// Stateful allocator that propagates on copy assignment; allocators with different counters are unequal
+template <typename T>
+struct CountingPoccaAllocator {
+    using value_type = T;
+    using propagate_on_container_copy_assignment = std::true_type;
+    using is_always_equal = std::false_type;
+
+    AllocatorIdCounters* my_counters;
+
+    explicit CountingPoccaAllocator( AllocatorIdCounters& counters ) : my_counters(&counters) {}
+
+    template <typename U>
+    CountingPoccaAllocator( const CountingPoccaAllocator<U>& other ) : my_counters(other.my_counters) {}
+
+    T* allocate( std::size_t n ) {
+        ++my_counters->allocations;
+        return std::allocator<T>().allocate(n);
+    }
+
+    void deallocate( T* ptr, std::size_t n ) {
+        ++my_counters->frees;
+        std::allocator<T>().deallocate(ptr, n);
+    }
+
+    template <typename U, typename... Args>
+    void construct( U* ptr, Args&&... args ) {
+        ::new (static_cast<void*>(ptr)) U(std::forward<Args>(args)...);
+        ++my_counters->constructions;
+    }
+
+    template <typename U>
+    void destroy( U* ptr ) {
+        ptr->~U();
+        ++my_counters->destructions;
+    }
+
+    template <typename U>
+    bool operator==( const CountingPoccaAllocator<U>& other ) const { return my_counters == other.my_counters; }
+
+    template <typename U>
+    bool operator!=( const CountingPoccaAllocator<U>& other ) const { return my_counters != other.my_counters; }
+};
+
+//! \brief \ref regression
+TEST_CASE("copy assignment with POCCA and unequal allocators") {
+    using allocator_type = CountingPoccaAllocator<int>;
+    using vector_type = tbb::concurrent_vector<int, allocator_type>;
+
+    AllocatorIdCounters dst_counters, src_counters;
+    {
+        vector_type dst(allocator_type{dst_counters});
+        vector_type src(allocator_type{src_counters});
+        for (int i = 0; i < 100; ++i) {
+            dst.push_back(i);
+        }
+        for (int i = 0; i < 50; ++i) {
+            src.push_back(-i);
+        }
+        REQUIRE(dst_counters.allocations > 0);
+
+        dst = src;
+
+        // The old elements and segments of dst belong to its old allocator
+        CHECK(dst_counters.destructions == dst_counters.constructions);
+        CHECK(dst_counters.frees == dst_counters.allocations);
+        CHECK(dst.get_allocator() == src.get_allocator());
+        REQUIRE(dst.size() == src.size());
+        for (std::size_t i = 0; i < dst.size(); ++i) {
+            CHECK(dst[i] == src[i]);
+        }
+    }
+    CHECK(dst_counters.destructions == dst_counters.constructions);
+    CHECK(dst_counters.frees == dst_counters.allocations);
+    CHECK(src_counters.destructions == src_counters.constructions);
+    CHECK(src_counters.frees == src_counters.allocations);
 }

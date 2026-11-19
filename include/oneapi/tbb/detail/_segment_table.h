@@ -119,7 +119,11 @@ public:
     }
 
     segment_table& operator=( const segment_table& other ) {
+        using pocca_type = typename segment_table_allocator_traits::propagate_on_container_copy_assignment;
+
         if (this != &other) {
+            // Release the old segments before the allocator they were created with is replaced
+            clear_before_copy_assign_allocators(other, pocca_type());
             copy_assign_allocators(my_segment_table_allocator, other.my_segment_table_allocator);
             internal_transfer(other, copy_segment_body_type{*this});
         }
@@ -433,6 +437,16 @@ private:
             });
         }
     }
+
+    // Destroys the elements and deallocates the segments if copy assignment is about to replace
+    // the allocator with an unequal one
+    void clear_before_copy_assign_allocators( const segment_table& other, /*pocca = */ std::true_type ) {
+        if (!(my_segment_table_allocator == other.my_segment_table_allocator)) {
+            clear();
+        }
+    }
+
+    void clear_before_copy_assign_allocators( const segment_table&, /*pocca = */ std::false_type ) {}
 
     // Move assigns the segment table to other is any instances of allocator_type are always equal
     // or propagate_on_container_move_assignment is true
