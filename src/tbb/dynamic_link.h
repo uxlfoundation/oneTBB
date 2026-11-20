@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -132,8 +133,7 @@ enum dynamic_link_error_t : int {
     // System call returned error status
     dl_sys_fail,                // char const * func, dlerr_t err
 
-    // Internal intermediate buffer is too small, consider setting PATH_MAX
-    // macro to a larger value
+    // Internal intermediate buffer is too small
     dl_buff_too_small,          // none
 
     // An error during library unload
