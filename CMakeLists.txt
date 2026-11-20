@@ -349,6 +349,17 @@ else()
     endif()
 endif()
 
+if (TCM_BUILD)
+  set(TCM_SUBDIR_NAME thread_composability_manager)
+  if (IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${TCM_SUBDIR_NAME}")
+    add_subdirectory(${TCM_SUBDIR_NAME})
+  elseif (TCM_BUILD_OPTION_EXPLICITLY_SET)
+    message(FATAL_ERROR "Build of Thread Composability Manager (TCM) is disabled since "
+                        "${TCM_SUBDIR_NAME} subdirectory does not exist")
+  endif()
+  unset(TCM_SUBDIR_NAME)
+endif()
+
 if (TBB_TEST OR TCM_TEST)
     enable_testing()
 endif()
@@ -415,17 +426,6 @@ endif()
 
 if (TBB4PY_BUILD)
     add_subdirectory(python)
-endif()
-
-if (TCM_BUILD)
-  set(TCM_SUBDIR_NAME thread_composability_manager)
-  if (IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${TCM_SUBDIR_NAME}")
-    add_subdirectory(${TCM_SUBDIR_NAME})
-  elseif (TCM_BUILD_OPTION_EXPLICITLY_SET)
-    message(FATAL_ERROR "Build of Thread Composability Manager (TCM) is disabled since "
-                        "${TCM_SUBDIR_NAME} subdirectory does not exist")
-  endif()
-  unset(TCM_SUBDIR_NAME)
 endif()
 
 # Keep it the last instruction.
