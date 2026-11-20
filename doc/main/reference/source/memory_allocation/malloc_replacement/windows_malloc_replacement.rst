@@ -53,7 +53,7 @@ To do the replacement use one of the following methods:
 
       tbbmalloc_proxy.lib /INCLUDE:"___TBB_malloc_proxy"
    
-   For 64-bit code (note the double underscore):
+   For 64-bit code, including ARM64 (note the double underscore):
 
 
    ::
