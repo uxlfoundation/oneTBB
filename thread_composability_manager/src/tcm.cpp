@@ -11,6 +11,7 @@
 #include "tcm.h"
 #include "tcm/types.h"
 #include "tcm_permit_rep.h"
+#include <memory>
 
 #if __linux__
 #include "linux/cgroup_info.h"
@@ -47,7 +48,51 @@ namespace tcm {
 
 namespace internal {
 class ThreadComposabilityFairBalance;
+
+void deallocate_thread_data(void* td_ptr) {
+    auto td = static_cast<std::shared_ptr<thread_data_t>*>(td_ptr);
+    delete td;
 }
+
+//! Basic cross-platform wrapper class for TLS operations.
+template <typename T>
+class tls_t {
+#if _WIN32 || _WIN64
+    typedef DWORD tls_key_t;
+public:
+    int create(void (*dtor)(void*) = nullptr) {
+        suppress_unused_warning(dtor);
+        tls_key_t tmp = TlsAlloc();
+        if( tmp==TLS_OUT_OF_INDEXES )
+            return TLS_OUT_OF_INDEXES;
+        my_key = tmp;
+        return 0;
+    }
+    int  destroy()      { TlsFree(my_key); my_key=0; return 0; }
+    void set( T value ) { TlsSetValue(my_key, (LPVOID)value); }
+    T    get()          { return (T)TlsGetValue(my_key); }
+#else /* _WIN32 || _WIN64 */
+    typedef pthread_key_t tls_key_t;
+public:
+    tls_t() {
+        const int r = create(&deallocate_thread_data);
+        __TCM_ASSERT_EX(r == 0, "Unable to create thread local key.");
+    }
+    ~tls_t() {
+        const int r = destroy();
+        __TCM_ASSERT_EX(r == 0, "Unable to delete thread local key.");
+    }
+    int  create( void (*dtor)(void*) = nullptr ) { return pthread_key_create(&my_key, dtor);  }
+    int  destroy()                               { return pthread_key_delete(my_key);         }
+    T    get()                                   { return (T)pthread_getspecific(my_key);     }
+    void set( T value )                          { pthread_setspecific(my_key, (void*)value); }
+#endif /* _WIN32 || _WIN64 */
+private:
+    tls_key_t my_key;
+};
+
+} // namespace internal
+
 using ThreadComposabilityManager = internal::ThreadComposabilityFairBalance;
 
 class theTCM {
@@ -57,6 +102,10 @@ class theTCM {
     static std::mutex tcm_mutex;
     static internal::environment tcm_env;
 public:
+#if _WIN32 || _WIN64
+    static internal::tls_t<std::shared_ptr<internal::thread_data_t>*> tls;
+#endif
+
     static std::size_t next_permit_id() {
         return num_unique_permits.fetch_add(1, std::memory_order_relaxed);
     }
@@ -119,13 +168,6 @@ float tcm_oversubscription_factor() {
                  "Incorrect value of oversubscription factor.");
     return oversb_factor;
 }
-
-const std::shared_ptr<thread_data_t>& thread_data_ptr() {
-    thread_local const std::shared_ptr<thread_data_t> td = std::make_shared<thread_data_t>();
-    return td;
-}
-
-thread_data_t& thread_data() { return *thread_data_ptr(); }
 
 /**
  *******************************************************************************
@@ -616,6 +658,10 @@ struct ThreadComposabilityManagerData {
     system_topology::destroy();
   }
 
+#if !(_WIN32 || _WIN64)
+  tls_t<std::shared_ptr<thread_data_t>*> tls;
+#endif
+
   std::mutex data_mutex{};
 
   tcm_client_id_t client_id = 1;
@@ -653,6 +699,28 @@ struct ThreadComposabilityManagerData {
   std::unordered_multimap<tcm_client_id_t, tcm_permit_handle_t> client_to_permit_mmap{};
 };
 
+const std::shared_ptr<thread_data_t>& thread_data_ptr(tls_t<std::shared_ptr<thread_data_t>*>& tls) {
+    std::shared_ptr<thread_data_t>* td_sp = tls.get();
+    if (!td_sp) {
+        td_sp = new std::shared_ptr<thread_data_t>(new thread_data_t);
+        tls.set(td_sp);
+    }
+    return *td_sp;
+}
+
+thread_data_t& thread_data(tls_t<std::shared_ptr<thread_data_t>*>& tls) {
+    return *thread_data_ptr(tls);
+}
+
+tls_t<std::shared_ptr<thread_data_t>*>& get_tls(ThreadComposabilityManagerData* data) {
+#if _WIN32 || _WIN64
+    suppress_unused_warning(data);
+    return theTCM::tls;
+#else
+   __TCM_ASSERT(data, "Attempt to dereference nullptr");
+   return data->tls;
+#endif
+}
 
 #if TCM_USE_ASSERT
 /**
@@ -1090,7 +1158,7 @@ public:
   void determine_nested_permit(tcm_permit_handle_t& ph) {
     bool is_nested = false;
     const std::size_t permit_id = ph->permit_id;
-    thread_data_t& td = thread_data();
+    thread_data_t& td = thread_data(get_tls(this));
     {
         std::lock_guard<std::mutex> lock(td.mutex);
         if (!td.permits.empty() && permit_id != td.permits.top())
@@ -1516,7 +1584,7 @@ public:
 
   tcm_result_t register_thread(tcm_permit_handle_t ph) {
       __TCM_ASSERT(ph, "Invalid permit handle");
-      const std::shared_ptr<thread_data_t>& td_sp = thread_data_ptr();
+      const std::shared_ptr<thread_data_t>& td_sp = thread_data_ptr(get_tls(this));
       thread_data_t* td_ptr = td_sp.get();
       bool is_first_registration = false;
       {
@@ -1556,11 +1624,15 @@ public:
   }
 
   tcm_result_t unregister_thread() {
-      thread_data_t& td = thread_data();
+      thread_data_t& td = thread_data(get_tls(this));
 
       std::lock_guard<std::mutex> lock(td.mutex);
-      if (td.permits.empty())
+      if (td.permits.empty()) {
+          std::printf("permit_stack.size() = %zu\n", td.permits.size());
+          // raise(SIGSTOP);
+          // std::this_thread::sleep_for(std::chrono::seconds(1000));
           return TCM_RESULT_PERMIT_MISMATCH;
+      }
 
       td.permits.pop(); // This thread undoes its previous registration
 
@@ -2825,7 +2897,32 @@ protected:
         return updates;
     }
 }; // ThreadComposabilityFairBalance
+
+
 } // namespace internal
+
+#if (_WIN32||_WIN64)
+
+internal::tls_t<std::shared_ptr<internal::thread_data_t>*> theTCM::tls;
+
+// Windows "DllMain" that handles startup and shutdown of a dynamic library.
+extern "C" bool WINAPI DllMain( HANDLE /*hinstDLL*/, DWORD reason, LPVOID /*lpvReserved*/ ) {
+    switch( reason ) {
+        case DLL_PROCESS_ATTACH:
+            break;
+        case DLL_PROCESS_DETACH:
+            // Since THREAD_DETACH is not called for the main thread, deallocate its local data here
+            // as well
+            deallocate_thread_data(internal::get_tls(nullptr).get());
+            internal::get_tls(nullptr).destroy();
+            break;
+        case DLL_THREAD_DETACH:
+            deallocate_thread_data(internal::get_tls(nullptr).get());
+            break;
+    }
+    return true;
+}
+#endif /* (_WIN32||_WIN64) && !__TBB_SOURCE_DIRECTLY_INCLUDED */
 
 void theTCM::increase_ref_count() {
     std::lock_guard<std::mutex> l(tcm_mutex);
