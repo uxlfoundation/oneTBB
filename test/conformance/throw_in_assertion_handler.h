@@ -53,18 +53,31 @@ void throw_in_assertion_handler(TestCase test_case) {
             test_case == TestCase::ASSERT_FROM_USER_CODE ?
                 tbb::set_assertion_handler([](const char* location, int line,
                                                    const char* expression, const char* comment) {
-                    CHECK(!assertion_handler_called);
-                    assertion_handler_called = true;
-                    CHECK(location);
-                    CHECK(location[0]);
-                    CHECK(line);
-                    CHECK(expression);
-                    CHECK(expression[0]);
-                    CHECK(comment);
                     CHECK(my_test_case == TestCase::ASSERT_FROM_USER_CODE);
-                    CHECK_MESSAGE(strstr(comment, assertion_comment),
-                                  "expected \"" << std::string(assertion_comment) << "\", got: "
-                                   << std::string(comment));
+                    if (assertion_handler_called) {
+                        CHECK(location);
+                        CHECK(location[0] == 0);
+                        CHECK(!line);
+                        CHECK(expression);
+                        CHECK(expression[0] == 0);
+                        CHECK(comment);
+                        const char *expected_comment = "Unknown exception";
+                        CHECK_MESSAGE(strstr(comment, expected_comment),
+                                      "expected \"" << std::string(expected_comment) << "\", got: "
+                                       << std::string(comment));
+                    }
+                    else {
+                        assertion_handler_called = true;
+                        CHECK(location);
+                        CHECK(location[0]);
+                        CHECK(line);
+                        CHECK(expression);
+                        CHECK(expression[0]);
+                        CHECK(comment);
+                        CHECK_MESSAGE(strstr(comment, assertion_comment),
+                                      "expected \"" << std::string(assertion_comment) << "\", got: "
+                                       << std::string(comment));
+                    }
                     throw 42;
                 })
             :

@@ -155,7 +155,7 @@ void terminate_on_user_exception() noexcept {
 
 void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line,
                                            const char* expression, const char* comment) {
-#if __TBB_BUILD
+#if 0 // __TBB_BUILD
     // terminate_on_exception() exists only in this configuration
     if (terminate_on_exception())
         [&]() noexcept {
