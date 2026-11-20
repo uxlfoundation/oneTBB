@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -323,4 +324,21 @@ TEST_CASE("test capacity on modifying operations") {
                     "Capacity is not preserved on swap");
     REQUIRE_MESSAGE(different_capacity_q2.capacity() == desired_capacity * 2,
                     "Capacity is not preserved on swap");
+}
+
+//! Test that set_capacity with a negative value makes the queue unbounded
+//! \brief \ref regression \ref error_guessing
+TEST_CASE("set_capacity with a negative value makes concurrent_bounded_queue unbounded") {
+    using queue_type = oneapi::tbb::concurrent_bounded_queue<int>;
+    queue_type q;
+    q.set_capacity(1);
+    REQUIRE(q.try_push(1));
+    REQUIRE_FALSE(q.try_push(2));
+
+    q.set_capacity(-1);
+    CHECK_MESSAGE(q.capacity() >= queue_type{}.capacity(),
+                  "Negative capacity should make the queue unbounded");
+    CHECK(q.try_push(2));
+    CHECK(q.try_push(3));
+    CHECK(q.size() == 3);
 }
