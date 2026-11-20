@@ -24,9 +24,11 @@
 #include "conformance/conformance_flowgraph.h"
 
 #include "tbb/flow_graph.h"
+#include "tbb/tick_count.h"
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
@@ -1361,3 +1363,105 @@ TEST_CASE("resource_limited_node priorities") {
     test_priorities_with_unlimited_resources();
     test_priorities_with_single_resource();
 }
+
+// ASan uses a fake stack for stack-use-after-return detection, so the addresses of local variables
+// do not reflect the depth of the real stack that the test below measures.
+#if !__TBB_USE_ADDRESS_SANITIZER
+// Counts the denied acquisitions and records how far the stack has grown between
+// the denied acquisitions that run on the same thread
+class denial_tracking_limiter : public oneapi::tbb::flow::resource_limiter<int> {
+    using base_type = oneapi::tbb::flow::resource_limiter<int>;
+    using request_id = tbb::detail::d2::request_id;
+public:
+    using base_type::base_type;
+
+    optional_type acquire(consumer_type& consumer, request_id id) override {
+        optional_type handle = base_type::acquire(consumer, id);
+        if (!handle.has_value()) {
+            record_stack_growth();
+            ++m_num_denials;
+        }
+        return handle;
+    }
+
+    std::size_t num_denials() const { return m_num_denials.load(); }
+    std::size_t max_stack_growth() const { return m_max_stack_growth.load(); }
+
+private:
+    void record_stack_growth() {
+        volatile char marker = 0;
+        std::uintptr_t address = reinterpret_cast<std::uintptr_t>(&marker);
+
+        thread_local const denial_tracking_limiter* owner = nullptr;
+        thread_local std::uintptr_t lowest = 0;
+        thread_local std::uintptr_t highest = 0;
+        if (owner != this) {
+            owner = this;
+            lowest = highest = address;
+        }
+        lowest = std::min(lowest, address);
+        highest = std::max(highest, address);
+
+        std::size_t growth = highest - lowest;
+        std::size_t current = m_max_stack_growth.load();
+        while (current < growth && !m_max_stack_growth.compare_exchange_weak(current, growth)) {}
+    }
+
+    std::atomic<std::size_t> m_num_denials{0};
+    std::atomic<std::size_t> m_max_stack_growth{0};
+};
+
+// A node that takes the same limiter twice needs two of its handles at once. While another node
+// holds one of the two handles, every acquisition attempt of the first node is denied, and the
+// re-requests are notified at once with the handle that the node itself has just released.
+// The attempts must not be retried recursively on the same stack.
+//! \brief \ref regression \ref error_guessing
+TEST_CASE("resource_limited_node retries a denied acquisition without recursion") {
+    using namespace tbb::flow;
+
+    // The holder body below occupies a thread while the other node retries the acquisition
+    if (tbb::this_task_arena::max_concurrency() < 2) return;
+
+    using node_type = resource_limited_node<int, std::tuple<>>;
+    using ports_type = typename node_type::output_ports_type;
+
+    // Each recursive retry adds a few hundred bytes of stack, so recursion crosses the threshold
+    // after a few hundred denied attempts, long before a thread's stack is exhausted.
+    // Without recursion the stack does not grow between the attempts.
+    constexpr std::size_t num_denials = 1000;
+    constexpr std::size_t stack_growth_threshold = 64 * 1024;
+    // Stop holding the handle in any case, e.g. if denied attempts stop being retried at once
+    const tbb::tick_count::interval_t max_hold_time(10.0);
+
+    denial_tracking_limiter limiter{1, 2};
+    graph g;
+
+    std::atomic<bool> holder_started{false};
+    std::atomic<std::size_t> num_pair_executions{0};
+
+    node_type holder(g, unlimited, std::tie(limiter), [&](int, ports_type&, int) {
+        holder_started = true;
+        tbb::tick_count start = tbb::tick_count::now();
+        // Do not sleep while waiting: a recursive retry adds hundreds of levels per millisecond
+        while (limiter.num_denials() < num_denials &&
+               limiter.max_stack_growth() < stack_growth_threshold &&
+               tbb::tick_count::now() - start < max_hold_time) {
+            tbb::detail::machine_pause(1);
+        }
+    });
+
+    node_type pair_user(g, unlimited, std::tie(limiter, limiter), [&](int, ports_type&, int first, int second) {
+        CHECK_MESSAGE(first != second, "The same resource handle is given twice");
+        ++num_pair_executions;
+    });
+
+    holder.try_put(0);
+    utils::SpinWaitUntilEq(holder_started, true);
+    pair_user.try_put(0);
+    g.wait_for_all();
+
+    CHECK(num_pair_executions == 1);
+    CHECK_MESSAGE(limiter.max_stack_growth() < stack_growth_threshold,
+                  "Denied acquisitions are retried recursively on the same stack");
+}
+#endif // !__TBB_USE_ADDRESS_SANITIZER

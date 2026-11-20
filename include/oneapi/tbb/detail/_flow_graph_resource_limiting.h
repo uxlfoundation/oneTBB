@@ -611,7 +611,8 @@ struct acquire_resources_helper {
             // Increment the notify counter before re-requesting, since a new notification is expected
             ++req_data.notify_counter;
             std::get<Index>(consumers).request_from_provider(id);
-            body_ptr->release_self_ref(id, req_data); // release the self-reference held at the beginning of resource acquisition
+            // Release the self-reference held at the beginning of resource acquisition
+            body_ptr->release_self_ref_after_denial(id, req_data);
             return false;
         }
     }
@@ -751,6 +752,26 @@ public:
         }
     }
 
+    // Called after a denied acquisition has re-requested the resources. If all the re-requests
+    // are already notified, the next acquisition attempt runs in a new task, not on the current
+    // stack. A recursive retry overflows the stack when the re-requests keep being notified while
+    // the acquisition keeps being denied, e.g. when the node takes the same provider more than
+    // once and only some of its handles are free.
+    void release_self_ref_after_denial(request_id id, request_data_type& req_data) {
+        std::size_t prev_value = req_data.notify_counter--;
+        __TBB_ASSERT(prev_value != 0, "Overflow detected");
+        if (prev_value == 1) {
+            spawn_acquisition_task(id, req_data);
+        }
+    }
+
+    void spawn_acquisition_task(request_id id, request_data_type& req_data) {
+        d1::small_object_allocator allocator;
+        using task_type = try_acquire_resources_and_execute_task<resource_limited_body_leaf, request_data_type>;
+        graph_task* t = allocator.new_object<task_type>(this->graph_reference(), allocator, this, id, req_data, m_input_ptr->priority());
+        spawn_in_graph_arena(this->graph_reference(), *t);
+    }
+
     bool try_acquire_resources(request_id id, request_data_type& req_data) {
         // Increment the counter to avoid another resource reacquisition by notify()
         // while current acquisition is in progress
@@ -815,10 +836,7 @@ public:
         std::size_t prev_value = data.notify_counter--;
         __TBB_ASSERT(prev_value != 0, "Overflow detected");
         if (prev_value == 1) {
-            d1::small_object_allocator allocator;
-            using task_type = try_acquire_resources_and_execute_task<resource_limited_body_leaf, request_data_type>;
-            graph_task* t = allocator.new_object<task_type>(this->graph_reference(), allocator, this, id, data, m_input_ptr->priority());
-            spawn_in_graph_arena(this->graph_reference(), *t);
+            spawn_acquisition_task(id, data);
         }
     }
 
