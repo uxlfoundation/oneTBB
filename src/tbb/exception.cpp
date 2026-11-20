@@ -59,8 +59,6 @@ const char* missing_wait::what() const noexcept(true) { return "wait() was not c
 #endif
     }
 
-    bool terminate_on_exception(); // defined in global_control.cpp and ipc_server.cpp
-
     template <typename F>
     /*[[noreturn]]*/ void do_throw(F throw_func, const char* exc_name, const char* init_args) {
         if (terminate_on_exception()) {
