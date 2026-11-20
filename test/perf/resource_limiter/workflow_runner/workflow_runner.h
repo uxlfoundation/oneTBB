@@ -17,7 +17,7 @@
 #ifndef TBB_test_perf_workflow_runner_H
 #define TBB_test_perf_workflow_runner_H
 
-#include "resource_common.h"
+#include "workflow_common.h"
 #include "oneapi/tbb/global_control.h"
 #include <atomic>
 #include <cctype>

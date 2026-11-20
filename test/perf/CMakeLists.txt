@@ -21,6 +21,8 @@
 # workflow_runner_all builds all three. Each variant is compiled against the oneTBB
 # headers and library of this build (or of the external package, with
 # TBB_FIND_PACKAGE), so limiter_impl measures whichever implementation that is.
+#
+# offset_puts and pipeline are single executables that run both implementations side by side.
 
 set(TBB_TEST_PERF_TREE "" CACHE STRING
     "Label recorded as the oneTBB tree in perf benchmark output (default: git branch@sha of this source tree)")
@@ -60,16 +62,11 @@ message(STATUS "Perf benchmarks: tree label '${_tbb_perf_tree}'")
 
 set(_tbb_perf_workflow_dir ${CMAKE_CURRENT_SOURCE_DIR}/resource_limiter/workflow_runner)
 
-# tbb_add_workflow_runner(VARIANT <name> LIMITER <0|1> [BODY_POLICY <queueing|rejecting>])
+# tbb_perf_configure_target(<target>)
 #
-# Adds the executable workflow_runner_<name>. LIMITER is USE_LIMITER_NODE: 0 builds
-# jn_impl, 1 builds limiter_impl. BODY_POLICY sets JN_BODY_POLICY for jn_impl and
-# defaults to the header's own default (queueing).
-function(tbb_add_workflow_runner)
-    cmake_parse_arguments(_wr "" "VARIANT;LIMITER;BODY_POLICY" "" ${ARGN})
-    set(_target workflow_runner_${_wr_VARIANT})
-
-    add_executable(${_target} ${_tbb_perf_workflow_dir}/workflow_runner.cpp)
+# The settings every perf benchmark shares: the common/ headers, C++17, this
+# build's warning and compile flags, and the link against oneTBB.
+function(tbb_perf_configure_target _target)
     target_include_directories(${_target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/common)
 
     # The harness needs C++17. A compile feature raises the target to at least that
@@ -84,12 +81,33 @@ function(tbb_add_workflow_runner)
         ${TBB_COMMON_COMPILE_FLAGS}
     )
 
+    target_compile_definitions(${_target} PRIVATE $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>)
+
+    if (COMMAND target_link_options)
+        target_link_options(${_target} PRIVATE ${TBB_COMMON_LINK_FLAGS} ${TBB_TEST_LINK_FLAGS})
+    else()
+        target_link_libraries(${_target} PRIVATE ${TBB_COMMON_LINK_FLAGS} ${TBB_TEST_LINK_FLAGS})
+    endif()
+    target_link_libraries(${_target} PRIVATE TBB::tbb Threads::Threads ${TBB_COMMON_LINK_LIBS})
+endfunction()
+
+# tbb_add_workflow_runner(VARIANT <name> LIMITER <0|1> [BODY_POLICY <queueing|rejecting>])
+#
+# Adds the executable workflow_runner_<name>. LIMITER is USE_LIMITER_NODE: 0 builds
+# jn_impl, 1 builds limiter_impl. BODY_POLICY sets JN_BODY_POLICY for jn_impl and
+# defaults to the header's own default (queueing).
+function(tbb_add_workflow_runner)
+    cmake_parse_arguments(_wr "" "VARIANT;LIMITER;BODY_POLICY" "" ${ARGN})
+    set(_target workflow_runner_${_wr_VARIANT})
+
+    add_executable(${_target} ${_tbb_perf_workflow_dir}/workflow_runner.cpp)
+    tbb_perf_configure_target(${_target})
+
     target_compile_definitions(${_target} PRIVATE
         USE_LIMITER_NODE=${_wr_LIMITER}
         USE_TRACE=$<BOOL:${TBB_TEST_PERF_TRACE}>
         VARIANT_TREE="${_tbb_perf_tree}"
         BENCH_COMPILER="${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}"
-        $<$<CONFIG:DEBUG>:TBB_USE_DEBUG>
     )
     if (_wr_LIMITER)
         target_compile_definitions(${_target} PRIVATE TBB_PREVIEW_FLOW_GRAPH_RESOURCE_LIMITING=1)
@@ -101,13 +119,6 @@ function(tbb_add_workflow_runner)
         # The harness reads its knobs with std::getenv, which the MSVC CRT deprecates.
         target_compile_definitions(${_target} PRIVATE _CRT_SECURE_NO_WARNINGS)
     endif()
-
-    if (COMMAND target_link_options)
-        target_link_options(${_target} PRIVATE ${TBB_COMMON_LINK_FLAGS} ${TBB_TEST_LINK_FLAGS})
-    else()
-        target_link_libraries(${_target} PRIVATE ${TBB_COMMON_LINK_FLAGS} ${TBB_TEST_LINK_FLAGS})
-    endif()
-    target_link_libraries(${_target} PRIVATE TBB::tbb Threads::Threads ${TBB_COMMON_LINK_LIBS})
 
     add_dependencies(workflow_runner_all ${_target})
 endfunction()
@@ -154,3 +165,12 @@ tbb_add_workflow_runner_test(NAME perf_workflow_runner_limiter_impl
 tbb_add_workflow_runner_test(NAME perf_workflow_runner_jn_impl_rejecting_refuses_inert
                              VARIANT jn_impl_rejecting INPUT synthetic_no_resources.json
                              PASS_REGEX "no algorithm in this workflow declares a resource")
+
+# offset_puts and pipeline compare jn_composite_node and resource_limited_node within a single
+# binary, so it is built once rather than per variant. It uses only
+# resource_common.h and turns on the resource-limiting preview itself.
+add_executable(offset_puts ${CMAKE_CURRENT_SOURCE_DIR}/resource_limiter/offset_puts/offset_puts.cpp)
+tbb_perf_configure_target(offset_puts)
+
+add_executable(pipeline ${CMAKE_CURRENT_SOURCE_DIR}/resource_limiter/pipeline/pipeline.cpp)
+tbb_perf_configure_target(pipeline)

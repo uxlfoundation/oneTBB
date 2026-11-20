@@ -116,7 +116,7 @@ int main(int argc, char* argv[]) {
 }   // tc is destroyed here and, if tracing was on, writes run.json
 ```
 
-To compile tracing out entirely, put the tracing code under a preprocessor switch. The benchmarks here use `USE_TRACE`: see `resource_common.h` and `workflow_runner.cpp`.
+To compile tracing out entirely, put the tracing code under a preprocessor switch. The benchmarks here use `USE_TRACE`: see `workflow_common.h` and `workflow_runner.cpp`.
 
 ## Viewing the trace
 
