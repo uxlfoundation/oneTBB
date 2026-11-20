@@ -292,6 +292,8 @@ static inline unsigned char is_in_transaction() {
 #endif // __TBB_BUILD
 #endif // TBB_USE_EXCEPTIONS
 
+bool terminate_on_exception(); // defined in global_control.cpp and ipc_server.cpp
+
 } // namespace r1
 } // namespace detail
 } // namespace tbb

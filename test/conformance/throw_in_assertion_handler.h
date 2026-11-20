@@ -24,7 +24,8 @@
 
 enum class TestCase {
     THROW_FROM_USER_CODE,
-    THROW_FROM_LIBRARY
+    THROW_FROM_LIBRARY,
+    ASSERT_FROM_USER_CODE
 };
 
 void throw_in_assertion_handler(TestCase test_case) {
@@ -32,6 +33,7 @@ void throw_in_assertion_handler(TestCase test_case) {
     static bool terminate_handler_called;
     static bool assertion_handler_called;
     static TestCase my_test_case;
+    constexpr const char *assertion_comment = "Assertion from user code";
 
     terminate_handler_called = false;
     assertion_handler_called = false;
@@ -48,8 +50,26 @@ void throw_in_assertion_handler(TestCase test_case) {
         });
 
         tbb::assertion_handler_type prev_assertion_handler =
-            tbb::set_assertion_handler([](const char* location, int line,
+            test_case == TestCase::ASSERT_FROM_USER_CODE ?
+                tbb::set_assertion_handler([](const char* location, int line,
                                                    const char* expression, const char* comment) {
+                    CHECK(!assertion_handler_called);
+                    assertion_handler_called = true;
+                    CHECK(location);
+                    CHECK(location[0]);
+                    CHECK(line);
+                    CHECK(expression);
+                    CHECK(expression[0]);
+                    CHECK(comment);
+                    CHECK(my_test_case == TestCase::ASSERT_FROM_USER_CODE);
+                    CHECK_MESSAGE(strstr(comment, assertion_comment),
+                                  "expected \"" << std::string(assertion_comment) << "\", got: "
+                                   << std::string(comment));
+                    throw 42;
+                })
+            :
+            tbb::set_assertion_handler([](const char* location, int line,
+                                          const char* expression, const char* comment) {
                 CHECK(!assertion_handler_called);
                 assertion_handler_called = true;
                 CHECK(location);
@@ -58,8 +78,19 @@ void throw_in_assertion_handler(TestCase test_case) {
                 CHECK(expression);
                 CHECK(expression[0] == 0);
                 CHECK(comment);
-                const char *expected_comment = my_test_case == TestCase::THROW_FROM_LIBRARY ?
-                    "std::invalid_argument" : "Unknown exception";
+                const char *expected_comment;
+                switch (my_test_case)
+                {
+                case TestCase::THROW_FROM_LIBRARY:
+                    expected_comment = "std::invalid_argument";
+                    break;
+                case TestCase::THROW_FROM_USER_CODE:
+                    expected_comment = "Unknown exception";
+                    break;
+                default:
+                    FAIL("Unexpected test case");
+                    break;
+                }
                 CHECK_MESSAGE(strstr(comment, expected_comment),
                               "expected \"" << std::string(expected_comment) << "\", got: "
                                << std::string(comment));
@@ -72,14 +103,19 @@ void throw_in_assertion_handler(TestCase test_case) {
         if (setjmp(buffer) == 0) {
             if (test_case == TestCase::THROW_FROM_LIBRARY) {
                 oneapi::tbb::parallel_for(0, 1, -1, [](int) {});
-            } else {
+            } else if (test_case == TestCase::THROW_FROM_USER_CODE) {
                 oneapi::tbb::parallel_for(0, 1, [](int) {
                     volatile bool suppress_unreachable_code_warning = true;
                     if (suppress_unreachable_code_warning) {
                         throw int{1};
                     }
                 });
-            }
+            } else if (test_case == TestCase::ASSERT_FROM_USER_CODE) {
+                oneapi::tbb::parallel_for(0, 1, [](int) {
+                    __TBB_ASSERT_RELEASE(false, assertion_comment);
+                });
+            } else
+                FAIL("Unexpected test case");
             FAIL("Unreachable code");
         }
         CHECK(terminate_handler_called);
