@@ -1,4 +1,5 @@
 # Copyright (c) 2020-2021 Intel Corporation
+# Copyright (c) 2026 UXL Foundation Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,12 +20,12 @@ if (NOT adb_executable)
     message(FATAL_ERROR "Could not find adb")
 endif()
 
-macro(execute_on_device cmd)
-    execute_process(COMMAND ${adb_executable} shell ${cmd} RESULT_VARIABLE CMD_RESULT)
+function(execute_on_device cmd)
+    execute_process(COMMAND ${adb_executable} shell "${cmd}" RESULT_VARIABLE CMD_RESULT)
     if (CMD_RESULT)
         message(FATAL_ERROR "Error while on device execution: ${cmd} error_code: ${CMD_RESULT}")
     endif()
-endmacro()
+endfunction()
 
 macro(transfer_data data_path)
     execute_process(COMMAND ${adb_executable} push --sync ${data_path} ${ANDROID_DEVICE_TESTING_DIRECTORY}
