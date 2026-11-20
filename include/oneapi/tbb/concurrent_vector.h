@@ -756,7 +756,7 @@ private:
         segment_table_type table = this->my_segment_table.load(std::memory_order_acquire);
 
         size_type seg_index = this->segment_index_of(index);
-        if (base_type::number_of_segments(table) < seg_index) {
+        if (base_type::number_of_segments(table) <= seg_index) {
             tbb::detail::throw_exception(exception_id::out_of_range);
         }
 
