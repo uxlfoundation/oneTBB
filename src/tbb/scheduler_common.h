@@ -526,13 +526,91 @@ public:
         return m_ref_count.load(std::memory_order_relaxed) & m_orphaned_bit;
     }
 #endif
+    
+    thread_reference_vertex*& next_vertex() { return m_next; }
 
 private:
     static constexpr std::uint64_t m_orphaned_bit = 1ull << 63;
     static constexpr std::uint64_t m_overflow_mask = ~(((1ull << 32) - 1) | m_orphaned_bit);
     wait_tree_vertex_interface& m_parent;
     std::atomic<std::uint64_t> m_ref_count;
+    thread_reference_vertex* m_next{this}; // TODO: should it be on a separate cache line with m_ref_count
 };
+
+class thread_reference_vertex_pool {
+    static constexpr std::size_t fill_threshold = 50;
+    static constexpr std::size_t reuse_threshold = 25;
+    static constexpr std::size_t probe_limit = 4;
+
+    thread_reference_vertex* m_head;
+    thread_reference_vertex* m_current;
+    
+    static thread_reference_vertex* allocate_vertex(d1::wait_tree_vertex_interface& parent) {
+        void* storage = cache_aligned_allocate(sizeof(thread_reference_vertex));
+        return ::new(storage) thread_reference_vertex(parent, 0);
+    }
+
+    thread_reference_vertex* grow() {
+        thread_reference_vertex* new_vertex = allocate_vertex(*m_head->next_vertex());
+
+        new_vertex->next_vertex() = m_head->next_vertex();
+        m_head->next_vertex() = new_vertex;
+
+        m_current = new_vertex;
+        return new_vertex;
+    }
+public:
+    thread_reference_vertex_pool(d1::wait_tree_vertex_interface& parent)
+        : m_head(allocate_vertex(parent))
+        , m_current(m_head)
+    {}
+
+    thread_reference_vertex_pool(const thread_reference_vertex_pool&) = delete;
+    thread_reference_vertex_pool& operator=(const thread_reference_vertex_pool&) = delete;
+
+    ~thread_reference_vertex_pool() {
+        thread_reference_vertex* node = m_head->next_vertex();
+
+        while (node != m_head) {
+            thread_reference_vertex* next = node->next_vertex();
+            node->release_ownership();
+            poison_pointer(node);
+            node = next;
+        }
+        m_head->release_ownership();
+        poison_pointer(m_head);
+    }
+
+    bool empty() const {
+        return m_head->get_num_children() == 0;
+    }
+
+    thread_reference_vertex* select() {
+        thread_reference_vertex* probe_vertex = m_current;
+        if (probe_vertex->get_num_children() < fill_threshold) {
+            return probe_vertex;
+        }
+        
+        // Try at most probe_limit other nodes
+        for (std::size_t i = 0; i < probe_limit; ++i) {
+            thread_reference_vertex* next = probe_vertex->next_vertex();
+
+            if (next == m_current) break;
+
+            probe_vertex = next;
+
+            if (probe_vertex->get_num_children() <= reuse_threshold) {
+                m_current = probe_vertex;
+                return probe_vertex;
+            }
+        }
+
+        // We did not find the vertex, so allocate the new one
+        return grow();
+    }
+
+    thread_reference_vertex* current() { return m_current; }
+}; // class thread_reference_vertex_pool
 
 class alignas (max_nfs_size) task_dispatcher {
 public:
@@ -572,9 +650,9 @@ public:
     suspend_point_type* m_suspend_point{ nullptr };
 
     //! Used to improve scalability of d1::wait_context by using per thread reference_counter
-    std::unordered_map<d1::wait_tree_vertex_interface*, r1::thread_reference_vertex*,
+    std::unordered_map<d1::wait_tree_vertex_interface*, thread_reference_vertex_pool,
                        std::hash<d1::wait_tree_vertex_interface*>, std::equal_to<d1::wait_tree_vertex_interface*>,
-                       tbb_allocator<std::pair<d1::wait_tree_vertex_interface* const, r1::thread_reference_vertex*>>
+                       tbb_allocator<std::pair<d1::wait_tree_vertex_interface* const, thread_reference_vertex_pool>>
                       >
         m_reference_vertex_map;
 
@@ -610,11 +688,11 @@ public:
             cache_aligned_deallocate(m_suspend_point);
         }
 
-        for (auto& elem : m_reference_vertex_map) {
-            thread_reference_vertex*& node = elem.second;
-            node->release_ownership();
-            poison_pointer(node);
-        }
+        // for (auto& elem : m_reference_vertex_map) {
+        //     thread_reference_vertex*& node = elem.second;
+        //     node->release_ownership();
+        //     poison_pointer(node);
+        // }
 
         poison_pointer(m_thread_data);
         poison_pointer(m_suspend_point);
