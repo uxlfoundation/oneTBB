@@ -95,6 +95,21 @@ using OperatorPlusNonConst = BlockedRangeValue</*CopyCtor = */true, /*CopyAssign
 using WrongInputOperatorPlus = BlockedRangeValue</*CopyCtor = */true, /*CopyAssignment = */true, /*Dtor = */true, /*Less = */State::correct, /*Minus = */State::correct, /*PlusSizeT = */State::incorrect_first_input>;
 using WrongReturnOperatorPlus = BlockedRangeValue</*CopyCtor = */true, /*CopyAssignment = */true, /*Dtor = */true, /*Less = */State::correct, /*Minus = */State::correct, /*PlusSizeT = */State::incorrect_return_type>;
 
+struct ExplicitDiffType {
+    long long val{0};
+    explicit operator std::size_t() const { return static_cast<std::size_t>(val); }
+    ExplicitDiffType operator/(int d) const { return ExplicitDiffType{val / d}; }
+};
+
+struct ExplicitDiffValue {
+    long long val{0};
+    bool operator<( const ExplicitDiffValue& other ) const { return val < other.val; }
+    ExplicitDiffType operator-( const ExplicitDiffValue& other ) const { return ExplicitDiffType{val - other.val}; }
+    ExplicitDiffValue operator+( std::size_t d ) const { return ExplicitDiffValue{val + static_cast<long long>(d)}; }
+    ExplicitDiffValue operator+( ExplicitDiffType d ) const { return ExplicitDiffValue{val + d.val}; }
+    ExplicitDiffValue operator-( std::size_t d ) const { return ExplicitDiffValue{val - static_cast<long long>(d)}; }
+};
+
 } // namespace blocked_range_value
 namespace range {
 

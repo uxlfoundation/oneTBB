@@ -33,6 +33,11 @@
 #include <utility> //for std::pair
 #include <functional>
 #include <vector>
+#if defined(__has_include)
+#if __has_include(<ranges>)
+#include <ranges>
+#endif
+#endif
 
 //! Testing blocked_range with range based for
 //! \brief \ref interface
@@ -133,7 +138,13 @@ TEST_CASE("constraints for blocked_range value") {
     using const_iterator = typename std::vector<int>::const_iterator;
 
     test_blocked_range_constraint</*Expected = */true,
-                                  Correct, char, int, std::size_t, const_iterator>();
+                                  Correct, char, int, std::size_t, const_iterator, ExplicitDiffValue>();
+#if __cpp_lib_ranges
+    auto view = std::views::iota(0ull, 10ull);
+    test_blocked_range_constraint</*Expected = */true, decltype(view.begin())>();
+    tbb::blocked_range range{ view.begin(), view.end() };
+    CHECK(range.size() == 10);
+#endif
 
     test_blocked_range_constraint</*Expected = */false,
                                   NonCopyable, NonCopyAssignable, NonDestructible,
@@ -148,7 +159,7 @@ TEST_CASE("constraints for blocked_range2d value") {
     using const_iterator = typename std::vector<int>::const_iterator;
 
     test_blocked_range2d_constraint</*Expected = */true,
-                                    Correct, char, int, std::size_t, const_iterator>();
+                                    Correct, char, int, std::size_t, const_iterator, ExplicitDiffValue>();
 
     test_blocked_range2d_constraint</*Expected = */false,
                                     NonCopyable, NonCopyAssignable, NonDestructible,
@@ -166,7 +177,7 @@ TEST_CASE("constraints for blocked_range3d value") {
     using const_iterator = typename std::vector<int>::const_iterator;
 
     test_blocked_range3d_constraint</*Expected = */true,
-                                    Correct, char, int, std::size_t, const_iterator>();
+                                    Correct, char, int, std::size_t, const_iterator, ExplicitDiffValue>();
 
     test_blocked_range3d_constraint</*Expected = */false,
                                     NonCopyable, NonCopyAssignable, NonDestructible,
@@ -184,7 +195,7 @@ TEST_CASE("constraints for blocked_nd_range value") {
     using namespace test_concepts::blocked_range_value;
     using const_iterator = typename std::vector<int>::const_iterator;
 
-    static_assert(well_formed_blocked_nd_range_instantiation<Correct, char, int, std::size_t, const_iterator>);
+    static_assert(well_formed_blocked_nd_range_instantiation<Correct, char, int, std::size_t, const_iterator, ExplicitDiffValue>);
 
     static_assert(!well_formed_blocked_nd_range_instantiation<NonCopyable, NonCopyAssignable, NonDestructible,
                                                               NoOperatorLess, OperatorLessNonConst, WrongReturnOperatorLess,
