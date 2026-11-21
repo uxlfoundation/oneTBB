@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2023 Intel Corporation
+    Copyright (c) 2005-2025 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -31,25 +31,6 @@
 
 namespace rml {
 namespace internal {
-
-#if TBB_USE_DEBUG
-#define DEBUG_SUFFIX "_debug"
-#else
-#define DEBUG_SUFFIX
-#endif /* TBB_USE_DEBUG */
-
-// MALLOCLIB_NAME is the name of the oneTBB memory allocator library.
-#if _WIN32||_WIN64
-#define MALLOCLIB_NAME "tbbmalloc" DEBUG_SUFFIX ".dll"
-#elif __APPLE__
-#define MALLOCLIB_NAME "libtbbmalloc" DEBUG_SUFFIX ".2.dylib"
-#elif __FreeBSD__ || __NetBSD__ || __OpenBSD__ || __sun || _AIX || __ANDROID__
-#define MALLOCLIB_NAME "libtbbmalloc" DEBUG_SUFFIX ".so"
-#elif __unix__
-#define MALLOCLIB_NAME "libtbbmalloc" DEBUG_SUFFIX  __TBB_STRING(.so.2)
-#else
-#error Unknown OS
-#endif
 
 void init_tbbmalloc() {
 #if __TBB_USE_ITT_NOTIFY
@@ -92,11 +73,14 @@ struct RegisterProcessShutdownNotification {
     RegisterProcessShutdownNotification() {
         // prevents unloading, POSIX case
 
-        // We need better support for the library pinning
-        // when dlopen can't find TBBmalloc library.
-        // for example: void *ret = dlopen(MALLOCLIB_NAME, RTLD_NOW);
-        // MALLOC_ASSERT(ret, "Allocator can't load itself.");
-        dlopen(MALLOCLIB_NAME, RTLD_NOW);
+        Dl_info dlinfo;
+        int ret = dladdr((void*)&init_tbbmalloc, &dlinfo);
+        MALLOC_ASSERT(ret && dlinfo.dli_fname, "Allocator can't find itself.");
+        tbb::detail::suppress_unused_warning(ret);
+
+        void* lib = dlopen(dlinfo.dli_fname, RTLD_NOW);
+        MALLOC_ASSERT(lib, "Allocator can't load itself.");
+        tbb::detail::suppress_unused_warning(lib);
     }
 
     RegisterProcessShutdownNotification(RegisterProcessShutdownNotification&) = delete;
