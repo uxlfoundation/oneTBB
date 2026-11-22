@@ -2909,15 +2909,16 @@ internal::tls_t<std::shared_ptr<internal::thread_data_t>*> theTCM::tls;
 extern "C" bool WINAPI DllMain( HANDLE /*hinstDLL*/, DWORD reason, LPVOID /*lpvReserved*/ ) {
     switch( reason ) {
         case DLL_PROCESS_ATTACH:
+            internal::get_tls(nullptr).create();
+            break;
+        case DLL_THREAD_DETACH:
+            deallocate_thread_data(internal::get_tls(nullptr).get());
             break;
         case DLL_PROCESS_DETACH:
             // Since THREAD_DETACH is not called for the main thread, deallocate its local data here
             // as well
             deallocate_thread_data(internal::get_tls(nullptr).get());
             internal::get_tls(nullptr).destroy();
-            break;
-        case DLL_THREAD_DETACH:
-            deallocate_thread_data(internal::get_tls(nullptr).get());
             break;
     }
     return true;
