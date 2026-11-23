@@ -204,6 +204,180 @@ unlock:
     return result;
 }
 
+d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_t slot_index,
+                                  arena_slot& stealer_slot, d1::slot_id& affinity_slot)
+{
+    static constexpr std::size_t batch_threshold = 50;
+
+    affinity_slot = d1::any_slot;
+
+    d1::task** victim_pool = lock_task_pool<pool_bounded_wait>();
+
+    if (victim_pool == LockedTaskPool || victim_pool == EmptyTaskPool) {
+        return nullptr;
+    }
+
+    std::size_t H = head.load(std::memory_order_relaxed);
+    std::size_t T = tail.load(std::memory_order_acquire);
+
+    if ((std::intptr_t)T > (std::intptr_t)H &&
+        T - H > batch_threshold)
+    {
+        // Try stealing the batch
+        d1::task* batch_entries[batch_threshold];
+        std::size_t batch_size = 0;
+
+        const std::size_t old_head = head.fetch_add(batch_threshold);
+        const std::size_t requested_end = old_head + batch_threshold;
+        const std::size_t observed_tail = tail.load(std::memory_order_acquire);
+
+        std::size_t end = requested_end;
+
+        if ((std::intptr_t)observed_tail < (std::intptr_t)end) {
+            end = observed_tail;
+        }
+
+        if ((std::intptr_t)end < (std::intptr_t)old_head) {
+            end = old_head;
+        }
+
+        if (end != requested_end) {
+            head.store(end, std::memory_order_relaxed);
+        }
+
+        // Proxies and tasks with incompatible isolation move intact
+        for (std::size_t i = old_head; i < end; ++i) {
+            d1::task* entry = victim_pool[i];
+            __TBB_ASSERT(!is_poisoned(entry), nullptr);
+
+            if (entry) {
+                batch_entries[batch_size++] = entry;
+            }
+            poison_pointer(victim_pool[i]);
+        }
+
+        unlock_task_pool(victim_pool);
+
+        // Select the entry to return
+        d1::task* result = nullptr;
+
+        if (batch_size == 0) {
+            return nullptr;
+        }
+
+        // TODO: what if allocation in prepare_task_pool throws?
+        const std::size_t stealer_tail = stealer_slot.prepare_task_pool(batch_size);
+
+        // Claimed-empty proxies are freed rather than transferred, so the count is tracked explicitly.
+        std::size_t transfer_count = 0;
+
+        for (std::size_t i = 0; i < batch_size; ++i) {
+            d1::task* entry = batch_entries[i];
+
+            if (!result &&
+                (isolation == no_isolation ||
+                 isolation == task_accessor::isolation(*entry)))
+            {
+                if (!task_accessor::is_proxy_task(*entry)) {
+                    result = entry;
+                    continue;
+                }
+
+                task_proxy& tp = *static_cast<task_proxy*>(entry);
+
+                if (!task_proxy::is_shared(tp.task_and_tag) ||
+                    !tp.outbox->recipient_is_idle() ||
+                    a.mailbox(slot_index).recipient_is_idle())
+                {
+                    // Read before extraction: after a successful extract the mailbox side may free the proxy.
+                    const d1::slot_id proxy_slot = tp.slot;
+                    result = tp.extract_task<task_proxy::pool_bit>();
+                    if (result) {
+                        affinity_slot = proxy_slot;
+                    } else {
+                        tp.allocator.delete_object(&tp);
+                    }
+                    continue;
+                }
+            }
+
+            __TBB_ASSERT(is_poisoned(stealer_slot.task_pool_ptr[stealer_tail + transfer_count]), nullptr);
+
+            stealer_slot.task_pool_ptr[stealer_tail + transfer_count++] = entry;
+        }
+
+        if (transfer_count != 0) {
+            stealer_slot.commit_spawned_tasks(stealer_tail + transfer_count);
+
+            if (!stealer_slot.is_task_pool_published()) {
+                stealer_slot.publish_task_pool();
+            }
+
+            a.advertise_new_work<arena::work_spawned>();
+        }
+
+        return result;
+    }
+
+    // Existing logic
+    d1::task* result = nullptr;
+    std::size_t H0 = H;
+    bool tasks_skipped = false;
+    do {
+        // The full fence is required to sync the store of `head` with the load of `tail` (write-read barrier)
+        H = ++head;
+        // The acquire load of tail is required to guarantee consistency of victim_pool
+        // because the owner synchronizes task spawning via tail.
+        if ((std::intptr_t)H > (std::intptr_t)(tail.load(std::memory_order_acquire))) {
+            // Stealing attempt failed, deque contents has not been changed by us
+            head.store( /*dead: H = */ H0, std::memory_order_relaxed );
+            __TBB_ASSERT( !result, nullptr );
+            goto unlock;
+        }
+        result = victim_pool[H-1];
+        __TBB_ASSERT( !is_poisoned( result ), nullptr );
+
+        if (result) {
+            if (isolation == no_isolation || isolation == task_accessor::isolation(*result)) {
+                if (!task_accessor::is_proxy_task(*result)) {
+                    break;
+                }
+                task_proxy& tp = *static_cast<task_proxy*>(result);
+                // If mailed task is likely to be grabbed by its destination thread, skip it.
+                if (!task_proxy::is_shared(tp.task_and_tag) || !tp.outbox->recipient_is_idle() || a.mailbox(slot_index).recipient_is_idle()) {
+                    break;
+                }
+            }
+            // The task cannot be executed either due to isolation or proxy constraints.
+            result = nullptr;
+            tasks_skipped = true;
+        } else if (!tasks_skipped) {
+            // Cleanup the task pool from holes until a task is skipped.
+            __TBB_ASSERT( H0 == H-1, nullptr );
+            poison_pointer( victim_pool[H0] );
+            H0 = H;
+        }
+    } while (!result);
+    __TBB_ASSERT( result, nullptr );
+
+    // emit "task was consumed" signal
+    poison_pointer( victim_pool[H-1] );
+    if (tasks_skipped) {
+        // Some proxies in the task pool have been skipped. Set the stolen task to nullptr.
+        victim_pool[H-1] = nullptr;
+        // The release store synchronizes the victim_pool update(the store of nullptr).
+        head.store( /*dead: H = */ H0, std::memory_order_release );
+    }
+unlock:
+    unlock_task_pool(victim_pool);
+
+#if __TBB_PREFETCHING
+    __TBB_cl_evict(&victim_slot.head);
+    __TBB_cl_evict(&victim_slot.tail);
+#endif
+    return result;
+}
+
 } // namespace r1
 } // namespace detail
 } // namespace tbb

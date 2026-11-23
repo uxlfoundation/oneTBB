@@ -414,7 +414,7 @@ public:
     template<arena::new_work_type work_type> void advertise_new_work();
 
     //! Attempts to steal a task from a randomly chosen arena slot
-    d1::task* steal_task(unsigned arena_index, FastRandom& frnd, execution_data_ext& ed, isolation_type isolation);
+    d1::task* steal_task(unsigned arena_index, FastRandom& frnd, execution_data_ext& ed, isolation_type isolation, bool allow_batch);
 
     //! Get a task from a global starvation resistant queue
     template<task_stream_accessor_type accessor>
@@ -524,7 +524,7 @@ void arena::advertise_new_work() {
     }
 }
 
-inline d1::task* arena::steal_task(unsigned arena_index, FastRandom& frnd, execution_data_ext& ed, isolation_type isolation) {
+inline d1::task* arena::steal_task(unsigned arena_index, FastRandom& frnd, execution_data_ext& ed, isolation_type isolation, bool allow_batch) {
     auto slot_num_limit = my_limit.load(std::memory_order_relaxed);
     if (slot_num_limit == 1) {
         // No slots to steal from
@@ -543,7 +543,16 @@ inline d1::task* arena::steal_task(unsigned arena_index, FastRandom& frnd, execu
     arena_slot* victim = &my_slots[k];
     d1::task **pool = victim->task_pool.load(std::memory_order_relaxed);
     d1::task *t = nullptr;
-    if (pool == EmptyTaskPool || !(t = victim->steal_task(*this, isolation, k))) {
+    if (pool == EmptyTaskPool) {
+        return nullptr;
+    }
+    if (allow_batch) {
+        t = victim->steal_batch(*this, isolation, k, my_slots[arena_index], ed.affinity_slot);
+    } else {
+        ed.affinity_slot = d1::any_slot;
+        t = victim->steal_task(*this, isolation, k);
+    }
+    if (!t) {
         return nullptr;
     }
     if (task_accessor::is_proxy_task(*t)) {
@@ -557,9 +566,6 @@ inline d1::task* arena::steal_task(unsigned arena_index, FastRandom& frnd, execu
         }
         // Note affinity is called for any stolen task (proxy or general)
         ed.affinity_slot = slot;
-    } else {
-        // Note affinity is called for any stolen task (proxy or general)
-        ed.affinity_slot = d1::any_slot;
     }
     // Update task owner thread id to identify stealing
     ed.original_slot = k;

@@ -164,7 +164,7 @@ inline d1::task* task_dispatcher::steal_or_get_critical(
     execution_data_ext& ed, arena& a, unsigned arena_index, FastRandom& random,
     isolation_type isolation, bool critical_allowed)
 {
-    if (d1::task* t = a.steal_task(arena_index, random, ed, isolation)) {
+    if (d1::task* t = a.steal_task(arena_index, random, ed, isolation, m_innermost_running_task == nullptr)) {
         ed.context = task_accessor::context(*t);
         ed.isolation = task_accessor::isolation(*t);
         return get_critical_task(t, ed, isolation, critical_allowed);

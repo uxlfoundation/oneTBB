@@ -152,6 +152,7 @@ public:
 
     //! Steal task from slot's ready pool
     d1::task* steal_task(arena&, isolation_type, std::size_t);
+    d1::task* steal_batch(arena&, isolation_type, std::size_t, arena_slot&, d1::slot_id&);
 
     //! Some thread is now the owner of this slot
     void occupy() {
