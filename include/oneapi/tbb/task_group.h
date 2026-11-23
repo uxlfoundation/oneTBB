@@ -626,6 +626,7 @@ public:
 }; // class task_group_base
 
 class task_group : public task_group_base {
+    d1::slot_id next_slot();
 public:
     task_group() : task_group_base(d1::task_group_context::concurrent_wait) {}
     task_group(d1::task_group_context& ctx) : task_group_base(ctx) {}
@@ -633,6 +634,12 @@ public:
     template<typename F>
     void run(F&& f) {
         d1::spawn(*prepare_task(std::forward<F>(f)), context());
+    }
+
+    template <typename F>
+    void round_robin_spawn(F&& f) {
+        // Should be executed by single producer in single arena only!
+        d1::spawn(*prepare_task(std::forward<F>(f)), context(), next_slot());
     }
 
     void run(d2::task_handle&& h) {

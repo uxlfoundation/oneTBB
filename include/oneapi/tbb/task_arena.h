@@ -703,6 +703,21 @@ inline std::vector<d1::task_arena> create_numa_task_arenas(d1::constraints c = {
 using r1::submit;
 
 } // namespace d1
+
+namespace d2 {
+    
+inline d1::slot_id task_group::next_slot() {
+    static d1::slot_id index = d1::slot_id(0);
+    static const d1::slot_id max = d1::slot_id(d1::max_concurrency());
+    d1::slot_id prev = index++;
+    if (index == max) {
+        index = d1::slot_id(0);
+    }
+
+    return prev;
+}
+}
+
 } // namespace detail
 
 inline namespace v1 {
