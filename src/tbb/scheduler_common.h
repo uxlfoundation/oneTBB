@@ -18,6 +18,11 @@
 #ifndef _TBB_scheduler_common_H
 #define _TBB_scheduler_common_H
 
+// Set to 0 to use current-vertex probing instead of a persistent cursor.
+#ifndef TBB_USE_REFERENCE_VERTEX_CURSOR
+#define TBB_USE_REFERENCE_VERTEX_CURSOR 1
+#endif
+
 #include "oneapi/tbb/detail/_utils.h"
 #include "oneapi/tbb/detail/_template_helpers.h"
 #include "oneapi/tbb/detail/_task.h"
@@ -544,6 +549,9 @@ class thread_reference_vertex_pool {
 
     thread_reference_vertex* m_head;
     thread_reference_vertex* m_current;
+#if TBB_USE_REFERENCE_VERTEX_CURSOR
+    thread_reference_vertex* m_search_cursor;
+#endif
     
     static thread_reference_vertex* allocate_vertex(d1::wait_tree_vertex_interface& parent) {
         void* storage = cache_aligned_allocate(sizeof(thread_reference_vertex));
@@ -563,6 +571,9 @@ public:
     thread_reference_vertex_pool(d1::wait_tree_vertex_interface& parent)
         : m_head(allocate_vertex(parent))
         , m_current(m_head)
+#if TBB_USE_REFERENCE_VERTEX_CURSOR
+        , m_search_cursor(m_head)
+#endif
     {}
 
     thread_reference_vertex_pool(const thread_reference_vertex_pool&) = delete;
@@ -591,18 +602,31 @@ public:
             return probe_vertex;
         }
         
+    #if TBB_USE_REFERENCE_VERTEX_CURSOR
+        // Preserve search progress independently of the current target.
+        thread_reference_vertex* start = m_search_cursor;
+    #else
         // Try at most probe_limit other nodes
+    #endif
         for (std::size_t i = 0; i < probe_limit; ++i) {
+    #if TBB_USE_REFERENCE_VERTEX_CURSOR
+            probe_vertex = m_search_cursor;
+            m_search_cursor = probe_vertex->next_vertex();
+    #else
             thread_reference_vertex* next = probe_vertex->next_vertex();
 
             if (next == m_current) break;
 
             probe_vertex = next;
+    #endif
 
             if (probe_vertex->get_num_children() <= reuse_threshold) {
                 m_current = probe_vertex;
                 return probe_vertex;
             }
+    #if TBB_USE_REFERENCE_VERTEX_CURSOR
+            if (m_search_cursor == start) break;
+    #endif
         }
 
         // We did not find the vertex, so allocate the new one
