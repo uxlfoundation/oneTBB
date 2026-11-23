@@ -33,7 +33,7 @@ void throw_in_assertion_handler(TestCase test_case) {
     static bool terminate_handler_called;
     static bool assertion_handler_called;
     static TestCase my_test_case;
-    constexpr const char *assertion_comment = "Assertion from user code";
+    static constexpr const char *assertion_comment = "Assertion from user code";
 
     terminate_handler_called = false;
     assertion_handler_called = false;
