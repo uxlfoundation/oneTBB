@@ -31,19 +31,22 @@ enum class TestCase {
 void throw_in_assertion_handler(TestCase test_case) {
     oneapi::tbb::global_control c(oneapi::tbb::global_control::terminate_on_exception, 1);
     static bool terminate_handler_called;
-    static bool assertion_handler_called;
+    static int assertion_handler_called_num;
     static TestCase my_test_case;
     static constexpr const char *assertion_comment = "Assertion from user code";
 
     terminate_handler_called = false;
-    assertion_handler_called = false;
+    assertion_handler_called_num = 0;
     my_test_case = test_case;
 
     try {
         static std::jmp_buf buffer;
 
         std::terminate_handler prev_terminate_handler = std::set_terminate([] {
-            CHECK(assertion_handler_called);
+            if (my_test_case == TestCase::ASSERT_FROM_USER_CODE)
+                CHECK(assertion_handler_called_num == 2);
+            else
+                CHECK(assertion_handler_called_num == 1);
             CHECK(!terminate_handler_called);
             terminate_handler_called = true;
             std::longjmp(buffer, 1);
@@ -54,7 +57,7 @@ void throw_in_assertion_handler(TestCase test_case) {
                 tbb::set_assertion_handler([](const char* location, int line,
                                                    const char* expression, const char* comment) {
                     CHECK(my_test_case == TestCase::ASSERT_FROM_USER_CODE);
-                    if (assertion_handler_called) {
+                    if (assertion_handler_called_num == 1) {
                         CHECK(location);
                         CHECK(location[0] == 0);
                         CHECK(!line);
@@ -66,8 +69,8 @@ void throw_in_assertion_handler(TestCase test_case) {
                                       "expected \"" << std::string(expected_comment) << "\", got: "
                                        << std::string(comment));
                     }
-                    else {
-                        assertion_handler_called = true;
+                    else if (assertion_handler_called_num == 0) {
+                        assertion_handler_called_num = 1;
                         CHECK(location);
                         CHECK(location[0]);
                         CHECK(line);
@@ -77,14 +80,16 @@ void throw_in_assertion_handler(TestCase test_case) {
                         CHECK_MESSAGE(strstr(comment, assertion_comment),
                                       "expected \"" << std::string(assertion_comment) << "\", got: "
                                        << std::string(comment));
-                    }
+                    } else
+                        FAIL("Unexpected assertion handler call order");
+
                     throw 42;
                 })
             :
             tbb::set_assertion_handler([](const char* location, int line,
                                           const char* expression, const char* comment) {
-                CHECK(!assertion_handler_called);
-                assertion_handler_called = true;
+                CHECK(!assertion_handler_called_num);
+                assertion_handler_called_num = 1;
                 CHECK(location);
                 CHECK(location[0] == 0);
                 CHECK(!line);
