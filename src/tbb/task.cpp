@@ -227,21 +227,24 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
     __TBB_ASSERT(top_wait_context, nullptr);
     auto& dispatcher = *governor::get_thread_data()->my_task_dispatcher;
 
-    thread_reference_vertex* ref_counter{nullptr};
+    // thread_reference_vertex* ref_counter{nullptr};
+    thread_reference_vertex_pool* vertex_pool = nullptr;
     auto& reference_map = dispatcher.m_reference_vertex_map;
     auto pos = reference_map.find(top_wait_context);
     if (pos != reference_map.end()) {
-        ref_counter = pos->second;
+        // ref_counter = pos->second;
+        vertex_pool = &pos->second;
     } else {
         constexpr std::size_t max_reference_vertex_map_size = 1000;
         if (reference_map.size() > max_reference_vertex_map_size) {
             // TODO: Research the possibility of using better approach for a clean-up
             for (auto it = reference_map.begin(); it != reference_map.end();) {
-                __TBB_ASSERT(it->second, nullptr);
-                thread_reference_vertex*& node = it->second;
-                __TBB_ASSERT(!node->is_orphaned(), "the orphaned bit should not yet be set");
-                if (node->get_num_children() == 0) {
-                    node->destroy();
+                // __TBB_ASSERT(it->second, nullptr);
+                // thread_reference_vertex*& node = it->second;
+                // __TBB_ASSERT(!node->is_orphaned(), "the orphaned bit should not yet be set");
+                // if (node->get_num_children() == 0) {
+                //     node->destroy();
+                if (it->second.empty()) {
                     it = reference_map.erase(it);
                 } else {
                     ++it;
@@ -249,11 +252,19 @@ d1::wait_tree_vertex_interface* get_thread_reference_vertex(d1::wait_tree_vertex
             }
         }
 
-        reference_map[top_wait_context] = ref_counter =
-            new (cache_aligned_allocate(sizeof(thread_reference_vertex))) thread_reference_vertex(*top_wait_context, 0);
+        auto inserted = reference_map.emplace(
+            std::piecewise_construct,
+            std::forward_as_tuple(top_wait_context),
+            std::forward_as_tuple(*top_wait_context));
+
+        vertex_pool = &inserted.first->second;
+
+        // reference_map[top_wait_context] = ref_counter =
+        //     new (cache_aligned_allocate(sizeof(thread_reference_vertex))) thread_reference_vertex(*top_wait_context, 0);
     }
 
-    return ref_counter;
+    __TBB_ASSERT(vertex_pool, nullptr);
+    return vertex_pool->select();
 }
 
 d1::task* __TBB_EXPORTED_FUNC current_task_ptr() {
