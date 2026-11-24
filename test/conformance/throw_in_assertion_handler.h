@@ -58,6 +58,7 @@ void throw_in_assertion_handler(TestCase test_case) {
                                                    const char* expression, const char* comment) {
                     CHECK(my_test_case == TestCase::ASSERT_FROM_USER_CODE);
                     if (assertion_handler_called_num == 1) {
+                        assertion_handler_called_num = 2;
                         CHECK(location);
                         CHECK(location[0] == 0);
                         CHECK(!line);
