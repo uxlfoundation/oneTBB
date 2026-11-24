@@ -155,17 +155,7 @@ void terminate_on_user_exception() noexcept {
 
 void __TBB_EXPORTED_FUNC assertion_failure(const char* location, int line,
                                            const char* expression, const char* comment) {
-#if 0 // __TBB_BUILD
-    // terminate_on_exception() exists only in this configuration
-    if (terminate_on_exception())
-        [&]() noexcept {
-            // we are supporting throwing exceptions from user provided assertion handlers, but in
-            // case of terminate_on_exception() throwing leads to std::terminate call
-            assertion_handler::get()(location, line, expression, comment);
-        }();
-    else
-#endif
-        assertion_handler::get()(location, line, expression, comment);
+    assertion_handler::get()(location, line, expression, comment);
 }
 
 #if !__TBBMALLOC_BUILD && !__TBBMALLOCPROXY_BUILD
