@@ -28,9 +28,9 @@ constexpr char test_name[] =
 
 #include "throw_in_assertion_handler.h"
 
-//! Test terminate_on_exception by triggering assert from user code and then throwing an exception
-//! that does not inherit from std::exception, and then throwing from the assertion handler. The assertion handler's exception
-//! triggers std::terminate, which the test intercepts with longjmp.
+//! Test terminate_on_exception: user code triggers an assert, then the assertion handler throws an exception
+//! that does not inherit from std::exception. This throw from the assertion handler results in std::terminate,
+//! which the test intercepts with longjmp.
 //! \brief \ref interface \ref requirement
 TEST_CASE(test_name) {
     throw_in_assertion_handler(TestCase::ASSERT_FROM_USER_CODE);
