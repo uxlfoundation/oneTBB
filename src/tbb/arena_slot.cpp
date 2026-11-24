@@ -204,6 +204,10 @@ unlock:
     return result;
 }
 
+inline std::size_t select_batch_max_size(std::size_t sz) {
+    return sz / 2;
+}
+
 d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_t slot_index,
                                   arena_slot& stealer_slot, d1::slot_id& affinity_slot)
 {
@@ -219,16 +223,20 @@ d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_
 
     std::size_t H = head.load(std::memory_order_relaxed);
     std::size_t T = tail.load(std::memory_order_acquire);
+    std::size_t SZ = T - H;
 
     if ((std::intptr_t)T > (std::intptr_t)H &&
-        T - H > batch_threshold)
+        SZ > batch_threshold)
     {
         // Try stealing the batch
-        d1::task* batch_entries[batch_threshold];
+        const std::size_t batch_max_size = select_batch_max_size(SZ);
+        d1::task** batch_entries = reinterpret_cast<d1::task**>(cache_aligned_allocate(sizeof(d1::task*) * batch_max_size));
+        
+        // d1::task* batch_entries[batch_threshold];
         std::size_t batch_size = 0;
 
-        const std::size_t old_head = head.fetch_add(batch_threshold);
-        const std::size_t requested_end = old_head + batch_threshold;
+        const std::size_t old_head = head.fetch_add(batch_max_size);
+        const std::size_t requested_end = old_head + batch_max_size;
         const std::size_t observed_tail = tail.load(std::memory_order_acquire);
 
         std::size_t end = requested_end;
@@ -315,6 +323,8 @@ d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_
 
             a.advertise_new_work<arena::work_spawned>();
         }
+
+        cache_aligned_deallocate(batch_entries);
 
         return result;
     }
