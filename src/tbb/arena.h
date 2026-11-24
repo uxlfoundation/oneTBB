@@ -292,7 +292,7 @@ struct arena_base : padded<intrusive_list_node> {
     std::atomic<bool> my_is_top_priority{false};
 
     //! Current task pool state and estimate of available tasks amount.
-    atomic_flag my_pool_state;
+    alignas(max_nfs_size) atomic_flag my_pool_state;
 
     //! The list of local observers attached to this arena.
     observer_list my_observers;
