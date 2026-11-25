@@ -76,15 +76,15 @@ struct close_handle {
 using unique_handle = std::unique_ptr<void, close_handle>;
 
 std::string run_assertion(bool with_description) {
-    wchar_t executable[32768];
-    constexpr DWORD capacity = sizeof(executable) / sizeof(*executable);
-    const DWORD length = GetModuleFileNameW(nullptr, executable, capacity);
+    constexpr DWORD capacity = 32768;
+    std::vector<wchar_t> executable(capacity);
+    const DWORD length = GetModuleFileNameW(nullptr, executable.data(), capacity);
     REQUIRE_MESSAGE((length > 0 && length < capacity),
                     "Could not locate the assertion test executable");
 
     const std::string argument = with_description ? child_with_description : child_without_description;
     std::vector<wchar_t> command{L'"'};
-    command.insert(command.end(), executable, executable + length);
+    command.insert(command.end(), executable.begin(), executable.begin() + length);
     command.insert(command.end(), {L'"', L' '});
     command.insert(command.end(), argument.begin(), argument.end());
     command.push_back(L'\0');
@@ -109,7 +109,7 @@ std::string run_assertion(bool with_description) {
     startup.hStdOutput = null_stream.get();
     startup.hStdError = writer.get();
     PROCESS_INFORMATION process{};
-    REQUIRE_MESSAGE(CreateProcessW(executable, command.data(), nullptr, nullptr, TRUE, 0,
+    REQUIRE_MESSAGE(CreateProcessW(executable.data(), command.data(), nullptr, nullptr, TRUE, 0,
                                    nullptr, nullptr, &startup, &process),
                     "Could not launch the assertion child");
     unique_handle child(process.hProcess), thread(process.hThread);
