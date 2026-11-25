@@ -228,6 +228,12 @@ d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_
     d1::task** victim_pool = lock_task_pool<pool_bounded_wait>();
 
     if (victim_pool == LockedTaskPool || victim_pool == EmptyTaskPool) {
+        if (try_steal_batch && stealer_tail != 0) {
+            stealer_slot.commit_spawned_tasks(stealer_tail);
+            if (!stealer_slot.is_task_pool_published()) {
+                stealer_slot.publish_task_pool();
+            }
+        }
         return nullptr;
     }
 
@@ -258,8 +264,8 @@ d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_
             d1::task* entry = victim_pool[i];
             __TBB_ASSERT(!is_poisoned(entry), nullptr);
             
-            if (!entry) continue;
             poison_pointer(victim_pool[i]);
+            if (!entry) continue;
 
             if (!result &&
                 (isolation == no_isolation || isolation == task_accessor::isolation(*entry)))
@@ -292,20 +298,24 @@ d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_
 
         unlock_task_pool(victim_pool);
 
-        if (transfer_count != 0) {
+        if (stealer_tail + transfer_count != 0) {
             stealer_slot.commit_spawned_tasks(stealer_tail + transfer_count);
-
+            
             if (!stealer_slot.is_task_pool_published()) {
                 stealer_slot.publish_task_pool();
             }
 
-            a.advertise_new_work<arena::work_spawned>(); // TODO: is it needed?
+            if (transfer_count != 0) {
+                a.advertise_new_work<arena::work_spawned>(); // TODO: is it needed?
+            }
         }
+
         return result;
     }
 
     // Existing logic
     d1::task* result = nullptr;
+    H = head.load(std::memory_order_relaxed);
     std::size_t H0 = H;
     bool tasks_skipped = false;
     do {
