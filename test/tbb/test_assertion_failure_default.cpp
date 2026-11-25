@@ -28,6 +28,7 @@
 #if defined(_WIN32)
 #include <windows.h>
 #include <memory>
+#include <vector>
 #if defined(_MSC_VER) && defined(_DEBUG)
 #include <crtdbg.h>
 #endif
@@ -67,8 +68,11 @@ std::string run_assertion(bool with_description) {
                     "Could not locate the assertion test executable");
 
     const std::string argument = with_description ? child_with_description : child_without_description;
-    std::wstring command = L"\"" + std::wstring(executable, length) + L"\" ";
-    command.append(argument.begin(), argument.end());
+    std::vector<wchar_t> command{L'"'};
+    command.insert(command.end(), executable, executable + length);
+    command.insert(command.end(), {L'"', L' '});
+    command.insert(command.end(), argument.begin(), argument.end());
+    command.push_back(L'\0');
 
     SECURITY_ATTRIBUTES security{};
     security.nLength = sizeof(security);
@@ -90,7 +94,7 @@ std::string run_assertion(bool with_description) {
     startup.hStdOutput = null_stream.get();
     startup.hStdError = writer.get();
     PROCESS_INFORMATION process{};
-    REQUIRE_MESSAGE(CreateProcessW(executable, &command[0], nullptr, nullptr, TRUE, 0,
+    REQUIRE_MESSAGE(CreateProcessW(executable, command.data(), nullptr, nullptr, TRUE, 0,
                                    nullptr, nullptr, &startup, &process),
                     "Could not launch the assertion child");
     unique_handle child(process.hProcess), thread(process.hThread);
