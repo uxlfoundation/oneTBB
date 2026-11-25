@@ -70,7 +70,13 @@ const char* const child_with_description = "--assertion-with-description";
 const char* const child_without_description = "--assertion-without-description";
 
 struct close_handle {
-    void operator()(HANDLE handle) const { CloseHandle(handle); }
+    void operator()(HANDLE handle) const {
+        // unique_ptr calls the deleter even for a null stored pointer; also guard against
+        // INVALID_HANDLE_VALUE to avoid spurious CloseHandle failures during unwinding.
+        if (handle && handle != INVALID_HANDLE_VALUE) {
+            CloseHandle(handle);
+        }
+    }
 };
 
 using unique_handle = std::unique_ptr<void, close_handle>;
