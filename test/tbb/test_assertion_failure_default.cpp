@@ -169,7 +169,8 @@ bool has_line(const std::string& diagnostic, const std::string& line) {
     for (std::size_t pos = diagnostic.find(line); pos != std::string::npos; pos = diagnostic.find(line, pos + 1)) {
         const std::size_t end = pos + line.size();
         if ((pos == 0 || diagnostic[pos - 1] == '\n') &&
-            (diagnostic.compare(end, 1, "\n") == 0 || diagnostic.compare(end, 2, "\r\n") == 0)) {
+            (diagnostic.compare(end, 1, "\n") == 0 || diagnostic.compare(end, 2, "\r\n") == 0 ||
+             end == diagnostic.size())) {
             return true;
         }
     }
@@ -181,7 +182,7 @@ constexpr char test_name[] = "Default assertion handler reports the failure and 
 #if defined(_WIN32) && defined(_MT) && !defined(_DLL)
 
 //! Test for the default assertion handler: skip in this configuration, because can't control error
-//! dialogs in runtime used by dll.
+//! dialogs in runtime used by the dll.
 //! \brief \ref interface \ref requirement
 TEST_CASE(test_name * doctest::skip()) {}
 
@@ -196,7 +197,7 @@ TEST_CASE(test_name) {
     SUBCASE("without description") {}
 
     const std::string diagnostic = run_assertion(with_description);
-    INFO("Child stderr: ", diagnostic);
+    INFO("Child stderr: " << diagnostic);
     CHECK(has_line(diagnostic, "Assertion test_expression failed (located in the test_location function, line in file: 42)"));
     if (with_description) {
         CHECK(has_line(diagnostic, std::string("Detailed description: ") + description));
