@@ -49,47 +49,80 @@ namespace tcm {
 namespace internal {
 class ThreadComposabilityFairBalance;
 
-void deallocate_thread_data(void* td_ptr) {
-    auto td = static_cast<std::shared_ptr<thread_data_t>*>(td_ptr);
-    delete td;
-}
-
 using tls_dtor_func = void(*)(void*);
+
+void deallocate_thread_data(void* td_ptr) {
+    auto td_sp = static_cast<std::shared_ptr<thread_data_t>*>(td_ptr);
+    delete td_sp;
+}
 
 //! Basic cross-platform wrapper class for TLS operations.
 template <typename T>
 class tls_t {
 #if _WIN32 || _WIN64
     typedef DWORD tls_key_t;
-public:
     int create( tls_dtor_func = nullptr ) {
         tls_key_t tmp = TlsAlloc();
         if( tmp==TLS_OUT_OF_INDEXES )
             return TLS_OUT_OF_INDEXES;
-        my_key = tmp;
+        m_key = tmp;
         return 0;
     }
-    int  destroy()      { TlsFree(my_key); my_key=0; return 0; }
-    void set( T value ) { TlsSetValue(my_key, (LPVOID)value); }
-    T    get()          { return (T)TlsGetValue(my_key); }
+    int  destroy()      { TlsFree(m_key); m_key=0; return 0; }
+public:
+    void set( T value ) { TlsSetValue(m_key, (LPVOID)value); }
+    T    get()          { return (T)TlsGetValue(m_key); }
 #else /* _WIN32 || _WIN64 */
     typedef pthread_key_t tls_key_t;
+    int  create( tls_dtor_func dtor = nullptr )  { return pthread_key_create(&m_key, dtor);  }
+    int  destroy()                               { return pthread_key_delete(m_key);         }
 public:
-    int  create( tls_dtor_func dtor = nullptr )  { return pthread_key_create(&my_key, dtor);  }
-    int  destroy()                               { return pthread_key_delete(my_key);         }
-    T    get()                                   { return (T)pthread_getspecific(my_key);     }
-    void set( T value )                          { pthread_setspecific(my_key, (void*)value); }
+    void set( T value )                          { pthread_setspecific(m_key, (void*)value); }
+    T    get()                                   { return (T)pthread_getspecific(m_key);     }
 #endif /* _WIN32 || _WIN64 */
     tls_t(tls_dtor_func dtor = nullptr) {
         const int r = create(dtor);
         __TCM_ASSERT_EX(r == 0, "Unable to create thread local key.");
     }
+    void refer() { ++m_refcount; }
+    void unrefer() {
+        __TCM_ASSERT(m_refcount.load(std::memory_order_relaxed) > 0,
+                     "TLS key has been destroyed already.");
+        if (!--m_refcount)
+            delete this;
+    }
+private:
+    tls_key_t m_key;
+    std::atomic<uint32_t> m_refcount{1}; // One so that creator does not need to bump the reference
     ~tls_t() {
         const int r = destroy();
         __TCM_ASSERT_EX(r == 0, "Unable to delete thread local key.");
     }
+};
+
+using tcm_tls_t = tls_t<std::shared_ptr<thread_data_t>*>;
+
+class tls_key_keeper_t {
+public:
+    ~tls_key_keeper_t() {
+        if (has_tls())
+            tls_ptr->unrefer();
+    }
+    tcm_tls_t& refer_tls() {
+        if (!tls_ptr)
+            tls_ptr = new tcm_tls_t(&deallocate_thread_data);
+
+        __TCM_ASSERT(has_tls(), "Invalid pointer to TLS");
+        tls_ptr->refer();
+        return tls();
+    }
+    tcm_tls_t& tls() const {
+        __TCM_ASSERT(has_tls(), "Invalid pointer to TLS");
+        return *tls_ptr;
+    }
+    bool has_tls() const { return bool(tls_ptr); }
 private:
-    tls_key_t my_key;
+    tcm_tls_t* tls_ptr{nullptr};
 };
 
 } // namespace internal
@@ -102,11 +135,8 @@ class theTCM {
     static std::atomic<std::size_t> num_unique_permits; // Number of unique permits IDs issued.
     static std::mutex tcm_mutex;
     static internal::environment tcm_env;
+    static internal::tls_key_keeper_t tcm_tls_key_keeper;
 public:
-#if _WIN32 || _WIN64
-    static internal::tls_t<std::shared_ptr<internal::thread_data_t>*> tls;
-#endif
-
     static std::size_t next_permit_id() {
         return num_unique_permits.fetch_add(1, std::memory_order_relaxed);
     }
@@ -128,6 +158,8 @@ public:
     static internal::environment& get_tcm_env() {
         return tcm_env;
     }
+
+    static internal::tls_key_keeper_t& tls_key_keeper() { return tcm_tls_key_keeper; }
 
     static void increase_ref_count();
 
@@ -160,6 +192,7 @@ std::size_t theTCM::reference_count{0};
 std::atomic<std::size_t> theTCM::num_unique_permits{0};
 std::mutex theTCM::tcm_mutex{};
 internal::environment theTCM::tcm_env{};
+internal::tls_key_keeper_t theTCM::tcm_tls_key_keeper;
 
 namespace internal {
 
@@ -625,11 +658,7 @@ fitting_result_t try_fit_concurrency(const int32_t min_threads, const int32_t ma
 }
 
 struct ThreadComposabilityManagerData {
-  ThreadComposabilityManagerData()
-#if !(_WIN32 || _WIN64)
-      : tls(&deallocate_thread_data)
-#endif
-    {
+  ThreadComposabilityManagerData() : tls(theTCM::tls_key_keeper().refer_tls()) {
     // TODO: parse topology only once
     system_topology::construct();
     system_topology& topology = system_topology::instance();
@@ -661,11 +690,10 @@ struct ThreadComposabilityManagerData {
   ~ThreadComposabilityManagerData() {
     hwloc_bitmap_free(process_mask);
     system_topology::destroy();
+    tls.unrefer();
   }
 
-#if !(_WIN32 || _WIN64)
-  tls_t<std::shared_ptr<thread_data_t>*> tls;
-#endif
+  tcm_tls_t& tls;
 
   std::mutex data_mutex{};
 
@@ -704,7 +732,7 @@ struct ThreadComposabilityManagerData {
   std::unordered_multimap<tcm_client_id_t, tcm_permit_handle_t> client_to_permit_mmap{};
 };
 
-const std::shared_ptr<thread_data_t>& thread_data_ptr(tls_t<std::shared_ptr<thread_data_t>*>& tls) {
+const std::shared_ptr<thread_data_t>& thread_data_ptr(tcm_tls_t& tls) {
     std::shared_ptr<thread_data_t>* td_sp = tls.get();
     if (!td_sp) {
         td_sp = new std::shared_ptr<thread_data_t>(new thread_data_t);
@@ -713,19 +741,7 @@ const std::shared_ptr<thread_data_t>& thread_data_ptr(tls_t<std::shared_ptr<thre
     return *td_sp;
 }
 
-thread_data_t& thread_data(tls_t<std::shared_ptr<thread_data_t>*>& tls) {
-    return *thread_data_ptr(tls);
-}
-
-tls_t<std::shared_ptr<thread_data_t>*>& get_tls(ThreadComposabilityManagerData* data) {
-#if _WIN32 || _WIN64
-    suppress_unused_warning(data);
-    return theTCM::tls;
-#else
-   __TCM_ASSERT(data, "Attempt to dereference nullptr");
-   return data->tls;
-#endif
-}
+thread_data_t& thread_data(tcm_tls_t& tls) { return *thread_data_ptr(tls); }
 
 #if TCM_USE_ASSERT
 /**
@@ -1163,7 +1179,7 @@ public:
   void determine_nested_permit(tcm_permit_handle_t& ph) {
     bool is_nested = false;
     const std::size_t permit_id = ph->permit_id;
-    thread_data_t& td = thread_data(get_tls(this));
+    thread_data_t& td = thread_data(tls);
     {
         std::lock_guard<std::mutex> lock(td.mutex);
         if (!td.permits.empty() && permit_id != td.permits.top())
@@ -1589,7 +1605,7 @@ public:
 
   tcm_result_t register_thread(tcm_permit_handle_t ph) {
       __TCM_ASSERT(ph, "Invalid permit handle");
-      const std::shared_ptr<thread_data_t>& td_sp = thread_data_ptr(get_tls(this));
+      const std::shared_ptr<thread_data_t>& td_sp = thread_data_ptr(tls);
       thread_data_t* td_ptr = td_sp.get();
       bool is_first_registration = false;
       {
@@ -1629,7 +1645,7 @@ public:
   }
 
   tcm_result_t unregister_thread() {
-      thread_data_t& td = thread_data(get_tls(this));
+      thread_data_t& td = thread_data(tls);
 
       std::lock_guard<std::mutex> lock(td.mutex);
       if (td.permits.empty())
@@ -2904,10 +2920,6 @@ protected:
 
 #if _WIN32 || _WIN64
 
-internal::tls_t<std::shared_ptr<internal::thread_data_t>*> theTCM::tls(
-    &internal::deallocate_thread_data
-);
-
 // Windows "DllMain" that handles startup and shutdown of a dynamic library.
 extern "C" bool WINAPI DllMain( HANDLE /*hinstDLL*/, DWORD reason, LPVOID /*lpvReserved*/ ) {
     switch( reason ) {
@@ -2916,7 +2928,9 @@ extern "C" bool WINAPI DllMain( HANDLE /*hinstDLL*/, DWORD reason, LPVOID /*lpvR
         case DLL_PROCESS_DETACH:
             // Since THREAD_DETACH is not called for the main thread, deallocate its local data here
             // as well
-            deallocate_thread_data(internal::get_tls(nullptr).get());
+            internal::tls_key_keeper_t& tkk = theTCM::tls_key_keeper();
+            if (tkk.has_tls())
+                deallocate_thread_data(tkk.tls().get());
             break;
     }
     return true;
