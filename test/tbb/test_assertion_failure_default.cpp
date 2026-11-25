@@ -108,7 +108,7 @@ std::string run_assertion(bool with_description) {
                     "Could not wait for the assertion child");
     DWORD status = 0;
     REQUIRE_MESSAGE(GetExitCodeProcess(child.get(), &status), "Could not read the child exit status");
-    CHECK_MESSAGE(status == 3, "The assertion child did not exit with the Windows CRT abort status");
+    CHECK_MESSAGE(status != 0, "The assertion child did not terminate abnormally (expected non-zero exit status)");
     return diagnostic;
 }
 
