@@ -213,6 +213,16 @@ d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_
 {
     static constexpr std::size_t batch_threshold = 50;
 
+    std::size_t H = head.load(std::memory_order_acquire);
+    std::size_t T = tail.load(std::memory_order_acquire);
+
+    const bool try_steal_batch = (std::intptr_t)T > (std::intptr_t)H && (T - H) > batch_threshold;
+    std::size_t stealer_tail = 0;
+
+    if (try_steal_batch) {
+        stealer_tail = stealer_slot.prepare_task_pool(batch_threshold);
+    }
+
     affinity_slot = d1::any_slot;
 
     d1::task** victim_pool = lock_task_pool<pool_bounded_wait>();
@@ -221,22 +231,9 @@ d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_
         return nullptr;
     }
 
-    std::size_t H = head.load(std::memory_order_relaxed);
-    std::size_t T = tail.load(std::memory_order_acquire);
-    std::size_t SZ = T - H;
-
-    if ((std::intptr_t)T > (std::intptr_t)H &&
-        SZ > batch_threshold)
-    {
-        // Try stealing the batch
-        const std::size_t batch_max_size = select_batch_max_size(SZ);
-        d1::task** batch_entries = reinterpret_cast<d1::task**>(cache_aligned_allocate(sizeof(d1::task*) * batch_max_size));
-        
-        // d1::task* batch_entries[batch_threshold];
-        std::size_t batch_size = 0;
-
-        const std::size_t old_head = head.fetch_add(batch_max_size);
-        const std::size_t requested_end = old_head + batch_max_size;
+    if (try_steal_batch) {
+        const std::size_t old_head = head.fetch_add(batch_threshold);
+        const std::size_t requested_end = old_head + batch_threshold;
         const std::size_t observed_tail = tail.load(std::memory_order_acquire);
 
         std::size_t end = requested_end;
@@ -253,38 +250,18 @@ d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_
             head.store(end, std::memory_order_relaxed);
         }
 
+        d1::task* result = nullptr;
+        std::size_t transfer_count = 0;
+
         // Proxies and tasks with incompatible isolation move intact
         for (std::size_t i = old_head; i < end; ++i) {
             d1::task* entry = victim_pool[i];
             __TBB_ASSERT(!is_poisoned(entry), nullptr);
 
-            if (entry) {
-                batch_entries[batch_size++] = entry;
-            }
-            poison_pointer(victim_pool[i]);
-        }
-
-        unlock_task_pool(victim_pool);
-
-        // Select the entry to return
-        d1::task* result = nullptr;
-
-        if (batch_size == 0) {
-            return nullptr;
-        }
-
-        // TODO: what if allocation in prepare_task_pool throws?
-        const std::size_t stealer_tail = stealer_slot.prepare_task_pool(batch_size);
-
-        // Claimed-empty proxies are freed rather than transferred, so the count is tracked explicitly.
-        std::size_t transfer_count = 0;
-
-        for (std::size_t i = 0; i < batch_size; ++i) {
-            d1::task* entry = batch_entries[i];
+            if (!entry) continue;
 
             if (!result &&
-                (isolation == no_isolation ||
-                 isolation == task_accessor::isolation(*entry)))
+                (isolation == no_isolation || isolation == task_accessor::isolation(*entry)))
             {
                 if (!task_accessor::is_proxy_task(*entry)) {
                     result = entry;
@@ -297,7 +274,6 @@ d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_
                     !tp.outbox->recipient_is_idle() ||
                     a.mailbox(slot_index).recipient_is_idle())
                 {
-                    // Read before extraction: after a successful extract the mailbox side may free the proxy.
                     const d1::slot_id proxy_slot = tp.slot;
                     result = tp.extract_task<task_proxy::pool_bit>();
                     if (result) {
@@ -310,9 +286,11 @@ d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_
             }
 
             __TBB_ASSERT(is_poisoned(stealer_slot.task_pool_ptr[stealer_tail + transfer_count]), nullptr);
-
             stealer_slot.task_pool_ptr[stealer_tail + transfer_count++] = entry;
+            poison_pointer(victim_pool[i]);
         }
+
+        unlock_task_pool(victim_pool);
 
         if (transfer_count != 0) {
             stealer_slot.commit_spawned_tasks(stealer_tail + transfer_count);
@@ -321,11 +299,8 @@ d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_
                 stealer_slot.publish_task_pool();
             }
 
-            a.advertise_new_work<arena::work_spawned>();
+            a.advertise_new_work<arena::work_spawned>(); // TODO: is it needed?
         }
-
-        cache_aligned_deallocate(batch_entries);
-
         return result;
     }
 
