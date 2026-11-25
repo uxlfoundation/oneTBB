@@ -104,8 +104,10 @@ public:
     template<typename U>
     memory_pool_allocator(const memory_pool_allocator<U,P>& src) noexcept : my_pool(src.my_pool) {}
 
+#if TBB_ALLOCATOR_TRAITS_BROKEN
     pointer address(reference x) const { return &x; }
     const_pointer address(const_reference x) const { return &x; }
+#endif
 
     //! Allocate space for n objects.
     pointer allocate( size_type n, const void* /*hint*/ = nullptr) {
