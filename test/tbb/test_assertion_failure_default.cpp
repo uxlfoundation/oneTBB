@@ -14,12 +14,21 @@
     limitations under the License.
 */
 
-#if defined(_WIN32)
+#if defined(_WIN32) && defined(_MT) && !defined(_DLL) && !defined(__TBBMALLOC_BUILD)
+// skip in this configuration, because can't control error dialogs in runtime used by the dll.
+#define TBB_TEST_SKIP_DEFAULT_ASSERTION 1
+#endif
+
+#if defined(_WIN32) && !defined(TBB_TEST_SKIP_DEFAULT_ASSERTION)
 #define DOCTEST_CONFIG_IMPLEMENT
 #endif
 #include "common/test.h"
 
+#if defined(__TBBMALLOC_BUILD)
+#include "../../src/tbb/assert_impl.h"
+#else
 #include "tbb/global_control.h"
+#endif
 
 #include <csignal>
 #include <cstdlib>
@@ -42,11 +51,17 @@
 //! \file test_assertion_failure_default.cpp
 //! \brief Test for the [internal] functionality
 
-const char* const description = "default assertion test description";
+const char* const test_description = "default assertion test description";
 
 void trigger_assertion(bool with_description) {
+#if defined(__TBBMALLOC_BUILD)
+    // this function is not exported, test it in whitebox mode
+    rml::internal::assertion_failure("test_location", 42, "test_expression",
+                                     with_description ? test_description : nullptr);
+#else
     tbb::get_assertion_handler()("test_location", 42, "test_expression",
-                                 with_description ? description : nullptr);
+                                 with_description ? test_description : nullptr);
+#endif
 }
 
 #if defined(_WIN32)
@@ -183,14 +198,13 @@ bool has_line(const std::string& diagnostic, const std::string& line) {
 
 constexpr char test_name[] = "Default assertion handler reports the failure and aborts";
 
-#if defined(_WIN32) && defined(_MT) && !defined(_DLL)
+#if defined(TBB_TEST_SKIP_DEFAULT_ASSERTION)
 
-//! Test for the default assertion handler: skip in this configuration, because can't control error
-//! dialogs in runtime used by the dll.
-//! \brief \ref interface \ref requirement
+//! Test for the default assertion handler: skip in this configuration.
+//! \brief \ref error_guessing
 TEST_CASE(test_name * doctest::skip()) {}
 
-#else // defined(_WIN32) && defined(_MT) && !defined(_DLL)
+#else
 
 //! Test for the default assertion handler behavior. Creates a child process to trigger the
 //! assertion and captures its output.
@@ -204,7 +218,7 @@ TEST_CASE(test_name) {
     INFO("Child stderr: " << diagnostic);
     CHECK(has_line(diagnostic, "Assertion test_expression failed (located in the test_location function, line in file: 42)"));
     if (with_description) {
-        CHECK(has_line(diagnostic, std::string("Detailed description: ") + description));
+        CHECK(has_line(diagnostic, std::string("Detailed description: ") + test_description));
     } else {
         CHECK(diagnostic.find("Detailed description:") == std::string::npos);
     }
@@ -233,4 +247,4 @@ int main(int argc, char** argv) {
 
 #endif // defined(_WIN32)
 
-#endif // defined(_WIN32) && defined(_MT) && !defined(_DLL)
+#endif // defined(TBB_TEST_SKIP_DEFAULT_ASSERTION)

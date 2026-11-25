@@ -122,7 +122,7 @@ function(tbb_add_test)
 
     # Process-isolated scenarios may intentionally exit without normal resource cleanup, so skip them.
     if (COMMAND _tbb_run_memcheck AND NOT _tbb_test_TEST_CASES)
-        _tbb_run_memcheck(${_tbb_test_NAME} ${_tbb_test_SUBDIR})
+        _tbb_run_memcheck(${_tbb_test_TARGET_NAME} ${_tbb_test_SUBDIR})
     endif()
 endfunction()
 
@@ -813,6 +813,13 @@ if (TARGET TBB::tbb)
 endif()
 
 if (TARGET TBB::tbbmalloc)
+    if (NOT TBB_EMSCRIPTEN AND NOT WINDOWS_STORE AND NOT TBB_WINDOWS_DRIVER)
+        tbb_add_test(SUBDIR tbb NAME test_assertion_failure_default SUFFIX tbbmalloc)
+        # the test has no dependencies on TBB::tbbmalloc, have to add include directories manually
+        target_include_directories(test_assertion_failure_default_tbbmalloc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+        target_compile_definitions(test_assertion_failure_default_tbbmalloc PRIVATE __TBBMALLOC_BUILD)
+    endif()
+
     # TBB allocator tests
     if (NOT "${CMAKE_SYSTEM_PROCESSOR}" MATCHES "mips")
         if (NOT TBB_EMSCRIPTEN)
