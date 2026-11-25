@@ -443,6 +443,7 @@ const char* known_bytecodes[] = {
     "4883EC284885C975",       // release _msize()
     "4885C974375348",         // release free() 8.0.50727.42, 10.0
     "C7442410000000008B",     // release free() ucrtbase.dll 10.0.14393.33
+    "4885C9740D4883E1F848",   // release _aligned_free() ucrtbase.dll 10.0.28000.3365
     "48895C24085748",         // release _aligned_msize() ucrtbase.dll 10.0.14393.33
     "48894C24084883EC28BA",   // debug prologue
     "4C894424184889542410",   // debug _aligned_msize() 10.0
