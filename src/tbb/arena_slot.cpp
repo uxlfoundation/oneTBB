@@ -257,9 +257,9 @@ d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_
         for (std::size_t i = old_head; i < end; ++i) {
             d1::task* entry = victim_pool[i];
             __TBB_ASSERT(!is_poisoned(entry), nullptr);
-            poison_pointer(victim_pool[i]);
-
+            
             if (!entry) continue;
+            poison_pointer(victim_pool[i]);
 
             if (!result &&
                 (isolation == no_isolation || isolation == task_accessor::isolation(*entry)))
