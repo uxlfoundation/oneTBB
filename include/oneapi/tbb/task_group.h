@@ -592,9 +592,15 @@ public:
 #endif
             // Always attempt to do proper cleanup to avoid inevitable memory corruption
             // in case of missing wait (for the sake of better testability & debuggability)
+
             if (!context().is_group_execution_cancelled())
                 cancel();
+            // wait() may take a task from the queue or wait for a task, whose execution can throw
+            // or invoke __TBB_ASSERT_RELEASE, while the assertion handler may also throw. If
+            // another exception is already being handled, this results in std::terminate being
+            // called; otherwise, the exception propagates.
             d1::wait(m_wait_vertex.get_context(), context());
+
             if (!stack_unwinding_in_progress)
                 throw_exception(exception_id::missing_wait);
         }
