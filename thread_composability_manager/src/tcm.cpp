@@ -85,11 +85,11 @@ public:
         const int r = create(dtor);
         __TCM_ASSERT_EX(r == 0, "Unable to create thread local key.");
     }
-    void refer() { ++m_refcount; }
+    void refer() { m_refcount.fetch_add(1, std::memory_order_relaxed); }
     void unrefer() {
         __TCM_ASSERT(m_refcount.load(std::memory_order_relaxed) > 0,
                      "TLS key has been destroyed already.");
-        if (!--m_refcount)
+        if (1 == m_refcount.fetch_sub(1, std::memory_order_relaxed))
             delete this;
     }
 private:
