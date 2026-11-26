@@ -169,7 +169,7 @@ std::string run_assertion(bool with_description) {
 
     std::string diagnostic;
     char buffer[256];
-    std::ssize count;
+    ssize_t count;
     do {
         count = read(pipe_ends[0], buffer, sizeof(buffer));
         if (count > 0) {
