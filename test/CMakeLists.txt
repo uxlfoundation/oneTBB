@@ -122,6 +122,7 @@ function(tbb_add_test)
 
     # Process-isolated scenarios may intentionally exit without normal resource cleanup, so skip them.
     if (COMMAND _tbb_run_memcheck AND NOT _tbb_test_TEST_CASES)
+        # use _tbb_test_TARGET_NAME, because it represents the actual executable name, not just the test case name
         _tbb_run_memcheck(${_tbb_test_TARGET_NAME} ${_tbb_test_SUBDIR})
     endif()
 endfunction()

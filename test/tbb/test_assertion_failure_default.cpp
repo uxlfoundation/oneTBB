@@ -15,7 +15,7 @@
 */
 
 #if defined(_WIN32) && defined(_MT) && !defined(_DLL) && !defined(__TBBMALLOC_BUILD)
-// skip this configuration, because can't control error dialogs in runtime used by the dll
+// skip this configuration, because can't control a run-time statically linked to the dll
 #define TBB_TEST_SKIP 1
 #else
 #define TBB_TEST_SKIP 0
