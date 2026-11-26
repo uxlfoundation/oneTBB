@@ -107,25 +107,25 @@ class tls_key_keeper_t {
 public:
     ~tls_key_keeper_t() {
         if (has_tls()) {
-            tls_ptr->unrefer();
-            tls_ptr = nullptr;
+            tls_ptr.load(std::memory_order_relaxed)->unrefer();
+            tls_ptr.store(nullptr, std::memory_order_relaxed);
         }
     }
     tcm_tls_t& refer_tls() {
-        if (!tls_ptr)
-            tls_ptr = new tcm_tls_t(&deallocate_thread_data);
+        if (!has_tls())
+            tls_ptr.store(new tcm_tls_t(&deallocate_thread_data), std::memory_order_release);
 
         __TCM_ASSERT(has_tls(), "Invalid pointer to TLS");
-        tls_ptr->refer();
+        tls_ptr.load(std::memory_order_relaxed)->refer();
         return tls();
     }
     tcm_tls_t& tls() const {
         __TCM_ASSERT(has_tls(), "Invalid pointer to TLS");
-        return *tls_ptr;
+        return *tls_ptr.load(std::memory_order_acquire);
     }
-    bool has_tls() const { return bool(tls_ptr); }
+    bool has_tls() const { return bool(tls_ptr.load(std::memory_order_relaxed)); }
 private:
-    tcm_tls_t* tls_ptr{nullptr};
+    std::atomic<tcm_tls_t*> tls_ptr{nullptr};
 };
 
 } // namespace internal
