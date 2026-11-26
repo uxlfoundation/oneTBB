@@ -743,7 +743,7 @@ const std::shared_ptr<thread_data_t>& thread_data_ptr(tcm_tls_t& tls) {
         auto unique_shared = std::make_unique<std::shared_ptr<thread_data_t>>(std::move(shared_td));
         td_sp = unique_shared.get();
         const bool r = tls.set(td_sp);
-        __TCM_ASSERT(r, "Setting TLS value failed.");
+        __TCM_ASSERT_EX(r, "Setting TLS value failed.");
         unique_shared.release();
     }
     return *td_sp;
