@@ -71,15 +71,15 @@ class tls_t {
     }
     int  destroy()      { TlsFree(m_key); m_key=0; return 0; }
 public:
-    void set( T value ) { TlsSetValue(m_key, (LPVOID)value); }
+    bool set( T value ) { return TlsSetValue(m_key, (LPVOID)value) != 0; }
     T    get()          { return (T)TlsGetValue(m_key); }
 #else /* _WIN32 || _WIN64 */
     using tls_key_t = pthread_key_t;
     int  create( tls_dtor_func dtor = nullptr )  { return pthread_key_create(&m_key, dtor);  }
     int  destroy()                               { return pthread_key_delete(m_key);         }
 public:
-    void set( T value )                          { pthread_setspecific(m_key, (void*)value); }
-    T    get()                                   { return (T)pthread_getspecific(m_key);     }
+    bool set( T value ) { return pthread_setspecific(m_key, (void*)value) == 0; }
+    T    get()          { return (T)pthread_getspecific(m_key);                 }
 #endif /* _WIN32 || _WIN64 */
     tls_t(tls_dtor_func dtor = nullptr) {
         const int r = create(dtor);
@@ -106,8 +106,10 @@ using tcm_tls_t = tls_t<std::shared_ptr<thread_data_t>*>;
 class tls_key_keeper_t {
 public:
     ~tls_key_keeper_t() {
-        if (has_tls())
+        if (has_tls()) {
             tls_ptr->unrefer();
+            tls_ptr = nullptr;
+        }
     }
     tcm_tls_t& refer_tls() {
         if (!tls_ptr)
@@ -740,7 +742,8 @@ const std::shared_ptr<thread_data_t>& thread_data_ptr(tcm_tls_t& tls) {
         auto shared_td = std::make_shared<thread_data_t>();
         auto unique_shared = std::make_unique<std::shared_ptr<thread_data_t>>(std::move(shared_td));
         td_sp = unique_shared.get();
-        tls.set(td_sp);
+        const bool r = tls.set(td_sp);
+        __TCM_ASSERT(r, "Setting TLS value failed.");
         unique_shared.release();
     }
     return *td_sp;
@@ -2934,8 +2937,10 @@ extern "C" bool WINAPI DllMain( HANDLE /*hinstDLL*/, DWORD reason, LPVOID /*lpvR
             // Since THREAD_DETACH is not called for the main thread, deallocate its local data here
             // as well
             internal::tls_key_keeper_t& tkk = theTCM::tls_key_keeper();
-            if (tkk.has_tls())
+            if (tkk.has_tls()) {
                 deallocate_thread_data(tkk.tls().get());
+                tkk.tls().set(nullptr);
+            }
             break;
     }
     return true;
