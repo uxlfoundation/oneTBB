@@ -736,8 +736,12 @@ struct ThreadComposabilityManagerData {
 const std::shared_ptr<thread_data_t>& thread_data_ptr(tcm_tls_t& tls) {
     std::shared_ptr<thread_data_t>* td_sp = tls.get();
     if (!td_sp) {
-        td_sp = new std::shared_ptr<thread_data_t>(new thread_data_t);
+        // Create managed objects to avoid leaks in case of unsuccessful allocation on each step.
+        auto shared_td = std::make_shared<thread_data_t>();
+        auto unique_shared = std::make_unique<std::shared_ptr<thread_data_t>>(std::move(shared_td));
+        td_sp = unique_shared.get();
         tls.set(td_sp);
+        unique_shared.release();
     }
     return *td_sp;
 }
