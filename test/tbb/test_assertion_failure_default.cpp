@@ -15,13 +15,17 @@
 */
 
 #if defined(_WIN32) && defined(_MT) && !defined(_DLL) && !defined(__TBBMALLOC_BUILD)
-// skip in this configuration, because can't control error dialogs in runtime used by the dll.
-#define TBB_TEST_SKIP_DEFAULT_ASSERTION 1
+// skip this configuration, because can't control error dialogs in runtime used by the dll
+#define TBB_TEST_SKIP 1
+#else
+#define TBB_TEST_SKIP 0
 #endif
 
-#if defined(_WIN32) && !defined(TBB_TEST_SKIP_DEFAULT_ASSERTION)
+#if defined(_WIN32) && !TBB_TEST_SKIP
 #define DOCTEST_CONFIG_IMPLEMENT
+#define TBB_TEST_DEFINE_MAIN 1
 #endif
+
 #include "common/test.h"
 
 #if defined(__TBBMALLOC_BUILD)
@@ -41,12 +45,12 @@
 #if defined(_MSC_VER) && defined(_DEBUG)
 #include <crtdbg.h>
 #endif
-#else
+#else // defined(_WIN32)
 #include <cerrno>
 #include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#endif
+#endif // defined(_WIN32)
 
 //! \file test_assertion_failure_default.cpp
 //! \brief Test for the [internal] functionality
@@ -107,6 +111,7 @@ std::string run_assertion(bool with_description) {
     unique_handle null_stream(null_device);
     STARTUPINFOW startup{};
     startup.cb = sizeof(startup);
+    // we want to redirect the child's stderr to the pipe
     startup.dwFlags = STARTF_USESTDHANDLES;
     startup.hStdInput = null_stream.get();
     startup.hStdOutput = null_stream.get();
@@ -130,7 +135,7 @@ std::string run_assertion(bool with_description) {
                     "Could not wait for the assertion child");
     DWORD status = 0;
     REQUIRE_MESSAGE(GetExitCodeProcess(child.get(), &status), "Could not read the child exit status");
-    CHECK_MESSAGE(status != 0, "The assertion child did not terminate abnormally (expected non-zero exit status)");
+    REQUIRE_MESSAGE(status != 0, "The assertion child did not terminate abnormally (expected non-zero exit status)");
     return diagnostic;
 }
 
@@ -187,32 +192,23 @@ std::string run_assertion(bool with_description) {
 
 #endif
 
-bool has_line(const std::string& diagnostic, const std::string& line) {
-    for (std::size_t pos = diagnostic.find(line); pos != std::string::npos; pos = diagnostic.find(line, pos + 1)) {
-        const std::size_t end = pos + line.size();
-        if ((pos == 0 || diagnostic[pos - 1] == '\n') &&
-            (diagnostic.compare(end, 1, "\n") == 0 || diagnostic.compare(end, 2, "\r\n") == 0 ||
-             end == diagnostic.size())) {
+bool has_line(const std::string& haystack, const std::string& needle) {
+    for (std::size_t pos = haystack.find(needle); pos != std::string::npos; pos = haystack.find(needle, pos + 1)) {
+        const std::size_t end = pos + needle.size();
+        // we want needle to be a complete line, not part of another line
+        if ((pos == 0 || haystack[pos - 1] == '\n') &&
+            (haystack.compare(end, 1, "\n") == 0 || haystack.compare(end, 2, "\r\n") == 0 ||
+             end == haystack.size())) {
             return true;
         }
     }
     return false;
 }
 
-constexpr char test_name[] = "Default assertion handler reports the failure and aborts";
-
-#if defined(TBB_TEST_SKIP_DEFAULT_ASSERTION)
-
-//! Test for the default assertion handler: skip in this configuration.
-//! \brief \ref error_guessing
-TEST_CASE(test_name * doctest::skip()) {}
-
-#else
-
 //! Test for the default assertion handler behavior. Creates a child process to trigger the
 //! assertion and captures its output.
 //! \brief \ref error_guessing
-TEST_CASE(test_name) {
+TEST_CASE("Default assertion handler reports the failure and aborts" * doctest::skip(TBB_TEST_SKIP)) {
     bool with_description = false;
     SUBCASE("with description") { with_description = true; }
     SUBCASE("without description") {}
@@ -227,27 +223,23 @@ TEST_CASE(test_name) {
     }
 }
 
-#if defined(_WIN32)
+#if TBB_TEST_DEFINE_MAIN
 
 int main(int argc, char** argv) {
-    if (argc == 2) {
+    if (argc == 2 &&
+        (strcmp(argv[1], child_with_description) == 0 || strcmp(argv[1], child_without_description) == 0)) {
         // child process: suppress error dialogs, because we want to test assertion_failure_default
-        const std::string argument = argv[1];
-        if (argument == child_with_description || argument == child_without_description) {
-            SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+        SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
 #if defined(_MSC_VER)
-            _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+        _set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
 #if defined(_DEBUG)
-            _CrtSetReportMode(_CRT_ASSERT, 0);
+        _CrtSetReportMode(_CRT_ASSERT, 0);
 #endif
 #endif
-            trigger_assertion(argument == child_with_description);
-            return EXIT_SUCCESS;
-        }
+        trigger_assertion(strcmp(argv[1], child_with_description) == 0);
+        return EXIT_SUCCESS;
     }
     return doctest::Context(argc, argv).run();
 }
 
-#endif // defined(_WIN32)
-
-#endif // defined(TBB_TEST_SKIP_DEFAULT_ASSERTION)
+#endif // TBB_TEST_DEFINE_MAIN
