@@ -5,19 +5,19 @@
    SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 */
 
+#include "detail/_environment.h"
 #include "detail/_tcm_assert.h"
 #include "detail/hwloc_utils.h"
-#include "detail/_environment.h"
 #include "tcm.h"
 #include "tcm/types.h"
 #include "tcm_permit_rep.h"
-#include <memory>
-
-#if __linux__
-#include "linux/cgroup_info.h"
-#endif
 
 #include "tracing/_tracer.h"
+
+#if __linux__
+#include <pthread.h>
+#include "linux/cgroup_info.h"
+#endif
 
 // MSVC Warning: unreferenced formal parameter
 __TCM_SUPPRESS_WARNING_WITH_PUSH(4100)
@@ -29,16 +29,17 @@ __TCM_SUPPRESS_WARNING_POP
 #include <cstdlib>
 #include <deque>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <numeric>
+#include <queue>
+#include <set>
+#include <stack>
 #include <string>
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
-#include <set>
 #include <vector>
-#include <queue>
-#include <stack>
 
 #if __TCM_ENABLE_TRACER
 #include <iostream>
