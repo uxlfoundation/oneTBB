@@ -2929,7 +2929,7 @@ protected:
 #if _WIN32 || _WIN64
 
 // Windows "DllMain" that handles startup and shutdown of a dynamic library.
-extern "C" bool WINAPI DllMain( HANDLE /*hinstDLL*/, DWORD reason, LPVOID /*lpvReserved*/ ) {
+extern "C" BOOL WINAPI DllMain( HINSTANCE /*hinstDLL*/, DWORD reason, LPVOID /*lpvReserved*/ ) {
     switch( reason ) {
         case DLL_THREAD_DETACH:
             [[fallthrough]];
@@ -2943,7 +2943,7 @@ extern "C" bool WINAPI DllMain( HANDLE /*hinstDLL*/, DWORD reason, LPVOID /*lpvR
             }
             break;
     }
-    return true;
+    return TRUE;
 }
 #endif /* _WIN32 || _WIN64 */
 
