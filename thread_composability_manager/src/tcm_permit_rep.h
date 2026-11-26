@@ -21,8 +21,6 @@
 namespace tcm {
 namespace internal {
 
-template <typename T> class tls_t;
-
 struct thread_data_t {
   std::mutex mutex{};
   std::stack<std::size_t> permits{};      // Permits with which a thread is registered.
