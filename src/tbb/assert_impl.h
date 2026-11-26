@@ -50,6 +50,21 @@ namespace r1 {
 // std::call_once here.
 static std::atomic<tbb::detail::do_once_state> assertion_state;
 
+#if _MSC_VER && _DEBUG
+#if __TBB_BUILD
+static constexpr const char* dll_name = "tbb" __TBB_STRING(__TBB_BINARY_VERSION) "_debug.dll";
+#elif __TBBMALLOC_BUILD
+static constexpr const char* dll_name = "tbbmalloc_debug.dll";
+#elif __TBBMALLOCPROXY_BUILD
+static constexpr const char* dll_name = "tbbmalloc_proxy_debug.dll";
+#elif __TBBBIND_BUILD
+// exact name of dll is not yet known
+static constexpr const char* dll_name = "tbbbind*_debug.dll";
+#else // dummy value for whitebox tests
+static constexpr const char* dll_name = "dummy.dll";
+#endif
+#endif
+
 // TODO: consider extension for formatted error description string
 /* [[noreturn]] */ static void assertion_failure_default(const char* location, int line,
                                                          const char* expression, const char* comment) {
@@ -66,8 +81,9 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
             std::fprintf(stderr, "Detailed description: %s\n", comment);
         }
 #if _MSC_VER && _DEBUG
-        if (1 == _CrtDbgReport(_CRT_ASSERT, location, line, "tbb_debug.dll", "%s\r\n%s",
-                               expression, comment?comment:"")) {
+        if (1 == _CrtDbgReport(_CRT_ASSERT, /*filename=*/nullptr, line, dll_name,
+                               "\r\n%s\r\n%s\r\nfunction %s",
+                               expression, comment?comment:"", location)) {
             _CrtDbgBreak();
         } else
 #endif
@@ -93,8 +109,8 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
     atomic_do_once([&](){
         std::fprintf(stderr, "%s\n", comment);
 #if _MSC_VER && _DEBUG
-        if (1 == _CrtDbgReport(_CRT_ASSERT, nullptr, 0, "tbb_debug.dll", "%s\r\n%s",
-                               "", comment?comment:"")) {
+        if (1 == _CrtDbgReport(_CRT_ASSERT, nullptr, 0, dll_name, "%s",
+                               comment?comment:"")) {
             _CrtDbgBreak();
         } else
 #endif
