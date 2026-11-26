@@ -2929,13 +2929,15 @@ protected:
 #if _WIN32 || _WIN64
 
 // Windows "DllMain" that handles startup and shutdown of a dynamic library.
-extern "C" BOOL WINAPI DllMain( HINSTANCE /*hinstDLL*/, DWORD reason, LPVOID /*lpvReserved*/ ) {
+extern "C" BOOL WINAPI DllMain( HINSTANCE /*hinstDLL*/, DWORD reason, LPVOID lpvReserved ) {
     switch( reason ) {
-        case DLL_THREAD_DETACH:
-            [[fallthrough]];
         case DLL_PROCESS_DETACH:
-            // Since THREAD_DETACH is not called for the main thread, deallocate its local data here
-            // as well
+            if (lpvReserved != NULL)
+                // Process is terminating: other threads have been killed possibly leaving heap in
+                // an inconsistent state. Let the OS reclaim the memory.
+                break;
+            [[fallthrough]];
+        case DLL_THREAD_DETACH:
             internal::tls_key_keeper_t& tkk = theTCM::tls_key_keeper();
             if (tkk.has_tls()) {
                 deallocate_thread_data(tkk.tls().get());
