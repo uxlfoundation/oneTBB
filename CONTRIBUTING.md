@@ -55,10 +55,9 @@ You can find all [open oneTBB pull requests](https://github.com/uxlfoundation/on
   * If your documentation has code samples or examples, place them into the corresponding example folder. 
 * Keep the copyright notices up to date in the file(s) you change:
   * Do not modify existing copyright notices.
-  * If a file has no `UXL Foundation Contributors` copyright notice, add one with the year of your change.
-    For example, if you commit your changes in 2026, add `Copyright (c) 2026 UXL Foundation Contributors`
-    below the existing notices.
-  * New files should contain only the `UXL Foundation Contributors` copyright notice with the year of creation.
+  * If a file you change has no `UXL Foundation Contributors` copyright notice, add
+    `Copyright (c) <current year> UXL Foundation Contributors` below the existing notices.
+  * New files should contain only the `UXL Foundation Contributors` copyright notice with the current year.
 * Submit a pull request into the master branch. You can submit changes with a pull request (preferred) or by sending an email patch.  
 
 Code changes that are known or suspected to break support for any currently supported hardware are not allowed.
