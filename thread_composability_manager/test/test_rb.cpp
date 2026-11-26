@@ -494,7 +494,7 @@ TEST("test_nested_clients_partial_consumption") {
   const int32_t maxA = available_concurrency / 2;
   const int32_t minA = available_concurrency / 4;
   const int32_t minB = available_concurrency - minA;
-  if (maxA <= minA + /*nested*/ 1) {
+  if (maxA - minA <= /*nested*/1) {
     return; // there is not enough room for permit A to shrink, therefore skipping the test
   }
 
