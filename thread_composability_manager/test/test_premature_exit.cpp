@@ -15,7 +15,6 @@
 #include "basic_test_utils.h"
 
 #include <atomic>
-#include <chrono>
 #include <cstdlib>              // for std::exit
 #include <string>
 #include <thread>
@@ -102,8 +101,10 @@ struct test_hang_guard {
 
 
 std::atomic<bool> can_leave = false;
+std::atomic<bool> can_register = false;
 
 void keep_process_alive_func() {
+    can_register.store(true, std::memory_order_relaxed);
     while (!can_leave.load(std::memory_order_relaxed))
         std::this_thread::yield();
 }
@@ -145,7 +146,9 @@ int main() {
         }
 
         // Make sure this thread registers after main thread exits
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        while (!can_register.load(std::memory_order_relaxed))
+            std::this_thread::yield();
+
         tcm_result_t r = tcm_register_thread(permit_handle);
         if (!check_success(r, std::string(api_names[2]) + " succeeds while main thread exited"))
             std::abort();
