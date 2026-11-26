@@ -136,10 +136,42 @@ d1::task* arena_slot::get_task(execution_data_ext& ed, isolation_type isolation)
 
     __TBB_ASSERT( (std::intptr_t)tail.load(std::memory_order_relaxed) >= 0, nullptr );
     __TBB_ASSERT( result || tasks_skipped || is_quiescent_local_task_pool_reset(), nullptr );
+
+    if (result && task_accessor::is_aggregation_buffer(*result)) {
+        aggregation_buffer* buffer = static_cast<aggregation_buffer*>(result);
+
+        std::size_t buffer_size = buffer->lock(); // TODO: lock is not really needed, we own the buffer
+        __TBB_ASSERT(buffer_size > 0, nullptr);
+
+        result = buffer->tasks[buffer_size - 1];
+        std::size_t dst_tail = 0;
+
+        if (buffer_size != 1) {
+            // There are tasks to re-spawn
+            dst_tail = prepare_task_pool(buffer_size - 1);
+
+            for (std::size_t i = 0; i < buffer_size - 1; ++i) {
+                __TBB_ASSERT(is_poisoned(task_pool_ptr[dst_tail + i]), nullptr);
+                task_pool_ptr[dst_tail + i] = buffer->tasks[i];
+            }
+        }
+
+        buffer->unlock(0);
+        buffer->release();
+
+        if (buffer_size != 1) {
+            commit_spawned_tasks(dst_tail + buffer_size - 1);
+            if (!is_task_pool_published()) {
+                publish_task_pool();
+            }
+            ed.task_disp->get_thread_data().my_arena->advertise_new_work<arena::work_spawned>();
+        }
+    }
+
     return result;
 }
 
-d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t slot_index) {
+d1::task* arena_slot::steal_task(arena& a, isolation_type isolation, std::size_t slot_index, arena_slot& stealer_slot) {
     d1::task** victim_pool = lock_task_pool<pool_bounded_wait>();
 
     if (victim_pool == LockedTaskPool || victim_pool == EmptyTaskPool) {
@@ -201,7 +233,79 @@ unlock:
     __TBB_cl_evict(&victim_slot.head);
     __TBB_cl_evict(&victim_slot.tail);
 #endif
+
+    if (result && task_accessor::is_aggregation_buffer(*result)) {
+        aggregation_buffer* buffer = static_cast<aggregation_buffer*>(result);
+
+        std::size_t buffer_size = buffer->lock();
+        __TBB_ASSERT(buffer_size > 0, nullptr);
+
+        result = buffer->tasks[buffer_size - 1];
+        std::size_t dst_tail = 0;
+
+        if (buffer_size != 1) {
+            // There are tasks to re-spawn
+            dst_tail = stealer_slot.prepare_task_pool(buffer_size - 1);
+
+            for (std::size_t i = 0; i < buffer_size - 1; ++i) {
+                __TBB_ASSERT(stealer_slot.is_poisoned(task_pool_ptr[dst_tail + i]), nullptr);
+                stealer_slot.task_pool_ptr[dst_tail + i] = buffer->tasks[i];
+            }
+        }
+
+        buffer->unlock(0);
+        buffer->release();
+
+        if (buffer_size != 1) {
+            stealer_slot.commit_spawned_tasks(dst_tail + buffer_size - 1);
+            if (!stealer_slot.is_task_pool_published()) {
+                stealer_slot.publish_task_pool();
+            }
+            a.advertise_new_work<arena::work_spawned>();
+        }
+    }
+
     return result;
+}
+
+void arena_slot::spawn_and_notify(arena& a, d1::task& t) {
+    std::size_t T = tail.load(std::memory_order_relaxed);
+    d1::task* task_to_spawn = &t;
+
+    if ((std::intptr_t)T - (std::intptr_t)my_cached_head >= (std::intptr_t)batch_threshold) {
+        // There is a risk of high backlog
+        my_cached_head = head.load(std::memory_order_relaxed);
+        if ((std::intptr_t)T - (std::intptr_t)my_cached_head >= (std::intptr_t)batch_threshold) {
+            // High backlog confirmed - aggregating
+            if (my_aggregation_buffer == nullptr) {
+                my_aggregation_buffer = ::new(cache_aligned_allocate(sizeof(aggregation_buffer))) aggregation_buffer(&t);
+                task_to_spawn = my_aggregation_buffer;
+            } else {
+                std::size_t aggregation_buffer_size = my_aggregation_buffer->lock();
+
+                if (aggregation_buffer_size == aggregation_buffer::buffer_max_size) {
+                    my_aggregation_buffer->unlock(aggregation_buffer_size);
+                    my_aggregation_buffer->release();
+                    my_aggregation_buffer = ::new(cache_aligned_allocate(sizeof(aggregation_buffer))) aggregation_buffer(&t);
+                    task_to_spawn = my_aggregation_buffer;
+                } else {
+                    const bool needs_publishing = (aggregation_buffer_size == 0);
+                    my_aggregation_buffer->tasks[aggregation_buffer_size++] = &t;
+
+                    if (needs_publishing) my_aggregation_buffer->reserve();
+
+                    my_aggregation_buffer->unlock(aggregation_buffer_size);
+
+                    task_to_spawn = needs_publishing ? my_aggregation_buffer : nullptr;
+                }
+            }
+        }
+    }
+
+    if (task_to_spawn) {
+        spawn(*task_to_spawn);
+        a.advertise_new_work<arena::work_spawned>();
+    }
 }
 
 } // namespace r1

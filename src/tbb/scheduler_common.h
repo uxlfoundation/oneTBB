@@ -107,6 +107,8 @@ struct execution_data_ext : d1::execution_data {
 struct task_accessor {
     static constexpr std::uint64_t proxy_task_trait = 1;
     static constexpr std::uint64_t resume_task_trait = 2;
+    static constexpr std::uint64_t aggregation_buffer_task_trait = 1 << 2;
+
     static d1::task_group_context*& context(d1::task& t) {
         task_group_context** tgc = reinterpret_cast<task_group_context**>(&t.m_reserved[0]);
         return *tgc;
@@ -120,6 +122,10 @@ struct task_accessor {
         //__TBB_ASSERT((t.m_version_and_traits & proxy_task_trait) == 0, nullptr);
         t.m_version_and_traits |= proxy_task_trait;
     }
+    static void set_aggregation_buffer_trait(d1::task& t) {
+        t.m_version_and_traits |= aggregation_buffer_task_trait;
+    }
+
     static bool is_proxy_task(d1::task& t) {
         return (t.m_version_and_traits & proxy_task_trait) != 0;
     }
@@ -129,6 +135,9 @@ struct task_accessor {
     }
     static bool is_resume_task(d1::task& t) {
         return (t.m_version_and_traits & resume_task_trait) != 0;
+    }
+    static bool is_aggregation_buffer(d1::task& t) {
+        return (t.m_version_and_traits & aggregation_buffer_task_trait) != 0;
     }
 };
 

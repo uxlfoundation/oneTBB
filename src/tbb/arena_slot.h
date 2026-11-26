@@ -42,8 +42,65 @@ class task_group_context;
 // Arena Slot
 //--------------------------------------------------------------------------------------------------------
 
+struct aggregation_buffer : d1::task {
+    static constexpr std::size_t max_size_power = 7;
+    static constexpr std::size_t buffer_max_size = 1 << max_size_power;
+    static constexpr std::size_t locked_bit = 1 << (max_size_power + 1);
+
+    std::atomic<std::size_t> size;
+    std::atomic<std::size_t> ref_count;
+    d1::task* tasks[buffer_max_size];
+
+    // TODO: comment why 2
+    aggregation_buffer(d1::task* first_task) : size(1), ref_count(2) {
+        task_accessor::set_aggregation_buffer_trait(*this);
+        tasks[0] = first_task;
+    }
+
+    std::size_t lock() {
+        atomic_backoff backoff;
+
+        std::size_t sz = size.load(std::memory_order_relaxed);
+
+        while ((sz & locked_bit) != 0 ||
+               !size.compare_exchange_strong(sz, sz | locked_bit, std::memory_order_acquire, std::memory_order_relaxed))
+        {
+            backoff.pause();
+            sz = size.load(std::memory_order_relaxed); // TODO: size is reloaded in case of cas, which is unnecessary
+        }
+        return sz;
+    }
+
+    // Executed by both the stealer and the owner
+    void unlock(std::size_t new_size) {
+        size.exchange(new_size, std::memory_order_release);
+    }
+
+    void reserve() {
+        ref_count.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    void release() {
+        if (ref_count.fetch_sub(1) == 1) {
+            cache_aligned_deallocate(this); // TODO: destructor?
+        }
+    }
+
+    d1::task* execute(d1::execution_data&) override {
+        __TBB_ASSERT(false, nullptr);
+        return nullptr;
+    }
+
+    d1::task* cancel(d1::execution_data&) override {
+        __TBB_ASSERT(false, nullptr);
+        return nullptr;
+    }
+};
+
 static d1::task** const EmptyTaskPool  = nullptr;
 static d1::task** const LockedTaskPool = reinterpret_cast<d1::task**>(~std::intptr_t(0));
+
+static constexpr std::size_t batch_threshold = 50;
 
 struct alignas(max_nfs_size) arena_slot_shared_state {
     //! The flag indicates whether the slot is used by a thread.
@@ -88,6 +145,10 @@ struct alignas(max_nfs_size) arena_slot_private_state {
     //! Task pool of the scheduler that owns this slot
     // TODO: previously was task**__TBB_atomic, but seems like not accessed on other thread
     d1::task** task_pool_ptr;
+
+    // For aggregating batch spawn
+    aggregation_buffer* my_aggregation_buffer;
+    std::size_t my_cached_head;
 };
 
 class arena_slot : private arena_slot_shared_state, private arena_slot_private_state {
@@ -151,7 +212,7 @@ public:
     d1::task* get_task(execution_data_ext&, isolation_type);
 
     //! Steal task from slot's ready pool
-    d1::task* steal_task(arena&, isolation_type, std::size_t);
+    d1::task* steal_task(arena&, isolation_type, std::size_t, arena_slot&);
 
     //! Some thread is now the owner of this slot
     void occupy() {
@@ -171,9 +232,12 @@ public:
     }
 
     //! Spawn newly created tasks
+    void spawn_and_notify(arena& a, d1::task& t);
+
     void spawn(d1::task& t) {
         std::size_t T = prepare_task_pool(1);
         __TBB_ASSERT(is_poisoned(task_pool_ptr[T]), nullptr);
+
         task_pool_ptr[T] = &t;
         commit_spawned_tasks(T + 1);
         if (!is_task_pool_published()) {

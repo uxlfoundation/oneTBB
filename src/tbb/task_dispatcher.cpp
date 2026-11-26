@@ -23,8 +23,9 @@ namespace detail {
 namespace r1 {
 
 static inline void spawn_and_notify(d1::task& t, arena_slot* slot, arena* a) {
-    slot->spawn(t);
-    a->advertise_new_work<arena::work_spawned>();
+    // slot->spawn(t);
+    // a->advertise_new_work<arena::work_spawned>();
+    slot->spawn_and_notify(*a, t);
     // TODO: TBB_REVAMP_TODO slot->assert_task_pool_valid();
 }
 

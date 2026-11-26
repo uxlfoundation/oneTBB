@@ -543,7 +543,7 @@ inline d1::task* arena::steal_task(unsigned arena_index, FastRandom& frnd, execu
     arena_slot* victim = &my_slots[k];
     d1::task **pool = victim->task_pool.load(std::memory_order_relaxed);
     d1::task *t = nullptr;
-    if (pool == EmptyTaskPool || !(t = victim->steal_task(*this, isolation, k))) {
+    if (pool == EmptyTaskPool || !(t = victim->steal_task(*this, isolation, k, my_slots[arena_index]))) {
         return nullptr;
     }
     if (task_accessor::is_proxy_task(*t)) {
