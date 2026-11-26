@@ -244,6 +244,12 @@ TEST_CASE("Allocator concept") {
     TestAllocator<tbb::memory_pool_allocator<void>>(Comparison, tbb::memory_pool_allocator<void>(mpool));
     TestAllocator<tbb::memory_pool_allocator<int>>(Comparison, mpalloc);
     TestAllocator<tbb::memory_pool_allocator<void>>(Comparison, mpalloc);
+
+    // address
+    int object = 1;
+    const int& const_object = object;
+    REQUIRE_MESSAGE(mpalloc.address(object) == std::addressof(object), "Incorrect address() return value");
+    REQUIRE_MESSAGE(mpalloc.address(const_object) == std::addressof(const_object), "Incorrect address() return value");
 }
 
 #if TBB_USE_EXCEPTIONS
