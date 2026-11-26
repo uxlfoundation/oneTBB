@@ -52,7 +52,7 @@ static std::atomic<tbb::detail::do_once_state> assertion_state;
 
 #if _MSC_VER && _DEBUG
 #if __TBB_BUILD
-static constexpr const char* dll_name = "tbb12_debug.dll";
+static constexpr const char* dll_name = "tbb" __TBB_STRING(__TBB_BINARY_VERSION) "_debug.dll";
 #elif __TBBMALLOC_BUILD
 static constexpr const char* dll_name = "tbbmalloc_debug.dll";
 #elif __TBBMALLOCPROXY_BUILD
