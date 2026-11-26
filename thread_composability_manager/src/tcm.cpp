@@ -60,7 +60,7 @@ void deallocate_thread_data(void* td_ptr) {
 template <typename T>
 class tls_t {
 #if _WIN32 || _WIN64
-    typedef DWORD tls_key_t;
+    using tls_key_t = DWORD;
     int create( tls_dtor_func = nullptr ) {
         tls_key_t tmp = TlsAlloc();
         if( tmp==TLS_OUT_OF_INDEXES )
@@ -73,7 +73,7 @@ public:
     void set( T value ) { TlsSetValue(m_key, (LPVOID)value); }
     T    get()          { return (T)TlsGetValue(m_key); }
 #else /* _WIN32 || _WIN64 */
-    typedef pthread_key_t tls_key_t;
+    using tls_key_t = pthread_key_t;
     int  create( tls_dtor_func dtor = nullptr )  { return pthread_key_create(&m_key, dtor);  }
     int  destroy()                               { return pthread_key_delete(m_key);         }
 public:
