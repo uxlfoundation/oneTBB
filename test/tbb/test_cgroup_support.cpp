@@ -17,9 +17,11 @@
 //! \file test_cgroup_support.cpp
 //! \brief Test for [internal] functionality of respecting CPU limitations set via Linux cgroup
 
-#if __linux__
-
+#include "common/config.h" // to get __TBB_USE_CGROUPS
 #include "common/test.h"
+
+#if __TBB_USE_CGROUPS
+
 #include "common/utils_concurrency_limit.h"
 
 #include "src/tbb/assert_impl.h"
@@ -270,9 +272,8 @@ TEST_CASE("cgroup v1 path finds correct CPU limitation") {
 
 #else
 
-int main() {
-    // Skipping the test on non-Linux systems
-    return 0;
-}
+//! Test is skipped when cgroup support is disabled at compile time
+//! \brief \ref requirement
+TEST_CASE("cgroup support is tested only when __TBB_USE_CGROUPS is enabled" * doctest::skip()) {}
 
-#endif                          // __linux__
+#endif                          // __TBB_USE_CGROUPS

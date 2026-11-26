@@ -33,7 +33,9 @@
 #include <tbb/parallel_reduce.h>
 #include <tbb/parallel_for.h>
 #include <algorithm>
+#include <condition_variable>
 #include <cmath>
+#include <cstdint>
 #include <random>
 
 //! \file test_concurrent_vector.cpp
@@ -661,6 +663,43 @@ TEST_CASE("Test exception in constructors") {
         utils::suppress_unused_warning(vec3);
     }(), const std::bad_alloc);
 }
+
+//! Test grow_to_at_least when the growth does not fit into int
+//! \brief \ref regression \ref error_guessing
+TEST_CASE("grow_to_at_least with growth larger than INT_MAX") {
+    using allocator_type = StaticSharedCountingAllocator<std::allocator<char>>;
+    using vector_type = tbb::concurrent_vector<char, allocator_type>;
+
+    // The vector below has size 1, so the growth is new_size - 1
+    std::vector<std::size_t> new_sizes = {
+        std::size_t(0x80000001) // growth is INT_MAX + 1
+    };
+#if SIZE_MAX > UINT32_MAX
+    new_sizes.push_back(std::size_t(1) << 32);       // growth is 0xFFFFFFFF
+    new_sizes.push_back((std::size_t(1) << 32) + 1); // growth is 0x100000000
+#endif
+
+    // Restore the shared allocator state even if a check fails
+    struct limits_guard {
+        ~limits_guard() {
+            allocator_type::set_limits(0);
+            allocator_type::init_counters();
+        }
+    } guard;
+
+    for (std::size_t new_size : new_sizes) {
+        allocator_type::init_counters();
+        allocator_type::set_limits(0);
+        vector_type vec;
+        vec.push_back('a');
+
+        // The allocator fails before the large segments are allocated,
+        // so the growth must be reported with an exception instead of a hang
+        allocator_type::set_limits(1 << 20);
+        CHECK_THROWS_AS(vec.grow_to_at_least(new_size), const std::bad_alloc);
+        allocator_type::set_limits(0);
+    }
+}
 #endif // TBB_USE_EXCEPTIONS
 
 //! \brief \ref regression \ref error_guessing
@@ -774,3 +813,75 @@ TEST_CASE("testing resize on sequantual mode") {
     v.clear();
     CHECK(v.size() == 0);
 }
+
+#if TBB_USE_EXCEPTIONS
+
+struct gated_allocator_base {
+    static bool block_allocate;
+    static bool allocate_entered;
+    static bool release_allocate;
+    static std::mutex gate_mutex;
+    static std::condition_variable gate_cv;
+
+    static void wait_for_allocate() {
+        std::unique_lock<std::mutex> lock(gate_mutex);
+        gate_cv.wait(lock, [] { return allocate_entered; });
+    }
+
+    static void unblock_allocate() {
+        {
+            std::lock_guard<std::mutex> lock(gate_mutex);
+            release_allocate = true;
+        }
+        gate_cv.notify_all();
+    }
+};
+
+bool gated_allocator_base::block_allocate = false;
+bool gated_allocator_base::allocate_entered = false;
+bool gated_allocator_base::release_allocate = false;
+std::mutex gated_allocator_base::gate_mutex;
+std::condition_variable gated_allocator_base::gate_cv;
+
+template <typename T>
+struct gated_allocator : std::allocator<T>, gated_allocator_base {
+    using value_type = T;
+    template <typename U> struct rebind { using other = gated_allocator<U>; };
+    gated_allocator() = default;
+    template <typename U> gated_allocator(const gated_allocator<U>&) {}
+
+    T* allocate(std::size_t n) {
+        {
+            std::unique_lock<std::mutex> lock(gate_mutex);
+            if (block_allocate) {
+                allocate_entered = true;
+                gate_cv.notify_all();
+                gate_cv.wait(lock, [] { return release_allocate; });
+            }
+        }
+        return std::allocator<T>::allocate(n);
+    }
+};
+
+//! Concurrent at() throws an exception when the table is being extended.
+//! \brief \ref regression
+TEST_CASE("at while segment table is being extended") {
+    tbb::concurrent_vector<int, gated_allocator<int>> v;
+    gated_allocator_base::block_allocate = true;
+    std::thread grower([&] { v.grow_by(16); });
+    gated_allocator_base::wait_for_allocate(); // to guarantee that the internal size is 16
+    bool threw = false;
+    try {
+        // at this point, internal size is already 16, but my_segment_table has not been extended yet,
+        // because gated_allocator::allocate is blocked, so we expect the exception
+        int* result = &v.at(8);
+        FAIL("at(8) returned " << static_cast<void*>(result)
+             << ", size=" << v.size() << ", capacity=" << v.capacity());
+    } catch (const std::out_of_range&) {
+        threw = true;
+    }
+    gated_allocator_base::unblock_allocate();
+    grower.join();
+    CHECK(threw);
+}
+#endif // TBB_USE_EXCEPTIONS

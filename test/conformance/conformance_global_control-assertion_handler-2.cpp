@@ -46,18 +46,26 @@ TEST_CASE(test_name) {
         prev_assertion_handler =
             tbb::set_assertion_handler([](const char* location, int line,
                                           const char* expression, const char* comment) {
-                CHECK(!terminate_handler_called);
+                REQUIRE(!terminate_handler_called);
                 terminate_handler_called = true;
-                CHECK(location);
-                CHECK(location[0] == 0);
-                CHECK(!line);
-                CHECK(expression);
-                CHECK(expression[0] == 0);
-                CHECK(comment);
+                REQUIRE(location);
+                REQUIRE(location[0] == 0);
+                REQUIRE(!line);
+                REQUIRE(expression);
+                REQUIRE(expression[0] == 0);
+                REQUIRE(comment);
                 const char *expected_comment = "Unknown exception";
-                CHECK_MESSAGE(strcmp(comment, expected_comment) == 0, "expected \"" << std::string(expected_comment) << "\", got: "
-                              << std::string(comment));
+                REQUIRE_MESSAGE(strcmp(comment, expected_comment) == 0,
+                    "expected \"" << std::string(expected_comment) << "\", got: " << std::string(comment));
+#if defined(__clang__) && defined(_MSC_VER)
+                // On Clang with MSVC, longjmp from within noexcept leads to std::terminate call,
+                // so exit instead. Under global_control::terminate_on_exception, we have noexcept.
+                // Must use REQUIRE instead of CHECK to ensure the test fails immediately if the condition
+                // is not met.
+                _Exit(0);
+#else
                 std::longjmp(buffer, 1);
+#endif
             });
 #if _MSC_VER
 #pragma warning(push)

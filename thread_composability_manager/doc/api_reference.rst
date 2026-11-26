@@ -158,6 +158,23 @@ function.
 This API is meant to be called by every thread that is going to participate in a parallel region,
 for which the resource permit was obtained.
 
+There is an alternative :code:`tcmUnregisterThreads` function that allows to unregister all
+previously registered threads with the given permit handle by a single invocation.
+
+.. code:: cpp
+
+    tcm_result_t tcmUnregisterThreads(tcm_permit_handle_t permit_handle)
+
++-----------------------+--------+----------------------------------------------------------------+
+| Parameter             | Type   | Description                                                    |
++=======================+========+================================================================+
+| :code:`permit_handle` | In     | Descriptor of the granted resources from which registered      |
+|                       |        | threads are to be unregistered.                                |
++-----------------------+--------+----------------------------------------------------------------+
+
+This function returns :code:`TCM_RESULT_PERMIT_MISMATCH` in case at least for one of the threads its
+most recent registration was done for different permit than the one passed to the function.
+
 Idling, Activating and Deactivating a Permit
 ********************************************
 
@@ -284,20 +301,26 @@ bits in a loop and setting corresponding bits in a platform-specific mask repres
 TCM Function Result
 ===================
 
-The :code:`tcm_result_t` enum defines a set of possible values that the TCM API may return.
+The :code:`tcm_result_t` enum defines a set of possible values that the TCM API may return. The
+exact values of these enum constants are implementation-defined.
 
 .. code:: cpp
 
     typedef enum _tcm_result_t {
-      TCM_RESULT_SUCCESS,
-      TCM_RESULT_ERROR_INVALID_ARGUMENT,
-      TCM_RESULT_ERROR_UNKNOWN
+      TCM_RESULT_SUCCESS = implementation-defined,
+      TCM_RESULT_PERMIT_MISMATCH = implementation-defined,
+      TCM_RESULT_ERROR_INVALID_ARGUMENT = implementation-defined,
+      TCM_RESULT_ERROR_UNKNOWN = implementation-defined
     } tcm_result_t;
 
 +-------------------------------------------+---------------------------------------------------+
 | Value                                     | Description                                       |
 +===========================================+===================================================+
 | :code:`TCM_RESULT_SUCCESS`                | Indicates successful execution of the function.   |
++-------------------------------------------+---------------------------------------------------+
+| :code:`TCM_RESULT_PERMIT_MISMATCH`        | Indicates that the permit handle passed to the    |
+|                                           | function does not correspond to the permit handle |
+|                                           | expected to be found during function execution.   |
 +-------------------------------------------+---------------------------------------------------+
 | :code:`TCM_RESULT_ERROR_INVALID_ARGUMENT` | Indicates that one or more function arguments are |
 |                                           | invalid.                                          |

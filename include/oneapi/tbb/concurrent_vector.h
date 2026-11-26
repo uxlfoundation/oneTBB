@@ -756,7 +756,7 @@ private:
         segment_table_type table = this->my_segment_table.load(std::memory_order_acquire);
 
         size_type seg_index = this->segment_index_of(index);
-        if (base_type::number_of_segments(table) < seg_index) {
+        if (base_type::number_of_segments(table) <= seg_index) {
             tbb::detail::throw_exception(exception_id::out_of_range);
         }
 
@@ -868,8 +868,7 @@ private:
         while (old_size < new_size && !this->my_size.compare_exchange_weak(old_size, new_size))
         {}
 
-        int delta = static_cast<int>(new_size) - static_cast<int>(old_size);
-        if (delta > 0) {
+        if (old_size < new_size) {
             return internal_grow(old_size, new_size, args...);
         }
 

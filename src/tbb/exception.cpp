@@ -64,7 +64,7 @@ const char* missing_wait::what() const noexcept(true) { return "wait() was not c
     template <typename F>
     /*[[noreturn]]*/ void do_throw(F throw_func, const char* exc_name, const char* init_args) {
         if (terminate_on_exception()) {
-            char buf[256] = { 0 };
+            char buf[384] = { 0 };
             std::snprintf(buf, sizeof(buf),
                       "Terminating due to exception: %s with arguments: %s",
                       exc_name, init_args);
@@ -173,4 +173,3 @@ bool gcc_rethrow_exception_broken() { return false; }
 } // namespace r1
 } // namespace detail
 } // namespace tbb
-

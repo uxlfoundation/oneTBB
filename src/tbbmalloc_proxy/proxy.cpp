@@ -435,6 +435,11 @@ void __TBB_malloc__free_base(void *ptr)
 // full instructions plus one extra byte code. It's not required for the patterns
 // to be unique (i.e., it's OK to have same pattern for unrelated functions).
 // TODO: use hot patch prologues if exist
+// TODO: short (rel8) jumps inside a pattern are copied to the trampoline as is, without
+// correcting their target. Patterns with "test rcx,rcx; je" (4885C974..) work only because
+// the jump is taken for a null pointer, and the original function is never called with one.
+// Be extra careful when adding a pattern with a jump in the middle: if it can be taken for
+// a non-null pointer (e.g. jne instead of je), the jump has to be corrected first.
 const char* known_bytecodes[] = {
 #if _WIN64
 //  "========================================================" - 56 symbols
@@ -443,6 +448,7 @@ const char* known_bytecodes[] = {
     "4883EC284885C975",       // release _msize()
     "4885C974375348",         // release free() 8.0.50727.42, 10.0
     "C7442410000000008B",     // release free() ucrtbase.dll 10.0.14393.33
+    "4885C9740D4883E1F848",   // release _aligned_free() ucrtbase.dll 10.0.28000.3365
     "48895C24085748",         // release _aligned_msize() ucrtbase.dll 10.0.14393.33
     "48894C24084883EC28BA",   // debug prologue
     "4C894424184889542410",   // debug _aligned_msize() 10.0
