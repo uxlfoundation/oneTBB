@@ -212,51 +212,29 @@ d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_
                                   arena_slot& stealer_slot, d1::slot_id& affinity_slot)
 {
     static constexpr std::size_t batch_threshold = 50;
+    static constexpr std::size_t max_batch_size = 128;
 
     affinity_slot = d1::any_slot;
-
-    std::size_t H = head.load(std::memory_order_acquire);
-    std::size_t T = tail.load(std::memory_order_acquire);
-
-    if ((std::intptr_t)T <= (std::intptr_t)H) return nullptr;
-
-    const bool try_steal_batch = (T - H) > batch_threshold;
-    const std::size_t prepared_batch = try_steal_batch ? (T - H) / 2 : 0;
-    const std::size_t stealer_tail = try_steal_batch ? stealer_slot.prepare_task_pool(prepared_batch) : 0;
-
-    auto commit_stealer = [&](std::size_t transfer_count) {
-        if (stealer_tail + transfer_count != 0) {
-            stealer_slot.commit_spawned_tasks(stealer_tail + transfer_count);
-            if (!stealer_slot.is_task_pool_published()) {
-                stealer_slot.publish_task_pool();
-            }
-            if (transfer_count != 0) {
-                a.advertise_new_work<arena::work_spawned>(); // TODO: can it be dropped?
-            }
-        }
-    };
 
     d1::task** victim_pool = lock_task_pool<pool_bounded_wait>();
 
     if (victim_pool == LockedTaskPool || victim_pool == EmptyTaskPool) {
-        commit_stealer(0);
         return nullptr;
     }
 
-    H = head.load(std::memory_order_relaxed);
-    T = tail.load(std::memory_order_acquire);
+    std::size_t H = head.load(std::memory_order_relaxed);
+    std::size_t T = tail.load(std::memory_order_acquire);
     const std::intptr_t avail = (std::intptr_t)T - (std::intptr_t)H;
 
     if (avail <= 0) {
         unlock_task_pool(victim_pool);
-        commit_stealer(0);
         return nullptr;
     }
 
-    if (try_steal_batch && (std::size_t)avail > batch_threshold) {
-        const std::size_t batch_size = ((std::size_t)avail / 2) < prepared_batch
+    if ((std::size_t)avail > batch_threshold) {
+        const std::size_t batch_size = ((std::size_t)avail / 2) < max_batch_size
                                        ? ((std::size_t)avail / 2)
-                                       : prepared_batch;
+                                       : max_batch_size;
         const std::size_t old_head = head.fetch_add(batch_size);
         const std::size_t requested_end = old_head + batch_size;
         const std::size_t observed_tail = tail.load(std::memory_order_acquire);
@@ -274,17 +252,26 @@ d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_
             head.store(end, std::memory_order_relaxed);
         }
 
-        d1::task* result = nullptr;
-        std::size_t transfer_count = 0;
+        d1::task* buffer[max_batch_size];
+        std::size_t buffer_size = 0;
 
-        // Proxies and tasks with incompatible isolation move intact
         for (std::size_t i = old_head; i < end; ++i) {
             d1::task* entry = victim_pool[i];
             __TBB_ASSERT(!is_poisoned(entry), nullptr);
-
             poison_pointer(victim_pool[i]);
-            if (!entry) continue;
+            if (entry) {
+                buffer[buffer_size++] = entry;
+            }
+        }
 
+        unlock_task_pool(victim_pool);
+
+        const std::size_t stealer_tail = stealer_slot.prepare_task_pool(buffer_size);
+        d1::task* result = nullptr;
+        std::size_t transfer_count = 0;
+
+        for (std::size_t i = 0; i < buffer_size; ++i) {
+            d1::task* entry = buffer[i];
 
             if (!result &&
                 (isolation == no_isolation || isolation == task_accessor::isolation(*entry)))
@@ -315,12 +302,18 @@ d1::task* arena_slot::steal_batch(arena& a, isolation_type isolation, std::size_
             stealer_slot.task_pool_ptr[stealer_tail + transfer_count++] = entry;
         }
 
-        unlock_task_pool(victim_pool);
-        commit_stealer(transfer_count);
+        if (stealer_tail + transfer_count != 0) {
+            stealer_slot.commit_spawned_tasks(stealer_tail + transfer_count);
+
+            if (!stealer_slot.is_task_pool_published()) {
+                stealer_slot.publish_task_pool();
+            }
+            if (transfer_count != 0) {
+                a.advertise_new_work<arena::work_spawned>();
+            }
+        }
         return result;
     }
-
-    commit_stealer(0);
 
     // Existing logic
     d1::task* result = nullptr;
