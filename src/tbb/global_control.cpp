@@ -188,7 +188,7 @@ std::size_t global_control_active_value_unsafe(d1::global_control::parameter par
 
 //! Comparator for a set of global_control objects
 inline bool control_storage_comparator::operator()(const d1::global_control* lhs, const d1::global_control* rhs) const {
-    __TBB_ASSERT(lhs->my_param < d1::global_control::parameter_max , nullptr);
+    __TBB_ASSERT_RELEASE(lhs->my_param < d1::global_control::parameter_max , nullptr);
     return lhs->my_value < rhs->my_value || (lhs->my_value == rhs->my_value && lhs < rhs);
 }
 
