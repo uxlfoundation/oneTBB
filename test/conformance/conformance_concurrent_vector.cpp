@@ -321,6 +321,58 @@ void TestCopyAssignment() {
     REQUIRE( allocator_t::allocations == allocator_t::frees );
 }
 
+// Arena allocator that propagates on copy assignment. ArenaAllocator::deallocate checks that
+// the memory belongs to the arena of the allocator, and destroy checks the same for objects.
+template <typename T>
+struct PoccaArenaAllocator : ArenaAllocator<T> {
+    using base_type = ArenaAllocator<T>;
+    using propagate_on_container_copy_assignment = std::true_type;
+
+    template <typename U>
+    struct rebind {
+        using other = PoccaArenaAllocator<U>;
+    };
+
+    PoccaArenaAllocator( typename base_type::arena_data_type& data ) noexcept : base_type(data) {}
+
+    template <typename U>
+    PoccaArenaAllocator( const PoccaArenaAllocator<U>& other ) noexcept : base_type(other) {}
+
+    bool owns( const void* ptr ) const {
+        const char* p = static_cast<const char*>(ptr);
+        return p >= this->my_data->my_buffer && p < this->my_data->my_buffer + this->my_data->my_size;
+    }
+
+    template <typename U>
+    void destroy( U* ptr ) {
+        REQUIRE_MESSAGE(owns(ptr), "Trying to destroy an object not from arena");
+        ptr->~U();
+    }
+}; // struct PoccaArenaAllocator
+
+// The old elements and memory of the destination must be released with its old allocator
+// before the allocator of the source is propagated
+void TestCopyAssignmentPOCCAUnequalAllocators( std::size_t dst_size, std::size_t src_size ) {
+    using allocator_type = PoccaArenaAllocator<int>;
+    using vector_type = oneapi::tbb::concurrent_vector<int, allocator_type>;
+
+    // ArenaAllocator does not reuse memory, so the source arena has room for both vectors
+    const std::size_t arena_size = 4096;
+    move_support_tests::ArenaAllocatorFixture<int> src_arena(arena_size), dst_arena(arena_size);
+    allocator_type src_allocator(src_arena.arena_data), dst_allocator(dst_arena.arena_data);
+    REQUIRE_MESSAGE(src_allocator != dst_allocator, "Incorrect test setup: allocators should not be equal");
+
+    vector_type src(src_size, 1, src_allocator);
+    vector_type dst(dst_size, 2, dst_allocator);
+
+    dst = src;
+
+    REQUIRE_MESSAGE(dst.get_allocator() == src_allocator, "Allocator was not propagated on copy assignment");
+    REQUIRE(dst == src);
+    REQUIRE_MESSAGE(std::all_of(dst.begin(), dst.end(), [&]( const int& item ) { return src_allocator.owns(&item); }),
+                    "Elements should be stored in the memory of the propagated allocator");
+}
+
 template<typename Vector, typename T>
 void TestGrowToAtLeastWithSourceParameter(T const& src){
     static const std::size_t vector_size = 10;
@@ -1434,6 +1486,13 @@ TEST_CASE("testing resize and copy"){
 //! \brief \ref interface \ref requirement
 TEST_CASE("testing copy assignment"){
     TestCopyAssignment();
+}
+
+//! Test copy assignment with unequal allocators that propagate on copy assignment
+//! \brief \ref requirement
+TEST_CASE("testing copy assignment with unequal allocators and POCCA") {
+    TestCopyAssignmentPOCCAUnequalAllocators(/*dst_size = */10, /*src_size = */100);
+    TestCopyAssignmentPOCCAUnequalAllocators(/*dst_size = */100, /*src_size = */10);
 }
 
 //! Testing grow_to_at_least operations
