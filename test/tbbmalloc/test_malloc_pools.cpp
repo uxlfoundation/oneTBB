@@ -32,11 +32,6 @@
 
 #include <atomic>
 
-template<typename T>
-static inline T alignUp  (T arg, uintptr_t alignment) {
-    return T(((uintptr_t)arg+(alignment-1)) & ~(alignment-1));
-}
-
 struct PoolSpace: utils::NoCopy {
     size_t pos;
     int    regions;
