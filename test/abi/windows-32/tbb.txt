@@ -1,6 +1,7 @@
 # Exported symbols of tbb on windows-32.
 # Generated automatically, do not edit by hand.
 
+??1unsafe_wait@r1@detail@tbb@@UAE@XZ
 ?abort_bounded_queue_monitors@r1@detail@tbb@@YAXPAVconcurrent_monitor@123@@Z
 ?acquire@r1@detail@tbb@@YAXAAVqueuing_rw_mutex@d1@23@AAVscoped_lock@4523@_N@Z
 ?acquire@r1@detail@tbb@@YAXAAVrtm_mutex@d1@23@AAVscoped_lock@4523@_N@Z

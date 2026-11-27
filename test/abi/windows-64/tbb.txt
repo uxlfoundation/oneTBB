@@ -1,6 +1,7 @@
 # Exported symbols of tbb on windows-64.
 # Generated automatically, do not edit by hand.
 
+??1unsafe_wait@r1@detail@tbb@@UEAA@XZ
 ?abort_bounded_queue_monitors@r1@detail@tbb@@YAXPEAVconcurrent_monitor@123@@Z
 ?acquire@r1@detail@tbb@@YAXAEAVqueuing_rw_mutex@d1@23@AEAVscoped_lock@4523@_N@Z
 ?acquire@r1@detail@tbb@@YAXAEAVrtm_mutex@d1@23@AEAVscoped_lock@4523@_N@Z
