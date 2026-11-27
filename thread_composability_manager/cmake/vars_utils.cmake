@@ -45,5 +45,6 @@ macro(tcm_generate_vars target)
     install(PROGRAMS "${CMAKE_CURRENT_BINARY_DIR}/${tcm_vars_name}_install"
         DESTINATION env
         RENAME "${tcm_vars_name}"
+        COMPONENT runtime
     )
 endmacro()
