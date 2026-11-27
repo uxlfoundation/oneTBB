@@ -230,6 +230,13 @@ TEST("test_nested_clients_renegotiation") {
   renegotiating_permits = {};    // no renegotiation is expected
   tcm_client_id_t clidA,  clidB;
 
+  const int32_t available_concurrency = platform_tcm_concurrency();
+  if (available_concurrency == 1) {
+    return; // single thread will be accounted via nesting, so there is no room for renegotiation
+  }
+  // permit B needs at least 2 threads, since 1 thread will be compensated by nesting
+  const int32_t minB = std::max(2, available_concurrency / 2);
+
   clidA = connect_new_client(client_renegotiate);
   clidB = connect_new_client(client_renegotiate);
 
@@ -242,7 +249,7 @@ TEST("test_nested_clients_renegotiation") {
                 pB = make_void_permit(&pB_concurrency),
                 eA = make_active_permit(&eA_concurrency);
 
-  tcm_permit_request_t rA = make_request(0, platform_tcm_concurrency());
+  tcm_permit_request_t rA = make_request(1, platform_tcm_concurrency());
   tcm_result_t r = tcmRequestPermit(clidA, rA, &phA, &phA, &pA);
   check_success(r, "tcmRequestPermit A");
   check_permit(eA, pA);
@@ -256,11 +263,11 @@ TEST("test_nested_clients_renegotiation") {
   uint32_t eB_concurrency = 0;
   tcm_permit_t eB = make_active_permit(&eB_concurrency);
 
-  tcm_permit_request_t rB = make_request(platform_tcm_concurrency()/2, platform_tcm_concurrency());
+  tcm_permit_request_t rB = make_request(minB, available_concurrency);
 
   r = tcmRequestPermit(clidB, rB, &phB, &phB, &pB);
-  eA_concurrency = platform_tcm_concurrency() - platform_tcm_concurrency()/2 + /*nested*/ 1;
-  eB_concurrency = platform_tcm_concurrency()/2;
+  eA_concurrency = available_concurrency - minB + /*nested*/ 1;
+  eB_concurrency = minB;
   auto unchanged_permits = list_unchanged_permits({{phA, &pA}});
 
   check_success(r, "tcmRequestPermit B");
@@ -483,20 +490,27 @@ TEST("test_nested_clients_concurrent") {
 TEST("test_nested_clients_partial_consumption") {
   tcm_client_id_t clidA, clidB;
 
+  const int32_t available_concurrency = platform_tcm_concurrency();
+  const int32_t maxA = std::max(1, available_concurrency / 2);
+  const int32_t minA = std::max(1, available_concurrency / 4);
+  const int32_t minB = std::max(1, available_concurrency - minA);
+  if (maxA - minA <= /*nested*/1) {
+    return; // there is not enough room for permit A to shrink, therefore skipping the test
+  }
+
   clidA = connect_new_client(client_renegotiate);
   clidB = connect_new_client(client_renegotiate);
 
   tcm_permit_handle_t phA = nullptr, phB = nullptr;
 
   uint32_t pA_concurrency, pB_concurrency,
-           eA_concurrency = platform_tcm_concurrency()/2;
+           eA_concurrency = maxA;
 
   tcm_permit_t pA = make_void_permit(&pA_concurrency),
                 pB = make_void_permit(&pB_concurrency),
                 eA = make_active_permit(&eA_concurrency);
 
-  tcm_permit_request_t rA = make_request(platform_tcm_concurrency()/4,
-                                         platform_tcm_concurrency()/2);
+  tcm_permit_request_t rA = make_request(minA, maxA);
   tcm_result_t r = tcmRequestPermit(clidA, rA, &phA, &phA, &pA);
   check_success(r, "tcmRequestPermit A half threads");
   check_permit(eA, pA);
@@ -510,11 +524,10 @@ TEST("test_nested_clients_partial_consumption") {
   uint32_t eB_concurrency = 0;
   tcm_permit_t eB = make_active_permit(&eB_concurrency);
 
-  tcm_permit_request_t rB = make_request(int((float)platform_tcm_concurrency()/4*3),
-                                         platform_tcm_concurrency());
+  tcm_permit_request_t rB = make_request(minB, available_concurrency);
   r = tcmRequestPermit(clidB, rB, &phB, &phB, &pB);
 
-  eA_concurrency = platform_tcm_concurrency() - rB.min_sw_threads + /*nested*/ 1;
+  eA_concurrency = available_concurrency - minB + /*nested*/ 1;
   eB_concurrency = rB.min_sw_threads;
   auto unchanged_permits = list_unchanged_permits({{phA, &pA}});
   check_success(r, "tcmRequestPermit B all threads");
@@ -535,7 +548,7 @@ TEST("test_nested_clients_partial_consumption") {
 
   renegotiating_permits = {phA};
   check_success(tcmGetPermitData(phA, &pA), "Reading permit " + to_string(phA));
-  eA.concurrencies[0] = platform_tcm_concurrency()/2;
+  eA.concurrencies[0] = maxA;
 
   r = tcmReleasePermit(phB);
   unchanged_permits = list_unchanged_permits({{phA, &pA}});
