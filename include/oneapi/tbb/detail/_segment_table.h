@@ -119,7 +119,16 @@ public:
     }
 
     segment_table& operator=( const segment_table& other ) {
+        using pocca_type = typename segment_table_allocator_traits::propagate_on_container_copy_assignment;
+        using is_equal_type = typename segment_table_allocator_traits::is_always_equal;
+
         if (this != &other) {
+            // The allocator of other cannot release the segments created with the current one,
+            // so release them before the allocator is replaced
+            if (pocca_type::value && !is_equal_type::value &&
+                !(my_segment_table_allocator == other.my_segment_table_allocator)) {
+                clear();
+            }
             copy_assign_allocators(my_segment_table_allocator, other.my_segment_table_allocator);
             internal_transfer(other, copy_segment_body_type{*this});
         }
