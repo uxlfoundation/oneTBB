@@ -1,14 +1,13 @@
 ### Description 
-_Add a comprehensive description of proposed changes_
+<!-- Add a comprehensive description of proposed changes -->
 
 
-Fixes # - _issue number(s) if exists_
+Fixes # <!-- issue number(s) if exists -->
 
 ### Type of change
 
-_Choose one or multiple, leave empty if none of the other choices apply_
-
-_Add a respective label(s) to PR if you have permissions_
+<!-- Choose one or multiple, leave empty if none of the other choices apply -->
+<!-- Add a respective label(s) to PR if you have permissions -->
 
 - [ ] bug fix - _change that fixes an issue_
 - [ ] new feature - _change that adds functionality_
@@ -23,7 +22,7 @@ _Add a respective label(s) to PR if you have permissions_
 
 ### Documentation
 
-- [ ] updated in # - _add PR number_
+- [ ] updated in # <!-- add PR number -->
 - [ ] needs to be updated
 - [ ] not needed
 
@@ -32,7 +31,14 @@ _Add a respective label(s) to PR if you have permissions_
 - [ ] No
 - [ ] Unknown
 
+### AI assistance used
+
+<!-- See https://github.com/uxlfoundation/oneTBB/blob/master/CONTRIBUTING.md#quality-guidelines -->
+
+- [ ] Yes - _briefly describe in how AI was used and what you validated yourself_
+- [ ] No
+
 ### Notify the following users
-_List users with `@` to send notifications_
+<!-- List users with `@` to send notifications -->
 
 ### Other information

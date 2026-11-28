@@ -27,6 +27,22 @@ Some imported or reused components within oneTBB use other licenses, as describe
 
 As a contributor, you'll want to be familiar with the oneTBB project and the repository layout. You should also know how to use it as explained in the [oneTBB documentation](https://uxlfoundation.github.io/oneTBB/) and how to set up your build development environment to configure, build, and test oneTBB as explained in the [oneTBB Build System Description](cmake/README.md). 
 
+## Quality Guidelines
+
+To give each contribution proper attention and to keep oneTBB maintainable in the long run, we ask contributors to follow a few quality guidelines. You are free to use whatever tools help you, including AI assistants, as long as the result meets these guidelines.
+
+These expectations apply to pull requests, issues, discussions, and review communication:
+
+* Take full responsibility for every line you submit.
+* Be ready to explain design and implementation decisions of contributions.
+* Verify correctness yourself: build the code, run the tests, and check the behavior and edge cases.
+* Keep contributions focused, well-described, and maintainable. Small, self-contained changes are easier to review.
+* Report issues based on reproducible, first-hand observations. Do not submit fabricated or unverified bug reports, benchmarks, citations, or security claims.
+* Communicate with maintainers and reviewers directly.
+* Be transparent about significant AI assistance: disclose it in the pull request description, along with the validation you performed yourself.
+
+Large and low-quality submissions, as well as submissions that the author cannot explain, maintain, or discuss directly, may be closed without a detailed review.
+
 ## Pull Requests 
 
 You can find all [open oneTBB pull requests](https://github.com/uxlfoundation/oneTBB/pulls) on GitHub. 
@@ -37,14 +53,15 @@ You can find all [open oneTBB pull requests](https://github.com/uxlfoundation/on
 * For a larger feature, provide a relevant test. 
 * Document your code. The oneTBB project uses reStructuredText for documentation.  
   * If your documentation has code samples or examples, place them into the corresponding example folder. 
-* Update the copyright year in the first line of the changing file(s). 
-  For example, if you commit your changes in 2025:
-  * the copyright year should be `2005-2025` for existing files
-  * the copyright year should be `2025` for new files
+* Keep the copyright notices up to date in the file(s) you change:
+  * Do not modify existing copyright notices.
+  * If a file you change has no `UXL Foundation Contributors` copyright notice, add
+    `Copyright (c) <current year> UXL Foundation Contributors` below the existing notices.
+  * New files should contain only the `UXL Foundation Contributors` copyright notice with the current year.
 * Submit a pull request into the master branch. You can submit changes with a pull request (preferred) or by sending an email patch.  
 
 Code changes that are known or suspected to break support for any currently supported hardware are not allowed.
 Contributors should make a reasonable effort to ensure compatibility with these platforms. If a contribution
 inadvertently affects hardware support, the community will work together to address and resolve the issue.
 
-Continuous Integration (CI) testing is enabled for the repository. Your pull request must pass all checks before it can be merged. We will review your contribution and may provide feedback to guide you if any additional fixes or modifications are necessary. When reviewed and accepted, your pull request will be merged into our GitHub repository. 
+Continuous Integration (CI) testing is enabled for the repository. Your pull request must pass all checks before it can be merged. We will review your contribution and may provide feedback to guide you if any additional fixes or modifications are necessary. When reviewed and accepted, your pull request will be merged into our GitHub repository.
