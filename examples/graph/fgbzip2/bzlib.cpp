@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2025 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -141,7 +142,12 @@ static int bz_config_ok(void) {
 
 /*---------------------------------------------------*/
 static void* default_bzalloc(void* opaque, Int32 items, Int32 size) {
-    void* v = malloc(items * size);
+    if (items < 0 || size < 0)
+        return nullptr;
+
+    size_t nitems = static_cast<size_t>(items);
+    size_t nsize = static_cast<size_t>(size);
+    void* v = malloc(nitems * nsize);
     return v;
 }
 

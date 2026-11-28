@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2021 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -23,13 +24,13 @@
 
 static void posdef_gen(double *A, int n) {
     /* Allocate memory for the matrix and its transpose */
-    double *L = (double *)calloc(sizeof(double), n * n);
+    double *L = (double *)calloc(sizeof(double), static_cast<size_t>(n) * static_cast<size_t>(n));
     assert(L);
 
-    double *LT = (double *)calloc(sizeof(double), n * n);
+    double *LT = (double *)calloc(sizeof(double), static_cast<size_t>(n) * static_cast<size_t>(n));
     assert(LT);
 
-    memset(A, 0, sizeof(double) * n * n);
+    memset(A, 0, sizeof(double) * static_cast<size_t>(n) * static_cast<size_t>(n));
 
     /* Generate a conditioned matrix and fill it with random numbers */
     for (int j = 0; j < n; ++j) {
@@ -70,7 +71,17 @@ void matrix_init(double *&A, int &n, const char *fname) {
             fprintf(stderr, "\nCouldn't read n from %s\n", fname);
             std::exit(-1);
         }
-        A = (double *)calloc(sizeof(double), n * n);
+        if (n < 0) {
+            fprintf(stderr, "\nInvalid matrix size %d\n", n);
+            std::exit(-1);
+        }
+        size_t n_sz = static_cast<size_t>(n);
+        if (n_sz != 0 && n_sz > SIZE_MAX / n_sz) {
+            fprintf(stderr, "\nMatrix size too large %d\n", n);
+            std::exit(-1);
+        }
+        size_t elem_count = n_sz * n_sz;
+        A = (double *)calloc(sizeof(double), elem_count);
         for (i = 0; i < n; ++i) {
             for (j = 0; j <= i; ++j) {
                 if (fscanf(fp, "%lf ", &A[i * n + j]) <= 0) {
@@ -85,7 +96,7 @@ void matrix_init(double *&A, int &n, const char *fname) {
         fclose(fp);
     }
     else {
-        A = (double *)calloc(sizeof(double), n * n);
+        A = (double *)calloc(sizeof(double), static_cast<size_t>(n) * static_cast<size_t>(n));
         posdef_gen(A, n);
     }
 }
