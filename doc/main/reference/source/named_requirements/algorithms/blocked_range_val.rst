@@ -43,9 +43,9 @@ A type `Value` satisfies `BlockedRangeValue` if it meets the following requireme
 
     *k*-th value after *i*.
 
-``D`` is the type of the expression ``j-i``. It can be any integral type that is convertible to ``size_t``.
-Examples that model the Value requirements are integral types, pointers, and STL random-access iterators
-whose difference can be implicitly converted to a ``size_t``.
+``D`` is the type of the expression ``j-i``. It can be any integral or integer-like type that is convertible (including explicitly) to ``size_t``.
+Examples that model the Value requirements are integral types, pointers, STL random-access iterators, and C++20 view iterators (such as ``std::views::iota``)
+whose difference can be converted to a ``size_t``.
 
 See also:
 
