@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2018-2024 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -872,7 +873,8 @@ TEST_CASE("Nested test case") {
 //! \brief \ref error_guessing
 TEST_CASE("Bypass prioritized task"){
     tbb::global_control gc( tbb::global_control::max_allowed_parallelism, 1 );
-    BypassPrioritizedTask::test();
+    tbb::task_arena arena(1);
+    arena.execute(BypassPrioritizedTask::test);
 }
 
 //! Test mixing prioritized and ordinary successors
