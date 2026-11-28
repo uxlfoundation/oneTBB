@@ -80,6 +80,9 @@ static const dynamic_link_descriptor tcm_link_table[] = {
 #if _WIN32 || _WIN64
 #define LIBRARY_EXTENSION ".dll"
 #define LIBRARY_PREFIX
+#elif __APPLE__
+#define LIBRARY_EXTENSION ".1.dylib"
+#define LIBRARY_PREFIX "lib"
 #elif __unix__
 #define LIBRARY_EXTENSION ".so.1"
 #define LIBRARY_PREFIX "lib"

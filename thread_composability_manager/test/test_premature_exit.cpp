@@ -19,7 +19,7 @@
 #include <string>
 #include <thread>
 
-#if __linux__
+#if __linux__ || __APPLE__
 #include <dlfcn.h>              // for dlopen, dlsym
 #elif _WIN32
 #include <Windows.h>
@@ -40,7 +40,7 @@ tcm_register_thread_t tcm_register_thread{nullptr};
 const char* api_names[] = {"tcmConnect()", "tcmRequestPermit()", "tcmRegisterThread()"};
 
 void load_tcm() {
-#if __linux__
+#if __linux__ || __APPLE__
     void* tcm_handler = dlopen(TCM_LIB_NAME, /*flags*/ RTLD_NOW | RTLD_LOCAL);
 #elif _WIN32
     HMODULE tcm_handler = LoadLibrary(TEXT(TCM_LIB_NAME));
@@ -48,7 +48,7 @@ void load_tcm() {
     if (NULL == tcm_handler)
         return;
 
-#if __linux__
+#if __linux__ || __APPLE__
     tcm_connect = (tcm_connect_t)dlsym(tcm_handler, "tcmConnect");
     tcm_request_permit = (tcm_request_permit_t)dlsym(tcm_handler, "tcmRequestPermit");
     tcm_register_thread = (tcm_register_thread_t)dlsym(tcm_handler, "tcmRegisterThread");
