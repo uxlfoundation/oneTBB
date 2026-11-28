@@ -38,8 +38,9 @@ public:
     }
 
 private:
-    static constexpr std::size_t hash_multiplier = (std::size_t)(
-        (sizeof(std::size_t) == sizeof(unsigned)) ? 2654435769U : 11400714819323198485ULL);
+    static constexpr std::size_t hash_multiplier =
+        (std::size_t)((sizeof(std::size_t) == sizeof(unsigned)) ? 2654435769U
+                                                                : 11400714819323198485ULL);
 
     std::hash<CharT> char_hash;
 }; // struct hash<std::basic_string>
@@ -74,6 +75,7 @@ static bool count_collisions = false;
 //! Problem size
 long N = 1000000;
 const int size_factor = 2;
+int numberOfIterations;
 
 //! A concurrent hash table that maps strings to ints.
 typedef oneapi::tbb::concurrent_hash_map<MyString, int> StringTable;
@@ -240,6 +242,7 @@ int main(int argc, char* argv[]) {
     StringTable table;
     oneapi::tbb::tick_count mainStartTime = oneapi::tbb::tick_count::now();
     srand(2);
+    double rel_error;
 
     //! Working threads count
     // The 1st argument is the function to obtain 'auto' value; the 2nd is the default value
@@ -253,6 +256,9 @@ int main(int argc, char* argv[]) {
             //"-h" option for displaying help is present implicitly
             .positional_arg(threads, "n-of-threads", utility::thread_number_range_desc)
             .positional_arg(N, "n-of-strings", "number of strings")
+            .positional_arg(numberOfIterations,
+                            "n-of-iterations",
+                            "number of iterations the example runs internally")
             .arg(verbose, "verbose", "verbose mode")
             .arg(silent, "silent", "no output except elapsed time")
             .arg(count_collisions, "count_collisions", "print the count of collisions"));
@@ -263,33 +269,56 @@ int main(int argc, char* argv[]) {
     Data = new MyString[N];
     CreateData();
 
-    if (threads.first) {
-        for (int p = threads.first; p <= threads.last; p = threads.step(p)) {
-            if (!silent)
-                printf("threads = %d  ", p);
-            oneapi::tbb::global_control c(oneapi::tbb::global_control::max_allowed_parallelism, p);
-            CountOccurrences(p);
-        }
+    if (numberOfIterations <= 0) {
+        numberOfIterations = 10;
+        std::cout << "Setting the number of iterations = 10 default"
+                  << "\n";
     }
-    else { // Number of threads wasn't set explicitly. Run serial and parallel version
-        { // serial run
-            if (!silent)
-                printf("serial run   ");
-            oneapi::tbb::global_control c(oneapi::tbb::global_control::max_allowed_parallelism, 1);
-            CountOccurrences(1);
-        }
-        { // parallel run (number of threads is selected automatically)
-            if (!silent)
-                printf("parallel run ");
-            oneapi::tbb::global_control c(oneapi::tbb::global_control::max_allowed_parallelism,
-                                          utility::get_default_num_threads());
-            CountOccurrences(0);
-        }
+    else {
+        std::cout << "Input for the number of iterations = " << numberOfIterations << "\n";
     }
+
+    utility::measurements mu(numberOfIterations);
+
+    for (int iter = 0; iter < numberOfIterations; ++iter) {
+        mu.start();
+
+        if (threads.first) {
+            for (int p = threads.first; p <= threads.last; p = threads.step(p)) {
+                if (!silent)
+                    printf("threads = %d  ", p);
+                oneapi::tbb::global_control c(oneapi::tbb::global_control::max_allowed_parallelism,
+                                              p);
+                CountOccurrences(p);
+            }
+        }
+        else { // Number of threads wasn't set explicitly. Run serial and parallel version
+            { // serial run
+                if (!silent)
+                    printf("serial run   ");
+
+                oneapi::tbb::global_control c(oneapi::tbb::global_control::max_allowed_parallelism,
+                                              1);
+                CountOccurrences(1);
+            }
+            { // parallel run (number of threads is selected automatically)
+                if (!silent)
+                    printf("parallel run ");
+
+                oneapi::tbb::global_control c(oneapi::tbb::global_control::max_allowed_parallelism,
+                                              utility::get_default_num_threads());
+                CountOccurrences(0);
+            }
+        }
+
+        mu.stop();
+    }
+    rel_error = mu.computeRelError();
 
     delete[] Data;
 
     utility::report_elapsed_time((oneapi::tbb::tick_count::now() - mainStartTime).seconds());
+    utility::report_relative_error(rel_error);
 
     return 0;
 }
