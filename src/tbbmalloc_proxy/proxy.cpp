@@ -441,7 +441,10 @@ void __TBB_malloc__free_base(void *ptr)
 // Be extra careful when adding a pattern with a jump in the middle: if it can be taken for
 // a non-null pointer (e.g. jne instead of je), the jump has to be corrected first.
 const char* known_bytecodes[] = {
-#if _WIN64
+#if defined(_M_ARM64)
+    // Not used on ARM64: only the first instruction is replaced, and it is relocated
+    // (see function_replacement.cpp), so no prologue dictionary is needed.
+#elif _WIN64
 //  "========================================================" - 56 symbols
     "E9********CCCC",         // multiple - jmp(0xE9) with address followed by empty space (0xCC - INT 3)
     "4883EC284885C974",       // release free()

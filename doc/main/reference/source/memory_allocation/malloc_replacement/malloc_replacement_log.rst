@@ -23,7 +23,8 @@ Description
 
 Dynamic replacement of memory allocation functions on Windows* OS uses in-memory binary instrumentation techniques.
 To make sure that such instrumentation is safe, oneTBB first searches for a subset of replaced functions in the Visual C++* runtime DLLs
-and checks if each one has a known bytecode pattern. If any required function is not found or its bytecode pattern is unknown, the replacement is skipped,
+and checks if each one has a known bytecode pattern. On ARM64, it instead checks that the first instruction of each function can be relocated.
+If any required function is not found or cannot be safely instrumented, the replacement is skipped,
 and the program continues to use the standard memory allocation functions.
 
 The ``TBB_malloc_replacement_log`` function allows the program to check if the dynamic memory replacement happens and to get a log of the performed checks.
