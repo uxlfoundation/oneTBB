@@ -556,7 +556,8 @@ private:
         swap(my_monitors, src.my_monitors);
     }
 
-    static constexpr std::ptrdiff_t infinite_capacity = std::ptrdiff_t(~size_type(0) / 2);
+    // PTRDIFF_MAX; size_type is signed in concurrent_bounded_queue, so do not derive this from it
+    static constexpr std::ptrdiff_t infinite_capacity = std::ptrdiff_t(~std::size_t(0) / 2);
 
     template <typename... Args>
     void internal_push( Args&&... args ) {
