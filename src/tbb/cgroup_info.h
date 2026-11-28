@@ -149,11 +149,12 @@ private:
     }
 
     static bool try_read_cgroup_v1_num_cpus_from(const char* dir, int& num_cpus) {
-        char path[PATH_MAX] = {0};
-        if (std::snprintf(path, PATH_MAX, "%s/cpu.cfs_quota_us", dir) < 0)
+        std::size_t pathlen = strlen(dir) + 30;
+        std::unique_ptr<char[]> path(new char[pathlen]);
+        if (std::snprintf(path.get(), pathlen, "%s/cpu.cfs_quota_us", dir) < 0)
             return false;       // Failed to create path
 
-        unique_file_t fd(std::fopen(path, "r"), &close_file);
+        unique_file_t fd(std::fopen(path.get(), "r"), &close_file);
         if (!fd)
             return false;
 
@@ -166,9 +167,10 @@ private:
             return true;
         }
 
-        if (std::snprintf(path, PATH_MAX, "%s/cpu.cfs_period_us", dir) < 0)
+        if (std::snprintf(path.get(), pathlen, "%s/cpu.cfs_period_us", dir) < 0)
             return false;       // Failed to create path;
-        fd.reset(std::fopen(path, "r"));
+
+        fd.reset(std::fopen(path.get(), "r"));
         if (!fd)
             return false;
 
@@ -181,11 +183,12 @@ private:
     }
 
     static bool try_read_cgroup_v2_num_cpus_from(const char* dir, int& num_cpus) {
-        char path[PATH_MAX] = {0};
-        if (std::snprintf(path, PATH_MAX, "%s/cpu.max", dir) < 0)
+        std::size_t pathlen = strlen(dir) + 30;
+        std::unique_ptr<char[]> path(new char[pathlen]);
+        if (std::snprintf(path.get(), pathlen, "%s/cpu.max", dir) < 0)
             return false;       // Failed to create path
 
-        unique_file_t fd(std::fopen(path, "r"), &close_file);
+        unique_file_t fd(std::fopen(path.get(), "r"), &close_file);
         if (!fd)
             return false;
 
@@ -222,9 +225,10 @@ private:
 
     static int parse_cgroup_entry(const char* mnt_dir, process_cgroup_data& pcd) {
         int num_cpus = error_value; // Initialize to an impossible value
-        char dir[PATH_MAX] = {0};
-        if (std::snprintf(dir, PATH_MAX, "%s/%s", mnt_dir, pcd.relative_path) >= 0) {
-            if (try_read_cgroup_num_cpus_from(dir, num_cpus, pcd.version)) {
+        std::size_t dirlen = strlen(mnt_dir) + strlen(pcd.relative_path) + 2;
+        std::unique_ptr<char[]> dir(new char[dirlen]);
+        if (std::snprintf(dir.get(), dirlen, "%s/%s", mnt_dir, pcd.relative_path) >= 0) {
+            if (try_read_cgroup_num_cpus_from(dir.get(), num_cpus, pcd.version)) {
                 return num_cpus;
             }
         }
@@ -276,16 +280,20 @@ private:
     static int try_common_cgroup_mount_path(const process_cgroup_data& pcd,
                                             const cgroup_settings& cg_cfg) {
         int num_cpus = error_value;
-        char dir[PATH_MAX] = {0};
+        std::size_t dirlen = (strlen(pcd.relative_path)
+                              + strlen(cg_cfg.sys_fs_cgroup_dir_path)
+                              + 25);
+        std::unique_ptr<char[]> dir(new char[dirlen]);
         __TBB_ASSERT(*pcd.relative_path, nullptr);
-        if (0 <= std::snprintf(dir, PATH_MAX, "%s/%s", cg_cfg.sys_fs_cgroup_dir_path,
+        if (0 <= std::snprintf(dir.get(), dirlen, "%s/%s",
+                               cg_cfg.sys_fs_cgroup_dir_path,
                                pcd.relative_path))
-            try_read_cgroup_num_cpus_from(dir, num_cpus, pcd.version);
+            try_read_cgroup_num_cpus_from(dir.get(), num_cpus, pcd.version);
 
         if (error_value == num_cpus && pcd.version == process_cgroup_data::cgroup_version::v2) {
-            if (0 <= std::snprintf(dir, PATH_MAX, "%s/%s", "/sys/fs/cgroup/unified",
+            if (0 <= std::snprintf(dir.get(), dirlen, "%s/%s", "/sys/fs/cgroup/unified",
                                    pcd.relative_path))
-                try_read_cgroup_v2_num_cpus_from(dir, num_cpus);
+                try_read_cgroup_v2_num_cpus_from(dir.get(), num_cpus);
         }
         return num_cpus;
     }
