@@ -41,6 +41,7 @@ namespace r1 {
 const char* bad_last_alloc::what() const noexcept(true) { return "bad allocation in previous or concurrent attempt"; }
 const char* user_abort::what() const noexcept(true) { return "User-initiated abort has terminated this operation"; }
 const char* missing_wait::what() const noexcept(true) { return "wait() was not called on the structured_task_group"; }
+unsafe_wait::~unsafe_wait() = default;
 
 #if TBB_USE_EXCEPTIONS
     // if throw, report to stderr which exception is being thrown and call std::terminate

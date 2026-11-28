@@ -54,6 +54,7 @@ EXPORTS
 ?what@bad_last_alloc@r1@detail@tbb@@UBEPBDXZ
 ?what@user_abort@r1@detail@tbb@@UBEPBDXZ
 ?what@missing_wait@r1@detail@tbb@@UBEPBDXZ
+??1unsafe_wait@r1@detail@tbb@@UAE@XZ
 
 ; RTM Mutex (rtm_mutex.cpp)
 ?acquire@r1@detail@tbb@@YAXAAVrtm_mutex@d1@23@AAVscoped_lock@4523@_N@Z

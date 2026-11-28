@@ -60,6 +60,9 @@ _ZTIN3tbb6detail2r110user_abortE;
 _ZTVN3tbb6detail2r110user_abortE;
 _ZTIN3tbb6detail2r111unsafe_waitE;
 _ZTVN3tbb6detail2r111unsafe_waitE;
+_ZN3tbb6detail2r111unsafe_waitD0Ev;
+_ZN3tbb6detail2r111unsafe_waitD1Ev;
+_ZN3tbb6detail2r111unsafe_waitD2Ev;
 
 /* RTM Mutex (rtm_mutex.cpp) */
 _ZN3tbb6detail2r17acquireERNS0_2d19rtm_mutexERNS3_11scoped_lockEb;

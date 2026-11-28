@@ -74,6 +74,7 @@ public:
 class TBB_EXPORT unsafe_wait : public std::runtime_error {
 public:
     unsafe_wait(const char* msg) : std::runtime_error(msg) {}
+    ~unsafe_wait() override;
 };
 #if __APPLE__ || __FreeBSD__
     #pragma GCC visibility pop
