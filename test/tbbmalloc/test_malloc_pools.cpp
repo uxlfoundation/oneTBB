@@ -1,5 +1,6 @@
 /*
     Copyright (c) 2005-2022 Intel Corporation
+    Copyright (c) 2026 UXL Foundation Contributors
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -31,11 +32,6 @@
 #include "tbb/scalable_allocator.h"
 
 #include <atomic>
-
-template<typename T>
-static inline T alignUp  (T arg, uintptr_t alignment) {
-    return T(((uintptr_t)arg+(alignment-1)) & ~(alignment-1));
-}
 
 struct PoolSpace: utils::NoCopy {
     size_t pos;
